@@ -1,6 +1,6 @@
 # Fieldbook
 
-A lightweight, opinionated Next.js enablement application organized around **Field Notes**, **Learning**, and **Knowledge**. This repository currently delivers the interactive demo; the authenticated production backend is planned, not implemented.
+A lightweight, opinionated Next.js enablement application organized around **Field Notes**, **Learning**, and **Knowledge**. The repository contains a static interactive demo at the root and a production application in `production/`. They share the UI and content models. The production application requires backend setup and end-to-end deployment verification before use.
 
 ## Run the demo
 
@@ -54,23 +54,19 @@ Use a **Static Site** component with `pnpm build` and output directory `out`. Do
 
 Build with `pnpm build` and publish `out`. Navigation uses URL fragments, so no server route rewrites are needed.
 
-## One codebase, future production mode
+## Personal production application
 
-UI components consume the shared models in `lib/types.ts`. `lib/store.ts` is the current browser persistence implementation. The planned production implementation should reuse those models and UI behind authenticated services, while keeping demo seeds/storage out of production bundles.
+Set the hosting project's root directory to `production/` and allow access to the repository's shared files outside that directory. The public demo stays at the repository root, with its own deployment. Read [the production setup guide](production/README.md) before deploying.
 
-Production work still required:
+The production application adds Google sign-in, optional learner accounts, PostgreSQL persistence through Supabase, branding/access settings, Markdown formatting and preview, private media storage with signed delivery, and OAuth-protected MCP content tools. Production content starts empty. Demo profiles and browser content are not imported automatically.
 
-- Running Next.js backend, PostgreSQL schema/migrations, and server-validated content/progress operations.
-- Configurable Google/OIDC sign-in (including compatible Okta/Entra providers); optionally email/password. Controlled enrollment and server-enforced permissions.
-- Server-side quiz grading; materialized enrollment dates, assignment history, and team reporting authorization.
-- PostgreSQL full-text search, private object storage, email delivery, backups, monitoring, audit records, and separated preview data.
-- Production deployment guides and integration tests for each supported host.
-
-A future MCP adapter should invoke the same authorized content services, not browser storage. HRIS sync, AI chat, and ordered learning paths are deferred.
+The first production scope is a public personal Fieldbook. Company groups, team administration, manager permissions, and enterprise identity providers remain demo features pending their production implementation. The production UI hides these controls.
 
 ## Verification
 
-`pnpm test` covers completion/versioning, progress isolation, nested group assignments, deadline resolution, manager scope, cycle prevention, retake history, and video URL validation. `pnpm build` checks types and produces the static artifact.
+`pnpm test` covers the shared learning rules plus production database migrations, draft/published isolation, optimistic revisions, direct table/function access restrictions, progress merging, OAuth audience binding/revocation, payload redaction, safe login redirects, and MCP tool/HTTP transport initialization. `pnpm build` builds the static demo. `pnpm build:production` builds the server application.
+
+Builds and local tests do not establish a working Google login, live storage upload, or ChatGPT/Claude connection. Those require the configured deployment and separate end-to-end verification.
 
 ## Publication status
 

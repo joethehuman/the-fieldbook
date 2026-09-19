@@ -1,2 +1,6 @@
+packages:
+  - production
+allowBuilds:
+  esbuild: true
 onlyBuiltDependencies:
   - esbuild

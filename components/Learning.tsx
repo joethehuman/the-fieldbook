@@ -66,7 +66,13 @@ export default function Learning({
   progress,
   onOpen,
   onKnowledge,
+  publicLearning = false,
+  guest = false,
+  onSignIn,
 }: {
+  publicLearning?: boolean;
+  guest?: boolean;
+  onSignIn?: () => void;
   courses: Content[];
   user: User;
   groups: Group[];
@@ -182,7 +188,44 @@ export default function Learning({
           </select>
         </label>
       </div>
-      {view === "home" && (
+      {view === "home" && publicLearning && (
+        <section className="public-learning">
+          <div>
+            <span className="eyebrow">YOUR LEARNING</span>
+            <h2>Keep your curiosity moving.</h2>
+            <p>
+              {courses.filter((c) => isComplete(c, progress)).length} courses
+              completed ·{" "}
+              {
+                courses.filter(
+                  (c) =>
+                    progress.some(
+                      (p) => p.content_id === c.id && p.version === c.version,
+                    ) && !isComplete(c, progress),
+                ).length
+              }{" "}
+              in progress
+            </p>
+            <p className="muted">
+              {guest
+                ? "Progress is saved in this browser. Sign in to keep learning across devices."
+                : "Your progress is saved to your account. Pick up wherever you left off."}
+            </p>
+            {guest && (
+              <button className="primary" onClick={onSignIn}>
+                Sign in with Google
+              </button>
+            )}
+          </div>
+          <button
+            className="text-button"
+            onClick={() => changeView("completed")}
+          >
+            View completed courses →
+          </button>
+        </section>
+      )}
+      {view === "home" && !publicLearning && (
         <section className="for-you">
           <div className="section-heading">
             <div>
@@ -197,7 +240,7 @@ export default function Learning({
               <div
                 className="progress-ring"
                 style={{
-                  background: `conic-gradient(#0069ff ${pct}%, #e4eaf5 0)`,
+                  background: `conic-gradient(var(--accent, #0069ff) ${pct}%, #e4eaf5 0)`,
                 }}
                 role="img"
                 aria-label={`${pct}% current`}

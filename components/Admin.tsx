@@ -12,6 +12,8 @@ import {
   ArrowLeft,
   Check,
 } from "lucide-react";
+import MarkdownEditor, { type UploadMedia } from "./MarkdownEditor";
+import SiteSettingsPanel from "./SiteSettingsPanel";
 import { FeedbackAdmin } from "./Feedback";
 import { TeamsAdmin, TeamProgress } from "./Teams";
 import { canParent, type Assignment } from "@/lib/types";
@@ -23,9 +25,21 @@ import {
   type Content,
   type User,
 } from "@/lib/types";
-type Props = { data: Workspace; user: User; onChange: (d: Workspace) => void };
+type Props = {
+  data: Workspace;
+  user: User;
+  onChange: (d: Workspace) => void | Promise<void>;
+  production?: boolean;
+  onUpload?: UploadMedia;
+};
 const id = () => crypto.randomUUID();
-export default function Admin({ data, user, onChange }: Props) {
+export default function Admin({
+  data,
+  user,
+  onChange,
+  production = false,
+  onUpload,
+}: Props) {
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
     [person, setPerson] = useState<User | null>(null),
@@ -60,7 +74,7 @@ export default function Admin({ data, user, onChange }: Props) {
       questions: [],
     });
   }
-  function save(c: Content) {
+  async function save(c: Content) {
     const old = data.content.find((x) => x.id === c.id);
     const updated = {
       ...c,
@@ -71,14 +85,14 @@ export default function Admin({ data, user, onChange }: Props) {
         new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    onChange({
+    await onChange({
       ...data,
       content: old
         ? data.content.map((x) => (x.id === c.id ? updated : x))
         : [...data.content, updated],
     });
     setEditing(null);
-    setNotice("Content saved in this browser.");
+    setNotice(production ? "Content saved." : "Content saved in this browser.");
   }
   function savePerson(e: React.FormEvent) {
     e.preventDefault();
@@ -122,6 +136,8 @@ export default function Admin({ data, user, onChange }: Props) {
         data={data}
         onSave={save}
         onCancel={() => setEditing(null)}
+        onUpload={onUpload}
+        production={production}
       />
     );
   return (
@@ -134,25 +150,34 @@ export default function Admin({ data, user, onChange }: Props) {
       <div className="admin-tabs">
         {[
           { id: "content", name: "Content", icon: FileText },
-          { id: "people", name: "Demo profiles", icon: Users },
+          {
+            id: "people",
+            name: production ? "People" : "Demo profiles",
+            icon: Users,
+          },
           { id: "groups", name: "Groups", icon: Layers },
           { id: "teams", name: "Teams", icon: Users },
           { id: "progress", name: "Progress", icon: BarChart3 },
           { id: "feedback", name: "Feedback", icon: FileText },
-        ].map((t) => (
-          <button
-            className={tab === t.id ? "selected" : ""}
-            key={t.id}
-            onClick={() => {
-              setTab(t.id);
-              setNotice("");
-              setQuery("");
-            }}
-          >
-            <t.icon size={17} />
-            {t.name}
-          </button>
-        ))}
+          { id: "settings", name: "Settings", icon: Layers },
+        ]
+          .filter(
+            (t) => !production || !["people", "groups", "teams"].includes(t.id),
+          )
+          .map((t) => (
+            <button
+              className={tab === t.id ? "selected" : ""}
+              key={t.id}
+              onClick={() => {
+                setTab(t.id);
+                setNotice("");
+                setQuery("");
+              }}
+            >
+              <t.icon size={17} />
+              {t.name}
+            </button>
+          ))}
       </div>
       {notice && (
         <div className="success" role="status">
@@ -166,7 +191,14 @@ export default function Admin({ data, user, onChange }: Props) {
           </button>
         </div>
       )}
-      {tab === "feedback" ? (
+      {tab === "settings" ? (
+        <SiteSettingsPanel
+          data={data}
+          onChange={onChange}
+          onUpload={onUpload}
+          production={production}
+        />
+      ) : tab === "feedback" ? (
         <FeedbackAdmin data={data} />
       ) : tab === "teams" ? (
         <TeamsAdmin data={data} onChange={onChange} />
@@ -292,7 +324,13 @@ export default function Admin({ data, user, onChange }: Props) {
                             : "Course"}
                       </td>
                       <td>
-                        <span className={"status " + c.status}>{c.status}</span>
+                        <span className={"status " + c.status}>
+                          {production && c.publishedRevision
+                            ? c.publishedRevision === c.revision
+                              ? "published"
+                              : "published · draft changes"
+                            : c.status}
+                        </span>
                       </td>
                       <td>v{c.version}</td>
                       <td>
@@ -302,6 +340,32 @@ export default function Admin({ data, user, onChange }: Props) {
                         >
                           Edit
                         </button>
+                        {production && c.publishedRevision && (
+                          <button
+                            className="text-button"
+                            onClick={async () => {
+                              if (
+                                !confirm(
+                                  "Unpublish this item? Its draft and history will be kept.",
+                                )
+                              )
+                                return;
+                              try {
+                                await onChange({
+                                  ...data,
+                                  content: data.content.filter(
+                                    (x) => x.id !== c.id,
+                                  ),
+                                });
+                                setNotice("Content unpublished.");
+                              } catch (e) {
+                                setNotice((e as Error).message);
+                              }
+                            }}
+                          >
+                            Unpublish
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -692,15 +756,19 @@ export default function Admin({ data, user, onChange }: Props) {
     </>
   );
 }
-function Editor({
+export function Editor({
   content,
   data,
   onSave,
   onCancel,
+  onUpload,
+  production = false,
 }: {
+  onUpload?: UploadMedia;
+  production?: boolean;
   content: Content;
   data: Workspace;
-  onSave: (c: Content) => void;
+  onSave: (c: Content) => void | Promise<void>;
   onCancel: () => void;
 }) {
   const [c, setC] = useState<Content>(() => ({
@@ -714,9 +782,10 @@ function Editor({
         })),
     })),
     [error, setError] = useState(""),
-    [refresh, setRefresh] = useState(false);
+    [refresh, setRefresh] = useState(false),
+    [saving, setSaving] = useState(false);
   const existing = data.content.some((x) => x.id === c.id);
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (
       c.kind === "course" &&
@@ -741,12 +810,20 @@ function Editor({
       setError("Use a supported HTTPS YouTube, Vimeo, MP4, or WebM URL.");
       return;
     }
-    onSave({
-      ...c,
-      title: c.title.trim(),
-      category: c.category.trim(),
-      version: existing && refresh ? content.version + 1 : content.version,
-    });
+    setSaving(true);
+    setError("");
+    try {
+      await onSave({
+        ...c,
+        title: c.title.trim(),
+        category: c.category.trim(),
+        version: existing && refresh ? content.version + 1 : content.version,
+      });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
   }
   const set = (key: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: value }));
@@ -768,7 +845,7 @@ function Editor({
           </span>
           <h1>{existing ? c.title : "Something worth sharing."}</h1>
         </div>
-        <button className="primary">
+        <button className="primary" disabled={saving}>
           <Save size={16} />
           Save {c.status === "published" ? "& publish" : "draft"}
         </button>
@@ -798,19 +875,12 @@ function Editor({
             />
           </label>
           {c.kind !== "course" ? (
-            <label>
-              Article content{" "}
-              <small>
-                Markdown supported: ## headings, **bold**, lists, and links.
-              </small>
-              <textarea
-                className="body-editor"
-                rows={18}
-                value={c.body}
-                onChange={(e) => set("body", e.target.value)}
-                placeholder="## Start with what matters"
-              />
-            </label>
+            <MarkdownEditor
+              label="Article content"
+              value={c.body}
+              onChange={(value) => set("body", value)}
+              onUpload={onUpload}
+            />
           ) : (
             <>
               <div className="section-heading">
@@ -876,29 +946,56 @@ function Editor({
                       }
                     />
                   </label>
-                  <label>
-                    Lesson text <small>Markdown supported</small>
-                    <textarea
-                      rows={8}
-                      value={l.body}
-                      onChange={(e) =>
-                        set(
-                          "lessons",
-                          c.lessons.map((x) =>
-                            x.id === l.id ? { ...x, body: e.target.value } : x,
-                          ),
-                        )
-                      }
-                    />
-                  </label>
+                  <MarkdownEditor
+                    label={`Lesson ${i + 1} text`}
+                    rows={8}
+                    value={l.body}
+                    onUpload={onUpload}
+                    onChange={(value) =>
+                      set(
+                        "lessons",
+                        c.lessons.map((x) =>
+                          x.id === l.id ? { ...x, body: value } : x,
+                        ),
+                      )
+                    }
+                  />
+                  {onUpload && (
+                    <label>
+                      Upload lesson video{" "}
+                      <small>MP4 or WebM, up to 50 MB.</small>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setSaving(true);
+                          try {
+                            const url = await onUpload(f);
+                            setC((prev) => ({
+                              ...prev,
+                              lessons: prev.lessons.map((x) =>
+                                x.id === l.id ? { ...x, videoUrl: url } : x,
+                              ),
+                            }));
+                          } catch (error) {
+                            setError((error as Error).message);
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
                   <label>
                     Video URL{" "}
                     <small>
                       Optional. YouTube, Vimeo, or a direct HTTPS MP4/WebM URL.
                     </small>
                     <input
-                      type="url"
-                      placeholder="https://www.youtube.com/watch?v=…"
+                      type="text"
+                      placeholder="Upload a file or paste a supported video URL"
                       value={l.videoUrl || ""}
                       onChange={(e) =>
                         set(
@@ -1021,6 +1118,13 @@ function Editor({
         </section>
         <aside className="editor-settings">
           <h3>Publishing</h3>
+          {production && (
+            <p className="muted">
+              Saving a draft keeps the current public version online. Select
+              Published to replace it. Unpublish from the content list to remove
+              public access.
+            </p>
+          )}
           <label>
             Status
             <select

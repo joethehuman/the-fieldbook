@@ -1,6 +1,9 @@
 import { seedContent } from "./seed";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 export type Workspace = {
+  settings?: import("./settings").SiteSettings;
+  revision?: number;
+  publishedContent?: Content[];
   schema: 1;
   feedback?: Feedback[];
   teams?: Team[];

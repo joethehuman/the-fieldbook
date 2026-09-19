@@ -1,6 +1,8 @@
 export function videoSource(
   raw: string,
 ): { type: "embed" | "file"; url: string } | null {
+  if (/^\/api\/media\/[a-f0-9-]{36}\.(mp4|webm)$/.test(raw))
+    return { type: "file", url: raw };
   try {
     const u = new URL(raw);
     if (u.protocol !== "https:") return null;

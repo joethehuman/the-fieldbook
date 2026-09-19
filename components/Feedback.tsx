@@ -12,14 +12,15 @@ export default function Feedback({
   content: Content;
   user: User;
   data: Workspace;
-  onChange: (d: Workspace) => void;
+  onChange: (d: Workspace) => void | Promise<void>;
 }) {
   const saved = data.feedback?.find(
     (f) => f.userId === user.id && f.contentId === content.id,
   );
+  const [error, setError] = useState("");
   const [expanded, setExpanded] = useState(false);
   const [comment, setComment] = useState(saved?.comment || "");
-  function save(rating: Entry["rating"], text = comment) {
+  async function save(rating: Entry["rating"], text = comment) {
     const next: Entry = {
       id: saved?.id || crypto.randomUUID(),
       userId: user.id,
@@ -29,19 +30,29 @@ export default function Feedback({
       comment: text.trim(),
       updatedAt: new Date().toISOString(),
     };
-    onChange({
-      ...data,
-      feedback: [
-        ...(data.feedback || []).filter(
-          (f) => !(f.userId === user.id && f.contentId === content.id),
-        ),
-        next,
-      ],
-    });
+    try {
+      await onChange({
+        ...data,
+        feedback: [
+          ...(data.feedback || []).filter(
+            (f) => !(f.userId === user.id && f.contentId === content.id),
+          ),
+          next,
+        ],
+      });
+      setError("");
+    } catch (e) {
+      setError((e as Error).message);
+    }
   }
   return (
     <section className="feedback-box" aria-label="Content feedback">
       <h3>Did you find this useful?</h3>
+      {error && (
+        <p className="error" role="alert">
+          {error}
+        </p>
+      )}
       <p>Your feedback helps us make this better.</p>
       <div className="button-group">
         {(["up", "down"] as const).map((rating) => (
