@@ -2298,3 +2298,212 @@ textarea {
 .doc-nav .nested-folder button {
   margin-top: 5px;
 }
+
+/* A single course row stays bounded as the catalog grows. */
+.main-shell,
+.main-content,
+.course-row-wrap {
+  min-width: 0;
+}
+.sidebar .nav-label {
+  margin-top: 28px;
+}
+.learning-assigned {
+  grid-template-columns: 205px minmax(0, 1fr);
+  align-items: start;
+}
+.learning-assigned .current-card {
+  height: 310px;
+}
+.course-row-wrap {
+  position: relative;
+}
+.row-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.row-controls .secondary {
+  padding: 7px;
+}
+.course-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 260px;
+  gap: 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding: 4px 2px 14px;
+}
+.course-row > .course-card {
+  scroll-snap-align: start;
+  height: 100%;
+}
+.course-row .course-art {
+  height: 125px;
+}
+.course-row .course-copy {
+  padding: 16px;
+}
+.learning-links,
+.learning-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0;
+}
+.learning-toolbar .search {
+  width: min(100%, 340px);
+}
+.learning-sort {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+.learning-sort select {
+  background: white;
+  border: 1px solid #dce3ee;
+  border-radius: 7px;
+  padding: 9px;
+  color: #26354a;
+}
+.course-row:focus-visible,
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid #0069ff;
+  outline-offset: 3px;
+}
+@media (max-width: 700px) {
+  .learning-assigned {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .learning-assigned .current-card {
+    height: auto;
+    min-height: 180px;
+  }
+  .course-row {
+    grid-auto-columns: min(260px, 80vw);
+  }
+  .learning-toolbar .search {
+    display: flex;
+  }
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+  margin: 20px 0;
+}
+.filter-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: 12px;
+  color: #526278;
+}
+.filter-bar input,
+.filter-bar select,
+.assignment-rule select,
+.assignment-rule input[type="date"],
+.assignment-rule input[type="number"],
+.knowledge-section select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #dce3ee;
+  border-radius: 7px;
+  background: white;
+  color: #26354a;
+}
+.feedback-box {
+  margin: 30px 0;
+  padding: 24px;
+  border: 1px solid #e1e7f0;
+  border-radius: 12px;
+  background: #fafcff;
+}
+.feedback-box h3 {
+  margin: 0 0 8px;
+}
+.feedback-box p {
+  color: #64748b;
+  margin: 12px 0;
+}
+.feedback-box label {
+  display: block;
+  margin: 15px 0;
+  font-size: 13px;
+}
+.feedback-box textarea {
+  display: block;
+  width: 100%;
+  border: 1px solid #dce3ee;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  font: inherit;
+}
+.feedback-comment {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.report-summary {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 20px;
+  background: #f2f7ff;
+  border-radius: 10px;
+  margin: 20px 0;
+  font-size: 14px;
+}
+.report-course {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e1e7f0;
+  font-size: 13px;
+}
+.report-course small {
+  display: block;
+  color: #64748b;
+  margin-top: 6px;
+}
+.assignment-rule {
+  border-bottom: 1px solid #e1e7f0;
+  padding: 12px 0;
+}
+.assignment-rule label {
+  margin-bottom: 10px;
+}
+.deadline {
+  display: block;
+  margin: 8px 0;
+  color: #64748b;
+}
+.deadline.overdue {
+  color: #a44322;
+}
+.lesson-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 10px;
+  margin: 20px 0;
+}
+.learning-sort {
+  white-space: nowrap;
+}
+.admin-tabs {
+  flex-wrap: wrap;
+}

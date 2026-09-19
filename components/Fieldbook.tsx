@@ -24,6 +24,10 @@ import {
   RotateCcw,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import Learning from "./Learning";
+import Feedback from "./Feedback";
+import { TeamProgress } from "./Teams";
+import { videoSource } from "@/lib/video";
 import {
   assignedCourses,
   isComplete,
@@ -40,7 +44,7 @@ import {
 } from "@/lib/store";
 import dynamic from "next/dynamic";
 const Admin = dynamic(() => import("./Admin"));
-type View = "learn" | "docs" | "briefs" | "admin";
+type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook() {
   const [data, setData] = useState<Workspace | null>(null),
     [uid, setUid] = useState<string | null>(null),
@@ -62,7 +66,7 @@ export default function Fieldbook() {
   useEffect(() => {
     const onHash = () => {
       const [v, id] = window.location.hash.slice(1).split("/");
-      if (["learn", "docs", "briefs", "admin"].includes(v)) {
+      if (["learn", "docs", "briefs", "admin", "team"].includes(v)) {
         setView(v as View);
         setSelected(id ? decodeURIComponent(id) : null);
       }
@@ -197,7 +201,7 @@ export default function Fieldbook() {
     );
   const visible = data.content.filter((c) => c.status === "published");
   const progress = data.progress[user.id] || [];
-  const assigned = assignedCourses(visible, user);
+  const assigned = assignedCourses(visible, user, data.groups);
   const completed = assigned.filter((c) => isComplete(c, progress)).length;
   const pct = assigned.length
     ? Math.round((completed / assigned.length) * 100)
@@ -220,24 +224,20 @@ export default function Fieldbook() {
         ? "Knowledge"
         : view === "briefs"
           ? "Field notes"
-          : "Workspace";
+          : view === "team"
+            ? "Team progress"
+            : "Workspace";
   return (
     <div className="app">
       <aside className={"sidebar " + (menu ? "open" : "")}>
         <Logo />
-        <div className="workspace-label">
-          <span className="workspace-icon">F</span>
-          <div>
-            Field workspace<small>Your team’s shared playbook</small>
-          </div>
-        </div>
         <span className="nav-label">YOUR WORKSPACE</span>
         <nav>
           {(
             [
+              { key: "briefs", title: "Field notes", icon: Newspaper },
               { key: "learn", title: "Learning", icon: GraduationCap },
               { key: "docs", title: "Knowledge", icon: BookOpen },
-              { key: "briefs", title: "Field notes", icon: Newspaper },
             ] as const
           ).map((n) => (
             <button
@@ -268,10 +268,6 @@ export default function Fieldbook() {
           </div>
         )}
         <div className="sidebar-bottom">
-          <div className="quiet-card">
-            <span className="tiny-dot" /> Make space for what matters.
-            <p>Stay curious. Stay current.</p>
-          </div>
           {user.role === "admin" && (
             <button
               className={"admin-nav " + (view === "admin" ? "active" : "")}
@@ -279,6 +275,13 @@ export default function Fieldbook() {
             >
               <Settings size={18} />
               Manage workspace
+            </button>
+          )}
+          {(user.role === "manager" ||
+            (data.teams || []).some((t) => t.managerId === user.id)) && (
+            <button className="admin-nav" onClick={() => navigate("team")}>
+              <GraduationCap size={18} />
+              My team’s progress
             </button>
           )}
           <button
@@ -290,7 +293,11 @@ export default function Fieldbook() {
             <span>
               <strong>{user.name}</strong>
               <small>
-                {user.role === "admin" ? "Administrator" : "Field team"}
+                {user.role === "admin"
+                  ? "Administrator"
+                  : user.role === "manager"
+                    ? "Manager"
+                    : "Field team"}
               </small>
             </span>
             <LogOut size={16} />
@@ -411,6 +418,15 @@ export default function Fieldbook() {
             </>
           ) : view === "admin" && user.role === "admin" ? (
             <Admin data={data} user={user} onChange={persist} />
+          ) : view === "team" ? (
+            <>
+              <PageHeading
+                eyebrow="GROW TOGETHER"
+                title="Your team, in focus."
+                description="A shared view of progress and what’s next."
+              />
+              <TeamProgress data={data} user={user} />
+            </>
           ) : selected && !item ? (
             <Empty
               title="This content isn’t available"
@@ -449,164 +465,29 @@ export default function Fieldbook() {
               <div className="markdown">
                 <ReactMarkdown>{item.body}</ReactMarkdown>
               </div>
+              <Feedback
+                key={item.id + user.id}
+                content={item}
+                user={user}
+                data={data}
+                onChange={persist}
+              />
               <div className="article-end">
                 <CheckCircle2 size={18} />
                 You’re at the end. Put it into practice.
               </div>
             </article>
           ) : view === "learn" ? (
-            <>
-              <PageHeading
-                eyebrow="A LITTLE LEARNING. A LOT OF MOMENTUM."
-                title={`Make your next move a great one.`}
-                description="Build your knowledge, sharpen your skills, and stay one step ahead."
-              />
-              <section className="for-you">
-                <div className="section-heading">
-                  <div>
-                    <h2>
-                      For you{" "}
-                      <span className="count-pill">{assigned.length}</span>
-                    </h2>
-                    <p>
-                      Picked for your role. A clear path to staying current.
-                    </p>
-                  </div>
-                  <span className="role-pill">
-                    {data.groups
-                      .filter((g) => user.groups.includes(g.id))
-                      .map((g) => g.name)
-                      .join(" · ") || "No group assigned"}
-                  </span>
-                </div>
-                <div className="assigned-layout">
-                  <div className="current-card">
-                    <div
-                      className="progress-ring"
-                      style={{
-                        background: `conic-gradient(#0069ff ${pct}%, #e4eaf5 0)`,
-                      }}
-                      role="img"
-                      aria-label={`${pct}% current`}
-                    >
-                      <div>
-                        <strong>
-                          {pct}
-                          <small>%</small>
-                        </strong>
-                        <span>current</span>
-                      </div>
-                    </div>
-                    <h3>
-                      {pct === 100
-                        ? "You’re all caught up."
-                        : "Keep your momentum."}
-                    </h3>
-                    <p>
-                      {assigned.length
-                        ? `${completed} of ${assigned.length} assigned courses complete`
-                        : "No courses assigned yet"}
-                    </p>
-                    <span className="current-caption">
-                      <span className="tiny-dot" />
-                      The goal? Stay at 100%.
-                    </span>
-                  </div>
-                  <div className="assigned-courses">
-                    {assigned.map((c) => (
-                      <CourseCard
-                        key={c.id}
-                        course={c}
-                        complete={isComplete(c, progress)}
-                        progress={
-                          progress.find(
-                            (p) =>
-                              p.content_id === c.id && p.version === c.version,
-                          )?.lessons.length || 0
-                        }
-                        onClick={() => navigate("learn", c.id)}
-                      />
-                    ))}
-                    {!assigned.length && (
-                      <Empty
-                        title="Room to explore"
-                        description="Browse the library while you wait for your next assignment."
-                      />
-                    )}
-                  </div>
-                </div>
-              </section>
-              <section className="library">
-                <div className="section-heading">
-                  <div>
-                    <h2>Explore the library</h2>
-                    <p>
-                      Follow your curiosity. There’s always something to
-                      discover.
-                    </p>
-                  </div>
-                  <span className="muted">{courses.length} courses</span>
-                </div>
-                <div className="topic-tabs">
-                  {["All topics", ...topics].map((t) => (
-                    <button
-                      key={t}
-                      className={topic === t ? "selected" : ""}
-                      onClick={() => setTopic(t)}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                {topics
-                  .filter((t) => topic === "All topics" || topic === t)
-                  .map((t, i) => (
-                    <div className="channel" key={t}>
-                      <div className="channel-title">
-                        <span className={"channel-icon tone-" + i}>
-                          {i === 0 ? (
-                            <Compass size={19} />
-                          ) : i === 1 ? (
-                            <Layers size={19} />
-                          ) : (
-                            <BookOpen size={19} />
-                          )}
-                        </span>
-                        <h3>{t}</h3>
-                        <span>
-                          {courses.filter((c) => c.category === t).length}{" "}
-                          courses
-                        </span>
-                      </div>
-                      <div className="course-grid">
-                        {courses
-                          .filter((c) => c.category === t)
-                          .map((c) => (
-                            <CourseCard
-                              key={c.id}
-                              course={c}
-                              complete={isComplete(c, progress)}
-                              onClick={() => navigate("learn", c.id)}
-                            />
-                          ))}
-                      </div>
-                    </div>
-                  ))}
-              </section>
-              <div className="bottom-callout">
-                <BookOpen size={22} />
-                <div>
-                  <h3>Looking for an answer?</h3>
-                  <p>The knowledge library is your everyday reference.</p>
-                </div>
-                <button
-                  className="text-button"
-                  onClick={() => navigate("docs")}
-                >
-                  Explore knowledge <ArrowRight size={17} />
-                </button>
-              </div>
-            </>
+            <Learning
+              key={user.id}
+              courses={courses}
+              user={user}
+              groups={data.groups}
+              assigned={assigned}
+              progress={progress}
+              onOpen={(id) => navigate("learn", id)}
+              onKnowledge={() => navigate("docs")}
+            />
           ) : view === "docs" ? (
             <>
               <PageHeading
@@ -802,62 +683,6 @@ function Empty({ title, description }: { title: string; description: string }) {
     </div>
   );
 }
-function CourseCard({
-  course: c,
-  complete,
-  progress = 0,
-  onClick,
-}: {
-  course: Content;
-  complete: boolean;
-  progress?: number;
-  onClick: () => void;
-}) {
-  const index = Number(c.id.replace(/\D/g, "")) || 1;
-  return (
-    <button className="course-card" onClick={onClick}>
-      <div className={"course-art art-" + (index % 6)}>
-        <div className="art-grid" />
-        <span className="art-label">{c.category}</span>
-        <div className={"abstract abstract-" + (index % 3)}>
-          <i />
-          <i />
-          <i />
-        </div>
-        <span className="play-disc">
-          <Play size={17} fill="currentColor" />
-        </span>
-        <span className="duration">{c.duration} min</span>
-      </div>
-      <div className="course-copy">
-        <div className="course-meta">
-          {complete ? (
-            <span className="completed">
-              <CheckCircle2 size={13} />
-              Completed
-            </span>
-          ) : progress ? (
-            <span className="in-progress">In progress</span>
-          ) : (
-            <span>{c.lessons.length} lessons · Knowledge check</span>
-          )}
-        </div>
-        <h3>{c.title}</h3>
-        <p>{c.summary}</p>
-        <div className="course-bottom">
-          <span>
-            {complete
-              ? "Review course"
-              : progress
-                ? "Continue learning"
-                : "Start learning"}
-          </span>
-          <ArrowUpRight size={17} />
-        </div>
-      </div>
-    </button>
-  );
-}
 function Course({
   course: c,
   data,
@@ -873,11 +698,13 @@ function Course({
 }) {
   const [step, setStep] = useState(0),
     [answers, setAnswers] = useState<number[]>([]),
-    [result, setResult] = useState<string | null>(null);
+    [result, setResult] = useState<string | null>(null),
+    [resultPassed, setResultPassed] = useState(false);
   const p = (data.progress[user.id] || []).find(
     (p) => p.content_id === c.id && p.version === c.version,
   );
   const lesson = c.lessons[step];
+  const video = lesson?.videoUrl ? videoSource(lesson.videoUrl) : null;
   const allDone = c.lessons.every((l) => p?.lessons.includes(l.id));
   const complete = isComplete(c, data.progress[user.id] || []);
   function mark() {
@@ -887,10 +714,13 @@ function Course({
   function submit() {
     const passed = c.questions.every((q, i) => answers[i] === q.answer);
     onChange(updateProgress(data, user.id, c, undefined, answers));
+    setResultPassed(passed);
     setResult(
       passed
         ? "Great work. You’ve completed this course."
-        : "Not quite yet. Revisit the lessons and try again.",
+        : complete
+          ? "This attempt did not pass. Your previous completion is preserved."
+          : "Not quite yet. Revisit the lessons and try again.",
     );
   }
   return (
@@ -959,16 +789,31 @@ function Course({
                 LESSON {step + 1} OF {c.lessons.length}
               </span>
               <h2>{lesson.title}</h2>
-              {lesson.videoUrl && (
+              {video?.type === "embed" ? (
+                <iframe
+                  className="lesson-video"
+                  key={video.url}
+                  src={video.url}
+                  title={lesson.title + " video"}
+                  allow="fullscreen; picture-in-picture"
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              ) : video?.type === "file" ? (
                 <video
-                  key={lesson.videoUrl}
+                  key={video.url}
                   controls
                   preload="metadata"
-                  src={lesson.videoUrl}
+                  src={video.url}
                 >
                   Your browser does not support video playback.
                 </video>
-              )}
+              ) : lesson.videoUrl ? (
+                <p className="notice">
+                  This video URL is not supported. Ask an editor to update it.
+                </p>
+              ) : null}
               <div className="markdown">
                 <ReactMarkdown>{lesson.body}</ReactMarkdown>
               </div>
@@ -1024,7 +869,10 @@ function Course({
                 </fieldset>
               ))}
               {result && (
-                <div role="status" className={complete ? "success" : "notice"}>
+                <div
+                  role="status"
+                  className={resultPassed ? "success" : "notice"}
+                >
                   {result}
                 </div>
               )}
@@ -1044,6 +892,13 @@ function Course({
                   <Check size={16} />
                 </button>
               </div>
+              <Feedback
+                key={c.id + user.id}
+                content={c}
+                user={user}
+                data={data}
+                onChange={onChange}
+              />
               {complete && (
                 <button className="text-button" onClick={onBack}>
                   Back to your learning <ArrowRight size={16} />
