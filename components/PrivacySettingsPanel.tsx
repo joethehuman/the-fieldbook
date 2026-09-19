@@ -27,7 +27,8 @@ export default function PrivacySettingsPanel({
       ? /^https:\/\//.test(draft.url)
       : !!draft.body.trim() &&
         !!draft.operatorName.trim() &&
-        /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.contactEmail);
+        (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.contactEmail) ||
+          /^https:\/\//.test(draft.contactUrl || ""));
   return (
     <section className="integration-card">
       <h2>Privacy policy</h2>
@@ -55,7 +56,7 @@ export default function PrivacySettingsPanel({
         />
       </label>
       <label>
-        Privacy contact email
+        Privacy contact email (optional)
         <input
           type="email"
           maxLength={254}
@@ -63,6 +64,21 @@ export default function PrivacySettingsPanel({
           onChange={(e) => edit({ contactEmail: e.target.value })}
         />
       </label>
+      <label>
+        Contact page URL (optional)
+        <input
+          type="url"
+          maxLength={2000}
+          placeholder="https://example.com/contact"
+          value={draft.contactUrl || ""}
+          onChange={(e) => edit({ contactUrl: e.target.value })}
+        />
+      </label>
+      <p>
+        Provide an email address, an HTTPS contact page, or both. A contact page
+        can keep your email address private. Google sign-in has its own
+        support-email requirement.
+      </p>
       {draft.mode === "external" ? (
         <label>
           Privacy policy URL

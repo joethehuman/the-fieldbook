@@ -66,3 +66,39 @@ test("policy publication requires a complete hosted policy or safe external URL"
   );
   assert.equal(privacyHref(defaultSettings), null);
 });
+
+test("hosted policies accept email, contact page or both without requiring a personal email", () => {
+  const policy = {
+    ...defaultPrivacy.draft,
+    body: "Policy",
+    operatorName: "Example",
+  };
+  const parse = (contact: object) =>
+    settingsSchema.safeParse({
+      ...defaultSettings,
+      privacy: { ...defaultPrivacy, published: { ...policy, ...contact } },
+    }).success;
+  assert.equal(parse({}), false);
+  assert.equal(parse({ contactUrl: "https://example.com/contact" }), true);
+  assert.equal(parse({ contactEmail: "support@example.com" }), true);
+  assert.equal(
+    parse({
+      contactEmail: "support@example.com",
+      contactUrl: "https://example.com/contact",
+    }),
+    true,
+  );
+  for (const contactUrl of [
+    "javascript:alert(1)",
+    "http://example.com",
+    "//example.com",
+  ])
+    assert.equal(parse({ contactUrl }), false);
+  assert.equal(
+    parse({
+      contactEmail: "invalid",
+      contactUrl: "https://example.com/contact",
+    }),
+    false,
+  );
+});

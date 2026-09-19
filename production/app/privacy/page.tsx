@@ -15,7 +15,15 @@ export default async function PrivacyPage() {
         <>
           <p>
             Operated by {policy.operatorName}. Contact:{" "}
-            <a href={`mailto:${policy.contactEmail}`}>{policy.contactEmail}</a>
+            {policy.contactEmail && (
+              <a href={`mailto:${policy.contactEmail}`}>
+                {policy.contactEmail}
+              </a>
+            )}
+            {policy.contactEmail && policy.contactUrl && " · "}
+            {policy.contactUrl && (
+              <a href={policy.contactUrl}>Contact the operator</a>
+            )}
           </p>
           <p>Last published: {settings.privacy?.publishedAt?.slice(0, 10)}</p>
           <article className="markdown">

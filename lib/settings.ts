@@ -2,6 +2,7 @@ export type PrivacyDocument = {
   mode: "hosted" | "external";
   operatorName: string;
   contactEmail: string;
+  contactUrl?: string;
   body: string;
   url: string;
 };
@@ -14,6 +15,7 @@ export const emptyPrivacyDocument: PrivacyDocument = {
   mode: "hosted",
   operatorName: "",
   contactEmail: "",
+  contactUrl: "",
   body: "",
   url: "",
 };

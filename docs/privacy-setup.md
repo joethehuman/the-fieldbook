@@ -2,6 +2,8 @@
 
 Fieldbook provides a policy editor, draft/publish controls, a public `/privacy` page, and footer/sign-in links. The operator supplies the actual notice in Settings. No personal operator identity or policy ships as a production default. Policies are stored in the installation's database, not in this repository.
 
+Hosted policies support an email, an HTTPS contact-page link, or both. A contact page is a link to an operator-maintained page, not a built-in form or email service. Google OAuth separately requires an eligible support email; do not assume a forwarding alias automatically qualifies.
+
 Choose a hosted Markdown policy or an existing HTTPS policy URL. Save settings to save a draft. Publish privacy policy explicitly promotes the reviewed version. Subsequent edits do not replace it until published again. Settings use revision checking to prevent overwriting concurrent edits. Unpublished text is removed from visitor and learner workspace responses. The production privacy page remains public on private installations so visitors can read it before signing in.
 
 An external corporate policy must cover this deployment. Google brand verification may require a policy hosted on the same domain as your app. The demo's editor is browser-local and its privacy route is explicitly a preview.
