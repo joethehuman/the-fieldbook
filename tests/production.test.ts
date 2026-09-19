@@ -4,6 +4,20 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { contentSchema, settingsSchema } from "../production/lib/schemas";
 import { videoSource } from "../lib/video";
+import { guestAnswersForImport } from "../lib/guest-progress";
+
+test("guest import preserves a passing answer set after a failed retake", () => {
+  const old = {
+    content_id: "course",
+    version: 1,
+    lessons: ["one"],
+    passed: true,
+    guestAnswers: [1, 0],
+  };
+  assert.deepEqual(guestAnswersForImport(old, [0, 0], false), [1, 0]);
+  assert.deepEqual(guestAnswersForImport(old, undefined, undefined), [1, 0]);
+  assert.deepEqual(guestAnswersForImport(old, [1, 1], true), [1, 1]);
+});
 
 test("production content rejects duplicate lesson ids and unsafe branding", () => {
   const c = {

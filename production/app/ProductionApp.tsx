@@ -5,6 +5,10 @@ import type { FieldbookRuntime } from "@/lib/runtime";
 import type { Workspace } from "@/lib/store";
 import type { Progress, User } from "@/lib/types";
 import { useEffect, useState } from "react";
+import {
+  guestAnswersForImport,
+  type GuestProgress,
+} from "@/lib/guest-progress";
 
 const GUEST_KEY = "fieldbook.guest-progress.v1";
 async function request(path: string, body?: unknown) {
@@ -93,10 +97,12 @@ const runtime: FieldbookRuntime = {
       attempts: r.attempts || prior?.attempts || [],
     };
     // Retain answers only for guest import; the server re-grades them after sign-in.
-    if (!currentUser && answers)
-      (p as Progress & { guestAnswers?: number[] }).guestAnswers = answers;
-    else if (!currentUser && prior && (prior as any).guestAnswers)
-      (p as any).guestAnswers = (prior as any).guestAnswers;
+    if (!currentUser)
+      (p as GuestProgress).guestAnswers = guestAnswersForImport(
+        prior,
+        answers,
+        r.attemptPassed,
+      );
     const progress = [
       ...current.filter(
         (x) => !(x.content_id === p.content_id && x.version === p.version),
@@ -156,9 +162,18 @@ export default function ProductionApp() {
           contentId: p.content_id,
           version: p.version,
           lessons: p.lessons,
-          answers: (p as any).guestAnswers,
+          answers: (p as GuestProgress).guestAnswers,
         });
         saved++;
+        localStorage.setItem(
+          GUEST_KEY,
+          JSON.stringify(
+            readGuest().filter(
+              (x) =>
+                !(x.content_id === p.content_id && x.version === p.version),
+            ),
+          ),
+        );
       }
       localStorage.removeItem(GUEST_KEY);
       window.location.reload();
