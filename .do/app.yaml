@@ -1,0 +1,15 @@
+name: fieldbook-demo
+region: sfo
+static_sites:
+  - name: fieldbook
+    github:
+      repo: joethehuman/fieldbook-do-prototype
+      branch: main
+      deploy_on_push: true
+    source_dir: /
+    build_command: pnpm build
+    output_dir: out
+    environment_slug: node-js
+    catchall_document: index.html
+    routes:
+      - path: /
