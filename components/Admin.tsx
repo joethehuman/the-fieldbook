@@ -1308,10 +1308,11 @@ export function Editor({
             </>
           )}
           <div className="demo-note">
-            <strong>Saved in your browser</strong>
+            <strong>{production ? "Saved to your workspace" : "Saved in your browser"}</strong>
             <p>
-              Published content is visible to demo profiles on this device. It
-              is not shared with other visitors.
+              {production
+                ? "Drafts are visible to administrators. Publish when you are ready to share with readers."
+                : "Published content is visible to demo profiles on this device. It is not shared with other visitors."}
             </p>
           </div>
         </aside>
