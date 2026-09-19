@@ -9,3 +9,4 @@ out/
 .data/
 *.log
 sources/
+artifacts/

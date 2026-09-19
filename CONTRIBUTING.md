@@ -22,3 +22,7 @@ Never commit secrets, exports containing personal data, `.env.local`, or provide
 ## Reporting problems
 
 Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. A private security-reporting channel must be established before public release; see the release checklist.
+
+## Scope and releases
+
+The documented stack is Vercel, hosted Supabase, and Google sign-in. Do not describe alternative providers or demo-only functionality as supported production features. There is no promised roadmap or release schedule. Record user-visible changes under Unreleased in [CHANGELOG.md](CHANGELOG.md); use the [manual release process](docs/releases.md) when preparing a release.

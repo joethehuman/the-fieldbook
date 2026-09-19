@@ -2,11 +2,19 @@
 
 This is the server application. The repository root remains the browser-local demo. Both use the same components; this app substitutes authenticated services for demo persistence.
 
+## Supported stack
+
+This guide supports **Vercel and hosted Supabase, with Google sign-in**. Supabase is required by the current code: PostgreSQL alone does not replace its database API, Auth, Storage, OAuth server, and token hook. Other providers and self-hosted Supabase require their own adaptation and verification; this guide does not promise compatibility.
+
+You need your own GitHub repository, Vercel account, Supabase project, and Google Cloud OAuth configuration. MCP is optional and may require an eligible AI-client plan. A custom domain and support mailbox are optional operator services.
+
 ## First deployment
+
+Start with your own deployment repository at a chosen release; follow [versions and upgrades](../docs/upgrading.md). Before the first release, only development snapshots exist.
 
 1. Create a dedicated **Supabase project** in your own account, directly or through the Vercel Marketplace. Choose a suitable region and plan. Each independent Fieldbook needs its own project; never reuse the maintainer's backend. Save any database password in your password manager.
 2. Apply `supabase/migrations/202609190001_fieldbook.sql`, then `202609190002_mcp_audience.sql` from the repository root using the Supabase SQL editor or migrations CLI. The scripts are for a fresh database; they are not designed to be run repeatedly. The first migration also creates the private `fieldbook-media` bucket. Run them in order and record which ran. SQL-editor runs are not automatically tracked as CLI migrations; do not subsequently replay them through the CLI. For upgrades, back up first and apply only new migrations.
-3. Create a separate Vercel project connected to this repository. Set **Root Directory** to `production`, enable shared files outside the root directory, use the Next.js preset, and `pnpm build`. Keep the existing demo project connected to the repository root.
+3. Create a Vercel project connected to **your own repository and chosen production branch**. Set **Root Directory** to `production`, enable shared files outside the root directory, use the Next.js preset, and `pnpm build`. Leave the output directory at the Next.js default; use Node.js 22.x and the pinned pnpm version. If you also want a demo, create a separate project rooted at the repository root; it is optional.
 4. Connect the Supabase project to this hosting project, or enter its keys manually. The required variables are `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SECRET_KEY`. Set `FIELDBOOK_URL` to the canonical HTTPS site origin and `FIELDBOOK_OWNER_EMAIL` to the exact Google email allowed to bootstrap administration. Do not put the secret key in any `NEXT_PUBLIC_` variable.
 5. In Google Cloud, configure an OAuth web client. Its authorized redirect URI is `https://PROJECT_REF.supabase.co/auth/v1/callback`. Enable the Google provider in Supabase using that client's ID and secret. Configure Google's consent screen appropriately for public access; while in Testing mode, only configured test users can sign in.
 6. In Supabase Auth URL configuration, set the Site URL to `FIELDBOOK_URL` and allow the exact application callback URL `FIELDBOOK_URL/auth/callback`. Do not add wildcard preview domains to the production allowlist. Supabase provider sign-up may create an Auth record, but Fieldbook's registration setting controls whether it gains application access.
@@ -14,6 +22,8 @@ This is the server application. The repository root remains the browser-local de
 8. Create real content in `/admin`. Start with one draft article, one field note, and one course; publish only after checking the previews. No demo data is seeded into this database.
 
 Use a separate backend for previews that need real writes, or leave them unconfigured. Never connect an untrusted preview to the production database. An unconfigured production app fails to load data; it does not fall back to demo profiles.
+
+Vercel does not run the SQL migrations automatically. Keep a private record of applied migrations and read the [upgrade guide](../docs/upgrading.md) before changing versions.
 
 ## MCP configuration
 
@@ -47,7 +57,7 @@ Check [current Supabase plan limits](https://supabase.com/pricing) and your host
 - Saves require a matching content revision. Draft and published snapshots are separate. Content writes and publication/unpublication are audited transactionally with the acting user and source.
 - Tables and write functions deny direct `anon` and `authenticated` access. The Next.js server validates identity and permissions before using the service role.
 - Search and reporting are deliberately small-instance implementations, not dedicated search infrastructure. The catalog/reports currently use Supabase's default 1,000-row response limit; MCP search scans the 500 newest documents and returns at most 50 matches, and media listing returns 100 items.
-- Company groups, teams, and manager reporting administration are not enabled in this production release. Glean, external video-provider integrations, rich WYSIWYG editing, and hosted multi-company SaaS are outside this milestone.
+- Company groups, teams, and manager reporting administration are not enabled in this production release. Dedicated enterprise integrations, a full WYSIWYG editor, and hosted multi-company SaaS are not supported.
 
 Before calling the instance ready, verify the real Google redirect flow, a second learner account's permissions and cross-device progress, guest import, image/video upload and playback, draft-media protection, MCP OAuth from an actual supported client, token expiry/revocation, and a database export/restore. Local tests and successful builds alone do not verify these external integrations.
 

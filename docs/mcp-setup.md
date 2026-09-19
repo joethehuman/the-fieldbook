@@ -33,10 +33,10 @@ Create a separate registration for each client application, such as ChatGPT and 
 2. In your Supabase OAuth server's client management, register that callback URI with a descriptive name. For clients accepting a client secret, use a confidential client and the token authentication method they support. The initial ChatGPT connection used `client_secret_basic`.
 3. Copy the generated client ID and secret directly into the AI client's OAuth configuration. Store secrets securely; never put them in a chat, README, public environment variable, or source control. The client secret is not the Supabase project secret or Google OAuth secret.
 4. Finish the connection, sign in as the Fieldbook administrator and approve the named client. Let the client discover the tools.
-5. Ask it to find content and create a disposable draft. Check that draft in `/admin` before asking it to publish anything.
+5. Ask it to find content and create a disposable draft. On an empty installation, create a draft in the admin panel first so a read test has something to find. Check that draft in `/admin` before asking it to publish anything.
 6. Test revocation in `/connections`; future calls must fail. Reconnect and approve again if you want to keep using the client.
 
-For ChatGPT, use its custom MCP app/developer-mode setup. For Claude, use its custom remote connector setup. Availability and workspace approval depend on the client's current plan and policy. If its UI requires a different registration flow, follow its current documentation; do not enable anonymous access as a workaround.
+The verified setup uses ChatGPT's custom MCP app/developer-mode flow. Claude has not been verified for this project; its custom remote connector setup is a reference for operators who choose to test it. Availability and workspace approval depend on the client's current plan and policy. If its UI requires a different registration flow, follow its current documentation; do not enable anonymous access as a workaround.
 
 - [ChatGPT developer mode and MCP apps](https://help.openai.com/en/articles/12584461-developer-mode-and-mcp-apps-in-chatgpt)
 - [Claude custom remote connectors](https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp)
@@ -54,7 +54,7 @@ For ChatGPT, use its custom MCP app/developer-mode setup. For Claude, use its cu
 
 The current grant is administrator-level across these tools, not a read-only or per-folder grant. It does not provide a general database interface, account administration, or individual learner reports. Upload files through the admin editor; MCP lists and references existing media. Search scans the newest 500 documents and returns up to 50 matches; media listing returns up to 100 items. Reports are subject to database response limits.
 
-[Optional authoring guidance](ai-authoring.md) can be supplied as project instructions. Tool schemas are the source of truth, and the server enforces authorization regardless of those instructions. A provider-specific `SKILL.md` could package guidance later; it would not install a connection, create credentials, or replace OAuth.
+[Optional authoring guidance](ai-authoring.md) can be supplied as project instructions. Tool schemas are the source of truth, and the server enforces authorization regardless of those instructions. A skill file is not required: these instructions do not install a connection, create credentials, or replace OAuth.
 
 ## Troubleshooting
 
@@ -64,4 +64,4 @@ The current grant is administrator-level across these tools, not a read-only or 
 - **Revision conflict:** fetch the latest content, preserve fields, then retry with its current revision. Do not overwrite silently.
 - **Old hostname:** follow the [domain migration guide](domains.md), then reconnect the AI client.
 
-Initial validation included a real ChatGPT connection and draft edit. Claude setup is documented from its supported OAuth flow but has not yet been verified end to end for this project. Do not treat one client's successful setup as proof that every client works.
+Initial validation included a real ChatGPT connection and draft edit. Claude is an unverified client for this project; the linked provider documentation is reference material, not a tested Fieldbook installation path. Do not treat one client's successful setup as proof that every client works.

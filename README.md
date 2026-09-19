@@ -2,76 +2,108 @@
 
 A lightweight, opinionated learning and knowledge management platform built with Next.js.
 
-Fieldbook gives a team three places to work:
+Fieldbook brings three kinds of content together:
 
-- **Field Notes:** timely updates, launch briefs, and newsletters.
-- **Learning:** short courses with text, video, quizzes, and progress.
-- **Knowledge:** evergreen articles organized in a nested navigation tree.
+- **Field Notes:** updates, launch briefs, and newsletters.
+- **Learning:** courses with text, video, quizzes, and saved progress.
+- **Knowledge:** evergreen articles organized in a nested knowledge base.
 
-The aim is a small, useful home for enablement—not a hosted multi-company SaaS service. Each operator deploys their own instance and owns its content, accounts, and infrastructure.
+Run your own installation, maintain content in the built-in admin panel, and optionally connect an AI client to edit content through MCP. Each installation has its own accounts, data, domain, and configuration. No separate CMS is required.
 
-> Pre-release: this repository is being prepared for open-source publication. No open-source license has been selected yet. Public release and licensing are separate from running the demo or a personal instance.
+> **Before the first release:** this project is still being prepared for publication. There are no published releases and no open-source license yet. The `0.1.0` values in the code are development placeholders, not a released version. Do not treat the current branch as a stable release.
 
-## One repository, two applications
+## Supported setup
 
-| | Interactive demo | Working instance |
+The documented production setup is **Vercel + hosted Supabase + Google sign-in**.
+
+| Component | What you supply |
+|---|---|
+| Code and hosting | Your GitHub repository and Vercel project |
+| Database | A dedicated Supabase PostgreSQL database |
+| Learner sign-in | Supabase Auth with your Google OAuth web client |
+| Images and video files | Supabase Storage; a private bucket created by the migrations |
+| AI content management (optional) | Supabase OAuth server and a registered MCP client; ChatGPT has been exercised end to end |
+| Domain (optional) | Your custom domain, or one canonical Vercel address |
+
+**Can I use another database?** Not through configuration alone. The application uses Supabase's database API, Auth, Storage, OAuth server, and token hook. A plain PostgreSQL database, Neon, or another auth/storage provider is not a drop-in replacement. Those substitutions require code changes and are outside this project's documented support scope. Other hosts and self-hosted Supabase are not verified installation paths.
+
+Provider accounts, quotas, pricing, and backups are the operator's responsibility. Free plans are not an application guarantee of free operation. There is no support SLA or commitment to additional providers.
+
+## Deploy your own instance
+
+1. Obtain your own copy of the code. Once releases exist, start from a named release and keep a separate `production` branch in your repository; see [versions and upgrades](docs/upgrading.md).
+2. Create your Supabase project and apply the included migrations in order.
+3. Import **your repository** into Vercel with **Root Directory = `production`**, including source files outside that directory.
+4. Configure the five required environment variables, Google sign-in, and matching domain/callback URLs.
+5. Sign in as your configured administrator, create content, and complete the deployment checks.
+6. Optionally connect ChatGPT to your instance's `/api/mcp` endpoint.
+
+**Follow the [complete installation guide](production/README.md).** A GitHub fork or Vercel deployment does not create your database or configure authentication automatically.
+
+## Demo versus a working installation
+
+| | Interactive demo | Production application |
 |---|---|---|
-| Deployment root | Repository root | `production/` |
-| Data | Sample content in browser storage | Your Supabase database and storage |
-| Accounts | Simulated profiles, no security boundary | Google sign-in; server-enforced permissions |
-| Purpose | Try the UI, including administration | Publish your content and save learner progress |
-| MCP | Not available | Authenticated endpoint on your own instance |
+| Vercel Root Directory | Repository root | `production` |
+| Data | Sample content in browser storage | Your Supabase project; starts empty |
+| Identity | Simulated profiles | Google accounts and server-enforced permissions |
+| Purpose | Explore the UI, including demo-only features | Publish content and save learner progress |
+| MCP | None | Authenticated endpoint on your instance |
 
-**Importing the repository with the default root deploys the demo.** To deploy the working application, select `production/` and configure the services in the [setup guide](production/README.md). Deploying code does not automatically provision a database or configure Google sign-in.
+**The default repository-root deployment is the demo.** It is not an authenticated installation. Never enter private information in it. Demo and production may be deployed as separate Vercel projects; you do not need to deploy the demo to run your own instance.
 
-You can deploy both from this repository as separate hosting projects. Their data is independent. A company can use the same code with its own configuration or fork it for code changes; normal branding and content edits belong in its instance settings, not a fork.
+## Current capabilities and boundaries
 
-## Start here
+The production application includes:
 
-- [Deploy a working instance: database, storage, Google sign-in](production/README.md)
-- [Connect ChatGPT or Claude through MCP](docs/mcp-setup.md)
-- [Choose or change your domain](docs/domains.md)
-- [Write your installation's privacy policy](docs/privacy-setup.md)
-- [Optional AI content-authoring guide](docs/ai-authoring.md)
-- [Contributing and development](CONTRIBUTING.md)
-- [Before the first public release](docs/release-checklist.md)
+- Public or members-only browsing and optional learner registration with Google.
+- Articles, field notes, and courses; Markdown formatting controls and preview.
+- Drafts, explicit publication, revision checks, and content-write audit records.
+- Images and video-file uploads, with a 50 MB per-file ceiling and no transcoding.
+- Persistent learner progress, server-graded quizzes, and optional browser-progress import.
+- Signed-in feedback, administrator progress/feedback views, branding, and privacy-policy settings.
+- Administrator-only MCP tools for content, aggregate reports, and existing media references.
 
-## Try the demo locally
+**Groups, nested teams, people administration, and manager reporting are demo-only.** Their models exist in shared code, but production does not offer the management APIs/UI needed to use them. Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. See the [repository audit](docs/repository-audit.md) for evidence and limits.
 
-Use Node.js 22.x and pnpm 10.17.1:
+## Documentation
+
+- [Install on Vercel and Supabase](production/README.md)
+- [Connect your own MCP client](docs/mcp-setup.md)
+- [Configure or change your domain](docs/domains.md)
+- [Configure your privacy policy](docs/privacy-setup.md)
+- [Select a version and upgrade](docs/upgrading.md)
+- [Maintainer release process](docs/releases.md) and [first-release checklist](docs/release-checklist.md)
+- [Changelog](CHANGELOG.md)
+- [Contributing and local development](CONTRIBUTING.md)
+- [Optional AI authoring instructions](docs/ai-authoring.md)
+
+## Run locally
+
+Use Node.js **22.x** and pnpm **10.17.1**:
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open the address shown in the terminal. Choose a sample profile in the sidebar to explore the learner, administrator, and manager views. Data stays in that browser and origin. Do not enter private data: demo role switching is a simulation.
+This starts the browser-local demo. For the production application, configure `production/.env.local` with a separate development backend, then run `pnpm dev:production`. See the installation guide for local Google callbacks.
 
 ```sh
 pnpm test
 pnpm build
-pnpm start
+pnpm build:production
 ```
 
-The demo exports static files to `out/`. On Vercel use the repository root and Next.js preset; on a static host build with `pnpm build` and publish `out/`. A DigitalOcean deployment must use a Static Site component, not a server application. Check each host's current plan and transfer limits; free hosting is not a universal spending guarantee.
+## Repository layout
 
-## What works today
-
-The working instance supports public or members-only browsing, optional Google accounts, persistent progress, feedback, draft/published content, Markdown formatting and preview, image/video uploads, branding and privacy settings, and administrator-only MCP tools. Content starts empty. No separate CMS is required.
-
-The demo also previews assignment groups, nested teams, and manager reports. **Those administration features are not enabled in production yet.** See [learning rules](docs/learning-model.md). Enterprise SSO/Okta, Glean, dedicated search, video transcoding, and hosted SaaS tenancy are not implemented.
-
-The frontend is Next.js; the current backend depends on **Supabase Auth, PostgreSQL and Storage**. Vercel is the documented deployment path. Other hosts need a compatible Next.js server runtime and their own deployment verification; this is not yet a tested deploy-anywhere package.
-
-## Repository map
-
-- `app/`: browser-local demo routes
-- `components/`, `lib/`: shared UI and models
-- `production/`: server application, authorization, APIs, MCP
-- `supabase/migrations/`: database and media-bucket setup
+- `app/`: static, browser-local demo
+- `components/`, `lib/`: shared interface and learning models
+- `production/`: Next.js server app, authorization, APIs, and MCP
+- `supabase/migrations/`: database and storage setup
 - `tests/`, `production/tests/`: behavior and server checks
-- `docs/`: operator and contributor guides
+- `docs/`: installation, operation, and release guides
 
-## License and support
+## Project status and license
 
-A license will be selected before source release; the absence of one does not grant open-source reuse rights. There is no support SLA. Before inviting real learners, complete the deployment verification and backup checklist in the setup guide. Report reproducible bugs through this repository's issues when available, without credentials or personal learner data.
+This is a small independent project. A license must be chosen before open-source publication; no reuse rights are granted by an absent license. Bug reports should include the version and reproduction steps, without credentials or learner data. A private vulnerability-reporting channel must be established before release. There is no promised release schedule, long-term-support branch, or feature roadmap.
