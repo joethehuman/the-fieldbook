@@ -3,7 +3,7 @@ region: sfo
 static_sites:
   - name: fieldbook
     github:
-      repo: joethehuman/fieldbook-do-prototype
+      repo: joethehuman/the-fieldbook
       branch: main
       deploy_on_push: true
     source_dir: /
