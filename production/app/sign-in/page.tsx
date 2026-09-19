@@ -1,9 +1,12 @@
+import { privacySettings } from "@production/lib/privacy";
+import { privacyHref } from "@/lib/settings";
 export default async function SignIn({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string; error?: string }>;
 }) {
   const q = await searchParams;
+  const policyLink = privacyHref(await privacySettings());
   return (
     <main className="auth-card">
       <span className="eyebrow">WELCOME TO FIELDBOOK</span>
@@ -21,6 +24,7 @@ export default async function SignIn({
       >
         Continue with Google
       </a>
+      {policyLink && <a href={policyLink}>Privacy policy</a>}
       <a className="text-button" href="/">
         Back to Fieldbook
       </a>

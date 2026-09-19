@@ -1,4 +1,5 @@
 import "server-only";
+import { publicSettings } from "@/lib/settings";
 import { db, check } from "./db";
 import { profile } from "./auth";
 import { canRead, document, redact } from "./content";
@@ -63,7 +64,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
   }
   return {
     schema: 1,
-    settings: config.settings,
+    settings: admin ? config.settings : publicSettings(config.settings),
     revision: config.revision,
     content: admin
       ? (documents.data || []).map((r) => document(r, true))

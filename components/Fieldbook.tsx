@@ -26,7 +26,7 @@ import {
 import ReactMarkdown from "./Markdown";
 import type { FieldbookRuntime } from "@/lib/runtime";
 import { sectionPaths } from "@/lib/navigation";
-import { defaultSettings } from "@/lib/settings";
+import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
 import Feedback from "./Feedback";
 import { TeamProgress } from "./Teams";
@@ -724,6 +724,9 @@ export default function Fieldbook({
           )}
           <footer>
             {branding.name} <span>{branding.tagline}</span>
+            {privacyHref(branding) && (
+              <a href={privacyHref(branding)!}>Privacy policy</a>
+            )}
             {!runtime && (
               <button onClick={() => setShowDemo(true)}>About this demo</button>
             )}

@@ -62,7 +62,30 @@ export const contentSchema = contentBaseSchema.superRefine((c, ctx) => {
         message: "Lesson and question IDs must be unique.",
       });
 });
+const privacyDocumentSchema = z.object({
+  mode: z.enum(["hosted", "external"]),
+  operatorName: text(160),
+  contactEmail: text(254).refine((s) => !s || z.email().safeParse(s).success),
+  body: text(100000),
+  url: text(2000).refine(
+    (s) => !s || (z.url().safeParse(s).success && s.startsWith("https://")),
+  ),
+});
+const publishedPrivacySchema = privacyDocumentSchema.refine(
+  (p) =>
+    p.mode === "external"
+      ? !!p.url
+      : !!p.body.trim() && !!p.operatorName.trim() && !!p.contactEmail,
+  "Published policies require text, operator and contact, or an HTTPS policy URL.",
+);
 export const settingsSchema = z.object({
+  privacy: z
+    .object({
+      draft: privacyDocumentSchema,
+      published: publishedPrivacySchema.nullable(),
+      publishedAt: z.iso.datetime().nullable(),
+    })
+    .optional(),
   name: text(60).trim().min(1),
   tagline: text(180),
   logoUrl: text(2000).refine(

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { defaultSettings } from "@/lib/settings";
 import type { Workspace } from "@/lib/store";
 import type { UploadMedia } from "./MarkdownEditor";
@@ -106,6 +107,24 @@ export default function SiteSettingsPanel({
           </button>
         </div>
       )}
+      <PrivacySettingsPanel
+        settings={settings}
+        onChange={setSettings}
+        busy={busy}
+        onPublish={async (next) => {
+          setBusy(true);
+          setNotice("");
+          try {
+            await onChange({ ...data, settings: next });
+            setSettings(next);
+            setNotice("Privacy policy published.");
+          } catch (e) {
+            setNotice((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
       <h2>Access and accounts</h2>
       <label>
         Who can browse?
