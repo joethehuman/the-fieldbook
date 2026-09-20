@@ -35,7 +35,8 @@ export const contentBaseSchema = z.object({
   assignments: z
     .array(
       z.object({
-        groupId: text(80),
+        groupId: text(80).optional(),
+        userId: z.uuid().optional(),
         assignedAt: z.iso.datetime(),
         due: z.discriminatedUnion("type", [
           z.object({ type: z.literal("none") }),

@@ -43,6 +43,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
         lessons: p.lessons,
         passed: p.passed,
         attempts: p.attempts,
+        revision: p.revision,
       });
     const ratings = admin
       ? await db().from("fb_feedback").select("*")
@@ -68,7 +69,11 @@ export async function snapshot(user: User | null): Promise<Workspace> {
       return {
         ...redact(c),
         groups: c.groups.filter((g) => groupIds.has(g)),
-        assignments: c.assignments?.filter((a) => groupIds.has(a.groupId)),
+        assignments: c.assignments?.filter(
+          (a) =>
+            (a.groupId && groupIds.has(a.groupId)) ||
+            (a.userId && users.some((u) => u.id === a.userId)),
+        ),
       };
     });
   return {

@@ -38,6 +38,16 @@ test("workspace serialization preserves public catalog but scopes assignments, d
         assignedAt: "2026-09-01T00:00:00Z",
         due: { type: "none" },
       },
+      {
+        userId: user.id,
+        assignedAt: "2026-09-01T00:00:00Z",
+        due: { type: "none" },
+      },
+      {
+        userId: "00000000-0000-4000-8000-000000000099",
+        assignedAt: "2026-09-01T00:00:00Z",
+        due: { type: "none" },
+      },
     ],
     questions: [{ id: "q", answer: 1, options: ["a", "b"] }],
   };
@@ -93,7 +103,7 @@ test("workspace serialization preserves public catalog but scopes assignments, d
     assert.deepEqual(state.content[0].groups, ["sales"]);
     assert.deepEqual(
       state.content[0].assignments?.map((a) => a.groupId),
-      ["sales"],
+      ["sales", undefined],
     );
     assert.deepEqual(Object.keys(state.progress), [user.id]);
     const guest = await snapshot(null);

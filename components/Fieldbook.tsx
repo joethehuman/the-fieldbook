@@ -519,6 +519,13 @@ export default function Fieldbook({
               data={data}
               user={user}
               onChange={persist}
+              onLearning={
+                runtime
+                  ? async (action) => {
+                      setData(await runtime.manageLearning(action));
+                    }
+                  : undefined
+              }
               production={!!runtime}
               onUpload={runtime?.upload}
             />

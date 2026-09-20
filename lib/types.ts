@@ -42,6 +42,7 @@ export type User = {
   effectiveGroupJoinedAt?: Record<string, string>;
 };
 export type Progress = {
+  revision?: number;
   content_id: string;
   version: number;
   lessons: string[];
@@ -56,7 +57,8 @@ export type Team = {
   managerId?: string;
 };
 export type Assignment = {
-  groupId: string;
+  groupId?: string;
+  userId?: string;
   assignedAt: string;
   due:
     | { type: "none" }
@@ -105,12 +107,15 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       due: { type: "none" },
     }));
   const matches = rules
-    .filter((r) => memberships.has(r.groupId))
+    .filter(
+      (r) =>
+        r.userId === user.id || (!!r.groupId && memberships.has(r.groupId)),
+    )
     .map((r) => {
       const joined =
-        user.effectiveGroupJoinedAt?.[r.groupId] ||
+        (r.groupId ? user.effectiveGroupJoinedAt?.[r.groupId] : r.assignedAt) ||
         user.groups
-          .filter((id) => ancestorIds(id, groups).has(r.groupId))
+          .filter((id) => ancestorIds(id, groups).has(r.groupId || ""))
           .map((id) => user.groupJoinedAt?.[id] || r.assignedAt)
           .sort()[0] ||
         r.assignedAt;
@@ -170,8 +175,12 @@ export function assignedCourses(
     (c) =>
       c.kind === "course" &&
       c.status === "published" &&
-      (c.assignments?.map((a) => a.groupId) ?? c.groups).some((g) =>
-        memberships.has(g),
-      ),
+      (c.assignments
+        ? c.assignments.some(
+            (a) =>
+              a.userId === user.id ||
+              (!!a.groupId && memberships.has(a.groupId)),
+          )
+        : c.groups.some((g) => memberships.has(g))),
   );
 }

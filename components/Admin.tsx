@@ -1,4 +1,6 @@
 "use client";
+import { Assignments, type LearningHandler } from "./Assignments";
+import { assignmentRules, assignmentKey } from "@/lib/learning";
 import { PendingPeople } from "./PendingPeople";
 import { useState } from "react";
 import {
@@ -31,6 +33,7 @@ type Props = {
   user: User;
   onChange: (d: Workspace) => void | Promise<void>;
   production?: boolean;
+  onLearning?: LearningHandler;
   onUpload?: UploadMedia;
 };
 const id = () => crypto.randomUUID();
@@ -40,6 +43,7 @@ export default function Admin({
   onChange,
   production = false,
   onUpload,
+  onLearning,
 }: Props) {
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
@@ -53,7 +57,44 @@ export default function Admin({
     [peopleRole, setPeopleRole] = useState("all"),
     [peopleGroup, setPeopleGroup] = useState("all"),
     [peopleStatus, setPeopleStatus] = useState("all"),
-    [groupParent, setGroupParent] = useState("");
+    [groupParent, setGroupParent] = useState(""),
+    [detailScope, setDetailScope] = useState<{
+      groupId?: string;
+      userId?: string;
+    } | null>(null);
+  const manageLearning: LearningHandler = async (action) => {
+    if (onLearning) return onLearning(action);
+    const next = structuredClone(data);
+    const c = next.content.find((c) => c.id === action.contentId)!;
+    if (action.operation === "assign" || action.operation === "unassign") {
+      c.assignments = assignmentRules(c).filter(
+        (a) => assignmentKey(a) !== assignmentKey(action),
+      );
+      if (action.operation === "assign")
+        c.assignments.push({
+          groupId: action.groupId,
+          userId: action.userId,
+          assignedAt: new Date().toISOString(),
+          due: action.due!,
+        });
+      c.groups = c.assignments.flatMap((a) => (a.groupId ? [a.groupId] : []));
+    } else {
+      const list = next.progress[action.userId!] || [];
+      next.progress[action.userId!] = [
+        ...list.filter((p) => p.content_id !== c.id || p.version !== c.version),
+        {
+          content_id: c.id,
+          version: c.version,
+          lessons:
+            action.operation === "complete" ? c.lessons.map((l) => l.id) : [],
+          passed: action.operation === "complete",
+          attempts: [],
+          revision: (action.progressExpected || 0) + 1,
+        },
+      ];
+    }
+    await onChange(next);
+  };
   function create(kind: Content["kind"]) {
     setEditing({
       id: id(),
@@ -143,8 +184,76 @@ export default function Admin({
         onCancel={() => setEditing(null)}
         onUpload={onUpload}
         production={production}
+        onLearning={manageLearning}
       />
     );
+  if (detailScope) {
+    const group = data.groups.find((g) => g.id === detailScope.groupId);
+    const person = data.users.find((u) => u.id === detailScope.userId);
+    return (
+      <>
+        <button className="text-button" onClick={() => setDetailScope(null)}>
+          <ArrowLeft size={16} />
+          Back to {group ? "groups" : "people"}
+        </button>
+        <div className="page-heading">
+          <h1>{group?.name || person?.name}</h1>
+          <p>
+            {group
+              ? "Manage this group’s members and learning assignments."
+              : person?.email}
+          </p>
+        </div>
+        <Assignments
+          key={JSON.stringify(detailScope)}
+          data={data}
+          scope={detailScope}
+          onAction={manageLearning}
+          onOpenGroup={(groupId) => setDetailScope({ groupId })}
+        />
+        {group && (
+          <section>
+            <h2>Direct members</h2>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Person</th>
+                    <th>Role</th>
+                    <th>Learning</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.users
+                    .filter((u) => u.groups.includes(group.id))
+                    .map((u) => (
+                      <tr key={u.id}>
+                        <td>
+                          {u.name}
+                          <small>{u.email}</small>
+                        </td>
+                        <td>{u.role}</td>
+                        <td>
+                          <button
+                            onClick={() => setDetailScope({ userId: u.id })}
+                          >
+                            View assignments
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="muted">
+              Manage group membership from People → Edit. Assignments also apply
+              to members of descendant groups.
+            </p>
+          </section>
+        )}
+      </>
+    );
+  }
   return (
     <>
       <div className="page-heading">
@@ -160,6 +269,7 @@ export default function Admin({
             name: production ? "People" : "Demo profiles",
             icon: Users,
           },
+          { id: "assignments", name: "Assignments", icon: Layers },
           { id: "groups", name: "Groups", icon: Layers },
           { id: "teams", name: "Teams", icon: Users },
           { id: "progress", name: "Progress", icon: BarChart3 },
@@ -341,6 +451,7 @@ export default function Admin({
                         >
                           Edit
                         </button>
+
                         {production && c.publishedRevision && (
                           <button
                             className="text-button"
@@ -506,6 +617,12 @@ export default function Admin({
                         >
                           Edit
                         </button>
+                        <button
+                          className="text-button"
+                          onClick={() => setDetailScope({ userId: u.id })}
+                        >
+                          Assignments & progress
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -513,6 +630,12 @@ export default function Admin({
             </table>
           </div>
         </>
+      ) : tab === "assignments" ? (
+        <Assignments
+          data={data}
+          onAction={manageLearning}
+          onOpenGroup={(groupId) => setDetailScope({ groupId })}
+        />
       ) : tab === "groups" ? (
         <>
           <form
@@ -621,18 +744,12 @@ export default function Admin({
                   }{" "}
                   assigned courses
                 </p>
-                <ul>
-                  {data.content
-                    .filter(
-                      (c) => c.kind === "course" && c.groups.includes(g.id),
-                    )
-                    .map((c) => (
-                      <li key={c.id}>
-                        {c.title}
-                        {c.status === "draft" ? " (draft)" : ""}
-                      </li>
-                    ))}
-                </ul>
+                <button
+                  className="primary"
+                  onClick={() => setDetailScope({ groupId: g.id })}
+                >
+                  Manage group
+                </button>
                 <button
                   onClick={() => {
                     const name = prompt("Group name", g.name)?.trim();
@@ -773,6 +890,7 @@ export default function Admin({
   );
 }
 export function Editor({
+  onLearning,
   content,
   data,
   onSave,
@@ -786,6 +904,7 @@ export function Editor({
   data: Workspace;
   onSave: (c: Content) => void | Promise<void>;
   onCancel: () => void;
+  onLearning?: LearningHandler;
 }) {
   const [c, setC] = useState<Content>(() => ({
       ...content,
@@ -797,6 +916,7 @@ export function Editor({
           due: { type: "none" },
         })),
     })),
+    [editorTab, setEditorTab] = useState("content"),
     [error, setError] = useState(""),
     [refresh, setRefresh] = useState(false),
     [saving, setSaving] = useState(false);
@@ -829,8 +949,16 @@ export function Editor({
     setSaving(true);
     setError("");
     try {
+      const latest = data.content.find((x) => x.id === c.id);
       await onSave({
         ...c,
+        ...(latest
+          ? {
+              assignments: latest.assignments,
+              groups: latest.groups,
+              revision: latest.revision,
+            }
+          : {}),
         title: c.title.trim(),
         category: c.category.trim(),
         version: existing && refresh ? content.version + 1 : content.version,
@@ -843,6 +971,21 @@ export function Editor({
   }
   const set = (key: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: value }));
+  if (editorTab === "assignments" && onLearning)
+    return (
+      <>
+        <button className="text-button" onClick={() => setEditorTab("content")}>
+          <ArrowLeft size={16} />
+          Back to course builder
+        </button>
+        <h1>{c.title}</h1>
+        <Assignments
+          data={data}
+          scope={{ courseId: c.id }}
+          onAction={onLearning}
+        />
+      </>
+    );
   return (
     <form className="editor" onSubmit={submit}>
       <button type="button" className="text-button" onClick={onCancel}>
@@ -1194,119 +1337,29 @@ export function Editor({
                   onChange={(e) => set("duration", Number(e.target.value))}
                 />
               </label>
-              <fieldset>
-                <legend>Group assignments</legend>
+              <section>
+                <h3>Assignments</h3>
                 <p className="muted">
-                  Assignments include nested groups. If deadlines overlap, the
-                  earliest applies.
+                  Manage group and individual assignments separately from course
+                  edits.
                 </p>
-                {data.groups.map((g) => {
-                  const rule = c.assignments?.find((a) => a.groupId === g.id);
-                  const update = (patch: Partial<Assignment>) => {
-                    if (rule)
-                      set(
-                        "assignments",
-                        c.assignments!.map((a) =>
-                          a.groupId === g.id ? { ...a, ...patch } : a,
-                        ),
-                      );
-                  };
-                  return (
-                    <div className="assignment-rule" key={g.id}>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={!!rule}
-                          onChange={(e) => {
-                            const rules = e.target.checked
-                              ? [
-                                  ...(c.assignments || []),
-                                  {
-                                    groupId: g.id,
-                                    assignedAt: new Date().toISOString(),
-                                    due: { type: "none" as const },
-                                  },
-                                ]
-                              : (c.assignments || []).filter(
-                                  (a) => a.groupId !== g.id,
-                                );
-                            setC((prev) => ({
-                              ...prev,
-                              assignments: rules,
-                              groups: rules.map((a) => a.groupId),
-                            }));
-                          }}
-                        />
-                        {g.name}
-                      </label>
-                      {rule && (
-                        <>
-                          <label>
-                            Due date for {g.name}
-                            <select
-                              value={rule.due.type}
-                              onChange={(e) =>
-                                update({
-                                  due:
-                                    e.target.value === "date"
-                                      ? {
-                                          type: "date",
-                                          date: new Date()
-                                            .toISOString()
-                                            .slice(0, 10),
-                                        }
-                                      : e.target.value === "days"
-                                        ? { type: "days", days: 7 }
-                                        : { type: "none" },
-                                })
-                              }
-                            >
-                              <option value="none">No deadline</option>
-                              <option value="date">Specific date</option>
-                              <option value="days">
-                                Days after assignment
-                              </option>
-                            </select>
-                          </label>
-                          {rule.due.type === "date" && (
-                            <input
-                              aria-label={`Deadline for ${g.name}`}
-                              required
-                              type="date"
-                              value={rule.due.date}
-                              onChange={(e) =>
-                                update({
-                                  due: { type: "date", date: e.target.value },
-                                })
-                              }
-                            />
-                          )}{" "}
-                          {rule.due.type === "days" && (
-                            <label>
-                              Days after assignment
-                              <input
-                                required
-                                type="number"
-                                min={1}
-                                max={3650}
-                                value={rule.due.days}
-                                onChange={(e) =>
-                                  update({
-                                    due: {
-                                      type: "days",
-                                      days: Number(e.target.value),
-                                    },
-                                  })
-                                }
-                              />
-                            </label>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </fieldset>
+                {existing &&
+                (data.publishedContent ?? data.content).some(
+                  (x) => x.id === c.id && x.status === "published",
+                ) &&
+                onLearning ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditorTab("assignments");
+                    }}
+                  >
+                    Manage assignments
+                  </button>
+                ) : (
+                  <p>Publish this course to assign it.</p>
+                )}
+              </section>
               {existing && (
                 <label className="checkbox-label">
                   <input

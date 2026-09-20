@@ -33,3 +33,11 @@ Vercel Preview credentials point only to the isolated backend. The app uses the 
 One dedicated Google web OAuth client should use callback `https://lmcrlobrxyxgwsyayhbb.supabase.co/auth/v1/callback`. Configure that client only on the isolated Supabase project. Supabase's allowed application redirect URLs must include the reviewed Preview branches' `/auth/callback` URLs; Google does not need a separate client per Vercel deployment. Keep the allowlist restricted to this project's Preview hosts; never allow arbitrary vercel.app projects.
 
 Hosted migrations and sample data have been applied to the isolated backend. Vercel Preview configuration and a successful redeployment are confirmed; the guest library displays both sample courses. Dedicated Google provider configuration and authenticated role verification are still pending.
+
+## Assignment management iteration
+
+Assignments can target one group (including descendants and future members) or one person. The workspace Assignments view, group/person detail views and course builder all manage the same published rules. Assignment-only edits preserve unpublished lesson edits. Multiple applicable rules yield one learner course and the earliest deadline. Unassigning removes only that source and never clears progress.
+
+Administrators can mark a person complete or reset their current published course version from assignment details or the person’s learning view. Completion records all lessons complete and a passing completion without fabricating a quiz attempt. Reset clears current-version lessons, completion and attempts; older versions remain intact and the audit stores before/after state. Both actions require confirmation, server-side admin authorization, current document revision and current progress revision. Managers retain reporting-only scope.
+
+Apply `202609200002_assignments.sql` after the governance migration. It adds progress revisions, individual assignment validation, and an audited service-only learning-management RPC. Apply to the isolated Preview database first; production remains approval-gated.

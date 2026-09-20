@@ -32,6 +32,10 @@ function readGuest(): Progress[] {
 }
 let currentUser: User | null = null;
 const runtime: FieldbookRuntime = {
+  async manageLearning(action) {
+    await request("/api/assignments", action);
+    return (await runtime.load()).data;
+  },
   async load() {
     const state = await request("/api/workspace");
     currentUser = state.user;
