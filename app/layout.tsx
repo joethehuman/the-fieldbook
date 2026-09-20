@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./design-system.css";
 export const metadata: Metadata = {
-  title: "Fieldbook · Your field, in focus",
+  title: "The Fieldbook · Interactive demo",
   description: "A lightweight home for docs, updates, and courses.",
 };
 export default function RootLayout({
