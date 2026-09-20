@@ -48,3 +48,7 @@ Before publication, complete the [first-release checklist](release-checklist.md)
 - Rehearse a clean Vercel/Supabase installation and test separate learner permissions, cross-device progress, guest import, media access, MCP expiry/revocation, and database/media recovery.
 
 These are release gates, not promised product features or a roadmap.
+
+## Consolidation follow-up
+
+The complete audited implementation and documentation were merged into `main` through PR #2; PR #1 was also recorded as merged because its commits are included. Both former development branch tips are ancestors of main. Vercel demo and production now track main, retaining separate build roots and backend configuration. The repository remains private and no version release was created. The source commit passed the configured GitHub CI checks before merge. The remaining license, security-history review, fresh-install, and external validation gates still apply.

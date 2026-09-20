@@ -3,7 +3,7 @@
 This is a release gate, not a claim that these tasks are already complete.
 
 - [ ] Choose a license, add `LICENSE`, and review dependency/asset licenses. Update README publication status.
-- [ ] Review and merge the intended implementation into the default branch. Ensure it contains these guides; deploying an older branch may deploy only the original demo.
+- [x] Consolidate the current demo, production implementation, and guides into `main`. Recheck the exact candidate commit before publishing any release.
 - [ ] Audit tracked files and history for secrets, personal information and installation-specific configuration. Keep operational notes and policy drafts outside the released repository.
 - [ ] Establish a private vulnerability-reporting channel and add `SECURITY.md` with the actual supported versions/contact.
 - [ ] Complete a fresh installation using only the public guides and new accounts. Record provider/runtime versions and any missing steps.
