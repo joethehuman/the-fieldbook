@@ -24,3 +24,12 @@ Exercise schema/hierarchy failures, active-admin protections, stale writes, dire
 This additive migration keeps the existing JSON hierarchy/membership model. `fb_config.governance_revision` serializes governance changes; database routines validate hierarchy/reference integrity and audit changes in the same transaction. `fb_profiles.effective_group_joined_at` records continuous inherited membership independently from direct membership. `fb_pending_profiles` holds unclaimed accounts. A service-only SQL snapshot scopes reporting before serialization and avoids the API's per-table 1,000-person truncation. The existing catalog and feedback queries retain their documented 1,000-row limit; this remains a small-instance application. Group/team deletion and hard account deletion are intentionally not exposed.
 
 Preview backend created: `fieldbook-governance-preview` (Supabase ref `lmcrlobrxyxgwsyayhbb`, Vercel storage `store_NsdevmvTq6jzh859`). It is separate from the live Fieldbook backend. Do not configure its credentials on the production application.
+
+
+## Reusable Preview authentication
+
+Vercel Preview credentials point only to the isolated backend. The app uses the trusted `VERCEL_BRANCH_URL` in Preview and retains `FIELDBOOK_URL` for production/local use. Login first redirects to that canonical host before setting the PKCE cookie, so the callback uses the same host. Review through the branch URL.
+
+One dedicated Google web OAuth client should use callback `https://lmcrlobrxyxgwsyayhbb.supabase.co/auth/v1/callback`. Configure that client only on the isolated Supabase project. Supabase's allowed application redirect URLs must include the reviewed Preview branches' `/auth/callback` URLs; Google does not need a separate client per Vercel deployment. Keep the allowlist restricted to this project's Preview hosts; never allow arbitrary vercel.app projects.
+
+Hosted migrations and sample data have been applied to the isolated backend. Vercel Preview configuration and a successful redeployment are confirmed; the guest library displays both sample courses. Dedicated Google provider configuration and authenticated role verification are still pending.

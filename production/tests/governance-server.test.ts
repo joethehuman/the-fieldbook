@@ -128,6 +128,10 @@ test("preview configuration fails closed if backend identity is missing or diffe
     assert.throws(env, /isolated/);
     process.env.FIELDBOOK_PREVIEW_SUPABASE_REF = "isolated";
     assert.equal(env().url, "https://isolated.supabase.co");
+    process.env.VERCEL_BRANCH_URL = "fieldbook-git-feature-two.vercel.app";
+    assert.equal(env().origin, "https://fieldbook-git-feature-two.vercel.app");
+    process.env.VERCEL_ENV = "production";
+    assert.equal(env().origin, "https://preview.example");
   } finally {
     process.env = saved;
   }
