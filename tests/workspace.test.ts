@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import {
   ancestorIds,
   assignedCourses,
-  assignmentInfo,
   canParent,
   reportTeamIds,
   isComplete,
 } from "../lib/types";
 import { freshWorkspace, updateProgress } from "../lib/store";
+import { learningTarget } from "../lib/learning";
 import { videoSource } from "../lib/video";
 
 test("nested memberships inherit assignments once and preserve full library access", () => {
@@ -29,7 +29,7 @@ test("nested memberships inherit assignments once and preserve full library acce
     6,
   );
 });
-test("earliest deadline wins and relative deadlines start when membership or assignment begins", () => {
+test("catch-up starts at the later membership or group requirement date, using the earliest continuing source", () => {
   const d = freshWorkspace();
   const c = {
     ...d.content.find((c) => c.id === "course-1")!,
@@ -37,12 +37,12 @@ test("earliest deadline wins and relative deadlines start when membership or ass
       {
         groupId: "sales",
         assignedAt: "2026-09-01T12:00:00Z",
-        due: { type: "days" as const, days: 7 },
+        due: { type: "none" as const },
       },
       {
         groupId: "startup",
-        assignedAt: "2026-09-01T12:00:00Z",
-        due: { type: "date" as const, date: "2026-09-12" },
+        assignedAt: "2026-09-15T12:00:00Z",
+        due: { type: "none" as const },
       },
     ],
   };
@@ -52,19 +52,16 @@ test("earliest deadline wins and relative deadlines start when membership or ass
   ];
   const u = {
     ...d.users[0],
+    onboardingStart: undefined,
     groups: ["startup"],
     groupJoinedAt: { startup: "2026-09-10T12:00:00Z" },
   };
-  assert.equal(assignmentInfo(c, u, groups).dueDate, "2026-09-12");
+  assert.equal(learningTarget(c, u, groups), "2026-10-10");
   assert.equal(
-    assignmentInfo({ ...c, assignments: c.assignments.slice(0, 1) }, u, groups)
-      .dueDate,
-    "2026-09-17",
+    learningTarget({ ...c, assignments: c.assignments.slice(1) }, u, groups),
+    "2026-10-15",
   );
-  assert.equal(
-    assignmentInfo(c, { ...u, groups: [] }, groups).dueDate,
-    undefined,
-  );
+  assert.equal(learningTarget(c, { ...u, groups: [] }, groups), undefined);
 });
 test("team manager can report on descendants, not siblings or ancestors", () => {
   const d = freshWorkspace();

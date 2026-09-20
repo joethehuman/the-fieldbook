@@ -4,6 +4,12 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Required-learning verification
+
+- Updated stale assignment tests and learning documentation to the current group-only requirements and organization onboarding/catch-up windows.
+- Database assignment checks now include the required-learning migration, rejection of individual assignments/custom deadlines, and preservation of audited individual progress actions.
+- Full test suite passes; no application behavior or database schema changes in this follow-up.
+
 ### Content navigation and course covers
 
 - Admins can save the Docs section order under Organization Settings → Docs navigation. The sidebar and overview use the same order; new sections append alphabetically.

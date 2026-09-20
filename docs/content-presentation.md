@@ -30,7 +30,7 @@ No database migration or new service is required. Both fields are optional and u
 
 - Demo and production builds passed, including TypeScript checks.
 - Docs ordering tests passed. All eight production tests passed, including cover authorization, media readiness/type validation, revision conflicts, draft isolation, publication and removal.
-- The full shared suite passed 21 of 22 tests. The pre-existing `direct and inherited assignments deduplicate courses and use earliest deadline` assertion still expects 2026-09-22 while unchanged code returns 2026-10-04. This branch does not modify assignment behavior.
+- The full suite now passes: 23 shared tests and 8 production tests. Superseded individual-assignment/per-course-deadline expectations were replaced with group-only requirements and organization completion-window tests. The database assignment test now applies the required-learning migration and verifies that retired assignment rules are rejected. Application assignment behavior is unchanged.
 - Headless Chrome checked keyboard reordering, save/reload persistence, matching Docs sidebar/overview, desktop/mobile Update layouts, cover display/fallback, and removing a cover through the course editor. No browser JavaScript errors occurred.
 - An isolated browser harness exercised the upload controls with a simulated upload callback: upload, replacement, failed replacement preserving the previous cover, removal, and rejection of video files. This is not a live Supabase upload test.
 - Local checks used the available Node 24.19.0 and pnpm 11.25.0 runtime; the repository targets Node 22 and pnpm 10.17.1. Release-runtime CI and real storage upload/playback remain external checks.

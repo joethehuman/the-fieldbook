@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { governanceSchema } from "../production/lib/governance-schema";
-import { assignmentInfo, assignedCourses } from "../lib/types";
+import { learningTarget } from "../lib/learning";
+import { assignedCourses } from "../lib/types";
 
 const admin = "00000000-0000-4000-8000-000000000001",
   manager = "00000000-0000-4000-8000-000000000002",
@@ -283,7 +284,7 @@ test("governance database enforces permissions, revision, hierarchy, registratio
   }
 });
 
-test("effective membership deadlines and group inheritance never gate catalog visibility", () => {
+test("effective group membership controls catch-up timing without gating catalog visibility", () => {
   const user: any = {
     ...users[2],
     effectiveGroupJoinedAt: {
@@ -299,16 +300,16 @@ test("effective membership deadlines and group inheritance never gate catalog vi
       {
         groupId: "all",
         assignedAt: "2026-09-10T00:00:00Z",
-        due: { type: "days", days: 7 },
+        due: { type: "none" },
       },
       {
         groupId: "sales",
         assignedAt: "2026-09-10T00:00:00Z",
-        due: { type: "date", date: "2026-09-25" },
+        due: { type: "none" },
       },
     ],
   };
-  assert.equal(assignmentInfo(course, user, groups).dueDate, "2026-09-25");
+  assert.equal(learningTarget(course, user, groups), "2026-10-10");
   assert.equal(assignedCourses([course], user, groups).length, 1);
   assert.equal(
     assignedCourses([course], { ...user, groups: [] }, groups).length,
