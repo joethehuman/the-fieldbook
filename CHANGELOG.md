@@ -4,6 +4,13 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Content navigation and course covers
+
+- Admins can save the Docs section order under Organization Settings → Docs navigation. The sidebar and overview use the same order; new sections append alphabetically.
+- Courses can use an uploaded cover image or retain generated artwork. Covers support replacement and removal, preserve draft/publication behavior, and use existing private media storage.
+- Update cards align artwork at the top, omit list-position numbers, and cycle through the existing background palette.
+- No database migration is required. See [content presentation controls](docs/content-presentation.md).
+
 ### Interface redesign (review branch)
 
 - Shared neutral theme, Geist typography, consistent spacing, compact actions, and responsive layout across learner, manager, and administrator views.

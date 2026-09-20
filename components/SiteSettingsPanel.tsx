@@ -5,11 +5,12 @@ import { Upload, ImageIcon } from "lucide-react";
 import { ActionGroup } from "./ui/action-group";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
+import { orderedDocCategories } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import type { Workspace } from "@/lib/store";
 import type { UploadMedia } from "./MarkdownEditor";
 export type SettingsSection =
-  "identity" | "courses" | "access" | "privacy" | "mcp";
+  "identity" | "docs" | "courses" | "access" | "privacy" | "mcp";
 export default function SiteSettingsPanel({
   data,
   onChange,
@@ -38,6 +39,20 @@ export default function SiteSettingsPanel({
           JSON.stringify({ ...defaultSettings, ...data.settings }),
     );
   }, [busy, settings, data.settings, onPendingChange]);
+  const docSections = orderedDocCategories(
+    data.content.filter((c) => c.kind === "doc"),
+    settings.docCategoryOrder,
+  );
+  function moveDocSection(index: number, offset: number) {
+    const next = [...docSections];
+    const target = index + offset;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    setSettings((current) => ({ ...current, docCategoryOrder: next }));
+    setNotice(
+      `${next[target]} moved ${offset < 0 ? "up" : "down"}. Save settings to apply the order.`,
+    );
+  }
   const logoInput = useRef<HTMLInputElement>(null);
   return (
     <form
@@ -47,7 +62,12 @@ export default function SiteSettingsPanel({
         setBusy(true);
         setNotice("");
         try {
-          await onChange({ ...data, settings });
+          const next =
+            section === "docs"
+              ? { ...settings, docCategoryOrder: docSections }
+              : settings;
+          await onChange({ ...data, settings: next });
+          setSettings(next);
           setNotice("Settings saved.");
         } catch (e) {
           setNotice((e as Error).message);
@@ -195,6 +215,52 @@ export default function SiteSettingsPanel({
               )}
             </fieldset>
           )}
+        </section>
+      )}
+      {section === "docs" && (
+        <section className="settings-section" id="settings-docs">
+          <h3>Docs navigation</h3>
+          <p>
+            Choose the section order for the Docs sidebar and overview. New
+            sections appear at the end, alphabetically. This does not change
+            article or folder order.
+          </p>
+          {docSections.length ? (
+            <ol className="doc-order-list">
+              {docSections.map((name, index) => (
+                <li key={name}>
+                  <span>{name}</span>
+                  <ActionGroup>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Move ${name} up`}
+                      disabled={busy || index === 0}
+                      onClick={() => moveDocSection(index, -1)}
+                    >
+                      Move up
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`Move ${name} down`}
+                      disabled={busy || index === docSections.length - 1}
+                      onClick={() => moveDocSection(index, 1)}
+                    >
+                      Move down
+                    </Button>
+                  </ActionGroup>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p>Create a document to add a section here.</p>
+          )}
+          <p className="field-help">
+            Only sections with published documents are shown to readers.
+          </p>
         </section>
       )}
       {section === "courses" && (
