@@ -2718,7 +2718,7 @@ select:focus-visible {
 
 .guest-import {
   position: relative;
-  z-index: 30;
+  margin-left: var(--nav);
   background: #edf4ff;
   border-bottom: 1px solid #cddff8;
   padding: 14px 24px;
@@ -2729,6 +2729,16 @@ select:focus-visible {
 }
 .guest-import p {
   margin: 0;
+}
+.guest-import button {
+  max-width: 100%;
+  white-space: normal;
+}
+@media (max-width: 760px) {
+  .guest-import {
+    margin-left: 0;
+    padding-inline: 16px;
+  }
 }
 
 /* Learning administration */
