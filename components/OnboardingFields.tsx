@@ -9,7 +9,7 @@ export function OnboardingFields({
 }) {
   return (
     <fieldset>
-      <legend>Learning stage</legend>
+      <legend>Onboarding</legend>
       <label>
         Starting point
         <SelectField
@@ -38,8 +38,8 @@ export function OnboardingFields({
         </label>
       )}
       <small>
-        The workspace learning windows determine the target. First login does
-        not start onboarding.
+        The organization course completion windows determine the target. First
+        login does not start onboarding.
       </small>
     </fieldset>
   );

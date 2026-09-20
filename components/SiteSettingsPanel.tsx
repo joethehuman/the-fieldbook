@@ -1,7 +1,9 @@
 "use client";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
-import { useState } from "react";
+import { Upload, ImageIcon } from "lucide-react";
+import { ActionGroup } from "./ui/action-group";
+import { useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { defaultSettings } from "@/lib/settings";
 import type { Workspace } from "@/lib/store";
@@ -23,6 +25,7 @@ export default function SiteSettingsPanel({
     }),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
+  const logoInput = useRef<HTMLInputElement>(null);
   return (
     <form
       className="settings-panel"
@@ -43,7 +46,7 @@ export default function SiteSettingsPanel({
       <nav className="settings-index" aria-label="Settings sections">
         {[
           "Identity",
-          "Learning",
+          "Courses",
           "Access",
           "Privacy",
           ...(production ? ["Connections"] : []),
@@ -68,9 +71,9 @@ export default function SiteSettingsPanel({
         tabIndex={-1}
         id="settings-identity"
       >
-        <h3>Workspace identity</h3>
+        <h3>Organization identity</h3>
         <p className="muted">
-          Your identity, with the same simple home for knowledge and learning.
+          Your identity, with the same simple home for docs and courses.
         </p>
         <label>
           Site name
@@ -91,64 +94,119 @@ export default function SiteSettingsPanel({
             }
           />
         </label>
-        <label>
-          Accent color
-          <input
-            type="color"
-            value={settings.accent}
-            onChange={(e) =>
-              setSettings({ ...settings, accent: e.target.value })
-            }
-          />
-        </label>
-        {onUpload && (
-          <label>
-            Logo
+        <fieldset className="brand-control">
+          <legend>Accent color</legend>
+          <p className="field-help">
+            Used for links and highlights across your organization.
+          </p>
+          <div className="color-control">
             <input
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              disabled={busy}
-              onChange={async (e) => {
-                const f = e.target.files?.[0];
-                if (!f) return;
-                setBusy(true);
-                try {
-                  const url = await onUpload(f);
-                  setSettings({ ...settings, logoUrl: url });
-                } catch (error) {
-                  setNotice((error as Error).message);
-                } finally {
-                  setBusy(false);
-                }
-              }}
+              aria-label="Choose accent color"
+              type="color"
+              value={
+                /^#[0-9a-f]{6}$/i.test(settings.accent)
+                  ? settings.accent
+                  : "#0069ff"
+              }
+              onChange={(e) =>
+                setSettings({ ...settings, accent: e.target.value })
+              }
             />
-          </label>
-        )}
-        {settings.logoUrl && (
-          <div>
-            <img
-              className="branding-preview"
-              src={settings.logoUrl}
-              alt="Current logo"
+            <input
+              aria-label="Accent color hex value"
+              type="text"
+              required
+              pattern="#[0-9a-fA-F]{6}"
+              maxLength={7}
+              spellCheck={false}
+              placeholder="#0069ff"
+              value={settings.accent}
+              onChange={(e) =>
+                setSettings({ ...settings, accent: e.target.value })
+              }
             />
-            <button
-              type="button"
-              onClick={() => setSettings({ ...settings, logoUrl: "" })}
-            >
-              Remove logo
-            </button>
           </div>
+        </fieldset>
+        {(onUpload || settings.logoUrl) && (
+          <fieldset className="brand-control">
+            <legend>Organization logo</legend>
+            <div className="logo-control">
+              <div className="logo-preview">
+                {settings.logoUrl ? (
+                  <img src={settings.logoUrl} alt="Organization logo preview" />
+                ) : (
+                  <ImageIcon aria-hidden="true" size={26} />
+                )}
+              </div>
+              <div className="logo-controls">
+                <ActionGroup>
+                  {onUpload && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => logoInput.current?.click()}
+                    >
+                      <Upload size={14} />
+                      {settings.logoUrl ? "Replace logo" : "Upload logo"}
+                    </Button>
+                  )}
+                  {settings.logoUrl && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => setSettings({ ...settings, logoUrl: "" })}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </ActionGroup>
+                <p className="field-help">
+                  PNG, JPG, or WebP. Your logo is scaled to fit.
+                </p>
+              </div>
+            </div>
+            {onUpload && (
+              <input
+                ref={logoInput}
+                hidden
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                disabled={busy}
+                aria-label="Upload organization logo"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = "";
+                  if (!file) return;
+                  setBusy(true);
+                  setNotice("");
+                  try {
+                    const url = await onUpload(file);
+                    setSettings((current) => ({ ...current, logoUrl: url }));
+                    setNotice("Logo uploaded. Save settings to apply it.");
+                  } catch (error) {
+                    setNotice((error as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+            )}
+          </fieldset>
         )}
       </section>
       <fieldset
         className="settings-section"
         tabIndex={-1}
-        id="settings-learning"
+        id="settings-courses"
       >
-        <legend>Learning windows</legend>
+        <legend>Course completion windows</legend>
         <p>
           Publishing adds to the library. Only courses selected for a group
-          become required learning.
+          become required courses.
         </p>
         <label>
           New user onboarding window (days)
@@ -180,8 +238,8 @@ export default function SiteSettingsPanel({
           />
         </label>
         <small>
-          New learning gets a full catch-up window, even near the end of
-          onboarding. Changes recalculate targets for everyone.
+          Newly required courses get a full catch-up window, even near the end
+          of onboarding. Changes recalculate targets for everyone.
         </small>
       </fieldset>
       <section className="settings-section" tabIndex={-1} id="settings-access">
@@ -243,33 +301,32 @@ export default function SiteSettingsPanel({
           }}
         />
       </section>
-      <div className="settings-save-bar">
-        <Button variant="default" disabled={busy}>
-          {busy ? "Saving…" : "Save settings"}
-        </Button>
-        <p role="status">{notice}</p>
-      </div>
       {production && (
         <section
           className="settings-section integration-card"
           tabIndex={-1}
           id="settings-connections"
         >
-          <h2>Connect your AI</h2>
+          <h3>AI connections</h3>
           <p>
-            Use{" "}
-            <code>
-              {typeof window !== "undefined" ? window.location.origin : ""}
-              /api/mcp
-            </code>{" "}
-            as a custom MCP server in ChatGPT or Claude. Sign in as an
-            administrator and approve the connection.
+            Connect ChatGPT or Claude using this MCP server address. Sign in as
+            an administrator to approve the connection.
           </p>
+          <code className="connection-address">
+            {typeof window !== "undefined" ? window.location.origin : ""}
+            /api/mcp
+          </code>
           <a className="text-button" href="/connections">
             Manage AI connections →
           </a>
         </section>
       )}
+      <div className="settings-save-bar">
+        <Button variant="default" disabled={busy}>
+          {busy ? "Saving…" : "Save settings"}
+        </Button>
+        <p role="status">{notice}</p>
+      </div>
     </form>
   );
 }

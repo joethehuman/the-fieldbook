@@ -95,9 +95,9 @@ export function Assignments({
       await onAction(action);
       setNotice(
         action.operation === "assign"
-          ? "Required learning updated."
+          ? "Required courses updated."
           : action.operation === "unassign"
-            ? "Requirement removed. Learning history preserved."
+            ? "Requirement removed. Course history preserved."
             : action.operation === "complete"
               ? "Course marked complete."
               : "Progress reset.",
@@ -145,7 +145,7 @@ export function Assignments({
         <thead>
           <tr>
             <th>Person</th>
-            <th>Learning status</th>
+            <th>Course status</th>
             <th>Progress</th>
             <th>Actions</th>
           </tr>
@@ -231,11 +231,11 @@ export function Assignments({
     <section className="assignments-panel">
       <div className="assignment-heading">
         <div>
-          <h2>{person ? "Learning & progress" : "Required learning"}</h2>
+          <h2>{person ? "Courses & progress" : "Required courses"}</h2>
           <p className="muted">
             {person
-              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Learning comes from group membership.`
-              : "Choose the learning each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
+              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Required courses come from group membership.`
+              : "Choose the courses each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
           </p>
         </div>
       </div>
@@ -296,17 +296,17 @@ export function Assignments({
             </SelectField>
           </label>
           <Button variant="default" disabled={busy || !available.length}>
-            Add to required learning
+            Add to required courses
           </Button>
         </form>
       )}
       {!person && !group && (
-        <p>Create a group to define its required learning.</p>
+        <p>Create a group to define its required courses.</p>
       )}
       <p className="muted">
         {data.settings?.onboardingDays ?? 90} days for new users ·{" "}
         {data.settings?.catchUpDays ?? 30} days to catch up with new required
-        learning. Manage these windows in Settings.
+        courses. Manage these windows in Settings.
       </p>
       {notice && <p role="status">{notice}</p>}
       <label>
@@ -314,7 +314,7 @@ export function Assignments({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search required learning"
+          placeholder="Search required courses"
         />
       </label>
       <div className="table-wrap">
@@ -405,7 +405,7 @@ export function Assignments({
                               onClick={async () => {
                                 if (
                                   await confirm(
-                                    `Remove ${c.title} from ${group?.name} required learning? Progress and other group requirements are preserved.`,
+                                    `Remove ${c.title} from ${group?.name} required courses? Progress and other group requirements are preserved.`,
                                   )
                                 )
                                   void act({
@@ -440,7 +440,7 @@ export function Assignments({
         </table>
         {!ordered.length && (
           <p className="empty">
-            No required learning yet. The full library remains available.
+            No required courses yet. The full library remains available.
           </p>
         )}
       </div>
@@ -452,7 +452,7 @@ export function Assignments({
       )}
       {person && (
         <>
-          <h3>Learning history</h3>
+          <h3>Course history</h3>
           {courses
             .filter(
               (c) =>
@@ -463,7 +463,7 @@ export function Assignments({
             )
             .map((c) => (
               <section key={c.id}>
-                <h4>{c.title} · Optional learning</h4>
+                <h4>{c.title} · Optional course</h4>
                 {progressTable(c)}
               </section>
             ))}

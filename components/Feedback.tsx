@@ -167,9 +167,9 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             }}
           >
             <option value="all">All types</option>
-            <option value="doc">Knowledge</option>
-            <option value="brief">Field notes</option>
-            <option value="course">Learning</option>
+            <option value="doc">Docs</option>
+            <option value="brief">Updates</option>
+            <option value="course">Courses</option>
           </SelectField>
         </label>
         <label>

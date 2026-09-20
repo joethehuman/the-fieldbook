@@ -1,4 +1,6 @@
 "use client";
+import { ActionGroup } from "./ui/action-group";
+import { GroupPicker } from "./ui/group-picker";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { OnboardingFields } from "./OnboardingFields";
@@ -64,24 +66,27 @@ export function PendingPeople({
           <span>
             {p.name} · {p.email} · {p.role}
           </span>
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => setEditing(p)}
-          >
-            Edit
-          </button>
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => void save(p, true)}
-          >
-            Revoke
-          </button>
+          <ActionGroup>
+            <button
+              className="text-button"
+              disabled={busy}
+              onClick={() => setEditing(p)}
+            >
+              Edit
+            </button>
+            <button
+              className="text-button"
+              disabled={busy}
+              onClick={() => void save(p, true)}
+            >
+              Revoke
+            </button>
+          </ActionGroup>
         </div>
       ))}
       {editing && (
         <form
+          className="profile-form"
           onSubmit={(e) => {
             e.preventDefault();
             void save({
@@ -151,37 +156,24 @@ export function PendingPeople({
               ))}
             </SelectField>
           </label>
-          <fieldset>
-            <legend>Assignment groups</legend>
-            {data.groups.map((g) => (
-              <label className="checkbox-label" key={g.id}>
-                <input
-                  type="checkbox"
-                  checked={editing.groups.includes(g.id)}
-                  onChange={(e) =>
-                    setEditing({
-                      ...editing,
-                      groups: e.target.checked
-                        ? [...editing.groups, g.id]
-                        : editing.groups.filter((id) => id !== g.id),
-                    })
-                  }
-                />
-                {g.name}
-              </label>
-            ))}
-          </fieldset>
-          <Button variant="default" disabled={busy}>
-            {busy ? "Saving…" : "Save pending account"}
-          </Button>
-          <button
-            className="text-button"
-            type="button"
-            disabled={busy}
-            onClick={() => setEditing(null)}
-          >
-            Cancel
-          </button>
+          <GroupPicker
+            groups={data.groups}
+            value={editing.groups}
+            onChange={(groups) => setEditing({ ...editing, groups })}
+          />
+          <ActionGroup>
+            <Button variant="default" disabled={busy}>
+              {busy ? "Saving…" : "Save pending account"}
+            </Button>
+            <button
+              className="text-button"
+              type="button"
+              disabled={busy}
+              onClick={() => setEditing(null)}
+            >
+              Cancel
+            </button>
+          </ActionGroup>
         </form>
       )}
     </section>

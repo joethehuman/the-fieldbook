@@ -60,7 +60,7 @@ export const seedContent: Content[] = [
   ...[
     [
       "brief-1",
-      "Your weekly field notes",
+      "Your weekly updates",
       "Weekly newsletter",
       "A little less noise. The updates worth knowing this week.",
     ],
@@ -84,7 +84,7 @@ export const seedContent: Content[] = [
     category,
     summary,
     updatedAt: `2026-09-${18 - i * 3}T12:00:00.000Z`,
-    body: `## In this edition\n\n${summary}\n\n### What’s new\n\nThis sample brief brings the most relevant updates together in one place. Link to evergreen documentation when readers need more depth.\n\n### What it means for the field\n\nFocus on the customer problem, the practical change, and the action your team should take.\n\n### Your next step\n\nExplore the knowledge library and complete the related course in your For you collection.`,
+    body: `## In this edition\n\n${summary}\n\n### What’s new\n\nThis sample update brings the most relevant updates together in one place. Link to evergreen documentation when readers need more depth.\n\n### What it means for the field\n\nFocus on the customer problem, the practical change, and the action your team should take.\n\n### Your next step\n\nExplore the docs library and complete the related course in your For you collection.`,
   })),
   ...[
     [

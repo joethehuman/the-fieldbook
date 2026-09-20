@@ -5,7 +5,7 @@ import "./globals.css";
 import "./design-system.css";
 export const metadata: Metadata = {
   title: "Fieldbook · Your field, in focus",
-  description: "A lightweight home for field knowledge, briefs, and learning.",
+  description: "A lightweight home for docs, updates, and courses.",
 };
 export default function RootLayout({
   children,

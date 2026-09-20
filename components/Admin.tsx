@@ -7,6 +7,8 @@ import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
 import { PendingPeople } from "./PendingPeople";
 import { useState } from "react";
+import { ActionGroup } from "./ui/action-group";
+import { GroupPicker } from "./ui/group-picker";
 import { Button } from "./ui/button";
 import {
   Dialog,
@@ -57,7 +59,7 @@ const adminSections = [
       {
         id: "content",
         name: "Content",
-        description: "Create and maintain courses, knowledge, and field notes.",
+        description: "Create and maintain courses, docs, and updates.",
         icon: FileText,
       },
       {
@@ -69,7 +71,7 @@ const adminSections = [
     ],
   },
   {
-    label: "People & learning",
+    label: "People & courses",
     items: [
       {
         id: "people",
@@ -80,13 +82,7 @@ const adminSections = [
       {
         id: "groups",
         name: "Groups",
-        description: "Organize the audiences for required learning.",
-        icon: Layers,
-      },
-      {
-        id: "assignments",
-        name: "Required learning",
-        description: "Choose what each group needs to know.",
+        description: "Organize the audiences for required courses.",
         icon: Layers,
       },
       {
@@ -94,6 +90,12 @@ const adminSections = [
         name: "Teams",
         description: "Organize reporting teams and their managers.",
         icon: Users,
+      },
+      {
+        id: "assignments",
+        name: "Required courses",
+        description: "Choose what each group needs to know.",
+        icon: Layers,
       },
       {
         id: "progress",
@@ -104,12 +106,13 @@ const adminSections = [
     ],
   },
   {
-    label: "Workspace",
+    label: "Organization",
     items: [
       {
         id: "settings",
         name: "Settings",
-        description: "Manage identity, access, learning windows, and privacy.",
+        description:
+          "Manage identity, access, course completion windows, and privacy.",
         icon: Settings,
       },
     ],
@@ -295,7 +298,7 @@ export default function Admin({
           <h1>{group?.name || person?.name}</h1>
           <p>
             {group
-              ? "Manage this group’s members and required learning."
+              ? "Manage this group’s members and required courses."
               : person?.email}
           </p>
         </div>
@@ -316,7 +319,7 @@ export default function Admin({
                   <tr>
                     <th>Person</th>
                     <th>Role</th>
-                    <th>Learning</th>
+                    <th>Courses</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -333,7 +336,7 @@ export default function Admin({
                           <button
                             onClick={() => setDetailScope({ userId: u.id })}
                           >
-                            View learning
+                            View courses
                           </button>
                         </td>
                       </tr>
@@ -353,10 +356,10 @@ export default function Admin({
   return (
     <>
       <div className="page-heading admin-page-heading">
-        <span className="eyebrow">WORKSPACE</span>
+        <span className="eyebrow">ORGANIZATION</span>
         <h1>Administration</h1>
         <p>
-          Content, people, and the settings that keep your workspace running.
+          Content, people, and the settings that keep your organization running.
         </p>
       </div>
       <Tabs
@@ -442,8 +445,8 @@ export default function Admin({
                       {
                         {
                           all: "All content",
-                          doc: "Knowledge",
-                          brief: "Field notes",
+                          doc: "Docs",
+                          brief: "Updates",
                           course: "Courses",
                         }[t]
                       }
@@ -453,11 +456,11 @@ export default function Admin({
                 <div className="button-group">
                   <Button variant="outline" onClick={() => create("doc")}>
                     <Plus size={15} />
-                    Article
+                    Doc
                   </Button>
                   <Button variant="outline" onClick={() => create("brief")}>
                     <Plus size={15} />
-                    Brief
+                    Update
                   </Button>
                   <Button variant="default" onClick={() => create("course")}>
                     <Plus size={15} />
@@ -547,9 +550,9 @@ export default function Admin({
                           </td>
                           <td>
                             {c.kind === "doc"
-                              ? "Article"
+                              ? "Doc"
                               : c.kind === "brief"
-                                ? "Brief"
+                                ? "Update"
                                 : "Course"}
                           </td>
                           <td>
@@ -563,39 +566,41 @@ export default function Admin({
                           </td>
                           <td>v{c.version}</td>
                           <td>
-                            <button
-                              className="text-button"
-                              onClick={() => setEditing(structuredClone(c))}
-                            >
-                              Edit
-                            </button>
-
-                            {production && c.publishedRevision && (
+                            <ActionGroup>
                               <button
                                 className="text-button"
-                                onClick={async () => {
-                                  if (
-                                    !(await confirm(
-                                      "Unpublish this item? Its draft and history will be kept.",
-                                    ))
-                                  )
-                                    return;
-                                  try {
-                                    await onChange({
-                                      ...data,
-                                      content: data.content.filter(
-                                        (x) => x.id !== c.id,
-                                      ),
-                                    });
-                                    setNotice("Content unpublished.");
-                                  } catch (e) {
-                                    setNotice((e as Error).message);
-                                  }
-                                }}
+                                onClick={() => setEditing(structuredClone(c))}
                               >
-                                Unpublish
+                                Edit
                               </button>
-                            )}
+
+                              {production && c.publishedRevision && (
+                                <button
+                                  className="text-button"
+                                  onClick={async () => {
+                                    if (
+                                      !(await confirm(
+                                        "Unpublish this item? Its draft and history will be kept.",
+                                      ))
+                                    )
+                                      return;
+                                    try {
+                                      await onChange({
+                                        ...data,
+                                        content: data.content.filter(
+                                          (x) => x.id !== c.id,
+                                        ),
+                                      });
+                                      setNotice("Content unpublished.");
+                                    } catch (e) {
+                                      setNotice((e as Error).message);
+                                    }
+                                  }}
+                                >
+                                  Unpublish
+                                </button>
+                              )}
+                            </ActionGroup>
                           </td>
                         </tr>
                       ))}
@@ -608,7 +613,7 @@ export default function Admin({
               <section className="editor-block">
                 <h2>New users</h2>
                 <label>
-                  Default learning stage for new users
+                  Default onboarding stage for new users
                   <SelectField
                     value={data.settings?.newUserStage || "existing"}
                     onValueChange={async (value) => {
@@ -640,14 +645,14 @@ export default function Admin({
                 <p className="muted">
                   Applies to newly added users and new self-registrations. You
                   can override the stage and start date for each person. Group
-                  membership still determines required learning.
+                  membership still determines required courses.
                 </p>
               </section>
               {production && <PendingPeople data={data} onChange={onChange} />}
               <div className="admin-toolbar">
                 <p className="muted">
                   {production
-                    ? "Manage signed-in accounts. Deactivation preserves learning history. Clear managed teams before removing a manager’s access."
+                    ? "Manage signed-in accounts. Deactivation preserves course history. Clear managed teams before removing a manager’s access."
                     : "Sample profiles for trying role-based assignments. No accounts or emails are created."}
                 </p>
                 {!production && (
@@ -774,18 +779,20 @@ export default function Admin({
                           </td>
                           <td>{u.active ? "Active" : "Inactive"}</td>
                           <td>
-                            <button
-                              className="text-button"
-                              onClick={() => setPerson(structuredClone(u))}
-                            >
-                              Edit
-                            </button>
-                            <button
-                              className="text-button"
-                              onClick={() => setDetailScope({ userId: u.id })}
-                            >
-                              Learning & progress
-                            </button>
+                            <ActionGroup>
+                              <button
+                                className="text-button"
+                                onClick={() => setPerson(structuredClone(u))}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="text-button"
+                                onClick={() => setDetailScope({ userId: u.id })}
+                              >
+                                Courses & progress
+                              </button>
+                            </ActionGroup>
                           </td>
                         </tr>
                       ))}
@@ -895,7 +902,7 @@ export default function Admin({
                       </SelectField>
                     </label>
                     <small>
-                      Members inherit required learning from parent groups.
+                      Members inherit required courses from parent groups.
                     </small>
                     <p>
                       {data.users.filter((u) => u.groups.includes(g.id)).length}{" "}
@@ -1055,26 +1062,11 @@ export default function Admin({
                   ))}
                 </SelectField>
               </label>
-              <fieldset>
-                <legend>Groups</legend>
-                {data.groups.map((g) => (
-                  <label className="checkbox-label" key={g.id}>
-                    <input
-                      type="checkbox"
-                      checked={person.groups.includes(g.id)}
-                      onChange={(e) =>
-                        setPerson({
-                          ...person,
-                          groups: e.target.checked
-                            ? [...person.groups, g.id]
-                            : person.groups.filter((x) => x !== g.id),
-                        })
-                      }
-                    />
-                    {g.name}
-                  </label>
-                ))}
-              </fieldset>
+              <GroupPicker
+                groups={data.groups}
+                value={person.groups}
+                onChange={(groups) => setPerson({ ...person, groups })}
+              />
               <label className="checkbox-label">
                 <input
                   type="checkbox"
@@ -1246,7 +1238,7 @@ export function Editor({
           </label>
           {c.kind !== "course" ? (
             <MarkdownEditor
-              label="Article content"
+              label="Doc content"
               value={c.body}
               onChange={(value) => set("body", value)}
               onUpload={onUpload}
@@ -1382,7 +1374,7 @@ export function Editor({
                 </section>
               ))}
               <div className="section-heading">
-                <h2>Knowledge check</h2>
+                <h2>Quiz</h2>
                 <Button
                   type="button"
                   variant="outline"
@@ -1487,112 +1479,125 @@ export function Editor({
           )}
         </section>
         <aside className="editor-settings">
-          <h3>Publishing</h3>
-          {production && (
-            <p className="muted">
-              Saving a draft keeps the current public version online. Select
-              Published to replace it. Unpublish from the content list to remove
-              public access.
-            </p>
-          )}
-          <label>
-            Status
-            <SelectField
-              value={c.status}
-              onValueChange={(value) => set("status", value)}
-            >
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-            </SelectField>
-          </label>
-          <label>
-            {c.kind === "course" ? "Topic / channel" : "Category"}
-            <input
-              required
-              list="categories"
-              value={c.category}
-              onChange={(e) => set("category", e.target.value)}
-            />
-            <datalist id="categories">
-              {Array.from(
-                new Set(
-                  data.content
-                    .filter((x) => x.kind === c.kind)
-                    .map((x) => x.category),
-                ),
-              ).map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </datalist>
-          </label>
-          {c.kind === "doc" && (
+          <section className="editor-setting-section">
+            <h3>Publishing</h3>
+            {production && (
+              <p className="muted">
+                Saving a draft keeps the current public version online. Select
+                Published to replace it. Unpublish from the content list to
+                remove public access.
+              </p>
+            )}
             <label>
-              Folder path <small>Use / for nested folders</small>
-              <input
-                value={c.folder}
-                onChange={(e) => set("folder", e.target.value)}
-                placeholder="Getting started / Basics"
-              />
+              Status
+              <SelectField
+                value={c.status}
+                onValueChange={(value) => set("status", value)}
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+              </SelectField>
             </label>
-          )}
-          {c.kind === "course" && (
-            <>
+          </section>
+          <section className="editor-setting-section">
+            <h3>Organization</h3>
+            <label>
+              {c.kind === "course" ? "Topic / channel" : "Category"}
+              <input
+                required
+                list="categories"
+                value={c.category}
+                onChange={(e) => set("category", e.target.value)}
+              />
+              <datalist id="categories">
+                {Array.from(
+                  new Set(
+                    data.content
+                      .filter((x) => x.kind === c.kind)
+                      .map((x) => x.category),
+                  ),
+                ).map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </datalist>
+            </label>
+            {c.kind === "doc" && (
               <label>
-                Estimated minutes
+                Folder path <small>Use / for nested folders</small>
                 <input
-                  type="number"
-                  min={1}
-                  max={600}
-                  required
-                  value={c.duration}
-                  onChange={(e) => set("duration", Number(e.target.value))}
+                  value={c.folder}
+                  onChange={(e) => set("folder", e.target.value)}
+                  placeholder="Getting started / Basics"
                 />
               </label>
-              <section>
-                <h3>Required learning</h3>
+            )}
+          </section>
+          {c.kind === "course" && (
+            <>
+              <section className="editor-setting-section">
+                <h3>Course details</h3>
+                <label>
+                  Estimated minutes
+                  <input
+                    type="number"
+                    min={1}
+                    max={600}
+                    required
+                    value={c.duration}
+                    onChange={(e) => set("duration", Number(e.target.value))}
+                  />
+                </label>
+              </section>
+              <section className="editor-setting-section">
+                <h3>Required courses</h3>
                 <p className="muted">
-                  Choose which groups require this course. Learning windows are
-                  managed in workspace settings.
+                  Choose which groups require this course. Course completion
+                  windows are managed in organization settings.
                 </p>
                 {existing &&
                 (data.publishedContent ?? data.content).some(
                   (x) => x.id === c.id && x.status === "published",
                 ) &&
                 onLearning ? (
-                  <button
+                  <Button
+                    variant="outline"
                     type="button"
                     onClick={() => {
                       setEditorTab("assignments");
                     }}
                   >
-                    Manage required learning
-                  </button>
+                    Manage required courses
+                  </Button>
                 ) : (
                   <p>
-                    Publish this course to add it to a group’s required
-                    learning.
+                    Publish this course to add it to a group’s required courses.
                   </p>
                 )}
               </section>
               {existing && (
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={refresh}
-                    onChange={(e) => setRefresh(e.target.checked)}
-                  />
-                  Publish a new version and require completion again
-                </label>
+                <section className="editor-setting-section">
+                  <h3>Course version</h3>
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      checked={refresh}
+                      onChange={(e) => setRefresh(e.target.checked)}
+                    />
+                    Publish a new version and require completion again
+                  </label>
+                  <small>
+                    Current version: {content.version}. Keep this unchecked for
+                    minor corrections.
+                  </small>
+                </section>
               )}
-              <small>
-                Current version: {content.version}. Keep this unchecked for
-                minor corrections.
-              </small>
             </>
           )}
           <div className="demo-note">
             <strong>
-              {production ? "Saved to your workspace" : "Saved in your browser"}
+              {production
+                ? "Saved to your organization"
+                : "Saved in your browser"}
             </strong>
             <p>
               {production

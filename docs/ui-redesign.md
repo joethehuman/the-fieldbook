@@ -40,3 +40,16 @@ Useful review areas:
 - Progress and manager reporting: filters, summary, people table, and course details.
 
 Design references: [Vercel Web Interface Guidelines](https://vercel.com/design/guidelines), [shadcn/ui Select](https://ui.shadcn.com/docs/components/radix/select), and [Next.js fonts](https://nextjs.org/docs/app/getting-started/fonts).
+
+### Review refinements
+
+- Shared action groups provide wrapping and spacing for content, people, and pending-account actions.
+- Shared group picker keeps labels next to their checkboxes, displays the selection count, and supports search when more than six groups are available. Dialog text-input sizing no longer affects checkboxes or radio controls.
+- Editor settings are organized into publishing, organization, course details, requirements, and version sections. Managing required courses is an outlined button.
+- Product sections are now Updates, Courses, and Docs throughout navigation, admin controls, search, headings, and metadata. New links use `/updates`, `/courses`, and `/docs`; existing routes and demo hashes remain accepted. Internal content types and saved records are unchanged.
+- Review scope: source inspection and local UI inspection only, per request. No build or automated suite was run. Production remains unchanged.
+
+- The user-facing term Organization replaces Workspace in navigation, settings, and supporting copy; internal data types and API endpoints remain unchanged.
+- Branding settings now pair a compact color swatch with a validated hex field and use a logo preview with upload, replace, and remove actions.
+
+- AI connections now precede the final save area, with a readable server-address block.

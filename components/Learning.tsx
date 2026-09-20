@@ -158,22 +158,22 @@ export default function Learning({
       <div className="page-heading">
         {view !== "home" && (
           <button className="text-button" onClick={() => changeView("home")}>
-            ← Back to learning
+            ← Back to courses
           </button>
         )}
-        <span className="eyebrow">YOUR WORKSPACE</span>
+        <span className="eyebrow">YOUR ORGANIZATION</span>
         <h1>
           {view === "all"
-            ? "Required learning"
+            ? "Required courses"
             : view === "completed"
               ? "Completed courses"
-              : "Learning"}
+              : "Courses"}
         </h1>
         <p>
           {view === "completed"
             ? "Revisit your completed courses. Your progress stays with you."
             : view === "all"
-              ? "Your role’s learning, in a recommended order. You can explore ahead at any time."
+              ? "Your role’s courses, in a recommended order. You can explore ahead at any time."
               : "Build your knowledge, sharpen your skills, and stay one step ahead."}
         </p>
       </div>
@@ -293,7 +293,7 @@ export default function Learning({
                       : outstanding.length
                         ? `${outstanding.length} courses to catch up on · You’re on track`
                         : assigned.length
-                          ? "All required learning is complete."
+                          ? "All required courses is complete."
                           : "Explore the library at your own pace."}
                 </span>
               </div>
@@ -302,7 +302,7 @@ export default function Learning({
                   variant="default"
                   onClick={() => onOpen(state.remaining[0].id)}
                 >
-                  Continue learning
+                  Continue course
                 </Button>
               )}
             </div>
@@ -314,7 +314,7 @@ export default function Learning({
           </div>
           {!!outstanding.length && (
             <details className="learning-by-group">
-              <summary>View required learning by group</summary>
+              <summary>View required courses by group</summary>
               {groups
                 .filter((g) => effectiveGroups(user, groups).has(g.id))
                 .sort(
@@ -344,7 +344,7 @@ export default function Learning({
           )}
           <div className="learning-links">
             <button className="text-button" onClick={() => changeView("all")}>
-              View required learning <ArrowRight size={16} />
+              View required courses <ArrowRight size={16} />
             </button>
             <button
               className="text-button"
@@ -362,7 +362,7 @@ export default function Learning({
               {view === "home"
                 ? "Explore the library"
                 : view === "all"
-                  ? "Required learning"
+                  ? "Required courses"
                   : "Completed courses"}
             </h2>
             <p>
@@ -429,7 +429,7 @@ export default function Learning({
             </h3>
             <p>
               {view === "completed"
-                ? "Completed courses will appear here. Try another filter or return to learning."
+                ? "Completed courses will appear here. Try another filter or return to courses."
                 : "Try another topic or search term."}
             </p>
           </div>
@@ -439,10 +439,10 @@ export default function Learning({
         <BookOpen size={22} />
         <div>
           <h3>Looking for an answer?</h3>
-          <p>The knowledge library is your everyday reference.</p>
+          <p>The docs library is your everyday reference.</p>
         </div>
         <button className="text-button" onClick={onKnowledge}>
-          Explore knowledge <ArrowRight size={17} />
+          Explore docs <ArrowRight size={17} />
         </button>
       </div>
     </>
