@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Give sign-in a compact, responsive layout with separated secondary links. Keep return destinations in a short-lived cookie so the sign-in address stays clean.
+
 ### Interface redesign (review branch)
 
 - Shared neutral theme, Geist typography, consistent spacing, compact actions, and responsive layout across learner, manager, and administrator views.

@@ -2811,3 +2811,58 @@ select:focus-visible {
 .assignments-panel > section > h4 {
   margin: 20px 0 12px;
 }
+
+/* Keep the sign-in layout independent from consent and connection cards. */
+.auth-card.sign-in-card {
+  width: calc(100% - 32px);
+  max-width: 480px;
+  margin: clamp(32px, 10vh, 96px) auto;
+  padding: clamp(24px, 5vw, 40px);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.sign-in-heading {
+  display: grid;
+  gap: 12px;
+}
+.sign-in-heading .eyebrow {
+  margin: 0;
+}
+.sign-in-heading h1 {
+  margin: 0;
+  font-size: clamp(26px, 4vw, 32px);
+  line-height: 1.15;
+}
+.sign-in-heading p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.sign-in-card a.primary {
+  margin: 0;
+  min-height: 44px;
+  justify-content: center;
+  width: 100%;
+}
+.sign-in-card .error {
+  margin: 0;
+}
+.sign-in-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  justify-content: space-between;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.sign-in-footer a {
+  color: var(--muted);
+  text-underline-offset: 3px;
+}
+.sign-in-card a:focus-visible {
+  outline: 2px solid var(--foreground);
+  outline-offset: 4px;
+}
