@@ -212,6 +212,7 @@ test("course row arrows track overflow, endpoints, resize and enlarged text", as
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });
+  await expect(product.getByRole("button", { name: /^Next / })).toHaveCount(0);
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("learning-enlarged.png"),

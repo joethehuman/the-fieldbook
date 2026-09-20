@@ -476,7 +476,7 @@
     padding: 0;
   }
   .course-row > [data-slot="content-action"] {
-    flex: 0 0 min(18rem, 85vw);
+    flex: 0 0 min(18rem, 85vw, 100%);
     scroll-snap-align: start;
   }
   .channel,
