@@ -19,6 +19,10 @@ Before proposing runtime changes, run `pnpm test`, `pnpm build`, and `pnpm build
 
 Never commit secrets, exports containing personal data, `.env.local`, or provider credentials. Examples must use placeholder domains and keys. Shared UI changes should be checked in both applications. Production authorization belongs on the server, not in hidden buttons or client state. Database changes require a new migration and upgrade guidance; do not rewrite an already-applied migration.
 
+## Interface contributions
+
+Read [Fieldbook interface standards](docs/design-system.md) before changing UI. Reuse shared controls and layout patterns across both applications; add missing patterns centrally instead of introducing feature-specific styling. The [design-system audit and migration proposal](docs/design-system-audit.md) records the original gaps and the implementation. Run `pnpm check:ui` and, after the demo build, `pnpm test:ui`; inspect the screenshot report for affected surfaces.
+
 ## Reporting problems
 
 Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. A private security-reporting channel must be established before public release; see the release checklist.

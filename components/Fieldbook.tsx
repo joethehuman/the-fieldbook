@@ -1,4 +1,17 @@
 "use client";
+import { Badge } from "@/components/ui/badge";
+import { SkipLink } from "./patterns/skip-link";
+import { AccountButton } from "./patterns/account-button";
+import { SearchField } from "./patterns/search-field";
+import { NavigationButton } from "./patterns/navigation-button";
+import { Card } from "./ui/card";
+import { Progress } from "./ui/progress";
+import { Radio } from "@/components/ui/choice";
+import { ActionGroup } from "@/components/ui/action-group";
+import { Alert } from "@/components/ui/alert";
+import { Input } from "@/components/ui/input";
+import { Field, FieldGroup } from "@/components/ui/field";
+import { Toolbar, EmptyState, PageHeader } from "@/components/patterns/layout";
 import Updates from "./Updates";
 import { reconcileLearning } from "@/lib/learning-groups";
 import { useInteractionDialog } from "./ui/interaction-dialog";
@@ -14,22 +27,17 @@ import {
   BookOpen,
   GraduationCap,
   Newspaper,
-  Search,
   ArrowUpRight,
   ArrowRight,
   ChevronRight,
   Check,
-  Play,
   Clock,
   Settings,
   LogOut,
-  Plus,
   X,
   Menu,
-  Layers,
   CheckCircle2,
   Compass,
-  FileText,
   Download,
   RotateCcw,
 } from "lucide-react";
@@ -69,7 +77,6 @@ export default function Fieldbook({
     [view, setView] = useState<View>("learn"),
     [selected, setSelected] = useState<string | null>(null),
     [search, setSearch] = useState(""),
-    [topic, setTopic] = useState("All topics"),
     [error, setError] = useState(""),
     [menu, setMenu] = useState(false),
     [showDemo, setShowDemo] = useState(false);
@@ -204,15 +211,17 @@ export default function Fieldbook({
         {error &&
           (runtime ? (
             <>
-              <a className="primary" href="/sign-in">
-                Sign in
-              </a>
-              <button onClick={() => window.location.reload()}>
+              <Button asChild variant="default">
+                <a href="/sign-in">Sign in</a>
+              </Button>
+              <Button variant="ghost" onClick={() => window.location.reload()}>
                 Try again
-              </button>
+              </Button>
             </>
           ) : (
-            <button onClick={reset}>Reset demo</button>
+            <Button variant="ghost" onClick={reset}>
+              Reset demo
+            </Button>
           ))}
       </div>
     );
@@ -248,7 +257,7 @@ export default function Fieldbook({
         </div>
         <main className="login-form">
           <div className="login-inner">
-            <span className="pill">INTERACTIVE DEMO</span>
+            <Badge variant="default">INTERACTIVE DEMO</Badge>
             <h2>Welcome to Fieldbook</h2>
             <p>Choose a demo profile to explore the organization.</p>
             <div className="profile-list">
@@ -260,7 +269,11 @@ export default function Fieldbook({
                     DEMO_PROFILE_IDS.indexOf(b.id),
                 )
                 .map((u) => (
-                  <button key={u.id} onClick={() => login(u.id)}>
+                  <NavigationButton
+                    variant="ghost"
+                    key={u.id}
+                    onClick={() => login(u.id)}
+                  >
                     <span className="avatar">{initials(u.name)}</span>
                     <span>
                       <strong>{u.name}</strong>
@@ -273,7 +286,7 @@ export default function Fieldbook({
                       </small>
                     </span>
                     <ArrowRight size={18} />
-                  </button>
+                  </NavigationButton>
                 ))}
             </div>
             <div className="demo-note">
@@ -303,7 +316,6 @@ export default function Fieldbook({
   );
   const item = visible.find((c) => c.id === selected);
   const courses = visible.filter((c) => c.kind === "course");
-  const topics = Array.from(new Set(courses.map((c) => c.category)));
   const docs = visible.filter((c) => c.kind === "doc");
   const currentTitle =
     view === "learn"
@@ -320,13 +332,11 @@ export default function Fieldbook({
       className="app"
       style={
         {
-          "--accent": branding.accent,
-          "--blue": branding.accent,
+          "--brand": branding.accent,
         } as CSSProperties
       }
     >
-      <a
-        className="skip-link"
+      <SkipLink
         href="#main-content"
         onClick={(event) => {
           event.preventDefault();
@@ -334,7 +344,7 @@ export default function Fieldbook({
         }}
       >
         Skip to content
-      </a>
+      </SkipLink>
       <aside className={"sidebar " + (menu ? "open" : "")}>
         <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
         <span className="nav-label">YOUR ORGANIZATION</span>
@@ -346,7 +356,8 @@ export default function Fieldbook({
               { key: "docs", title: "Docs", icon: BookOpen },
             ] as const
           ).map((n) => (
-            <button
+            <NavigationButton
+              variant="ghost"
               className={view === n.key ? "active" : ""}
               key={n.key}
               onClick={() => navigate(n.key)}
@@ -356,7 +367,7 @@ export default function Fieldbook({
               {n.key === "learn" && (
                 <span className="nav-count">{assigned.length - completed}</span>
               )}
-            </button>
+            </NavigationButton>
           ))}
         </nav>
         {view === "docs" && (
@@ -377,26 +388,27 @@ export default function Fieldbook({
         )}
         <div className="sidebar-bottom">
           {user.role === "admin" && (
-            <button
+            <NavigationButton
+              variant="ghost"
               className={"admin-nav " + (view === "admin" ? "active" : "")}
               onClick={() => navigate("admin")}
             >
               <Settings size={18} />
               Manage organization
-            </button>
+            </NavigationButton>
           )}
           {(user.role === "manager" ||
             (data.teams || []).some((t) => t.managerId === user.id)) && (
-            <button
+            <NavigationButton
+              variant="ghost"
               className={"admin-nav " + (view === "team" ? "active" : "")}
               onClick={() => navigate("team")}
             >
               <GraduationCap size={18} />
               My team’s progress
-            </button>
+            </NavigationButton>
           )}
-          <button
-            className="user-menu"
+          <AccountButton
             onClick={logout}
             title={
               runtime
@@ -405,45 +417,45 @@ export default function Fieldbook({
                   : "Sign out"
                 : "Switch demo profile"
             }
-          >
-            <span className="avatar">{initials(user.name)}</span>
-            <span>
-              <strong>
-                {runtime && uid === "guest" ? "Sign in with Google" : user.name}
-              </strong>
-              <small>
-                {user.role === "admin"
-                  ? "Administrator"
-                  : user.role === "manager"
-                    ? "Sales Director"
-                    : runtime
-                      ? uid === "guest"
-                        ? "Save progress across devices"
-                        : "Learner"
-                      : "Account Executive"}
-              </small>
-            </span>
-            <LogOut size={16} />
-          </button>
+            initials={initials(user.name)}
+            name={
+              runtime && uid === "guest" ? "Sign in with Google" : user.name
+            }
+            description={
+              user.role === "admin"
+                ? "Administrator"
+                : user.role === "manager"
+                  ? "Sales Director"
+                  : runtime
+                    ? uid === "guest"
+                      ? "Save progress across devices"
+                      : "Learner"
+                    : "Account Executive"
+            }
+            icon={<LogOut size={16} />}
+          />
         </div>
       </aside>
       {menu && (
-        <button
-          className="scrim"
+        <Button
+          variant="ghost"
+          className="fixed inset-0 z-20 rounded-none bg-overlay p-0 hover:bg-overlay md:hidden"
           aria-label="Close navigation"
           onClick={() => setMenu(false)}
         />
       )}
       <div className="main-shell">
         <header className="topbar">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            aria-label="Open navigation"
+            onClick={() => setMenu(!menu)}
+          >
+            <Menu />
+          </Button>
           <div className="breadcrumb">
-            <button
-              className="mobile-menu icon-button"
-              aria-label="Open navigation"
-              onClick={() => setMenu(!menu)}
-            >
-              <Menu />
-            </button>
             <span>Organization</span>
             <ChevronRight size={14} />
             <strong>{currentTitle}</strong>
@@ -454,37 +466,40 @@ export default function Fieldbook({
               </>
             )}
           </div>
-          <div className="top-actions">
-            <label className="search">
-              <Search size={16} />
-              <input
+          <Toolbar>
+            <SearchField>
+              <Input
                 aria-label="Search all content"
                 placeholder="Search fieldbook…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
               {search && (
-                <button
-                  className="icon-button"
+                <Button
+                  variant="ghost"
+                  size="icon"
                   aria-label="Clear search"
                   onClick={() => setSearch("")}
                 >
                   <X size={14} />
-                </button>
+                </Button>
               )}
-            </label>
+            </SearchField>
             {!runtime && (
-              <button className="demo-chip" onClick={() => setShowDemo(true)}>
-                <span />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDemo(true)}
+              >
                 Demo organization
-              </button>
+              </Button>
             )}
-          </div>
+          </Toolbar>
         </header>
         {error && (
-          <div className="error" role="alert">
+          <Alert variant="destructive" role="alert">
             {error}
-          </div>
+          </Alert>
         )}
         <main id="main-content" className="main-content" tabIndex={-1}>
           {query ? (
@@ -496,7 +511,8 @@ export default function Fieldbook({
               />
               <div className="result-list">
                 {results.map((c) => (
-                  <button
+                  <NavigationButton
+                    variant="ghost"
                     key={c.id}
                     onClick={() =>
                       navigate(
@@ -531,7 +547,7 @@ export default function Fieldbook({
                       <p>{c.summary}</p>
                     </span>
                     <ArrowUpRight />
-                  </button>
+                  </NavigationButton>
                 ))}
                 {!results.length && (
                   <Empty
@@ -557,7 +573,7 @@ export default function Fieldbook({
               onUpload={runtime?.upload}
             />
           ) : view === "admin" && runtime ? (
-            <section className="empty">
+            <EmptyState>
               <h2>Administration requires an authorized account.</h2>
               <p>
                 Sign in with your administrator account to manage this
@@ -566,7 +582,7 @@ export default function Fieldbook({
               <Button variant="default" onClick={runtime.signIn}>
                 Sign in with Google
               </Button>
-            </section>
+            </EmptyState>
           ) : view === "team" ? (
             <>
               <PageHeading
@@ -611,14 +627,14 @@ export default function Fieldbook({
             />
           ) : item ? (
             <article className="article">
-              <button
-                className="text-button"
+              <Button
+                variant="link"
                 onClick={() =>
                   navigate(item.kind === "doc" ? "docs" : "briefs")
                 }
               >
                 ← Back to {item.kind === "doc" ? "docs" : "updates"}
-              </button>
+              </Button>
               <span className="eyebrow">{item.category}</span>
               <h1>{item.title}</h1>
               <p className="article-lede">{item.summary}</p>
@@ -687,7 +703,7 @@ export default function Fieldbook({
                       Get oriented, find your way, and make this fieldbook
                       yours.
                     </p>
-                    <span className="text-button">
+                    <span className="text-link">
                       Open the guide <ArrowRight size={17} />
                     </span>
                   </div>
@@ -706,13 +722,14 @@ export default function Fieldbook({
                       {docs
                         .filter((d) => d.category === cat)
                         .map((d) => (
-                          <button
+                          <NavigationButton
+                            variant="ghost"
                             onClick={() => navigate("docs", d.id)}
                             key={d.id}
                           >
                             {d.title}
                             <ChevronRight size={16} />
-                          </button>
+                          </NavigationButton>
                         ))}
                     </section>
                   ),
@@ -741,23 +758,27 @@ export default function Fieldbook({
               <a href={privacyHref(branding)!}>Privacy policy</a>
             )}
             {!runtime && (
-              <button onClick={() => setShowDemo(true)}>About this demo</button>
+              <Button variant="ghost" onClick={() => setShowDemo(true)}>
+                About this demo
+              </Button>
             )}
           </footer>
         </main>
       </div>
       <Dialog open={showDemo} onOpenChange={setShowDemo}>
         <DialogContent className="demo-dialog">
-          <button
-            className="modal-close icon-button"
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-3 right-3"
             onClick={() => setShowDemo(false)}
             aria-label="Close"
           >
             <X />
-          </button>
+          </Button>
           <span className="eyebrow">YOUR DEMO ORGANIZATION</span>
-          <DialogTitle className="ui-dialog-title">About this demo</DialogTitle>
-          <DialogDescription className="ui-dialog-description">
+          <DialogTitle>About this demo</DialogTitle>
+          <DialogDescription>
             This Next.js demo runs entirely in your browser. Content, profiles,
             assignments, and progress are saved here, on this device.
           </DialogDescription>
@@ -765,7 +786,7 @@ export default function Fieldbook({
             Profiles simulate login and roles; they are not secure accounts.
             Don’t enter private information. Nothing is synced to a server.
           </p>
-          <div className="modal-actions">
+          <ActionGroup>
             <Button variant="outline" onClick={exportData}>
               <Download size={16} />
               Export demo data
@@ -774,7 +795,7 @@ export default function Fieldbook({
               <RotateCcw size={16} />
               Reset sample data
             </Button>
-          </div>
+          </ActionGroup>
         </DialogContent>
       </Dialog>
     </div>
@@ -826,20 +847,20 @@ function PageHeading({
   description: string;
 }) {
   return (
-    <div className="page-heading">
+    <PageHeader>
       <span className="eyebrow">{eyebrow}</span>
       <h1>{title}</h1>
       <p>{description}</p>
-    </div>
+    </PageHeader>
   );
 }
 function Empty({ title, description }: { title: string; description: string }) {
   return (
-    <div className="empty">
+    <EmptyState>
       <Compass size={28} />
       <h3>{title}</h3>
       <p>{description}</p>
-    </div>
+    </EmptyState>
   );
 }
 export function Course({
@@ -915,9 +936,9 @@ export function Course({
   }
   return (
     <div className="course-detail">
-      <button className="text-button" onClick={onBack}>
+      <Button variant="link" onClick={onBack}>
         ← Back to courses
-      </button>
+      </Button>
       <div className="course-detail-heading">
         <span className="eyebrow">{c.category}</span>
         <h1>{c.title}</h1>
@@ -927,7 +948,7 @@ export function Course({
           {c.duration} min <span>·</span>
           {c.lessons.length} lessons<span>·</span>
           {complete ? (
-            <span className="completed">Completed</span>
+            <Badge variant="success">Completed</Badge>
           ) : (
             "At your own pace"
           )}
@@ -936,21 +957,22 @@ export function Course({
       {runtime && user.id === "guest" && (
         <div className="guest-progress-note">
           Your progress is saved in this browser.{" "}
-          <button className="text-button" onClick={runtime.signIn}>
+          <Button variant="link" onClick={runtime.signIn}>
             Sign in to keep it across devices →
-          </button>
+          </Button>
         </div>
       )}
       {saveError && (
-        <p className="error" role="alert">
+        <Alert variant="destructive" role="alert">
           {saveError}
-        </p>
+        </Alert>
       )}
       <div className="lesson-layout">
         <aside className="lesson-nav">
           <h3>In this course</h3>
           {c.lessons.map((l, i) => (
-            <button
+            <NavigationButton
+              variant="ghost"
               className={step === i ? "selected" : ""}
               onClick={() => setStep(i)}
               key={l.id}
@@ -963,29 +985,31 @@ export function Course({
                 {p?.lessons.includes(l.id) ? <Check size={13} /> : i + 1}
               </span>
               {l.title}
-            </button>
+            </NavigationButton>
           ))}
-          <button
+          <NavigationButton
+            variant="ghost"
             className={step === c.lessons.length ? "selected" : ""}
             onClick={() => setStep(c.lessons.length)}
           >
             <CheckCircle2 size={18} />
             {c.questions.length ? "Quiz" : "Finish course"}
-          </button>
+          </NavigationButton>
           <div className="lesson-progress">
-            <div>
-              <span
-                style={{
-                  width: `${c.lessons.length ? ((p?.lessons.length || 0) / c.lessons.length) * 100 : 0}%`,
-                }}
-              />
-            </div>
+            <Progress
+              aria-label="Lessons completed"
+              value={
+                c.lessons.length
+                  ? ((p?.lessons.length || 0) / c.lessons.length) * 100
+                  : 0
+              }
+            />
             <small>
               {p?.lessons.length || 0} of {c.lessons.length} lessons complete
             </small>
           </div>
         </aside>
-        <section className="lesson-content">
+        <Card className="grid gap-6">
           {lesson ? (
             <>
               <span className="eyebrow">
@@ -1013,19 +1037,19 @@ export function Course({
                   Your browser does not support video playback.
                 </video>
               ) : lesson.videoUrl ? (
-                <p className="notice">
+                <Alert>
                   This video URL is not supported. Ask an editor to update it.
-                </p>
+                </Alert>
               ) : null}
               <div className="markdown">
                 <ReactMarkdown>{lesson.body}</ReactMarkdown>
               </div>
-              <div className="lesson-actions">
+              <ActionGroup>
                 {p?.lessons.includes(lesson.id) && (
-                  <span className="completed">
+                  <Badge variant="success">
                     <CheckCircle2 size={16} />
                     Lesson completed
-                  </span>
+                  </Badge>
                 )}
                 <Button variant="default" onClick={mark} disabled={busy}>
                   {step === c.lessons.length - 1
@@ -1033,7 +1057,7 @@ export function Course({
                     : "Complete & continue"}
                   <ArrowRight size={16} />
                 </Button>
-              </div>
+              </ActionGroup>
             </>
           ) : (
             <>
@@ -1044,19 +1068,18 @@ export function Course({
                 try again as often as you need.
               </p>
               {!allDone && (
-                <div className="notice">
+                <Alert>
                   Complete all lessons before submitting your answers.
-                </div>
+                </Alert>
               )}
               {c.questions.map((q, i) => (
-                <fieldset className="quiz-question" key={q.id}>
+                <FieldGroup className="quiz-question" key={q.id}>
                   <legend>
                     {i + 1}. {q.prompt}
                   </legend>
                   {q.options.map((o, j) => (
-                    <label className={answers[i] === j ? "chosen" : ""} key={j}>
-                      <input
-                        type="radio"
+                    <Field orientation="horizontal" variant="choice" key={j}>
+                      <Radio
                         name={q.id}
                         checked={answers[i] === j}
                         onChange={() => {
@@ -1067,19 +1090,19 @@ export function Course({
                         }}
                       />
                       {o}
-                    </label>
+                    </Field>
                   ))}
-                </fieldset>
+                </FieldGroup>
               ))}
               {result && (
-                <div
+                <Alert
                   role="status"
-                  className={resultPassed ? "success" : "notice"}
+                  variant={resultPassed ? "success" : "default"}
                 >
                   {result}
-                </div>
+                </Alert>
               )}
-              <div className="lesson-actions">
+              <ActionGroup>
                 <Button variant="outline" onClick={() => setStep(0)}>
                   Review lessons
                 </Button>
@@ -1095,7 +1118,7 @@ export function Course({
                   {c.questions.length ? "Check answers" : "Complete course"}
                   <Check size={16} />
                 </Button>
-              </div>
+              </ActionGroup>
               {(!runtime || user.id !== "guest") && (
                 <Feedback
                   key={c.id + user.id}
@@ -1106,13 +1129,13 @@ export function Course({
                 />
               )}
               {complete && (
-                <button className="text-button" onClick={onBack}>
+                <Button variant="link" onClick={onBack}>
                   Back to your courses <ArrowRight size={16} />
-                </button>
+                </Button>
               )}
             </>
           )}
-        </section>
+        </Card>
       </div>
     </div>
   );
@@ -1142,13 +1165,14 @@ function DocFolders({
       {docs
         .filter((d) => path(d).length === depth)
         .map((d) => (
-          <button
+          <Button
+            variant="ghost"
             key={d.id}
             className={selected === d.id ? "selected" : ""}
             onClick={() => onOpen(d.id)}
           >
             {d.title}
-          </button>
+          </Button>
         ))}
       {folders.map((folder) => (
         <details className="nested-folder" open key={folder}>

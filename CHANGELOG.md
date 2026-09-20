@@ -4,6 +4,16 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Shared design system
+
+- Tighten shared composition rules: aligned navigation and reorder actions, stacked heading descriptions, separated filter/create actions, predictable account identity, inline card arrows and spaced feedback confirmation actions. Declare stable column schemas for every application table so filtering cannot redistribute columns. Extend the catalog and visual checks to tablet widths and changing result sets.
+
+- Apply one token-based shadcn/Radix and Tailwind component system across learner, manager, administrator, editor, and server account pages. Replace raw feature controls and unify forms, tables, actions, navigation, feedback, and page structure.
+- Replace native group/curriculum dropdowns with shared Select controls and use keyboard-accessible group tabs. Reuse one course-sequencing pattern and keep admin navigation compact on narrow screens.
+- Delete the overlapping redesign override sheet and retire the old global control styling. Keep scoped layout, prose and decorative artwork with explicit ownership.
+- Add a demo component catalog at `/ui`, automated component/styling rules, desktop/phone browser checks and screenshot reports. Document mandatory component reuse in AGENTS.md and contributor guidance.
+- Add Tailwind/PostCSS build dependencies and Playwright development checks. This UI overhaul adds no database migration; the underlying learning-groups changes retain their separate upgrade requirement.
+
 ### Learning groups and curricula
 
 - Consolidate Groups and Required courses into Learning groups, with people/team membership, searchable course and curriculum selection, recommended sequencing, and Update targeting.

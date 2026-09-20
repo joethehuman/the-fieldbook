@@ -1,4 +1,7 @@
 "use client";
+import { ReorderRow } from "./patterns/reorder-row";
+import { Input } from "@/components/ui/input";
+import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import DocSectionCreate from "./DocSectionCreate";
@@ -96,9 +99,9 @@ export default function SiteSettingsPanel({
           <p className="muted">
             Your identity, with the same simple home for docs and courses.
           </p>
-          <label>
+          <Field>
             Site name
-            <input
+            <Input
               required
               maxLength={60}
               value={settings.name}
@@ -106,24 +109,24 @@ export default function SiteSettingsPanel({
                 setSettings({ ...settings, name: e.target.value })
               }
             />
-          </label>
-          <label>
+          </Field>
+          <Field>
             Footer tagline
-            <input
+            <Input
               maxLength={180}
               value={settings.tagline}
               onChange={(e) =>
                 setSettings({ ...settings, tagline: e.target.value })
               }
             />
-          </label>
-          <fieldset className="brand-control">
+          </Field>
+          <FieldGroup className="brand-control">
             <legend>Accent color</legend>
-            <p className="field-help">
+            <FieldDescription>
               Used for links and highlights across your organization.
-            </p>
+            </FieldDescription>
             <div className="color-control">
-              <input
+              <Input
                 aria-label="Choose accent color"
                 type="color"
                 value={
@@ -135,7 +138,7 @@ export default function SiteSettingsPanel({
                   setSettings({ ...settings, accent: e.target.value })
                 }
               />
-              <input
+              <Input
                 aria-label="Accent color hex value"
                 type="text"
                 required
@@ -149,9 +152,9 @@ export default function SiteSettingsPanel({
                 }
               />
             </div>
-          </fieldset>
+          </FieldGroup>
           {(onUpload || settings.logoUrl) && (
-            <fieldset className="brand-control">
+            <FieldGroup className="brand-control">
               <legend>Organization logo</legend>
               <div className="logo-control">
                 <div className="logo-preview">
@@ -192,13 +195,13 @@ export default function SiteSettingsPanel({
                       </Button>
                     )}
                   </ActionGroup>
-                  <p className="field-help">
+                  <FieldDescription>
                     PNG, JPG, or WebP. Your logo is scaled to fit.
-                  </p>
+                  </FieldDescription>
                 </div>
               </div>
               {onUpload && (
-                <input
+                <Input
                   ref={logoInput}
                   hidden
                   type="file"
@@ -223,13 +226,12 @@ export default function SiteSettingsPanel({
                   }}
                 />
               )}
-            </fieldset>
+            </FieldGroup>
           )}
         </section>
       )}
       {section === "docs" && (
         <section className="settings-section" id="settings-docs">
-          <h3>Docs navigation</h3>
           <p>
             Create sections and drag them into order for the Docs sidebar and
             overview. You can also use the arrow buttons or focus a drag handle
@@ -238,95 +240,98 @@ export default function SiteSettingsPanel({
           {docSections.length ? (
             <ol className="doc-order-list">
               {docSections.map((name, index) => (
-                <li
+                <ReorderRow
                   key={name}
                   data-doc-section={name}
                   className={
-                    dropTarget === name ? "doc-section-drop-target" : undefined
+                    dropTarget === name ? "ring-2 ring-ring" : undefined
                   }
-                >
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="doc-section-drag"
-                    aria-label={`Reorder ${name}`}
-                    disabled={busy}
-                    onKeyDown={(e) => {
-                      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                        e.preventDefault();
-                        moveDocSection(
-                          index,
-                          index + (e.key === "ArrowUp" ? -1 : 1),
-                        );
-                      }
-                    }}
-                    onPointerDown={(e) => {
-                      if (e.button !== 0) return;
-                      e.currentTarget.setPointerCapture(e.pointerId);
-                      setDragging(name);
-                    }}
-                    onPointerMove={(e) => {
-                      if (dragging !== name) return;
-                      const row = document
-                        .elementFromPoint(e.clientX, e.clientY)
-                        ?.closest("[data-doc-section]");
-                      setDropTarget(
-                        row?.getAttribute("data-doc-section") ?? null,
-                      );
-                      if (e.clientY < 70) window.scrollBy(0, -18);
-                      else if (e.clientY > window.innerHeight - 70)
-                        window.scrollBy(0, 18);
-                    }}
-                    onPointerUp={(e) => {
-                      if (dragging === name) {
-                        const target = document
+                  handle={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="doc-section-drag"
+                      aria-label={`Reorder ${name}`}
+                      disabled={busy}
+                      onKeyDown={(e) => {
+                        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                          e.preventDefault();
+                          moveDocSection(
+                            index,
+                            index + (e.key === "ArrowUp" ? -1 : 1),
+                          );
+                        }
+                      }}
+                      onPointerDown={(e) => {
+                        if (e.button !== 0) return;
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                        setDragging(name);
+                      }}
+                      onPointerMove={(e) => {
+                        if (dragging !== name) return;
+                        const row = document
                           .elementFromPoint(e.clientX, e.clientY)
-                          ?.closest("[data-doc-section]")
-                          ?.getAttribute("data-doc-section");
-                        moveDocSection(
-                          index,
-                          target ? docSections.indexOf(target) : -1,
+                          ?.closest("[data-doc-section]");
+                        setDropTarget(
+                          row?.getAttribute("data-doc-section") ?? null,
                         );
-                      }
-                      setDragging(null);
-                      setDropTarget(null);
-                    }}
-                    onPointerCancel={() => {
-                      setDragging(null);
-                      setDropTarget(null);
-                    }}
-                    onLostPointerCapture={() => {
-                      setDragging(null);
-                      setDropTarget(null);
-                    }}
-                  >
-                    <GripVertical size={18} aria-hidden="true" />
-                  </Button>
-                  <span>{name}</span>
-                  <ActionGroup>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      aria-label={`Move ${name} up`}
-                      disabled={busy || index === 0}
-                      onClick={() => moveDocSection(index, index - 1)}
+                        if (e.clientY < 70) window.scrollBy(0, -18);
+                        else if (e.clientY > window.innerHeight - 70)
+                          window.scrollBy(0, 18);
+                      }}
+                      onPointerUp={(e) => {
+                        if (dragging === name) {
+                          const target = document
+                            .elementFromPoint(e.clientX, e.clientY)
+                            ?.closest("[data-doc-section]")
+                            ?.getAttribute("data-doc-section");
+                          moveDocSection(
+                            index,
+                            target ? docSections.indexOf(target) : -1,
+                          );
+                        }
+                        setDragging(null);
+                        setDropTarget(null);
+                      }}
+                      onPointerCancel={() => {
+                        setDragging(null);
+                        setDropTarget(null);
+                      }}
+                      onLostPointerCapture={() => {
+                        setDragging(null);
+                        setDropTarget(null);
+                      }}
                     >
-                      <ArrowUp size={16} aria-hidden="true" />
+                      <GripVertical size={18} aria-hidden="true" />
                     </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      aria-label={`Move ${name} down`}
-                      disabled={busy || index === docSections.length - 1}
-                      onClick={() => moveDocSection(index, index + 1)}
-                    >
-                      <ArrowDown size={16} aria-hidden="true" />
-                    </Button>
-                  </ActionGroup>
-                </li>
+                  }
+                  title={name}
+                  actions={
+                    <>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Move ${name} up`}
+                        disabled={busy || index === 0}
+                        onClick={() => moveDocSection(index, index - 1)}
+                      >
+                        <ArrowUp size={16} aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-label={`Move ${name} down`}
+                        disabled={busy || index === docSections.length - 1}
+                        onClick={() => moveDocSection(index, index + 1)}
+                      >
+                        <ArrowDown size={16} aria-hidden="true" />
+                      </Button>
+                    </>
+                  }
+                />
               ))}
             </ol>
           ) : (
@@ -343,14 +348,14 @@ export default function SiteSettingsPanel({
               setNotice(`${name} created. Save settings to keep it.`);
             }}
           />
-          <p className="field-help">
+          <FieldDescription>
             Empty sections stay available here and in the editor. Only sections
             with published documents are shown to readers.
-          </p>
+          </FieldDescription>
         </section>
       )}
       {section === "courses" && (
-        <fieldset
+        <FieldGroup
           className="settings-section"
           tabIndex={-1}
           id="settings-courses"
@@ -360,9 +365,9 @@ export default function SiteSettingsPanel({
             Publishing adds to the library. Only courses selected for a group
             join that group’s assigned learning list.
           </p>
-          <label>
+          <Field>
             New user onboarding window (days)
-            <input
+            <Input
               type="number"
               required
               min={1}
@@ -375,10 +380,10 @@ export default function SiteSettingsPanel({
                 })
               }
             />
-          </label>
-          <label>
+          </Field>
+          <Field>
             Ongoing catch-up window (days)
-            <input
+            <Input
               type="number"
               required
               min={1}
@@ -391,12 +396,12 @@ export default function SiteSettingsPanel({
                 })
               }
             />
-          </label>
+          </Field>
           <small>
             Newly assigned courses get a full catch-up window, even near the end
             of onboarding. Changes recalculate targets for everyone.
           </small>
-        </fieldset>
+        </FieldGroup>
       )}
       {section === "access" && (
         <section
@@ -405,7 +410,7 @@ export default function SiteSettingsPanel({
           id="settings-access"
         >
           <h3>Access and accounts</h3>
-          <label>
+          <Field>
             Who can browse?
             <SelectField
               value={settings.access}
@@ -419,8 +424,8 @@ export default function SiteSettingsPanel({
               <option value="public">Anyone — accounts are optional</option>
               <option value="private">Signed-in members only</option>
             </SelectField>
-          </label>
-          <label>
+          </Field>
+          <Field>
             New learner accounts
             <SelectField
               value={settings.registration}
@@ -434,7 +439,7 @@ export default function SiteSettingsPanel({
               <option value="open">Allow registration with Google</option>
               <option value="closed">Existing members only</option>
             </SelectField>
-          </label>
+          </Field>
           <p className="muted">
             {production
               ? "Google is the sign-in provider. Provider credentials and the initial administrator are configured securely in the deployment settings."
@@ -506,10 +511,10 @@ function McpSettings({ production }: { production: boolean }) {
         Add Fieldbook as a custom MCP server in ChatGPT, Claude, or another
         compatible tool.
       </p>
-      <label>
+      <Field>
         Server address
         <div className="mcp-address">
-          <input
+          <Input
             readOnly
             value={address}
             aria-label="MCP server address"
@@ -530,10 +535,8 @@ function McpSettings({ production }: { production: boolean }) {
             Copy
           </Button>
         </div>
-      </label>
-      <p role="status" className="field-help">
-        {copied}
-      </p>
+      </Field>
+      <FieldDescription role="status">{copied}</FieldDescription>
       <ol className="mcp-steps">
         <li>Add the server address in your AI tool’s connection settings.</li>
         <li>Sign in to Fieldbook as an administrator.</li>

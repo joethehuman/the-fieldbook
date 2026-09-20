@@ -8,7 +8,9 @@
     "start": "serve out -l 3000",
     "test": "node --import tsx --test tests/*.test.ts && node --conditions=react-server --import tsx --test production/tests/*.test.ts",
     "build:production": "next build production --webpack",
-    "dev:production": "next dev production -H 127.0.0.1"
+    "dev:production": "next dev production -H 127.0.0.1",
+    "check:ui": "node scripts/check-ui.mjs",
+    "test:ui": "playwright test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
@@ -36,11 +38,15 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "postcss": "^8.5.0",
     "prettier": "^3.6.2",
     "serve": "^14.2.4",
+    "tailwindcss": "^4.3.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0"
   },

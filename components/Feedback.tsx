@@ -1,4 +1,15 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import {
+  FilterBar,
+  SectionHeader,
+  StatusActions,
+  EmptyState,
+} from "@/components/patterns/layout";
+import { Textarea } from "@/components/ui/textarea";
+import { Field } from "@/components/ui/field";
+import { ActionGroup } from "@/components/ui/action-group";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { useState } from "react";
@@ -51,16 +62,16 @@ export default function Feedback({
     <section className="feedback-box" aria-label="Content feedback">
       <h3>Did you find this useful?</h3>
       {error && (
-        <p className="error" role="alert">
+        <Alert variant="destructive" role="alert">
           {error}
-        </p>
+        </Alert>
       )}
       <p>Your feedback helps us make this better.</p>
-      <div className="button-group">
+      <ActionGroup>
         {(["up", "down"] as const).map((rating) => (
-          <button
+          <Button
+            variant={saved?.rating === rating ? "default" : "outline"}
             key={rating}
-            className={saved?.rating === rating ? "primary" : "secondary"}
             aria-label={rating === "up" ? "Useful" : "Not useful"}
             aria-pressed={saved?.rating === rating}
             onClick={() => {
@@ -73,18 +84,21 @@ export default function Feedback({
             ) : (
               <ThumbsDown size={17} />
             )}
-          </button>
+          </Button>
         ))}
-      </div>
+      </ActionGroup>
       {saved && (
-        <p role="status">
+        <StatusActions
+          actions={
+            !expanded && (
+              <Button variant="link" onClick={() => setExpanded(true)}>
+                Edit comment
+              </Button>
+            )
+          }
+        >
           Thanks—your rating is saved.
-          {!expanded && (
-            <button className="text-button" onClick={() => setExpanded(true)}>
-              Edit comment
-            </button>
-          )}
-        </p>
+        </StatusActions>
       )}
       {expanded && (
         <form
@@ -94,17 +108,17 @@ export default function Feedback({
             setExpanded(false);
           }}
         >
-          <label>
+          <Field>
             Tell us more <span className="muted">(optional)</span>
-            <textarea
+            <Textarea
               rows={3}
               maxLength={2000}
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               placeholder="What worked? What could be more useful?"
             />
-          </label>
-          <div className="button-group">
+          </Field>
+          <ActionGroup>
             <Button variant="default">Save comment</Button>
             <Button
               variant="outline"
@@ -116,7 +130,7 @@ export default function Feedback({
             >
               Done
             </Button>
-          </div>
+          </ActionGroup>
         </form>
       )}
     </section>
@@ -148,16 +162,16 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
   const positive = records.filter((f) => f.rating === "up").length;
   return (
     <>
-      <div className="filter-bar">
-        <label>
+      <FilterBar>
+        <Field>
           Search feedback
-          <input
+          <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Content title or comment"
           />
-        </label>
-        <label>
+        </Field>
+        <Field>
           Content type
           <SelectField
             value={kind}
@@ -171,8 +185,8 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             <option value="brief">Updates</option>
             <option value="course">Courses</option>
           </SelectField>
-        </label>
-        <label>
+        </Field>
+        <Field>
           Content item
           <SelectField value={item} onValueChange={(value) => setItem(value)}>
             <option value="all">All content</option>
@@ -184,8 +198,8 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
                 </option>
               ))}
           </SelectField>
-        </label>
-        <label>
+        </Field>
+        <Field>
           Rating
           <SelectField
             value={rating}
@@ -195,15 +209,15 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             <option value="up">Useful</option>
             <option value="down">Not useful</option>
           </SelectField>
-        </label>
-        <label>
+        </Field>
+        <Field>
           Sort feedback
           <SelectField value={sort} onValueChange={(value) => setSort(value)}>
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
           </SelectField>
-        </label>
-      </div>
+        </Field>
+      </FilterBar>
       <div className="report-summary">
         <strong>{records.length} ratings</strong>
         <span>{positive} useful</span>
@@ -217,13 +231,16 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
       <div className="feedback-list">
         {records.map((f) => (
           <article className="feedback-box" key={f.id}>
-            <div className="section-heading">
-              <h3>
-                {data.content.find((c) => c.id === f.contentId)?.title ||
-                  "Removed content"}
-              </h3>
+            <SectionHeader
+              title={
+                <h3>
+                  {data.content.find((c) => c.id === f.contentId)?.title ||
+                    "Removed content"}
+                </h3>
+              }
+            >
               <span>{f.rating === "up" ? "👍 Useful" : "👎 Not useful"}</span>
-            </div>
+            </SectionHeader>
             <small>
               {data.users.find((u) => u.id === f.userId)?.name || "Former user"}{" "}
               · v{f.version} · {new Date(f.updatedAt).toLocaleDateString()}
@@ -231,17 +248,14 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             <p className="feedback-comment">
               {f.comment || "No written comment."}
             </p>
-            <button
-              className="text-button"
-              onClick={() => setItem(f.contentId)}
-            >
+            <Button variant="link" onClick={() => setItem(f.contentId)}>
               View all feedback for this item
-            </button>
+            </Button>
           </article>
         ))}
       </div>
       {!records.length && (
-        <div className="empty">No feedback matches these filters.</div>
+        <EmptyState>No feedback matches these filters.</EmptyState>
       )}
     </>
   );

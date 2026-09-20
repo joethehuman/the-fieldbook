@@ -1,9 +1,17 @@
 "use client";
+import { SelectField } from "./ui/select";
+import { Card } from "@/components/ui/card";
+import { SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { ActionGroup } from "@/components/ui/action-group";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { FieldGroup, Field, FieldDescription } from "@/components/ui/field";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/store";
 import type { Curriculum } from "@/lib/types";
 import { groupItems } from "@/lib/learning-groups";
-import { OrderedLearning } from "./LearningGroups";
+import { OrderedLearning } from "./patterns/ordered-learning";
 import { Button } from "./ui/button";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 
@@ -98,11 +106,7 @@ export default function Curricula({
   }
   return (
     <section className="learning-admin">
-      {notice && (
-        <p role="status" className="notice">
-          {notice}
-        </p>
-      )}
+      {notice && <Alert role="status">{notice}</Alert>}
       {editing ? (
         <form
           onSubmit={(e) => {
@@ -110,16 +114,16 @@ export default function Curricula({
             void save();
           }}
         >
-          <fieldset disabled={busy} className="learning-admin-fields">
+          <FieldGroup disabled={busy}>
             <h2>
               {all.some((c) => c.id === editing.id)
                 ? "Edit curriculum"
                 : "New curriculum"}
             </h2>
             <p>A playlist of courses, in the order you recommend.</p>
-            <label>
+            <Field>
               Name
-              <input
+              <Input
                 required
                 maxLength={80}
                 value={editing.name}
@@ -127,10 +131,10 @@ export default function Curricula({
                   setEditing({ ...editing, name: e.target.value })
                 }
               />
-            </label>
-            <label>
+            </Field>
+            <Field>
               Description
-              <textarea
+              <Textarea
                 maxLength={1000}
                 rows={2}
                 value={editing.description}
@@ -138,7 +142,7 @@ export default function Curricula({
                   setEditing({ ...editing, description: e.target.value })
                 }
               />
-            </label>
+            </Field>
             <OrderedLearning
               items={editing.courseIds.map((id) => ({
                 id,
@@ -158,15 +162,15 @@ export default function Curricula({
                 })
               }
             />
-            <label>
+            <Field>
               Find a course
-              <input
+              <Input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search the course library"
               />
-            </label>
+            </Field>
             <div className="learning-search-results">
               {content
                 .filter(
@@ -200,14 +204,15 @@ export default function Curricula({
                   </div>
                 ))}
             </div>
-            <label>
+            <Field>
               Status
-              <select
+              <SelectField
+                disabled={busy}
                 value={editing.status}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   setEditing({
                     ...editing,
-                    status: e.target.value as Curriculum["status"],
+                    status: value as Curriculum["status"],
                   })
                 }
               >
@@ -215,21 +220,21 @@ export default function Curricula({
                   Draft
                 </option>
                 <option value="published">Published</option>
-              </select>
-            </label>
-            <p className="field-help">
+              </SelectField>
+            </Field>
+            <FieldDescription>
               Published curricula are available in the library and can be added
               to learning groups.
-            </p>
+            </FieldDescription>
             {!!linked(editing.id).length && (
-              <p className="notice">
+              <Alert>
                 Saving updates {linked(editing.id).length} learning groups. New
                 courses join their assigned learning lists; existing completions
                 are preserved. Remove group links before returning this
                 curriculum to draft.
-              </p>
+              </Alert>
             )}
-            <div className="button-group">
+            <ActionGroup>
               <Button type="submit" disabled={busy}>
                 {busy ? "Saving…" : "Save curriculum"}
               </Button>
@@ -245,18 +250,17 @@ export default function Curricula({
               >
                 Cancel
               </Button>
-            </div>
-          </fieldset>
+            </ActionGroup>
+          </FieldGroup>
         </form>
       ) : (
         <>
-          <div className="section-heading">
-            <div>
-              <h2>Curricula</h2>
-              <p>
-                Create reusable playlists, then add them to learning groups.
-              </p>
-            </div>
+          <SectionHeader
+            title={<h2>Curricula</h2>}
+            description={
+              <>Create reusable playlists, then add them to learning groups.</>
+            }
+          >
             <Button
               onClick={() => {
                 setEditing({
@@ -272,10 +276,10 @@ export default function Curricula({
             >
               Create curriculum
             </Button>
-          </div>
+          </SectionHeader>
           <div className="group-grid">
             {all.map((c) => (
-              <section className="group-card" key={c.id}>
+              <Card className="grid gap-4" key={c.id}>
                 <span className="eyebrow">{c.status}</span>
                 <h3>{c.name}</h3>
                 <p>{c.description}</p>
@@ -283,7 +287,7 @@ export default function Curricula({
                   {c.courseIds.length} courses · {linked(c.id).length} learning
                   groups
                 </p>
-                <div className="button-group">
+                <ActionGroup>
                   <Button
                     variant="outline"
                     disabled={busy}
@@ -302,15 +306,15 @@ export default function Curricula({
                   >
                     Delete
                   </Button>
-                </div>
-              </section>
+                </ActionGroup>
+              </Card>
             ))}
           </div>
           {!all.length && (
-            <p className="empty">
+            <EmptyState>
               No curricula yet. Create a playlist for onboarding or an ongoing
               learning program.
-            </p>
+            </EmptyState>
           )}
         </>
       )}

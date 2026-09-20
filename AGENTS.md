@@ -4,7 +4,7 @@ These instructions apply to AI-assisted contributions throughout this repository
 
 ## Product principles
 
-Fieldbook is a lightweight learning and knowledge platform combining Field Notes for updates, Learning for courses and knowledge checks, and Knowledge for maintained reference articles.
+Fieldbook is a lightweight learning and knowledge platform combining Updates, Courses and Docs.
 
 Keep it practical and maintainable for independent operators and small teams. Prefer focused changes that solve a concrete user problem. Discuss major architectural changes before implementing them. Keep installation-specific content, branding, accounts, and configuration separate from reusable application code.
 
@@ -29,6 +29,18 @@ The documented production stack is Vercel, hosted Supabase, and Google sign-in. 
 - Add new migrations instead of modifying migrations that may already have been applied. Document schema changes and their upgrade requirements.
 - Use an isolated development backend for tests and local development. Keep credentials, local environment files, and personal data out of commits, fixtures, logs, and screenshots. Use synthetic data and placeholder configuration in examples.
 - Treat installation content as operator-owned data. Avoid changes that overwrite it or couple the application to a particular deployment.
+
+## Interface and design system
+
+Read [Fieldbook interface standards](docs/design-system.md) before changing components, styling or layouts. The shared component catalog lives at `/ui` in the demo; UI ownership checks and browser tests run in CI.
+
+- Use the shared component library in `components/ui/` across demo and production, including standalone account pages. Use the appropriate shared primitive and `components/patterns/` composition rather than hand-built equivalents.
+- When a primitive or repeated form/layout pattern is missing, add it centrally and compose the feature from it. Do not build a second feature-local control system. Keep data, authorization and mutation logic outside UI primitives.
+- Use semantic theme tokens and shared variants. Do not add hard-coded interface colors, arbitrary control sizing, broad descendant overrides or `!important` fixes for shared components. Scope prose and decorative artwork separately; runtime branding/progress values and documented specialized native controls are valid exceptions.
+- Labels, descriptions, errors, field spacing, section spacing and action wrapping belong to shared patterns. Use Tabs for panels, filters for collections and DropdownMenu for actions. Preserve keyboard behavior and accessible names.
+- Do not treat legacy raw controls or duplicate CSS as examples to copy. New UI must follow the standards; migrate adjacent legacy structure when necessary without unrelated rewrites.
+- Follow the documented composition contracts for headers, navigation, account identity, reorder rows, card footers, status actions and data tables. Application tables must declare a shared column schema; verify that filtering does not move their columns.
+- Check applicable empty, error, loading, disabled, selected, focus and long-content states, narrow layouts and overlays inside dialogs. Report visual checks separately from builds. Extend the component catalog when introducing a reusable pattern. Run `pnpm check:ui` and `pnpm test:ui` for interface changes; review screenshots as well as interaction results. Do not weaken the ownership checks to accommodate new feature-local controls.
 
 ## Development and verification
 
@@ -56,3 +68,13 @@ Report which checks passed, which could not run, and any remaining limitations. 
 - Write clear, concrete instructions. Describe verified capabilities and identify limitations without inventing roadmap commitments.
 - Explain the problem, resulting behavior, and verification in the contribution summary. Include migration or compatibility implications where applicable.
 - Follow `docs/releases.md` for release work. Contributions do not by themselves authorize publishing a release, deploying an installation, or modifying its database; follow the scope authorized by the maintainer or operator.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -1,4 +1,10 @@
 "use client";
+import { ContentAction } from "@/components/patterns/content-action";
+import {
+  SectionHeader,
+  EmptyState,
+  CardFooter,
+} from "@/components/patterns/layout";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { updatesForUser } from "@/lib/learning-groups";
 import type { Content, User, Group } from "@/lib/types";
@@ -20,32 +26,30 @@ export default function Updates({
     <>
       {!guest && (
         <section className="updates-section">
-          <div className="section-heading">
-            <div>
-              <h2>For you</h2>
-              <p>The latest updates for your learning groups.</p>
-            </div>
-          </div>
+          <SectionHeader
+            title={<h2>For you</h2>}
+            description={<> The latest updates for your learning groups. </>}
+          ></SectionHeader>
           {forYou.length ? (
             <UpdateCards items={forYou} onOpen={onOpen} />
           ) : (
-            <p className="empty">
+            <EmptyState>
               No updates for your groups yet. Explore all updates below.
-            </p>
+            </EmptyState>
           )}
         </section>
       )}
       <section className="updates-section">
-        <div className="section-heading">
-          <h2>{forYou.length ? "Other updates" : "All updates"}</h2>
-        </div>
+        <SectionHeader
+          title={<h2>{forYou.length ? "Other updates" : "All updates"}</h2>}
+        ></SectionHeader>
         <UpdateCards items={other} onOpen={onOpen} />
         {!other.length && (
-          <p className="empty">
+          <EmptyState>
             {forYou.length
               ? "You’ve reached the rest of the updates."
               : "No updates published yet."}
-          </p>
+          </EmptyState>
         )}
       </section>
     </>
@@ -61,7 +65,7 @@ function UpdateCards({
   return (
     <div className="brief-list">
       {items.map((b, i) => (
-        <button
+        <ContentAction
           className={"brief-card " + (i === 0 ? "featured" : "")}
           key={b.id}
           onClick={() => onOpen(b.id)}
@@ -74,19 +78,22 @@ function UpdateCards({
             <span className="eyebrow">{b.category}</span>
             <h3>{b.title}</h3>
             <p>{b.summary}</p>
-            <span className="brief-date">
+            <CardFooter
+              action={
+                <>
+                  Read the update <ArrowRight size={16} />
+                </>
+              }
+            >
               {new Date(b.updatedAt).toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
                 timeZone: "UTC",
               })}
-              <span>
-                Read the update <ArrowRight size={16} />
-              </span>
-            </span>
+            </CardFooter>
           </div>
-        </button>
+        </ContentAction>
       ))}
     </div>
   );

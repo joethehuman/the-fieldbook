@@ -38,7 +38,11 @@
     "prettier": "^3.6.2",
     "serve": "^14.2.4",
     "tsx": "^4.20.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "tailwindcss": "^4.3.0",
+    "@tailwindcss/postcss": "^4.3.0",
+    "postcss": "^8.5.0",
+    "@playwright/test": "^1.63.0"
   },
   "packageManager": "pnpm@10.17.1",
   "engines": {

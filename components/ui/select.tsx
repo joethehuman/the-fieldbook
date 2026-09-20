@@ -17,7 +17,10 @@ export function SelectTrigger({
   return (
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
-      className={cn("ui-select-trigger", className)}
+      className={cn(
+        "flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-left text-sm font-normal text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 [&>span:first-child]:truncate [&>svg]:shrink-0 [&>svg]:text-muted-foreground",
+        className,
+      )}
       {...props}
     >
       {children}
@@ -39,16 +42,19 @@ export function SelectContent({
         data-slot="select-content"
         position={position}
         sideOffset={5}
-        className={cn("ui-select-content", className)}
+        className={cn(
+          "relative z-50 max-h-[min(22rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg",
+          className,
+        )}
         {...props}
       >
-        <SelectPrimitive.ScrollUpButton className="ui-select-scroll">
+        <SelectPrimitive.ScrollUpButton className="flex justify-center py-1">
           <ChevronUp size={14} />
         </SelectPrimitive.ScrollUpButton>
-        <SelectPrimitive.Viewport className="ui-select-viewport">
+        <SelectPrimitive.Viewport className="p-0">
           {children}
         </SelectPrimitive.Viewport>
-        <SelectPrimitive.ScrollDownButton className="ui-select-scroll">
+        <SelectPrimitive.ScrollDownButton className="flex justify-center py-1">
           <ChevronDown size={14} />
         </SelectPrimitive.ScrollDownButton>
       </SelectPrimitive.Content>
@@ -63,11 +69,14 @@ export function SelectItem({
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
-      className={cn("ui-select-item", className)}
+      className={cn(
+        "relative flex min-h-9 cursor-default select-none items-center rounded-sm py-2 pr-8 pl-3 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:font-medium",
+        className,
+      )}
       {...props}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
-      <SelectPrimitive.ItemIndicator className="ui-select-indicator">
+      <SelectPrimitive.ItemIndicator className="absolute right-2 flex size-4 items-center justify-center">
         <Check size={14} />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>

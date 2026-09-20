@@ -5,10 +5,23 @@ import { cn } from "@/lib/utils";
 export const Tabs = TabsPrimitive.Root;
 export function TabsList({
   className,
+  variant = "default",
   ...props
-}: React.ComponentProps<typeof TabsPrimitive.List>) {
+}: React.ComponentProps<typeof TabsPrimitive.List> & {
+  variant?: "default" | "sidebar";
+}) {
   return (
-    <TabsPrimitive.List className={cn("ui-tabs-list", className)} {...props} />
+    <TabsPrimitive.List
+      data-variant={variant}
+      className={cn(
+        "group/tabs",
+        variant === "sidebar"
+          ? "grid gap-6"
+          : "inline-flex max-w-full flex-wrap gap-1 rounded-lg bg-muted p-1 text-muted-foreground",
+        className,
+      )}
+      {...props}
+    />
   );
 }
 export function TabsTrigger({
@@ -17,7 +30,10 @@ export function TabsTrigger({
 }: React.ComponentProps<typeof TabsPrimitive.Trigger>) {
   return (
     <TabsPrimitive.Trigger
-      className={cn("ui-tabs-trigger", className)}
+      className={cn(
+        "inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs group-data-[variant=sidebar]/tabs:justify-start group-data-[variant=sidebar]/tabs:text-left group-data-[variant=sidebar]/tabs:[&_svg]:size-4 group-data-[variant=sidebar]/tabs:[&_svg]:shrink-0 group-data-[variant=sidebar]/tabs:data-[state=active]:bg-accent group-data-[variant=sidebar]/tabs:data-[state=active]:shadow-none",
+        className,
+      )}
       {...props}
     />
   );
@@ -28,7 +44,10 @@ export function TabsContent({
 }: React.ComponentProps<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content
-      className={cn("ui-tabs-content", className)}
+      className={cn(
+        "mt-6 min-w-0 outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        className,
+      )}
       {...props}
     />
   );

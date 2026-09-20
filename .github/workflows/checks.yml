@@ -16,6 +16,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm check:ui
       - run: pnpm test
       - run: pnpm build
         env:
@@ -23,3 +24,13 @@ jobs:
       - run: pnpm build:production
         env:
           NEXT_TELEMETRY_DISABLED: 1
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ui-review
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

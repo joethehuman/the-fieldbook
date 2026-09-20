@@ -1,12 +1,26 @@
 "use client";
+import { Badge } from "@/components/ui/badge";
+import { SearchField } from "./patterns/search-field";
+import { Card } from "./ui/card";
+import { ProgressRing } from "./ui/progress";
+import { SplitPanel } from "./patterns/layout";
+import { FilterOptions } from "./patterns/filter-options";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import {
+  Callout,
+  PageHeader,
+  Toolbar,
+  SectionHeader,
+  EmptyState,
+} from "@/components/patterns/layout";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, BookOpen, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
 import {
   isComplete,
   type Content,
-  assignmentInfo,
   type User,
   type Group,
   type Progress,
@@ -159,11 +173,11 @@ export default function Learning({
   }
   return (
     <>
-      <div className="page-heading">
+      <PageHeader>
         {view !== "home" && (
-          <button className="text-button" onClick={() => changeView("home")}>
+          <Button variant="link" onClick={() => changeView("home")}>
             ← Back to courses
-          </button>
+          </Button>
         )}
         <span className="eyebrow">YOUR ORGANIZATION</span>
         <h1>
@@ -180,10 +194,10 @@ export default function Learning({
               ? "Your role’s courses, in a recommended order. You can explore ahead at any time."
               : "Build your knowledge, sharpen your skills, and stay one step ahead."}
         </p>
-      </div>
-      <div className="learning-toolbar">
+      </PageHeader>
+      <Toolbar>
         {" "}
-        <label className="learning-sort">
+        <Field className="learning-sort">
           Sort courses
           <SelectField value={sort} onValueChange={(value) => setSort(value)}>
             <option value="recommended">Recommended order</option>
@@ -192,10 +206,10 @@ export default function Learning({
             <option value="updated">Recently updated</option>
             <option value="oldest">Oldest update first</option>
           </SelectField>
-        </label>
-      </div>
+        </Field>
+      </Toolbar>
       {view === "home" && publicLearning && (
-        <section className="public-learning">
+        <Callout>
           <div>
             <span className="eyebrow">YOUR LEARNING</span>
             <h2>Keep your curiosity moving.</h2>
@@ -223,52 +237,31 @@ export default function Learning({
               </Button>
             )}
           </div>
-          <button
-            className="text-button"
-            onClick={() => changeView("completed")}
-          >
+          <Button variant="link" onClick={() => changeView("completed")}>
             View completed courses →
-          </button>
-        </section>
+          </Button>
+        </Callout>
       )}
       {view === "home" && !publicLearning && (
         <section className="for-you">
-          <div className="section-heading">
-            <div>
+          <SectionHeader
+            title={
               <h2>
-                For you <span className="count-pill">{outstanding.length}</span>
+                For you <Badge variant="default">{outstanding.length}</Badge>
               </h2>
-              <p>
+            }
+            description={
+              <>
                 {state.onboarding
                   ? "Get up to speed at your pace."
                   : "Build your knowledge and stay current."}
-              </p>
-            </div>
-          </div>
-          <div
-            className={
-              "assigned-layout learning-assigned" +
-              (!outstanding.length ? " learning-current" : "")
+              </>
             }
-          >
-            <div className="current-card">
+          ></SectionHeader>
+          <SplitPanel split={outstanding.length > 0}>
+            <Card className="grid justify-items-center gap-4 text-center">
               {assigned.length > 0 ? (
-                <div
-                  className="progress-ring"
-                  style={{
-                    background: `conic-gradient(var(--accent, #0069ff) ${pct}%, #e4eaf5 0)`,
-                  }}
-                  role="img"
-                  aria-label={`${pct}% complete`}
-                >
-                  <div>
-                    <strong>
-                      {pct}
-                      <small>%</small>
-                    </strong>
-                    <span>complete</span>
-                  </div>
-                </div>
+                <ProgressRing value={pct} />
               ) : (
                 <div className="learning-status-icon">
                   <BookOpen size={24} />
@@ -304,18 +297,19 @@ export default function Learning({
               {!!outstanding.length && (
                 <Button
                   variant="default"
+                  className="w-full"
                   onClick={() => onOpen(state.remaining[0].id)}
                 >
                   Continue course
                 </Button>
               )}
-            </div>
+            </Card>
             {outstanding.length ? (
               <CourseRow title="For you">
                 {ordered(outstanding).map(card)}
               </CourseRow>
             ) : null}
-          </div>
+          </SplitPanel>
           {!!outstanding.length && (
             <details className="learning-by-group">
               <summary>View assigned courses by group</summary>
@@ -347,26 +341,23 @@ export default function Learning({
             </details>
           )}
           <div className="learning-links">
-            <button className="text-button" onClick={() => changeView("all")}>
+            <Button variant="link" onClick={() => changeView("all")}>
               View assigned courses <ArrowRight size={16} />
-            </button>
-            <button
-              className="text-button"
-              onClick={() => changeView("completed")}
-            >
+            </Button>
+            <Button variant="link" onClick={() => changeView("completed")}>
               View completed courses <ArrowRight size={16} />
-            </button>
+            </Button>
           </div>
         </section>
       )}
       {view === "home" && curricula.some((c) => c.status === "published") && (
         <section className="curricula-library">
-          <div className="section-heading">
-            <div>
-              <h2>Curricula</h2>
-              <p>Explore a playlist of courses in a recommended order.</p>
-            </div>
-          </div>
+          <SectionHeader
+            title={<h2>Curricula</h2>}
+            description={
+              <> Explore a playlist of courses in a recommended order. </>
+            }
+          ></SectionHeader>
           <div className="curricula-grid">
             {curricula
               .filter((c) => c.status === "published")
@@ -375,40 +366,45 @@ export default function Learning({
                   (id) => courses.find((course) => course.id === id) || [],
                 );
                 return (
-                  <details className="curriculum-card" key={c.id}>
-                    <summary>
-                      <strong>{c.name}</strong>
-                      <span>
-                        {
-                          items.filter((course) => isComplete(course, progress))
-                            .length
-                        }{" "}
-                        of {items.length} courses complete
-                      </span>
-                    </summary>
-                    <p>{c.description}</p>
-                    <ol>
-                      {items.map((course) => (
-                        <li key={course.id}>
-                          <button
-                            className="text-button"
-                            onClick={() => onOpen(course.id)}
-                          >
-                            {course.title}
-                            {isComplete(course, progress) ? " · Complete" : ""}
-                          </button>
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
+                  <Card asChild key={c.id}>
+                    <details className="curriculum-card">
+                      <summary>
+                        <strong>{c.name}</strong>
+                        <span>
+                          {
+                            items.filter((course) =>
+                              isComplete(course, progress),
+                            ).length
+                          }{" "}
+                          of {items.length} courses complete
+                        </span>
+                      </summary>
+                      <p>{c.description}</p>
+                      <ol>
+                        {items.map((course) => (
+                          <li key={course.id}>
+                            <Button
+                              variant="link"
+                              onClick={() => onOpen(course.id)}
+                            >
+                              {course.title}
+                              {isComplete(course, progress)
+                                ? " · Complete"
+                                : ""}
+                            </Button>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  </Card>
                 );
               })}
           </div>
         </section>
       )}
       <section className="library">
-        <div className="section-heading">
-          <div>
+        <SectionHeader
+          title={
             <h2>
               {view === "home"
                 ? "Explore the library"
@@ -416,39 +412,38 @@ export default function Learning({
                   ? "Assigned courses"
                   : "Completed courses"}
             </h2>
-            <p>
+          }
+          description={
+            <>
               {view === "home"
                 ? "Follow your curiosity. There’s always something to discover."
                 : "Browse by channel or find a specific course."}
-            </p>
-          </div>
+            </>
+          }
+        >
           <span className="muted" role="status">
             {filtered.length} courses
           </span>
-        </div>
-        <div className="learning-toolbar catalog-toolbar">
-          <label className="search">
-            <Search size={16} />
-            <input
+        </SectionHeader>
+        <Toolbar>
+          <SearchField className="w-full max-w-sm">
+            <Input
               aria-label="Filter courses"
               placeholder="Find a course…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-          </label>
-        </div>
-        <div className="topic-tabs">
-          {["All channels", ...topics].map((t) => (
-            <button
-              key={t}
-              aria-pressed={topic === t}
-              className={topic === t ? "selected" : ""}
-              onClick={() => setTopic(t)}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+          </SearchField>
+        </Toolbar>
+        <FilterOptions
+          label="Course channels"
+          value={topic}
+          onValueChange={setTopic}
+          options={["All channels", ...topics].map((value) => ({
+            value,
+            label: value,
+          }))}
+        />
         {topics
           .filter((t) => filtered.some((c) => c.category === t))
           .map((t) => (
@@ -472,7 +467,7 @@ export default function Learning({
             </div>
           ))}
         {!filtered.length && (
-          <div className="empty">
+          <EmptyState>
             <h3>
               {view === "completed" && !query && topic === "All channels"
                 ? "Your learning story starts here."
@@ -483,19 +478,19 @@ export default function Learning({
                 ? "Completed courses will appear here. Try another filter or return to courses."
                 : "Try another channel or search term."}
             </p>
-          </div>
+          </EmptyState>
         )}
       </section>
-      <div className="bottom-callout">
+      <Callout>
         <BookOpen size={22} />
         <div>
           <h3>Looking for an answer?</h3>
           <p>The docs library is your everyday reference.</p>
         </div>
-        <button className="text-button" onClick={onKnowledge}>
+        <Button variant="link" onClick={onKnowledge}>
           Explore docs <ArrowRight size={17} />
-        </button>
-      </div>
+        </Button>
+      </Callout>
     </>
   );
 }

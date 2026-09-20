@@ -1,4 +1,18 @@
 "use client";
+import { DataTable } from "./patterns/data-table";
+import { Card } from "@/components/ui/card";
+import {
+  TableContainer,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
+import { ActionGroup } from "@/components/ui/action-group";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { Toolbar, FilterBar, EmptyState } from "@/components/patterns/layout";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import {
@@ -11,7 +25,6 @@ import type { Workspace } from "@/lib/store";
 import {
   ancestorIds,
   assignedCourses,
-  assignmentInfo,
   canParent,
   isComplete,
   reportTeamIds,
@@ -62,7 +75,7 @@ export function TeamsAdmin({
   }
   return (
     <>
-      <div className="admin-toolbar">
+      <Toolbar>
         <p>Teams organize reporting. Groups determine assignments.</p>
         <Button
           variant="default"
@@ -73,14 +86,14 @@ export function TeamsAdmin({
         >
           Add team
         </Button>
-      </div>
+      </Toolbar>
       {notice && <p role="status">{notice}</p>}
       {editing && (
-        <form className="editor-block" onSubmit={save}>
-          <div className="filter-bar">
-            <label>
+        <form className="grid gap-4" onSubmit={save}>
+          <FilterBar>
+            <Field>
               Team name
-              <input
+              <Input
                 required
                 maxLength={80}
                 value={editing.name}
@@ -88,8 +101,8 @@ export function TeamsAdmin({
                   setEditing({ ...editing, name: e.target.value })
                 }
               />
-            </label>
-            <label>
+            </Field>
+            <Field>
               Parent team
               <SelectField
                 value={editing.parentId || ""}
@@ -109,8 +122,8 @@ export function TeamsAdmin({
                     </option>
                   ))}
               </SelectField>
-            </label>
-            <label>
+            </Field>
+            <Field>
               Manager
               <SelectField
                 value={editing.managerId || ""}
@@ -133,13 +146,13 @@ export function TeamsAdmin({
                     </option>
                   ))}
               </SelectField>
-            </label>
-          </div>
+            </Field>
+          </FilterBar>
           <p className="muted">
             Assigning a manager grants reporting access for this team and its
             subteams.
           </p>
-          <div className="button-group">
+          <ActionGroup>
             <Button variant="default">Save team</Button>
             <Button
               type="button"
@@ -148,57 +161,61 @@ export function TeamsAdmin({
             >
               Cancel
             </Button>
-          </div>
+          </ActionGroup>
         </form>
       )}
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Team</th>
-              <th>Parent</th>
-              <th>Manager</th>
-              <th>Direct members</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
+      <TableContainer>
+        <DataTable layout="teams">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Team</TableHead>
+              <TableHead>Parent</TableHead>
+              <TableHead>Manager</TableHead>
+              <TableHead align="right">Direct members</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {teams.map((t) => (
-              <tr key={t.id}>
-                <td>
+              <TableRow key={t.id}>
+                <TableCell>
                   <strong>{t.name}</strong>
-                </td>
-                <td>{teams.find((p) => p.id === t.parentId)?.name || "—"}</td>
-                <td>
+                </TableCell>
+                <TableCell>
+                  {teams.find((p) => p.id === t.parentId)?.name || "—"}
+                </TableCell>
+                <TableCell>
                   {data.users.find((u) => u.id === t.managerId)?.name ||
                     "Unassigned"}
-                </td>
-                <td>
+                </TableCell>
+                <TableCell align="right">
                   {
                     data.users.filter((u) => u.active && u.teamId === t.id)
                       .length
                   }
-                </td>
-                <td>
-                  <button
-                    className="text-button"
+                </TableCell>
+                <TableCell>
+                  <Button
+                    variant="link"
                     onClick={() => {
                       setEditing({ ...t });
                       setNotice("");
                     }}
                   >
                     Edit team
-                  </button>
-                </td>
-              </tr>
+                  </Button>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </DataTable>
+      </TableContainer>
       {!teams.length && (
-        <div className="empty">
+        <EmptyState>
           Create your first team, then assign its members in Profiles.
-        </div>
+        </EmptyState>
       )}
     </>
   );
@@ -232,8 +249,8 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
     done = rows.reduce((n, r) => n + r.completed, 0);
   return (
     <>
-      <div className="filter-bar">
-        <label>
+      <FilterBar>
+        <Field>
           Reporting team
           <SelectField
             value={teamId}
@@ -253,10 +270,10 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                 </option>
               ))}
           </SelectField>
-        </label>
-        <label>
+        </Field>
+        <Field>
           Find a team member
-          <input
+          <Input
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -264,8 +281,8 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             }}
             placeholder="Name or email"
           />
-        </label>
-      </div>
+        </Field>
+      </FilterBar>
       <p className="muted">
         Includes subteams. Completion uses the latest published course versions.
       </p>
@@ -280,29 +297,31 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             : "No assignments"}
         </span>
       </div>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Team member</th>
-              <th>Team</th>
-              <th>Assigned</th>
-              <th>Completed</th>
-              <th>Complete</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
+      <TableContainer>
+        <DataTable layout="progress">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Team member</TableHead>
+              <TableHead>Team</TableHead>
+              <TableHead align="right">Assigned</TableHead>
+              <TableHead align="right">Completed</TableHead>
+              <TableHead align="right">Complete</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {rows.map(({ u, assigned, completed }) => (
-              <tr key={u.id}>
-                <td>
+              <TableRow key={u.id}>
+                <TableCell>
                   <strong>{u.name}</strong>
                   <small>{u.email}</small>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   {teams.find((t) => t.id === u.teamId)?.name || "No team"}
-                </td>
-                <td>
+                </TableCell>
+                <TableCell align="right">
                   {assigned.length}
                   <small>
                     {
@@ -315,33 +334,30 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                       ).status
                     }
                   </small>
-                </td>
-                <td>{completed}</td>
-                <td>
+                </TableCell>
+                <TableCell align="right">{completed}</TableCell>
+                <TableCell align="right">
                   {assigned.length
                     ? completionPercent(completed, assigned.length) + "%"
                     : "—"}
-                </td>
-                <td>
-                  <button
-                    className="text-button"
-                    onClick={() => setPerson(u.id)}
-                  >
+                </TableCell>
+                <TableCell>
+                  <Button variant="link" onClick={() => setPerson(u.id)}>
                     View courses
-                  </button>
-                </td>
-              </tr>
+                  </Button>
+                </TableCell>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </DataTable>
+      </TableContainer>
       {!users.length && (
-        <div className="empty">No team members match this view.</div>
+        <EmptyState>No team members match this view.</EmptyState>
       )}
       {rows
         .filter((r) => r.u.id === person)
         .map(({ u, assigned }) => (
-          <section className="editor-block" key={u.id}>
+          <Card className="grid gap-4" key={u.id}>
             <h2>{u.name}’s assignments</h2>
             {assigned.map((c) => {
               const done = isComplete(c, data.progress[u.id] || []),
@@ -350,7 +366,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                 <div className="report-course" key={c.id}>
                   <div>
                     <strong>{c.title}</strong>
-                    <small>
+                    <small className="block text-muted-foreground">
                       {c.category} · v{c.version}
                       {due ? ` · Target ${due}` : ""}
                     </small>
@@ -366,7 +382,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
               );
             })}
             {!assigned.length && <p>No assigned courses.</p>}
-          </section>
+          </Card>
         ))}
     </>
   );

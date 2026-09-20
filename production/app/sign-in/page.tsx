@@ -1,3 +1,7 @@
+import { Button } from "@/components/ui/button";
+
+import { Alert } from "@/components/ui/alert";
+import { AccountPage } from "@/components/patterns/layout";
 import { redirect } from "next/navigation";
 import { privacySettings } from "@production/lib/privacy";
 import { privacyHref } from "@/lib/settings";
@@ -12,25 +16,25 @@ export default async function SignIn({
   }
   const policyLink = privacyHref(await privacySettings());
   return (
-    <main className="auth-card sign-in-card">
+    <AccountPage>
       <header className="sign-in-heading">
         <span className="eyebrow">WELCOME TO FIELDBOOK</span>
         <h1>Keep your learning with you.</h1>
         <p>Sign in with Google to save your progress across devices.</p>
       </header>
       {q.error && (
-        <p className="error" role="alert">
+        <Alert variant="destructive" role="alert">
           Sign-in could not be completed. Check that Google is configured and
           your account is allowed to join.
-        </p>
+        </Alert>
       )}
-      <a className="primary" href="/auth/login">
-        Continue with Google
-      </a>
+      <Button asChild variant="default" className="w-full">
+        <a href="/auth/login">Continue with Google</a>
+      </Button>
       <nav className="sign-in-footer" aria-label="Sign-in links">
         <a href="/">Back to Fieldbook</a>
         {policyLink && <a href={policyLink}>Privacy policy</a>}
       </nav>
-    </main>
+    </AccountPage>
   );
 }

@@ -1,6 +1,16 @@
 "use client";
-import { useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, GripVertical, Plus, Trash2 } from "lucide-react";
+import { OrderedLearning } from "./patterns/ordered-learning";
+import { SelectField } from "./ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+import { Checkbox } from "@/components/ui/choice";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
+import { SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { Alert } from "@/components/ui/alert";
+import { ActionGroup } from "@/components/ui/action-group";
+import { useState } from "react";
+import { Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import {
   canParent,
@@ -13,109 +23,6 @@ import { Button } from "./ui/button";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import type { LearningHandler } from "./Assignments";
 
-export function OrderedLearning({
-  items,
-  onReorder,
-  onRemove,
-  disabled = false,
-}: {
-  items: { id: string; label: string; detail?: ReactNode }[];
-  onReorder: (ids: string[]) => void;
-  onRemove: (id: string) => void;
-  disabled?: boolean;
-}) {
-  const [dragged, setDragged] = useState<string | null>(null);
-  function move(id: string, position: number) {
-    const ids = items.map((i) => i.id),
-      from = ids.indexOf(id);
-    if (
-      from < 0 ||
-      position < 0 ||
-      position >= ids.length ||
-      from === position ||
-      disabled
-    )
-      return;
-    ids.splice(from, 1);
-    ids.splice(position, 0, id);
-    onReorder(ids);
-  }
-  return (
-    <ol className="learning-order">
-      {items.map((item, index) => (
-        <li
-          key={item.id}
-          onDragOver={(e) => {
-            if (dragged) e.preventDefault();
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            if (dragged) move(dragged, index);
-            setDragged(null);
-          }}
-        >
-          <button
-            type="button"
-            className="order-handle"
-            draggable={!disabled}
-            disabled={disabled}
-            aria-label={`Reorder ${item.label}; use up or down arrow`}
-            onDragStart={(e) => {
-              e.dataTransfer.setData("text/plain", item.id);
-              setDragged(item.id);
-            }}
-            onDragEnd={() => setDragged(null)}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                e.preventDefault();
-                move(item.id, index + (e.key === "ArrowUp" ? -1 : 1));
-              }
-            }}
-          >
-            <GripVertical size={17} />
-          </button>
-          <span className="order-position">{index + 1}</span>
-          <div className="order-copy">
-            <strong>{item.label}</strong>
-            {item.detail && <small>{item.detail}</small>}
-          </div>
-          <div className="order-actions">
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Move ${item.label} up`}
-              disabled={disabled || index === 0}
-              onClick={() => move(item.id, index - 1)}
-            >
-              <ArrowUp size={16} />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Move ${item.label} down`}
-              disabled={disabled || index === items.length - 1}
-              onClick={() => move(item.id, index + 1)}
-            >
-              <ArrowDown size={16} />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              disabled={disabled}
-              aria-label={`Remove ${item.label}`}
-              onClick={() => onRemove(item.id)}
-            >
-              <Trash2 size={16} />
-            </Button>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
 const key = (i: LearningItem) => `${i.kind}:${i.id}`;
 export default function LearningGroups({
   data,
@@ -193,22 +100,18 @@ export default function LearningGroups({
     name.toLowerCase().includes(query.trim().toLowerCase());
   return (
     <section className="learning-admin">
-      {notice && (
-        <p role="status" className="notice">
-          {notice}
-        </p>
-      )}
+      {notice && <Alert role="status">{notice}</Alert>}
       {!group ? (
         <>
-          <div className="section-heading">
-            <div>
-              <h2>Learning groups</h2>
-              <p>
+          <SectionHeader
+            title={<h2>Learning groups</h2>}
+            description={
+              <>
                 Choose who courses and updates are for. Everyone can explore the
                 full library.
-              </p>
-            </div>
-          </div>
+              </>
+            }
+          ></SectionHeader>
           <form
             className="group-create"
             onSubmit={async (e) => {
@@ -241,16 +144,16 @@ export default function LearningGroups({
               }
             }}
           >
-            <label>
+            <Field>
               New learning group
-              <input
+              <Input
                 required
                 maxLength={80}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Account executives"
               />
-            </label>
+            </Field>
             <Button disabled={busy} type="submit">
               <Plus size={16} />
               Create group
@@ -258,7 +161,7 @@ export default function LearningGroups({
           </form>
           <div className="group-grid">
             {data.groups.map((g) => (
-              <section className="group-card" key={g.id}>
+              <Card className="grid gap-4" key={g.id}>
                 <h3>{g.name}</h3>
                 <p>
                   {
@@ -285,29 +188,28 @@ export default function LearningGroups({
                 >
                   Manage {g.name}
                 </Button>
-              </section>
+              </Card>
             ))}
           </div>
         </>
       ) : (
         <>
-          <button
-            className="text-button"
+          <Button
+            variant="link"
             onClick={() => {
               setSelected("");
               setQuery("");
             }}
           >
             ← All learning groups
-          </button>
-          <div className="section-heading">
-            <div>
-              <h2>{group.name}</h2>
-              <p>
-                Members receive this group’s courses and updates in For you.
-              </p>
-            </div>
-            <div className="button-group">
+          </Button>
+          <SectionHeader
+            title={<h2>{group.name}</h2>}
+            description={
+              <>Members receive this group’s courses and updates in For you.</>
+            }
+          >
+            <ActionGroup>
               <Button
                 variant="outline"
                 disabled={busy}
@@ -339,316 +241,331 @@ export default function LearningGroups({
               >
                 Delete group
               </Button>
-            </div>
-          </div>
-          <div className="topic-tabs" aria-label="Learning group sections">
-            {["members", "learning", "updates"].map((t) => (
-              <button
-                key={t}
-                aria-pressed={tab === t}
-                onClick={() => {
-                  setTab(t);
-                  setQuery("");
-                }}
-              >
-                {t[0].toUpperCase() + t.slice(1)}
-              </button>
-            ))}
-          </div>
-          <fieldset disabled={busy} className="learning-admin-fields">
-            {tab === "members" ? (
-              <>
-                <label>
-                  Parent learning group
-                  <select
-                    value={group.parentId || ""}
-                    onChange={(e) =>
-                      changeGroup({ parentId: e.target.value || undefined })
-                    }
-                  >
-                    <option value="">No parent</option>
-                    {data.groups
-                      .filter((g) => canParent(group.id, g.id, data.groups))
-                      .map((g) => (
-                        <option value={g.id} key={g.id}>
-                          {g.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <p className="field-help">
-                  Members also receive courses and updates from parent groups.
-                </p>
-                <h3>Teams</h3>
-                <p className="field-help">
-                  Team membership stays in sync. Each selected team includes its
-                  direct members; select child teams separately.
-                </p>
-                <div className="group-picker-options">
-                  {(data.teams || []).map((t) => (
-                    <label className="group-picker-option" key={t.id}>
-                      <input
-                        type="checkbox"
-                        checked={group.teamIds?.includes(t.id) || false}
-                        onChange={(e) =>
-                          changeGroup({
-                            teamIds: e.target.checked
-                              ? [...(group.teamIds || []), t.id]
-                              : (group.teamIds || []).filter(
-                                  (id) => id !== t.id,
-                                ),
-                          })
+            </ActionGroup>
+          </SectionHeader>
+          <Tabs
+            value={tab}
+            onValueChange={(value) => {
+              setTab(value);
+              setQuery("");
+            }}
+          >
+            <TabsList aria-label="Learning group sections">
+              {["members", "learning", "updates"].map((t) => (
+                <TabsTrigger value={t} key={t}>
+                  {t[0].toUpperCase() + t.slice(1)}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            <TabsContent value={tab} key={tab}>
+              <FieldGroup disabled={busy}>
+                {tab === "members" ? (
+                  <>
+                    <Field>
+                      Parent learning group
+                      <SelectField
+                        disabled={busy}
+                        value={group.parentId || ""}
+                        onValueChange={(value) =>
+                          changeGroup({ parentId: value || undefined })
                         }
-                      />
-                      {t.name}
-                    </label>
-                  ))}
-                </div>
-                {!data.teams?.length && (
-                  <p>Create a team in Teams to link it here.</p>
-                )}
-                <h3>People</h3>
-                <label>
-                  Find a person
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search name or email"
-                  />
-                </label>
-                <div className="membership-list">
-                  {data.users
-                    .filter((u) => matches(u.name + " " + u.email))
-                    .map((u) => {
-                      const via = u.teamId && group.teamIds?.includes(u.teamId);
-                      const effective = effectiveGroups(u, data.groups).has(
-                        group.id,
-                      );
-                      return (
-                        <label className="membership-person" key={u.id}>
-                          <input
-                            type="checkbox"
-                            checked={u.groups.includes(group.id)}
+                      >
+                        <option value="">No parent</option>
+                        {data.groups
+                          .filter((g) => canParent(group.id, g.id, data.groups))
+                          .map((g) => (
+                            <option value={g.id} key={g.id}>
+                              {g.name}
+                            </option>
+                          ))}
+                      </SelectField>
+                    </Field>
+                    <FieldDescription>
+                      Members also receive courses and updates from parent
+                      groups.
+                    </FieldDescription>
+                    <h3>Teams</h3>
+                    <FieldDescription>
+                      Team membership stays in sync. Each selected team includes
+                      its direct members; select child teams separately.
+                    </FieldDescription>
+                    <div className="group-picker-options">
+                      {(data.teams || []).map((t) => (
+                        <Field
+                          orientation="horizontal"
+                          className="group-picker-option"
+                          key={t.id}
+                        >
+                          <Checkbox
+                            checked={group.teamIds?.includes(t.id) || false}
                             onChange={(e) =>
-                              save({
-                                ...data,
-                                users: data.users.map((p) =>
-                                  p.id === u.id
-                                    ? {
-                                        ...p,
-                                        groups: e.target.checked
-                                          ? [...p.groups, group.id]
-                                          : p.groups.filter(
-                                              (id) => id !== group.id,
-                                            ),
-                                      }
-                                    : p,
-                                ),
+                              changeGroup({
+                                teamIds: e.target.checked
+                                  ? [...(group.teamIds || []), t.id]
+                                  : (group.teamIds || []).filter(
+                                      (id) => id !== t.id,
+                                    ),
                               })
                             }
                           />
-                          <span>
-                            <strong>{u.name}</strong>
-                            <small>
-                              {u.email}
-                              {!u.active ? " · Inactive" : ""}
-                            </small>
-                          </span>
-                          <small>
-                            {via
-                              ? "Via team"
-                              : effective && !u.groups.includes(group.id)
-                                ? "Via child group"
-                                : ""}
-                            {u.groups.includes(group.id)
-                              ? " · Individually added"
-                              : ""}
-                          </small>
-                        </label>
-                      );
-                    })}
-                </div>
-                <p className="field-help">
-                  Check a person to add them individually. Unchecking does not
-                  remove membership supplied by a team or child group.
-                </p>
-              </>
-            ) : tab === "learning" ? (
-              <>
-                <h3>Recommended sequence</h3>
-                <p className="field-help">
-                  Add courses or reusable curricula. Reorder to recommend what
-                  to take next. Every course stays available.
-                </p>
-                {group.parentId && (
-                  <p className="notice">
-                    Courses from parent groups come first. Manage those courses
-                    in the parent group.
-                  </p>
+                          {t.name}
+                        </Field>
+                      ))}
+                    </div>
+                    {!data.teams?.length && (
+                      <p>Create a team in Teams to link it here.</p>
+                    )}
+                    <h3>People</h3>
+                    <Field>
+                      Find a person
+                      <Input
+                        type="search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search name or email"
+                      />
+                    </Field>
+                    <div className="membership-list">
+                      {data.users
+                        .filter((u) => matches(u.name + " " + u.email))
+                        .map((u) => {
+                          const via =
+                            u.teamId && group.teamIds?.includes(u.teamId);
+                          const effective = effectiveGroups(u, data.groups).has(
+                            group.id,
+                          );
+                          return (
+                            <Field
+                              orientation="horizontal"
+                              className="membership-person"
+                              key={u.id}
+                            >
+                              <Checkbox
+                                checked={u.groups.includes(group.id)}
+                                onChange={(e) =>
+                                  save({
+                                    ...data,
+                                    users: data.users.map((p) =>
+                                      p.id === u.id
+                                        ? {
+                                            ...p,
+                                            groups: e.target.checked
+                                              ? [...p.groups, group.id]
+                                              : p.groups.filter(
+                                                  (id) => id !== group.id,
+                                                ),
+                                          }
+                                        : p,
+                                    ),
+                                  })
+                                }
+                              />
+                              <span>
+                                <strong>{u.name}</strong>
+                                <small>
+                                  {u.email}
+                                  {!u.active ? " · Inactive" : ""}
+                                </small>
+                              </span>
+                              <small>
+                                {via
+                                  ? "Via team"
+                                  : effective && !u.groups.includes(group.id)
+                                    ? "Via child group"
+                                    : ""}
+                                {u.groups.includes(group.id)
+                                  ? " · Individually added"
+                                  : ""}
+                              </small>
+                            </Field>
+                          );
+                        })}
+                    </div>
+                    <FieldDescription>
+                      Check a person to add them individually. Unchecking does
+                      not remove membership supplied by a team or child group.
+                    </FieldDescription>
+                  </>
+                ) : tab === "learning" ? (
+                  <>
+                    <h3>Recommended sequence</h3>
+                    <FieldDescription>
+                      Add courses or reusable curricula. Reorder to recommend
+                      what to take next. Every course stays available.
+                    </FieldDescription>
+                    {group.parentId && (
+                      <Alert>
+                        Courses from parent groups come first. Manage those
+                        courses in the parent group.
+                      </Alert>
+                    )}
+                    <OrderedLearning
+                      items={items.map((i) => ({
+                        id: key(i),
+                        label:
+                          i.kind === "course"
+                            ? content.find((c) => c.id === i.id)?.title ||
+                              "Unavailable course"
+                            : curricula.find((c) => c.id === i.id)?.name ||
+                              "Unavailable curriculum",
+                        detail:
+                          i.kind === "curriculum"
+                            ? `Curriculum · ${curricula.find((c) => c.id === i.id)?.courseIds.length || 0} courses`
+                            : "Course",
+                      }))}
+                      disabled={busy}
+                      onReorder={(ids) =>
+                        changeGroup({
+                          learningItems: ids.map((id) =>
+                            items.find((i) => key(i) === id)!,
+                          ),
+                        })
+                      }
+                      onRemove={(id) =>
+                        changeGroup({
+                          learningItems: items.filter((i) => key(i) !== id),
+                        })
+                      }
+                    />
+                    {!items.length && (
+                      <EmptyState>
+                        No assigned courses yet. Add a course or curriculum
+                        below.
+                      </EmptyState>
+                    )}
+                    <Field>
+                      Search courses and curricula
+                      <Input
+                        type="search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search the library"
+                      />
+                    </Field>
+                    <div className="learning-search-results">
+                      {[
+                        ...published
+                          .filter((c) => c.kind === "course")
+                          .map((c) => ({
+                            kind: "course" as const,
+                            id: c.id,
+                            name: c.title,
+                            detail: c.category,
+                          })),
+                        ...curricula
+                          .filter((c) => c.status === "published")
+                          .map((c) => ({
+                            kind: "curriculum" as const,
+                            id: c.id,
+                            name: c.name,
+                            detail: `${c.courseIds.length} courses`,
+                          })),
+                      ]
+                        .filter(
+                          (i) =>
+                            matches(i.name + " " + i.detail) &&
+                            !items.some((x) => key(x) === key(i)),
+                        )
+                        .map((i) => (
+                          <div className="learning-search-result" key={key(i)}>
+                            <span>
+                              <strong>{i.name}</strong>
+                              <small>
+                                {i.kind === "curriculum"
+                                  ? "Curriculum"
+                                  : "Course"}{" "}
+                                · {i.detail}
+                              </small>
+                            </span>
+                            <Button
+                              variant="outline"
+                              onClick={() =>
+                                changeGroup({
+                                  learningItems: [
+                                    ...items,
+                                    { kind: i.kind, id: i.id },
+                                  ],
+                                })
+                              }
+                              aria-label={`Add ${i.name}`}
+                            >
+                              Add
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3>Updates for this group</h3>
+                    <FieldDescription>
+                      These updates appear in For you, newest first. Updates
+                      never affect learning completion.
+                    </FieldDescription>
+                    <Field>
+                      Find an update
+                      <Input
+                        type="search"
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        placeholder="Search updates"
+                      />
+                    </Field>
+                    <div className="learning-search-results">
+                      {published
+                        .filter((c) => c.kind === "brief" && matches(c.title))
+                        .sort(
+                          (a, b) =>
+                            Number(b.groups.includes(group.id)) -
+                              Number(a.groups.includes(group.id)) ||
+                            b.updatedAt.localeCompare(a.updatedAt),
+                        )
+                        .map((c) => (
+                          <div className="learning-search-result" key={c.id}>
+                            <span>
+                              <strong>{c.title}</strong>
+                              <small>
+                                {c.groups.includes(group.id)
+                                  ? "For this group"
+                                  : "Available to everyone"}
+                              </small>
+                            </span>
+                            <Button
+                              variant="outline"
+                              onClick={async () => {
+                                setBusy(true);
+                                setNotice("");
+                                try {
+                                  await onLearning({
+                                    operation: c.groups.includes(group.id)
+                                      ? "untarget"
+                                      : "target",
+                                    contentId: c.id,
+                                    groupId: group.id,
+                                    expected:
+                                      data.content.find((x) => x.id === c.id)
+                                        ?.revision ||
+                                      c.revision ||
+                                      1,
+                                  });
+                                  setNotice("Update audience saved.");
+                                } catch (e) {
+                                  setNotice((e as Error).message);
+                                } finally {
+                                  setBusy(false);
+                                }
+                              }}
+                            >
+                              {c.groups.includes(group.id) ? "Remove" : "Add"}
+                            </Button>
+                          </div>
+                        ))}
+                    </div>
+                  </>
                 )}
-                <OrderedLearning
-                  items={items.map((i) => ({
-                    id: key(i),
-                    label:
-                      i.kind === "course"
-                        ? content.find((c) => c.id === i.id)?.title ||
-                          "Unavailable course"
-                        : curricula.find((c) => c.id === i.id)?.name ||
-                          "Unavailable curriculum",
-                    detail:
-                      i.kind === "curriculum"
-                        ? `Curriculum · ${curricula.find((c) => c.id === i.id)?.courseIds.length || 0} courses`
-                        : "Course",
-                  }))}
-                  disabled={busy}
-                  onReorder={(ids) =>
-                    changeGroup({
-                      learningItems: ids.map((id) =>
-                        items.find((i) => key(i) === id)!,
-                      ),
-                    })
-                  }
-                  onRemove={(id) =>
-                    changeGroup({
-                      learningItems: items.filter((i) => key(i) !== id),
-                    })
-                  }
-                />
-                {!items.length && (
-                  <p className="empty">
-                    No assigned courses yet. Add a course or curriculum below.
-                  </p>
-                )}
-                <label>
-                  Search courses and curricula
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search the library"
-                  />
-                </label>
-                <div className="learning-search-results">
-                  {[
-                    ...published
-                      .filter((c) => c.kind === "course")
-                      .map((c) => ({
-                        kind: "course" as const,
-                        id: c.id,
-                        name: c.title,
-                        detail: c.category,
-                      })),
-                    ...curricula
-                      .filter((c) => c.status === "published")
-                      .map((c) => ({
-                        kind: "curriculum" as const,
-                        id: c.id,
-                        name: c.name,
-                        detail: `${c.courseIds.length} courses`,
-                      })),
-                  ]
-                    .filter(
-                      (i) =>
-                        matches(i.name + " " + i.detail) &&
-                        !items.some((x) => key(x) === key(i)),
-                    )
-                    .map((i) => (
-                      <div className="learning-search-result" key={key(i)}>
-                        <span>
-                          <strong>{i.name}</strong>
-                          <small>
-                            {i.kind === "curriculum" ? "Curriculum" : "Course"}{" "}
-                            · {i.detail}
-                          </small>
-                        </span>
-                        <Button
-                          variant="outline"
-                          onClick={() =>
-                            changeGroup({
-                              learningItems: [
-                                ...items,
-                                { kind: i.kind, id: i.id },
-                              ],
-                            })
-                          }
-                          aria-label={`Add ${i.name}`}
-                        >
-                          Add
-                        </Button>
-                      </div>
-                    ))}
-                </div>
-              </>
-            ) : (
-              <>
-                <h3>Updates for this group</h3>
-                <p className="field-help">
-                  These updates appear in For you, newest first. Updates never
-                  affect learning completion.
-                </p>
-                <label>
-                  Find an update
-                  <input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search updates"
-                  />
-                </label>
-                <div className="learning-search-results">
-                  {published
-                    .filter((c) => c.kind === "brief" && matches(c.title))
-                    .sort(
-                      (a, b) =>
-                        Number(b.groups.includes(group.id)) -
-                          Number(a.groups.includes(group.id)) ||
-                        b.updatedAt.localeCompare(a.updatedAt),
-                    )
-                    .map((c) => (
-                      <div className="learning-search-result" key={c.id}>
-                        <span>
-                          <strong>{c.title}</strong>
-                          <small>
-                            {c.groups.includes(group.id)
-                              ? "For this group"
-                              : "Available to everyone"}
-                          </small>
-                        </span>
-                        <Button
-                          variant="outline"
-                          onClick={async () => {
-                            setBusy(true);
-                            setNotice("");
-                            try {
-                              await onLearning({
-                                operation: c.groups.includes(group.id)
-                                  ? "untarget"
-                                  : "target",
-                                contentId: c.id,
-                                groupId: group.id,
-                                expected:
-                                  data.content.find((x) => x.id === c.id)
-                                    ?.revision ||
-                                  c.revision ||
-                                  1,
-                              });
-                              setNotice("Update audience saved.");
-                            } catch (e) {
-                              setNotice((e as Error).message);
-                            } finally {
-                              setBusy(false);
-                            }
-                          }}
-                        >
-                          {c.groups.includes(group.id) ? "Remove" : "Add"}
-                        </Button>
-                      </div>
-                    ))}
-                </div>
-              </>
-            )}
-          </fieldset>
+              </FieldGroup>
+            </TabsContent>
+          </Tabs>
         </>
       )}
     </section>

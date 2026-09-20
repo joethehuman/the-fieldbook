@@ -1,0 +1,87 @@
+/* Decorative course artwork. Palette literals are intentionally isolated from UI tokens. */
+@layer components {
+  .art-0 {
+    background: #e2eaf5;
+    color: #61769c;
+  }
+  .art-1 {
+    background: #deebfc;
+    color: #4474b9;
+  }
+  .art-2 {
+    background: #e3e8fb;
+    color: #716caa;
+  }
+  .art-3 {
+    background: #def0ec;
+    color: #3b8b7d;
+  }
+  .art-4 {
+    background: #f3e9dd;
+    color: #a4815d;
+  }
+  .art-5 {
+    background: #ebe5f6;
+    color: #9475b5;
+  }
+  .art-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(#ffffff36 1px, transparent 1px),
+      linear-gradient(90deg, #ffffff36 1px, transparent 1px);
+    background-size: 27px 27px;
+    mask-image: linear-gradient(145deg, transparent, #000);
+  }
+  .abstract {
+    position: absolute;
+    width: 145px;
+    height: 140px;
+    right: 14%;
+    top: 18px;
+    transform: rotate(-22deg);
+  }
+  .abstract i {
+    position: absolute;
+    width: 96px;
+    height: 96px;
+    border: 1px solid currentColor;
+    opacity: 0.25;
+    border-radius: 18px;
+    left: 20px;
+    top: 12px;
+    background: #ffffff32;
+  }
+  .abstract i:nth-child(2) {
+    left: 37px;
+    top: 29px;
+  }
+  .abstract i:nth-child(3) {
+    left: 54px;
+    top: 46px;
+  }
+  .abstract-1 {
+    transform: rotate(-24deg);
+    top: 12px;
+  }
+  .abstract-1 i {
+    border-radius: 50%;
+    width: 94px;
+    height: 94px;
+    border-width: 15px;
+    background: transparent;
+  }
+  .abstract-2 {
+    transform: rotate(-28deg);
+    right: 19%;
+    top: 21px;
+  }
+  .abstract-2 i {
+    height: 100px;
+    width: 65px;
+    border-radius: 4px;
+    border-width: 1px;
+    background: #ffffff45;
+    box-shadow: 10px 10px 25px #64589308;
+  }
+}
