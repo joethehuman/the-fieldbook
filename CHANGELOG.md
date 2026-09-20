@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep the browser-progress import banner clear of the desktop sidebar and allow its controls to wrap on narrow screens.
+
 - Give sign-in a compact, responsive layout with separated secondary links. Keep return destinations in a short-lived cookie so the sign-in address stays clean.
 
 ### Required-learning verification
