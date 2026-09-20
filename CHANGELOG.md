@@ -6,6 +6,19 @@ No versions have been released. Package and MCP version strings do not constitut
 
 - Give sign-in a compact, responsive layout with separated secondary links. Keep return destinations in a short-lived cookie so the sign-in address stays clean.
 
+### Required-learning verification
+
+- Updated stale assignment tests and learning documentation to the current group-only requirements and organization onboarding/catch-up windows.
+- Database assignment checks now include the required-learning migration, rejection of individual assignments/custom deadlines, and preservation of audited individual progress actions.
+- Full test suite passes; no application behavior or database schema changes in this follow-up.
+
+### Content navigation and course covers
+
+- Admins can save the Docs section order under Organization Settings → Docs navigation. The sidebar and overview use the same order; new sections append alphabetically.
+- Courses can use an uploaded cover image or retain generated artwork. Covers support replacement and removal, preserve draft/publication behavior, and use existing private media storage.
+- Update cards align artwork at the top, omit list-position numbers, and cycle through the existing background palette.
+- No database migration is required. See [content presentation controls](docs/content-presentation.md).
+
 ### Interface redesign (review branch)
 
 - Shared neutral theme, Geist typography, consistent spacing, compact actions, and responsive layout across learner, manager, and administrator views.

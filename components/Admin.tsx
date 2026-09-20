@@ -39,6 +39,7 @@ import {
   MessageSquare,
   MoreHorizontal,
 } from "lucide-react";
+import CourseCoverEditor from "./CourseCoverEditor";
 import MarkdownEditor, { type UploadMedia } from "./MarkdownEditor";
 import SiteSettingsPanel from "./SiteSettingsPanel";
 import { FeedbackAdmin } from "./Feedback";
@@ -113,6 +114,12 @@ const adminSections = [
         name: "Identity",
         description: "Your organization’s name, logo, and accent color.",
         icon: Settings,
+      },
+      {
+        id: "settings-docs",
+        name: "Docs navigation",
+        description: "Choose the section order for Docs.",
+        icon: FileText,
       },
       {
         id: "settings-courses",
@@ -1158,10 +1165,12 @@ export function Editor({
     [editorTab, setEditorTab] = useState("content"),
     [error, setError] = useState(""),
     [refresh, setRefresh] = useState(false),
-    [saving, setSaving] = useState(false);
+    [saving, setSaving] = useState(false),
+    [coverUploading, setCoverUploading] = useState(false);
   const existing = data.content.some((x) => x.id === c.id);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (coverUploading) return;
     if (
       c.kind === "course" &&
       c.status === "published" &&
@@ -1244,7 +1253,7 @@ export function Editor({
           </span>
           <h1>{existing ? c.title : "Something worth sharing."}</h1>
         </div>
-        <Button variant="default" disabled={saving}>
+        <Button variant="default" disabled={saving || coverUploading}>
           <Save size={16} />
           Save {c.status === "published" ? "& publish" : "draft"}
         </Button>
@@ -1573,6 +1582,15 @@ export function Editor({
             <>
               <section className="editor-setting-section">
                 <h3>Course details</h3>
+                <CourseCoverEditor
+                  url={c.coverImageUrl}
+                  onUpload={onUpload}
+                  disabled={saving || coverUploading}
+                  onBusyChange={setCoverUploading}
+                  onChange={(url) =>
+                    setC((current) => ({ ...current, coverImageUrl: url }))
+                  }
+                />
                 <label>
                   Estimated minutes
                   <input

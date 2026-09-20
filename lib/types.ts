@@ -25,6 +25,7 @@ export type Content = {
   updatedAt: string;
   createdAt?: string;
   assignments?: Assignment[];
+  coverImageUrl?: string;
   duration: number;
   groups: string[];
   lessons: Lesson[];

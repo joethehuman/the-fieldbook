@@ -34,6 +34,7 @@ import {
 import ReactMarkdown from "./Markdown";
 import type { FieldbookRuntime } from "@/lib/runtime";
 import { sectionPaths, resolveSection } from "@/lib/navigation";
+import { orderedDocCategories } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
 import Feedback from "./Feedback";
@@ -360,16 +361,18 @@ export default function Fieldbook({
         </nav>
         {view === "docs" && (
           <div className="doc-nav">
-            {Array.from(new Set(docs.map((d) => d.category))).map((cat) => (
-              <details open key={cat}>
-                <summary>{cat}</summary>
-                <DocFolders
-                  docs={docs.filter((d) => d.category === cat)}
-                  selected={selected}
-                  onOpen={(id) => navigate("docs", id)}
-                />
-              </details>
-            ))}
+            {orderedDocCategories(docs, branding.docCategoryOrder).map(
+              (cat) => (
+                <details open key={cat}>
+                  <summary>{cat}</summary>
+                  <DocFolders
+                    docs={docs.filter((d) => d.category === cat)}
+                    selected={selected}
+                    onOpen={(id) => navigate("docs", id)}
+                  />
+                </details>
+              ),
+            )}
           </div>
         )}
         <div className="sidebar-bottom">
@@ -691,26 +694,28 @@ export default function Fieldbook({
                 </div>
               )}
               <div className="knowledge-grid">
-                {Array.from(new Set(docs.map((d) => d.category))).map((cat) => (
-                  <section className="knowledge-section" key={cat}>
-                    <BookOpen size={22} />
-                    <h2>{cat}</h2>
-                    <p>
-                      {docs.filter((d) => d.category === cat).length} articles
-                    </p>
-                    {docs
-                      .filter((d) => d.category === cat)
-                      .map((d) => (
-                        <button
-                          onClick={() => navigate("docs", d.id)}
-                          key={d.id}
-                        >
-                          {d.title}
-                          <ChevronRight size={16} />
-                        </button>
-                      ))}
-                  </section>
-                ))}
+                {orderedDocCategories(docs, branding.docCategoryOrder).map(
+                  (cat) => (
+                    <section className="knowledge-section" key={cat}>
+                      <BookOpen size={22} />
+                      <h2>{cat}</h2>
+                      <p>
+                        {docs.filter((d) => d.category === cat).length} articles
+                      </p>
+                      {docs
+                        .filter((d) => d.category === cat)
+                        .map((d) => (
+                          <button
+                            onClick={() => navigate("docs", d.id)}
+                            key={d.id}
+                          >
+                            {d.title}
+                            <ChevronRight size={16} />
+                          </button>
+                        ))}
+                    </section>
+                  ),
+                )}
               </div>
             </>
           ) : (
@@ -730,10 +735,8 @@ export default function Fieldbook({
                       key={b.id}
                       onClick={() => navigate("briefs", b.id)}
                     >
-                      <div className={"brief-art art-" + i}>
-                        <span>
-                          UPDATES<span className="art-number">0{i + 1}</span>
-                        </span>
+                      <div className={"brief-art art-" + (i % 6)}>
+                        <span>UPDATES</span>
                         <ArrowUpRight size={36} />
                       </div>
                       <div className="brief-copy">

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Play, CheckCircle2, ArrowUpRight } from "lucide-react";
 import type { Content } from "@/lib/types";
 export function CourseCard({
@@ -13,17 +14,35 @@ export function CourseCard({
   progress?: number;
   onClick: () => void;
 }) {
+  const [failedCover, setFailedCover] = useState<string | null>(null);
+  const showCover = !!c.coverImageUrl && c.coverImageUrl !== failedCover;
   const index = Number(c.id.replace(/\D/g, "")) || 1;
   return (
     <button className="course-card" onClick={onClick}>
-      <div className={"course-art art-" + (index % 6)}>
-        <div className="art-grid" />
+      <div
+        className={
+          "course-art art-" + (index % 6) + (showCover ? " has-cover" : "")
+        }
+      >
+        {showCover ? (
+          <img
+            className="course-cover"
+            src={c.coverImageUrl}
+            alt=""
+            loading="lazy"
+            onError={() => setFailedCover(c.coverImageUrl || null)}
+          />
+        ) : (
+          <div className="art-grid" />
+        )}
         <span className="art-label">{c.category}</span>
-        <div className={"abstract abstract-" + (index % 3)}>
-          <i />
-          <i />
-          <i />
-        </div>
+        {!showCover && (
+          <div className={"abstract abstract-" + (index % 3)}>
+            <i />
+            <i />
+            <i />
+          </div>
+        )}
         <span className="play-disc">
           <Play size={17} fill="currentColor" />
         </span>

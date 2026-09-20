@@ -25,6 +25,7 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
+  docCategoryOrder?: string[];
   newUserStage?: "existing" | "newhire";
   onboardingDays?: number;
   catchUpDays?: number;

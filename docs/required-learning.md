@@ -1,12 +1,14 @@
 # Required learning: opinionated MVP
 
-## Implementation plan
+## Current implementation
 
-1. Retire individual assignments and course-specific deadline controls. Keep the existing group rule storage, authorization, audit history and progress administration.
-2. Add workspace onboarding/catch-up windows (90/30 days by default) and an explicit onboarding start date on people and pre-registered accounts. Existing users have no onboarding start date. People includes a default stage for new accounts (Existing user or New user); only an explicit New user default makes self-registration start an onboarding window. Pre-registered accounts retain their individually chosen stage/start date, and changing the default never updates existing people.
-3. Manage required learning by group with recommended course order. Parent foundations come first, courses remain unlocked, and overlapping group requirements count once.
-4. Keep the learner channel layout and full library. Show Get up to speed during onboarding, then Stay current, with a recommended next course and on-track/needs-attention status distinct from completion percentage.
-5. Build the feature branch and deploy Preview. Apply migration only to the isolated Preview database. Leave production and main unchanged; user performs acceptance testing.
+Required learning is group-only. The application retains group rule storage, authorization, audit history, and individual progress administration, while retiring individual course assignments and course-specific deadline controls.
+
+Organization settings define onboarding/catch-up windows (90/30 days by default). People and pre-registered accounts have an optional onboarding start date. Existing users have none. Only an explicit New user default starts onboarding for self-registration; pre-registered accounts retain their selected stage and start date. Changing the default does not update existing people.
+
+Groups define required courses and recommended order. Parent foundations come first, courses remain unlocked, and overlapping requirements count once. The learner library remains available independently of requirements. New users see Get up to speed; existing users see Stay current, with a recommended next course and an on-track/needs-attention status distinct from completion percentage.
+
+See [learning-model.md](learning-model.md) for the current behavior and examples. This describes the code, not a verified deployment state.
 
 ## Timing
 
@@ -14,9 +16,9 @@ A person's requirement starts at the later of the course's group requirement dat
 
 The workspace settings are live policies: changing a window recalculates targets. Publishing by itself does not require a course. Removing a requirement does not erase progress. Admin completion/reset controls remain, scoped to the current published course version and audited.
 
-## Preview migration
+## Installation and upgrade
 
-Apply `supabase/migrations/202609200003_required_learning.sql` after existing migrations, in a transaction. It stores onboarding dates for current/pending people, retires direct requirements and old custom deadlines with an audit snapshot, preserves progress, and updates service-only governance functions. No production migration is authorized.
+Apply `supabase/migrations/202609200003_required_learning.sql` after existing migrations, in a transaction. It stores onboarding dates for current/pending people, retires direct requirements and old custom deadlines with an audit snapshot, preserves progress, and updates service-only governance functions. Apply and verify on an isolated development or preview database before an authorized production upgrade. This documentation does not authorize changing a production database.
 
 ## Deliberate exclusions
 

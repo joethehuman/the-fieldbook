@@ -10,6 +10,12 @@ export const contentBaseSchema = z.object({
   folder: text(300),
   status: z.enum(["draft", "published"]),
   version: z.number().int().min(1),
+  coverImageUrl: text(2000)
+    .refine(
+      (s) => !s || /^\/api\/media\/[a-f0-9-]{36}\.(png|jpg|webp|gif)$/.test(s),
+      "Upload a course cover using Fieldbook.",
+    )
+    .optional(),
   duration: z.number().int().min(0).max(10000),
   groups: z.array(text(80)).max(100),
   lessons: z
@@ -88,6 +94,14 @@ const publishedPrivacySchema = privacyDocumentSchema.refine(
   "Published policies require text, operator and an email or contact page, or an HTTPS policy URL.",
 );
 export const settingsSchema = z.object({
+  docCategoryOrder: z
+    .array(text(80).trim().min(1))
+    .max(500)
+    .refine(
+      (names) => new Set(names).size === names.length,
+      "Docs sections must be unique.",
+    )
+    .optional(),
   newUserStage: z.enum(["existing", "newhire"]).default("existing"),
   onboardingDays: z.number().int().min(1).max(365).default(90),
   catchUpDays: z.number().int().min(1).max(365).default(30),

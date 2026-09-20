@@ -2,11 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
-import { assignedCourses, assignmentInfo } from "../lib/types";
+import { assignedCourses } from "../lib/types";
+import { learningTarget, requiredSequence } from "../lib/learning";
+import { freshWorkspace } from "../lib/store";
+import { defaultSettings } from "../lib/settings";
 const admin = "00000000-0000-4000-8000-000000000001",
   learner = "00000000-0000-4000-8000-000000000002",
   cid = "00000000-0000-4000-8000-000000000003";
-test("assignment and progress administration is atomic, versioned, isolated and audited", async () => {
+test("group requirements and person progress administration are atomic, versioned, isolated and audited", async () => {
   const pg = new PGlite();
   try {
     await pg.exec(
@@ -17,6 +20,7 @@ test("assignment and progress administration is atomic, versioned, isolated and 
       "202609190002_mcp_audience.sql",
       "202609200001_governance.sql",
       "202609200002_assignments.sql",
+      "202609200003_required_learning.sql",
     ])
       await pg.exec(
         await readFile(
@@ -32,7 +36,7 @@ test("assignment and progress administration is atomic, versioned, isolated and 
       );
     }
     await pg.exec(
-      `update public.fb_config set groups='[{"id":"sales","name":"Sales"}]'`,
+      `update public.fb_config set groups='[{"id":"sales","name":"Sales"},{"id":"solutions","name":"Solutions"}]'`,
     );
     const course = {
       id: cid,
@@ -66,7 +70,9 @@ test("assignment and progress administration is atomic, versioned, isolated and 
           operation,
           contentId: cid,
           expected: 2,
-          userId: learner,
+          ...(operation === "assign" || operation === "unassign"
+            ? { groupId: "solutions" }
+            : { userId: learner }),
           ...extra,
         }),
       ]);
@@ -74,7 +80,28 @@ test("assignment and progress administration is atomic, versioned, isolated and 
       manage("assign", { due: { type: "none" } }, learner),
       /Administrator/,
     );
-    await manage("assign", { due: { type: "days", days: 3 } });
+    await assert.rejects(
+      manage("assign", { groupId: undefined, userId: learner }),
+      /belongs to a group/,
+    );
+    await assert.rejects(
+      manage("unassign", { groupId: undefined, userId: learner }),
+      /belongs to a group/,
+    );
+    for (const assignments of [
+      [{ userId: learner, due: { type: "none" } }],
+      [{ groupId: "sales", due: { type: "days", days: 3 } }],
+      [{ groupId: "sales", due: { type: "date", date: "2026-09-22" } }],
+    ]) {
+      await assert.rejects(
+        pg.query(
+          "select public.fb_save_document($1,2,$2,true,false,$3,'test')",
+          [cid, JSON.stringify({ ...course, assignments }), admin],
+        ),
+        /groups and workspace windows/,
+      );
+    }
+    await manage("assign", { due: { type: "none" } });
     const getDoc = async () =>
       (
         await pg.query<any>("select * from public.fb_documents where id=$1", [
@@ -86,6 +113,11 @@ test("assignment and progress administration is atomic, versioned, isolated and 
     assert.equal(d.draft.title, "Unpublished edits");
     assert.equal(d.published.assignments.length, 2);
     assert.equal(d.published.assignments[0].groupId, "sales");
+    assert(
+      d.published.assignments.every(
+        (rule: any) => rule.groupId && !rule.userId && rule.due.type === "none",
+      ),
+    );
     await assert.rejects(manage("unassign"), /changed/);
     const getProgress = async () =>
       (
@@ -116,6 +148,11 @@ test("assignment and progress administration is atomic, versioned, isolated and 
     d = await getDoc();
     assert.equal(d.published.assignments.length, 1);
     assert.equal(d.published.assignments[0].groupId, "sales");
+    assert(
+      d.published.assignments.every(
+        (rule: any) => rule.groupId && !rule.userId && rule.due.type === "none",
+      ),
+    );
     assert.equal((await getProgress()).revision, 2);
     await pg.query(
       "select public.fb_record_progress($1,$2,1,'[\"lesson\"]',true,null)",
@@ -140,39 +177,95 @@ test("assignment and progress administration is atomic, versioned, isolated and 
     await pg.close();
   }
 });
-test("direct and inherited assignments deduplicate courses and use earliest deadline", () => {
-  const user: any = {
-    id: learner,
-    groups: ["sales"],
-    groupJoinedAt: { sales: "2026-09-20T00:00:00Z" },
+test("overlapping parent and child group requirements count once; individual rules do not require courses", () => {
+  const data = freshWorkspace();
+  const user = {
+    ...data.users[0],
+    onboardingStart: undefined,
+    groups: ["startup"],
+    groupJoinedAt: { startup: "2026-09-20T00:00:00Z" },
   };
-  const groups = [{ id: "sales", name: "Sales" }];
-  const course: any = {
-    kind: "course",
-    status: "published",
-    groups: ["sales"],
+  const groups = [
+    { id: "sales", name: "Sales" },
+    { id: "startup", name: "Startup", parentId: "sales" },
+  ];
+  const course = {
+    ...data.content.find((c) => c.kind === "course")!,
     assignments: [
       {
         groupId: "sales",
         assignedAt: "2026-09-01T00:00:00Z",
-        due: { type: "days", days: 14 },
+        due: { type: "none" as const },
       },
       {
-        userId: learner,
-        assignedAt: "2026-09-20T00:00:00Z",
-        due: { type: "date", date: "2026-09-22" },
+        groupId: "startup",
+        assignedAt: "2026-09-25T00:00:00Z",
+        due: { type: "none" as const },
+      },
+      // Historical data must not revive retired individual requirements.
+      {
+        userId: user.id,
+        assignedAt: "2026-09-01T00:00:00Z",
+        due: { type: "date" as const, date: "2026-09-22" },
       },
     ],
   };
   assert.equal(assignedCourses([course], user, groups).length, 1);
-  assert.equal(assignmentInfo(course, user, groups).dueDate, "2026-09-22");
+  assert.deepEqual(
+    requiredSequence([course], user, groups).map((c) => c.id),
+    [course.id],
+  );
+  assert.equal(learningTarget(course, user, groups), "2026-10-20");
   assert.equal(
     assignedCourses([course], { ...user, groups: [] }, groups).length,
-    1,
-  );
-  assert.equal(
-    assignedCourses([course], { ...user, id: admin, groups: [] }, groups)
-      .length,
     0,
   );
+  assert.equal(
+    learningTarget(course, { ...user, groups: [] }, groups),
+    undefined,
+  );
+});
+
+test("completion targets use the later onboarding or catch-up window and respond to settings changes", () => {
+  const data = freshWorkspace();
+  const user = {
+    ...data.users[0],
+    onboardingStart: "2026-09-01",
+    groups: ["sales"],
+    groupJoinedAt: { sales: "2026-09-20T00:00:00Z" },
+  };
+  const course = {
+    ...data.content.find((c) => c.kind === "course")!,
+    assignments: [
+      {
+        groupId: "sales",
+        assignedAt: "2026-09-01T00:00:00Z",
+        due: { type: "none" as const },
+      },
+    ],
+  };
+  assert.equal(learningTarget(course, user, data.groups), "2026-11-30");
+  const existingUser = { ...user, onboardingStart: undefined };
+  assert.equal(learningTarget(course, existingUser, data.groups), "2026-10-20");
+  assert.equal(
+    learningTarget(course, existingUser, data.groups, {
+      ...defaultSettings,
+      catchUpDays: 14,
+    }),
+    "2026-10-04",
+  );
+  assert.equal(
+    learningTarget(course, user, data.groups, {
+      ...defaultSettings,
+      onboardingDays: 30,
+    }),
+    "2026-10-20",
+  );
+  const newlyRequired = {
+    ...course,
+    assignments: [
+      { ...course.assignments[0], assignedAt: "2026-11-20T00:00:00Z" },
+    ],
+  };
+  assert.equal(learningTarget(newlyRequired, user, data.groups), "2026-12-20");
 });

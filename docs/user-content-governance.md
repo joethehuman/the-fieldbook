@@ -2,7 +2,9 @@
 
 The group-only required-learning model in [required-learning.md](required-learning.md) supersedes the individual-assignment and per-course-deadline iteration below. Its migration retires those rules while preserving progress and audit history.
 
-# Production governance
+# Historical governance implementation notes
+
+The following sections record earlier implementation and preview work. They are not the current learning specification; use [learning-model.md](learning-model.md) and [required-learning.md](required-learning.md).
 
 ## Audit and scope
 
@@ -38,7 +40,7 @@ One dedicated Google web OAuth client should use callback `https://lmcrlobrxyxgw
 
 Hosted migrations and sample data have been applied to the isolated backend. Vercel Preview configuration and a successful redeployment are confirmed; the guest library displays both sample courses. Dedicated Google provider configuration and authenticated role verification are still pending.
 
-## Assignment management iteration
+## Superseded assignment management iteration
 
 Assignments can target one group (including descendants and future members) or one person. The workspace Assignments view, group/person detail views and course builder all manage the same published rules. Assignment-only edits preserve unpublished lesson edits. Multiple applicable rules yield one learner course and the earliest deadline. Unassigning removes only that source and never clears progress.
 
