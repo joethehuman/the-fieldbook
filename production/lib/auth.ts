@@ -36,6 +36,7 @@ export function profile(row: any): User {
     groups: row.groups,
     teamId: row.team_id || undefined,
     groupJoinedAt: row.group_joined_at,
+    effectiveGroupJoinedAt: row.effective_group_joined_at,
   };
 }
 export async function actor(token?: string): Promise<User | null> {
@@ -60,41 +61,29 @@ export async function actor(token?: string): Promise<User | null> {
       403,
       "Sign in to Fieldbook before connecting an AI client.",
     );
-  const owner = u.email.toLowerCase() === env().owner;
-  const { data: config, error: configError } = await db()
-    .from("fb_config")
-    .select("settings")
-    .single();
-  check(configError);
-  if (!owner && config?.settings.registration !== "open")
-    throw new HttpError(403, "New account registration is closed.");
-  const row = {
-    id: u.id,
-    name: String(u.user_metadata?.full_name || u.email.split("@")[0]).slice(
-      0,
-      80,
-    ),
-    email: u.email,
-    role: owner ? "admin" : "learner",
-    active: true,
-    groups: [],
-    group_joined_at: {},
-  };
-  const { error: insertError } = await db()
-    .from("fb_profiles")
-    .upsert(row, { onConflict: "id", ignoreDuplicates: true });
-  check(insertError);
-  const { data: saved, error: savedError } = await db()
-    .from("fb_profiles")
-    .select("*")
-    .eq("id", u.id)
-    .single();
-  check(savedError);
+  const { data: saved, error: registrationError } = await db().rpc(
+    "fb_register_profile",
+    {
+      p_id: u.id,
+      p_email: u.email,
+      p_name: String(u.user_metadata?.full_name || u.email.split("@")[0]).slice(
+        0,
+        80,
+      ),
+      p_owner: u.email.toLowerCase() === env().owner,
+    },
+  );
+  if (registrationError)
+    throw new HttpError(
+      403,
+      "This account cannot register. Contact an administrator.",
+    );
+  if (!saved.active) throw new HttpError(403, "This account is inactive.");
   return profile(saved);
 }
 export function requireAdmin(user: User | null): asserts user is User {
   if (!user) throw new HttpError(401, "Sign in to continue.");
-  if (user.role !== "admin")
+  if (!user.active || user.role !== "admin")
     throw new HttpError(403, "Administrator access is required.");
 }
 export function sameOrigin(req: Request) {

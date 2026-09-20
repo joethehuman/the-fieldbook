@@ -64,7 +64,7 @@ The production application includes:
 - Signed-in feedback, administrator progress/feedback views, branding, and privacy-policy settings.
 - Administrator-only MCP tools for content, aggregate reports, and existing media references.
 
-**Groups, nested teams, people administration, and manager reporting are demo-only.** Their models exist in shared code, but production does not offer the management APIs/UI needed to use them. Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. See the [repository audit](docs/repository-audit.md) for evidence and limits.
+**Production governance** includes people administration, pre-registered Google accounts, nested assignment groups, course deadlines, nested reporting teams and server-scoped manager reporting. See [permission rules and rollout checks](docs/user-content-governance.md). Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. See the [repository audit](docs/repository-audit.md) for evidence and limits.
 
 ## Documentation
 

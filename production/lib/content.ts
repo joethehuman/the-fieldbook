@@ -132,6 +132,11 @@ export async function saveContent(
     p_actor: user.id,
     p_source: source,
   });
+  if (saveError?.code === "P0001")
+    throw new HttpError(
+      saveError.message.includes("Revision conflict") ? 409 : 400,
+      saveError.message,
+    );
   check(saveError);
   return document(saved, true);
 }

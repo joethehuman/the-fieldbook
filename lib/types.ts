@@ -39,6 +39,7 @@ export type User = {
   active: boolean;
   teamId?: string;
   groupJoinedAt?: Record<string, string>;
+  effectiveGroupJoinedAt?: Record<string, string>;
 };
 export type Progress = {
   content_id: string;
@@ -107,10 +108,12 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
     .filter((r) => memberships.has(r.groupId))
     .map((r) => {
       const joined =
+        user.effectiveGroupJoinedAt?.[r.groupId] ||
         user.groups
           .filter((id) => ancestorIds(id, groups).has(r.groupId))
           .map((id) => user.groupJoinedAt?.[id] || r.assignedAt)
-          .sort()[0] || r.assignedAt;
+          .sort()[0] ||
+        r.assignedAt;
       const assignedAt = joined > r.assignedAt ? joined : r.assignedAt;
       let dueDate: string | undefined;
       if (r.due.type === "date") dueDate = r.due.date;
@@ -128,6 +131,7 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
 }
 export function reportTeamIds(user: User, teams: Team[]) {
   if (user.role === "admin") return new Set(teams.map((t) => t.id));
+  if (!user.active || user.role !== "manager") return new Set<string>();
   const roots = teams.filter((t) => t.managerId === user.id).map((t) => t.id);
   return new Set(
     teams

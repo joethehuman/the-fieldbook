@@ -9,5 +9,15 @@ export function env() {
     throw new Error(
       "Fieldbook production configuration is incomplete. Set the required environment variables.",
     );
+  if (
+    process.env.VERCEL_ENV === "preview" ||
+    process.env.FIELDBOOK_ENVIRONMENT === "preview"
+  ) {
+    const previewRef = process.env.FIELDBOOK_PREVIEW_SUPABASE_REF;
+    if (!previewRef || new URL(url).hostname !== `${previewRef}.supabase.co`)
+      throw new Error(
+        "Preview must use its explicitly configured isolated Supabase backend.",
+      );
+  }
   return { url, key, secret, origin: new URL(origin).origin, owner };
 }

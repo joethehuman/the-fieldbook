@@ -16,12 +16,12 @@ export function TeamsAdmin({
   onChange,
 }: {
   data: Workspace;
-  onChange: (d: Workspace) => void;
+  onChange: (d: Workspace) => void | Promise<void>;
 }) {
   const teams = data.teams || [];
   const [editing, setEditing] = useState<Team | null>(null),
     [notice, setNotice] = useState("");
-  function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!editing) return;
     const name = editing.name.trim();
@@ -39,15 +39,19 @@ export function TeamsAdmin({
       setNotice("A team cannot sit inside itself or one of its subteams.");
       return;
     }
-    onChange({
-      ...data,
-      teams: [
-        ...teams.filter((t) => t.id !== editing.id),
-        { ...editing, name },
-      ],
-    });
-    setEditing(null);
-    setNotice("Team saved.");
+    try {
+      await onChange({
+        ...data,
+        teams: [
+          ...teams.filter((t) => t.id !== editing.id),
+          { ...editing, name },
+        ],
+      });
+      setEditing(null);
+      setNotice("Team saved.");
+    } catch (e) {
+      setNotice((e as Error).message);
+    }
   }
   return (
     <>
@@ -112,7 +116,10 @@ export function TeamsAdmin({
               >
                 <option value="">No manager</option>
                 {data.users
-                  .filter((u) => u.active)
+                  .filter(
+                    (u) =>
+                      u.active && (u.role === "manager" || u.role === "admin"),
+                  )
                   .map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}
@@ -204,7 +211,11 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
       `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()),
   );
   const rows = users.map((u) => {
-    const assigned = assignedCourses(data.content, u, data.groups);
+    const assigned = assignedCourses(
+      data.publishedContent || data.content,
+      u,
+      data.groups,
+    );
     const completed = assigned.filter((c) =>
       isComplete(c, data.progress[u.id] || []),
     ).length;

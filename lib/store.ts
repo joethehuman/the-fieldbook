@@ -3,6 +3,14 @@ import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 export type Workspace = {
   settings?: import("./settings").SiteSettings;
   revision?: number;
+  governanceRevision?: number;
+  pendingUsers?: {
+    email: string;
+    name: string;
+    role: User["role"];
+    groups: string[];
+    teamId?: string;
+  }[];
   publishedContent?: Content[];
   schema: 1;
   feedback?: Feedback[];

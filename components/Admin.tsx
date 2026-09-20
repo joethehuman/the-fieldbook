@@ -1,4 +1,5 @@
 "use client";
+import { PendingPeople } from "./PendingPeople";
 import { useState } from "react";
 import {
   Plus,
@@ -94,7 +95,7 @@ export default function Admin({
     setEditing(null);
     setNotice(production ? "Content saved." : "Content saved in this browser.");
   }
-  function savePerson(e: React.FormEvent) {
+  async function savePerson(e: React.FormEvent) {
     e.preventDefault();
     if (!person) return;
     if (
@@ -104,7 +105,7 @@ export default function Admin({
           u.email.toLowerCase() === person.email.toLowerCase(),
       )
     ) {
-      setNotice("A demo profile already uses that email.");
+      setNotice("A profile already uses that email.");
       return;
     }
     const previous = data.users.find((u) => u.id === person.id);
@@ -119,14 +120,18 @@ export default function Admin({
         ]),
       ),
     };
-    onChange({
-      ...data,
-      users: data.users.some((u) => u.id === person.id)
-        ? data.users.map((u) => (u.id === person.id ? savedPerson : u))
-        : [...data.users, savedPerson],
-    });
-    setPerson(null);
-    setNotice("Demo profile saved.");
+    try {
+      await onChange({
+        ...data,
+        users: data.users.some((u) => u.id === person.id)
+          ? data.users.map((u) => (u.id === person.id ? savedPerson : u))
+          : [...data.users, savedPerson],
+      });
+      setPerson(null);
+      setNotice(production ? "Account saved." : "Demo profile saved.");
+    } catch (e) {
+      setNotice((e as Error).message);
+    }
   }
   if (editing)
     return (
@@ -160,24 +165,20 @@ export default function Admin({
           { id: "progress", name: "Progress", icon: BarChart3 },
           { id: "feedback", name: "Feedback", icon: FileText },
           { id: "settings", name: "Settings", icon: Layers },
-        ]
-          .filter(
-            (t) => !production || !["people", "groups", "teams"].includes(t.id),
-          )
-          .map((t) => (
-            <button
-              className={tab === t.id ? "selected" : ""}
-              key={t.id}
-              onClick={() => {
-                setTab(t.id);
-                setNotice("");
-                setQuery("");
-              }}
-            >
-              <t.icon size={17} />
-              {t.name}
-            </button>
-          ))}
+        ].map((t) => (
+          <button
+            className={tab === t.id ? "selected" : ""}
+            key={t.id}
+            onClick={() => {
+              setTab(t.id);
+              setNotice("");
+              setQuery("");
+            }}
+          >
+            <t.icon size={17} />
+            {t.name}
+          </button>
+        ))}
       </div>
       {notice && (
         <div className="success" role="status">
@@ -375,27 +376,31 @@ export default function Admin({
         </>
       ) : tab === "people" ? (
         <>
+          {production && <PendingPeople data={data} onChange={onChange} />}
           <div className="admin-toolbar">
             <p className="muted">
-              Sample profiles for trying role-based assignments. No accounts or
-              emails are created.
+              {production
+                ? "Manage signed-in accounts. Deactivation preserves learning history. Clear managed teams before removing a manager’s access."
+                : "Sample profiles for trying role-based assignments. No accounts or emails are created."}
             </p>
-            <button
-              className="primary"
-              onClick={() =>
-                setPerson({
-                  id: id(),
-                  name: "",
-                  email: "",
-                  role: "learner",
-                  groups: [],
-                  active: true,
-                })
-              }
-            >
-              <Plus size={16} />
-              Add demo profile
-            </button>
+            {!production && (
+              <button
+                className="primary"
+                onClick={() =>
+                  setPerson({
+                    id: id(),
+                    name: "",
+                    email: "",
+                    role: "learner",
+                    groups: [],
+                    active: true,
+                  })
+                }
+              >
+                <Plus size={16} />
+                Add demo profile
+              </button>
+            )}
           </div>
           <div className="filter-bar">
             <label>
@@ -512,7 +517,7 @@ export default function Admin({
         <>
           <form
             className="group-form"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
               const name = groupName.trim();
               if (!name) return;
@@ -524,17 +529,21 @@ export default function Admin({
                 setNotice("That group already exists.");
                 return;
               }
-              onChange({
-                ...data,
-                groups: [
-                  ...data.groups,
-                  { id: id(), name, parentId: groupParent || undefined },
-                ],
-              });
-              setGroupName("");
-              setNotice(
-                "Group added. Assign profiles and courses to this group.",
-              );
+              try {
+                await onChange({
+                  ...data,
+                  groups: [
+                    ...data.groups,
+                    { id: id(), name, parentId: groupParent || undefined },
+                  ],
+                });
+                setGroupName("");
+                setNotice(
+                  "Group added. Assign profiles and courses to this group.",
+                );
+              } catch (e) {
+                setNotice((e as Error).message);
+              }
             }}
           >
             <label>
@@ -576,14 +585,16 @@ export default function Admin({
                   <select
                     value={g.parentId || ""}
                     onChange={(e) =>
-                      onChange({
-                        ...data,
-                        groups: data.groups.map((x) =>
-                          x.id === g.id
-                            ? { ...x, parentId: e.target.value || undefined }
-                            : x,
-                        ),
-                      })
+                      Promise.resolve(
+                        onChange({
+                          ...data,
+                          groups: data.groups.map((x) =>
+                            x.id === g.id
+                              ? { ...x, parentId: e.target.value || undefined }
+                              : x,
+                          ),
+                        }),
+                      ).catch((e) => setNotice(e.message))
                     }
                   >
                     <option value="">Top-level group</option>
@@ -633,12 +644,14 @@ export default function Admin({
                           x.name.toLowerCase() === name.toLowerCase(),
                       )
                     )
-                      onChange({
-                        ...data,
-                        groups: data.groups.map((x) =>
-                          x.id === g.id ? { ...x, name } : x,
-                        ),
-                      });
+                      Promise.resolve(
+                        onChange({
+                          ...data,
+                          groups: data.groups.map((x) =>
+                            x.id === g.id ? { ...x, name } : x,
+                          ),
+                        }),
+                      ).catch((e) => setNotice(e.message));
                   }}
                 >
                   Rename group
@@ -661,9 +674,11 @@ export default function Admin({
             >
               <X />
             </button>
-            <h2>Demo profile</h2>
+            <h2>{production ? "Account" : "Demo profile"}</h2>
             <p className="muted">
-              Use fictional details. This does not create a secure account.
+              {production
+                ? "Changes apply to this verified account. Login email is read-only."
+                : "Use fictional details. This does not create a secure account."}
             </p>
             <label>
               Name
@@ -675,10 +690,11 @@ export default function Admin({
               />
             </label>
             <label>
-              Email label
+              {production ? "Login email" : "Email label"}
               <input
                 type="email"
                 required
+                disabled={production}
                 value={person.email}
                 onChange={(e) =>
                   setPerson({ ...person, email: e.target.value })
@@ -1308,7 +1324,9 @@ export function Editor({
             </>
           )}
           <div className="demo-note">
-            <strong>{production ? "Saved to your workspace" : "Saved in your browser"}</strong>
+            <strong>
+              {production ? "Saved to your workspace" : "Saved in your browser"}
+            </strong>
             <p>
               {production
                 ? "Drafts are visible to administrators. Publish when you are ready to share with readers."
