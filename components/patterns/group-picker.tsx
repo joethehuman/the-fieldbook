@@ -1,4 +1,7 @@
 "use client";
+import { Checkbox } from "@/components/ui/choice";
+import { Input } from "@/components/ui/input";
+import { FieldGroup, FieldDescription, Field } from "@/components/ui/field";
 import { useState } from "react";
 
 export function GroupPicker({
@@ -15,15 +18,16 @@ export function GroupPicker({
     group.name.toLowerCase().includes(query.toLowerCase()),
   );
   return (
-    <fieldset className="group-picker">
+    <FieldGroup className="group-picker">
       <legend>
         Groups <span>{value.length} selected</span>
       </legend>
-      <p className="field-help">
-        Group membership determines required courses.
-      </p>
+      <FieldDescription>
+        Learning groups personalize courses and updates. Everyone can explore
+        the library.
+      </FieldDescription>
       {groups.length > 6 && (
-        <input
+        <Input
           aria-label="Find a group"
           type="search"
           placeholder="Find a group…"
@@ -33,9 +37,12 @@ export function GroupPicker({
       )}
       <div className="group-picker-options">
         {visible.map((group) => (
-          <label className="group-picker-option" key={group.id}>
-            <input
-              type="checkbox"
+          <Field
+            orientation="horizontal"
+            className="group-picker-option"
+            key={group.id}
+          >
+            <Checkbox
               checked={value.includes(group.id)}
               onChange={(event) =>
                 onChange(
@@ -46,16 +53,16 @@ export function GroupPicker({
               }
             />
             <span>{group.name}</span>
-          </label>
+          </Field>
         ))}
         {!visible.length && (
-          <p className="field-help">
+          <FieldDescription>
             {groups.length
               ? "No matching groups."
               : "No groups have been created yet."}
-          </p>
+          </FieldDescription>
         )}
       </div>
-    </fieldset>
+    </FieldGroup>
   );
 }

@@ -1,0 +1,132 @@
+import type { Workspace } from "./store";
+import {
+  effectiveGroups,
+  type Content,
+  type Group,
+  type Curriculum,
+  type LearningItem,
+} from "./types";
+import { assignmentRules } from "./learning";
+
+export function groupItems(group: Group, content: Content[]): LearningItem[] {
+  if (group.learningItems) return group.learningItems;
+  const assigned = content.filter(
+    (c) =>
+      c.kind === "course" &&
+      assignmentRules(c).some((a) => a.groupId === group.id),
+  );
+  const order = group.requiredCourseIds || [];
+  return assigned
+    .sort(
+      (a, b) =>
+        (order.indexOf(a.id) < 0 ? 99999 : order.indexOf(a.id)) -
+          (order.indexOf(b.id) < 0 ? 99999 : order.indexOf(b.id)) ||
+        a.title.localeCompare(b.title),
+    )
+    .map((c) => ({ kind: "course", id: c.id }));
+}
+export function expandLearning(
+  items: LearningItem[],
+  curricula: Curriculum[],
+): string[] {
+  return [
+    ...new Set(
+      items.flatMap((item) =>
+        item.kind === "course"
+          ? [item.id]
+          : curricula.find((c) => c.id === item.id && c.status === "published")
+              ?.courseIds || [],
+      ),
+    ),
+  ];
+}
+export function updatesForUser(
+  content: Content[],
+  user: Workspace["users"][number],
+  groups: Group[],
+) {
+  const memberships = effectiveGroups(user, groups);
+  const updates = content
+    .filter((c) => c.kind === "brief" && c.status === "published")
+    .sort(
+      (a, b) =>
+        b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id),
+    );
+  const matches = (c: Content) => c.groups.some((g) => memberships.has(g));
+  return {
+    forYou: updates.filter(matches),
+    other: updates.filter((c) => !matches(c)),
+  };
+}
+// Browser demo mirrors the server's atomic membership and assignment reconciliation.
+export function reconcileLearning(
+  before: Workspace,
+  after: Workspace,
+  stamp = new Date().toISOString(),
+): Workspace {
+  const next = structuredClone(after);
+  next.curricula ||= [];
+  next.groups = next.groups.map((g) => ({
+    ...g,
+    learningItems: groupItems(g, before.publishedContent || before.content),
+  }));
+  next.groups = next.groups.map((g) => ({
+    ...g,
+    requiredCourseIds: expandLearning(g.learningItems!, next.curricula!),
+  }));
+  next.users = next.users.map((u) => {
+    const old = before.users.find((p) => p.id === u.id);
+    const was = old ? effectiveGroups(old, before.groups) : new Set<string>();
+    return {
+      ...u,
+      groupJoinedAt: Object.fromEntries(
+        u.groups.map((id) => [
+          id,
+          old?.groups.includes(id) ? old.groupJoinedAt?.[id] || stamp : stamp,
+        ]),
+      ),
+      effectiveGroupJoinedAt: Object.fromEntries(
+        [...effectiveGroups(u, next.groups)].map((id) => [
+          id,
+          was.has(id)
+            ? old?.effectiveGroupJoinedAt?.[id] ||
+              old?.groupJoinedAt?.[id] ||
+              "1970-01-01T00:00:00.000Z"
+            : stamp,
+        ]),
+      ),
+    };
+  });
+  const sync = (c: Content) => {
+    if (c.kind !== "course")
+      return {
+        ...c,
+        groups:
+          c.kind === "doc"
+            ? []
+            : c.groups.filter((id) => next.groups.some((g) => g.id === id)),
+        assignments: [],
+      };
+    const prior = before.content.find((x) => x.id === c.id);
+    const assignments = next.groups
+      .filter((g) => g.requiredCourseIds?.includes(c.id))
+      .map((g) => ({
+        groupId: g.id,
+        due: { type: "none" as const },
+        assignedAt:
+          prior?.version === c.version
+            ? assignmentRules(prior).find((a) => a.groupId === g.id)
+                ?.assignedAt || stamp
+            : stamp,
+      }));
+    return { ...c, assignments, groups: assignments.map((a) => a.groupId) };
+  };
+  next.pendingUsers = next.pendingUsers?.map((p) => ({
+    ...p,
+    groups: p.groups.filter((id) => next.groups.some((g) => g.id === id)),
+  }));
+  next.content = next.content.map(sync);
+  if (next.publishedContent)
+    next.publishedContent = next.publishedContent.map(sync);
+  return next;
+}

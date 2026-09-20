@@ -1,4 +1,8 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { dialogOverlayClass, dialogContentClass } from "./dialog";
+import { cn } from "@/lib/utils";
 import {
   createContext,
   useCallback,
@@ -83,18 +87,18 @@ export function InteractionDialogProvider({
         }}
       >
         <AlertDialog.Portal>
-          <AlertDialog.Overlay className="ui-dialog-overlay ui-interaction-overlay" />
+          <AlertDialog.Overlay className={cn(dialogOverlayClass, "z-60")} />
           <AlertDialog.Content
-            className="ui-dialog-content ui-interaction-content"
+            className={cn(dialogContentClass, "z-60")}
             onCloseAutoFocus={restoreFocus}
           >
-            <AlertDialog.Title className="ui-dialog-title">
+            <AlertDialog.Title className="text-lg font-semibold tracking-tight">
               Confirm action
             </AlertDialog.Title>
-            <AlertDialog.Description className="ui-dialog-description">
+            <AlertDialog.Description className="text-sm leading-relaxed text-muted-foreground">
               {request?.message}
             </AlertDialog.Description>
-            <div className="ui-dialog-actions">
+            <div className="mt-6 flex justify-end gap-2">
               <AlertDialog.Cancel asChild>
                 <Button
                   type="button"
@@ -120,15 +124,15 @@ export function InteractionDialogProvider({
         }}
       >
         <Dialog.Portal>
-          <Dialog.Overlay className="ui-dialog-overlay ui-interaction-overlay" />
+          <Dialog.Overlay className={cn(dialogOverlayClass, "z-60")} />
           <Dialog.Content
-            className="ui-dialog-content ui-interaction-content"
+            className={cn(dialogContentClass, "z-60")}
             onCloseAutoFocus={restoreFocus}
           >
-            <Dialog.Title className="ui-dialog-title">
+            <Dialog.Title className="text-lg font-semibold tracking-tight">
               Rename group
             </Dialog.Title>
-            <Dialog.Description className="ui-dialog-description">
+            <Dialog.Description className="text-sm leading-relaxed text-muted-foreground">
               Choose a clear, unique name for this group.
             </Dialog.Description>
             <form
@@ -137,17 +141,17 @@ export function InteractionDialogProvider({
                 finish(value.trim());
               }}
             >
-              <label>
+              <Field>
                 {request?.message}
-                <input
+                <Input
                   autoFocus
                   required
                   maxLength={80}
                   value={value}
                   onChange={(event) => setValue(event.target.value)}
                 />
-              </label>
-              <div className="ui-dialog-actions">
+              </Field>
+              <div className="mt-6 flex justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"

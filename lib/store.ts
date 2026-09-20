@@ -16,6 +16,7 @@ export type Workspace = {
   schema: 1;
   feedback?: Feedback[];
   teams?: Team[];
+  curricula?: import("./types").Curriculum[];
   content: Content[];
   users: User[];
   groups: Group[];
@@ -33,8 +34,24 @@ const completedCourse = (id: string): Progress => ({
 export function freshWorkspace(): Workspace {
   return {
     schema: 1,
-    content: structuredClone(seedContent),
-    teams: [{ id: "sales-team", name: "Sales team", managerId: "demo-manager" }],
+    content: structuredClone(seedContent).map((c) =>
+      c.kind === "brief" && ["brief-1", "brief-2"].includes(c.id)
+        ? { ...c, groups: ["sales"] }
+        : c,
+    ),
+    curricula: [
+      {
+        id: "sales-foundations",
+        name: "Account executive foundations",
+        description:
+          "Get oriented, learn the product story, and build your discovery skills.",
+        status: "published",
+        courseIds: ["course-1", "course-2", "course-3"],
+      },
+    ],
+    teams: [
+      { id: "sales-team", name: "Sales team", managerId: "demo-manager" },
+    ],
     feedback: [],
     users: [
       {
@@ -100,12 +117,24 @@ export function freshWorkspace(): Workspace {
         active: true,
       },
     ],
-    groups: [{ id: "sales", name: "Account executives" }],
+    groups: [
+      {
+        id: "sales",
+        name: "Account executives",
+        requiredCourseIds: ["course-1", "course-2", "course-3"],
+        learningItems: [{ kind: "curriculum", id: "sales-foundations" }],
+        teamIds: [],
+      },
+    ],
     progress: {
       "demo-learner": [completedCourse("course-1")],
       "demo-rep-2": [],
       "demo-rep-3": [completedCourse("course-1"), completedCourse("course-2")],
-      "demo-rep-4": [completedCourse("course-1"), completedCourse("course-2"), completedCourse("course-3")],
+      "demo-rep-4": [
+        completedCourse("course-1"),
+        completedCourse("course-2"),
+        completedCourse("course-3"),
+      ],
       "demo-rep-5": [completedCourse("course-3")],
     },
   };

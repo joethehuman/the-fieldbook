@@ -1,4 +1,7 @@
 "use client";
+import { ActionGroup } from "@/components/ui/action-group";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { newDocSection } from "@/lib/docs-navigation";
@@ -37,9 +40,9 @@ export default function DocSectionCreate({
   }
   return (
     <div className="doc-section-create">
-      <label>
+      <Field>
         New section name
-        <input
+        <Input
           value={name}
           maxLength={80}
           disabled={disabled || busy}
@@ -51,8 +54,8 @@ export default function DocSectionCreate({
             }
           }}
         />
-      </label>
-      <div className="doc-section-actions">
+      </Field>
+      <ActionGroup>
         <Button
           type="button"
           variant="outline"
@@ -71,7 +74,7 @@ export default function DocSectionCreate({
             Cancel
           </Button>
         )}
-      </div>
+      </ActionGroup>
       {error && <p role="alert">{error}</p>}
     </div>
   );

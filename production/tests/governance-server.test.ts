@@ -67,6 +67,15 @@ test("workspace serialization preserves public catalog but scopes assignments, d
         revision: 1,
         groups: [],
         teams: [],
+        curricula: [
+          {
+            id: "published",
+            name: "Playlist",
+            status: "published",
+            courseIds: ["course", "draft"],
+          },
+          { id: "draft-playlist", status: "draft", courseIds: ["draft"] },
+        ],
       };
     else if (url.includes("fb_documents"))
       body = [row, { ...row, id: "draft", published: null }];
@@ -110,6 +119,10 @@ test("workspace serialization preserves public catalog but scopes assignments, d
     assert.equal(guest.content.length, 1);
     assert.deepEqual(guest.content[0].groups, []);
     assert.deepEqual(guest.groups, []);
+    assert.deepEqual(
+      guest.curricula?.map((c) => ({ id: c.id, courseIds: c.courseIds })),
+      [{ id: "published", courseIds: ["course"] }],
+    );
     // A stale actor role cannot upgrade the authoritative database-scoped response.
     govRole = "learner";
     const changed = await snapshot({ ...user, role: "admin" });

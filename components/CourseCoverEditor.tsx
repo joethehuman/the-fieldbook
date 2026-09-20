@@ -1,3 +1,5 @@
+import { Input } from "@/components/ui/input";
+import { FieldDescription } from "@/components/ui/field";
 import { useRef, useState } from "react";
 import { Button } from "./ui/button";
 import { ActionGroup } from "./ui/action-group";
@@ -25,10 +27,10 @@ export default function CourseCoverEditor({
       {url && (
         <img className="cover-preview" src={url} alt="Course cover preview" />
       )}
-      <p className="field-help">
+      <FieldDescription>
         Use the generated artwork or upload your own image. Wide images work
         best; they are cropped to fill the card.
-      </p>
+      </FieldDescription>
       <ActionGroup>
         {onUpload && (
           <Button
@@ -60,11 +62,11 @@ export default function CourseCoverEditor({
       </ActionGroup>
       {onUpload ? (
         <>
-          <p className="field-help">
+          <FieldDescription>
             JPG, PNG, WebP, or GIF, up to 50 MB (your installation may set a
             lower limit). Save the course to apply changes.
-          </p>
-          <input
+          </FieldDescription>
+          <Input
             ref={input}
             hidden
             type="file"
@@ -110,10 +112,10 @@ export default function CourseCoverEditor({
           />
         </>
       ) : (
-        <p className="field-help">
+        <FieldDescription>
           Cover uploads are available in an installed Fieldbook. The demo uses
           generated artwork.
-        </p>
+        </FieldDescription>
       )}
       <p role="status">{notice}</p>
     </div>

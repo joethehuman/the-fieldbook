@@ -1,4 +1,7 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { Card } from "@/components/ui/card";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
@@ -34,14 +37,14 @@ export default function PrivacySettingsPanel({
         (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.contactEmail) ||
           /^https:\/\//.test(draft.contactUrl || ""));
   return (
-    <section className="integration-card">
-      <h2>Privacy policy</h2>
+    <Card className="grid gap-4">
+      <h3>Policy content</h3>
       <p>
         Describe this installation’s practices. Save settings to keep a draft;
         publish separately after review. The current published policy stays
         visible while you edit.
       </p>
-      <label>
+      <Field>
         Policy location
         <SelectField
           value={draft.mode}
@@ -50,50 +53,50 @@ export default function PrivacySettingsPanel({
           <option value="hosted">Write a policy in Fieldbook</option>
           <option value="external">Link to an existing policy</option>
         </SelectField>
-      </label>
-      <label>
+      </Field>
+      <Field>
         Operator name
-        <input
+        <Input
           maxLength={160}
           value={draft.operatorName}
           onChange={(e) => edit({ operatorName: e.target.value })}
         />
-      </label>
-      <label>
+      </Field>
+      <Field>
         Privacy contact email (optional)
-        <input
+        <Input
           type="email"
           maxLength={254}
           value={draft.contactEmail}
           onChange={(e) => edit({ contactEmail: e.target.value })}
         />
-      </label>
-      <label>
+      </Field>
+      <Field>
         Contact page URL (optional)
-        <input
+        <Input
           type="url"
           maxLength={2000}
           placeholder="https://example.com/contact"
           value={draft.contactUrl || ""}
           onChange={(e) => edit({ contactUrl: e.target.value })}
         />
-      </label>
+      </Field>
       <p>
         Provide an email address, an HTTPS contact page, or both. A contact page
         can keep your email address private. Google sign-in has its own
         support-email requirement.
       </p>
       {draft.mode === "external" ? (
-        <label>
+        <Field>
           Privacy policy URL
-          <input
+          <Input
             type="url"
             placeholder="https://example.com/privacy"
             value={draft.url}
             maxLength={2000}
             onChange={(e) => edit({ url: e.target.value })}
           />
-        </label>
+        </Field>
       ) : (
         <MarkdownEditor
           label="Privacy policy draft"
@@ -128,6 +131,6 @@ export default function PrivacySettingsPanel({
       >
         Publish privacy policy
       </Button>
-    </section>
+    </Card>
   );
 }

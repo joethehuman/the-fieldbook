@@ -1,4 +1,17 @@
 "use client";
+import { DataTable } from "./patterns/data-table";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { ActionGroup } from "@/components/ui/action-group";
+import {
+  TableContainer,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
@@ -95,9 +108,9 @@ export function Assignments({
       await onAction(action);
       setNotice(
         action.operation === "assign"
-          ? "Required courses updated."
+          ? "Assigned courses updated."
           : action.operation === "unassign"
-            ? "Requirement removed. Course history preserved."
+            ? "Assignment removed. Course history preserved."
             : action.operation === "complete"
               ? "Course marked complete."
               : "Progress reset.",
@@ -140,17 +153,17 @@ export function Assignments({
             ),
         );
   const progressTable = (c: Content) => (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Person</th>
-            <th>Course status</th>
-            <th>Progress</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody>
+    <TableContainer>
+      <DataTable layout="assignments">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Person</TableHead>
+            <TableHead>Course status</TableHead>
+            <TableHead>Progress</TableHead>
+            <TableHead>Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
           {peopleFor(c).map((u) => {
             const p = (data.progress[u.id] || []).find(
                 (p) => p.content_id === c.id && p.version === c.version,
@@ -158,27 +171,28 @@ export function Assignments({
               done = isComplete(c, data.progress[u.id] || []);
             const target = learningTarget(c, u, data.groups, data.settings);
             return (
-              <tr key={u.id}>
-                <td>
+              <TableRow key={u.id}>
+                <TableCell>
                   {u.name}
                   <small>{u.email}</small>
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   {done
-                    ? "Current"
+                    ? "Complete"
                     : target && target < new Date().toISOString().slice(0, 10)
                       ? "Needs attention"
                       : "On track"}
                   {!done && target && <small>Target {target}</small>}
-                </td>
-                <td>
+                </TableCell>
+                <TableCell>
                   {done
                     ? "Complete"
                     : `${p?.lessons.length || 0} of ${c.lessons.length} lessons`}
-                </td>
-                <td>
-                  <div className="assignment-actions">
-                    <button
+                </TableCell>
+                <TableCell>
+                  <ActionGroup>
+                    <Button
+                      variant="ghost"
                       disabled={busy || done}
                       onClick={async () => {
                         if (
@@ -197,8 +211,9 @@ export function Assignments({
                       }}
                     >
                       Mark complete
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
                       disabled={busy || !p}
                       onClick={async () => {
                         if (
@@ -217,30 +232,30 @@ export function Assignments({
                       }}
                     >
                       Reset progress
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                    </Button>
+                  </ActionGroup>
+                </TableCell>
+              </TableRow>
             );
           })}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </DataTable>
+    </TableContainer>
   );
   return (
     <section className="assignments-panel">
-      <div className="assignment-heading">
-        <div>
-          <h2>{person ? "Courses & progress" : "Required courses"}</h2>
-          <p className="muted">
+      <SectionHeader
+        title={<h2>{person ? "Courses & progress" : "Assigned courses"}</h2>}
+        description={
+          <>
             {person
-              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Required courses come from group membership.`
+              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Assigned courses come from group membership.`
               : "Choose the courses each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
-          </p>
-        </div>
-      </div>
+          </>
+        }
+      ></SectionHeader>
       {!person && !scope.groupId && (
-        <label>
+        <Field>
           Group
           <SelectField
             value={selected}
@@ -255,7 +270,7 @@ export function Assignments({
               </option>
             ))}
           </SelectField>
-        </label>
+        </Field>
       )}
       {!person && group && (
         <form
@@ -273,8 +288,8 @@ export function Assignments({
               });
           }}
         >
-          <label>
-            Add required course
+          <Field>
+            Add course
             <SelectField
               value={
                 available.some((c) => c.id === courseId)
@@ -294,40 +309,40 @@ export function Assignments({
                 <option value="">No additional published courses</option>
               )}
             </SelectField>
-          </label>
+          </Field>
           <Button variant="default" disabled={busy || !available.length}>
-            Add to required courses
+            Add to assigned courses
           </Button>
         </form>
       )}
       {!person && !group && (
-        <p>Create a group to define its required courses.</p>
+        <p>Create a group to define its assigned courses.</p>
       )}
       <p className="muted">
         {data.settings?.onboardingDays ?? 90} days for new users ·{" "}
-        {data.settings?.catchUpDays ?? 30} days to catch up with new required
+        {data.settings?.catchUpDays ?? 30} days to catch up with new assigned
         courses. Manage these windows in Settings.
       </p>
       {notice && <p role="status">{notice}</p>}
-      <label>
+      <Field>
         Find a course
-        <input
+        <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search required courses"
+          placeholder="Search assigned courses"
         />
-      </label>
-      <div className="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Course</th>
-              <th>Required through</th>
-              <th>Completion</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
+      </Field>
+      <TableContainer>
+        <DataTable layout="courses">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Course</TableHead>
+              <TableHead>Assigned through</TableHead>
+              <TableHead>Completion</TableHead>
+              <TableHead>Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {ordered
               .filter(
                 (c) =>
@@ -346,16 +361,16 @@ export function Assignments({
                   people = peopleFor(c),
                   index = direct.findIndex((d) => d.id === c.id);
                 return (
-                  <tr key={c.id}>
-                    <td>
-                      <button
-                        className="text-button"
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      <Button
+                        variant="link"
                         onClick={() => setDetail(detail === c.id ? null : c.id)}
                       >
                         {c.title}
-                      </button>
-                    </td>
-                    <td>
+                      </Button>
+                    </TableCell>
+                    <TableCell>
                       {sources.map((a) => (
                         <div key={a.groupId}>
                           {data.groups.find((g) => g.id === a.groupId)?.name}
@@ -364,34 +379,37 @@ export function Assignments({
                             : ""}
                         </div>
                       ))}
-                    </td>
-                    <td>
+                    </TableCell>
+                    <TableCell>
                       {
                         people.filter((u) =>
                           isComplete(c, data.progress[u.id] || []),
                         ).length
                       }{" "}
                       of {people.length} complete
-                    </td>
-                    <td>
-                      <div className="assignment-actions">
-                        <button
+                    </TableCell>
+                    <TableCell>
+                      <ActionGroup>
+                        <Button
+                          variant="ghost"
                           onClick={() =>
                             setDetail(detail === c.id ? null : c.id)
                           }
                         >
                           View progress
-                        </button>
+                        </Button>
                         {!person && local && (
                           <>
-                            <button
+                            <Button
+                              variant="ghost"
                               aria-label={`Move ${c.title} earlier`}
                               disabled={busy || index === 0 || !onChange}
                               onClick={() => move(c, -1)}
                             >
                               ↑
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="ghost"
                               aria-label={`Move ${c.title} later`}
                               disabled={
                                 busy || index === direct.length - 1 || !onChange
@@ -399,13 +417,14 @@ export function Assignments({
                               onClick={() => move(c, 1)}
                             >
                               ↓
-                            </button>
-                            <button
+                            </Button>
+                            <Button
+                              variant="ghost"
                               disabled={busy}
                               onClick={async () => {
                                 if (
                                   await confirm(
-                                    `Remove ${c.title} from ${group?.name} required courses? Progress and other group requirements are preserved.`,
+                                    `Remove ${c.title} from ${group?.name} assigned courses? Progress and other group requirements are preserved.`,
                                   )
                                 )
                                   void act({
@@ -416,12 +435,13 @@ export function Assignments({
                                   });
                               }}
                             >
-                              Remove requirement
-                            </button>
+                              Remove assignment
+                            </Button>
                           </>
                         )}
                         {!person && !local && sources[0]?.groupId && (
-                          <button
+                          <Button
+                            variant="ghost"
                             onClick={() =>
                               onOpenGroup
                                 ? onOpenGroup(sources[0].groupId!)
@@ -429,21 +449,21 @@ export function Assignments({
                             }
                           >
                             Manage parent group
-                          </button>
+                          </Button>
                         )}
-                      </div>
-                    </td>
-                  </tr>
+                      </ActionGroup>
+                    </TableCell>
+                  </TableRow>
                 );
               })}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
         {!ordered.length && (
-          <p className="empty">
-            No required courses yet. The full library remains available.
-          </p>
+          <EmptyState>
+            No assigned courses yet. The full library remains available.
+          </EmptyState>
         )}
-      </div>
+      </TableContainer>
       {detail && courses.find((c) => c.id === detail) && (
         <section className="assignment-detail">
           <h3>{courses.find((c) => c.id === detail)!.title}</h3>

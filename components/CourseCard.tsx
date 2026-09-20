@@ -1,3 +1,6 @@
+import { CardFooter } from "./patterns/layout";
+import { Badge } from "@/components/ui/badge";
+import { ContentAction } from "@/components/patterns/content-action";
 import { useState } from "react";
 import { Play, CheckCircle2, ArrowUpRight } from "lucide-react";
 import type { Content } from "@/lib/types";
@@ -18,7 +21,7 @@ export function CourseCard({
   const showCover = !!c.coverImageUrl && c.coverImageUrl !== failedCover;
   const index = Number(c.id.replace(/\D/g, "")) || 1;
   return (
-    <button className="course-card" onClick={onClick}>
+    <ContentAction className="course-card" onClick={onClick}>
       <div
         className={
           "course-art art-" + (index % 6) + (showCover ? " has-cover" : "")
@@ -51,12 +54,12 @@ export function CourseCard({
       <div className="course-copy">
         <div className="course-meta">
           {complete ? (
-            <span className="completed">
+            <Badge variant="success">
               <CheckCircle2 size={13} />
               Completed
-            </span>
+            </Badge>
           ) : progress ? (
-            <span className="in-progress">In progress</span>
+            <Badge variant="warning">In progress</Badge>
           ) : (
             <span>{c.lessons.length} lessons · Quiz</span>
           )}
@@ -77,17 +80,19 @@ export function CourseCard({
           </small>
         )}
         <p>{c.summary}</p>
-        <div className="course-bottom">
-          <span>
-            {complete
-              ? "Review course"
-              : progress
-                ? "Continue course"
-                : "Start course"}
-          </span>
-          <ArrowUpRight size={17} />
-        </div>
+        <CardFooter
+          action={
+            <>
+              {complete
+                ? "Review course"
+                : progress
+                  ? "Continue course"
+                  : "Start course"}
+              <ArrowUpRight size={17} />
+            </>
+          }
+        />
       </div>
-    </button>
+    </ContentAction>
   );
 }

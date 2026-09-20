@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { ActionGroup } from "@/components/ui/action-group";
+import { Alert } from "@/components/ui/alert";
+import { AccountPage } from "@/components/patterns/layout";
 import { useEffect, useState } from "react";
 export default function Consent() {
   const [details, setDetails] = useState<any>(null),
@@ -39,7 +43,7 @@ export default function Consent() {
     }
   }
   return (
-    <main className="auth-card">
+    <AccountPage>
       <span className="eyebrow">CONNECT TO FIELDBOOK</span>
       <h1>
         {details
@@ -47,9 +51,9 @@ export default function Consent() {
           : "Connecting your AI…"}
       </h1>
       {error && (
-        <p className="error" role="alert">
+        <Alert variant="destructive" role="alert">
           {error}
-        </p>
+        </Alert>
       )}
       {details && (
         <>
@@ -68,24 +72,26 @@ export default function Consent() {
             connection you initiated.
           </p>
           <p className="muted">Requested identity access: {details.scope}</p>
-          <div className="button-group">
-            <button
+          <ActionGroup>
+            <Button
+              variant="default"
               disabled={busy}
-              className="primary"
+
               onClick={() => decide(true)}
             >
               Allow connection
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="outline"
               disabled={busy}
-              className="secondary"
+
               onClick={() => decide(false)}
             >
               Deny
-            </button>
-          </div>
+            </Button>
+          </ActionGroup>
         </>
       )}
-    </main>
+    </AccountPage>
   );
 }

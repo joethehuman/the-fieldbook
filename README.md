@@ -64,7 +64,7 @@ The production application includes:
 - Signed-in feedback, administrator progress/feedback views, branding, and privacy-policy settings.
 - Administrator-only MCP tools for content, aggregate reports, and existing media references.
 
-**Production governance** includes people administration, pre-registered Google accounts, nested assignment groups, course deadlines, nested reporting teams and server-scoped manager reporting. See [permission rules and rollout checks](docs/user-content-governance.md). Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. See the [repository audit](docs/repository-audit.md) for evidence and limits.
+**Production governance** includes people administration, pre-registered Google accounts, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [permission rules and rollout checks](docs/user-content-governance.md). Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. See the [repository audit](docs/repository-audit.md) for evidence and limits.
 
 ## Documentation
 
@@ -74,6 +74,7 @@ The production application includes:
 - [Configure your privacy policy](docs/privacy-setup.md)
 - [Select a version and upgrade](docs/upgrading.md)
 - [Maintainer release process](docs/releases.md) and [first-release checklist](docs/release-checklist.md)
+- [Learning groups and curricula](docs/learning-groups.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing and local development](CONTRIBUTING.md)
 - [Optional AI authoring instructions](docs/ai-authoring.md)

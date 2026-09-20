@@ -88,6 +88,18 @@ export async function snapshot(user: User | null): Promise<Workspace> {
     progress,
     feedback,
     groups: governance.groups,
+    curricula: (config.curricula || [])
+      .filter((c: any) => admin || c.status === "published")
+      .map((c: any) =>
+        admin
+          ? c
+          : {
+              ...c,
+              courseIds: c.courseIds.filter((id: string) =>
+                learningContent.some((d) => d.id === id && d.kind === "course"),
+              ),
+            },
+      ),
     teams: governance.teams,
     governanceRevision: admin ? governance.revision : undefined,
     pendingUsers: governance.pending.map((p: any) => ({

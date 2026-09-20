@@ -1,4 +1,8 @@
 "use client";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Alert } from "@/components/ui/alert";
+import { AccountPage } from "@/components/patterns/layout";
 import { useEffect, useState } from "react";
 export default function Connections() {
   const [items, setItems] = useState<any[]>([]),
@@ -13,24 +17,24 @@ export default function Connections() {
     load().catch((e) => setError(e.message));
   }, []);
   return (
-    <main className="auth-card">
-      <a className="text-button" href="/admin">
-        ← Back to administration
-      </a>
+    <AccountPage>
+      <Button asChild variant="link">
+        <a href="/admin">← Back to administration</a>
+      </Button>
       <h1>AI connections</h1>
       <p>Revoke a connection to immediately stop its Fieldbook tools.</p>
       {error && (
-        <p role="alert" className="error">
+        <Alert variant="destructive" role="alert">
           {error}
-        </p>
+        </Alert>
       )}
       {items.map((c) => (
-        <div className="integration-card" key={c.client_id}>
+        <Card className="grid gap-4" key={c.client_id}>
           <h2>{c.client_name}</h2>
           <p>{c.enabled ? "Connected" : "Revoked"}</p>
           {c.enabled && (
-            <button
-              className="secondary"
+            <Button
+              variant="outline"
               onClick={async () => {
                 try {
                   const r = await fetch("/api/connections", {
@@ -46,11 +50,11 @@ export default function Connections() {
               }}
             >
               Revoke access
-            </button>
+            </Button>
           )}
-        </div>
+        </Card>
       ))}
       {!items.length && !error && <p>No AI connections yet.</p>}
-    </main>
+    </AccountPage>
   );
 }

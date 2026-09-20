@@ -1,4 +1,5 @@
 "use client";
+import { ReadingPage } from "@/components/patterns/layout";
 import { useEffect, useState } from "react";
 import { loadWorkspace } from "@/lib/store";
 import { defaultSettings, type SiteSettings } from "@/lib/settings";
@@ -15,7 +16,7 @@ export default function DemoPrivacyPage() {
   }, []);
   const policy = settings?.privacy?.published;
   return (
-    <main style={{ maxWidth: 800, margin: "48px auto", padding: "0 24px" }}>
+    <ReadingPage>
       <a href="/">← Back to demo</a>
       <h1>Privacy policy preview</h1>
       <p>
@@ -35,6 +36,6 @@ export default function DemoPrivacyPage() {
       ) : (
         <p>No policy has been published in this browser.</p>
       )}
-    </main>
+    </ReadingPage>
   );
 }

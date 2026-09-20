@@ -1,4 +1,7 @@
 "use client";
+import { Callout } from "@/components/patterns/layout";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import Fieldbook from "@/components/Fieldbook";
 import { createBrowserClient } from "@supabase/ssr";
 import type { FieldbookRuntime } from "@/lib/runtime";
@@ -75,13 +78,15 @@ const runtime: FieldbookRuntime = {
     if (
       JSON.stringify(before.users) !== JSON.stringify(after.users) ||
       JSON.stringify(before.groups) !== JSON.stringify(after.groups) ||
-      JSON.stringify(before.teams) !== JSON.stringify(after.teams)
+      JSON.stringify(before.teams) !== JSON.stringify(after.teams) ||
+      JSON.stringify(before.curricula) !== JSON.stringify(after.curricula)
     )
       await request("/api/governance", {
         expected: before.governanceRevision,
         users: after.users,
         groups: after.groups,
         teams: after.teams || [],
+        curricula: after.curricula || [],
       });
     const pendingBefore = before.pendingUsers || [],
       pendingAfter = after.pendingUsers || [];
@@ -219,28 +224,28 @@ export default function ProductionApp() {
   return (
     <>
       {importable && (
-        <div
-          className="guest-import"
+        <Callout
+          className="m-4"
           role="region"
           aria-label="Import browser progress"
         >
           <p>Keep the progress you made before signing in?</p>
-          <button
-            className="primary"
+          <Button
+            variant="default"
             disabled={importing}
             onClick={importProgress}
           >
             {importing ? "Importing…" : "Save browser progress to my account"}
-          </button>
-          <button
-            className="text-button"
+          </Button>
+          <Button
+            variant="link"
             disabled={importing}
             onClick={() => setImportable(false)}
           >
             Not now
-          </button>
-          {error && <p role="alert">{error}</p>}
-        </div>
+          </Button>
+          {error && <Alert variant="destructive">{error}</Alert>}
+        </Callout>
       )}
       <Fieldbook runtime={runtime} />
     </>

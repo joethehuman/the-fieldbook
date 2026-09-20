@@ -5,10 +5,27 @@ const node = z.object({
   name: z.string().trim().min(1).max(80),
   parentId: id.optional(),
   requiredCourseIds: z.array(z.uuid()).max(1000).optional(),
+  teamIds: z.array(id).max(1000).optional(),
+  learningItems: z
+    .array(z.object({ kind: z.enum(["course", "curriculum"]), id }))
+    .max(1000)
+    .optional(),
 });
 export const governanceSchema = z
   .object({
     expected: z.number().int().positive(),
+    curricula: z
+      .array(
+        z.object({
+          id,
+          name: z.string().trim().min(1).max(80),
+          description: z.string().max(1000),
+          courseIds: z.array(z.uuid()).max(1000),
+          status: z.enum(["draft", "published"]),
+        }),
+      )
+      .max(1000)
+      .optional(),
     groups: z.array(node).max(1000),
     teams: z.array(node.extend({ managerId: z.uuid().optional() })).max(1000),
     users: z
@@ -54,6 +71,40 @@ export const governanceSchema = z
     }
     const groups = new Set(value.groups.map((g) => g.id)),
       teams = new Set(value.teams.map((t) => t.id));
+    const curricula = value.curricula || [];
+    if (
+      new Set(curricula.map((c) => c.id)).size !== curricula.length ||
+      new Set(curricula.map((c) => c.name.toLowerCase())).size !==
+        curricula.length
+    )
+      fail("Use unique curriculum IDs and names.");
+    for (const c of curricula)
+      if (
+        new Set(c.courseIds).size !== c.courseIds.length ||
+        (c.status === "published" && !c.courseIds.length)
+      )
+        fail("Published curricula need unique courses.");
+    for (const g of value.groups) {
+      if (
+        g.teamIds?.some((id) => !teams.has(id)) ||
+        new Set(g.teamIds).size !== (g.teamIds?.length || 0)
+      )
+        fail("Invalid team link.");
+      if (
+        new Set(g.learningItems?.map((i) => i.kind + ":" + i.id)).size !==
+        (g.learningItems?.length || 0)
+      )
+        fail("Duplicate learning item.");
+      if (
+        value.curricula &&
+        g.learningItems?.some(
+          (i) =>
+            i.kind === "curriculum" &&
+            !curricula.some((c) => c.id === i.id && c.status === "published"),
+        )
+      )
+        fail("Choose a published curriculum.");
+    }
     if (new Set(value.users.map((u) => u.id)).size !== value.users.length)
       fail("Duplicate user.");
     for (const u of value.users)

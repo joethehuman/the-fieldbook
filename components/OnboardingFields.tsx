@@ -1,4 +1,6 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { FieldGroup, Field } from "@/components/ui/field";
 import { SelectField } from "./ui/select";
 export function OnboardingFields({
   value,
@@ -8,9 +10,9 @@ export function OnboardingFields({
   onChange: (value: string | undefined) => void;
 }) {
   return (
-    <fieldset>
+    <FieldGroup>
       <legend>Onboarding</legend>
-      <label>
+      <Field>
         Starting point
         <SelectField
           value={value ? "new" : "existing"}
@@ -25,22 +27,22 @@ export function OnboardingFields({
           <option value="existing">Existing user — stay current</option>
           <option value="new">New user — onboarding window</option>
         </SelectField>
-      </label>
+      </Field>
       {value && (
-        <label>
+        <Field>
           Onboarding start date
-          <input
+          <Input
             type="date"
             required
             value={value}
             onChange={(e) => onChange(e.target.value)}
           />
-        </label>
+        </Field>
       )}
       <small>
         The organization course completion windows determine the target. First
         login does not start onboarding.
       </small>
-    </fieldset>
+    </FieldGroup>
   );
 }

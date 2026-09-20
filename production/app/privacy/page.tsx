@@ -1,3 +1,4 @@
+import { ReadingPage } from "@/components/patterns/layout";
 import { redirect } from "next/navigation";
 import Markdown from "@/components/Markdown";
 import { privacySettings } from "@production/lib/privacy";
@@ -8,7 +9,7 @@ export default async function PrivacyPage() {
   const policy = settings.privacy?.published;
   if (policy?.mode === "external") redirect(policy.url);
   return (
-    <main style={{ maxWidth: 800, margin: "48px auto", padding: "0 24px" }}>
+    <ReadingPage>
       <a href="/">← {settings.name}</a>
       <h1>Privacy policy</h1>
       {policy ? (
@@ -33,6 +34,6 @@ export default async function PrivacyPage() {
       ) : (
         <p>The operator has not published a privacy policy yet.</p>
       )}
-    </main>
+    </ReadingPage>
   );
 }

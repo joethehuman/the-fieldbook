@@ -51,11 +51,21 @@ export type Progress = {
   passed: boolean;
   attempts?: { at: string; passed: boolean }[];
 };
+export type LearningItem = { kind: "course" | "curriculum"; id: string };
+export type Curriculum = {
+  id: string;
+  name: string;
+  description: string;
+  courseIds: string[];
+  status: "draft" | "published";
+};
 export type Group = {
   id: string;
   name: string;
   parentId?: string;
   requiredCourseIds?: string[];
+  learningItems?: LearningItem[];
+  teamIds?: string[];
 };
 export type Team = {
   id: string;
@@ -102,7 +112,13 @@ export function canParent(
   return !parentId || !ancestorIds(parentId, nodes).has(id);
 }
 export function effectiveGroups(user: User, groups: Group[]) {
-  return new Set(user.groups.flatMap((id) => [...ancestorIds(id, groups)]));
+  const direct = [
+    ...user.groups,
+    ...groups
+      .filter((g) => user.teamId && g.teamIds?.includes(user.teamId))
+      .map((g) => g.id),
+  ];
+  return new Set(direct.flatMap((id) => [...ancestorIds(id, groups)]));
 }
 export function assignmentInfo(c: Content, user: User, groups: Group[]) {
   const memberships = effectiveGroups(user, groups);

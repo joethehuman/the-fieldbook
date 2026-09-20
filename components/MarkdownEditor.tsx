@@ -1,4 +1,10 @@
 "use client";
+import { Alert } from "@/components/ui/alert";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/field";
+import { SectionHeader, Toolbar } from "@/components/patterns/layout";
 import { SelectField } from "./ui/select";
 import { useId, useRef, useState } from "react";
 import {
@@ -75,20 +81,21 @@ export default function MarkdownEditor({
   }
   return (
     <div className="markdown-editor">
-      <div className="markdown-editor-heading">
-        <label htmlFor={id}>{label}</label>
-        <button
+      <SectionHeader title={<Field htmlFor={id}>{label}</Field>}>
+        <Button
+          variant="link"
           type="button"
-          className="text-button"
+
           onClick={() => setPreview(!preview)}
           disabled={busy}
         >
           {preview ? <Pencil size={15} /> : <Eye size={15} />}{" "}
           {preview ? "Write" : "Preview"}
-        </button>
-      </div>
-      <div
-        className="markdown-toolbar"
+        </Button>
+      </SectionHeader>
+      <Toolbar
+        className="rounded-t-lg border border-border bg-muted/40 p-2"
+
         role="toolbar"
         aria-label={`${label} formatting`}
       >
@@ -122,7 +129,8 @@ export default function MarkdownEditor({
             ],
           ] as const
         ).map(([name, Icon, before, after, placeholder]) => (
-          <button
+          <Button
+            variant="ghost"
             key={name}
             type="button"
             title={name}
@@ -131,10 +139,11 @@ export default function MarkdownEditor({
             onClick={() => insert(before, after, placeholder)}
           >
             <Icon size={17} />
-          </button>
+          </Button>
         ))}
         {(["image", "video"] as const).map((kind) => (
-          <button
+          <Button
+            variant="ghost"
             key={kind}
             type="button"
             title={
@@ -159,9 +168,9 @@ export default function MarkdownEditor({
             }}
           >
             {kind === "image" ? <ImagePlus size={17} /> : <Video size={17} />}
-          </button>
+          </Button>
         ))}
-        <input
+        <Input
           ref={file}
           type="file"
           hidden
@@ -170,13 +179,13 @@ export default function MarkdownEditor({
             if (f) void upload(f);
           }}
         />
-      </div>
+      </Toolbar>
       {preview ? (
         <div className="markdown markdown-preview">
           <Markdown>{value || "Nothing to preview yet."}</Markdown>
         </div>
       ) : (
-        <textarea
+        <Textarea
           id={id}
           ref={input}
           className="body-editor"
@@ -193,9 +202,9 @@ export default function MarkdownEditor({
           : "Markdown with formatting shortcuts. Preview before publishing."}
       </small>
       {error && (
-        <p role="alert" className="error">
+        <Alert variant="destructive" role="alert">
           {error}
-        </p>
+        </Alert>
       )}
     </div>
   );

@@ -1,5 +1,7 @@
 # UI redesign review
 
+Historical implementation record. For current contribution rules and the proposed completion of the design system, see [Fieldbook interface standards](design-system.md) and [the design-system audit](design-system-audit.md).
+
 Branch: `feature/ui-redesign`, based on `main` at `53ec70fb7ddcee2faeaa9b15c7b9855679eff813`.
 
 ## Design direction

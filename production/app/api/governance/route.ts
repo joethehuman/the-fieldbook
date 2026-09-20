@@ -24,6 +24,15 @@ export async function POST(req: Request) {
         400,
         parsed.error.issues.map((i) => i.message).join(" "),
       );
+    const { error: learningSetupError } = await db()
+      .from("fb_config")
+      .select("curricula")
+      .limit(0);
+    if (learningSetupError)
+      throw new HttpError(
+        503,
+        "Learning groups setup is incomplete. Apply the learning-groups migration before saving.",
+      );
     if (
       body.onboardingStart ||
       body.users?.some((u: any) => u.onboardingStart)

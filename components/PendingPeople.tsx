@@ -1,6 +1,9 @@
 "use client";
+import { Input } from "@/components/ui/input";
+import { Field } from "@/components/ui/field";
+import { Card } from "@/components/ui/card";
 import { ActionGroup } from "./ui/action-group";
-import { GroupPicker } from "./ui/group-picker";
+import { GroupPicker } from "./patterns/group-picker";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { OnboardingFields } from "./OnboardingFields";
@@ -36,7 +39,7 @@ export function PendingPeople({
     }
   }
   return (
-    <section className="editor-block">
+    <Card className="grid gap-4">
       <h2>Pending accounts</h2>
       <p>
         Pre-register a Google email. The person claims this account on verified
@@ -67,20 +70,20 @@ export function PendingPeople({
             {p.name} · {p.email} · {p.role}
           </span>
           <ActionGroup>
-            <button
-              className="text-button"
+            <Button
+              variant="link"
               disabled={busy}
               onClick={() => setEditing(p)}
             >
               Edit
-            </button>
-            <button
-              className="text-button"
+            </Button>
+            <Button
+              variant="link"
               disabled={busy}
               onClick={() => void save(p, true)}
             >
               Revoke
-            </button>
+            </Button>
           </ActionGroup>
         </div>
       ))}
@@ -95,18 +98,18 @@ export function PendingPeople({
             });
           }}
         >
-          <label>
+          <Field>
             Name
-            <input
+            <Input
               required
               maxLength={80}
               value={editing.name}
               onChange={(e) => setEditing({ ...editing, name: e.target.value })}
             />
-          </label>
-          <label>
+          </Field>
+          <Field>
             Google email
-            <input
+            <Input
               required
               type="email"
               disabled={(data.pendingUsers || []).some(
@@ -117,14 +120,14 @@ export function PendingPeople({
                 setEditing({ ...editing, email: e.target.value })
               }
             />
-          </label>
+          </Field>
           <OnboardingFields
             value={editing.onboardingStart}
             onChange={(onboardingStart) =>
               setEditing({ ...editing, onboardingStart })
             }
           />
-          <label>
+          <Field>
             Role
             <SelectField
               value={editing.role}
@@ -139,8 +142,8 @@ export function PendingPeople({
               <option value="manager">Manager</option>
               <option value="admin">Administrator</option>
             </SelectField>
-          </label>
-          <label>
+          </Field>
+          <Field>
             Reporting team
             <SelectField
               value={editing.teamId || ""}
@@ -155,7 +158,7 @@ export function PendingPeople({
                 </option>
               ))}
             </SelectField>
-          </label>
+          </Field>
           <GroupPicker
             groups={data.groups}
             value={editing.groups}
@@ -165,17 +168,17 @@ export function PendingPeople({
             <Button variant="default" disabled={busy}>
               {busy ? "Saving…" : "Save pending account"}
             </Button>
-            <button
-              className="text-button"
+            <Button
+              variant="link"
               type="button"
               disabled={busy}
               onClick={() => setEditing(null)}
             >
               Cancel
-            </button>
+            </Button>
           </ActionGroup>
         </form>
       )}
-    </section>
+    </Card>
   );
 }
