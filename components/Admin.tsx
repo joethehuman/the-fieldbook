@@ -106,13 +106,37 @@ const adminSections = [
     ],
   },
   {
-    label: "Organization",
+    label: "Organization Settings",
     items: [
       {
-        id: "settings",
-        name: "Settings",
+        id: "settings-identity",
+        name: "Identity",
+        description: "Your organization’s name, logo, and accent color.",
+        icon: Settings,
+      },
+      {
+        id: "settings-courses",
+        name: "Assignment window",
         description:
-          "Manage identity, access, course completion windows, and privacy.",
+          "Set completion windows for onboarding and ongoing courses.",
+        icon: Layers,
+      },
+      {
+        id: "settings-access",
+        name: "Access",
+        description: "Manage browsing access and account registration.",
+        icon: Users,
+      },
+      {
+        id: "settings-privacy",
+        name: "Privacy",
+        description: "Maintain and publish your organization’s privacy policy.",
+        icon: FileText,
+      },
+      {
+        id: "settings-mcp",
+        name: "MCP",
+        description: "Connect your AI tools to Fieldbook.",
         icon: Settings,
       },
     ],
@@ -136,6 +160,7 @@ export default function Admin({
   onLearning,
 }: Props) {
   const { confirm, prompt } = useInteractionDialog();
+  const [settingsPending, setSettingsPending] = useState(false);
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
     [person, setPerson] = useState<User | null>(null),
@@ -366,7 +391,15 @@ export default function Admin({
         className="admin-layout"
         orientation="vertical"
         value={tab}
-        onValueChange={(next) => {
+        onValueChange={async (next) => {
+          if (
+            settingsPending &&
+            !(await confirm(
+              "Leave this settings page? Unsaved changes will be discarded.",
+            ))
+          )
+            return;
+          setSettingsPending(false);
           setTab(next);
           setNotice("");
           setQuery("");
@@ -418,8 +451,12 @@ export default function Admin({
               </button>
             </div>
           )}
-          {tab === "settings" ? (
+          {tab.startsWith("settings-") ? (
             <SiteSettingsPanel
+              section={
+                tab.slice(9) as import("./SiteSettingsPanel").SettingsSection
+              }
+              onPendingChange={setSettingsPending}
               data={data}
               onChange={onChange}
               onUpload={onUpload}

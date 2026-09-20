@@ -1665,3 +1665,47 @@ td .action-group {
   font-size: 12px;
   line-height: 1.6;
 }
+
+/* Each organization setting has its own sidebar destination. */
+.mcp-settings {
+  max-width: 760px;
+}
+.mcp-address {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.mcp-address input {
+  min-width: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+.mcp-address .ui-button {
+  flex-shrink: 0;
+}
+.mcp-steps {
+  padding-left: 22px;
+  margin: 20px 0 28px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.mcp-steps li + li {
+  margin-top: 8px;
+}
+.mcp-manage {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.mcp-manage h3 {
+  margin: 0 0 8px;
+}
+.mcp-manage p {
+  margin: 0;
+}

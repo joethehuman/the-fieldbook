@@ -53,3 +53,7 @@ Design references: [Vercel Web Interface Guidelines](https://vercel.com/design/g
 - Branding settings now pair a compact color swatch with a validated hex field and use a logo preview with upload, replace, and remove actions.
 
 - AI connections now precede the final save area, with a readable server-address block.
+
+### Organization settings navigation
+
+Identity, Assignment window, Access, Privacy, and MCP are independent destinations under **Organization Settings** in the admin sidebar. Each editable destination has its own save area; navigation warns before discarding unsaved changes. MCP has a copyable server address, concise setup steps, and a connection-management action, with no unrelated save button. The demo explains the installed-only connection feature.
