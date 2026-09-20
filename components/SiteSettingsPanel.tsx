@@ -1,11 +1,21 @@
 "use client";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
-import { Upload, ImageIcon } from "lucide-react";
+import DocSectionCreate from "./DocSectionCreate";
+import {
+  Upload,
+  ImageIcon,
+  GripVertical,
+  ArrowUp,
+  ArrowDown,
+} from "lucide-react";
 import { ActionGroup } from "./ui/action-group";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
-import { orderedDocCategories } from "@/lib/docs-navigation";
+import {
+  availableDocSections,
+  reorderDocSections,
+} from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import type { Workspace } from "@/lib/store";
 import type { UploadMedia } from "./MarkdownEditor";
@@ -39,18 +49,18 @@ export default function SiteSettingsPanel({
           JSON.stringify({ ...defaultSettings, ...data.settings }),
     );
   }, [busy, settings, data.settings, onPendingChange]);
-  const docSections = orderedDocCategories(
+  const docSections = availableDocSections(
     data.content.filter((c) => c.kind === "doc"),
     settings.docCategoryOrder,
   );
-  function moveDocSection(index: number, offset: number) {
-    const next = [...docSections];
-    const target = index + offset;
-    if (target < 0 || target >= next.length) return;
-    [next[index], next[target]] = [next[target], next[index]];
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+  function moveDocSection(index: number, target: number) {
+    if (target < 0 || target >= docSections.length || index === target) return;
+    const next = reorderDocSections(docSections, index, target);
     setSettings((current) => ({ ...current, docCategoryOrder: next }));
     setNotice(
-      `${next[target]} moved ${offset < 0 ? "up" : "down"}. Save settings to apply the order.`,
+      `${next[target]} moved to position ${target + 1}. Save settings to apply the order.`,
     );
   }
   const logoInput = useRef<HTMLInputElement>(null);
@@ -221,14 +231,78 @@ export default function SiteSettingsPanel({
         <section className="settings-section" id="settings-docs">
           <h3>Docs navigation</h3>
           <p>
-            Choose the section order for the Docs sidebar and overview. New
-            sections appear at the end, alphabetically. This does not change
-            article or folder order.
+            Create sections and drag them into order for the Docs sidebar and
+            overview. You can also use the arrow buttons or focus a drag handle
+            and press the up and down arrow keys.
           </p>
           {docSections.length ? (
             <ol className="doc-order-list">
               {docSections.map((name, index) => (
-                <li key={name}>
+                <li
+                  key={name}
+                  data-doc-section={name}
+                  className={
+                    dropTarget === name ? "doc-section-drop-target" : undefined
+                  }
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="doc-section-drag"
+                    aria-label={`Reorder ${name}`}
+                    disabled={busy}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+                        e.preventDefault();
+                        moveDocSection(
+                          index,
+                          index + (e.key === "ArrowUp" ? -1 : 1),
+                        );
+                      }
+                    }}
+                    onPointerDown={(e) => {
+                      if (e.button !== 0) return;
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      setDragging(name);
+                    }}
+                    onPointerMove={(e) => {
+                      if (dragging !== name) return;
+                      const row = document
+                        .elementFromPoint(e.clientX, e.clientY)
+                        ?.closest("[data-doc-section]");
+                      setDropTarget(
+                        row?.getAttribute("data-doc-section") ?? null,
+                      );
+                      if (e.clientY < 70) window.scrollBy(0, -18);
+                      else if (e.clientY > window.innerHeight - 70)
+                        window.scrollBy(0, 18);
+                    }}
+                    onPointerUp={(e) => {
+                      if (dragging === name) {
+                        const target = document
+                          .elementFromPoint(e.clientX, e.clientY)
+                          ?.closest("[data-doc-section]")
+                          ?.getAttribute("data-doc-section");
+                        moveDocSection(
+                          index,
+                          target ? docSections.indexOf(target) : -1,
+                        );
+                      }
+                      setDragging(null);
+                      setDropTarget(null);
+                    }}
+                    onPointerCancel={() => {
+                      setDragging(null);
+                      setDropTarget(null);
+                    }}
+                    onLostPointerCapture={() => {
+                      setDragging(null);
+                      setDropTarget(null);
+                    }}
+                  >
+                    <GripVertical size={18} aria-hidden="true" />
+                  </Button>
                   <span>{name}</span>
                   <ActionGroup>
                     <Button
@@ -237,9 +311,9 @@ export default function SiteSettingsPanel({
                       size="sm"
                       aria-label={`Move ${name} up`}
                       disabled={busy || index === 0}
-                      onClick={() => moveDocSection(index, -1)}
+                      onClick={() => moveDocSection(index, index - 1)}
                     >
-                      Move up
+                      <ArrowUp size={16} aria-hidden="true" />
                     </Button>
                     <Button
                       type="button"
@@ -247,19 +321,31 @@ export default function SiteSettingsPanel({
                       size="sm"
                       aria-label={`Move ${name} down`}
                       disabled={busy || index === docSections.length - 1}
-                      onClick={() => moveDocSection(index, 1)}
+                      onClick={() => moveDocSection(index, index + 1)}
                     >
-                      Move down
+                      <ArrowDown size={16} aria-hidden="true" />
                     </Button>
                   </ActionGroup>
                 </li>
               ))}
             </ol>
           ) : (
-            <p>Create a document to add a section here.</p>
+            <p>No sections yet. Create one below.</p>
           )}
+          <DocSectionCreate
+            sections={docSections}
+            disabled={busy}
+            onCreate={(name) => {
+              setSettings((current) => ({
+                ...current,
+                docCategoryOrder: [...docSections, name],
+              }));
+              setNotice(`${name} created. Save settings to keep it.`);
+            }}
+          />
           <p className="field-help">
-            Only sections with published documents are shown to readers.
+            Empty sections stay available here and in the editor. Only sections
+            with published documents are shown to readers.
           </p>
         </section>
       )}

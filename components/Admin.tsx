@@ -3,6 +3,8 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { SelectField } from "./ui/select";
 import { Assignments, type LearningHandler } from "./Assignments";
 import { assignmentRules, assignmentKey } from "@/lib/learning";
+import DocSectionCreate from "./DocSectionCreate";
+import { availableDocSections } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
 import { PendingPeople } from "./PendingPeople";
@@ -1166,11 +1168,20 @@ export function Editor({
     [error, setError] = useState(""),
     [refresh, setRefresh] = useState(false),
     [saving, setSaving] = useState(false),
-    [coverUploading, setCoverUploading] = useState(false);
+    [coverUploading, setCoverUploading] = useState(false),
+    [creatingSection, setCreatingSection] = useState(false),
+    [sectionSaving, setSectionSaving] = useState(false);
+  const docSections = availableDocSections(
+    [
+      ...data.content.filter((item) => item.kind === "doc"),
+      ...(c.kind === "doc" ? [c] : []),
+    ],
+    data.settings?.docCategoryOrder,
+  );
   const existing = data.content.some((x) => x.id === c.id);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (coverUploading) return;
+    if (coverUploading || sectionSaving) return;
     if (
       c.kind === "course" &&
       c.status === "published" &&
@@ -1253,7 +1264,10 @@ export function Editor({
           </span>
           <h1>{existing ? c.title : "Something worth sharing."}</h1>
         </div>
-        <Button variant="default" disabled={saving || coverUploading}>
+        <Button
+          variant="default"
+          disabled={saving || coverUploading || sectionSaving}
+        >
           <Save size={16} />
           Save {c.status === "published" ? "& publish" : "draft"}
         </Button>
@@ -1547,34 +1561,73 @@ export function Editor({
           </section>
           <section className="editor-setting-section">
             <h3>Organization</h3>
-            <label>
-              {c.kind === "course" ? "Topic / channel" : "Category"}
-              <input
-                required
-                list="categories"
-                value={c.category}
-                onChange={(e) => set("category", e.target.value)}
-              />
-              <datalist id="categories">
-                {Array.from(
-                  new Set(
-                    data.content
-                      .filter((x) => x.kind === c.kind)
-                      .map((x) => x.category),
-                  ),
-                ).map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </datalist>
-            </label>
-            {c.kind === "doc" && (
+            {c.kind === "doc" ? (
+              <>
+                <label>
+                  Section
+                  <SelectField
+                    aria-label="Section"
+                    value={`section:${c.category}`}
+                    disabled={saving || sectionSaving}
+                    onValueChange={(value) => {
+                      if (value === "create") setCreatingSection(true);
+                      else {
+                        set("category", value.slice(8));
+                        setCreatingSection(false);
+                      }
+                    }}
+                  >
+                    {docSections.map((name) => (
+                      <option key={name} value={`section:${name}`}>
+                        {name}
+                      </option>
+                    ))}
+                    {onWorkspaceChange && (
+                      <option value="create">Create new section…</option>
+                    )}
+                  </SelectField>
+                </label>
+                {creatingSection && onWorkspaceChange && (
+                  <DocSectionCreate
+                    sections={docSections}
+                    disabled={saving}
+                    onBusyChange={setSectionSaving}
+                    onCancel={() => setCreatingSection(false)}
+                    onCreate={async (name) => {
+                      await onWorkspaceChange({
+                        ...data,
+                        settings: {
+                          ...defaultSettings,
+                          ...data.settings,
+                          docCategoryOrder: [...docSections, name],
+                        },
+                      });
+                      set("category", name);
+                      setCreatingSection(false);
+                    }}
+                  />
+                )}
+              </>
+            ) : (
               <label>
-                Folder path <small>Use / for nested folders</small>
+                {c.kind === "course" ? "Topic / channel" : "Category"}
                 <input
-                  value={c.folder}
-                  onChange={(e) => set("folder", e.target.value)}
-                  placeholder="Getting started / Basics"
+                  required
+                  list="categories"
+                  value={c.category}
+                  onChange={(e) => set("category", e.target.value)}
                 />
+                <datalist id="categories">
+                  {Array.from(
+                    new Set(
+                      data.content
+                        .filter((x) => x.kind === c.kind)
+                        .map((x) => x.category),
+                    ),
+                  ).map((x) => (
+                    <option key={x}>{x}</option>
+                  ))}
+                </datalist>
               </label>
             )}
           </section>
@@ -1585,7 +1638,7 @@ export function Editor({
                 <CourseCoverEditor
                   url={c.coverImageUrl}
                   onUpload={onUpload}
-                  disabled={saving || coverUploading}
+                  disabled={saving || coverUploading || sectionSaving}
                   onBusyChange={setCoverUploading}
                   onChange={(url) =>
                     setC((current) => ({ ...current, coverImageUrl: url }))
