@@ -228,30 +228,20 @@ export default function Fieldbook({
         <div className="login-story">
           <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
           <div>
-            <span className="eyebrow">A LITTLE CLARITY GOES A LONG WAY</span>
-            <h1>
-              Your field.
-              <br />
-              In focus.
-            </h1>
-            <p>
-              The knowledge you need.
-              <br />
-              The updates that matter.
-              <br />
-              The confidence to move forward.
-            </p>
+            <span className="eyebrow">LEARNING AND KNOWLEDGE</span>
+            <h1>The Fieldbook</h1>
+            <p>Updates, courses, and docs in one place.</p>
             <div className="login-icons">
               <BookOpen />
               <Newspaper />
               <GraduationCap />
             </div>
           </div>
-          <small>One home for docs, updates, and courses.</small>
+          <small>Interactive demo with sample content.</small>
         </div>
         <main className="login-form">
           <div className="login-inner">
-            <span className="pill">INTERACTIVE PROTOTYPE</span>
+            <span className="pill">INTERACTIVE DEMO</span>
             <h2>Welcome to Fieldbook</h2>
             <p>Choose a demo profile to explore the organization.</p>
             <div className="profile-list">
