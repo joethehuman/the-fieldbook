@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Workspace } from "@/lib/store";
 import {
   ancestorIds,
@@ -51,6 +51,39 @@ export function Assignments({
   const [pending, setPending] = useState<LearningAction | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogOpen = !!form || !!pending;
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const previous = document.activeElement as HTMLElement | null;
+    const root = dialogRef.current;
+    const focusable = () =>
+      Array.from(
+        root?.querySelectorAll<HTMLElement>(
+          'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]',
+        ) || [],
+      );
+    focusable()[0]?.focus();
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Tab") {
+        const list = focusable();
+        const first = list[0],
+          last = list[list.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    root?.addEventListener("keydown", key);
+    return () => {
+      root?.removeEventListener("keydown", key);
+      previous?.focus();
+    };
+  }, [dialogOpen]);
   const courses = (data.publishedContent ?? data.content).filter(
     (c) => c.kind === "course" && c.status === "published",
   );
@@ -438,7 +471,7 @@ export function Assignments({
         </section>
       )}
       {form && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop" ref={dialogRef}>
           <form
             className="modal assignment-modal"
             role="dialog"
@@ -582,7 +615,7 @@ export function Assignments({
         </div>
       )}
       {pending && (
-        <div className="modal-backdrop">
+        <div className="modal-backdrop" ref={dialogRef}>
           <section
             className="modal assignment-modal"
             role="dialog"

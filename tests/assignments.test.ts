@@ -171,7 +171,8 @@ test("direct and inherited assignments deduplicate courses and use earliest dead
     1,
   );
   assert.equal(
-    assignedCourses([course], { id: admin, groups: [] }, groups).length,
+    assignedCourses([course], { ...user, id: admin, groups: [] }, groups)
+      .length,
     0,
   );
 });
