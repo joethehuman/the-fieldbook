@@ -167,7 +167,7 @@ const runtime: FieldbookRuntime = {
     return (await request("/api/upload", { complete: sign.id })).url;
   },
   signIn() {
-    window.location.href = `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.hash)}`;
+    window.location.href = `/auth/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search + window.location.hash)}`;
   },
   async signOut() {
     await request("/auth/logout", {});

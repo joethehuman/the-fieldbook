@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Give sign-in a compact, responsive layout with separated secondary links. Keep return destinations in a short-lived cookie so the sign-in address stays clean.
+
 ### Required-learning verification
 
 - Updated stale assignment tests and learning documentation to the current group-only requirements and organization onboarding/catch-up windows.

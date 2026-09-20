@@ -12,7 +12,7 @@ export default function Consent() {
     fetch(`/api/consent?id=${encodeURIComponent(value)}`, { cache: "no-store" })
       .then(async (r) => {
         if (r.status === 401) {
-          window.location.href = `/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+          window.location.href = `/auth/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
           return;
         }
         const d = await r.json();
