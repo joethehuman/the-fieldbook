@@ -18,3 +18,9 @@ Baseline: private `joethehuman/the-fieldbook`, main `26af994d1be8fd7157fb4b08e09
 ## Validation and preview
 
 Exercise schema/hierarchy failures, active-admin protections, stale writes, direct database privilege denial, pending email claim, inheritance/reparent/rejoin dates, course publication, and manager sibling isolation. Build both applications. Preview must use a dedicated Supabase project and synthetic accounts; never copy production learner data. Apply migrations only to that isolated backend, seed sample hierarchies and courses, then verify authenticated roles in the browser. Live OAuth and deployment checks remain separate from local test results.
+
+## Implemented storage and limits
+
+This additive migration keeps the existing JSON hierarchy/membership model. `fb_config.governance_revision` serializes governance changes; database routines validate hierarchy/reference integrity and audit changes in the same transaction. `fb_profiles.effective_group_joined_at` records continuous inherited membership independently from direct membership. `fb_pending_profiles` holds unclaimed accounts. A service-only SQL snapshot scopes reporting before serialization and avoids the API's per-table 1,000-person truncation. The existing catalog and feedback queries retain their documented 1,000-row limit; this remains a small-instance application. Group/team deletion and hard account deletion are intentionally not exposed.
+
+Preview backend created: `fieldbook-governance-preview` (Supabase ref `lmcrlobrxyxgwsyayhbb`, Vercel storage `store_NsdevmvTq6jzh859`). It is separate from the live Fieldbook backend. Do not configure its credentials on the production application.

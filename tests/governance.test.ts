@@ -80,7 +80,7 @@ test("governance database enforces permissions, revision, hierarchy, registratio
   const pg = new PGlite();
   try {
     await pg.exec(
-      "create role anon; create role authenticated; create role service_role; create role supabase_auth_admin; create schema auth; create table auth.users(id uuid primary key); create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);",
+      "create role anon; create role authenticated; create role service_role bypassrls; create role supabase_auth_admin; create schema auth; create table auth.users(id uuid primary key); create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);",
     );
     for (const name of [
       "202609190001_fieldbook.sql",
@@ -114,7 +114,9 @@ test("governance database enforces permissions, revision, hierarchy, registratio
       ]);
     const data = { users, groups, teams };
     await assert.rejects(save(1, data, manager), /Administrator/);
+    await pg.exec("set role service_role");
     await save(1, data);
+    await pg.exec("reset role");
     await assert.rejects(save(1, data), /Revision conflict/);
     await assert.rejects(
       save(2, {
