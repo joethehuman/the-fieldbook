@@ -7,9 +7,23 @@ import {
   reportTeamIds,
   isComplete,
 } from "../lib/types";
-import { freshWorkspace, updateProgress } from "../lib/store";
+import { DEMO_PROFILE_IDS, freshWorkspace, updateProgress } from "../lib/store";
 import { learningTarget } from "../lib/learning";
 import { videoSource } from "../lib/video";
+
+test("demo presents three personas and a five-rep manager team with varied completion", () => {
+  const d = freshWorkspace();
+  assert.deepEqual(DEMO_PROFILE_IDS, ["demo-learner", "demo-manager", "demo-admin"]);
+  const manager = d.users.find((u) => u.id === "demo-manager")!;
+  const teamIds = reportTeamIds(manager, d.teams || []);
+  const reps = d.users.filter((u) => u.role === "learner" && u.teamId && teamIds.has(u.teamId));
+  assert.equal(reps.length, 5);
+  assert.deepEqual(
+    reps.map((u) => assignedCourses(d.content, u, d.groups).filter((c) => isComplete(c, d.progress[u.id] || [])).length).sort(),
+    [0, 1, 1, 2, 3],
+  );
+  assert.ok(reps.every((u) => assignedCourses(d.content, u, d.groups).length === 3));
+});
 
 test("nested memberships inherit assignments once and preserve full library access", () => {
   const d = freshWorkspace();

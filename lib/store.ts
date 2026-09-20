@@ -23,19 +23,18 @@ export type Workspace = {
 };
 const KEY = "fieldbook.workspace.v1";
 export const SESSION = "fieldbook.profile.v1";
+export const DEMO_PROFILE_IDS = ["demo-learner", "demo-manager", "demo-admin"];
+const completedCourse = (id: string): Progress => ({
+  content_id: id,
+  version: 1,
+  lessons: [`${id}-1`, `${id}-2`],
+  passed: true,
+});
 export function freshWorkspace(): Workspace {
   return {
     schema: 1,
     content: structuredClone(seedContent),
-    teams: [
-      { id: "field", name: "Field team", managerId: "demo-manager" },
-      {
-        id: "startup",
-        name: "Startup sales",
-        parentId: "field",
-        managerId: "demo-manager",
-      },
-    ],
+    teams: [{ id: "sales-team", name: "Sales team", managerId: "demo-manager" }],
     feedback: [],
     users: [
       {
@@ -45,20 +44,48 @@ export function freshWorkspace(): Workspace {
         email: "alex@example.com",
         role: "learner",
         groups: ["sales"],
-        teamId: "startup",
+        teamId: "sales-team",
         active: true,
       },
       {
-        id: "demo-solutions",
+        id: "demo-rep-2",
         name: "Sam Taylor",
         email: "sam@example.com",
         role: "learner",
-        groups: ["solutions"],
+        groups: ["sales"],
+        teamId: "sales-team",
+        active: true,
+      },
+      {
+        id: "demo-rep-3",
+        name: "Casey Rivera",
+        email: "casey@example.com",
+        role: "learner",
+        groups: ["sales"],
+        teamId: "sales-team",
+        active: true,
+      },
+      {
+        id: "demo-rep-4",
+        name: "Taylor Chen",
+        email: "taylor@example.com",
+        role: "learner",
+        groups: ["sales"],
+        teamId: "sales-team",
+        active: true,
+      },
+      {
+        id: "demo-rep-5",
+        name: "Morgan Patel",
+        email: "morgan@example.com",
+        role: "learner",
+        groups: ["sales"],
+        teamId: "sales-team",
         active: true,
       },
       {
         id: "demo-admin",
-        name: "Workspace admin",
+        name: "Organization Admin",
         email: "admin@example.com",
         role: "admin",
         groups: ["sales"],
@@ -70,23 +97,16 @@ export function freshWorkspace(): Workspace {
         email: "jordan@example.com",
         role: "manager",
         groups: ["sales"],
-        teamId: "field",
         active: true,
       },
     ],
-    groups: [
-      { id: "sales", name: "Account executives" },
-      { id: "solutions", name: "Solutions engineers" },
-    ],
+    groups: [{ id: "sales", name: "Account executives" }],
     progress: {
-      "demo-learner": [
-        {
-          content_id: "course-1",
-          version: 1,
-          lessons: ["course-1-1", "course-1-2"],
-          passed: true,
-        },
-      ],
+      "demo-learner": [completedCourse("course-1")],
+      "demo-rep-2": [],
+      "demo-rep-3": [completedCourse("course-1"), completedCourse("course-2")],
+      "demo-rep-4": [completedCourse("course-1"), completedCourse("course-2"), completedCourse("course-3")],
+      "demo-rep-5": [completedCourse("course-3")],
     },
   };
 }

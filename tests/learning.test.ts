@@ -5,7 +5,7 @@ import { assignedCourses, isComplete } from "../lib/types";
 test("assignments follow role groups and exclude drafts", () => {
   const d = freshWorkspace();
   assert.equal(assignedCourses(d.content, d.users[0]).length, 3);
-  assert.equal(assignedCourses(d.content, d.users[1]).length, 2);
+  assert.equal(assignedCourses(d.content, { ...d.users[1], groups: ["solutions"] }).length, 2);
   d.content.find((c) => c.id === "course-2")!.status = "draft";
   assert.equal(assignedCourses(d.content, d.users[0]).length, 2);
 });
@@ -41,5 +41,5 @@ test("progress is isolated by user and ignores unknown lessons", () => {
     [],
   );
   d = updateProgress(d, d.users[0].id, c, c.lessons[0].id);
-  assert.equal(d.progress[d.users[1].id], undefined);
+  assert.equal(d.progress[d.users.find((u) => u.id === "demo-manager")!.id], undefined);
 });
