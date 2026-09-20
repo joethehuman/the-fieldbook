@@ -192,7 +192,13 @@ export default function Admin({
     const person = data.users.find((u) => u.id === detailScope.userId);
     return (
       <>
-        <button className="text-button" onClick={() => setDetailScope(null)}>
+        <button
+          className="text-button"
+          onClick={() => {
+            setTab(group ? "groups" : "people");
+            setDetailScope(null);
+          }}
+        >
           <ArrowLeft size={16} />
           Back to {group ? "groups" : "people"}
         </button>

@@ -2748,3 +2748,6 @@ select:focus-visible {
 .assignment-modal select,.assignment-modal input { width:100%; }
 .assignments-panel table small { display:block; margin-top:4px; }
 @media(max-width:700px) { .assignment-heading { flex-direction:column; } .assignment-detail { padding:14px; } }
+
+.assignments-panel > h3 { margin-top:32px; margin-bottom:8px; }
+.assignments-panel > section > h4 { margin:20px 0 12px; }
