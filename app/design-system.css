@@ -873,42 +873,48 @@ tbody tr:hover {
   margin: 0;
 }
 .learning-assigned {
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: 250px minmax(0, 1fr);
+  gap: 20px;
+  align-items: stretch;
 }
 .learning-assigned .current-card {
   display: flex;
-  flex-direction: row;
-  justify-content: flex-start;
+  flex-direction: column;
+  justify-content: center;
   align-items: center;
   height: auto;
-  min-height: 0;
+  min-height: 310px;
+  margin-top: 48px;
+  margin-bottom: 14px;
   gap: 20px;
-  padding: 20px 24px;
+  padding: 28px 24px;
+  text-align: center;
   background: var(--muted-surface);
   border-radius: var(--radius);
 }
 .progress-ring {
-  width: 64px;
-  height: 64px;
+  width: 136px;
+  height: 136px;
   flex-shrink: 0;
   margin: 0;
 }
 .progress-ring > div {
-  width: 54px;
-  height: 54px;
+  width: 116px;
+  height: 116px;
   background: var(--muted-surface);
 }
 .progress-ring strong {
-  font-size: 20px;
+  font-size: 36px;
   font-weight: 600;
   letter-spacing: -0.5px;
 }
 .progress-ring strong small {
-  font-size: 11px;
+  font-size: 16px;
 }
 .progress-ring > div > span {
-  display: none;
+  display: block;
+  font-size: 12px;
+  color: var(--muted-foreground);
 }
 .learning-status-icon {
   width: 48px;
@@ -922,7 +928,7 @@ tbody tr:hover {
   flex-shrink: 0;
 }
 .learning-status-copy {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
 }
 .current-card h3 {
@@ -941,7 +947,12 @@ tbody tr:hover {
   color: var(--muted-foreground);
 }
 .learning-current .current-card {
+  margin-top: 0;
   background: var(--background);
+}
+.learning-assigned .current-card > .ui-button {
+  width: 100%;
+  white-space: normal;
 }
 .learning-links {
   justify-content: flex-start;
@@ -1155,6 +1166,13 @@ tbody tr:hover {
   }
 }
 @media (max-width: 1000px) {
+  .learning-assigned {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .learning-assigned .current-card {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
   .admin-layout {
     grid-template-columns: minmax(0, 1fr);
     gap: 24px;
@@ -1233,9 +1251,6 @@ tbody tr:hover {
     flex-wrap: wrap;
     padding: 20px;
     gap: 16px;
-  }
-  .learning-status-copy {
-    flex-basis: calc(100% - 80px);
   }
   .learning-assigned .current-card > .ui-button {
     margin-left: 0;
