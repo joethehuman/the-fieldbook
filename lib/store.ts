@@ -1,7 +1,12 @@
 import { seedContent } from "./seed";
-import type { Content, User, Group, Progress } from "./types";
+import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 export type Workspace = {
+  settings?: import("./settings").SiteSettings;
+  revision?: number;
+  publishedContent?: Content[];
   schema: 1;
+  feedback?: Feedback[];
+  teams?: Team[];
   content: Content[];
   users: User[];
   groups: Group[];
@@ -13,6 +18,16 @@ export function freshWorkspace(): Workspace {
   return {
     schema: 1,
     content: structuredClone(seedContent),
+    teams: [
+      { id: "field", name: "Field team", managerId: "demo-manager" },
+      {
+        id: "startup",
+        name: "Startup sales",
+        parentId: "field",
+        managerId: "demo-manager",
+      },
+    ],
+    feedback: [],
     users: [
       {
         id: "demo-learner",
@@ -20,6 +35,7 @@ export function freshWorkspace(): Workspace {
         email: "alex@example.com",
         role: "learner",
         groups: ["sales"],
+        teamId: "startup",
         active: true,
       },
       {
@@ -36,6 +52,15 @@ export function freshWorkspace(): Workspace {
         email: "admin@example.com",
         role: "admin",
         groups: ["sales"],
+        active: true,
+      },
+      {
+        id: "demo-manager",
+        name: "Jordan Lee",
+        email: "jordan@example.com",
+        role: "manager",
+        groups: ["sales"],
+        teamId: "field",
         active: true,
       },
     ],
@@ -101,8 +126,10 @@ export function updateProgress(
     !p.lessons.includes(lessonId)
   )
     p.lessons.push(lessonId);
-  if (answers && course.lessons.every((l) => p!.lessons.includes(l.id)))
-    p.passed =
-      p.passed || course.questions.every((q, i) => q.answer === answers[i]);
+  if (answers && course.lessons.every((l) => p!.lessons.includes(l.id))) {
+    const passed = course.questions.every((q, i) => q.answer === answers[i]);
+    (p.attempts ??= []).push({ at: new Date().toISOString(), passed });
+    p.passed = p.passed || passed;
+  }
   return next;
 }

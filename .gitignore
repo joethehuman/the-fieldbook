@@ -1,9 +1,12 @@
 node_modules/
 .next/
-.data/
+out/
+.vercel/
 .env*
 !.env.example
+*.tsbuildinfo
+.pnpm-store/
+.data/
 *.log
 sources/
-out/
-*.tsbuildinfo
+artifacts/

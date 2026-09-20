@@ -12,6 +12,12 @@ import {
   ArrowLeft,
   Check,
 } from "lucide-react";
+import MarkdownEditor, { type UploadMedia } from "./MarkdownEditor";
+import SiteSettingsPanel from "./SiteSettingsPanel";
+import { FeedbackAdmin } from "./Feedback";
+import { TeamsAdmin, TeamProgress } from "./Teams";
+import { canParent, type Assignment } from "@/lib/types";
+import { videoSource } from "@/lib/video";
 import type { Workspace } from "@/lib/store";
 import {
   assignedCourses,
@@ -19,15 +25,34 @@ import {
   type Content,
   type User,
 } from "@/lib/types";
-type Props = { data: Workspace; user: User; onChange: (d: Workspace) => void };
+type Props = {
+  data: Workspace;
+  user: User;
+  onChange: (d: Workspace) => void | Promise<void>;
+  production?: boolean;
+  onUpload?: UploadMedia;
+};
 const id = () => crypto.randomUUID();
-export default function Admin({ data, user, onChange }: Props) {
+export default function Admin({
+  data,
+  user,
+  onChange,
+  production = false,
+  onUpload,
+}: Props) {
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
     [person, setPerson] = useState<User | null>(null),
     [groupName, setGroupName] = useState(""),
     [notice, setNotice] = useState(""),
-    [filter, setFilter] = useState("all");
+    [filter, setFilter] = useState("all"),
+    [query, setQuery] = useState(""),
+    [category, setCategory] = useState("all"),
+    [sort, setSort] = useState("title"),
+    [peopleRole, setPeopleRole] = useState("all"),
+    [peopleGroup, setPeopleGroup] = useState("all"),
+    [peopleStatus, setPeopleStatus] = useState("all"),
+    [groupParent, setGroupParent] = useState("");
   function create(kind: Content["kind"]) {
     setEditing({
       id: id(),
@@ -40,6 +65,8 @@ export default function Admin({ data, user, onChange }: Props) {
       status: "draft",
       version: 1,
       updatedAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      assignments: [],
       duration: 5,
       groups: [],
       lessons:
@@ -47,17 +74,25 @@ export default function Admin({ data, user, onChange }: Props) {
       questions: [],
     });
   }
-  function save(c: Content) {
+  async function save(c: Content) {
     const old = data.content.find((x) => x.id === c.id);
-    const updated = { ...c, updatedAt: new Date().toISOString() };
-    onChange({
+    const updated = {
+      ...c,
+      createdAt:
+        old?.createdAt ||
+        old?.updatedAt ||
+        c.createdAt ||
+        new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await onChange({
       ...data,
       content: old
         ? data.content.map((x) => (x.id === c.id ? updated : x))
         : [...data.content, updated],
     });
     setEditing(null);
-    setNotice("Content saved in this browser.");
+    setNotice(production ? "Content saved." : "Content saved in this browser.");
   }
   function savePerson(e: React.FormEvent) {
     e.preventDefault();
@@ -72,11 +107,23 @@ export default function Admin({ data, user, onChange }: Props) {
       setNotice("A demo profile already uses that email.");
       return;
     }
+    const previous = data.users.find((u) => u.id === person.id);
+    const savedPerson = {
+      ...person,
+      groupJoinedAt: Object.fromEntries(
+        person.groups.map((g) => [
+          g,
+          previous?.groups.includes(g)
+            ? previous.groupJoinedAt?.[g] || "1970-01-01T00:00:00.000Z"
+            : new Date().toISOString(),
+        ]),
+      ),
+    };
     onChange({
       ...data,
       users: data.users.some((u) => u.id === person.id)
-        ? data.users.map((u) => (u.id === person.id ? person : u))
-        : [...data.users, person],
+        ? data.users.map((u) => (u.id === person.id ? savedPerson : u))
+        : [...data.users, savedPerson],
     });
     setPerson(null);
     setNotice("Demo profile saved.");
@@ -89,6 +136,8 @@ export default function Admin({ data, user, onChange }: Props) {
         data={data}
         onSave={save}
         onCancel={() => setEditing(null)}
+        onUpload={onUpload}
+        production={production}
       />
     );
   return (
@@ -101,22 +150,34 @@ export default function Admin({ data, user, onChange }: Props) {
       <div className="admin-tabs">
         {[
           { id: "content", name: "Content", icon: FileText },
-          { id: "people", name: "Demo profiles", icon: Users },
+          {
+            id: "people",
+            name: production ? "People" : "Demo profiles",
+            icon: Users,
+          },
           { id: "groups", name: "Groups", icon: Layers },
+          { id: "teams", name: "Teams", icon: Users },
           { id: "progress", name: "Progress", icon: BarChart3 },
-        ].map((t) => (
-          <button
-            className={tab === t.id ? "selected" : ""}
-            key={t.id}
-            onClick={() => {
-              setTab(t.id);
-              setNotice("");
-            }}
-          >
-            <t.icon size={17} />
-            {t.name}
-          </button>
-        ))}
+          { id: "feedback", name: "Feedback", icon: FileText },
+          { id: "settings", name: "Settings", icon: Layers },
+        ]
+          .filter(
+            (t) => !production || !["people", "groups", "teams"].includes(t.id),
+          )
+          .map((t) => (
+            <button
+              className={tab === t.id ? "selected" : ""}
+              key={t.id}
+              onClick={() => {
+                setTab(t.id);
+                setNotice("");
+                setQuery("");
+              }}
+            >
+              <t.icon size={17} />
+              {t.name}
+            </button>
+          ))}
       </div>
       {notice && (
         <div className="success" role="status">
@@ -130,14 +191,28 @@ export default function Admin({ data, user, onChange }: Props) {
           </button>
         </div>
       )}
-      {tab === "content" ? (
+      {tab === "settings" ? (
+        <SiteSettingsPanel
+          data={data}
+          onChange={onChange}
+          onUpload={onUpload}
+          production={production}
+        />
+      ) : tab === "feedback" ? (
+        <FeedbackAdmin data={data} />
+      ) : tab === "teams" ? (
+        <TeamsAdmin data={data} onChange={onChange} />
+      ) : tab === "content" ? (
         <>
           <div className="admin-toolbar">
             <div className="topic-tabs">
               {["all", "doc", "brief", "course"].map((t) => (
                 <button
                   className={filter === t ? "selected" : ""}
-                  onClick={() => setFilter(t)}
+                  onClick={() => {
+                    setFilter(t);
+                    setCategory("all");
+                  }}
                   key={t}
                 >
                   {
@@ -166,6 +241,44 @@ export default function Admin({ data, user, onChange }: Props) {
               </button>
             </div>
           </div>
+          <div className="filter-bar">
+            <label>
+              Search content
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Title, summary, or folder"
+              />
+            </label>
+            <label>
+              Topic / category
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                <option value="all">All topics</option>
+                {[
+                  ...new Set(
+                    data.content
+                      .filter((c) => filter === "all" || c.kind === filter)
+                      .map((c) => c.category),
+                  ),
+                ]
+                  .sort()
+                  .map((t) => (
+                    <option key={t}>{t}</option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              Sort content
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="title">Title A–Z</option>
+                <option value="updated">Recently updated</option>
+                <option value="oldest">Oldest update first</option>
+              </select>
+            </label>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -179,7 +292,21 @@ export default function Admin({ data, user, onChange }: Props) {
               </thead>
               <tbody>
                 {data.content
-                  .filter((c) => filter === "all" || c.kind === filter)
+                  .filter(
+                    (c) =>
+                      (filter === "all" || c.kind === filter) &&
+                      (category === "all" || c.category === category) &&
+                      `${c.title} ${c.summary} ${c.folder}`
+                        .toLowerCase()
+                        .includes(query.toLowerCase()),
+                  )
+                  .sort((a, b) =>
+                    sort === "title"
+                      ? a.title.localeCompare(b.title)
+                      : sort === "updated"
+                        ? b.updatedAt.localeCompare(a.updatedAt)
+                        : a.updatedAt.localeCompare(b.updatedAt),
+                  )
                   .map((c) => (
                     <tr key={c.id}>
                       <td>
@@ -197,7 +324,13 @@ export default function Admin({ data, user, onChange }: Props) {
                             : "Course"}
                       </td>
                       <td>
-                        <span className={"status " + c.status}>{c.status}</span>
+                        <span className={"status " + c.status}>
+                          {production && c.publishedRevision
+                            ? c.publishedRevision === c.revision
+                              ? "published"
+                              : "published · draft changes"
+                            : c.status}
+                        </span>
                       </td>
                       <td>v{c.version}</td>
                       <td>
@@ -207,6 +340,32 @@ export default function Admin({ data, user, onChange }: Props) {
                         >
                           Edit
                         </button>
+                        {production && c.publishedRevision && (
+                          <button
+                            className="text-button"
+                            onClick={async () => {
+                              if (
+                                !confirm(
+                                  "Unpublish this item? Its draft and history will be kept.",
+                                )
+                              )
+                                return;
+                              try {
+                                await onChange({
+                                  ...data,
+                                  content: data.content.filter(
+                                    (x) => x.id !== c.id,
+                                  ),
+                                });
+                                setNotice("Content unpublished.");
+                              } catch (e) {
+                                setNotice((e as Error).message);
+                              }
+                            }}
+                          >
+                            Unpublish
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -238,6 +397,60 @@ export default function Admin({ data, user, onChange }: Props) {
               Add demo profile
             </button>
           </div>
+          <div className="filter-bar">
+            <label>
+              Search profiles
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Name or email"
+              />
+            </label>
+            <label>
+              Role
+              <select
+                value={peopleRole}
+                onChange={(e) => setPeopleRole(e.target.value)}
+              >
+                <option value="all">All roles</option>
+                <option value="learner">Learner</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <label>
+              Group
+              <select
+                value={peopleGroup}
+                onChange={(e) => setPeopleGroup(e.target.value)}
+              >
+                <option value="all">All groups</option>
+                {data.groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Profile status
+              <select
+                value={peopleStatus}
+                onChange={(e) => setPeopleStatus(e.target.value)}
+              >
+                <option value="all">All statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+            <label>
+              Sort profiles
+              <select value={sort} onChange={(e) => setSort(e.target.value)}>
+                <option value="title">Name A–Z</option>
+                <option value="reverse">Name Z–A</option>
+              </select>
+            </label>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -250,30 +463,47 @@ export default function Admin({ data, user, onChange }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {data.users.map((u) => (
-                  <tr key={u.id}>
-                    <td>
-                      <strong>{u.name}</strong>
-                      <small>{u.email}</small>
-                    </td>
-                    <td>{u.role}</td>
-                    <td>
-                      {data.groups
-                        .filter((g) => u.groups.includes(g.id))
-                        .map((g) => g.name)
-                        .join(", ") || "No groups"}
-                    </td>
-                    <td>{u.active ? "Active" : "Inactive"}</td>
-                    <td>
-                      <button
-                        className="text-button"
-                        onClick={() => setPerson(structuredClone(u))}
-                      >
-                        Edit
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {data.users
+                  .filter(
+                    (u) =>
+                      `${u.name} ${u.email}`
+                        .toLowerCase()
+                        .includes(query.toLowerCase()) &&
+                      (peopleRole === "all" || u.role === peopleRole) &&
+                      (peopleGroup === "all" ||
+                        u.groups.includes(peopleGroup)) &&
+                      (peopleStatus === "all" ||
+                        u.active === (peopleStatus === "active")),
+                  )
+                  .sort((a, b) =>
+                    sort === "reverse"
+                      ? b.name.localeCompare(a.name)
+                      : a.name.localeCompare(b.name),
+                  )
+                  .map((u) => (
+                    <tr key={u.id}>
+                      <td>
+                        <strong>{u.name}</strong>
+                        <small>{u.email}</small>
+                      </td>
+                      <td>{u.role}</td>
+                      <td>
+                        {data.groups
+                          .filter((g) => u.groups.includes(g.id))
+                          .map((g) => g.name)
+                          .join(", ") || "No groups"}
+                      </td>
+                      <td>{u.active ? "Active" : "Inactive"}</td>
+                      <td>
+                        <button
+                          className="text-button"
+                          onClick={() => setPerson(structuredClone(u))}
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>
@@ -296,7 +526,10 @@ export default function Admin({ data, user, onChange }: Props) {
               }
               onChange({
                 ...data,
-                groups: [...data.groups, { id: id(), name }],
+                groups: [
+                  ...data.groups,
+                  { id: id(), name, parentId: groupParent || undefined },
+                ],
               });
               setGroupName("");
               setNotice(
@@ -314,6 +547,20 @@ export default function Admin({ data, user, onChange }: Props) {
                 placeholder="e.g. Customer success"
               />
             </label>
+            <label>
+              Parent group
+              <select
+                value={groupParent}
+                onChange={(e) => setGroupParent(e.target.value)}
+              >
+                <option value="">Top-level group</option>
+                {data.groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button className="primary">
               <Plus size={16} />
               Create group
@@ -324,6 +571,32 @@ export default function Admin({ data, user, onChange }: Props) {
               <section className="knowledge-section" key={g.id}>
                 <Layers />
                 <h2>{g.name}</h2>
+                <label>
+                  Parent group
+                  <select
+                    value={g.parentId || ""}
+                    onChange={(e) =>
+                      onChange({
+                        ...data,
+                        groups: data.groups.map((x) =>
+                          x.id === g.id
+                            ? { ...x, parentId: e.target.value || undefined }
+                            : x,
+                        ),
+                      })
+                    }
+                  >
+                    <option value="">Top-level group</option>
+                    {data.groups
+                      .filter((x) => canParent(g.id, x.id, data.groups))
+                      .map((x) => (
+                        <option key={x.id} value={x.id}>
+                          {x.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <small>Members inherit assignments from parent groups.</small>
                 <p>
                   {data.users.filter((u) => u.groups.includes(g.id)).length}{" "}
                   profiles ·{" "}
@@ -375,55 +648,7 @@ export default function Admin({ data, user, onChange }: Props) {
           </div>
         </>
       ) : (
-        <>
-          <p className="muted">
-            Completion is based on each profile’s current published assignments
-            and course versions.
-          </p>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Team member</th>
-                  <th>Assigned</th>
-                  <th>Completed</th>
-                  <th>Current</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.users
-                  .filter((u) => u.active)
-                  .map((u) => {
-                    const assigned = assignedCourses(data.content, u);
-                    const complete = assigned.filter((c) =>
-                      isComplete(c, data.progress[u.id] || []),
-                    ).length;
-                    const pct = assigned.length
-                      ? Math.round((complete / assigned.length) * 100)
-                      : 100;
-                    return (
-                      <tr key={u.id}>
-                        <td>
-                          <strong>{u.name}</strong>
-                          <small>{u.email}</small>
-                        </td>
-                        <td>{assigned.length}</td>
-                        <td>{complete}</td>
-                        <td>
-                          <div className="report-progress">
-                            <span>
-                              <i style={{ width: pct + "%" }} />
-                            </span>
-                            <strong>{pct}%</strong>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </>
+        <TeamProgress data={data} user={user} />
       )}
       {person && (
         <div className="modal-backdrop">
@@ -471,6 +696,23 @@ export default function Admin({ data, user, onChange }: Props) {
               >
                 <option value="learner">Learner</option>
                 <option value="admin">Admin</option>
+                <option value="manager">Manager</option>
+              </select>
+            </label>
+            <label>
+              Reporting team
+              <select
+                value={person.teamId || ""}
+                onChange={(e) =>
+                  setPerson({ ...person, teamId: e.target.value || undefined })
+                }
+              >
+                <option value="">No team</option>
+                {(data.teams || []).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
               </select>
             </label>
             <fieldset>
@@ -514,22 +756,36 @@ export default function Admin({ data, user, onChange }: Props) {
     </>
   );
 }
-function Editor({
+export function Editor({
   content,
   data,
   onSave,
   onCancel,
+  onUpload,
+  production = false,
 }: {
+  onUpload?: UploadMedia;
+  production?: boolean;
   content: Content;
   data: Workspace;
-  onSave: (c: Content) => void;
+  onSave: (c: Content) => void | Promise<void>;
   onCancel: () => void;
 }) {
-  const [c, setC] = useState(content),
+  const [c, setC] = useState<Content>(() => ({
+      ...content,
+      assignments:
+        content.assignments ??
+        content.groups.map((groupId) => ({
+          groupId,
+          assignedAt: content.createdAt || content.updatedAt,
+          due: { type: "none" },
+        })),
+    })),
     [error, setError] = useState(""),
-    [refresh, setRefresh] = useState(false);
+    [refresh, setRefresh] = useState(false),
+    [saving, setSaving] = useState(false);
   const existing = data.content.some((x) => x.id === c.id);
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (
       c.kind === "course" &&
@@ -550,16 +806,24 @@ function Editor({
       );
       return;
     }
-    if (c.lessons.some((l) => l.videoUrl && !/^https:\/\//.test(l.videoUrl))) {
-      setError("Use a secure HTTPS video URL.");
+    if (c.lessons.some((l) => l.videoUrl && !videoSource(l.videoUrl))) {
+      setError("Use a supported HTTPS YouTube, Vimeo, MP4, or WebM URL.");
       return;
     }
-    onSave({
-      ...c,
-      title: c.title.trim(),
-      category: c.category.trim(),
-      version: existing && refresh ? content.version + 1 : content.version,
-    });
+    setSaving(true);
+    setError("");
+    try {
+      await onSave({
+        ...c,
+        title: c.title.trim(),
+        category: c.category.trim(),
+        version: existing && refresh ? content.version + 1 : content.version,
+      });
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
   }
   const set = (key: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: value }));
@@ -581,7 +845,7 @@ function Editor({
           </span>
           <h1>{existing ? c.title : "Something worth sharing."}</h1>
         </div>
-        <button className="primary">
+        <button className="primary" disabled={saving}>
           <Save size={16} />
           Save {c.status === "published" ? "& publish" : "draft"}
         </button>
@@ -611,19 +875,12 @@ function Editor({
             />
           </label>
           {c.kind !== "course" ? (
-            <label>
-              Article content{" "}
-              <small>
-                Markdown supported: ## headings, **bold**, lists, and links.
-              </small>
-              <textarea
-                className="body-editor"
-                rows={18}
-                value={c.body}
-                onChange={(e) => set("body", e.target.value)}
-                placeholder="## Start with what matters"
-              />
-            </label>
+            <MarkdownEditor
+              label="Article content"
+              value={c.body}
+              onChange={(value) => set("body", value)}
+              onUpload={onUpload}
+            />
           ) : (
             <>
               <div className="section-heading">
@@ -689,30 +946,56 @@ function Editor({
                       }
                     />
                   </label>
-                  <label>
-                    Lesson text <small>Markdown supported</small>
-                    <textarea
-                      rows={8}
-                      value={l.body}
-                      onChange={(e) =>
-                        set(
-                          "lessons",
-                          c.lessons.map((x) =>
-                            x.id === l.id ? { ...x, body: e.target.value } : x,
-                          ),
-                        )
-                      }
-                    />
-                  </label>
+                  <MarkdownEditor
+                    label={`Lesson ${i + 1} text`}
+                    rows={8}
+                    value={l.body}
+                    onUpload={onUpload}
+                    onChange={(value) =>
+                      set(
+                        "lessons",
+                        c.lessons.map((x) =>
+                          x.id === l.id ? { ...x, body: value } : x,
+                        ),
+                      )
+                    }
+                  />
+                  {onUpload && (
+                    <label>
+                      Upload lesson video{" "}
+                      <small>MP4 or WebM, up to 50 MB.</small>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/webm"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          setSaving(true);
+                          try {
+                            const url = await onUpload(f);
+                            setC((prev) => ({
+                              ...prev,
+                              lessons: prev.lessons.map((x) =>
+                                x.id === l.id ? { ...x, videoUrl: url } : x,
+                              ),
+                            }));
+                          } catch (error) {
+                            setError((error as Error).message);
+                          } finally {
+                            setSaving(false);
+                          }
+                        }}
+                      />
+                    </label>
+                  )}
                   <label>
                     Video URL{" "}
                     <small>
-                      Optional. Direct HTTPS MP4/WebM URL, including
-                      DigitalOcean Spaces URLs. Not a YouTube page.
+                      Optional. YouTube, Vimeo, or a direct HTTPS MP4/WebM URL.
                     </small>
                     <input
-                      type="url"
-                      placeholder="https://…/lesson.mp4"
+                      type="text"
+                      placeholder="Upload a file or paste a supported video URL"
                       value={l.videoUrl || ""}
                       onChange={(e) =>
                         set(
@@ -835,6 +1118,13 @@ function Editor({
         </section>
         <aside className="editor-settings">
           <h3>Publishing</h3>
+          {production && (
+            <p className="muted">
+              Saving a draft keeps the current public version online. Select
+              Published to replace it. Unpublish from the content list to remove
+              public access.
+            </p>
+          )}
           <label>
             Status
             <select
@@ -889,27 +1179,117 @@ function Editor({
                 />
               </label>
               <fieldset>
-                <legend>Assign to groups</legend>
+                <legend>Group assignments</legend>
                 <p className="muted">
-                  Appears in For you for every profile in these groups.
+                  Assignments include nested groups. If deadlines overlap, the
+                  earliest applies.
                 </p>
-                {data.groups.map((g) => (
-                  <label key={g.id} className="checkbox-label">
-                    <input
-                      type="checkbox"
-                      checked={c.groups.includes(g.id)}
-                      onChange={(e) =>
-                        set(
-                          "groups",
-                          e.target.checked
-                            ? [...c.groups, g.id]
-                            : c.groups.filter((x) => x !== g.id),
-                        )
-                      }
-                    />
-                    {g.name}
-                  </label>
-                ))}
+                {data.groups.map((g) => {
+                  const rule = c.assignments?.find((a) => a.groupId === g.id);
+                  const update = (patch: Partial<Assignment>) => {
+                    if (rule)
+                      set(
+                        "assignments",
+                        c.assignments!.map((a) =>
+                          a.groupId === g.id ? { ...a, ...patch } : a,
+                        ),
+                      );
+                  };
+                  return (
+                    <div className="assignment-rule" key={g.id}>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={!!rule}
+                          onChange={(e) => {
+                            const rules = e.target.checked
+                              ? [
+                                  ...(c.assignments || []),
+                                  {
+                                    groupId: g.id,
+                                    assignedAt: new Date().toISOString(),
+                                    due: { type: "none" as const },
+                                  },
+                                ]
+                              : (c.assignments || []).filter(
+                                  (a) => a.groupId !== g.id,
+                                );
+                            setC((prev) => ({
+                              ...prev,
+                              assignments: rules,
+                              groups: rules.map((a) => a.groupId),
+                            }));
+                          }}
+                        />
+                        {g.name}
+                      </label>
+                      {rule && (
+                        <>
+                          <label>
+                            Due date for {g.name}
+                            <select
+                              value={rule.due.type}
+                              onChange={(e) =>
+                                update({
+                                  due:
+                                    e.target.value === "date"
+                                      ? {
+                                          type: "date",
+                                          date: new Date()
+                                            .toISOString()
+                                            .slice(0, 10),
+                                        }
+                                      : e.target.value === "days"
+                                        ? { type: "days", days: 7 }
+                                        : { type: "none" },
+                                })
+                              }
+                            >
+                              <option value="none">No deadline</option>
+                              <option value="date">Specific date</option>
+                              <option value="days">
+                                Days after assignment
+                              </option>
+                            </select>
+                          </label>
+                          {rule.due.type === "date" && (
+                            <input
+                              aria-label={`Deadline for ${g.name}`}
+                              required
+                              type="date"
+                              value={rule.due.date}
+                              onChange={(e) =>
+                                update({
+                                  due: { type: "date", date: e.target.value },
+                                })
+                              }
+                            />
+                          )}{" "}
+                          {rule.due.type === "days" && (
+                            <label>
+                              Days after assignment
+                              <input
+                                required
+                                type="number"
+                                min={1}
+                                max={3650}
+                                value={rule.due.days}
+                                onChange={(e) =>
+                                  update({
+                                    due: {
+                                      type: "days",
+                                      days: Number(e.target.value),
+                                    },
+                                  })
+                                }
+                              />
+                            </label>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </fieldset>
               {existing && (
                 <label className="checkbox-label">
@@ -928,10 +1308,11 @@ function Editor({
             </>
           )}
           <div className="demo-note">
-            <strong>Saved in your browser</strong>
+            <strong>{production ? "Saved to your workspace" : "Saved in your browser"}</strong>
             <p>
-              Published content is visible to demo profiles on this device. It
-              is not shared with other visitors.
+              {production
+                ? "Drafts are visible to administrators. Publish when you are ready to share with readers."
+                : "Published content is visible to demo profiles on this device. It is not shared with other visitors."}
             </p>
           </div>
         </aside>

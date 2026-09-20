@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   BookOpen,
   GraduationCap,
@@ -23,7 +23,14 @@ import {
   Download,
   RotateCcw,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown from "./Markdown";
+import type { FieldbookRuntime } from "@/lib/runtime";
+import { sectionPaths } from "@/lib/navigation";
+import { defaultSettings, privacyHref } from "@/lib/settings";
+import Learning from "./Learning";
+import Feedback from "./Feedback";
+import { TeamProgress } from "./Teams";
+import { videoSource } from "@/lib/video";
 import {
   assignedCourses,
   isComplete,
@@ -40,8 +47,10 @@ import {
 } from "@/lib/store";
 import dynamic from "next/dynamic";
 const Admin = dynamic(() => import("./Admin"));
-type View = "learn" | "docs" | "briefs" | "admin";
-export default function Fieldbook() {
+type View = "learn" | "docs" | "briefs" | "admin" | "team";
+export default function Fieldbook({
+  runtime,
+}: { runtime?: FieldbookRuntime } = {}) {
   const [data, setData] = useState<Workspace | null>(null),
     [uid, setUid] = useState<string | null>(null),
     [view, setView] = useState<View>("learn"),
@@ -52,6 +61,18 @@ export default function Fieldbook() {
     [menu, setMenu] = useState(false),
     [showDemo, setShowDemo] = useState(false);
   useEffect(() => {
+    if (runtime) {
+      runtime
+        .load()
+        .then(({ data, user }) => {
+          setData(data);
+          setUid(user?.id || "guest");
+        })
+        .catch((e) => {
+          setError(e.message);
+        });
+      return;
+    }
     try {
       setData(loadWorkspace());
       setUid(sessionStorage.getItem(SESSION) || "demo-learner");
@@ -61,25 +82,53 @@ export default function Fieldbook() {
   }, []);
   useEffect(() => {
     const onHash = () => {
-      const [v, id] = window.location.hash.slice(1).split("/");
-      if (["learn", "docs", "briefs", "admin"].includes(v)) {
+      let [v, id] = window.location.hash.slice(1).split("/");
+      if (runtime && !window.location.hash) {
+        const parts = window.location.pathname.split("/");
+        v =
+          Object.entries(sectionPaths).find(
+            ([, path]) => path === parts[1],
+          )?.[0] || "learn";
+        id = parts[2];
+      }
+      if (["learn", "docs", "briefs", "admin", "team"].includes(v)) {
         setView(v as View);
         setSelected(id ? decodeURIComponent(id) : null);
       }
     };
     onHash();
     window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
+    window.addEventListener("popstate", onHash);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener("popstate", onHash);
+    };
   }, []);
   function navigate(v: View, id?: string) {
     setView(v);
     setSelected(id || null);
     setSearch("");
     setMenu(false);
-    window.location.hash = v + (id ? "/" + encodeURIComponent(id) : "");
+    if (runtime)
+      window.history.pushState(
+        null,
+        "",
+        `/${sectionPaths[v]}${id ? "/" + encodeURIComponent(id) : ""}`,
+      );
+    else window.location.hash = v + (id ? "/" + encodeURIComponent(id) : "");
     window.scrollTo({ top: 0 });
   }
-  function persist(next: Workspace) {
+  async function persist(next: Workspace) {
+    if (runtime && data) {
+      try {
+        setData(await runtime.save(data, next));
+        setError("");
+      } catch (e) {
+        setError((e as Error).message);
+        throw e;
+      }
+      return;
+    }
     try {
       saveWorkspace(next);
       setData(next);
@@ -96,6 +145,11 @@ export default function Fieldbook() {
     navigate("learn");
   }
   function logout() {
+    if (runtime) {
+      if (uid === "guest") runtime.signIn();
+      else void runtime.signOut();
+      return;
+    }
     sessionStorage.removeItem(SESSION);
     setUid(null);
   }
@@ -126,15 +180,39 @@ export default function Fieldbook() {
       <div className="loading">
         <BookOpen size={32} />
         <h2>{error || "Opening your fieldbook…"}</h2>
-        {error && <button onClick={reset}>Reset demo</button>}
+        {error &&
+          (runtime ? (
+            <>
+              <a className="primary" href="/sign-in">
+                Sign in
+              </a>
+              <button onClick={() => window.location.reload()}>
+                Try again
+              </button>
+            </>
+          ) : (
+            <button onClick={reset}>Reset demo</button>
+          ))}
       </div>
     );
-  const user = data.users.find((u) => u.id === uid && u.active);
+  const user =
+    data.users.find((u) => u.id === uid && u.active) ||
+    (runtime && uid === "guest"
+      ? {
+          id: "guest",
+          name: "Guest",
+          email: "",
+          role: "learner" as const,
+          groups: [],
+          active: true,
+        }
+      : undefined);
+  const branding = { ...defaultSettings, ...data.settings };
   if (!user)
     return (
       <div className="login-page">
         <div className="login-story">
-          <Logo />
+          <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
           <div>
             <span className="eyebrow">A LITTLE CLARITY GOES A LONG WAY</span>
             <h1>
@@ -195,9 +273,11 @@ export default function Fieldbook() {
         </main>
       </div>
     );
-  const visible = data.content.filter((c) => c.status === "published");
+  const visible = (data.publishedContent || data.content).filter(
+    (c) => c.status === "published",
+  );
   const progress = data.progress[user.id] || [];
-  const assigned = assignedCourses(visible, user);
+  const assigned = assignedCourses(visible, user, data.groups);
   const completed = assigned.filter((c) => isComplete(c, progress)).length;
   const pct = assigned.length
     ? Math.round((completed / assigned.length) * 100)
@@ -220,24 +300,28 @@ export default function Fieldbook() {
         ? "Knowledge"
         : view === "briefs"
           ? "Field notes"
-          : "Workspace";
+          : view === "team"
+            ? "Team progress"
+            : "Workspace";
   return (
-    <div className="app">
+    <div
+      className="app"
+      style={
+        {
+          "--accent": branding.accent,
+          "--blue": branding.accent,
+        } as CSSProperties
+      }
+    >
       <aside className={"sidebar " + (menu ? "open" : "")}>
-        <Logo />
-        <div className="workspace-label">
-          <span className="workspace-icon">F</span>
-          <div>
-            Field workspace<small>Your team’s shared playbook</small>
-          </div>
-        </div>
+        <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
         <span className="nav-label">YOUR WORKSPACE</span>
         <nav>
           {(
             [
+              { key: "briefs", title: "Field notes", icon: Newspaper },
               { key: "learn", title: "Learning", icon: GraduationCap },
               { key: "docs", title: "Knowledge", icon: BookOpen },
-              { key: "briefs", title: "Field notes", icon: Newspaper },
             ] as const
           ).map((n) => (
             <button
@@ -268,10 +352,6 @@ export default function Fieldbook() {
           </div>
         )}
         <div className="sidebar-bottom">
-          <div className="quiet-card">
-            <span className="tiny-dot" /> Make space for what matters.
-            <p>Stay curious. Stay current.</p>
-          </div>
           {user.role === "admin" && (
             <button
               className={"admin-nav " + (view === "admin" ? "active" : "")}
@@ -281,16 +361,39 @@ export default function Fieldbook() {
               Manage workspace
             </button>
           )}
+          {(user.role === "manager" ||
+            (data.teams || []).some((t) => t.managerId === user.id)) && (
+            <button className="admin-nav" onClick={() => navigate("team")}>
+              <GraduationCap size={18} />
+              My team’s progress
+            </button>
+          )}
           <button
             className="user-menu"
             onClick={logout}
-            title="Switch demo profile"
+            title={
+              runtime
+                ? uid === "guest"
+                  ? "Sign in"
+                  : "Sign out"
+                : "Switch demo profile"
+            }
           >
             <span className="avatar">{initials(user.name)}</span>
             <span>
-              <strong>{user.name}</strong>
+              <strong>
+                {runtime && uid === "guest" ? "Sign in with Google" : user.name}
+              </strong>
               <small>
-                {user.role === "admin" ? "Administrator" : "Field team"}
+                {user.role === "admin"
+                  ? "Administrator"
+                  : user.role === "manager"
+                    ? "Manager"
+                    : runtime
+                      ? uid === "guest"
+                        ? "Save progress across devices"
+                        : "Learner"
+                      : "Field team"}
               </small>
             </span>
             <LogOut size={16} />
@@ -343,10 +446,12 @@ export default function Fieldbook() {
                 </button>
               )}
             </label>
-            <button className="demo-chip" onClick={() => setShowDemo(true)}>
-              <span />
-              Demo workspace
-            </button>
+            {!runtime && (
+              <button className="demo-chip" onClick={() => setShowDemo(true)}>
+                <span />
+                Demo workspace
+              </button>
+            )}
           </div>
         </header>
         {error && (
@@ -410,7 +515,33 @@ export default function Fieldbook() {
               </div>
             </>
           ) : view === "admin" && user.role === "admin" ? (
-            <Admin data={data} user={user} onChange={persist} />
+            <Admin
+              data={data}
+              user={user}
+              onChange={persist}
+              production={!!runtime}
+              onUpload={runtime?.upload}
+            />
+          ) : view === "admin" && runtime ? (
+            <section className="empty">
+              <h2>Administration requires an authorized account.</h2>
+              <p>
+                Sign in with your administrator account to manage this
+                Fieldbook.
+              </p>
+              <button className="primary" onClick={runtime.signIn}>
+                Sign in with Google
+              </button>
+            </section>
+          ) : view === "team" ? (
+            <>
+              <PageHeading
+                eyebrow="GROW TOGETHER"
+                title="Your team, in focus."
+                description="A shared view of progress and what’s next."
+              />
+              <TeamProgress data={data} user={user} />
+            </>
           ) : selected && !item ? (
             <Empty
               title="This content isn’t available"
@@ -424,6 +555,25 @@ export default function Fieldbook() {
               user={user}
               onChange={persist}
               onBack={() => navigate("learn")}
+              runtime={runtime}
+              onProgress={async (lessonId, answers) => {
+                if (!runtime) return undefined;
+                const r = await runtime.progress(
+                  item,
+                  data.progress[user.id] || [],
+                  lessonId,
+                  answers,
+                );
+                setData((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        progress: { ...prev.progress, [user.id]: r.progress },
+                      }
+                    : prev,
+                );
+                return r.attemptPassed;
+              }}
             />
           ) : item ? (
             <article className="article">
@@ -440,7 +590,7 @@ export default function Fieldbook() {
               <p className="article-lede">{item.summary}</p>
               <div className="article-meta">
                 <span className="avatar small">FB</span>
-                <span>Fieldbook team</span>
+                <span>{branding.name}</span>
                 <span>·</span>
                 <span>Updated {date(item.updatedAt)}</span>
                 <span>·</span>
@@ -449,164 +599,34 @@ export default function Fieldbook() {
               <div className="markdown">
                 <ReactMarkdown>{item.body}</ReactMarkdown>
               </div>
+              {(!runtime || user.id !== "guest") && (
+                <Feedback
+                  key={item.id + user.id}
+                  content={item}
+                  user={user}
+                  data={data}
+                  onChange={persist}
+                />
+              )}
               <div className="article-end">
                 <CheckCircle2 size={18} />
                 You’re at the end. Put it into practice.
               </div>
             </article>
           ) : view === "learn" ? (
-            <>
-              <PageHeading
-                eyebrow="A LITTLE LEARNING. A LOT OF MOMENTUM."
-                title={`Make your next move a great one.`}
-                description="Build your knowledge, sharpen your skills, and stay one step ahead."
-              />
-              <section className="for-you">
-                <div className="section-heading">
-                  <div>
-                    <h2>
-                      For you{" "}
-                      <span className="count-pill">{assigned.length}</span>
-                    </h2>
-                    <p>
-                      Picked for your role. A clear path to staying current.
-                    </p>
-                  </div>
-                  <span className="role-pill">
-                    {data.groups
-                      .filter((g) => user.groups.includes(g.id))
-                      .map((g) => g.name)
-                      .join(" · ") || "No group assigned"}
-                  </span>
-                </div>
-                <div className="assigned-layout">
-                  <div className="current-card">
-                    <div
-                      className="progress-ring"
-                      style={{
-                        background: `conic-gradient(#0069ff ${pct}%, #e4eaf5 0)`,
-                      }}
-                      role="img"
-                      aria-label={`${pct}% current`}
-                    >
-                      <div>
-                        <strong>
-                          {pct}
-                          <small>%</small>
-                        </strong>
-                        <span>current</span>
-                      </div>
-                    </div>
-                    <h3>
-                      {pct === 100
-                        ? "You’re all caught up."
-                        : "Keep your momentum."}
-                    </h3>
-                    <p>
-                      {assigned.length
-                        ? `${completed} of ${assigned.length} assigned courses complete`
-                        : "No courses assigned yet"}
-                    </p>
-                    <span className="current-caption">
-                      <span className="tiny-dot" />
-                      The goal? Stay at 100%.
-                    </span>
-                  </div>
-                  <div className="assigned-courses">
-                    {assigned.map((c) => (
-                      <CourseCard
-                        key={c.id}
-                        course={c}
-                        complete={isComplete(c, progress)}
-                        progress={
-                          progress.find(
-                            (p) =>
-                              p.content_id === c.id && p.version === c.version,
-                          )?.lessons.length || 0
-                        }
-                        onClick={() => navigate("learn", c.id)}
-                      />
-                    ))}
-                    {!assigned.length && (
-                      <Empty
-                        title="Room to explore"
-                        description="Browse the library while you wait for your next assignment."
-                      />
-                    )}
-                  </div>
-                </div>
-              </section>
-              <section className="library">
-                <div className="section-heading">
-                  <div>
-                    <h2>Explore the library</h2>
-                    <p>
-                      Follow your curiosity. There’s always something to
-                      discover.
-                    </p>
-                  </div>
-                  <span className="muted">{courses.length} courses</span>
-                </div>
-                <div className="topic-tabs">
-                  {["All topics", ...topics].map((t) => (
-                    <button
-                      key={t}
-                      className={topic === t ? "selected" : ""}
-                      onClick={() => setTopic(t)}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-                {topics
-                  .filter((t) => topic === "All topics" || topic === t)
-                  .map((t, i) => (
-                    <div className="channel" key={t}>
-                      <div className="channel-title">
-                        <span className={"channel-icon tone-" + i}>
-                          {i === 0 ? (
-                            <Compass size={19} />
-                          ) : i === 1 ? (
-                            <Layers size={19} />
-                          ) : (
-                            <BookOpen size={19} />
-                          )}
-                        </span>
-                        <h3>{t}</h3>
-                        <span>
-                          {courses.filter((c) => c.category === t).length}{" "}
-                          courses
-                        </span>
-                      </div>
-                      <div className="course-grid">
-                        {courses
-                          .filter((c) => c.category === t)
-                          .map((c) => (
-                            <CourseCard
-                              key={c.id}
-                              course={c}
-                              complete={isComplete(c, progress)}
-                              onClick={() => navigate("learn", c.id)}
-                            />
-                          ))}
-                      </div>
-                    </div>
-                  ))}
-              </section>
-              <div className="bottom-callout">
-                <BookOpen size={22} />
-                <div>
-                  <h3>Looking for an answer?</h3>
-                  <p>The knowledge library is your everyday reference.</p>
-                </div>
-                <button
-                  className="text-button"
-                  onClick={() => navigate("docs")}
-                >
-                  Explore knowledge <ArrowRight size={17} />
-                </button>
-              </div>
-            </>
+            <Learning
+              key={user.id}
+              courses={courses}
+              user={user}
+              groups={data.groups}
+              assigned={assigned}
+              progress={progress}
+              onOpen={(id) => navigate("learn", id)}
+              onKnowledge={() => navigate("docs")}
+              publicLearning={!!runtime && assigned.length === 0}
+              guest={!!runtime && uid === "guest"}
+              onSignIn={runtime?.signIn}
+            />
           ) : view === "docs" ? (
             <>
               <PageHeading
@@ -614,27 +634,30 @@ export default function Fieldbook() {
                 title="Your everyday reference."
                 description="A shared source of truth. Built for the conversations that matter."
               />
-              <div
-                className="knowledge-feature"
-                onClick={() => navigate("docs", "start")}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") navigate("docs", "start");
-                }}
-              >
-                <div>
-                  <span className="eyebrow">START HERE</span>
-                  <h2>A good place to begin.</h2>
-                  <p>
-                    Get oriented, find your way, and make this fieldbook yours.
-                  </p>
-                  <span className="text-button">
-                    Open the guide <ArrowRight size={17} />
-                  </span>
+              {docs.some((d) => d.id === "start") && (
+                <div
+                  className="knowledge-feature"
+                  onClick={() => navigate("docs", "start")}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") navigate("docs", "start");
+                  }}
+                >
+                  <div>
+                    <span className="eyebrow">START HERE</span>
+                    <h2>A good place to begin.</h2>
+                    <p>
+                      Get oriented, find your way, and make this fieldbook
+                      yours.
+                    </p>
+                    <span className="text-button">
+                      Open the guide <ArrowRight size={17} />
+                    </span>
+                  </div>
+                  <BookOpen size={76} strokeWidth={1} />
                 </div>
-                <BookOpen size={76} strokeWidth={1} />
-              </div>
+              )}
               <div className="knowledge-grid">
                 {Array.from(new Set(docs.map((d) => d.category))).map((cat) => (
                   <section className="knowledge-section" key={cat}>
@@ -700,8 +723,13 @@ export default function Fieldbook() {
             </>
           )}
           <footer>
-            Fieldbook <span>A shared place to get better.</span>
-            <button onClick={() => setShowDemo(true)}>About this demo</button>
+            {branding.name} <span>{branding.tagline}</span>
+            {privacyHref(branding) && (
+              <a href={privacyHref(branding)!}>Privacy policy</a>
+            )}
+            {!runtime && (
+              <button onClick={() => setShowDemo(true)}>About this demo</button>
+            )}
           </footer>
         </main>
       </div>
@@ -751,13 +779,24 @@ export default function Fieldbook() {
     </div>
   );
 }
-function Logo() {
+function Logo({
+  name = "fieldbook",
+  logoUrl,
+}: {
+  name?: string;
+  logoUrl?: string;
+}) {
   return (
     <div className="logo">
       <span>
-        <BookOpen size={22} strokeWidth={2.3} />
+        {logoUrl ? (
+          <img src={logoUrl} alt="" />
+        ) : (
+          <BookOpen size={22} strokeWidth={2.3} />
+        )}
       </span>
-      fieldbook<span className="logo-period">.</span>
+      {name}
+      <span className="logo-period">.</span>
     </div>
   );
 }
@@ -802,69 +841,20 @@ function Empty({ title, description }: { title: string; description: string }) {
     </div>
   );
 }
-function CourseCard({
-  course: c,
-  complete,
-  progress = 0,
-  onClick,
-}: {
-  course: Content;
-  complete: boolean;
-  progress?: number;
-  onClick: () => void;
-}) {
-  const index = Number(c.id.replace(/\D/g, "")) || 1;
-  return (
-    <button className="course-card" onClick={onClick}>
-      <div className={"course-art art-" + (index % 6)}>
-        <div className="art-grid" />
-        <span className="art-label">{c.category}</span>
-        <div className={"abstract abstract-" + (index % 3)}>
-          <i />
-          <i />
-          <i />
-        </div>
-        <span className="play-disc">
-          <Play size={17} fill="currentColor" />
-        </span>
-        <span className="duration">{c.duration} min</span>
-      </div>
-      <div className="course-copy">
-        <div className="course-meta">
-          {complete ? (
-            <span className="completed">
-              <CheckCircle2 size={13} />
-              Completed
-            </span>
-          ) : progress ? (
-            <span className="in-progress">In progress</span>
-          ) : (
-            <span>{c.lessons.length} lessons · Knowledge check</span>
-          )}
-        </div>
-        <h3>{c.title}</h3>
-        <p>{c.summary}</p>
-        <div className="course-bottom">
-          <span>
-            {complete
-              ? "Review course"
-              : progress
-                ? "Continue learning"
-                : "Start learning"}
-          </span>
-          <ArrowUpRight size={17} />
-        </div>
-      </div>
-    </button>
-  );
-}
-function Course({
+export function Course({
   course: c,
   data,
   user,
   onChange,
   onBack,
+  runtime,
+  onProgress,
 }: {
+  runtime?: FieldbookRuntime;
+  onProgress?: (
+    lessonId?: string,
+    answers?: number[],
+  ) => Promise<boolean | undefined>;
   course: Content;
   data: Workspace;
   user: User;
@@ -873,25 +863,54 @@ function Course({
 }) {
   const [step, setStep] = useState(0),
     [answers, setAnswers] = useState<number[]>([]),
-    [result, setResult] = useState<string | null>(null);
+    [result, setResult] = useState<string | null>(null),
+    [resultPassed, setResultPassed] = useState(false),
+    [busy, setBusy] = useState(false),
+    [saveError, setSaveError] = useState("");
   const p = (data.progress[user.id] || []).find(
     (p) => p.content_id === c.id && p.version === c.version,
   );
   const lesson = c.lessons[step];
+  const video = lesson?.videoUrl ? videoSource(lesson.videoUrl) : null;
   const allDone = c.lessons.every((l) => p?.lessons.includes(l.id));
   const complete = isComplete(c, data.progress[user.id] || []);
-  function mark() {
-    if (lesson) onChange(updateProgress(data, user.id, c, lesson.id));
-    setStep(Math.min(step + 1, c.lessons.length));
+  async function mark() {
+    setBusy(true);
+    setSaveError("");
+    try {
+      if (lesson) {
+        if (runtime) await onProgress?.(lesson.id);
+        else onChange(updateProgress(data, user.id, c, lesson.id));
+      }
+      setStep(Math.min(step + 1, c.lessons.length));
+    } catch (e) {
+      setSaveError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
-  function submit() {
-    const passed = c.questions.every((q, i) => answers[i] === q.answer);
-    onChange(updateProgress(data, user.id, c, undefined, answers));
-    setResult(
-      passed
-        ? "Great work. You’ve completed this course."
-        : "Not quite yet. Revisit the lessons and try again.",
-    );
+  async function submit() {
+    setBusy(true);
+    setSaveError("");
+    try {
+      const passed = runtime
+        ? !!(await onProgress?.(undefined, answers))
+        : c.questions.every((q, i) => answers[i] === q.answer);
+      if (!runtime)
+        onChange(updateProgress(data, user.id, c, undefined, answers));
+      setResultPassed(passed);
+      setResult(
+        passed
+          ? "Great work. You’ve completed this course."
+          : complete
+            ? "This attempt did not pass. Your previous completion is preserved."
+            : "Not quite yet. Revisit the lessons and try again.",
+      );
+    } catch (e) {
+      setSaveError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <div className="course-detail">
@@ -913,6 +932,19 @@ function Course({
           )}
         </div>
       </div>
+      {runtime && user.id === "guest" && (
+        <div className="guest-progress-note">
+          Your progress is saved in this browser.{" "}
+          <button className="text-button" onClick={runtime.signIn}>
+            Sign in to keep it across devices →
+          </button>
+        </div>
+      )}
+      {saveError && (
+        <p className="error" role="alert">
+          {saveError}
+        </p>
+      )}
       <div className="lesson-layout">
         <aside className="lesson-nav">
           <h3>In this course</h3>
@@ -959,16 +991,31 @@ function Course({
                 LESSON {step + 1} OF {c.lessons.length}
               </span>
               <h2>{lesson.title}</h2>
-              {lesson.videoUrl && (
+              {video?.type === "embed" ? (
+                <iframe
+                  className="lesson-video"
+                  key={video.url}
+                  src={video.url}
+                  title={lesson.title + " video"}
+                  allow="fullscreen; picture-in-picture"
+                  allowFullScreen
+                  loading="lazy"
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              ) : video?.type === "file" ? (
                 <video
-                  key={lesson.videoUrl}
+                  key={video.url}
                   controls
                   preload="metadata"
-                  src={lesson.videoUrl}
+                  src={video.url}
                 >
                   Your browser does not support video playback.
                 </video>
-              )}
+              ) : lesson.videoUrl ? (
+                <p className="notice">
+                  This video URL is not supported. Ask an editor to update it.
+                </p>
+              ) : null}
               <div className="markdown">
                 <ReactMarkdown>{lesson.body}</ReactMarkdown>
               </div>
@@ -979,7 +1026,7 @@ function Course({
                     Lesson completed
                   </span>
                 )}
-                <button className="primary" onClick={mark}>
+                <button className="primary" onClick={mark} disabled={busy}>
                   {step === c.lessons.length - 1
                     ? "Continue to knowledge check"
                     : "Complete & continue"}
@@ -1024,7 +1071,10 @@ function Course({
                 </fieldset>
               ))}
               {result && (
-                <div role="status" className={complete ? "success" : "notice"}>
+                <div
+                  role="status"
+                  className={resultPassed ? "success" : "notice"}
+                >
                   {result}
                 </div>
               )}
@@ -1035,6 +1085,7 @@ function Course({
                 <button
                   className="primary"
                   disabled={
+                    busy ||
                     !allDone ||
                     c.questions.some((_, i) => answers[i] === undefined)
                   }
@@ -1044,6 +1095,15 @@ function Course({
                   <Check size={16} />
                 </button>
               </div>
+              {(!runtime || user.id !== "guest") && (
+                <Feedback
+                  key={c.id + user.id}
+                  content={c}
+                  user={user}
+                  data={data}
+                  onChange={onChange}
+                />
+              )}
               {complete && (
                 <button className="text-button" onClick={onBack}>
                   Back to your learning <ArrowRight size={16} />

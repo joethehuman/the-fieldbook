@@ -2298,3 +2298,437 @@ textarea {
 .doc-nav .nested-folder button {
   margin-top: 5px;
 }
+
+/* A single course row stays bounded as the catalog grows. */
+.main-shell,
+.main-content,
+.course-row-wrap {
+  min-width: 0;
+}
+.sidebar .nav-label {
+  margin-top: 28px;
+}
+.learning-assigned {
+  grid-template-columns: 205px minmax(0, 1fr);
+  align-items: start;
+}
+.learning-assigned .current-card {
+  height: 310px;
+}
+.course-row-wrap {
+  position: relative;
+}
+.row-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.row-controls .secondary {
+  padding: 7px;
+}
+.course-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 260px;
+  gap: 16px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x proximity;
+  padding: 4px 2px 14px;
+}
+.course-row > .course-card {
+  scroll-snap-align: start;
+  height: 100%;
+}
+.course-row .course-art {
+  height: 125px;
+}
+.course-row .course-copy {
+  padding: 16px;
+}
+.learning-links,
+.learning-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 18px 0;
+}
+.learning-toolbar .search {
+  width: min(100%, 340px);
+}
+.learning-sort {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #64748b;
+  font-size: 12px;
+}
+.learning-sort select {
+  background: white;
+  border: 1px solid #dce3ee;
+  border-radius: 7px;
+  padding: 9px;
+  color: #26354a;
+}
+.course-row:focus-visible,
+button:focus-visible,
+select:focus-visible {
+  outline: 2px solid #0069ff;
+  outline-offset: 3px;
+}
+@media (max-width: 700px) {
+  .learning-assigned {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .learning-assigned .current-card {
+    height: auto;
+    min-height: 180px;
+  }
+  .course-row {
+    grid-auto-columns: min(260px, 80vw);
+  }
+  .learning-toolbar .search {
+    display: flex;
+  }
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+  margin: 20px 0;
+}
+.filter-bar label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: 12px;
+  color: #526278;
+}
+.filter-bar input,
+.filter-bar select,
+.assignment-rule select,
+.assignment-rule input[type="date"],
+.assignment-rule input[type="number"],
+.knowledge-section select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #dce3ee;
+  border-radius: 7px;
+  background: white;
+  color: #26354a;
+}
+.feedback-box {
+  margin: 30px 0;
+  padding: 24px;
+  border: 1px solid #e1e7f0;
+  border-radius: 12px;
+  background: #fafcff;
+}
+.feedback-box h3 {
+  margin: 0 0 8px;
+}
+.feedback-box p {
+  color: #64748b;
+  margin: 12px 0;
+}
+.feedback-box label {
+  display: block;
+  margin: 15px 0;
+  font-size: 13px;
+}
+.feedback-box textarea {
+  display: block;
+  width: 100%;
+  border: 1px solid #dce3ee;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 8px;
+  font: inherit;
+}
+.feedback-comment {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.report-summary {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 20px;
+  background: #f2f7ff;
+  border-radius: 10px;
+  margin: 20px 0;
+  font-size: 14px;
+}
+.report-course {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid #e1e7f0;
+  font-size: 13px;
+}
+.report-course small {
+  display: block;
+  color: #64748b;
+  margin-top: 6px;
+}
+.assignment-rule {
+  border-bottom: 1px solid #e1e7f0;
+  padding: 12px 0;
+}
+.assignment-rule label {
+  margin-bottom: 10px;
+}
+.deadline {
+  display: block;
+  margin: 8px 0;
+  color: #64748b;
+}
+.deadline.overdue {
+  color: #a44322;
+}
+.lesson-video {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 10px;
+  margin: 20px 0;
+}
+.learning-sort {
+  white-space: nowrap;
+}
+.admin-tabs {
+  flex-wrap: wrap;
+}
+/* Shared production authoring and account surfaces. */
+.markdown-editor {
+  border: 1px solid #dfe4ec;
+  border-radius: 12px;
+  overflow: hidden;
+  margin: 18px 0;
+  background: #fff;
+}
+.markdown-editor-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #edf0f5;
+}
+.markdown-editor-heading label {
+  margin: 0;
+  font-weight: 600;
+}
+.markdown-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-bottom: 1px solid #edf0f5;
+}
+.markdown-toolbar button {
+  border: 0;
+  border-radius: 6px;
+  padding: 8px;
+  color: #475569;
+  background: transparent;
+  display: inline-flex;
+}
+.markdown-toolbar button:hover:not(:disabled) {
+  color: var(--accent, #0069ff);
+  background: #eaf1ff;
+}
+.markdown-toolbar button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.markdown-toolbar select {
+  width: auto;
+  min-width: 120px;
+  padding: 6px;
+  border: 1px solid #dfe4ec;
+  border-radius: 6px;
+  background: white;
+}
+.markdown-editor textarea {
+  border: 0 !important;
+  border-radius: 0 !important;
+  resize: vertical;
+  margin: 0;
+  line-height: 1.7;
+  padding: 18px;
+  width: 100%;
+}
+.markdown-preview {
+  min-height: 280px;
+  padding: 18px;
+}
+.editor-help {
+  display: block;
+  padding: 8px 16px;
+  color: #64748b;
+  border-top: 1px solid #edf0f5;
+  font-size: 12px;
+}
+.markdown-table {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid #dfe4ec;
+  padding: 10px;
+  text-align: left;
+}
+.markdown img,
+.markdown video {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+}
+.settings-panel {
+  max-width: 720px;
+  background: #fff;
+  border: 1px solid #e3e8ee;
+  border-radius: 16px;
+  padding: 28px;
+}
+.settings-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 20px 0;
+}
+.settings-panel input,
+.settings-panel select {
+  padding: 10px;
+  border: 1px solid #dfe4ec;
+  border-radius: 8px;
+}
+.settings-panel input[type="color"] {
+  padding: 3px;
+  height: 42px;
+  width: 70px;
+}
+.branding-preview {
+  max-width: 150px;
+  max-height: 80px;
+  object-fit: contain;
+}
+.logo img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+.auth-card {
+  max-width: 600px;
+  margin: 10vh auto;
+  padding: 36px;
+  background: #fff;
+  border: 1px solid #e3e8ee;
+  border-radius: 20px;
+}
+.auth-card h1 {
+  font-size: 32px;
+  line-height: 1.2;
+  letter-spacing: -1px;
+}
+.auth-card p,
+.auth-card li {
+  line-height: 1.7;
+  color: #586575;
+}
+.auth-card a.primary {
+  display: inline-flex;
+  margin: 20px 0;
+  text-decoration: none;
+}
+.auth-card > a.text-button {
+  display: block;
+}
+.integration-card {
+  border-top: 1px solid #e3e8ee;
+  margin-top: 28px;
+  padding-top: 22px;
+}
+.integration-card code {
+  overflow-wrap: anywhere;
+}
+.guest-progress-note {
+  padding: 14px 18px;
+  border: 1px solid #dce6f4;
+  background: #f3f7ff;
+  border-radius: 10px;
+  margin: 20px 0;
+  font-size: 14px;
+}
+.public-learning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border: 1px solid #dde7ef;
+  border-radius: 16px;
+  padding: 28px;
+  background: linear-gradient(110deg, #f4f8ff, #fff);
+  margin: 20px 0 40px;
+}
+.public-learning h2 {
+  font-size: 25px;
+  margin: 10px 0;
+}
+.public-learning p {
+  margin: 10px 0;
+}
+.app .primary {
+  background: var(--accent, #0069ff);
+}
+.app .text-button,
+.app .logo-period {
+  color: var(--accent, #0069ff);
+}
+@media (max-width: 650px) {
+  .public-learning {
+    flex-direction: column;
+    align-items: start;
+  }
+  .auth-card {
+    margin: 24px 16px;
+    padding: 24px;
+  }
+  .settings-panel {
+    padding: 20px;
+  }
+  .markdown-toolbar {
+    padding: 6px;
+  }
+}
+
+.guest-import {
+  position: relative;
+  z-index: 30;
+  background: #edf4ff;
+  border-bottom: 1px solid #cddff8;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.guest-import p {
+  margin: 0;
+}
