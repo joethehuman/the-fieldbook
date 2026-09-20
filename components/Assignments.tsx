@@ -1,4 +1,7 @@
 "use client";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { Button } from "./ui/button";
+import { SelectField } from "./ui/select";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
 import {
@@ -28,6 +31,7 @@ export function Assignments({
   onOpenGroup?: (id: string) => void;
   onChange?: (data: Workspace) => void | Promise<void>;
 }) {
+  const { confirm } = useInteractionDialog();
   const [selected, setSelected] = useState(
       scope.groupId || data.groups[0]?.id || "",
     ),
@@ -176,8 +180,12 @@ export function Assignments({
                   <div className="assignment-actions">
                     <button
                       disabled={busy || done}
-                      onClick={() => {
-                        if (confirm(`Mark ${c.title} complete for ${u.name}?`))
+                      onClick={async () => {
+                        if (
+                          await confirm(
+                            `Mark ${c.title} complete for ${u.name}?`,
+                          )
+                        )
                           void act({
                             operation: "complete",
                             contentId: c.id,
@@ -192,9 +200,9 @@ export function Assignments({
                     </button>
                     <button
                       disabled={busy || !p}
-                      onClick={() => {
+                      onClick={async () => {
                         if (
-                          confirm(
+                          await confirm(
                             `Reset lessons, quiz attempts and completion for ${u.name} on ${c.title}? Previous state is retained in the audit record.`,
                           )
                         )
@@ -234,10 +242,10 @@ export function Assignments({
       {!person && !scope.groupId && (
         <label>
           Group
-          <select
+          <SelectField
             value={selected}
-            onChange={(e) => {
-              setSelected(e.target.value);
+            onValueChange={(value) => {
+              setSelected(value);
               setDetail(null);
             }}
           >
@@ -246,7 +254,7 @@ export function Assignments({
                 {g.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
       )}
       {!person && group && (
@@ -267,13 +275,13 @@ export function Assignments({
         >
           <label>
             Add required course
-            <select
+            <SelectField
               value={
                 available.some((c) => c.id === courseId)
                   ? courseId
                   : available[0]?.id || ""
               }
-              onChange={(e) => setCourseId(e.target.value)}
+              onValueChange={(value) => setCourseId(value)}
               disabled={!available.length}
             >
               {available.length ? (
@@ -285,11 +293,11 @@ export function Assignments({
               ) : (
                 <option value="">No additional published courses</option>
               )}
-            </select>
+            </SelectField>
           </label>
-          <button className="primary" disabled={busy || !available.length}>
+          <Button variant="default" disabled={busy || !available.length}>
             Add to required learning
-          </button>
+          </Button>
         </form>
       )}
       {!person && !group && (
@@ -394,9 +402,9 @@ export function Assignments({
                             </button>
                             <button
                               disabled={busy}
-                              onClick={() => {
+                              onClick={async () => {
                                 if (
-                                  confirm(
+                                  await confirm(
                                     `Remove ${c.title} from ${group?.name} required learning? Progress and other group requirements are preserved.`,
                                   )
                                 )

@@ -1,4 +1,5 @@
 "use client";
+import { SelectField } from "./ui/select";
 export function OnboardingFields({
   value,
   onChange,
@@ -11,11 +12,11 @@ export function OnboardingFields({
       <legend>Learning stage</legend>
       <label>
         Starting point
-        <select
+        <SelectField
           value={value ? "new" : "existing"}
-          onChange={(e) =>
+          onValueChange={(value) =>
             onChange(
-              e.target.value === "new"
+              value === "new"
                 ? new Date().toISOString().slice(0, 10)
                 : undefined,
             )
@@ -23,7 +24,7 @@ export function OnboardingFields({
         >
           <option value="existing">Existing user — stay current</option>
           <option value="new">New user — onboarding window</option>
-        </select>
+        </SelectField>
       </label>
       {value && (
         <label>

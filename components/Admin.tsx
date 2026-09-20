@@ -1,10 +1,27 @@
 "use client";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { SelectField } from "./ui/select";
 import { Assignments, type LearningHandler } from "./Assignments";
 import { assignmentRules, assignmentKey } from "@/lib/learning";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
 import { PendingPeople } from "./PendingPeople";
 import { useState } from "react";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "./ui/dialog";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "./ui/dropdown-menu";
+
 import {
   Plus,
   X,
@@ -16,6 +33,9 @@ import {
   Trash2,
   ArrowLeft,
   Check,
+  Settings,
+  MessageSquare,
+  MoreHorizontal,
 } from "lucide-react";
 import MarkdownEditor, { type UploadMedia } from "./MarkdownEditor";
 import SiteSettingsPanel from "./SiteSettingsPanel";
@@ -30,6 +50,71 @@ import {
   type Content,
   type User,
 } from "@/lib/types";
+const adminSections = [
+  {
+    label: "Publishing",
+    items: [
+      {
+        id: "content",
+        name: "Content",
+        description: "Create and maintain courses, knowledge, and field notes.",
+        icon: FileText,
+      },
+      {
+        id: "feedback",
+        name: "Feedback",
+        description: "See what readers and learners are telling you.",
+        icon: MessageSquare,
+      },
+    ],
+  },
+  {
+    label: "People & learning",
+    items: [
+      {
+        id: "people",
+        name: "People",
+        description: "Manage accounts, access, and group membership.",
+        icon: Users,
+      },
+      {
+        id: "groups",
+        name: "Groups",
+        description: "Organize the audiences for required learning.",
+        icon: Layers,
+      },
+      {
+        id: "assignments",
+        name: "Required learning",
+        description: "Choose what each group needs to know.",
+        icon: Layers,
+      },
+      {
+        id: "teams",
+        name: "Teams",
+        description: "Organize reporting teams and their managers.",
+        icon: Users,
+      },
+      {
+        id: "progress",
+        name: "Progress",
+        description: "Understand completion across your organization.",
+        icon: BarChart3,
+      },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      {
+        id: "settings",
+        name: "Settings",
+        description: "Manage identity, access, learning windows, and privacy.",
+        icon: Settings,
+      },
+    ],
+  },
+];
 type Props = {
   data: Workspace;
   user: User;
@@ -47,6 +132,7 @@ export default function Admin({
   onUpload,
   onLearning,
 }: Props) {
+  const { confirm, prompt } = useInteractionDialog();
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
     [person, setPerson] = useState<User | null>(null),
@@ -266,681 +352,748 @@ export default function Admin({
   }
   return (
     <>
-      <div className="page-heading">
-        <span className="eyebrow">MAKE IT YOUR TEAM’S</span>
-        <h1>A little order. A lot of clarity.</h1>
-        <p>Keep your content fresh and your team moving forward.</p>
+      <div className="page-heading admin-page-heading">
+        <span className="eyebrow">WORKSPACE</span>
+        <h1>Administration</h1>
+        <p>
+          Content, people, and the settings that keep your workspace running.
+        </p>
       </div>
-      <div className="admin-tabs">
-        {[
-          { id: "content", name: "Content", icon: FileText },
-          {
-            id: "people",
-            name: production ? "People" : "Demo profiles",
-            icon: Users,
-          },
-          { id: "assignments", name: "Required learning", icon: Layers },
-          { id: "groups", name: "Groups", icon: Layers },
-          { id: "teams", name: "Teams", icon: Users },
-          { id: "progress", name: "Progress", icon: BarChart3 },
-          { id: "feedback", name: "Feedback", icon: FileText },
-          { id: "settings", name: "Settings", icon: Layers },
-        ].map((t) => (
-          <button
-            className={tab === t.id ? "selected" : ""}
-            key={t.id}
-            onClick={() => {
-              setTab(t.id);
-              setNotice("");
-              setQuery("");
-            }}
-          >
-            <t.icon size={17} />
-            {t.name}
-          </button>
-        ))}
-      </div>
-      {notice && (
-        <div className="success" role="status">
-          {notice}
-          <button
-            className="icon-button"
-            aria-label="Dismiss message"
-            onClick={() => setNotice("")}
-          >
-            <X size={15} />
-          </button>
-        </div>
-      )}
-      {tab === "settings" ? (
-        <SiteSettingsPanel
-          data={data}
-          onChange={onChange}
-          onUpload={onUpload}
-          production={production}
-        />
-      ) : tab === "feedback" ? (
-        <FeedbackAdmin data={data} />
-      ) : tab === "teams" ? (
-        <TeamsAdmin data={data} onChange={onChange} />
-      ) : tab === "content" ? (
-        <>
-          <div className="admin-toolbar">
-            <div className="topic-tabs">
-              {["all", "doc", "brief", "course"].map((t) => (
-                <button
-                  className={filter === t ? "selected" : ""}
-                  onClick={() => {
-                    setFilter(t);
-                    setCategory("all");
-                  }}
-                  key={t}
+      <Tabs
+        className="admin-layout"
+        orientation="vertical"
+        value={tab}
+        onValueChange={(next) => {
+          setTab(next);
+          setNotice("");
+          setQuery("");
+        }}
+      >
+        <TabsList className="admin-sidebar" aria-label="Administration">
+          {adminSections.map((section) => (
+            <div className="admin-nav-group" key={section.label}>
+              <span className="admin-nav-label">{section.label}</span>
+              {section.items.map((item) => (
+                <TabsTrigger
+                  value={item.id}
+                  key={item.id}
+                  className={tab === item.id ? "selected" : ""}
                 >
-                  {
-                    {
-                      all: "All content",
-                      doc: "Knowledge",
-                      brief: "Field notes",
-                      course: "Courses",
-                    }[t]
-                  }
-                </button>
+                  <item.icon size={16} />
+                  {item.id === "people" && !production
+                    ? "Demo profiles"
+                    : item.name}
+                </TabsTrigger>
               ))}
             </div>
-            <div className="button-group">
-              <button className="secondary" onClick={() => create("doc")}>
-                <Plus size={15} />
-                Article
-              </button>
-              <button className="secondary" onClick={() => create("brief")}>
-                <Plus size={15} />
-                Brief
-              </button>
-              <button className="primary" onClick={() => create("course")}>
-                <Plus size={15} />
-                Course
+          ))}
+        </TabsList>
+        <TabsContent value={tab} className="admin-panel" key={tab}>
+          <div className="admin-panel-heading">
+            <h2>
+              {
+                adminSections.flatMap((s) => s.items).find((s) => s.id === tab)
+                  ?.name
+              }
+            </h2>
+            <p>
+              {
+                adminSections.flatMap((s) => s.items).find((s) => s.id === tab)
+                  ?.description
+              }
+            </p>
+          </div>
+          {notice && (
+            <div className="success" role="status">
+              {notice}
+              <button
+                className="icon-button"
+                aria-label="Dismiss message"
+                onClick={() => setNotice("")}
+              >
+                <X size={15} />
               </button>
             </div>
-          </div>
-          <div className="filter-bar">
-            <label>
-              Search content
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Title, summary, or folder"
-              />
-            </label>
-            <label>
-              Topic / category
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                <option value="all">All topics</option>
-                {[
-                  ...new Set(
-                    data.content
-                      .filter((c) => filter === "all" || c.kind === filter)
-                      .map((c) => c.category),
-                  ),
-                ]
-                  .sort()
-                  .map((t) => (
-                    <option key={t}>{t}</option>
+          )}
+          {tab === "settings" ? (
+            <SiteSettingsPanel
+              data={data}
+              onChange={onChange}
+              onUpload={onUpload}
+              production={production}
+            />
+          ) : tab === "feedback" ? (
+            <FeedbackAdmin data={data} />
+          ) : tab === "teams" ? (
+            <TeamsAdmin data={data} onChange={onChange} />
+          ) : tab === "content" ? (
+            <>
+              <div className="admin-toolbar">
+                <div className="topic-tabs">
+                  {["all", "doc", "brief", "course"].map((t) => (
+                    <button
+                      className={filter === t ? "selected" : ""}
+                      onClick={() => {
+                        setFilter(t);
+                        setCategory("all");
+                      }}
+                      key={t}
+                    >
+                      {
+                        {
+                          all: "All content",
+                          doc: "Knowledge",
+                          brief: "Field notes",
+                          course: "Courses",
+                        }[t]
+                      }
+                    </button>
                   ))}
-              </select>
-            </label>
-            <label>
-              Sort content
-              <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="title">Title A–Z</option>
-                <option value="updated">Recently updated</option>
-                <option value="oldest">Oldest update first</option>
-              </select>
-            </label>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Content</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Version</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {data.content
-                  .filter(
-                    (c) =>
-                      (filter === "all" || c.kind === filter) &&
-                      (category === "all" || c.category === category) &&
-                      `${c.title} ${c.summary} ${c.folder}`
-                        .toLowerCase()
-                        .includes(query.toLowerCase()),
-                  )
-                  .sort((a, b) =>
-                    sort === "title"
-                      ? a.title.localeCompare(b.title)
-                      : sort === "updated"
-                        ? b.updatedAt.localeCompare(a.updatedAt)
-                        : a.updatedAt.localeCompare(b.updatedAt),
-                  )
-                  .map((c) => (
-                    <tr key={c.id}>
-                      <td>
-                        <strong>{c.title}</strong>
-                        <small>
-                          {c.category}
-                          {c.folder ? " / " + c.folder : ""}
-                        </small>
-                      </td>
-                      <td>
-                        {c.kind === "doc"
-                          ? "Article"
-                          : c.kind === "brief"
-                            ? "Brief"
-                            : "Course"}
-                      </td>
-                      <td>
-                        <span className={"status " + c.status}>
-                          {production && c.publishedRevision
-                            ? c.publishedRevision === c.revision
-                              ? "published"
-                              : "published · draft changes"
-                            : c.status}
-                        </span>
-                      </td>
-                      <td>v{c.version}</td>
-                      <td>
-                        <button
-                          className="text-button"
-                          onClick={() => setEditing(structuredClone(c))}
-                        >
-                          Edit
-                        </button>
-
-                        {production && c.publishedRevision && (
-                          <button
-                            className="text-button"
-                            onClick={async () => {
-                              if (
-                                !confirm(
-                                  "Unpublish this item? Its draft and history will be kept.",
-                                )
-                              )
-                                return;
-                              try {
-                                await onChange({
-                                  ...data,
-                                  content: data.content.filter(
-                                    (x) => x.id !== c.id,
-                                  ),
-                                });
-                                setNotice("Content unpublished.");
-                              } catch (e) {
-                                setNotice((e as Error).message);
-                              }
-                            }}
-                          >
-                            Unpublish
-                          </button>
-                        )}
-                      </td>
+                </div>
+                <div className="button-group">
+                  <Button variant="outline" onClick={() => create("doc")}>
+                    <Plus size={15} />
+                    Article
+                  </Button>
+                  <Button variant="outline" onClick={() => create("brief")}>
+                    <Plus size={15} />
+                    Brief
+                  </Button>
+                  <Button variant="default" onClick={() => create("course")}>
+                    <Plus size={15} />
+                    Course
+                  </Button>
+                </div>
+              </div>
+              <div className="filter-bar">
+                <label>
+                  Search content
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Title, summary, or folder"
+                  />
+                </label>
+                <label>
+                  Topic / category
+                  <SelectField
+                    value={category}
+                    onValueChange={(value) => setCategory(value)}
+                  >
+                    <option value="all">All topics</option>
+                    {[
+                      ...new Set(
+                        data.content
+                          .filter((c) => filter === "all" || c.kind === filter)
+                          .map((c) => c.category),
+                      ),
+                    ]
+                      .sort()
+                      .map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                  </SelectField>
+                </label>
+                <label>
+                  Sort content
+                  <SelectField
+                    value={sort}
+                    onValueChange={(value) => setSort(value)}
+                  >
+                    <option value="title">Title A–Z</option>
+                    <option value="updated">Recently updated</option>
+                    <option value="oldest">Oldest update first</option>
+                  </SelectField>
+                </label>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Content</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th>Version</th>
+                      <th />
                     </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : tab === "people" ? (
-        <>
-          <section className="editor-block">
-            <h2>New users</h2>
-            <label>
-              Default learning stage for new users
-              <select
-                value={data.settings?.newUserStage || "existing"}
-                onChange={async (e) => {
+                  </thead>
+                  <tbody>
+                    {data.content
+                      .filter(
+                        (c) =>
+                          (filter === "all" || c.kind === filter) &&
+                          (category === "all" || c.category === category) &&
+                          `${c.title} ${c.summary} ${c.folder}`
+                            .toLowerCase()
+                            .includes(query.toLowerCase()),
+                      )
+                      .sort((a, b) =>
+                        sort === "title"
+                          ? a.title.localeCompare(b.title)
+                          : sort === "updated"
+                            ? b.updatedAt.localeCompare(a.updatedAt)
+                            : a.updatedAt.localeCompare(b.updatedAt),
+                      )
+                      .map((c) => (
+                        <tr key={c.id}>
+                          <td>
+                            <strong>{c.title}</strong>
+                            <small>
+                              {c.category}
+                              {c.folder ? " / " + c.folder : ""}
+                            </small>
+                          </td>
+                          <td>
+                            {c.kind === "doc"
+                              ? "Article"
+                              : c.kind === "brief"
+                                ? "Brief"
+                                : "Course"}
+                          </td>
+                          <td>
+                            <span className={"status " + c.status}>
+                              {production && c.publishedRevision
+                                ? c.publishedRevision === c.revision
+                                  ? "published"
+                                  : "published · draft changes"
+                                : c.status}
+                            </span>
+                          </td>
+                          <td>v{c.version}</td>
+                          <td>
+                            <button
+                              className="text-button"
+                              onClick={() => setEditing(structuredClone(c))}
+                            >
+                              Edit
+                            </button>
+
+                            {production && c.publishedRevision && (
+                              <button
+                                className="text-button"
+                                onClick={async () => {
+                                  if (
+                                    !(await confirm(
+                                      "Unpublish this item? Its draft and history will be kept.",
+                                    ))
+                                  )
+                                    return;
+                                  try {
+                                    await onChange({
+                                      ...data,
+                                      content: data.content.filter(
+                                        (x) => x.id !== c.id,
+                                      ),
+                                    });
+                                    setNotice("Content unpublished.");
+                                  } catch (e) {
+                                    setNotice((e as Error).message);
+                                  }
+                                }}
+                              >
+                                Unpublish
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : tab === "people" ? (
+            <>
+              <section className="editor-block">
+                <h2>New users</h2>
+                <label>
+                  Default learning stage for new users
+                  <SelectField
+                    value={data.settings?.newUserStage || "existing"}
+                    onValueChange={async (value) => {
+                      try {
+                        await onChange({
+                          ...data,
+                          settings: {
+                            ...defaultSettings,
+                            ...data.settings,
+                            newUserStage: value as "existing" | "newhire",
+                          },
+                        });
+                        setNotice(
+                          "Default saved. Existing people are unchanged.",
+                        );
+                      } catch (error) {
+                        setNotice((error as Error).message);
+                      }
+                    }}
+                  >
+                    <option value="existing">
+                      Existing user — stay current
+                    </option>
+                    <option value="newhire">
+                      New user — onboarding window
+                    </option>
+                  </SelectField>
+                </label>
+                <p className="muted">
+                  Applies to newly added users and new self-registrations. You
+                  can override the stage and start date for each person. Group
+                  membership still determines required learning.
+                </p>
+              </section>
+              {production && <PendingPeople data={data} onChange={onChange} />}
+              <div className="admin-toolbar">
+                <p className="muted">
+                  {production
+                    ? "Manage signed-in accounts. Deactivation preserves learning history. Clear managed teams before removing a manager’s access."
+                    : "Sample profiles for trying role-based assignments. No accounts or emails are created."}
+                </p>
+                {!production && (
+                  <Button
+                    variant="default"
+                    onClick={() =>
+                      setPerson({
+                        id: id(),
+                        name: "",
+                        email: "",
+                        role: "learner",
+                        onboardingStart:
+                          data.settings?.newUserStage === "newhire"
+                            ? new Date().toISOString().slice(0, 10)
+                            : undefined,
+                        groups: [],
+                        active: true,
+                      })
+                    }
+                  >
+                    <Plus size={16} />
+                    Add demo profile
+                  </Button>
+                )}
+              </div>
+              <div className="filter-bar">
+                <label>
+                  Search profiles
+                  <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Name or email"
+                  />
+                </label>
+                <label>
+                  Role
+                  <SelectField
+                    value={peopleRole}
+                    onValueChange={(value) => setPeopleRole(value)}
+                  >
+                    <option value="all">All roles</option>
+                    <option value="learner">Learner</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Admin</option>
+                  </SelectField>
+                </label>
+                <label>
+                  Group
+                  <SelectField
+                    value={peopleGroup}
+                    onValueChange={(value) => setPeopleGroup(value)}
+                  >
+                    <option value="all">All groups</option>
+                    {data.groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                </label>
+                <label>
+                  Profile status
+                  <SelectField
+                    value={peopleStatus}
+                    onValueChange={(value) => setPeopleStatus(value)}
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </SelectField>
+                </label>
+                <label>
+                  Sort profiles
+                  <SelectField
+                    value={sort}
+                    onValueChange={(value) => setSort(value)}
+                  >
+                    <option value="title">Name A–Z</option>
+                    <option value="reverse">Name Z–A</option>
+                  </SelectField>
+                </label>
+              </div>
+              <div className="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Access</th>
+                      <th>Groups</th>
+                      <th>Status</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.users
+                      .filter(
+                        (u) =>
+                          `${u.name} ${u.email}`
+                            .toLowerCase()
+                            .includes(query.toLowerCase()) &&
+                          (peopleRole === "all" || u.role === peopleRole) &&
+                          (peopleGroup === "all" ||
+                            u.groups.includes(peopleGroup)) &&
+                          (peopleStatus === "all" ||
+                            u.active === (peopleStatus === "active")),
+                      )
+                      .sort((a, b) =>
+                        sort === "reverse"
+                          ? b.name.localeCompare(a.name)
+                          : a.name.localeCompare(b.name),
+                      )
+                      .map((u) => (
+                        <tr key={u.id}>
+                          <td>
+                            <strong>{u.name}</strong>
+                            <small>{u.email}</small>
+                          </td>
+                          <td>{u.role}</td>
+                          <td>
+                            {data.groups
+                              .filter((g) => u.groups.includes(g.id))
+                              .map((g) => g.name)
+                              .join(", ") || "No groups"}
+                          </td>
+                          <td>{u.active ? "Active" : "Inactive"}</td>
+                          <td>
+                            <button
+                              className="text-button"
+                              onClick={() => setPerson(structuredClone(u))}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="text-button"
+                              onClick={() => setDetailScope({ userId: u.id })}
+                            >
+                              Learning & progress
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : tab === "assignments" ? (
+            <Assignments
+              data={data}
+              onAction={manageLearning}
+              onChange={onChange}
+              onOpenGroup={(groupId) => setDetailScope({ groupId })}
+            />
+          ) : tab === "groups" ? (
+            <>
+              <form
+                className="group-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const name = groupName.trim();
+                  if (!name) return;
+                  if (
+                    data.groups.some(
+                      (g) => g.name.toLowerCase() === name.toLowerCase(),
+                    )
+                  ) {
+                    setNotice("That group already exists.");
+                    return;
+                  }
                   try {
                     await onChange({
                       ...data,
-                      settings: {
-                        ...defaultSettings,
-                        ...data.settings,
-                        newUserStage: e.target.value as "existing" | "newhire",
-                      },
+                      groups: [
+                        ...data.groups,
+                        { id: id(), name, parentId: groupParent || undefined },
+                      ],
                     });
-                    setNotice("Default saved. Existing people are unchanged.");
-                  } catch (error) {
-                    setNotice((error as Error).message);
+                    setGroupName("");
+                    setNotice(
+                      "Group added. Assign profiles and courses to this group.",
+                    );
+                  } catch (e) {
+                    setNotice((e as Error).message);
                   }
                 }}
               >
-                <option value="existing">Existing user — stay current</option>
-                <option value="newhire">New user — onboarding window</option>
-              </select>
-            </label>
-            <p className="muted">
-              Applies to newly added users and new self-registrations. You can
-              override the stage and start date for each person. Group
-              membership still determines required learning.
-            </p>
-          </section>
-          {production && <PendingPeople data={data} onChange={onChange} />}
-          <div className="admin-toolbar">
-            <p className="muted">
-              {production
-                ? "Manage signed-in accounts. Deactivation preserves learning history. Clear managed teams before removing a manager’s access."
-                : "Sample profiles for trying role-based assignments. No accounts or emails are created."}
-            </p>
-            {!production && (
-              <button
-                className="primary"
-                onClick={() =>
-                  setPerson({
-                    id: id(),
-                    name: "",
-                    email: "",
-                    role: "learner",
-                    onboardingStart:
-                      data.settings?.newUserStage === "newhire"
-                        ? new Date().toISOString().slice(0, 10)
-                        : undefined,
-                    groups: [],
-                    active: true,
-                  })
-                }
-              >
-                <Plus size={16} />
-                Add demo profile
-              </button>
-            )}
-          </div>
-          <div className="filter-bar">
-            <label>
-              Search profiles
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Name or email"
-              />
-            </label>
-            <label>
-              Role
-              <select
-                value={peopleRole}
-                onChange={(e) => setPeopleRole(e.target.value)}
-              >
-                <option value="all">All roles</option>
-                <option value="learner">Learner</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
-              </select>
-            </label>
-            <label>
-              Group
-              <select
-                value={peopleGroup}
-                onChange={(e) => setPeopleGroup(e.target.value)}
-              >
-                <option value="all">All groups</option>
-                {data.groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Profile status
-              <select
-                value={peopleStatus}
-                onChange={(e) => setPeopleStatus(e.target.value)}
-              >
-                <option value="all">All statuses</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </label>
-            <label>
-              Sort profiles
-              <select value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="title">Name A–Z</option>
-                <option value="reverse">Name Z–A</option>
-              </select>
-            </label>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Access</th>
-                  <th>Groups</th>
-                  <th>Status</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {data.users
-                  .filter(
-                    (u) =>
-                      `${u.name} ${u.email}`
-                        .toLowerCase()
-                        .includes(query.toLowerCase()) &&
-                      (peopleRole === "all" || u.role === peopleRole) &&
-                      (peopleGroup === "all" ||
-                        u.groups.includes(peopleGroup)) &&
-                      (peopleStatus === "all" ||
-                        u.active === (peopleStatus === "active")),
-                  )
-                  .sort((a, b) =>
-                    sort === "reverse"
-                      ? b.name.localeCompare(a.name)
-                      : a.name.localeCompare(b.name),
-                  )
-                  .map((u) => (
-                    <tr key={u.id}>
-                      <td>
-                        <strong>{u.name}</strong>
-                        <small>{u.email}</small>
-                      </td>
-                      <td>{u.role}</td>
-                      <td>
-                        {data.groups
-                          .filter((g) => u.groups.includes(g.id))
-                          .map((g) => g.name)
-                          .join(", ") || "No groups"}
-                      </td>
-                      <td>{u.active ? "Active" : "Inactive"}</td>
-                      <td>
-                        <button
-                          className="text-button"
-                          onClick={() => setPerson(structuredClone(u))}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="text-button"
-                          onClick={() => setDetailScope({ userId: u.id })}
-                        >
-                          Learning & progress
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      ) : tab === "assignments" ? (
-        <Assignments
-          data={data}
-          onAction={manageLearning}
-          onChange={onChange}
-          onOpenGroup={(groupId) => setDetailScope({ groupId })}
-        />
-      ) : tab === "groups" ? (
-        <>
-          <form
-            className="group-form"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const name = groupName.trim();
-              if (!name) return;
-              if (
-                data.groups.some(
-                  (g) => g.name.toLowerCase() === name.toLowerCase(),
-                )
-              ) {
-                setNotice("That group already exists.");
-                return;
-              }
-              try {
-                await onChange({
-                  ...data,
-                  groups: [
-                    ...data.groups,
-                    { id: id(), name, parentId: groupParent || undefined },
-                  ],
-                });
-                setGroupName("");
-                setNotice(
-                  "Group added. Assign profiles and courses to this group.",
-                );
-              } catch (e) {
-                setNotice((e as Error).message);
-              }
-            }}
-          >
-            <label>
-              New group name
-              <input
-                required
-                maxLength={80}
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-                placeholder="e.g. Customer success"
-              />
-            </label>
-            <label>
-              Parent group
-              <select
-                value={groupParent}
-                onChange={(e) => setGroupParent(e.target.value)}
-              >
-                <option value="">Top-level group</option>
-                {data.groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <button className="primary">
-              <Plus size={16} />
-              Create group
-            </button>
-          </form>
-          <div className="knowledge-grid">
-            {data.groups.map((g) => (
-              <section className="knowledge-section" key={g.id}>
-                <Layers />
-                <h2>{g.name}</h2>
+                <label>
+                  New group name
+                  <input
+                    required
+                    maxLength={80}
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    placeholder="e.g. Customer success"
+                  />
+                </label>
                 <label>
                   Parent group
-                  <select
-                    value={g.parentId || ""}
-                    onChange={(e) =>
-                      Promise.resolve(
-                        onChange({
-                          ...data,
-                          groups: data.groups.map((x) =>
-                            x.id === g.id
-                              ? { ...x, parentId: e.target.value || undefined }
-                              : x,
-                          ),
-                        }),
-                      ).catch((e) => setNotice(e.message))
-                    }
+                  <SelectField
+                    value={groupParent}
+                    onValueChange={(value) => setGroupParent(value)}
                   >
                     <option value="">Top-level group</option>
-                    {data.groups
-                      .filter((x) => canParent(g.id, x.id, data.groups))
-                      .map((x) => (
-                        <option key={x.id} value={x.id}>
-                          {x.name}
-                        </option>
-                      ))}
-                  </select>
+                    {data.groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </SelectField>
                 </label>
-                <small>
-                  Members inherit required learning from parent groups.
-                </small>
-                <p>
-                  {data.users.filter((u) => u.groups.includes(g.id)).length}{" "}
-                  profiles ·{" "}
-                  {
-                    data.content.filter(
-                      (c) =>
-                        c.kind === "course" &&
-                        c.groups.includes(g.id) &&
-                        c.status === "published",
-                    ).length
-                  }{" "}
-                  required courses
-                </p>
-                <button
-                  className="primary"
-                  onClick={() => setDetailScope({ groupId: g.id })}
-                >
-                  Manage group
-                </button>
-                <button
-                  onClick={() => {
-                    const name = prompt("Group name", g.name)?.trim();
-                    if (
-                      name &&
-                      !data.groups.some(
-                        (x) =>
-                          x.id !== g.id &&
-                          x.name.toLowerCase() === name.toLowerCase(),
-                      )
-                    )
-                      Promise.resolve(
-                        onChange({
-                          ...data,
-                          groups: data.groups.map((x) =>
-                            x.id === g.id ? { ...x, name } : x,
-                          ),
-                        }),
-                      ).catch((e) => setNotice(e.message));
-                  }}
-                >
-                  Rename group
-                </button>
-              </section>
-            ))}
-          </div>
-        </>
-      ) : (
-        <TeamProgress data={data} user={user} />
-      )}
-      {person && (
-        <div className="modal-backdrop">
-          <form className="modal" onSubmit={savePerson}>
-            <button
-              type="button"
-              className="modal-close icon-button"
-              aria-label="Close profile editor"
-              onClick={() => setPerson(null)}
-            >
-              <X />
-            </button>
-            <h2>{production ? "Account" : "Demo profile"}</h2>
-            <p className="muted">
-              {production
-                ? "Changes apply to this verified account. Login email is read-only."
-                : "Use fictional details. This does not create a secure account."}
-            </p>
-            <label>
-              Name
-              <input
-                required
-                maxLength={80}
-                value={person.name}
-                onChange={(e) => setPerson({ ...person, name: e.target.value })}
-              />
-            </label>
-            <label>
-              {production ? "Login email" : "Email label"}
-              <input
-                type="email"
-                required
-                disabled={production}
-                value={person.email}
-                onChange={(e) =>
-                  setPerson({ ...person, email: e.target.value })
-                }
-              />
-            </label>
-            <OnboardingFields
-              value={person.onboardingStart}
-              onChange={(onboardingStart) =>
-                setPerson({ ...person, onboardingStart })
-              }
-            />
-            <label>
-              Access
-              <select
-                disabled={person.id === user.id}
-                value={person.role}
-                onChange={(e) =>
-                  setPerson({ ...person, role: e.target.value as User["role"] })
-                }
-              >
-                <option value="learner">Learner</option>
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-              </select>
-            </label>
-            <label>
-              Reporting team
-              <select
-                value={person.teamId || ""}
-                onChange={(e) =>
-                  setPerson({ ...person, teamId: e.target.value || undefined })
-                }
-              >
-                <option value="">No team</option>
-                {(data.teams || []).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
+                <Button variant="default">
+                  <Plus size={16} />
+                  Create group
+                </Button>
+              </form>
+              <div className="group-grid">
+                {data.groups.map((g) => (
+                  <section className="group-card" key={g.id}>
+                    <Layers />
+                    <h2>{g.name}</h2>
+                    <label>
+                      Parent group
+                      <SelectField
+                        value={g.parentId || ""}
+                        onValueChange={(value) =>
+                          Promise.resolve(
+                            onChange({
+                              ...data,
+                              groups: data.groups.map((x) =>
+                                x.id === g.id
+                                  ? { ...x, parentId: value || undefined }
+                                  : x,
+                              ),
+                            }),
+                          ).catch((e) => setNotice(e.message))
+                        }
+                      >
+                        <option value="">Top-level group</option>
+                        {data.groups
+                          .filter((x) => canParent(g.id, x.id, data.groups))
+                          .map((x) => (
+                            <option key={x.id} value={x.id}>
+                              {x.name}
+                            </option>
+                          ))}
+                      </SelectField>
+                    </label>
+                    <small>
+                      Members inherit required learning from parent groups.
+                    </small>
+                    <p>
+                      {data.users.filter((u) => u.groups.includes(g.id)).length}{" "}
+                      profiles ·{" "}
+                      {
+                        data.content.filter(
+                          (c) =>
+                            c.kind === "course" &&
+                            c.groups.includes(g.id) &&
+                            c.status === "published",
+                        ).length
+                      }{" "}
+                      required courses
+                    </p>
+                    <div className="group-card-actions">
+                      <Button
+                        variant="outline"
+
+                        onClick={() => setDetailScope({ groupId: g.id })}
+                      >
+                        Manage group
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label={`Actions for ${g.name}`}
+                          >
+                            <MoreHorizontal size={16} />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onSelect={async () => {
+                              // Let the menu close and restore trigger focus before opening a dialog.
+                              await new Promise<void>((resolve) =>
+                                setTimeout(resolve, 0),
+                              );
+                              const name = (
+                                await prompt("Group name", g.name)
+                              )?.trim();
+                              if (
+                                name &&
+                                !data.groups.some(
+                                  (x) =>
+                                    x.id !== g.id &&
+                                    x.name.toLowerCase() === name.toLowerCase(),
+                                )
+                              )
+                                Promise.resolve(
+                                  onChange({
+                                    ...data,
+                                    groups: data.groups.map((x) =>
+                                      x.id === g.id ? { ...x, name } : x,
+                                    ),
+                                  }),
+                                ).catch((e) => setNotice(e.message));
+                            }}
+                          >
+                            Rename group
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </section>
                 ))}
-              </select>
-            </label>
-            <fieldset>
-              <legend>Groups</legend>
-              {data.groups.map((g) => (
-                <label className="checkbox-label" key={g.id}>
-                  <input
-                    type="checkbox"
-                    checked={person.groups.includes(g.id)}
-                    onChange={(e) =>
-                      setPerson({
-                        ...person,
-                        groups: e.target.checked
-                          ? [...person.groups, g.id]
-                          : person.groups.filter((x) => x !== g.id),
-                      })
-                    }
-                  />
-                  {g.name}
-                </label>
-              ))}
-            </fieldset>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                disabled={person.id === user.id}
-                checked={person.active}
-                onChange={(e) =>
-                  setPerson({ ...person, active: e.target.checked })
+              </div>
+            </>
+          ) : (
+            <TeamProgress data={data} user={user} />
+          )}
+        </TabsContent>
+      </Tabs>
+      <Dialog
+        open={!!person}
+        onOpenChange={(open) => {
+          if (!open) setPerson(null);
+        }}
+      >
+        {person && (
+          <DialogContent className="profile-dialog">
+            <form className="profile-form" onSubmit={savePerson}>
+              <button
+                type="button"
+                className="modal-close icon-button"
+                aria-label="Close profile editor"
+                onClick={() => setPerson(null)}
+              >
+                <X />
+              </button>
+              <DialogTitle className="ui-dialog-title">
+                {production ? "Account" : "Demo profile"}
+              </DialogTitle>
+              <DialogDescription className="ui-dialog-description">
+                {production
+                  ? "Changes apply to this verified account. Login email is read-only."
+                  : "Use fictional details. This does not create a secure account."}
+              </DialogDescription>
+              <label>
+                Name
+                <input
+                  required
+                  maxLength={80}
+                  value={person.name}
+                  onChange={(e) =>
+                    setPerson({ ...person, name: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                {production ? "Login email" : "Email label"}
+                <input
+                  type="email"
+                  required
+                  disabled={production}
+                  value={person.email}
+                  onChange={(e) =>
+                    setPerson({ ...person, email: e.target.value })
+                  }
+                />
+              </label>
+              <OnboardingFields
+                value={person.onboardingStart}
+                onChange={(onboardingStart) =>
+                  setPerson({ ...person, onboardingStart })
                 }
               />
-              Active profile
-            </label>
-            <button className="primary">
-              <Save size={16} />
-              Save profile
-            </button>
-          </form>
-        </div>
-      )}
+              <label>
+                Access
+                <SelectField
+                  disabled={person.id === user.id}
+                  value={person.role}
+                  onValueChange={(value) =>
+                    setPerson({ ...person, role: value as User["role"] })
+                  }
+                >
+                  <option value="learner">Learner</option>
+                  <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                </SelectField>
+              </label>
+              <label>
+                Reporting team
+                <SelectField
+                  value={person.teamId || ""}
+                  onValueChange={(value) =>
+                    setPerson({ ...person, teamId: value || undefined })
+                  }
+                >
+                  <option value="">No team</option>
+                  {(data.teams || []).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </SelectField>
+              </label>
+              <fieldset>
+                <legend>Groups</legend>
+                {data.groups.map((g) => (
+                  <label className="checkbox-label" key={g.id}>
+                    <input
+                      type="checkbox"
+                      checked={person.groups.includes(g.id)}
+                      onChange={(e) =>
+                        setPerson({
+                          ...person,
+                          groups: e.target.checked
+                            ? [...person.groups, g.id]
+                            : person.groups.filter((x) => x !== g.id),
+                        })
+                      }
+                    />
+                    {g.name}
+                  </label>
+                ))}
+              </fieldset>
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  disabled={person.id === user.id}
+                  checked={person.active}
+                  onChange={(e) =>
+                    setPerson({ ...person, active: e.target.checked })
+                  }
+                />
+                Active profile
+              </label>
+              <Button variant="default">
+                <Save size={16} />
+                Save profile
+              </Button>
+            </form>
+          </DialogContent>
+        )}
+      </Dialog>
     </>
   );
 }
@@ -1062,10 +1215,10 @@ export function Editor({
           </span>
           <h1>{existing ? c.title : "Something worth sharing."}</h1>
         </div>
-        <button className="primary" disabled={saving}>
+        <Button variant="default" disabled={saving}>
           <Save size={16} />
           Save {c.status === "published" ? "& publish" : "draft"}
-        </button>
+        </Button>
       </div>
       {error && <div className="error">{error}</div>}
       <div className="editor-layout">
@@ -1102,9 +1255,9 @@ export function Editor({
             <>
               <div className="section-heading">
                 <h2>Lessons</h2>
-                <button
+                <Button
                   type="button"
-                  className="secondary"
+                  variant="outline"
                   onClick={() =>
                     set("lessons", [
                       ...c.lessons,
@@ -1114,7 +1267,7 @@ export function Editor({
                 >
                   <Plus size={16} />
                   Add lesson
-                </button>
+                </Button>
               </div>
               {c.lessons.map((l, i) => (
                 <section className="editor-block" key={l.id}>
@@ -1230,9 +1383,9 @@ export function Editor({
               ))}
               <div className="section-heading">
                 <h2>Knowledge check</h2>
-                <button
+                <Button
                   type="button"
-                  className="secondary"
+                  variant="outline"
                   onClick={() =>
                     set("questions", [
                       ...c.questions,
@@ -1247,7 +1400,7 @@ export function Editor({
                 >
                   <Plus size={16} />
                   Add question
-                </button>
+                </Button>
               </div>
               <p className="muted">
                 Learners must answer every question correctly. Unlimited
@@ -1344,13 +1497,13 @@ export function Editor({
           )}
           <label>
             Status
-            <select
+            <SelectField
               value={c.status}
-              onChange={(e) => set("status", e.target.value)}
+              onValueChange={(value) => set("status", value)}
             >
               <option value="draft">Draft</option>
               <option value="published">Published</option>
-            </select>
+            </SelectField>
           </label>
           <label>
             {c.kind === "course" ? "Topic / channel" : "Category"}

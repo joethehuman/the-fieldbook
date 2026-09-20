@@ -1,4 +1,5 @@
 "use client";
+import { SelectField } from "./ui/select";
 import { useId, useRef, useState } from "react";
 import {
   Bold,
@@ -91,19 +92,19 @@ export default function MarkdownEditor({
         role="toolbar"
         aria-label={`${label} formatting`}
       >
-        <select
+        <SelectField
           aria-label="Heading level"
           value=""
           disabled={preview || busy}
-          onChange={(e) => {
-            if (e.target.value) insert(`\n${e.target.value} `, "\n", "Heading");
+          onValueChange={(value) => {
+            if (value) insert(`\n${value} `, "\n", "Heading");
           }}
         >
           <option value="">Heading</option>
           <option value="#">Heading 1</option>
           <option value="##">Heading 2</option>
           <option value="###">Heading 3</option>
-        </select>
+        </SelectField>
         {(
           [
             ["Bold", Bold, "**", "**", "bold text"],

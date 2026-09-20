@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "./ui/button";
+import { SelectField } from "./ui/select";
 import { OnboardingFields } from "./OnboardingFields";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
@@ -38,8 +40,8 @@ export function PendingPeople({
         Pre-register a Google email. The person claims this account on verified
         sign-in, including when registration is closed. No email is sent.
       </p>
-      <button
-        className="secondary"
+      <Button
+        variant="outline"
         disabled={busy}
         onClick={() =>
           setEditing({
@@ -55,7 +57,7 @@ export function PendingPeople({
         }
       >
         Pre-register account
-      </button>
+      </Button>
       {error && <p role="alert">{error}</p>}
       {(data.pendingUsers || []).map((p) => (
         <div className="report-course" key={p.email}>
@@ -119,26 +121,26 @@ export function PendingPeople({
           />
           <label>
             Role
-            <select
+            <SelectField
               value={editing.role}
-              onChange={(e) =>
+              onValueChange={(value) =>
                 setEditing({
                   ...editing,
-                  role: e.target.value as Pending["role"],
+                  role: value as Pending["role"],
                 })
               }
             >
               <option value="learner">Learner</option>
               <option value="manager">Manager</option>
               <option value="admin">Administrator</option>
-            </select>
+            </SelectField>
           </label>
           <label>
             Reporting team
-            <select
+            <SelectField
               value={editing.teamId || ""}
-              onChange={(e) =>
-                setEditing({ ...editing, teamId: e.target.value || undefined })
+              onValueChange={(value) =>
+                setEditing({ ...editing, teamId: value || undefined })
               }
             >
               <option value="">No team</option>
@@ -147,7 +149,7 @@ export function PendingPeople({
                   {t.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
           <fieldset>
             <legend>Assignment groups</legend>
@@ -169,9 +171,9 @@ export function PendingPeople({
               </label>
             ))}
           </fieldset>
-          <button className="primary" disabled={busy}>
+          <Button variant="default" disabled={busy}>
             {busy ? "Saving…" : "Save pending account"}
-          </button>
+          </Button>
           <button
             className="text-button"
             type="button"

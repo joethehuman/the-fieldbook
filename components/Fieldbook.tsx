@@ -1,4 +1,12 @@
 "use client";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "./ui/dialog";
 import { useEffect, useState, type CSSProperties } from "react";
 import {
   BookOpen,
@@ -51,6 +59,7 @@ type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook({
   runtime,
 }: { runtime?: FieldbookRuntime } = {}) {
+  const { confirm } = useInteractionDialog();
   const [data, setData] = useState<Workspace | null>(null),
     [uid, setUid] = useState<string | null>(null),
     [view, setView] = useState<View>("learn"),
@@ -153,9 +162,11 @@ export default function Fieldbook({
     sessionStorage.removeItem(SESSION);
     setUid(null);
   }
-  function reset() {
+  async function reset() {
     if (
-      confirm("Reset this browser’s sample content, profiles, and progress?")
+      await confirm(
+        "Reset this browser’s sample content, profiles, and progress?",
+      )
     ) {
       const next = freshWorkspace();
       persist(next);
@@ -302,7 +313,7 @@ export default function Fieldbook({
           ? "Field notes"
           : view === "team"
             ? "Team progress"
-            : "Workspace";
+            : "Administration";
   return (
     <div
       className="app"
@@ -313,6 +324,16 @@ export default function Fieldbook({
         } as CSSProperties
       }
     >
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >
+        Skip to content
+      </a>
       <aside className={"sidebar " + (menu ? "open" : "")}>
         <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
         <span className="nav-label">YOUR WORKSPACE</span>
@@ -363,7 +384,10 @@ export default function Fieldbook({
           )}
           {(user.role === "manager" ||
             (data.teams || []).some((t) => t.managerId === user.id)) && (
-            <button className="admin-nav" onClick={() => navigate("team")}>
+            <button
+              className={"admin-nav " + (view === "team" ? "active" : "")}
+              onClick={() => navigate("team")}
+            >
               <GraduationCap size={18} />
               My team’s progress
             </button>
@@ -459,7 +483,7 @@ export default function Fieldbook({
             {error}
           </div>
         )}
-        <main className="main-content">
+        <main id="main-content" className="main-content" tabIndex={-1}>
           {query ? (
             <>
               <PageHeading
@@ -536,15 +560,15 @@ export default function Fieldbook({
                 Sign in with your administrator account to manage this
                 Fieldbook.
               </p>
-              <button className="primary" onClick={runtime.signIn}>
+              <Button variant="default" onClick={runtime.signIn}>
                 Sign in with Google
-              </button>
+              </Button>
             </section>
           ) : view === "team" ? (
             <>
               <PageHeading
                 eyebrow="GROW TOGETHER"
-                title="Your team, in focus."
+                title="Team progress"
                 description="A shared view of progress and what’s next."
               />
               <TeamProgress data={data} user={user} />
@@ -639,7 +663,7 @@ export default function Fieldbook({
             <>
               <PageHeading
                 eyebrow="THE KNOWLEDGE THAT GOES WITH YOU"
-                title="Your everyday reference."
+                title="Knowledge"
                 description="A shared source of truth. Built for the conversations that matter."
               />
               {docs.some((d) => d.id === "start") && (
@@ -693,7 +717,7 @@ export default function Fieldbook({
             <>
               <PageHeading
                 eyebrow="LESS NOISE. MORE SIGNAL."
-                title="Notes from the field."
+                title="Field notes"
                 description="The latest updates, launch briefs, and ideas worth sharing."
               />
               <div className="brief-list">
@@ -741,49 +765,37 @@ export default function Fieldbook({
           </footer>
         </main>
       </div>
-      {showDemo && (
-        <div className="modal-backdrop" onClick={() => setShowDemo(false)}>
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="About this demo"
-            onClick={(e) => e.stopPropagation()}
+      <Dialog open={showDemo} onOpenChange={setShowDemo}>
+        <DialogContent className="demo-dialog">
+          <button
+            className="modal-close icon-button"
+            onClick={() => setShowDemo(false)}
+            aria-label="Close"
           >
-            <button
-              className="modal-close icon-button"
-              onClick={() => setShowDemo(false)}
-              aria-label="Close"
-            >
-              <X />
-            </button>
-            <span className="eyebrow">YOUR DEMO WORKSPACE</span>
-            <h2>
-              A small prototype.
-              <br />A big starting point.
-            </h2>
-            <p>
-              This Next.js demo runs entirely in your browser. Content,
-              profiles, assignments, and progress are saved here, on this
-              device.
-            </p>
-            <p>
-              Profiles simulate login and roles; they are not secure accounts.
-              Don’t enter private information. Nothing is synced to a server.
-            </p>
-            <div className="modal-actions">
-              <button className="secondary" onClick={exportData}>
-                <Download size={16} />
-                Export demo data
-              </button>
-              <button className="secondary" onClick={reset}>
-                <RotateCcw size={16} />
-                Reset sample data
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+            <X />
+          </button>
+          <span className="eyebrow">YOUR DEMO WORKSPACE</span>
+          <DialogTitle className="ui-dialog-title">About this demo</DialogTitle>
+          <DialogDescription className="ui-dialog-description">
+            This Next.js demo runs entirely in your browser. Content, profiles,
+            assignments, and progress are saved here, on this device.
+          </DialogDescription>
+          <p>
+            Profiles simulate login and roles; they are not secure accounts.
+            Don’t enter private information. Nothing is synced to a server.
+          </p>
+          <div className="modal-actions">
+            <Button variant="outline" onClick={exportData}>
+              <Download size={16} />
+              Export demo data
+            </Button>
+            <Button variant="outline" onClick={reset}>
+              <RotateCcw size={16} />
+              Reset sample data
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1034,12 +1046,12 @@ export function Course({
                     Lesson completed
                   </span>
                 )}
-                <button className="primary" onClick={mark} disabled={busy}>
+                <Button variant="default" onClick={mark} disabled={busy}>
                   {step === c.lessons.length - 1
                     ? "Continue to knowledge check"
                     : "Complete & continue"}
                   <ArrowRight size={16} />
-                </button>
+                </Button>
               </div>
             </>
           ) : (
@@ -1087,11 +1099,11 @@ export function Course({
                 </div>
               )}
               <div className="lesson-actions">
-                <button className="secondary" onClick={() => setStep(0)}>
+                <Button variant="outline" onClick={() => setStep(0)}>
                   Review lessons
-                </button>
-                <button
-                  className="primary"
+                </Button>
+                <Button
+                  variant="default"
                   disabled={
                     busy ||
                     !allDone ||
@@ -1101,7 +1113,7 @@ export function Course({
                 >
                   {c.questions.length ? "Check answers" : "Complete course"}
                   <Check size={16} />
-                </button>
+                </Button>
               </div>
               {(!runtime || user.id !== "guest") && (
                 <Feedback
