@@ -1,27 +1,27 @@
 import { CardFooter } from "./patterns/layout";
-import { Badge } from "@/components/ui/badge";
+import { ProgressStatus } from "./ui/progress";
+import type { courseProgress } from "@/lib/course-progress";
 import { ContentAction } from "@/components/patterns/content-action";
 import { useState } from "react";
-import { Play, CheckCircle2, ArrowUpRight } from "lucide-react";
+import { Play, ArrowUpRight } from "lucide-react";
 import type { Content } from "@/lib/types";
 export function CourseCard({
   course: c,
-  complete,
+  status,
   dueDate,
-  progress = 0,
   onClick,
 }: {
   course: Content;
-  complete: boolean;
+  status: ReturnType<typeof courseProgress>;
   dueDate?: string;
-  progress?: number;
   onClick: () => void;
 }) {
+  const { complete, started, percent } = status;
   const [failedCover, setFailedCover] = useState<string | null>(null);
   const showCover = !!c.coverImageUrl && c.coverImageUrl !== failedCover;
   const index = Number(c.id.replace(/\D/g, "")) || 1;
   return (
-    <ContentAction className="course-card" onClick={onClick}>
+    <ContentAction focusRing="inside" className="course-card" onClick={onClick}>
       <div
         className={
           "course-art art-" + (index % 6) + (showCover ? " has-cover" : "")
@@ -53,16 +53,12 @@ export function CourseCard({
       </div>
       <div className="course-copy">
         <div className="course-meta">
-          {complete ? (
-            <Badge variant="success">
-              <CheckCircle2 size={13} />
-              Completed
-            </Badge>
-          ) : progress ? (
-            <Badge variant="warning">In progress</Badge>
-          ) : (
-            <span>{c.lessons.length} lessons · Quiz</span>
-          )}
+          <span>{c.lessons.length} lessons · Quiz</span>
+          <ProgressStatus
+            value={percent}
+            complete={complete}
+            started={started}
+          />
         </div>
         <h3>{c.title}</h3>
         {dueDate && !complete && (
@@ -85,7 +81,7 @@ export function CourseCard({
             <>
               {complete
                 ? "Review course"
-                : progress
+                : started
                   ? "Continue course"
                   : "Start course"}
               <ArrowUpRight size={17} />

@@ -1,4 +1,6 @@
 "use client";
+import { CourseRow } from "@/components/patterns/course-row";
+import { ContentAction } from "@/components/patterns/content-action";
 import { DataTable } from "@/components/patterns/data-table";
 import { AccountButton } from "@/components/patterns/account-button";
 import { ArrowRight, Layers, LogOut, Settings } from "lucide-react";
@@ -19,7 +21,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
+import { Progress, ProgressStatus } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +79,28 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <section className="grid min-w-0 gap-4">
+        <SectionHeader
+          title={<h2>Course row and progress</h2>}
+          description="Controls appear only when the row overflows. Focus stays inside each card."
+        />
+        <CourseRow title="Example">
+          {[0, 33, 100].map((value) => (
+            <ContentAction
+              key={value}
+              focusRing="inside"
+              className="grid gap-4 p-4"
+            >
+              <strong>Example course</strong>
+              <ProgressStatus
+                value={value}
+                complete={value === 100}
+                started={value > 0}
+              />
+            </ContentAction>
+          ))}
+        </CourseRow>
+      </section>
       <Card>
         <Stack>
           <SectionHeader title={<h2>Actions and feedback</h2>}></SectionHeader>
@@ -101,6 +125,11 @@ export default function ComponentCatalog() {
             We couldn’t save. Your changes are still here.
           </Alert>
           <Progress value={75} aria-label="Assigned learning complete" />
+          <div className="flex flex-wrap gap-4">
+            <ProgressStatus value={0} complete={false} started={false} />
+            <ProgressStatus value={33} complete={false} started={true} />
+            <ProgressStatus value={100} complete={true} started={true} />
+          </div>
         </Stack>
       </Card>
       <Card id="fields">

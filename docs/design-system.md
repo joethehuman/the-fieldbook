@@ -43,6 +43,8 @@ Shared controls are necessary but do not establish a consistent page by themselv
 
 Acceptance checks must exercise state changes, not just initial screenshots: long and short labels, populated and empty results, reporting-team changes, desktop/tablet/phone widths and enlarged text. Compare column positions before/after filtering and action alignment across differently sized rows. Inspect screenshots after the interaction checks; passing overflow checks alone is insufficient.
 
+`ProgressStatus` is the compact course/curriculum indicator: an empty or partial ring with text, or a completion check. Its caller owns the completion calculation. `CourseRow` owns overflow observation, keyboard scrolling and endpoint controls. Use `ContentAction` with `focusRing="inside"` inside clipping containers so keyboard focus remains visible. `SplitPanel` has an explicit stretch option for equal-height summary/card compositions.
+
 ## Theme and layout rules
 
 Keep the light, neutral visual direction. Primary actions are neutral; organization branding uses `--brand`, separate from shadcn's semantic `--accent` surface. This prevents operator branding from changing menu/selection contrast. Radix portals inherit the root interface theme; popovers sit above ordinary dialogs, and confirmation overlays sit above both.

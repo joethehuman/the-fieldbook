@@ -178,14 +178,17 @@ export function AccountPage({ className, ...props }: ComponentProps<"main">) {
 export function SplitPanel({
   children,
   split = true,
+  align = "start",
 }: {
   children: React.ReactNode;
   split?: boolean;
+  align?: "start" | "stretch";
 }) {
   return (
     <div
       className={cn(
-        "grid min-w-0 items-start gap-6",
+        "grid min-w-0 gap-6",
+        align === "stretch" ? "items-stretch" : "items-start",
         split && "xl:grid-cols-[18rem_minmax(0,1fr)]",
       )}
     >
