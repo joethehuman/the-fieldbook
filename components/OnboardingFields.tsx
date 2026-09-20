@@ -21,8 +21,8 @@ export function OnboardingFields({
             )
           }
         >
-          <option value="existing">Existing staff — stay current</option>
-          <option value="new">New hire — onboarding window</option>
+          <option value="existing">Existing user — stay current</option>
+          <option value="new">New user — onboarding window</option>
         </select>
       </label>
       {value && (

@@ -498,9 +498,9 @@ export default function Admin({
       ) : tab === "people" ? (
         <>
           <section className="editor-block">
-            <h2>New people</h2>
+            <h2>New users</h2>
             <label>
-              Default learning stage for new people
+              Default learning stage for new users
               <select
                 value={data.settings?.newUserStage || "existing"}
                 onChange={async (e) => {
@@ -519,12 +519,12 @@ export default function Admin({
                   }
                 }}
               >
-                <option value="existing">Existing team — stay current</option>
-                <option value="newhire">New hire — onboarding window</option>
+                <option value="existing">Existing user — stay current</option>
+                <option value="newhire">New user — onboarding window</option>
               </select>
             </label>
             <p className="muted">
-              Applies to newly added people and new self-registrations. You can
+              Applies to newly added users and new self-registrations. You can
               override the stage and start date for each person. Group
               membership still determines required learning.
             </p>

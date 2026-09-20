@@ -3,7 +3,7 @@
 ## Implementation plan
 
 1. Retire individual assignments and course-specific deadline controls. Keep the existing group rule storage, authorization, audit history and progress administration.
-2. Add workspace onboarding/catch-up windows (90/30 days by default) and an explicit onboarding start date on people and pre-registered accounts. Existing staff have no onboarding start date. People includes a default stage for new accounts (Existing team or New hire); only an explicit New hire default makes self-registration start an onboarding window. Pre-registered accounts retain their individually chosen stage/start date, and changing the default never updates existing people.
+2. Add workspace onboarding/catch-up windows (90/30 days by default) and an explicit onboarding start date on people and pre-registered accounts. Existing users have no onboarding start date. People includes a default stage for new accounts (Existing user or New user); only an explicit New user default makes self-registration start an onboarding window. Pre-registered accounts retain their individually chosen stage/start date, and changing the default never updates existing people.
 3. Manage required learning by group with recommended course order. Parent foundations come first, courses remain unlocked, and overlapping group requirements count once.
 4. Keep the learner channel layout and full library. Show Get up to speed during onboarding, then Stay current, with a recommended next course and on-track/needs-attention status distinct from completion percentage.
 5. Build the feature branch and deploy Preview. Apply migration only to the isolated Preview database. Leave production and main unchanged; user performs acceptance testing.

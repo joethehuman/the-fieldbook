@@ -296,7 +296,7 @@ export function Assignments({
         <p>Create a group to define its required learning.</p>
       )}
       <p className="muted">
-        {data.settings?.onboardingDays ?? 90} days for new hires ·{" "}
+        {data.settings?.onboardingDays ?? 90} days for new users ·{" "}
         {data.settings?.catchUpDays ?? 30} days to catch up with new required
         learning. Manage these windows in Settings.
       </p>

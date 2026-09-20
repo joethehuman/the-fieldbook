@@ -114,7 +114,7 @@ export default function SiteSettingsPanel({
           become required learning.
         </p>
         <label>
-          New hire onboarding window (days)
+          New user onboarding window (days)
           <input
             type="number"
             required
