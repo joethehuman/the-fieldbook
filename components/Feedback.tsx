@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "./ui/button";
+import { SelectField } from "./ui/select";
 import { useState } from "react";
 import { ThumbsDown, ThumbsUp } from "lucide-react";
 import type { Content, User, Feedback as Entry } from "@/lib/types";
@@ -103,9 +105,9 @@ export default function Feedback({
             />
           </label>
           <div className="button-group">
-            <button className="primary">Save comment</button>
-            <button
-              className="secondary"
+            <Button variant="default">Save comment</Button>
+            <Button
+              variant="outline"
               type="button"
               onClick={() => {
                 setComment(saved?.comment || "");
@@ -113,7 +115,7 @@ export default function Feedback({
               }}
             >
               Done
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -157,22 +159,22 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
         </label>
         <label>
           Content type
-          <select
+          <SelectField
             value={kind}
-            onChange={(e) => {
-              setKind(e.target.value);
+            onValueChange={(value) => {
+              setKind(value);
               setItem("all");
             }}
           >
             <option value="all">All types</option>
-            <option value="doc">Knowledge</option>
-            <option value="brief">Field notes</option>
-            <option value="course">Learning</option>
-          </select>
+            <option value="doc">Docs</option>
+            <option value="brief">Updates</option>
+            <option value="course">Courses</option>
+          </SelectField>
         </label>
         <label>
           Content item
-          <select value={item} onChange={(e) => setItem(e.target.value)}>
+          <SelectField value={item} onValueChange={(value) => setItem(value)}>
             <option value="all">All content</option>
             {data.content
               .filter((c) => kind === "all" || c.kind === kind)
@@ -181,22 +183,25 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
                   {c.title}
                 </option>
               ))}
-          </select>
+          </SelectField>
         </label>
         <label>
           Rating
-          <select value={rating} onChange={(e) => setRating(e.target.value)}>
+          <SelectField
+            value={rating}
+            onValueChange={(value) => setRating(value)}
+          >
             <option value="all">All ratings</option>
             <option value="up">Useful</option>
             <option value="down">Not useful</option>
-          </select>
+          </SelectField>
         </label>
         <label>
           Sort feedback
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          <SelectField value={sort} onValueChange={(value) => setSort(value)}>
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
-          </select>
+          </SelectField>
         </label>
       </div>
       <div className="report-summary">

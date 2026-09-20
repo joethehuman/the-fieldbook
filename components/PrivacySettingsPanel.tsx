@@ -1,4 +1,7 @@
 "use client";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { Button } from "./ui/button";
+import { SelectField } from "./ui/select";
 import MarkdownEditor from "./MarkdownEditor";
 import { defaultPrivacy, type SiteSettings } from "@/lib/settings";
 export default function PrivacySettingsPanel({
@@ -12,6 +15,7 @@ export default function PrivacySettingsPanel({
   onPublish: (s: SiteSettings) => Promise<void>;
   busy: boolean;
 }) {
+  const { confirm } = useInteractionDialog();
   const privacy = settings.privacy || defaultPrivacy;
   const draft = privacy.draft;
   const edit = (patch: Partial<typeof draft>) =>
@@ -39,13 +43,13 @@ export default function PrivacySettingsPanel({
       </p>
       <label>
         Policy location
-        <select
+        <SelectField
           value={draft.mode}
-          onChange={(e) => edit({ mode: e.target.value as typeof draft.mode })}
+          onValueChange={(value) => edit({ mode: value as typeof draft.mode })}
         >
           <option value="hosted">Write a policy in Fieldbook</option>
           <option value="external">Link to an existing policy</option>
-        </select>
+        </SelectField>
       </label>
       <label>
         Operator name
@@ -102,13 +106,13 @@ export default function PrivacySettingsPanel({
           ? `Published ${privacy.publishedAt?.slice(0, 10) || "previously"}.`
           : "No policy has been published yet."}
       </p>
-      <button
+      <Button
         type="button"
-        className="secondary"
+        variant="outline"
         disabled={busy || !valid}
-        onClick={() => {
+        onClick={async () => {
           if (
-            window.confirm(
+            await confirm(
               "Publish this privacy policy for all visitors? This also saves your current settings.",
             )
           )
@@ -123,7 +127,7 @@ export default function PrivacySettingsPanel({
         }}
       >
         Publish privacy policy
-      </button>
+      </Button>
     </section>
   );
 }

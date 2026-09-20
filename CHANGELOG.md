@@ -4,6 +4,14 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Interface redesign (review branch)
+
+- Shared neutral theme, Geist typography, consistent spacing, compact actions, and responsive layout across learner, manager, and administrator views.
+- Grouped administration navigation and clearly separated settings sections.
+- shadcn-style owned Radix components for dropdowns, tabs, menus, buttons, and accessible dialogs.
+- Compact learning status, an accurate no-required-courses state, and expandable group-specific learning.
+- Preserved existing feature handlers; no database or permission changes. See [review scope and verification limits](docs/ui-redesign.md).
+
 ### Current implementation
 
 - Separate browser-local demo and server application sharing a Next.js interface.

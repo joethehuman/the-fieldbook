@@ -39,7 +39,7 @@ export function CourseCard({
           ) : progress ? (
             <span className="in-progress">In progress</span>
           ) : (
-            <span>{c.lessons.length} lessons · Knowledge check</span>
+            <span>{c.lessons.length} lessons · Quiz</span>
           )}
         </div>
         <h3>{c.title}</h3>
@@ -63,8 +63,8 @@ export function CourseCard({
             {complete
               ? "Review course"
               : progress
-                ? "Continue learning"
-                : "Start learning"}
+                ? "Continue course"
+                : "Start course"}
           </span>
           <ArrowUpRight size={17} />
         </div>

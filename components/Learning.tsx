@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "./ui/button";
+import { SelectField } from "./ui/select";
 import { useRef, useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, BookOpen, Search } from "lucide-react";
 import {
@@ -33,20 +35,20 @@ function CourseRow({
   return (
     <div className="course-row-wrap">
       <div className="row-controls">
-        <button
-          className="secondary"
+        <Button
+          variant="outline"
           aria-label={`Previous ${title} courses`}
           onClick={() => scroll(-1)}
         >
           <ArrowLeft size={16} />
-        </button>
-        <button
-          className="secondary"
+        </Button>
+        <Button
+          variant="outline"
           aria-label={`Next ${title} courses`}
           onClick={() => scroll(1)}
         >
           <ArrowRight size={16} />
-        </button>
+        </Button>
       </div>
       <div
         ref={row}
@@ -156,22 +158,22 @@ export default function Learning({
       <div className="page-heading">
         {view !== "home" && (
           <button className="text-button" onClick={() => changeView("home")}>
-            ← Back to learning
+            ← Back to courses
           </button>
         )}
-        <span className="eyebrow">A LITTLE LEARNING. A LOT OF MOMENTUM.</span>
+        <span className="eyebrow">YOUR ORGANIZATION</span>
         <h1>
           {view === "all"
-            ? "Your required learning."
+            ? "Required courses"
             : view === "completed"
-              ? "Look how far you’ve come."
-              : "Make your next move a great one."}
+              ? "Completed courses"
+              : "Courses"}
         </h1>
         <p>
           {view === "completed"
             ? "Revisit your completed courses. Your progress stays with you."
             : view === "all"
-              ? "Your role’s learning, in a recommended order. You can explore ahead at any time."
+              ? "Your role’s courses, in a recommended order. You can explore ahead at any time."
               : "Build your knowledge, sharpen your skills, and stay one step ahead."}
         </p>
       </div>
@@ -179,13 +181,13 @@ export default function Learning({
         {" "}
         <label className="learning-sort">
           Sort courses
-          <select value={sort} onChange={(e) => setSort(e.target.value)}>
+          <SelectField value={sort} onValueChange={(value) => setSort(value)}>
             <option value="recommended">Recommended order</option>
             <option value="added">Recently added</option>
             <option value="title">Title A–Z</option>
             <option value="updated">Recently updated</option>
             <option value="oldest">Oldest update first</option>
-          </select>
+          </SelectField>
         </label>
       </div>
       {view === "home" && publicLearning && (
@@ -212,9 +214,9 @@ export default function Learning({
                 : "Your progress is saved to your account. Pick up wherever you left off."}
             </p>
             {guest && (
-              <button className="primary" onClick={onSignIn}>
+              <Button variant="default" onClick={onSignIn}>
                 Sign in with Google
-              </button>
+              </Button>
             )}
           </div>
           <button
@@ -239,96 +241,110 @@ export default function Learning({
               </p>
             </div>
           </div>
-          <div className="assigned-layout learning-assigned">
+          <div
+            className={
+              "assigned-layout learning-assigned" +
+              (!outstanding.length ? " learning-current" : "")
+            }
+          >
             <div className="current-card">
-              <div
-                className="progress-ring"
-                style={{
-                  background: `conic-gradient(var(--accent, #0069ff) ${pct}%, #e4eaf5 0)`,
-                }}
-                role="img"
-                aria-label={`${pct}% current`}
-              >
-                <div>
-                  <strong>
-                    {pct}
-                    <small>%</small>
-                  </strong>
-                  <span>current</span>
+              {assigned.length > 0 ? (
+                <div
+                  className="progress-ring"
+                  style={{
+                    background: `conic-gradient(var(--accent, #0069ff) ${pct}%, #e4eaf5 0)`,
+                  }}
+                  role="img"
+                  aria-label={`${pct}% current`}
+                >
+                  <div>
+                    <strong>
+                      {pct}
+                      <small>%</small>
+                    </strong>
+                    <span>current</span>
+                  </div>
                 </div>
+              ) : (
+                <div className="learning-status-icon">
+                  <BookOpen size={24} />
+                </div>
+              )}
+              <div className="learning-status-copy">
+                <h3>
+                  {!assigned.length
+                    ? "Learn something new"
+                    : state.onboarding
+                      ? "Get up to speed"
+                      : pct === 100
+                        ? "You’re up to date"
+                        : "Stay current"}
+                </h3>
+                <p>
+                  {assigned.length
+                    ? `${completed.length} of ${assigned.length} required courses complete`
+                    : "No required courses right now."}
+                </p>
+                <span className="current-caption">
+                  {state.overdue.length
+                    ? `${state.overdue.length} courses need attention`
+                    : state.onboarding
+                      ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days remaining · Onboarding target ${state.target}`
+                      : outstanding.length
+                        ? `${outstanding.length} courses to catch up on · You’re on track`
+                        : assigned.length
+                          ? "All required courses is complete."
+                          : "Explore the library at your own pace."}
+                </span>
               </div>
-              <h3>
-                {state.onboarding
-                  ? "Get up to speed"
-                  : pct === 100
-                    ? "You’re up to date"
-                    : "Stay current"}
-              </h3>
-              <p>
-                {completed.length} of {assigned.length} required courses
-                complete
-              </p>
-              <span className="current-caption">
-                {state.overdue.length
-                  ? `${state.overdue.length} courses need attention`
-                  : state.onboarding
-                    ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days remaining · Onboarding target ${state.target}`
-                    : outstanding.length
-                      ? `${outstanding.length} courses to catch up on · You’re on track`
-                      : "The goal? Stay current."}
-              </span>
               {!!outstanding.length && (
-                <button
-                  className="primary"
+                <Button
+                  variant="default"
                   onClick={() => onOpen(state.remaining[0].id)}
                 >
-                  Continue learning
-                </button>
+                  Continue course
+                </Button>
               )}
             </div>
             {outstanding.length ? (
               <CourseRow title="For you">
                 {ordered(outstanding).map(card)}
               </CourseRow>
-            ) : (
-              <div className="empty">
-                <h3>
-                  {assigned.length
-                    ? "You’re current. Keep exploring."
-                    : "Room to explore"}
-                </h3>
-                <p>The full library is yours to discover.</p>
-              </div>
-            )}
+            ) : null}
           </div>
-          {groups
-            .filter((g) => effectiveGroups(user, groups).has(g.id))
-            .sort(
-              (a, b) =>
-                ancestorIds(a.id, groups).size -
-                  ancestorIds(b.id, groups).size ||
-                a.name.localeCompare(b.name),
-            )
-            .map((g) => {
-              const items = requiredSequence(
-                courses,
-                { ...user, groups: [g.id] },
-                [{ ...g, parentId: undefined }],
-              ).filter((c) => !isComplete(c, progress));
-              return items.length ? (
-                <div className="channel" key={g.id}>
-                  <div className="channel-title">
-                    <BookOpen size={19} />
-                    <h3>{g.name}</h3>
-                    <span>Recommended order</span>
-                  </div>
-                  <CourseRow title={g.name}>{items.map(card)}</CourseRow>
-                </div>
-              ) : null;
-            })}
+          {!!outstanding.length && (
+            <details className="learning-by-group">
+              <summary>View required courses by group</summary>
+              {groups
+                .filter((g) => effectiveGroups(user, groups).has(g.id))
+                .sort(
+                  (a, b) =>
+                    ancestorIds(a.id, groups).size -
+                      ancestorIds(b.id, groups).size ||
+                    a.name.localeCompare(b.name),
+                )
+                .map((g) => {
+                  const items = requiredSequence(
+                    courses,
+                    { ...user, groups: [g.id] },
+                    [{ ...g, parentId: undefined }],
+                  ).filter((c) => !isComplete(c, progress));
+                  return items.length ? (
+                    <div className="channel" key={g.id}>
+                      <div className="channel-title">
+                        <BookOpen size={19} />
+                        <h3>{g.name}</h3>
+                        <span>Recommended order</span>
+                      </div>
+                      <CourseRow title={g.name}>{items.map(card)}</CourseRow>
+                    </div>
+                  ) : null;
+                })}
+            </details>
+          )}
           <div className="learning-links">
             <button className="text-button" onClick={() => changeView("all")}>
-              View required learning <ArrowRight size={16} />
+              View required courses <ArrowRight size={16} />
             </button>
             <button
               className="text-button"
@@ -346,7 +362,7 @@ export default function Learning({
               {view === "home"
                 ? "Explore the library"
                 : view === "all"
-                  ? "Required learning"
+                  ? "Required courses"
                   : "Completed courses"}
             </h2>
             <p>
@@ -359,7 +375,7 @@ export default function Learning({
             {filtered.length} courses
           </span>
         </div>
-        <div className="learning-toolbar">
+        <div className="learning-toolbar catalog-toolbar">
           <label className="search">
             <Search size={16} />
             <input
@@ -413,7 +429,7 @@ export default function Learning({
             </h3>
             <p>
               {view === "completed"
-                ? "Completed courses will appear here. Try another filter or return to learning."
+                ? "Completed courses will appear here. Try another filter or return to courses."
                 : "Try another topic or search term."}
             </p>
           </div>
@@ -423,10 +439,10 @@ export default function Learning({
         <BookOpen size={22} />
         <div>
           <h3>Looking for an answer?</h3>
-          <p>The knowledge library is your everyday reference.</p>
+          <p>The docs library is your everyday reference.</p>
         </div>
         <button className="text-button" onClick={onKnowledge}>
-          Explore knowledge <ArrowRight size={17} />
+          Explore docs <ArrowRight size={17} />
         </button>
       </div>
     </>

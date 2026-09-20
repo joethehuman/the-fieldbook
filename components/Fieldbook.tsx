@@ -1,4 +1,12 @@
 "use client";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { Button } from "./ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+} from "./ui/dialog";
 import { useEffect, useState, type CSSProperties } from "react";
 import {
   BookOpen,
@@ -25,7 +33,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "./Markdown";
 import type { FieldbookRuntime } from "@/lib/runtime";
-import { sectionPaths } from "@/lib/navigation";
+import { sectionPaths, resolveSection } from "@/lib/navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
 import Feedback from "./Feedback";
@@ -51,6 +59,7 @@ type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook({
   runtime,
 }: { runtime?: FieldbookRuntime } = {}) {
+  const { confirm } = useInteractionDialog();
   const [data, setData] = useState<Workspace | null>(null),
     [uid, setUid] = useState<string | null>(null),
     [view, setView] = useState<View>("learn"),
@@ -85,14 +94,12 @@ export default function Fieldbook({
       let [v, id] = window.location.hash.slice(1).split("/");
       if (runtime && !window.location.hash) {
         const parts = window.location.pathname.split("/");
-        v =
-          Object.entries(sectionPaths).find(
-            ([, path]) => path === parts[1],
-          )?.[0] || "learn";
+        v = parts[1] || "courses";
         id = parts[2];
       }
-      if (["learn", "docs", "briefs", "admin", "team"].includes(v)) {
-        setView(v as View);
+      const section = resolveSection(v);
+      if (section) {
+        setView(section);
         setSelected(id ? decodeURIComponent(id) : null);
       }
     };
@@ -115,7 +122,9 @@ export default function Fieldbook({
         "",
         `/${sectionPaths[v]}${id ? "/" + encodeURIComponent(id) : ""}`,
       );
-    else window.location.hash = v + (id ? "/" + encodeURIComponent(id) : "");
+    else
+      window.location.hash =
+        sectionPaths[v] + (id ? "/" + encodeURIComponent(id) : "");
     window.scrollTo({ top: 0 });
   }
   async function persist(next: Workspace) {
@@ -153,9 +162,11 @@ export default function Fieldbook({
     sessionStorage.removeItem(SESSION);
     setUid(null);
   }
-  function reset() {
+  async function reset() {
     if (
-      confirm("Reset this browser’s sample content, profiles, and progress?")
+      await confirm(
+        "Reset this browser’s sample content, profiles, and progress?",
+      )
     ) {
       const next = freshWorkspace();
       persist(next);
@@ -233,13 +244,13 @@ export default function Fieldbook({
               <GraduationCap />
             </div>
           </div>
-          <small>One home for knowledge, updates, and learning.</small>
+          <small>One home for docs, updates, and courses.</small>
         </div>
         <main className="login-form">
           <div className="login-inner">
             <span className="pill">INTERACTIVE PROTOTYPE</span>
             <h2>Welcome to Fieldbook</h2>
-            <p>Choose a demo profile to explore the workspace.</p>
+            <p>Choose a demo profile to explore the organization.</p>
             <div className="profile-list">
               {data.users
                 .filter((u) => u.active)
@@ -250,7 +261,7 @@ export default function Fieldbook({
                       <strong>{u.name}</strong>
                       <small>
                         {u.role === "admin"
-                          ? "Admin · Manage the workspace"
+                          ? "Admin · Manage the organization"
                           : data.groups
                               .filter((g) => u.groups.includes(g.id))
                               .map((g) => g.name)
@@ -295,14 +306,14 @@ export default function Fieldbook({
   const docs = visible.filter((c) => c.kind === "doc");
   const currentTitle =
     view === "learn"
-      ? "Learning"
+      ? "Courses"
       : view === "docs"
-        ? "Knowledge"
+        ? "Docs"
         : view === "briefs"
-          ? "Field notes"
+          ? "Updates"
           : view === "team"
             ? "Team progress"
-            : "Workspace";
+            : "Administration";
   return (
     <div
       className="app"
@@ -313,15 +324,25 @@ export default function Fieldbook({
         } as CSSProperties
       }
     >
+      <a
+        className="skip-link"
+        href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          document.getElementById("main-content")?.focus();
+        }}
+      >
+        Skip to content
+      </a>
       <aside className={"sidebar " + (menu ? "open" : "")}>
         <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
-        <span className="nav-label">YOUR WORKSPACE</span>
+        <span className="nav-label">YOUR ORGANIZATION</span>
         <nav>
           {(
             [
-              { key: "briefs", title: "Field notes", icon: Newspaper },
-              { key: "learn", title: "Learning", icon: GraduationCap },
-              { key: "docs", title: "Knowledge", icon: BookOpen },
+              { key: "briefs", title: "Updates", icon: Newspaper },
+              { key: "learn", title: "Courses", icon: GraduationCap },
+              { key: "docs", title: "Docs", icon: BookOpen },
             ] as const
           ).map((n) => (
             <button
@@ -358,12 +379,15 @@ export default function Fieldbook({
               onClick={() => navigate("admin")}
             >
               <Settings size={18} />
-              Manage workspace
+              Manage organization
             </button>
           )}
           {(user.role === "manager" ||
             (data.teams || []).some((t) => t.managerId === user.id)) && (
-            <button className="admin-nav" onClick={() => navigate("team")}>
+            <button
+              className={"admin-nav " + (view === "team" ? "active" : "")}
+              onClick={() => navigate("team")}
+            >
               <GraduationCap size={18} />
               My team’s progress
             </button>
@@ -417,7 +441,7 @@ export default function Fieldbook({
             >
               <Menu />
             </button>
-            <span>Workspace</span>
+            <span>Organization</span>
             <ChevronRight size={14} />
             <strong>{currentTitle}</strong>
             {item && (
@@ -449,7 +473,7 @@ export default function Fieldbook({
             {!runtime && (
               <button className="demo-chip" onClick={() => setShowDemo(true)}>
                 <span />
-                Demo workspace
+                Demo organization
               </button>
             )}
           </div>
@@ -459,7 +483,7 @@ export default function Fieldbook({
             {error}
           </div>
         )}
-        <main className="main-content">
+        <main id="main-content" className="main-content" tabIndex={-1}>
           {query ? (
             <>
               <PageHeading
@@ -494,10 +518,10 @@ export default function Fieldbook({
                     <span>
                       <small>
                         {c.kind === "course"
-                          ? "Learning"
+                          ? "Courses"
                           : c.kind === "doc"
-                            ? "Knowledge"
-                            : "Field notes"}{" "}
+                            ? "Docs"
+                            : "Updates"}{" "}
                         / {c.category}
                       </small>
                       <h3>{c.title}</h3>
@@ -509,7 +533,7 @@ export default function Fieldbook({
                 {!results.length && (
                   <Empty
                     title="No results yet"
-                    description="Try a different word or browse the workspace."
+                    description="Try a different word or browse the organization."
                   />
                 )}
               </div>
@@ -536,15 +560,15 @@ export default function Fieldbook({
                 Sign in with your administrator account to manage this
                 Fieldbook.
               </p>
-              <button className="primary" onClick={runtime.signIn}>
+              <Button variant="default" onClick={runtime.signIn}>
                 Sign in with Google
-              </button>
+              </Button>
             </section>
           ) : view === "team" ? (
             <>
               <PageHeading
                 eyebrow="GROW TOGETHER"
-                title="Your team, in focus."
+                title="Team progress"
                 description="A shared view of progress and what’s next."
               />
               <TeamProgress data={data} user={user} />
@@ -590,7 +614,7 @@ export default function Fieldbook({
                   navigate(item.kind === "doc" ? "docs" : "briefs")
                 }
               >
-                ← Back to {item.kind === "doc" ? "knowledge" : "field notes"}
+                ← Back to {item.kind === "doc" ? "docs" : "updates"}
               </button>
               <span className="eyebrow">{item.category}</span>
               <h1>{item.title}</h1>
@@ -639,7 +663,7 @@ export default function Fieldbook({
             <>
               <PageHeading
                 eyebrow="THE KNOWLEDGE THAT GOES WITH YOU"
-                title="Your everyday reference."
+                title="Docs"
                 description="A shared source of truth. Built for the conversations that matter."
               />
               {docs.some((d) => d.id === "start") && (
@@ -693,7 +717,7 @@ export default function Fieldbook({
             <>
               <PageHeading
                 eyebrow="LESS NOISE. MORE SIGNAL."
-                title="Notes from the field."
+                title="Updates"
                 description="The latest updates, launch briefs, and ideas worth sharing."
               />
               <div className="brief-list">
@@ -708,9 +732,7 @@ export default function Fieldbook({
                     >
                       <div className={"brief-art art-" + i}>
                         <span>
-                          FIELD
-                          <br />
-                          NOTES<span className="art-number">0{i + 1}</span>
+                          UPDATES<span className="art-number">0{i + 1}</span>
                         </span>
                         <ArrowUpRight size={36} />
                       </div>
@@ -721,7 +743,7 @@ export default function Fieldbook({
                         <span className="brief-date">
                           {date(b.updatedAt)}{" "}
                           <span>
-                            Read the brief <ArrowRight size={16} />
+                            Read the update <ArrowRight size={16} />
                           </span>
                         </span>
                       </div>
@@ -741,49 +763,37 @@ export default function Fieldbook({
           </footer>
         </main>
       </div>
-      {showDemo && (
-        <div className="modal-backdrop" onClick={() => setShowDemo(false)}>
-          <section
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="About this demo"
-            onClick={(e) => e.stopPropagation()}
+      <Dialog open={showDemo} onOpenChange={setShowDemo}>
+        <DialogContent className="demo-dialog">
+          <button
+            className="modal-close icon-button"
+            onClick={() => setShowDemo(false)}
+            aria-label="Close"
           >
-            <button
-              className="modal-close icon-button"
-              onClick={() => setShowDemo(false)}
-              aria-label="Close"
-            >
-              <X />
-            </button>
-            <span className="eyebrow">YOUR DEMO WORKSPACE</span>
-            <h2>
-              A small prototype.
-              <br />A big starting point.
-            </h2>
-            <p>
-              This Next.js demo runs entirely in your browser. Content,
-              profiles, assignments, and progress are saved here, on this
-              device.
-            </p>
-            <p>
-              Profiles simulate login and roles; they are not secure accounts.
-              Don’t enter private information. Nothing is synced to a server.
-            </p>
-            <div className="modal-actions">
-              <button className="secondary" onClick={exportData}>
-                <Download size={16} />
-                Export demo data
-              </button>
-              <button className="secondary" onClick={reset}>
-                <RotateCcw size={16} />
-                Reset sample data
-              </button>
-            </div>
-          </section>
-        </div>
-      )}
+            <X />
+          </button>
+          <span className="eyebrow">YOUR DEMO ORGANIZATION</span>
+          <DialogTitle className="ui-dialog-title">About this demo</DialogTitle>
+          <DialogDescription className="ui-dialog-description">
+            This Next.js demo runs entirely in your browser. Content, profiles,
+            assignments, and progress are saved here, on this device.
+          </DialogDescription>
+          <p>
+            Profiles simulate login and roles; they are not secure accounts.
+            Don’t enter private information. Nothing is synced to a server.
+          </p>
+          <div className="modal-actions">
+            <Button variant="outline" onClick={exportData}>
+              <Download size={16} />
+              Export demo data
+            </Button>
+            <Button variant="outline" onClick={reset}>
+              <RotateCcw size={16} />
+              Reset sample data
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -923,7 +933,7 @@ export function Course({
   return (
     <div className="course-detail">
       <button className="text-button" onClick={onBack}>
-        ← Back to learning
+        ← Back to courses
       </button>
       <div className="course-detail-heading">
         <span className="eyebrow">{c.category}</span>
@@ -977,7 +987,7 @@ export function Course({
             onClick={() => setStep(c.lessons.length)}
           >
             <CheckCircle2 size={18} />
-            {c.questions.length ? "Knowledge check" : "Finish course"}
+            {c.questions.length ? "Quiz" : "Finish course"}
           </button>
           <div className="lesson-progress">
             <div>
@@ -1034,18 +1044,18 @@ export function Course({
                     Lesson completed
                   </span>
                 )}
-                <button className="primary" onClick={mark} disabled={busy}>
+                <Button variant="default" onClick={mark} disabled={busy}>
                   {step === c.lessons.length - 1
-                    ? "Continue to knowledge check"
+                    ? "Continue to quiz"
                     : "Complete & continue"}
                   <ArrowRight size={16} />
-                </button>
+                </Button>
               </div>
             </>
           ) : (
             <>
               <span className="eyebrow">PUT YOUR KNOWLEDGE TO WORK</span>
-              <h2>{complete ? "Nicely done." : "A quick knowledge check."}</h2>
+              <h2>{complete ? "Nicely done." : "A quick quiz."}</h2>
               <p>
                 Answer every question correctly to complete the course. You can
                 try again as often as you need.
@@ -1087,11 +1097,11 @@ export function Course({
                 </div>
               )}
               <div className="lesson-actions">
-                <button className="secondary" onClick={() => setStep(0)}>
+                <Button variant="outline" onClick={() => setStep(0)}>
                   Review lessons
-                </button>
-                <button
-                  className="primary"
+                </Button>
+                <Button
+                  variant="default"
                   disabled={
                     busy ||
                     !allDone ||
@@ -1101,7 +1111,7 @@ export function Course({
                 >
                   {c.questions.length ? "Check answers" : "Complete course"}
                   <Check size={16} />
-                </button>
+                </Button>
               </div>
               {(!runtime || user.id !== "guest") && (
                 <Feedback
@@ -1114,7 +1124,7 @@ export function Course({
               )}
               {complete && (
                 <button className="text-button" onClick={onBack}>
-                  Back to your learning <ArrowRight size={16} />
+                  Back to your courses <ArrowRight size={16} />
                 </button>
               )}
             </>

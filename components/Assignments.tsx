@@ -1,4 +1,7 @@
 "use client";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { Button } from "./ui/button";
+import { SelectField } from "./ui/select";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
 import {
@@ -28,6 +31,7 @@ export function Assignments({
   onOpenGroup?: (id: string) => void;
   onChange?: (data: Workspace) => void | Promise<void>;
 }) {
+  const { confirm } = useInteractionDialog();
   const [selected, setSelected] = useState(
       scope.groupId || data.groups[0]?.id || "",
     ),
@@ -91,9 +95,9 @@ export function Assignments({
       await onAction(action);
       setNotice(
         action.operation === "assign"
-          ? "Required learning updated."
+          ? "Required courses updated."
           : action.operation === "unassign"
-            ? "Requirement removed. Learning history preserved."
+            ? "Requirement removed. Course history preserved."
             : action.operation === "complete"
               ? "Course marked complete."
               : "Progress reset.",
@@ -141,7 +145,7 @@ export function Assignments({
         <thead>
           <tr>
             <th>Person</th>
-            <th>Learning status</th>
+            <th>Course status</th>
             <th>Progress</th>
             <th>Actions</th>
           </tr>
@@ -176,8 +180,12 @@ export function Assignments({
                   <div className="assignment-actions">
                     <button
                       disabled={busy || done}
-                      onClick={() => {
-                        if (confirm(`Mark ${c.title} complete for ${u.name}?`))
+                      onClick={async () => {
+                        if (
+                          await confirm(
+                            `Mark ${c.title} complete for ${u.name}?`,
+                          )
+                        )
                           void act({
                             operation: "complete",
                             contentId: c.id,
@@ -192,9 +200,9 @@ export function Assignments({
                     </button>
                     <button
                       disabled={busy || !p}
-                      onClick={() => {
+                      onClick={async () => {
                         if (
-                          confirm(
+                          await confirm(
                             `Reset lessons, quiz attempts and completion for ${u.name} on ${c.title}? Previous state is retained in the audit record.`,
                           )
                         )
@@ -223,21 +231,21 @@ export function Assignments({
     <section className="assignments-panel">
       <div className="assignment-heading">
         <div>
-          <h2>{person ? "Learning & progress" : "Required learning"}</h2>
+          <h2>{person ? "Courses & progress" : "Required courses"}</h2>
           <p className="muted">
             {person
-              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Learning comes from group membership.`
-              : "Choose the learning each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
+              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Required courses come from group membership.`
+              : "Choose the courses each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
           </p>
         </div>
       </div>
       {!person && !scope.groupId && (
         <label>
           Group
-          <select
+          <SelectField
             value={selected}
-            onChange={(e) => {
-              setSelected(e.target.value);
+            onValueChange={(value) => {
+              setSelected(value);
               setDetail(null);
             }}
           >
@@ -246,7 +254,7 @@ export function Assignments({
                 {g.name}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
       )}
       {!person && group && (
@@ -267,13 +275,13 @@ export function Assignments({
         >
           <label>
             Add required course
-            <select
+            <SelectField
               value={
                 available.some((c) => c.id === courseId)
                   ? courseId
                   : available[0]?.id || ""
               }
-              onChange={(e) => setCourseId(e.target.value)}
+              onValueChange={(value) => setCourseId(value)}
               disabled={!available.length}
             >
               {available.length ? (
@@ -285,20 +293,20 @@ export function Assignments({
               ) : (
                 <option value="">No additional published courses</option>
               )}
-            </select>
+            </SelectField>
           </label>
-          <button className="primary" disabled={busy || !available.length}>
-            Add to required learning
-          </button>
+          <Button variant="default" disabled={busy || !available.length}>
+            Add to required courses
+          </Button>
         </form>
       )}
       {!person && !group && (
-        <p>Create a group to define its required learning.</p>
+        <p>Create a group to define its required courses.</p>
       )}
       <p className="muted">
         {data.settings?.onboardingDays ?? 90} days for new users ·{" "}
         {data.settings?.catchUpDays ?? 30} days to catch up with new required
-        learning. Manage these windows in Settings.
+        courses. Manage these windows in Settings.
       </p>
       {notice && <p role="status">{notice}</p>}
       <label>
@@ -306,7 +314,7 @@ export function Assignments({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search required learning"
+          placeholder="Search required courses"
         />
       </label>
       <div className="table-wrap">
@@ -394,10 +402,10 @@ export function Assignments({
                             </button>
                             <button
                               disabled={busy}
-                              onClick={() => {
+                              onClick={async () => {
                                 if (
-                                  confirm(
-                                    `Remove ${c.title} from ${group?.name} required learning? Progress and other group requirements are preserved.`,
+                                  await confirm(
+                                    `Remove ${c.title} from ${group?.name} required courses? Progress and other group requirements are preserved.`,
                                   )
                                 )
                                   void act({
@@ -432,7 +440,7 @@ export function Assignments({
         </table>
         {!ordered.length && (
           <p className="empty">
-            No required learning yet. The full library remains available.
+            No required courses yet. The full library remains available.
           </p>
         )}
       </div>
@@ -444,7 +452,7 @@ export function Assignments({
       )}
       {person && (
         <>
-          <h3>Learning history</h3>
+          <h3>Course history</h3>
           {courses
             .filter(
               (c) =>
@@ -455,7 +463,7 @@ export function Assignments({
             )
             .map((c) => (
               <section key={c.id}>
-                <h4>{c.title} · Optional learning</h4>
+                <h4>{c.title} · Optional course</h4>
                 {progressTable(c)}
               </section>
             ))}

@@ -1,4 +1,8 @@
 "use client";
+import { ActionGroup } from "./ui/action-group";
+import { GroupPicker } from "./ui/group-picker";
+import { Button } from "./ui/button";
+import { SelectField } from "./ui/select";
 import { OnboardingFields } from "./OnboardingFields";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
@@ -38,8 +42,8 @@ export function PendingPeople({
         Pre-register a Google email. The person claims this account on verified
         sign-in, including when registration is closed. No email is sent.
       </p>
-      <button
-        className="secondary"
+      <Button
+        variant="outline"
         disabled={busy}
         onClick={() =>
           setEditing({
@@ -55,31 +59,34 @@ export function PendingPeople({
         }
       >
         Pre-register account
-      </button>
+      </Button>
       {error && <p role="alert">{error}</p>}
       {(data.pendingUsers || []).map((p) => (
         <div className="report-course" key={p.email}>
           <span>
             {p.name} · {p.email} · {p.role}
           </span>
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => setEditing(p)}
-          >
-            Edit
-          </button>
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => void save(p, true)}
-          >
-            Revoke
-          </button>
+          <ActionGroup>
+            <button
+              className="text-button"
+              disabled={busy}
+              onClick={() => setEditing(p)}
+            >
+              Edit
+            </button>
+            <button
+              className="text-button"
+              disabled={busy}
+              onClick={() => void save(p, true)}
+            >
+              Revoke
+            </button>
+          </ActionGroup>
         </div>
       ))}
       {editing && (
         <form
+          className="profile-form"
           onSubmit={(e) => {
             e.preventDefault();
             void save({
@@ -119,26 +126,26 @@ export function PendingPeople({
           />
           <label>
             Role
-            <select
+            <SelectField
               value={editing.role}
-              onChange={(e) =>
+              onValueChange={(value) =>
                 setEditing({
                   ...editing,
-                  role: e.target.value as Pending["role"],
+                  role: value as Pending["role"],
                 })
               }
             >
               <option value="learner">Learner</option>
               <option value="manager">Manager</option>
               <option value="admin">Administrator</option>
-            </select>
+            </SelectField>
           </label>
           <label>
             Reporting team
-            <select
+            <SelectField
               value={editing.teamId || ""}
-              onChange={(e) =>
-                setEditing({ ...editing, teamId: e.target.value || undefined })
+              onValueChange={(value) =>
+                setEditing({ ...editing, teamId: value || undefined })
               }
             >
               <option value="">No team</option>
@@ -147,39 +154,26 @@ export function PendingPeople({
                   {t.name}
                 </option>
               ))}
-            </select>
+            </SelectField>
           </label>
-          <fieldset>
-            <legend>Assignment groups</legend>
-            {data.groups.map((g) => (
-              <label className="checkbox-label" key={g.id}>
-                <input
-                  type="checkbox"
-                  checked={editing.groups.includes(g.id)}
-                  onChange={(e) =>
-                    setEditing({
-                      ...editing,
-                      groups: e.target.checked
-                        ? [...editing.groups, g.id]
-                        : editing.groups.filter((id) => id !== g.id),
-                    })
-                  }
-                />
-                {g.name}
-              </label>
-            ))}
-          </fieldset>
-          <button className="primary" disabled={busy}>
-            {busy ? "Saving…" : "Save pending account"}
-          </button>
-          <button
-            className="text-button"
-            type="button"
-            disabled={busy}
-            onClick={() => setEditing(null)}
-          >
-            Cancel
-          </button>
+          <GroupPicker
+            groups={data.groups}
+            value={editing.groups}
+            onChange={(groups) => setEditing({ ...editing, groups })}
+          />
+          <ActionGroup>
+            <Button variant="default" disabled={busy}>
+              {busy ? "Saving…" : "Save pending account"}
+            </Button>
+            <button
+              className="text-button"
+              type="button"
+              disabled={busy}
+              onClick={() => setEditing(null)}
+            >
+              Cancel
+            </button>
+          </ActionGroup>
         </form>
       )}
     </section>

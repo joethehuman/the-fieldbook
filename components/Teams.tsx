@@ -1,4 +1,6 @@
 "use client";
+import { Button } from "./ui/button";
+import { SelectField } from "./ui/select";
 import { learningState, learningTarget } from "@/lib/learning";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
@@ -58,15 +60,15 @@ export function TeamsAdmin({
     <>
       <div className="admin-toolbar">
         <p>Teams organize reporting. Groups determine assignments.</p>
-        <button
-          className="primary"
+        <Button
+          variant="default"
           onClick={() => {
             setEditing({ id: crypto.randomUUID(), name: "" });
             setNotice("");
           }}
         >
           Add team
-        </button>
+        </Button>
       </div>
       {notice && <p role="status">{notice}</p>}
       {editing && (
@@ -85,12 +87,12 @@ export function TeamsAdmin({
             </label>
             <label>
               Parent team
-              <select
+              <SelectField
                 value={editing.parentId || ""}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   setEditing({
                     ...editing,
-                    parentId: e.target.value || undefined,
+                    parentId: value || undefined,
                   })
                 }
               >
@@ -102,16 +104,16 @@ export function TeamsAdmin({
                       {t.name}
                     </option>
                   ))}
-              </select>
+              </SelectField>
             </label>
             <label>
               Manager
-              <select
+              <SelectField
                 value={editing.managerId || ""}
-                onChange={(e) =>
+                onValueChange={(value) =>
                   setEditing({
                     ...editing,
-                    managerId: e.target.value || undefined,
+                    managerId: value || undefined,
                   })
                 }
               >
@@ -126,7 +128,7 @@ export function TeamsAdmin({
                       {u.name}
                     </option>
                   ))}
-              </select>
+              </SelectField>
             </label>
           </div>
           <p className="muted">
@@ -134,14 +136,14 @@ export function TeamsAdmin({
             subteams.
           </p>
           <div className="button-group">
-            <button className="primary">Save team</button>
-            <button
+            <Button variant="default">Save team</Button>
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               onClick={() => setEditing(null)}
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       )}
@@ -229,10 +231,10 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
       <div className="filter-bar">
         <label>
           Reporting team
-          <select
+          <SelectField
             value={teamId}
-            onChange={(e) => {
-              setTeamId(e.target.value);
+            onValueChange={(value) => {
+              setTeamId(value);
               setPerson("");
             }}
           >
@@ -246,7 +248,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                   {t.name}
                 </option>
               ))}
-          </select>
+          </SelectField>
         </label>
         <label>
           Find a team member
