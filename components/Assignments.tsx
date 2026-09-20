@@ -40,6 +40,7 @@ export function Assignments({
     [filter, setFilter] = useState("all"),
     [deadline, setDeadline] = useState("all");
   const [form, setForm] = useState<{
+    editing: boolean;
     contentId: string;
     target: string;
     due: Assignment["due"];
@@ -51,6 +52,10 @@ export function Assignments({
   const [pending, setPending] = useState<LearningAction | null>(null),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
+  function confirmAction(action: LearningAction) {
+    setMessage("");
+    setPending(action);
+  }
   const dialogRef = useRef<HTMLDivElement>(null);
   const dialogOpen = !!form || !!pending;
   useEffect(() => {
@@ -103,8 +108,9 @@ export function Assignments({
   const recipients = (a: Assignment) =>
     data.users.filter(
       (u) =>
-        a.userId === u.id ||
-        (!!a.groupId && effectiveGroups(u, data.groups).has(a.groupId)),
+        (a.userId === u.id ||
+          (!!a.groupId && effectiveGroups(u, data.groups).has(a.groupId))) &&
+        (!scope.groupId || effectiveGroups(u, data.groups).has(scope.groupId)),
     );
   const targetName = (a: Assignment) =>
     a.groupId
@@ -158,6 +164,7 @@ export function Assignments({
   function openForm(c?: Content, a?: Assignment) {
     setMessage("");
     setForm({
+      editing: !!a,
       contentId: c?.id || scope.courseId || courses[0]?.id || "",
       target: a
         ? assignmentKey(a)
@@ -210,7 +217,7 @@ export function Assignments({
                     <button
                       disabled={busy || complete}
                       onClick={() =>
-                        setPending({
+                        confirmAction({
                           operation: "complete",
                           contentId: c.id,
                           expected: versioned(c),
@@ -225,7 +232,7 @@ export function Assignments({
                     <button
                       disabled={busy || !p}
                       onClick={() =>
-                        setPending({
+                        confirmAction({
                           operation: "reset",
                           contentId: c.id,
                           expected: versioned(c),
@@ -404,7 +411,7 @@ export function Assignments({
                           <button
                             disabled={busy}
                             onClick={() =>
-                              setPending({
+                              confirmAction({
                                 operation: "unassign",
                                 contentId: c.id,
                                 expected: versioned(c),
@@ -498,6 +505,7 @@ export function Assignments({
               Course
               <select
                 required
+                disabled={form.editing}
                 value={form.contentId}
                 onChange={(e) =>
                   setForm({ ...form, contentId: e.target.value })
@@ -514,6 +522,7 @@ export function Assignments({
               Assign to
               <select
                 required
+                disabled={form.editing}
                 value={form.target}
                 onChange={(e) => setForm({ ...form, target: e.target.value })}
               >
