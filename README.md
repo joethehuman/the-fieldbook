@@ -4,9 +4,9 @@ A lightweight, opinionated learning and knowledge management platform built with
 
 Fieldbook brings three kinds of content together:
 
-- **Field Notes:** updates, launch briefs, and newsletters.
-- **Learning:** courses with text, video, quizzes, and saved progress.
-- **Knowledge:** evergreen articles organized in a nested knowledge base.
+- **Updates:** updates, launch briefs, and newsletters.
+- **Courses:** courses with text, video, quizzes, and saved progress.
+- **Docs:** evergreen articles organized in a nested knowledge base.
 
 Run your own installation, maintain content in the built-in admin panel, and optionally connect an AI client to edit content through MCP. Each installation has its own accounts, data, domain, and configuration. No separate CMS is required.
 
@@ -25,7 +25,7 @@ The documented production setup is **Vercel + hosted Supabase + Google sign-in**
 | AI content management (optional) | Supabase OAuth server and a registered MCP client; ChatGPT has been exercised end to end |
 | Domain (optional) | Your custom domain, or one canonical Vercel address |
 
-**Can I use another database?** Not through configuration alone. The application uses Supabase's database API, Auth, Storage, OAuth server, and token hook. A plain PostgreSQL database, Neon, or another auth/storage provider is not a drop-in replacement. Those substitutions require code changes and are outside this project's documented support scope. Other hosts and self-hosted Supabase are not verified installation paths.
+**Can I use another database?** Not through configuration alone. The application uses Supabase's database API, Auth, Storage, OAuth server, and token hook. A plain PostgreSQL database, Neon, or another auth/storage provider is not a drop-in replacement. Those substitutions require code changes and are currently outside this project's documented support scope. Other hosts and self-hosted Supabase are not verified installation paths.
 
 Provider accounts, quotas, pricing, and backups are the operator's responsibility. Free plans are not an application guarantee of free operation. There is no support SLA or commitment to additional providers.
 
