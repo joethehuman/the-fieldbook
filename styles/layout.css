@@ -97,6 +97,7 @@
   }
   .main-content {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     min-width: 0;
     max-width: var(--page-width);
     gap: var(--space-8);
@@ -378,11 +379,9 @@
     flex-wrap: wrap;
     gap: var(--space-2);
   }
-  .learning-by-group,
   .for-you,
   .library,
-  .updates-section,
-  .curricula-library {
+  .updates-section {
     display: grid;
     gap: var(--space-6);
   }
@@ -391,65 +390,35 @@
     flex-wrap: wrap;
     gap: var(--space-3);
   }
-  .learning-sort {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-  }
-  .learning-sort > [data-slot="field"] {
-    min-width: 12rem;
-  }
-  .learning-status-copy {
-    display: grid;
-    gap: var(--space-2);
-  }
   .learning-status-icon {
     color: var(--muted-foreground);
   }
-  .current-caption {
-    margin-top: var(--space-2);
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-  }
-  .course-grid,
   .brief-list {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: var(--space-6);
   }
-  .course-card,
   .brief-card {
     display: flex;
     flex-direction: column;
   }
-  .course-copy,
   .brief-copy {
     display: grid;
     flex: 1;
     gap: var(--space-3);
     padding: var(--space-4);
   }
-  .course-copy p,
   .brief-copy p {
     color: var(--muted-foreground);
     font-size: 0.875rem;
   }
-  .course-copy h3,
   .brief-copy h3 {
     font-size: 1.0625rem;
   }
-  .course-meta {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-2);
-    font-size: 0.75rem;
-    color: var(--muted-foreground);
-  }
   .course-row-wrap {
     display: grid;
-    gap: var(--space-2);
+    min-width: 0;
+    gap: var(--space-4);
   }
   .course-row {
     display: flex;
@@ -458,33 +427,22 @@
     width: 100%;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
-    padding: var(--space-1);
+    padding: 0;
   }
   .course-row > [data-slot="content-action"] {
-    flex: 0 0 min(18rem, 85vw);
+    flex: 0 0 min(18rem, 85vw, 100%);
     scroll-snap-align: start;
   }
-  .channel,
-  .curriculum-card {
+  .channel {
     display: grid;
     gap: var(--space-4);
   }
   .channel-title {
     display: flex;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
     align-items: center;
     gap: var(--space-2);
-  }
-  .curriculum-card summary span {
-    display: block;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-  }
-  .curriculum-card ol {
-    margin-top: var(--space-4);
-    padding-left: var(--space-6);
-  }
-  .curriculum-card li {
-    padding-block: var(--space-1);
   }
   .knowledge-feature {
     display: grid;
@@ -657,7 +615,6 @@
     font-size: 0.8125rem;
   }
   @media (width < 80rem) {
-    .course-grid,
     .brief-list {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
@@ -706,7 +663,6 @@
     .topbar [data-slot="search-field"] {
       width: min(24rem, 55vw);
     }
-    .course-grid,
     .brief-list,
     .knowledge-grid {
       grid-template-columns: minmax(0, 1fr);

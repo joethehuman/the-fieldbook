@@ -4,6 +4,13 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Assigned curricula now replace their courses with one progress card and open a simple ordered course-launch page. Course return navigation preserves curriculum context.
+- Shared learning cards, collection toolbars, header-owned scrolling controls and launch lists reduce layout drift; channel dropdowns replace repeated filter buttons.
+
+- Unify course browsing into For you, In progress, Completed and All courses, with a default-off Hide completed control for assignments and channel grouping throughout.
+- Add compact course/curriculum progress rings and completion checks while keeping overall progress assigned-only. Simplify the learning summary, align its desktop card with the course row, and hide unnecessary scrolling controls.
+
+
 ### Shared design system
 
 - Tighten shared composition rules: aligned navigation and reorder actions, stacked heading descriptions, separated filter/create actions, predictable account identity, inline card arrows and spaced feedback confirmation actions. Declare stable column schemas for every application table so filtering cannot redistribute columns. Extend the catalog and visual checks to tablet widths and changing result sets.

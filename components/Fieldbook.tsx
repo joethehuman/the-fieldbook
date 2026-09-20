@@ -1,4 +1,5 @@
 "use client";
+import { CurriculumPage } from "./CurriculumPage";
 import { Badge } from "@/components/ui/badge";
 import { SkipLink } from "./patterns/skip-link";
 import { AccountButton } from "./patterns/account-button";
@@ -75,6 +76,7 @@ export default function Fieldbook({
   const [data, setData] = useState<Workspace | null>(null),
     [uid, setUid] = useState<string | null>(null),
     [view, setView] = useState<View>("learn"),
+    [courseOrigin, setCourseOrigin] = useState<string | undefined>(undefined),
     [selected, setSelected] = useState<string | null>(null),
     [search, setSearch] = useState(""),
     [error, setError] = useState(""),
@@ -116,7 +118,15 @@ export default function Fieldbook({
       const section = resolveSection(v);
       if (section) {
         setView(section);
-        setSelected(id ? decodeURIComponent(id) : null);
+        setSelected(
+          id
+            ? (v === "curricula" ? "curriculum:" : "") + decodeURIComponent(id)
+            : null,
+        );
+        setCourseOrigin(
+          new URLSearchParams(window.location.search).get("curriculum") ||
+            undefined,
+        );
       }
     };
     onHash();
@@ -127,20 +137,24 @@ export default function Fieldbook({
       window.removeEventListener("popstate", onHash);
     };
   }, []);
-  function navigate(v: View, id?: string) {
+  function navigate(v: View, id?: string, origin?: string) {
     setView(v);
     setSelected(id || null);
+    setCourseOrigin(origin);
     setSearch("");
     setMenu(false);
-    if (runtime)
-      window.history.pushState(
-        null,
-        "",
-        `/${sectionPaths[v]}${id ? "/" + encodeURIComponent(id) : ""}`,
-      );
-    else
-      window.location.hash =
-        sectionPaths[v] + (id ? "/" + encodeURIComponent(id) : "");
+    const curriculum = v === "learn" && id?.startsWith("curriculum:");
+    const path = curriculum
+      ? `curricula/${encodeURIComponent(id!.slice(11))}`
+      : sectionPaths[v] + (id ? "/" + encodeURIComponent(id) : "");
+    const query = origin ? `?curriculum=${encodeURIComponent(origin)}` : "";
+    window.history.pushState(
+      null,
+      "",
+      runtime
+        ? `/${path}${query}`
+        : `${window.location.pathname}${query}#${path}`,
+    );
     window.scrollTo({ top: 0 });
   }
   async function persist(next: Workspace) {
@@ -314,6 +328,12 @@ export default function Fieldbook({
       .toLowerCase()
       .includes(query),
   );
+  const curriculum =
+    view === "learn" && selected?.startsWith("curriculum:")
+      ? data.curricula?.find(
+          (c) => c.id === selected.slice(11) && c.status === "published",
+        )
+      : undefined;
   const item = visible.find((c) => c.id === selected);
   const courses = visible.filter((c) => c.kind === "course");
   const docs = visible.filter((c) => c.kind === "doc");
@@ -592,6 +612,14 @@ export default function Fieldbook({
               />
               <TeamProgress data={data} user={user} />
             </>
+          ) : curriculum ? (
+            <CurriculumPage
+              curriculum={curriculum}
+              courses={courses}
+              progress={progress}
+              onBack={() => navigate("learn")}
+              onOpen={(id) => navigate("learn", id, curriculum.id)}
+            />
           ) : selected && !item ? (
             <Empty
               title="This content isn’t available"
@@ -604,7 +632,15 @@ export default function Fieldbook({
               data={data}
               user={user}
               onChange={persist}
-              onBack={() => navigate("learn")}
+              onBack={() =>
+                navigate(
+                  "learn",
+                  courseOrigin ? `curriculum:${courseOrigin}` : undefined,
+                )
+              }
+              backLabel={
+                courseOrigin ? "Back to curriculum" : "Back to courses"
+              }
               runtime={runtime}
               onProgress={async (lessonId, answers) => {
                 if (!runtime) return undefined;
@@ -674,6 +710,7 @@ export default function Fieldbook({
               settings={data.settings}
               progress={progress}
               onOpen={(id) => navigate("learn", id)}
+              onCurriculum={(id) => navigate("learn", `curriculum:${id}`)}
               onKnowledge={() => navigate("docs")}
               publicLearning={!!runtime && uid === "guest"}
               guest={!!runtime && uid === "guest"}
@@ -869,6 +906,7 @@ export function Course({
   user,
   onChange,
   onBack,
+  backLabel,
   runtime,
   onProgress,
 }: {
@@ -882,6 +920,7 @@ export function Course({
   user: User;
   onChange: (d: Workspace) => void;
   onBack: () => void;
+  backLabel: string;
 }) {
   const [step, setStep] = useState(0),
     [answers, setAnswers] = useState<number[]>([]),
@@ -937,7 +976,7 @@ export function Course({
   return (
     <div className="course-detail">
       <Button variant="link" onClick={onBack}>
-        ← Back to courses
+        ← {backLabel}
       </Button>
       <div className="course-detail-heading">
         <span className="eyebrow">{c.category}</span>
@@ -1130,7 +1169,7 @@ export function Course({
               )}
               {complete && (
                 <Button variant="link" onClick={onBack}>
-                  Back to your courses <ArrowRight size={16} />
+                  {backLabel} <ArrowRight size={16} />
                 </Button>
               )}
             </>

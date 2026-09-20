@@ -178,14 +178,17 @@ export function AccountPage({ className, ...props }: ComponentProps<"main">) {
 export function SplitPanel({
   children,
   split = true,
+  align = "start",
 }: {
   children: React.ReactNode;
   split?: boolean;
+  align?: "start" | "stretch";
 }) {
   return (
     <div
       className={cn(
-        "grid min-w-0 items-start gap-6",
+        "grid min-w-0 gap-6",
+        align === "stretch" ? "items-stretch" : "items-start",
         split && "xl:grid-cols-[18rem_minmax(0,1fr)]",
       )}
     >
@@ -203,5 +206,17 @@ export function Callout({ className, ...props }: ComponentProps<typeof Card>) {
       )}
       {...props}
     />
+  );
+}
+
+/** Labeled collection controls share a baseline and wrap into whole fields. */
+export function BrowseToolbar({ children }: { children: ReactNode }) {
+  return (
+    <div
+      data-slot="browse-toolbar"
+      className="flex min-w-0 flex-wrap items-end gap-4 [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1"
+    >
+      {children}
+    </div>
   );
 }

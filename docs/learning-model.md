@@ -13,6 +13,18 @@ Everyone with access to an installation can explore its full published library. 
 
 The Courses page starts with For you for signed-in users, then offers published curricula and the full course library. For you shows outstanding assigned courses and a completion card. The card reports completed designated courses divided by all currently published designated courses. A valid completion counts regardless of where the learner originally took the course. A percentage is never rounded to 100 while a course remains unfinished. People with no designated learning see “No assigned courses yet,” without an earned completion percentage.
 
+### Browsing courses and personal activity
+
+“View all for you” opens the shared course browser with **For you** selected. It contains every assigned published course, grouped by channel, including completed courses. **Hide completed** defaults off and filters only this view. The home For you row always shows unfinished assigned courses in recommended order; its Start/Continue action opens the next course in that same order.
+
+The browser also provides **In progress** (any started, unfinished course), **Completed** (all current-version completions, assigned or optional), and **All courses** (the published course library). Switching views clears search/channel filters and resets Hide completed. Search and sorting apply within the selected collection. These views use the same saved progress; they do not enroll learners or change assignments.
+
+Activity means a valid completed lesson, a recorded quiz attempt, or a passing quiz on the current course version. Merely opening a course or having an empty progress record does not make it in progress. Course-card rings count completed lessons plus the passing knowledge check as one final step; only a valid completion earns a check mark. Curriculum indicators count completed published courses in their playlist. Empty curricula do not show earned completion.
+
+Optional activity never changes the assigned completion percentage. Someone who has completed all five assigned courses and started an optional sixth stays 100% complete, with the sixth course available in In progress. Completed assigned courses remain available in the full For you view and Completed.
+
+Course-row arrows appear only when the row overflows and are disabled at each unavailable endpoint. Resizing and course-list changes recalculate their state. Compact progress indicators are shared UI primitives, with text status as well as color.
+
 The Updates page starts with matching group updates, newest updated first, followed by other updates in the same date order. Each update appears once. Updates do not affect course completion or create deadlines. Adding an audience tag does not change an update's editorial date. Users without matching groups still see all published updates. Guest users see the full unpersonalized library.
 
 Docs are organized by their navigation, without learning-group targeting.
@@ -36,3 +48,11 @@ Leaving a linked team removes that membership source. Individual membership or a
 Reports count each course once per learner. Managers retain their existing team-and-descendant reporting scope. Administrators can mark a person's current course version complete or reset progress with revision checks and an audit record.
 
 See [learning groups installation and verification](learning-groups.md) before upgrading. This describes implementation, not proof of any installation's deployment state.
+
+### Curriculum presentation
+
+For you replaces courses contained in an explicitly assigned, published curriculum with a curriculum card. Inherited group assignments count. Standalone assigned courses remain visible; assigning the same curriculum through multiple groups does not duplicate its card. Overlapping curricula may both appear, but their shared courses still count only once in the overall assigned completion summary. Draft or unassigned curricula never suppress assigned course cards.
+
+The home queue hides complete cards; the full For you browser includes them unless Hide completed is selected. In progress and Completed remain course-level views across assigned and optional learning. Channel filtering matches a curriculum when one of its courses belongs to that channel; searching also matches its course titles. Optional curricula are accessible through Browse curricula.
+
+A curriculum opens at `/curricula/<id>` in the server application or `/#curricula/<id>` in the demo. Its simple page lists available published courses in saved order. Start/Continue launches the first incomplete course, and the course's Back to curriculum action preserves that context through reload using a curriculum query parameter. Sequence is recommended, not a prerequisite lock; completed courses remain available for review. The underlying assignment, completion and authorization rules are unchanged.

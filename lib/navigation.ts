@@ -14,6 +14,7 @@ export function resolveSection(
     learn: "learn",
     learning: "learn",
     courses: "learn",
+    curricula: "learn",
     knowledge: "docs",
     docs: "docs",
     briefs: "briefs",

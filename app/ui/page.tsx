@@ -1,4 +1,9 @@
 "use client";
+import { LearningCard } from "@/components/patterns/learning-card";
+import { BrowseToolbar } from "@/components/patterns/layout";
+import { LaunchList } from "@/components/patterns/launch-list";
+import { CourseRow } from "@/components/patterns/course-row";
+import { ContentAction } from "@/components/patterns/content-action";
 import { DataTable } from "@/components/patterns/data-table";
 import { AccountButton } from "@/components/patterns/account-button";
 import { ArrowRight, Layers, LogOut, Settings } from "lucide-react";
@@ -19,7 +24,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
-import { Progress } from "@/components/ui/progress";
+import { Progress, ProgressStatus } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
@@ -77,6 +82,76 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <section className="grid min-w-0 gap-4">
+        <CourseRow
+          title="Example"
+          heading={<h2>Learning cards and progress</h2>}
+          description="Courses and curricula share their layout. Controls appear only when the row overflows."
+        >
+          {[0, 33, 100].map((value) => (
+            <LearningCard
+              key={value}
+              title={
+                value === 33
+                  ? "A longer curriculum title that wraps naturally"
+                  : "Example course"
+              }
+              description="Shared spacing, readable descriptions and aligned actions."
+              metadata={
+                value === 33 ? "1 of 3 courses complete" : "2 lessons · Quiz"
+              }
+              status={{
+                percent: value,
+                complete: value === 100,
+                started: value > 0,
+              }}
+              artwork={
+                <div className="course-art art-1">
+                  <span className="art-label">
+                    {value === 33 ? "Curriculum" : "Course"}
+                  </span>
+                </div>
+              }
+              action={value === 33 ? "View curriculum" : "Start course"}
+              onClick={() => {}}
+            />
+          ))}
+        </CourseRow>
+        <BrowseToolbar>
+          <Field>
+            Search
+            <SearchField>
+              <Input placeholder="Find a course…" />
+            </SearchField>
+          </Field>
+          <Field>
+            Channel
+            <SelectField value="all" onValueChange={() => {}}>
+              <option value="all">All channels</option>
+            </SelectField>
+          </Field>
+          <Field>
+            Sort
+            <SelectField value="recommended" onValueChange={() => {}}>
+              <option value="recommended">Recommended order</option>
+            </SelectField>
+          </Field>
+        </BrowseToolbar>
+        <LaunchList
+          items={[
+            {
+              id: "example",
+              title: "A course in a curriculum",
+              description: "2 lessons · 10 min",
+              status: (
+                <ProgressStatus value={0} started={false} complete={false} />
+              ),
+              action: "Start course",
+              onClick: () => {},
+            },
+          ]}
+        />
+      </section>
       <Card>
         <Stack>
           <SectionHeader title={<h2>Actions and feedback</h2>}></SectionHeader>
@@ -101,6 +176,11 @@ export default function ComponentCatalog() {
             We couldn’t save. Your changes are still here.
           </Alert>
           <Progress value={75} aria-label="Assigned learning complete" />
+          <div className="flex flex-wrap gap-4">
+            <ProgressStatus value={0} complete={false} started={false} />
+            <ProgressStatus value={33} complete={false} started={true} />
+            <ProgressStatus value={100} complete={true} started={true} />
+          </div>
         </Stack>
       </Card>
       <Card id="fields">

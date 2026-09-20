@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+const port = Number(process.env.FIELDBOOK_TEST_PORT || 3117);
 export default defineConfig({
   testDir: "./tests/ui",
   fullyParallel: true,
@@ -6,7 +7,7 @@ export default defineConfig({
   workers: process.env.CI ? 2 : undefined,
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://127.0.0.1:3117",
+    baseURL: `http://127.0.0.1:${port}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
@@ -17,8 +18,8 @@ export default defineConfig({
     { name: "phone", use: { viewport: { width: 375, height: 812 } } },
   ],
   webServer: {
-    command: "node node_modules/serve/build/main.js out -l 3117 --no-clipboard",
-    url: "http://127.0.0.1:3117",
+    command: `node node_modules/serve/build/main.js out -l ${port} --no-clipboard`,
+    url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
   },
 });
