@@ -1,4 +1,7 @@
 "use client";
+import { LearningCard } from "@/components/patterns/learning-card";
+import { BrowseToolbar } from "@/components/patterns/layout";
+import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
 import { ContentAction } from "@/components/patterns/content-action";
 import { DataTable } from "@/components/patterns/data-table";
@@ -80,26 +83,74 @@ export default function ComponentCatalog() {
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
       <section className="grid min-w-0 gap-4">
-        <SectionHeader
-          title={<h2>Course row and progress</h2>}
-          description="Controls appear only when the row overflows. Focus stays inside each card."
-        />
-        <CourseRow title="Example">
+        <CourseRow
+          title="Example"
+          heading={<h2>Learning cards and progress</h2>}
+          description="Courses and curricula share their layout. Controls appear only when the row overflows."
+        >
           {[0, 33, 100].map((value) => (
-            <ContentAction
+            <LearningCard
               key={value}
-              focusRing="inside"
-              className="grid gap-4 p-4"
-            >
-              <strong>Example course</strong>
-              <ProgressStatus
-                value={value}
-                complete={value === 100}
-                started={value > 0}
-              />
-            </ContentAction>
+              title={
+                value === 33
+                  ? "A longer curriculum title that wraps naturally"
+                  : "Example course"
+              }
+              description="Shared spacing, readable descriptions and aligned actions."
+              metadata={
+                value === 33 ? "1 of 3 courses complete" : "2 lessons · Quiz"
+              }
+              status={{
+                percent: value,
+                complete: value === 100,
+                started: value > 0,
+              }}
+              artwork={
+                <div className="course-art art-1">
+                  <span className="art-label">
+                    {value === 33 ? "Curriculum" : "Course"}
+                  </span>
+                </div>
+              }
+              action={value === 33 ? "View curriculum" : "Start course"}
+              onClick={() => {}}
+            />
           ))}
         </CourseRow>
+        <BrowseToolbar>
+          <Field>
+            Search
+            <SearchField>
+              <Input placeholder="Find a course…" />
+            </SearchField>
+          </Field>
+          <Field>
+            Channel
+            <SelectField value="all" onValueChange={() => {}}>
+              <option value="all">All channels</option>
+            </SelectField>
+          </Field>
+          <Field>
+            Sort
+            <SelectField value="recommended" onValueChange={() => {}}>
+              <option value="recommended">Recommended order</option>
+            </SelectField>
+          </Field>
+        </BrowseToolbar>
+        <LaunchList
+          items={[
+            {
+              id: "example",
+              title: "A course in a curriculum",
+              description: "2 lessons · 10 min",
+              status: (
+                <ProgressStatus value={0} started={false} complete={false} />
+              ),
+              action: "Start course",
+              onClick: () => {},
+            },
+          ]}
+        />
       </section>
       <Card>
         <Stack>

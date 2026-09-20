@@ -208,10 +208,10 @@ test("learner routes and narrow navigation remain usable", async ({
   await page.goto("/#courses");
   const firstChannel = page.locator(".library .channel").first();
   const channelHeading = await firstChannel
-    .locator(".channel-title")
+    .locator('[data-slot="section-header"]')
     .boundingBox();
   const channelCourses = await firstChannel
-    .locator(".course-row-wrap")
+    .locator(".course-row")
     .boundingBox();
   expect(channelCourses!.y).toBeGreaterThan(
     channelHeading!.y + channelHeading!.height,

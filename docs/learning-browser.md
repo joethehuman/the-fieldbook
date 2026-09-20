@@ -1,27 +1,22 @@
-# Learning browser and progress indicators
+# Learning browser and curriculum navigation
 
-The Courses home keeps the assigned-only completion summary and unfinished assigned queue. The full browser has four views: For you, In progress, Completed, and All courses. For you includes completed assignments by default; Hide completed removes them without changing channel grouping or recommended ordering. In progress and Completed include optional courses as well as assignments.
+The Courses home keeps an assigned-only completion summary and an unfinished queue. An assigned curriculum appears as one card in place of its constituent courses. Standalone assignments remain cards. The summary counts distinct courses, even when curricula overlap. Completed curricula disappear from the home queue and remain available in the full For you view.
 
-The same saved current-version progress drives every card. Valid lesson activity or a quiz attempt starts a course; opening it alone does not. Lessons plus a passed knowledge check fill the course ring. A curriculum ring counts completed courses, and empty playlists do not earn a completion check. Only group assignments affect the overall percentage, deduplicated through the existing learning model.
+The full browser has For you, In progress, Completed and All courses views. For you includes all assigned cards by default, with Hide completed beside the result count. In progress and Completed include optional courses. Search, one Channel dropdown and Sort share a labeled toolbar. Home uses channel headings without repeating channel filter buttons. Browse curricula opens the published curriculum collection.
 
-## Shared UI
+Curriculum cards open a simple page with description, completion, next-course action and an ordered launch list. All available published courses remain accessible, including completed ones. The next action chooses the first incomplete course. Course pages return to the curriculum, including after reload. Direct curriculum URLs work in demo and server routing.
 
-- `ProgressStatus` owns compact ring/check presentation and accessible text.
-- `CourseRow` owns resize/list/scroll observation and endpoint controls.
-- `ContentAction` offers an inside-focus-ring variant for clipped scrolling containers.
-- `SplitPanel` supports equal-height summary/course compositions.
-- Existing FilterOptions, Field, Checkbox, CardFooter and theme tokens remain the control system. The demo `/ui` catalog includes the new shared patterns.
+Current-version progress drives every indicator. Opening a course alone does not start it; valid lesson or quiz activity does. Course rings include the knowledge check; curriculum rings count completed courses. Empty curricula do not earn completion checks.
 
-The home queue always follows the saved recommendation. Browser sorting affects its collection only. No assignment, completion-write, authorization, schema or content mutation was added.
+## Shared patterns
 
-## Verification
+LearningCard and CardGrid own card anatomy, spacing and sizing. CourseRow owns its section heading, optional leading summary, overflow measurement and header-slot controls. BrowseToolbar aligns labeled collection controls. LaunchList owns the simple ordered learner list. These compose existing ContentAction, CardFooter, ProgressStatus, Field, SelectField and semantic tokens. The `/ui` catalog and design-system standards document their contracts. Superseded offsets and feature-local layout rules were removed.
 
-Locally verified using Node 22.23.2 and the repository's existing pnpm 10.17.1 dependency installation:
+## Verification for this iteration
 
-- 36 shared behavior tests and 10 server tests passed.
-- Demo and server builds passed; both TypeScript checks passed.
-- UI ownership check passed.
-- All 45 browser tests passed in installed Chrome across desktop, tablet and phone, including 200% text, filter keyboard operation, optional activity at 100% assigned completion, completion followed by reload, curriculum indicators, card height alignment, and scrolling endpoints/resize.
-- Reviewed screenshots of the home row, For you cards, phone layout and enlarged-text layout. Browser tests exercise synthetic, browser-local demo data. Hosted Google sign-in and authenticated Supabase persistence were not exercised by this change.
+- 40 shared model tests and 10 server tests passed, including assigned/inherited/overlapping curricula, standalone assignments, unavailable courses and current-version completion.
+- Demo and server builds passed; UI ownership and TypeScript checks passed.
+- Browser regression tests were updated for the new curriculum navigation, reload/return behavior, filters, alignment and existing optional-learning/overflow scenarios. They were not run locally in this iteration: browser access could not verify the administrator's policy for the local preview. Fresh visual review remains outstanding. Earlier screenshots and passing browser runs describe the preceding UI and are not evidence for this iteration.
+- No database migration, assignment write, authorization change or content change. Hosted Google sign-in and authenticated persistence were not exercised.
 
-Set `FIELDBOOK_TEST_PORT` to isolate this checkout's browser test server from another running demo (default remains 3117).
+Use FIELDBOOK_TEST_PORT to isolate the demo test server from another checkout (default 3117).

@@ -73,54 +73,70 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 
-test("For you defaults to all assignments and Hide completed preserves channel browsing", async ({
+test("For you uses curriculum cards, one channel picker and a simple ordered page", async ({
   page,
 }, info) => {
   await seed(page);
   const home = page.locator(".for-you");
-  await expect(home.locator(".course-card")).toHaveCount(2);
-  await expect(home.locator(".course-card").first()).toContainText(
-    "Know the platform",
+  await expect(home.locator(".course-card")).toHaveCount(1);
+  await expect(home.locator(".course-card")).toContainText(
+    "Account executive foundations",
   );
-  await expect(home.getByText("View assigned courses by group")).toHaveCount(0);
+  await expect(home.locator(".course-card")).toContainText(
+    "1 of 3 courses complete",
+  );
+  await expect(
+    page.getByRole("group", { name: "Course channels" }),
+  ).toHaveCount(0);
   if (info.project.name === "desktop") {
     const summary = await home.locator('[data-slot="card"]').boundingBox();
-    const course = await home.locator(".course-card").first().boundingBox();
-    expect(Math.abs(summary!.y - course!.y)).toBeLessThan(2);
-    expect(Math.abs(summary!.height - course!.height)).toBeLessThan(2);
+    const card = await home.locator(".course-card").boundingBox();
+    expect(Math.abs(summary!.y - card!.y)).toBeLessThan(2);
+    expect(Math.abs(summary!.height - card!.height)).toBeLessThan(2);
   }
   await page.screenshot({
     path: info.outputPath("learning-home.png"),
     fullPage: true,
   });
-  await expect(
-    page.locator(".curriculum-card [data-slot=progress-status]"),
-  ).toContainText("In progress");
   await page
     .getByRole("button", { name: "View all for you", exact: true })
     .click();
   const library = page.locator(".library");
-  await expect(library.locator(".course-card")).toHaveCount(3);
-  await expect(
-    page.getByRole("checkbox", { name: "Hide completed" }),
-  ).not.toBeChecked();
-  await expect(
-    library
-      .locator(".course-card")
-      .filter({ hasText: "Start with the customer" }),
-  ).toContainText("Completed");
+  await expect(library.locator(".course-card")).toHaveCount(1);
   await page.getByRole("checkbox", { name: "Hide completed" }).check();
-  await expect(library.locator(".course-card")).toHaveCount(2);
+  await expect(library.locator(".course-card")).toHaveCount(1);
+  await page.getByRole("combobox", { name: "Channel", exact: true }).click();
   await page
-    .getByRole("group", { name: "Course channels" })
-    .getByRole("button", { name: "Sales foundations", exact: true })
+    .getByRole("option", { name: "Sales foundations", exact: true })
     .click();
   await expect(library.locator(".course-card")).toHaveCount(1);
-  await page.getByRole("checkbox", { name: "Hide completed" }).uncheck();
-  await expect(library.locator(".course-card")).toHaveCount(2);
+  await library.locator(".course-card").click();
+  await expect(page).toHaveURL(/#curricula\/sales-foundations$/);
+  await expect(
+    page.getByRole("heading", {
+      name: "Account executive foundations",
+      level: 1,
+    }),
+  ).toBeVisible();
+  const rows = page.locator('[data-slot="launch-list"] li');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText("Start with the customer");
+  await expect(rows.nth(1)).toContainText("Know the platform");
+  await expect(rows.nth(2)).toContainText("From discovery to next steps");
+  await expect(page.getByRole("combobox")).toHaveCount(0);
+  await page.reload();
+  await page
+    .getByRole("button", { name: "Continue curriculum", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Know the platform", level: 1 }),
+  ).toBeVisible();
+  await page.reload();
+  await page.getByRole("button", { name: "Back to curriculum" }).click();
+  await expect(rows.nth(0)).toContainText("Completed");
   await noOverflow(page);
   await page.screenshot({
-    path: info.outputPath("for-you.png"),
+    path: info.outputPath("curriculum.png"),
     fullPage: true,
   });
 });
@@ -133,9 +149,7 @@ test("optional activity is resumable and all completions remain available at 100
     page.locator(".for-you").getByRole("img", { name: "100% complete" }),
   ).toBeVisible();
   await expect(page.locator(".for-you .course-card")).toHaveCount(0);
-  await expect(
-    page.locator(".curriculum-card [data-slot=progress-status]"),
-  ).toContainText("Completed");
+
   await page
     .getByRole("button", { name: "View in progress", exact: true })
     .click();
@@ -154,6 +168,7 @@ test("optional activity is resumable and all completions remain available at 100
     library.locator(".course-card").filter({ hasText: "Optional achievement" }),
   ).toBeVisible();
   await views.getByRole("button", { name: "For you", exact: true }).click();
+  await expect(library.locator(".course-card")).toContainText("Completed");
   await page.getByRole("checkbox", { name: "Hide completed" }).check();
   await expect(
     page.getByRole("heading", { name: "You’re up to date" }),
@@ -253,10 +268,12 @@ test("completion removes a course from the home queue and remains visible in bot
   await page.reload();
   await expect(page.locator(".for-you .course-card")).toHaveCount(1);
   await expect(page.locator(".for-you .course-card")).toContainText(
-    "From discovery to next steps",
+    "2 of 3 courses complete",
   );
   await expect(
-    page.locator(".for-you").getByRole("img", { name: "67% complete" }),
+    page
+      .locator('.for-you [data-slot="card"]')
+      .getByRole("img", { name: "67% complete" }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "View completed", exact: true })
@@ -266,7 +283,7 @@ test("completion removes a course from the home queue and remains visible in bot
     .getByRole("group", { name: "Course views", exact: true })
     .getByRole("button", { name: "For you", exact: true })
     .click();
-  await expect(page.locator(".library .course-card")).toHaveCount(3);
+  await expect(page.locator(".library .course-card")).toHaveCount(1);
   await page.getByRole("checkbox", { name: "Hide completed" }).focus();
   await page.keyboard.press("Space");
   await expect(page.locator(".library .course-card")).toHaveCount(1);

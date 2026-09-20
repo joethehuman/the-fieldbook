@@ -2,15 +2,22 @@
 import { Badge } from "@/components/ui/badge";
 import { SearchField } from "./patterns/search-field";
 import { Card } from "./ui/card";
-import { ProgressRing, ProgressStatus } from "./ui/progress";
-import { SplitPanel } from "./patterns/layout";
+import { ProgressRing } from "./ui/progress";
+import { BrowseToolbar } from "./patterns/layout";
+import { CardGrid } from "./patterns/learning-card";
+import { CurriculumCard } from "./CurriculumCard";
+import {
+  assignedLearningCards,
+  curriculumCourses,
+  curriculumProgress,
+  type LearningCardItem,
+} from "@/lib/learning-cards";
 import { FilterOptions } from "./patterns/filter-options";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import {
   Callout,
   PageHeader,
-  Toolbar,
   SectionHeader,
   EmptyState,
 } from "@/components/patterns/layout";
@@ -50,6 +57,7 @@ export default function Learning({
   progress,
   onOpen,
   onKnowledge,
+  onCurriculum,
   publicLearning = false,
   guest = false,
   onSignIn,
@@ -66,8 +74,11 @@ export default function Learning({
   progress: Progress[];
   onOpen: (id: string) => void;
   onKnowledge: () => void;
+  onCurriculum: (id: string) => void;
 }) {
-  const [view, setView] = useState<"home" | LearningCollection>("home");
+  const [view, setView] = useState<"home" | "curricula" | LearningCollection>(
+    "home",
+  );
   const [hideCompleted, setHideCompleted] = useState(false);
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState("All channels");
@@ -80,23 +91,98 @@ export default function Learning({
     courses,
     assigned,
     progress,
-    view === "home" ? "all" : view,
+    view === "home" || view === "curricula" ? "all" : view,
     hideCompleted,
   );
   const topics = Array.from(
     new Set((view === "assigned" ? assigned : source).map((c) => c.category)),
   );
   const sequence = requiredSequence(courses, user, groups);
+  const assignedCards = assignedLearningCards(
+    sequence,
+    curricula,
+    user,
+    groups,
+  );
+  const completeCard = (item: LearningCardItem) =>
+    item.kind === "course"
+      ? isComplete(item.course, progress)
+      : curriculumProgress(item.courses, progress).complete;
+  const cardCourses = (item: LearningCardItem) =>
+    item.kind === "course" ? [item.course] : item.courses;
+  const cardTitle = (item: LearningCardItem) =>
+    item.kind === "course" ? item.course.title : item.curriculum.name;
+  const displayCard = (item: LearningCardItem) =>
+    item.kind === "course" ? (
+      card(item.course)
+    ) : (
+      <CurriculumCard
+        key={item.curriculum.id}
+        curriculum={item.curriculum}
+        courses={item.courses}
+        progress={progress}
+        onClick={() => onCurriculum(item.curriculum.id)}
+      />
+    );
+  const browserCards = (
+    view === "curricula"
+      ? curricula
+          .filter((c) => c.status === "published")
+          .map((curriculum) => ({
+            kind: "curriculum" as const,
+            curriculum,
+            courses: curriculumCourses(curriculum, courses),
+          }))
+      : assignedCards
+  ).filter(
+    (item) =>
+      (!hideCompleted || !completeCard(item)) &&
+      (topic === "All channels" ||
+        cardCourses(item).some((c) => c.category === topic)) &&
+      [
+        cardTitle(item),
+        item.kind === "course"
+          ? item.course.summary
+          : item.curriculum.description,
+        ...cardCourses(item).map((c) => `${c.title} ${c.category}`),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()),
+  );
+  if (sort !== "recommended")
+    browserCards.sort((a, b) =>
+      sort === "title"
+        ? cardTitle(a).localeCompare(cardTitle(b))
+        : (sort === "oldest" ? 1 : -1) *
+          (
+            cardCourses(a)
+              .map((c) =>
+                sort === "added" ? c.createdAt || c.updatedAt : c.updatedAt,
+              )
+              .sort()
+              .at(-1) || ""
+          ).localeCompare(
+            cardCourses(b)
+              .map((c) =>
+                sort === "added" ? c.createdAt || c.updatedAt : c.updatedAt,
+              )
+              .sort()
+              .at(-1) || "",
+          ),
+    );
   const ranks = new Map(sequence.map((c, i) => [c.id, i]));
   const nextCourse = state.remaining[0];
   const viewTitle =
-    view === "assigned"
-      ? "For you"
-      : view === "in-progress"
-        ? "In progress"
-        : view === "completed"
-          ? "Completed"
-          : "All courses";
+    view === "curricula"
+      ? "Curricula"
+      : view === "assigned"
+        ? "For you"
+        : view === "in-progress"
+          ? "In progress"
+          : view === "completed"
+            ? "Completed"
+            : "All courses";
   const ordered = (items: Content[]) =>
     [...items].sort((a, b) => {
       if (sort === "recommended") {
@@ -191,72 +277,70 @@ export default function Learning({
       )}
       {view === "home" && !publicLearning && (
         <section className="for-you">
-          <SectionHeader
-            title={
+          <CourseRow
+            title="For you"
+            heading={
               <h2>
                 For you <Badge variant="default">{outstanding.length}</Badge>
               </h2>
             }
             description={
-              <>
-                {state.onboarding
-                  ? "Get up to speed at your pace."
-                  : "Build your knowledge and stay current."}
-              </>
+              state.onboarding
+                ? "Get up to speed at your pace."
+                : "Build your knowledge and stay current."
             }
-          ></SectionHeader>
-          <SplitPanel split={outstanding.length > 0} align="stretch">
-            <Card className="flex flex-col items-center justify-center gap-4 text-center">
-              {assigned.length > 0 ? (
-                <ProgressRing value={pct} />
-              ) : (
-                <div className="learning-status-icon">
-                  <BookOpen size={24} />
-                </div>
-              )}
-              <div className="grid gap-2">
-                <h3>
-                  {!assigned.length
-                    ? "Learn something new"
-                    : pct === 100
-                      ? "You’re up to date"
+            leading={
+              <Card className="flex flex-col items-center justify-center gap-4 text-center">
+                {assigned.length > 0 ? (
+                  <ProgressRing value={pct} />
+                ) : (
+                  <div className="learning-status-icon">
+                    <BookOpen size={24} />
+                  </div>
+                )}
+                <div className="grid gap-2">
+                  <h3>
+                    {!assigned.length
+                      ? "Learn something new"
+                      : pct === 100
+                        ? "You’re up to date"
+                        : state.onboarding
+                          ? "Get up to speed"
+                          : "Stay current"}
+                  </h3>
+                  <p>
+                    {assigned.length
+                      ? `${completed.length} of ${assigned.length} assigned courses complete`
+                      : "No assigned courses yet."}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {state.overdue.length
+                      ? `${state.overdue.length} courses past their target`
                       : state.onboarding
-                        ? "Get up to speed"
-                        : "Stay current"}
-                </h3>
-                <p>
-                  {assigned.length
-                    ? `${completed.length} of ${assigned.length} assigned courses complete`
-                    : "No assigned courses yet."}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {state.overdue.length
-                    ? `${state.overdue.length} courses past their target`
-                    : state.onboarding
-                      ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`
-                      : outstanding.length
-                        ? "You’re on track"
-                        : "Explore the library at your own pace."}
-                </p>
-              </div>
-              {nextCourse && (
-                <Button
-                  variant="default"
-                  className="mt-auto w-full"
-                  onClick={() => onOpen(nextCourse.id)}
-                >
-                  {courseProgress(nextCourse, progress).started
-                    ? "Continue course"
-                    : "Start course"}
-                </Button>
-              )}
-            </Card>
-            {outstanding.length ? (
-              <CourseRow title="For you">
-                {sequence.filter((c) => !isComplete(c, progress)).map(card)}
-              </CourseRow>
-            ) : null}
-          </SplitPanel>
+                        ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`
+                        : outstanding.length
+                          ? "You’re on track"
+                          : "Explore the library at your own pace."}
+                  </p>
+                </div>
+                {nextCourse && (
+                  <Button
+                    variant="default"
+                    className="mt-auto w-full"
+                    onClick={() => onOpen(nextCourse.id)}
+                  >
+                    {courseProgress(nextCourse, progress).started
+                      ? "Continue course"
+                      : "Start course"}
+                  </Button>
+                )}
+              </Card>
+            }
+          >
+            {assignedCards
+              .filter((item) => !completeCard(item))
+              .map(displayCard)}
+          </CourseRow>
           <div className="learning-links">
             <Button variant="link" onClick={() => changeView("assigned")}>
               View all for you <ArrowRight size={16} />
@@ -270,78 +354,8 @@ export default function Learning({
           </div>
         </section>
       )}
-      {view === "home" && curricula.some((c) => c.status === "published") && (
-        <section className="curricula-library">
-          <SectionHeader
-            title={<h2>Curricula</h2>}
-            description={
-              <> Explore a playlist of courses in a recommended order. </>
-            }
-          ></SectionHeader>
-          <div className="curricula-grid">
-            {curricula
-              .filter((c) => c.status === "published")
-              .map((c) => {
-                const items = c.courseIds.flatMap(
-                  (id) => courses.find((course) => course.id === id) || [],
-                );
-                return (
-                  <Card asChild key={c.id}>
-                    <details className="curriculum-card">
-                      <summary>
-                        <strong>{c.name}</strong>
-                        <ProgressStatus
-                          value={completionPercent(
-                            items.filter((course) =>
-                              isComplete(course, progress),
-                            ).length,
-                            items.length,
-                          )}
-                          complete={
-                            items.length > 0 &&
-                            items.every((course) =>
-                              isComplete(course, progress),
-                            )
-                          }
-                          started={items.some(
-                            (course) =>
-                              courseProgress(course, progress).started,
-                          )}
-                        />
-                        <span>
-                          {
-                            items.filter((course) =>
-                              isComplete(course, progress),
-                            ).length
-                          }{" "}
-                          of {items.length} courses complete
-                        </span>
-                      </summary>
-                      <p>{c.description}</p>
-                      <ol>
-                        {items.map((course) => (
-                          <li key={course.id}>
-                            <Button
-                              variant="link"
-                              onClick={() => onOpen(course.id)}
-                            >
-                              {course.title}
-                              {isComplete(course, progress)
-                                ? " · Complete"
-                                : ""}
-                            </Button>
-                          </li>
-                        ))}
-                      </ol>
-                    </details>
-                  </Card>
-                );
-              })}
-          </div>
-        </section>
-      )}
       <section className="library">
-        {view !== "home" && (
+        {view !== "home" && view !== "curricula" && (
           <FilterOptions
             label="Course views"
             value={view}
@@ -358,7 +372,7 @@ export default function Learning({
           title={<h2>{view === "home" ? "Explore the library" : viewTitle}</h2>}
           description={
             view === "assigned"
-              ? "Courses assigned to your learning groups, organized by channel."
+              ? "Courses and curricula assigned to your learning groups."
               : view === "in-progress"
                 ? "Continue any course you’ve started, assigned or optional."
                 : view === "completed"
@@ -367,15 +381,15 @@ export default function Learning({
           }
         >
           <span className="muted" role="status">
-            {filtered.length} {filtered.length === 1 ? "course" : "courses"}
+            {view === "assigned" || view === "curricula"
+              ? `${browserCards.length} items`
+              : `${filtered.length} courses`}
           </span>
           {view === "home" && (
             <Button variant="link" onClick={() => changeView("all")}>
               View all courses <ArrowRight size={16} />
             </Button>
           )}
-        </SectionHeader>
-        <Toolbar>
           {view === "assigned" && (
             <Field orientation="horizontal">
               <Checkbox
@@ -385,15 +399,42 @@ export default function Learning({
               Hide completed
             </Field>
           )}
-          <SearchField className="w-full max-w-sm">
-            <Input
-              aria-label="Filter courses"
-              placeholder="Find a course…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </SearchField>
-          <Field className="learning-sort">
+          {curricula.some((c) => c.status === "published") &&
+            view !== "curricula" && (
+              <Button variant="link" onClick={() => changeView("curricula")}>
+                Browse curricula <ArrowRight size={16} />
+              </Button>
+            )}
+        </SectionHeader>
+        <BrowseToolbar>
+          <Field>
+            Search
+            <SearchField>
+              <Input
+                aria-label="Filter courses"
+                placeholder="Find a course…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </SearchField>
+          </Field>
+          {view !== "home" && (
+            <Field>
+              Channel
+              <SelectField
+                aria-label="Channel"
+                value={topic}
+                onValueChange={setTopic}
+              >
+                {["All channels", ...topics].map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </SelectField>
+            </Field>
+          )}
+          <Field>
             Sort courses
             <SelectField value={sort} onValueChange={setSort}>
               <option value="recommended">Recommended order</option>
@@ -403,39 +444,38 @@ export default function Learning({
               <option value="oldest">Oldest update first</option>
             </SelectField>
           </Field>
-        </Toolbar>
-        <FilterOptions
-          label="Course channels"
-          value={topic}
-          onValueChange={setTopic}
-          options={["All channels", ...topics].map((value) => ({
-            value,
-            label: value,
-          }))}
-        />
-        {topics
-          .filter((t) => filtered.some((c) => c.category === t))
-          .map((t) => (
-            <div className="channel" key={t}>
-              <div className="channel-title">
-                <BookOpen size={19} />
-                <h3>{t}</h3>
-                <span>
-                  {filtered.filter((c) => c.category === t).length} courses
-                </span>
+        </BrowseToolbar>
+        {view === "assigned" || view === "curricula" ? (
+          <CardGrid>{browserCards.map(displayCard)}</CardGrid>
+        ) : (
+          topics
+            .filter((t) => filtered.some((c) => c.category === t))
+            .map((t) => (
+              <div className="channel" key={t}>
+                {view !== "home" && (
+                  <div className="channel-title">
+                    <BookOpen size={19} />
+                    <h3>{t}</h3>
+                    <span>
+                      {filtered.filter((c) => c.category === t).length} courses
+                    </span>
+                  </div>
+                )}
+                {view === "home" ? (
+                  <CourseRow title={t}>
+                    {filtered.filter((c) => c.category === t).map(card)}
+                  </CourseRow>
+                ) : (
+                  <CardGrid>
+                    {filtered.filter((c) => c.category === t).map(card)}
+                  </CardGrid>
+                )}
               </div>
-              {view === "home" ? (
-                <CourseRow title={t}>
-                  {filtered.filter((c) => c.category === t).map(card)}
-                </CourseRow>
-              ) : (
-                <div className="course-grid">
-                  {filtered.filter((c) => c.category === t).map(card)}
-                </div>
-              )}
-            </div>
-          ))}
-        {!filtered.length && (
+            ))
+        )}
+        {!(view === "assigned" || view === "curricula"
+          ? browserCards.length
+          : filtered.length) && (
           <EmptyState>
             <h3>
               {query || topic !== "All channels"

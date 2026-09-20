@@ -48,3 +48,11 @@ Leaving a linked team removes that membership source. Individual membership or a
 Reports count each course once per learner. Managers retain their existing team-and-descendant reporting scope. Administrators can mark a person's current course version complete or reset progress with revision checks and an audit record.
 
 See [learning groups installation and verification](learning-groups.md) before upgrading. This describes implementation, not proof of any installation's deployment state.
+
+### Curriculum presentation
+
+For you replaces courses contained in an explicitly assigned, published curriculum with a curriculum card. Inherited group assignments count. Standalone assigned courses remain visible; assigning the same curriculum through multiple groups does not duplicate its card. Overlapping curricula may both appear, but their shared courses still count only once in the overall assigned completion summary. Draft or unassigned curricula never suppress assigned course cards.
+
+The home queue hides complete cards; the full For you browser includes them unless Hide completed is selected. In progress and Completed remain course-level views across assigned and optional learning. Channel filtering matches a curriculum when one of its courses belongs to that channel; searching also matches its course titles. Optional curricula are accessible through Browse curricula.
+
+A curriculum opens at `/curricula/<id>` in the server application or `/#curricula/<id>` in the demo. Its simple page lists available published courses in saved order. Start/Continue launches the first incomplete course, and the course's Back to curriculum action preserves that context through reload using a curriculum query parameter. Sequence is recommended, not a prerequisite lock; completed courses remain available for review. The underlying assignment, completion and authorization rules are unchanged.

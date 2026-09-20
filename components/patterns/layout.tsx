@@ -208,3 +208,15 @@ export function Callout({ className, ...props }: ComponentProps<typeof Card>) {
     />
   );
 }
+
+/** Labeled collection controls share a baseline and wrap into whole fields. */
+export function BrowseToolbar({ children }: { children: ReactNode }) {
+  return (
+    <div
+      data-slot="browse-toolbar"
+      className="flex min-w-0 flex-wrap items-end gap-4 [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1"
+    >
+      {children}
+    </div>
+  );
+}
