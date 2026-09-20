@@ -4,6 +4,14 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Learning groups and curricula
+
+- Consolidate Groups and Required courses into Learning groups, with people/team membership, searchable course and curriculum selection, recommended sequencing, and Update targeting.
+- Add a separate Curricula builder and browsable published course playlists. Linked playlist edits update group learning lists while preserving valid completions and continuous assignment dates.
+- Show personalized Updates first, then other updates, without hiding content or counting updates toward learning completion. Standardize course organization as Channel.
+- Use assigned-learning and completion language, reserve 100% for full completion, and keep recognition/enforcement outside the platform.
+- Requires new migration `202609200004_learning_groups.sql` and matching code during a coordinated upgrade. See [upgrade and verification details](docs/learning-groups.md). No new environment variables or dependencies.
+
 - Restore the learning completion summary as a left-hand card with a prominent progress ring beside the For you courses. Stack the card above courses on smaller screens.
 
 - Replace the demo sign-in slogan with straightforward Fieldbook copy and update its browser title.

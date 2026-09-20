@@ -11,7 +11,11 @@ import {
   type Group,
   type Progress,
 } from "@/lib/types";
-import { learningState, requiredSequence } from "@/lib/learning";
+import {
+  completionPercent,
+  learningState,
+  requiredSequence,
+} from "@/lib/learning";
 import type { SiteSettings } from "@/lib/settings";
 import { ancestorIds, effectiveGroups } from "@/lib/types";
 import { CourseCard } from "./CourseCard";
@@ -64,6 +68,7 @@ function CourseRow({
 }
 
 export default function Learning({
+  curricula = [],
   settings,
   courses,
   user,
@@ -76,6 +81,7 @@ export default function Learning({
   guest = false,
   onSignIn,
 }: {
+  curricula?: import("@/lib/types").Curriculum[];
   settings?: SiteSettings;
   publicLearning?: boolean;
   guest?: boolean;
@@ -90,14 +96,12 @@ export default function Learning({
 }) {
   const [view, setView] = useState<"home" | "all" | "completed">("home");
   const [query, setQuery] = useState("");
-  const [topic, setTopic] = useState("All topics");
+  const [topic, setTopic] = useState("All channels");
   const [sort, setSort] = useState("recommended");
   const state = learningState(courses, user, groups, progress, settings);
   const completed = assigned.filter((c) => isComplete(c, progress));
   const outstanding = assigned.filter((c) => !isComplete(c, progress));
-  const pct = assigned.length
-    ? Math.round((completed.length / assigned.length) * 100)
-    : 100;
+  const pct = completionPercent(completed.length, assigned.length);
   const topics = Array.from(new Set(courses.map((c) => c.category)));
   const source =
     view === "all"
@@ -129,7 +133,7 @@ export default function Learning({
   const filtered = ordered(
     source.filter(
       (c) =>
-        (topic === "All topics" || c.category === topic) &&
+        (topic === "All channels" || c.category === topic) &&
         [c.title, c.summary, c.category]
           .join(" ")
           .toLowerCase()
@@ -151,7 +155,7 @@ export default function Learning({
   function changeView(next: typeof view) {
     setView(next);
     setQuery("");
-    setTopic("All topics");
+    setTopic("All channels");
   }
   return (
     <>
@@ -164,7 +168,7 @@ export default function Learning({
         <span className="eyebrow">YOUR ORGANIZATION</span>
         <h1>
           {view === "all"
-            ? "Required courses"
+            ? "Assigned courses"
             : view === "completed"
               ? "Completed courses"
               : "Courses"}
@@ -255,14 +259,14 @@ export default function Learning({
                     background: `conic-gradient(var(--accent, #0069ff) ${pct}%, #e4eaf5 0)`,
                   }}
                   role="img"
-                  aria-label={`${pct}% current`}
+                  aria-label={`${pct}% complete`}
                 >
                   <div>
                     <strong>
                       {pct}
                       <small>%</small>
                     </strong>
-                    <span>current</span>
+                    <span>complete</span>
                   </div>
                 </div>
               ) : (
@@ -282,18 +286,18 @@ export default function Learning({
                 </h3>
                 <p>
                   {assigned.length
-                    ? `${completed.length} of ${assigned.length} required courses complete`
-                    : "No required courses right now."}
+                    ? `${completed.length} of ${assigned.length} assigned courses complete`
+                    : "No assigned courses yet."}
                 </p>
                 <span className="current-caption">
                   {state.overdue.length
-                    ? `${state.overdue.length} courses need attention`
+                    ? `${state.overdue.length} courses past their target`
                     : state.onboarding
                       ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days remaining · Onboarding target ${state.target}`
                       : outstanding.length
-                        ? `${outstanding.length} courses to catch up on · You’re on track`
+                        ? `${outstanding.length} courses to complete`
                         : assigned.length
-                          ? "All required courses is complete."
+                          ? "All assigned courses are complete."
                           : "Explore the library at your own pace."}
                 </span>
               </div>
@@ -314,7 +318,7 @@ export default function Learning({
           </div>
           {!!outstanding.length && (
             <details className="learning-by-group">
-              <summary>View required courses by group</summary>
+              <summary>View assigned courses by group</summary>
               {groups
                 .filter((g) => effectiveGroups(user, groups).has(g.id))
                 .sort(
@@ -344,7 +348,7 @@ export default function Learning({
           )}
           <div className="learning-links">
             <button className="text-button" onClick={() => changeView("all")}>
-              View required courses <ArrowRight size={16} />
+              View assigned courses <ArrowRight size={16} />
             </button>
             <button
               className="text-button"
@@ -355,6 +359,53 @@ export default function Learning({
           </div>
         </section>
       )}
+      {view === "home" && curricula.some((c) => c.status === "published") && (
+        <section className="curricula-library">
+          <div className="section-heading">
+            <div>
+              <h2>Curricula</h2>
+              <p>Explore a playlist of courses in a recommended order.</p>
+            </div>
+          </div>
+          <div className="curricula-grid">
+            {curricula
+              .filter((c) => c.status === "published")
+              .map((c) => {
+                const items = c.courseIds.flatMap(
+                  (id) => courses.find((course) => course.id === id) || [],
+                );
+                return (
+                  <details className="curriculum-card" key={c.id}>
+                    <summary>
+                      <strong>{c.name}</strong>
+                      <span>
+                        {
+                          items.filter((course) => isComplete(course, progress))
+                            .length
+                        }{" "}
+                        of {items.length} courses complete
+                      </span>
+                    </summary>
+                    <p>{c.description}</p>
+                    <ol>
+                      {items.map((course) => (
+                        <li key={course.id}>
+                          <button
+                            className="text-button"
+                            onClick={() => onOpen(course.id)}
+                          >
+                            {course.title}
+                            {isComplete(course, progress) ? " · Complete" : ""}
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  </details>
+                );
+              })}
+          </div>
+        </section>
+      )}
       <section className="library">
         <div className="section-heading">
           <div>
@@ -362,13 +413,13 @@ export default function Learning({
               {view === "home"
                 ? "Explore the library"
                 : view === "all"
-                  ? "Required courses"
+                  ? "Assigned courses"
                   : "Completed courses"}
             </h2>
             <p>
               {view === "home"
                 ? "Follow your curiosity. There’s always something to discover."
-                : "Browse by topic or find a specific course."}
+                : "Browse by channel or find a specific course."}
             </p>
           </div>
           <span className="muted" role="status">
@@ -387,7 +438,7 @@ export default function Learning({
           </label>
         </div>
         <div className="topic-tabs">
-          {["All topics", ...topics].map((t) => (
+          {["All channels", ...topics].map((t) => (
             <button
               key={t}
               aria-pressed={topic === t}
@@ -423,14 +474,14 @@ export default function Learning({
         {!filtered.length && (
           <div className="empty">
             <h3>
-              {view === "completed" && !query && topic === "All topics"
+              {view === "completed" && !query && topic === "All channels"
                 ? "Your learning story starts here."
                 : "No courses found"}
             </h3>
             <p>
               {view === "completed"
                 ? "Completed courses will appear here. Try another filter or return to courses."
-                : "Try another topic or search term."}
+                : "Try another channel or search term."}
             </p>
           </div>
         )}

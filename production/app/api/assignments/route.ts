@@ -9,7 +9,14 @@ import {
 import { db } from "@production/lib/db";
 const schema = z
   .object({
-    operation: z.enum(["assign", "unassign", "complete", "reset"]),
+    operation: z.enum([
+      "assign",
+      "unassign",
+      "complete",
+      "reset",
+      "target",
+      "untarget",
+    ]),
     contentId: z.uuid(),
     expected: z.number().int().positive(),
     groupId: z.string().min(1).max(80).optional(),
@@ -30,12 +37,12 @@ const schema = z
         message: "Choose a person and current course progress.",
       });
     if (
-      ["assign", "unassign"].includes(a.operation) &&
+      ["assign", "unassign", "target", "untarget"].includes(a.operation) &&
       (!a.groupId || a.userId)
     )
       ctx.addIssue({
         code: "custom",
-        message: "Required learning belongs to a group.",
+        message: "Choose a learning group.",
       });
   });
 export async function POST(req: Request) {

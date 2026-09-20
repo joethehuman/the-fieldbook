@@ -75,13 +75,15 @@ const runtime: FieldbookRuntime = {
     if (
       JSON.stringify(before.users) !== JSON.stringify(after.users) ||
       JSON.stringify(before.groups) !== JSON.stringify(after.groups) ||
-      JSON.stringify(before.teams) !== JSON.stringify(after.teams)
+      JSON.stringify(before.teams) !== JSON.stringify(after.teams) ||
+      JSON.stringify(before.curricula) !== JSON.stringify(after.curricula)
     )
       await request("/api/governance", {
         expected: before.governanceRevision,
         users: after.users,
         groups: after.groups,
         teams: after.teams || [],
+        curricula: after.curricula || [],
       });
     const pendingBefore = before.pendingUsers || [],
       pendingAfter = after.pendingUsers || [];

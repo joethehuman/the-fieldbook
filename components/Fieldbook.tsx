@@ -1,4 +1,6 @@
 "use client";
+import Updates from "./Updates";
+import { reconcileLearning } from "@/lib/learning-groups";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import {
@@ -87,7 +89,11 @@ export default function Fieldbook({
     try {
       setData(loadWorkspace());
       const savedProfile = sessionStorage.getItem(SESSION);
-      setUid(savedProfile && DEMO_PROFILE_IDS.includes(savedProfile) ? savedProfile : "demo-learner");
+      setUid(
+        savedProfile && DEMO_PROFILE_IDS.includes(savedProfile)
+          ? savedProfile
+          : "demo-learner",
+      );
     } catch (e) {
       setError((e as Error).message);
     }
@@ -142,8 +148,9 @@ export default function Fieldbook({
       return;
     }
     try {
-      saveWorkspace(next);
-      setData(next);
+      const reconciled = reconcileLearning(data || next, next);
+      saveWorkspace(reconciled);
+      setData(reconciled);
       setError("");
     } catch {
       setError(
@@ -247,7 +254,11 @@ export default function Fieldbook({
             <div className="profile-list">
               {data.users
                 .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
-                .sort((a, b) => DEMO_PROFILE_IDS.indexOf(a.id) - DEMO_PROFILE_IDS.indexOf(b.id))
+                .sort(
+                  (a, b) =>
+                    DEMO_PROFILE_IDS.indexOf(a.id) -
+                    DEMO_PROFILE_IDS.indexOf(b.id),
+                )
                 .map((u) => (
                   <button key={u.id} onClick={() => login(u.id)}>
                     <span className="avatar">{initials(u.name)}</span>
@@ -283,9 +294,6 @@ export default function Fieldbook({
   const progress = data.progress[user.id] || [];
   const assigned = assignedCourses(visible, user, data.groups);
   const completed = assigned.filter((c) => isComplete(c, progress)).length;
-  const pct = assigned.length
-    ? Math.round((completed / assigned.length) * 100)
-    : 100;
   const query = search.trim().toLowerCase();
   const results = visible.filter((c) =>
     [c.title, c.summary, c.body, c.category, c.folder]
@@ -643,6 +651,7 @@ export default function Fieldbook({
             <Learning
               key={user.id}
               courses={courses}
+              curricula={data.curricula || []}
               user={user}
               groups={data.groups}
               assigned={assigned}
@@ -717,34 +726,13 @@ export default function Fieldbook({
                 title="Updates"
                 description="The latest updates, launch briefs, and ideas worth sharing."
               />
-              <div className="brief-list">
-                {visible
-                  .filter((c) => c.kind === "brief")
-                  .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-                  .map((b, i) => (
-                    <button
-                      className={"brief-card " + (i === 0 ? "featured" : "")}
-                      key={b.id}
-                      onClick={() => navigate("briefs", b.id)}
-                    >
-                      <div className={"brief-art art-" + (i % 6)}>
-                        <span>UPDATES</span>
-                        <ArrowUpRight size={36} />
-                      </div>
-                      <div className="brief-copy">
-                        <span className="eyebrow">{b.category}</span>
-                        <h2>{b.title}</h2>
-                        <p>{b.summary}</p>
-                        <span className="brief-date">
-                          {date(b.updatedAt)}{" "}
-                          <span>
-                            Read the update <ArrowRight size={16} />
-                          </span>
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-              </div>
+              <Updates
+                content={visible}
+                user={user}
+                groups={data.groups}
+                guest={!!runtime && uid === "guest"}
+                onOpen={(id) => navigate("briefs", id)}
+              />
             </>
           )}
           <footer>

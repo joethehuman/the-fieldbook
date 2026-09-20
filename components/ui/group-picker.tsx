@@ -20,7 +20,8 @@ export function GroupPicker({
         Groups <span>{value.length} selected</span>
       </legend>
       <p className="field-help">
-        Group membership determines required courses.
+        Learning groups personalize courses and updates. Everyone can explore
+        the library.
       </p>
       {groups.length > 6 && (
         <input

@@ -1,7 +1,11 @@
 "use client";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
-import { learningState, learningTarget } from "@/lib/learning";
+import {
+  completionPercent,
+  learningState,
+  learningTarget,
+} from "@/lib/learning";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
 import {
@@ -263,8 +267,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
         </label>
       </div>
       <p className="muted">
-        Includes subteams. Currentness uses the latest published course
-        versions.
+        Includes subteams. Completion uses the latest published course versions.
       </p>
       <div className="report-summary">
         <strong>{users.length} people</strong>
@@ -273,7 +276,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
         </span>
         <span>
           {total
-            ? Math.round((done / total) * 100) + "% current"
+            ? completionPercent(done, total) + "% complete"
             : "No assignments"}
         </span>
       </div>
@@ -283,9 +286,9 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             <tr>
               <th>Team member</th>
               <th>Team</th>
-              <th>Required</th>
+              <th>Assigned</th>
               <th>Completed</th>
-              <th>Current</th>
+              <th>Complete</th>
               <th />
             </tr>
           </thead>
@@ -316,7 +319,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                 <td>{completed}</td>
                 <td>
                   {assigned.length
-                    ? Math.round((completed / assigned.length) * 100) + "%"
+                    ? completionPercent(completed, assigned.length) + "%"
                     : "—"}
                 </td>
                 <td>
@@ -362,7 +365,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                 </div>
               );
             })}
-            {!assigned.length && <p>No required courses.</p>}
+            {!assigned.length && <p>No assigned courses.</p>}
           </section>
         ))}
     </>

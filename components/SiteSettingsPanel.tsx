@@ -358,7 +358,7 @@ export default function SiteSettingsPanel({
           <legend>Course completion windows</legend>
           <p>
             Publishing adds to the library. Only courses selected for a group
-            become required courses.
+            join that group’s assigned learning list.
           </p>
           <label>
             New user onboarding window (days)
@@ -393,7 +393,7 @@ export default function SiteSettingsPanel({
             />
           </label>
           <small>
-            Newly required courses get a full catch-up window, even near the end
+            Newly assigned courses get a full catch-up window, even near the end
             of onboarding. Changes recalculate targets for everyone.
           </small>
         </fieldset>

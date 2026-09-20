@@ -95,9 +95,9 @@ export function Assignments({
       await onAction(action);
       setNotice(
         action.operation === "assign"
-          ? "Required courses updated."
+          ? "Assigned courses updated."
           : action.operation === "unassign"
-            ? "Requirement removed. Course history preserved."
+            ? "Assignment removed. Course history preserved."
             : action.operation === "complete"
               ? "Course marked complete."
               : "Progress reset.",
@@ -165,7 +165,7 @@ export function Assignments({
                 </td>
                 <td>
                   {done
-                    ? "Current"
+                    ? "Complete"
                     : target && target < new Date().toISOString().slice(0, 10)
                       ? "Needs attention"
                       : "On track"}
@@ -231,10 +231,10 @@ export function Assignments({
     <section className="assignments-panel">
       <div className="assignment-heading">
         <div>
-          <h2>{person ? "Courses & progress" : "Required courses"}</h2>
+          <h2>{person ? "Courses & progress" : "Assigned courses"}</h2>
           <p className="muted">
             {person
-              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Required courses come from group membership.`
+              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Assigned courses come from group membership.`
               : "Choose the courses each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
           </p>
         </div>
@@ -274,7 +274,7 @@ export function Assignments({
           }}
         >
           <label>
-            Add required course
+            Add course
             <SelectField
               value={
                 available.some((c) => c.id === courseId)
@@ -296,16 +296,16 @@ export function Assignments({
             </SelectField>
           </label>
           <Button variant="default" disabled={busy || !available.length}>
-            Add to required courses
+            Add to assigned courses
           </Button>
         </form>
       )}
       {!person && !group && (
-        <p>Create a group to define its required courses.</p>
+        <p>Create a group to define its assigned courses.</p>
       )}
       <p className="muted">
         {data.settings?.onboardingDays ?? 90} days for new users ·{" "}
-        {data.settings?.catchUpDays ?? 30} days to catch up with new required
+        {data.settings?.catchUpDays ?? 30} days to catch up with new assigned
         courses. Manage these windows in Settings.
       </p>
       {notice && <p role="status">{notice}</p>}
@@ -314,7 +314,7 @@ export function Assignments({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search required courses"
+          placeholder="Search assigned courses"
         />
       </label>
       <div className="table-wrap">
@@ -322,7 +322,7 @@ export function Assignments({
           <thead>
             <tr>
               <th>Course</th>
-              <th>Required through</th>
+              <th>Assigned through</th>
               <th>Completion</th>
               <th>Actions</th>
             </tr>
@@ -405,7 +405,7 @@ export function Assignments({
                               onClick={async () => {
                                 if (
                                   await confirm(
-                                    `Remove ${c.title} from ${group?.name} required courses? Progress and other group requirements are preserved.`,
+                                    `Remove ${c.title} from ${group?.name} assigned courses? Progress and other group requirements are preserved.`,
                                   )
                                 )
                                   void act({
@@ -416,7 +416,7 @@ export function Assignments({
                                   });
                               }}
                             >
-                              Remove requirement
+                              Remove assignment
                             </button>
                           </>
                         )}
@@ -440,7 +440,7 @@ export function Assignments({
         </table>
         {!ordered.length && (
           <p className="empty">
-            No required courses yet. The full library remains available.
+            No assigned courses yet. The full library remains available.
           </p>
         )}
       </div>

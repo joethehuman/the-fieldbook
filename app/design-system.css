@@ -1724,3 +1724,196 @@ td .action-group {
 .mcp-manage p {
   margin: 0;
 }
+
+/* Learning groups and reusable course playlists */
+.learning-admin {
+  max-width: 1050px;
+}
+.learning-admin h2,
+.learning-admin h3 {
+  margin: 1rem 0 0.5rem;
+}
+.learning-admin p {
+  color: var(--muted-foreground, #64748b);
+}
+.learning-admin-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 14px;
+}
+.learning-admin label,
+.group-create label {
+  display: grid;
+  gap: 7px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.learning-admin input:not([type="checkbox"]),
+.learning-admin select,
+.learning-admin textarea {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid #dfe3e8;
+  border-radius: 6px;
+  background: white;
+  color: #1f2937;
+  font: inherit;
+}
+.group-create {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin: 24px 0;
+}
+.group-create label {
+  flex: 1;
+}
+.learning-order {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0;
+  display: grid;
+  gap: 8px;
+}
+.learning-order li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+  background: white;
+}
+.order-handle {
+  cursor: grab;
+  border: 0;
+  background: none;
+  color: #64748b;
+  padding: 6px;
+}
+.order-handle:focus-visible {
+  outline: 2px solid var(--accent);
+  border-radius: 4px;
+}
+.order-position {
+  color: #64748b;
+  font-size: 13px;
+}
+.order-copy {
+  flex: 1;
+  min-width: 0;
+}
+.order-copy strong {
+  overflow-wrap: anywhere;
+}
+.order-copy small,
+.learning-search-result small,
+.membership-person small {
+  display: block;
+  color: #64748b;
+  margin-top: 4px;
+  font-size: 12px;
+}
+.order-actions {
+  display: flex;
+  gap: 2px;
+}
+.learning-search-results,
+.membership-list {
+  max-height: 370px;
+  overflow: auto;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+}
+.learning-search-results:empty {
+  border: 0;
+}
+.learning-search-result,
+.membership-person {
+  display: flex !important;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid #edf0f2;
+}
+.learning-search-result > span,
+.membership-person > span {
+  flex: 1;
+  min-width: 0;
+}
+.learning-search-result strong {
+  font-size: 14px;
+}
+.learning-admin .group-picker-option {
+  display: flex;
+}
+.learning-admin .button-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.updates-section {
+  margin-bottom: 36px;
+}
+.brief-copy h3 {
+  font-size: 25px;
+  letter-spacing: -0.6px;
+  line-height: 1.2;
+  margin: 10px 0;
+}
+.curricula-library {
+  margin: 32px 0;
+}
+.curricula-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 16px;
+}
+.curriculum-card {
+  padding: 18px;
+  background: white;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+}
+.curriculum-card summary {
+  cursor: pointer;
+}
+.curriculum-card summary span {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin: 6px 0;
+}
+.curriculum-card p {
+  font-size: 14px;
+  color: #64748b;
+}
+.curriculum-card li {
+  padding: 6px 0;
+}
+@media (max-width: 600px) {
+  .group-create {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .learning-order li {
+    gap: 5px;
+    padding: 8px;
+    flex-wrap: wrap;
+  }
+  .order-copy {
+    flex-basis: 60%;
+  }
+  .order-actions {
+    margin-left: auto;
+  }
+  .learning-admin .section-heading {
+    align-items: start;
+    flex-direction: column;
+    gap: 10px;
+  }
+}

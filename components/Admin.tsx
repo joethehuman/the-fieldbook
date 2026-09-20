@@ -1,8 +1,10 @@
 "use client";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { SelectField } from "./ui/select";
+import LearningGroups from "./LearningGroups";
+import Curricula from "./Curricula";
+import { groupItems } from "@/lib/learning-groups";
 import { Assignments, type LearningHandler } from "./Assignments";
-import { assignmentRules, assignmentKey } from "@/lib/learning";
 import DocSectionCreate from "./DocSectionCreate";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
@@ -46,15 +48,9 @@ import MarkdownEditor, { type UploadMedia } from "./MarkdownEditor";
 import SiteSettingsPanel from "./SiteSettingsPanel";
 import { FeedbackAdmin } from "./Feedback";
 import { TeamsAdmin, TeamProgress } from "./Teams";
-import { canParent, type Assignment } from "@/lib/types";
 import { videoSource } from "@/lib/video";
 import type { Workspace } from "@/lib/store";
-import {
-  assignedCourses,
-  isComplete,
-  type Content,
-  type User,
-} from "@/lib/types";
+import { effectiveGroups, type Content, type User } from "@/lib/types";
 const adminSections = [
   {
     label: "Publishing",
@@ -84,8 +80,8 @@ const adminSections = [
       },
       {
         id: "groups",
-        name: "Groups",
-        description: "Organize the audiences for required courses.",
+        name: "Learning groups",
+        description: "Manage people, assigned courses, and relevant updates.",
         icon: Layers,
       },
       {
@@ -95,9 +91,9 @@ const adminSections = [
         icon: Users,
       },
       {
-        id: "assignments",
-        name: "Required courses",
-        description: "Choose what each group needs to know.",
+        id: "curricula",
+        name: "Curricula",
+        description: "Build reusable playlists of courses.",
         icon: Layers,
       },
       {
@@ -168,12 +164,11 @@ export default function Admin({
   onUpload,
   onLearning,
 }: Props) {
-  const { confirm, prompt } = useInteractionDialog();
+  const { confirm } = useInteractionDialog();
   const [settingsPending, setSettingsPending] = useState(false);
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
     [person, setPerson] = useState<User | null>(null),
-    [groupName, setGroupName] = useState(""),
     [notice, setNotice] = useState(""),
     [filter, setFilter] = useState("all"),
     [query, setQuery] = useState(""),
@@ -182,7 +177,6 @@ export default function Admin({
     [peopleRole, setPeopleRole] = useState("all"),
     [peopleGroup, setPeopleGroup] = useState("all"),
     [peopleStatus, setPeopleStatus] = useState("all"),
-    [groupParent, setGroupParent] = useState(""),
     [detailScope, setDetailScope] = useState<{
       groupId?: string;
       userId?: string;
@@ -191,18 +185,22 @@ export default function Admin({
     if (onLearning) return onLearning(action);
     const next = structuredClone(data);
     const c = next.content.find((c) => c.id === action.contentId)!;
-    if (action.operation === "assign" || action.operation === "unassign") {
-      c.assignments = assignmentRules(c).filter(
-        (a) => assignmentKey(a) !== assignmentKey(action),
-      );
-      if (action.operation === "assign")
-        c.assignments.push({
-          groupId: action.groupId,
-          userId: action.userId,
-          assignedAt: new Date().toISOString(),
-          due: action.due!,
-        });
-      c.groups = c.assignments.flatMap((a) => (a.groupId ? [a.groupId] : []));
+    if (action.operation === "target" || action.operation === "untarget") {
+      c.groups = c.groups.filter((id) => id !== action.groupId);
+      if (action.operation === "target") c.groups.push(action.groupId!);
+    } else if (
+      action.operation === "assign" ||
+      action.operation === "unassign"
+    ) {
+      next.groups = next.groups.map((g) => {
+        if (g.id !== action.groupId) return g;
+        const items = groupItems(g, next.content).filter(
+          (i) => i.kind !== "course" || i.id !== c.id,
+        );
+        if (action.operation === "assign")
+          items.push({ kind: "course", id: c.id });
+        return { ...g, learningItems: items };
+      });
     } else {
       const list = next.progress[action.userId!] || [];
       next.progress[action.userId!] = [
@@ -227,7 +225,7 @@ export default function Admin({
       title: "",
       summary: "",
       body: "",
-      category: kind === "course" ? "New topic" : "General",
+      category: kind === "course" ? "New channel" : "General",
       folder: "",
       status: "draft",
       version: 1,
@@ -313,80 +311,55 @@ export default function Admin({
         onWorkspaceChange={onChange}
       />
     );
-  if (detailScope) {
-    const group = data.groups.find((g) => g.id === detailScope.groupId);
+  if (detailScope?.groupId)
+    return (
+      <>
+        <button
+          className="text-button"
+          onClick={() => {
+            setDetailScope(null);
+            setTab("groups");
+          }}
+        >
+          ← Administration
+        </button>
+        <LearningGroups
+          data={data}
+          onChange={onChange}
+          onLearning={manageLearning}
+          initialGroup={detailScope.groupId}
+        />
+      </>
+    );
+  if (detailScope?.userId) {
     const person = data.users.find((u) => u.id === detailScope.userId);
     return (
       <>
         <button
           className="text-button"
           onClick={() => {
-            setTab(group ? "groups" : "people");
+            setTab("people");
             setDetailScope(null);
           }}
         >
-          <ArrowLeft size={16} />
-          Back to {group ? "groups" : "people"}
+          <ArrowLeft size={16} /> Back to people
         </button>
         <div className="page-heading">
-          <h1>{group?.name || person?.name}</h1>
-          <p>
-            {group
-              ? "Manage this group’s members and required courses."
-              : person?.email}
-          </p>
+          <h1>{person?.name}</h1>
+          <p>{person?.email}</p>
         </div>
         <Assignments
-          key={JSON.stringify(detailScope)}
+          key={detailScope.userId}
           data={data}
           scope={detailScope}
           onAction={manageLearning}
           onChange={onChange}
           onOpenGroup={(groupId) => setDetailScope({ groupId })}
         />
-        {group && (
-          <section>
-            <h2>Direct members</h2>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Person</th>
-                    <th>Role</th>
-                    <th>Courses</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.users
-                    .filter((u) => u.groups.includes(group.id))
-                    .map((u) => (
-                      <tr key={u.id}>
-                        <td>
-                          {u.name}
-                          <small>{u.email}</small>
-                        </td>
-                        <td>{u.role}</td>
-                        <td>
-                          <button
-                            onClick={() => setDetailScope({ userId: u.id })}
-                          >
-                            View courses
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="muted">
-              Manage group membership from People → Edit. Requirements also
-              apply to members of descendant groups.
-            </p>
-          </section>
-        )}
       </>
     );
   }
+
   return (
     <>
       <div className="page-heading admin-page-heading">
@@ -404,7 +377,7 @@ export default function Admin({
           if (
             settingsPending &&
             !(await confirm(
-              "Leave this settings page? Unsaved changes will be discarded.",
+              "Leave this page? Unsaved changes will be discarded.",
             ))
           )
             return;
@@ -524,12 +497,12 @@ export default function Admin({
                   />
                 </label>
                 <label>
-                  Topic / category
+                  Channel / category
                   <SelectField
                     value={category}
                     onValueChange={(value) => setCategory(value)}
                   >
-                    <option value="all">All topics</option>
+                    <option value="all">All channels / categories</option>
                     {[
                       ...new Set(
                         data.content
@@ -691,7 +664,7 @@ export default function Admin({
                 <p className="muted">
                   Applies to newly added users and new self-registrations. You
                   can override the stage and start date for each person. Group
-                  membership still determines required courses.
+                  membership still determines assigned courses.
                 </p>
               </section>
               {production && <PendingPeople data={data} onChange={onChange} />}
@@ -801,7 +774,7 @@ export default function Admin({
                             .includes(query.toLowerCase()) &&
                           (peopleRole === "all" || u.role === peopleRole) &&
                           (peopleGroup === "all" ||
-                            u.groups.includes(peopleGroup)) &&
+                            effectiveGroups(u, data.groups).has(peopleGroup)) &&
                           (peopleStatus === "all" ||
                             u.active === (peopleStatus === "active")),
                       )
@@ -819,7 +792,9 @@ export default function Admin({
                           <td>{u.role}</td>
                           <td>
                             {data.groups
-                              .filter((g) => u.groups.includes(g.id))
+                              .filter((g) =>
+                                effectiveGroups(u, data.groups).has(g.id),
+                              )
                               .map((g) => g.name)
                               .join(", ") || "No groups"}
                           </td>
@@ -846,179 +821,18 @@ export default function Admin({
                 </table>
               </div>
             </>
-          ) : tab === "assignments" ? (
-            <Assignments
+          ) : tab === "curricula" ? (
+            <Curricula
               data={data}
-              onAction={manageLearning}
               onChange={onChange}
-              onOpenGroup={(groupId) => setDetailScope({ groupId })}
+              onEditingChange={setSettingsPending}
             />
           ) : tab === "groups" ? (
-            <>
-              <form
-                className="group-form"
-                onSubmit={async (e) => {
-                  e.preventDefault();
-                  const name = groupName.trim();
-                  if (!name) return;
-                  if (
-                    data.groups.some(
-                      (g) => g.name.toLowerCase() === name.toLowerCase(),
-                    )
-                  ) {
-                    setNotice("That group already exists.");
-                    return;
-                  }
-                  try {
-                    await onChange({
-                      ...data,
-                      groups: [
-                        ...data.groups,
-                        { id: id(), name, parentId: groupParent || undefined },
-                      ],
-                    });
-                    setGroupName("");
-                    setNotice(
-                      "Group added. Assign profiles and courses to this group.",
-                    );
-                  } catch (e) {
-                    setNotice((e as Error).message);
-                  }
-                }}
-              >
-                <label>
-                  New group name
-                  <input
-                    required
-                    maxLength={80}
-                    value={groupName}
-                    onChange={(e) => setGroupName(e.target.value)}
-                    placeholder="e.g. Customer success"
-                  />
-                </label>
-                <label>
-                  Parent group
-                  <SelectField
-                    value={groupParent}
-                    onValueChange={(value) => setGroupParent(value)}
-                  >
-                    <option value="">Top-level group</option>
-                    {data.groups.map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                  </SelectField>
-                </label>
-                <Button variant="default">
-                  <Plus size={16} />
-                  Create group
-                </Button>
-              </form>
-              <div className="group-grid">
-                {data.groups.map((g) => (
-                  <section className="group-card" key={g.id}>
-                    <Layers />
-                    <h2>{g.name}</h2>
-                    <label>
-                      Parent group
-                      <SelectField
-                        value={g.parentId || ""}
-                        onValueChange={(value) =>
-                          Promise.resolve(
-                            onChange({
-                              ...data,
-                              groups: data.groups.map((x) =>
-                                x.id === g.id
-                                  ? { ...x, parentId: value || undefined }
-                                  : x,
-                              ),
-                            }),
-                          ).catch((e) => setNotice(e.message))
-                        }
-                      >
-                        <option value="">Top-level group</option>
-                        {data.groups
-                          .filter((x) => canParent(g.id, x.id, data.groups))
-                          .map((x) => (
-                            <option key={x.id} value={x.id}>
-                              {x.name}
-                            </option>
-                          ))}
-                      </SelectField>
-                    </label>
-                    <small>
-                      Members inherit required courses from parent groups.
-                    </small>
-                    <p>
-                      {data.users.filter((u) => u.groups.includes(g.id)).length}{" "}
-                      profiles ·{" "}
-                      {
-                        data.content.filter(
-                          (c) =>
-                            c.kind === "course" &&
-                            c.groups.includes(g.id) &&
-                            c.status === "published",
-                        ).length
-                      }{" "}
-                      required courses
-                    </p>
-                    <div className="group-card-actions">
-                      <Button
-                        variant="outline"
-
-                        onClick={() => setDetailScope({ groupId: g.id })}
-                      >
-                        Manage group
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label={`Actions for ${g.name}`}
-                          >
-                            <MoreHorizontal size={16} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onSelect={async () => {
-                              // Let the menu close and restore trigger focus before opening a dialog.
-                              await new Promise<void>((resolve) =>
-                                setTimeout(resolve, 0),
-                              );
-                              const name = (
-                                await prompt("Group name", g.name)
-                              )?.trim();
-                              if (
-                                name &&
-                                !data.groups.some(
-                                  (x) =>
-                                    x.id !== g.id &&
-                                    x.name.toLowerCase() === name.toLowerCase(),
-                                )
-                              )
-                                Promise.resolve(
-                                  onChange({
-                                    ...data,
-                                    groups: data.groups.map((x) =>
-                                      x.id === g.id ? { ...x, name } : x,
-                                    ),
-                                  }),
-                                ).catch((e) => setNotice(e.message));
-                            }}
-                          >
-                            Rename group
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </section>
-                ))}
-              </div>
-            </>
+            <LearningGroups
+              data={data}
+              onChange={onChange}
+              onLearning={manageLearning}
+            />
           ) : (
             <TeamProgress data={data} user={user} />
           )}
@@ -1157,12 +971,14 @@ export function Editor({
   const [c, setC] = useState<Content>(() => ({
       ...content,
       assignments:
-        content.assignments ??
-        content.groups.map((groupId) => ({
-          groupId,
-          assignedAt: content.createdAt || content.updatedAt,
-          due: { type: "none" },
-        })),
+        content.kind !== "course"
+          ? []
+          : (content.assignments ??
+            content.groups.map((groupId) => ({
+              groupId,
+              assignedAt: content.createdAt || content.updatedAt,
+              due: { type: "none" },
+            }))),
     })),
     [editorTab, setEditorTab] = useState("content"),
     [error, setError] = useState(""),
@@ -1209,12 +1025,27 @@ export function Editor({
     setError("");
     try {
       const latest = data.content.find((x) => x.id === c.id);
+      const editable = (item: Content) => {
+        const {
+          revision,
+          publishedRevision,
+          groups,
+          assignments,
+          updatedAt,
+          ...body
+        } = item;
+        return JSON.stringify(body);
+      };
+      if (latest && editable(latest) !== editable(content))
+        throw new Error(
+          "This content changed while you were editing. Reopen it before saving so those changes are preserved.",
+        );
       await onSave({
         ...c,
         ...(latest
           ? {
               assignments: latest.assignments,
-              groups: latest.groups,
+              groups: c.kind === "course" ? latest.groups : c.groups,
               revision: latest.revision,
             }
           : {}),
@@ -1238,12 +1069,13 @@ export function Editor({
           Back to course builder
         </button>
         <h1>{c.title}</h1>
-        <Assignments
-          data={data}
-          scope={{ courseId: c.id }}
-          onAction={onLearning}
-          onChange={onWorkspaceChange}
-        />
+        {onWorkspaceChange && (
+          <LearningGroups
+            data={data}
+            onChange={onWorkspaceChange}
+            onLearning={onLearning}
+          />
+        )}
       </>
     );
   return (
@@ -1610,7 +1442,7 @@ export function Editor({
               </>
             ) : (
               <label>
-                {c.kind === "course" ? "Topic / channel" : "Category"}
+                {c.kind === "course" ? "Channel" : "Category"}
                 <input
                   required
                   list="categories"
@@ -1631,6 +1463,20 @@ export function Editor({
               </label>
             )}
           </section>
+          {c.kind === "brief" && (
+            <section className="editor-setting-section">
+              <h3>For you</h3>
+              <p>
+                Choose the learning groups this update is relevant to. Everyone
+                can still read it.
+              </p>
+              <GroupPicker
+                groups={data.groups}
+                value={c.groups}
+                onChange={(groups) => set("groups", groups)}
+              />
+            </section>
+          )}
           {c.kind === "course" && (
             <>
               <section className="editor-setting-section">
@@ -1657,9 +1503,9 @@ export function Editor({
                 </label>
               </section>
               <section className="editor-setting-section">
-                <h3>Required courses</h3>
+                <h3>Assigned courses</h3>
                 <p className="muted">
-                  Choose which groups require this course. Course completion
+                  Manage this course through Learning groups. Course completion
                   windows are managed in organization settings.
                 </p>
                 {existing &&
@@ -1674,11 +1520,11 @@ export function Editor({
                       setEditorTab("assignments");
                     }}
                   >
-                    Manage required courses
+                    Manage learning groups
                   </Button>
                 ) : (
                   <p>
-                    Publish this course to add it to a group’s required courses.
+                    Publish this course to add it to a group’s assigned courses.
                   </p>
                 )}
               </section>
@@ -1691,7 +1537,7 @@ export function Editor({
                       checked={refresh}
                       onChange={(e) => setRefresh(e.target.checked)}
                     />
-                    Publish a new version and require completion again
+                    Publish a new version and start a new completion window
                   </label>
                   <small>
                     Current version: {content.version}. Keep this unchecked for

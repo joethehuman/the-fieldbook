@@ -1,6 +1,7 @@
 import type { Assignment, Content } from "./types";
 export type LearningAction = {
-  operation: "assign" | "unassign" | "complete" | "reset";
+  operation:
+    "assign" | "unassign" | "complete" | "reset" | "target" | "untarget";
   contentId: string;
   expected: number;
   groupId?: string;
@@ -121,12 +122,22 @@ export function learningState(
     target,
     onboarding,
     overdue,
-    status: !remaining.length
-      ? "Current"
-      : overdue.length
-        ? "Needs attention"
-        : onboarding
-          ? "Getting started"
-          : "On track",
+    status: !required.length
+      ? "No assigned courses"
+      : !remaining.length
+        ? "Complete"
+        : overdue.length
+          ? "Needs attention"
+          : onboarding
+            ? "Getting started"
+            : "On track",
   };
+}
+
+// A rounded percentage must never claim completion while a course remains.
+export function completionPercent(completed: number, total: number) {
+  if (!total) return 0;
+  return completed >= total
+    ? 100
+    : Math.min(99, Math.round((completed / total) * 100));
 }

@@ -62,7 +62,7 @@ export async function saveContent(
   )
     throw new HttpError(
       400,
-      "Required learning uses groups and workspace learning windows.",
+      "Assigned courses use learning groups and organization windows.",
     );
   const { data: old, error } = await db()
     .from("fb_documents")
@@ -75,6 +75,17 @@ export async function saveContent(
       409,
       "This item changed since you opened it. Reload before saving.",
     );
+  if (c.kind === "course") {
+    const audience = (groups: string[] = []) =>
+      JSON.stringify([...groups].sort());
+    const rules = (value: Content["assignments"] = []) =>
+      JSON.stringify(value.map((a) => a.groupId).sort());
+    if (
+      audience(c.groups) !== audience(old?.draft.groups) ||
+      rules(c.assignments) !== rules(old?.draft.assignments)
+    )
+      throw new HttpError(400, "Manage assigned courses in Learning groups.");
+  }
   if (
     old &&
     (c.kind !== old.draft.kind ||
