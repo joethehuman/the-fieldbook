@@ -1,18 +1,16 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { Workspace } from "@/lib/store";
 import {
   ancestorIds,
-  assignmentInfo,
   effectiveGroups,
   isComplete,
-  type Assignment,
   type Content,
 } from "@/lib/types";
 import {
-  assignmentKey,
   assignmentRules,
-  deadlineLabel,
+  learningState,
+  learningTarget,
   type LearningAction,
 } from "@/lib/learning";
 export type LearningHandler = (action: LearningAction) => Promise<void>;
@@ -22,225 +20,193 @@ export function Assignments({
   scope = {},
   onAction,
   onOpenGroup,
+  onChange,
 }: {
   data: Workspace;
   scope?: Scope;
   onAction: LearningHandler;
   onOpenGroup?: (id: string) => void;
+  onChange?: (data: Workspace) => void | Promise<void>;
 }) {
-  const [sourceGroup, setSourceGroup] = useState<string | null>(null);
-  if (sourceGroup) scope = { groupId: sourceGroup };
-  const openGroup =
-    onOpenGroup ||
-    ((id: string) => {
-      setSourceGroup(id);
-      setDetail(null);
-    });
-  const [query, setQuery] = useState(""),
-    [filter, setFilter] = useState("all"),
-    [deadline, setDeadline] = useState("all");
-  const [form, setForm] = useState<{
-    editing: boolean;
-    contentId: string;
-    target: string;
-    due: Assignment["due"];
-  } | null>(null);
-  const [detail, setDetail] = useState<{
-    courseId: string;
-    key: string;
-  } | null>(null);
-  const [pending, setPending] = useState<LearningAction | null>(null),
+  const [selected, setSelected] = useState(
+      scope.groupId || data.groups[0]?.id || "",
+    ),
+    [courseId, setCourseId] = useState(scope.courseId || ""),
+    [query, setQuery] = useState(""),
+    [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
-    [message, setMessage] = useState("");
-  function confirmAction(action: LearningAction) {
-    setMessage("");
-    setPending(action);
-  }
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const dialogOpen = !!form || !!pending;
-  useEffect(() => {
-    if (!dialogOpen) return;
-    const previous = document.activeElement as HTMLElement | null;
-    const root = dialogRef.current;
-    const focusable = () =>
-      Array.from(
-        root?.querySelectorAll<HTMLElement>(
-          'button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]',
-        ) || [],
-      );
-    focusable()[0]?.focus();
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Tab") {
-        const list = focusable();
-        const first = list[0],
-          last = list[list.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last?.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first?.focus();
-        }
-      }
-    };
-    root?.addEventListener("keydown", key);
-    return () => {
-      root?.removeEventListener("keydown", key);
-      previous?.focus();
-    };
-  }, [dialogOpen]);
+    [detail, setDetail] = useState<string | null>(null);
+  const groupId = scope.groupId || selected,
+    group = data.groups.find((g) => g.id === groupId),
+    person = data.users.find((u) => u.id === scope.userId);
   const courses = (data.publishedContent ?? data.content).filter(
     (c) => c.kind === "course" && c.status === "published",
   );
-  const versioned = (c: Content) =>
-    data.content.find((d) => d.id === c.id)?.revision || c.revision || 1;
-  const person = data.users.find((u) => u.id === scope.userId);
-  const group = data.groups.find((g) => g.id === scope.groupId);
-  const relevant = (a: Assignment) =>
-    scope.userId
-      ? a.userId === scope.userId ||
-        (!!a.groupId &&
-          !!person &&
-          effectiveGroups(person, data.groups).has(a.groupId))
-      : scope.groupId
-        ? !!a.groupId && ancestorIds(scope.groupId, data.groups).has(a.groupId)
-        : true;
-  const recipients = (a: Assignment) =>
-    data.users.filter(
-      (u) =>
-        (a.userId === u.id ||
-          (!!a.groupId && effectiveGroups(u, data.groups).has(a.groupId))) &&
-        (!scope.groupId || effectiveGroups(u, data.groups).has(scope.groupId)),
-    );
-  const targetName = (a: Assignment) =>
-    a.groupId
-      ? data.groups.find((g) => g.id === a.groupId)?.name || "Unknown group"
-      : data.users.find((u) => u.id === a.userId)?.name || "Unknown person";
-  const inherited = (a: Assignment) =>
-    !!a.groupId &&
-    (!!scope.userId || (!!scope.groupId && a.groupId !== scope.groupId));
-  const rows = courses
-    .filter((c) => !scope.courseId || c.id === scope.courseId)
-    .flatMap((c) =>
-      assignmentRules(c)
-        .filter(relevant)
-        .map((a) => ({ c, a })),
-    );
-  const shown = rows.filter(
-    ({ c, a }) =>
-      `${c.title} ${targetName(a)}`
-        .toLowerCase()
-        .includes(query.toLowerCase()) &&
-      (filter === "all" || assignmentKey(a) === filter) &&
-      (deadline === "all" || a.due.type === deadline),
-  );
-  const active = detail
-    ? rows.find(
-        (r) => r.c.id === detail.courseId && assignmentKey(r.a) === detail.key,
+  const state = person
+    ? learningState(
+        courses,
+        person,
+        data.groups,
+        data.progress[person.id] || [],
+        data.settings,
       )
-    : undefined;
-  async function act(a: LearningAction) {
+    : null;
+  const required = person
+    ? state!.required
+    : courses.filter((c) =>
+        assignmentRules(c).some(
+          (a) => a.groupId && ancestorIds(groupId, data.groups).has(a.groupId),
+        ),
+      );
+  const ids = group?.requiredCourseIds || [];
+  const direct = courses
+    .filter((c) => assignmentRules(c).some((a) => a.groupId === groupId))
+    .sort((a, b) => {
+      const ai = ids.indexOf(a.id),
+        bi = ids.indexOf(b.id);
+      return (
+        (ai < 0 ? 99999 : ai) - (bi < 0 ? 99999 : bi) ||
+        a.title.localeCompare(b.title)
+      );
+    });
+  const ordered = person
+    ? required
+    : [
+        ...required
+          .filter((c) => !direct.some((d) => d.id === c.id))
+          .sort((a, b) => a.title.localeCompare(b.title)),
+        ...direct,
+      ];
+  const available = courses.filter(
+    (c) =>
+      (!scope.courseId || c.id === scope.courseId) &&
+      !direct.some((d) => d.id === c.id),
+  );
+  const currentRevision = (c: Content) =>
+    data.content.find((d) => d.id === c.id)?.revision || c.revision || 1;
+  async function act(action: LearningAction) {
     setBusy(true);
-    setMessage("");
+    setNotice("");
     try {
-      await onAction(a);
-      setForm(null);
-      setPending(null);
-      setMessage(
-        a.operation === "reset"
-          ? "Progress reset."
-          : a.operation === "complete"
-            ? "Course marked complete."
-            : a.operation === "unassign"
-              ? "Assignment removed. Learning history was preserved."
-              : "Assignment saved.",
+      await onAction(action);
+      setNotice(
+        action.operation === "assign"
+          ? "Required learning updated."
+          : action.operation === "unassign"
+            ? "Requirement removed. Learning history preserved."
+            : action.operation === "complete"
+              ? "Course marked complete."
+              : "Progress reset.",
       );
     } catch (e) {
-      setMessage((e as Error).message);
+      setNotice((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  function openForm(c?: Content, a?: Assignment) {
-    setMessage("");
-    setForm({
-      editing: !!a,
-      contentId: c?.id || scope.courseId || courses[0]?.id || "",
-      target: a
-        ? assignmentKey(a)
-        : scope.userId
-          ? `user:${scope.userId}`
-          : scope.groupId
-            ? `group:${scope.groupId}`
-            : "",
-      due: a?.due || { type: "none" },
-    });
+  async function move(c: Content, offset: number) {
+    if (!group || !onChange) return;
+    const order = direct.map((c) => c.id),
+      i = order.indexOf(c.id);
+    [order[i], order[i + offset]] = [order[i + offset], order[i]];
+    setBusy(true);
+    try {
+      await onChange({
+        ...data,
+        groups: data.groups.map((g) =>
+          g.id === group.id ? { ...g, requiredCourseIds: order } : g,
+        ),
+      });
+      setNotice("Recommended order saved.");
+    } catch (e) {
+      setNotice((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
   }
-  const progressRows = (c: Content, people: typeof data.users) => (
+  const peopleFor = (c: Content) =>
+    person
+      ? [person]
+      : data.users.filter(
+          (u) =>
+            effectiveGroups(u, data.groups).has(groupId) &&
+            assignmentRules(c).some(
+              (a) =>
+                a.groupId && effectiveGroups(u, data.groups).has(a.groupId),
+            ),
+        );
+  const progressTable = (c: Content) => (
     <div className="table-wrap">
       <table>
         <thead>
           <tr>
             <th>Person</th>
-            <th>Deadline</th>
+            <th>Learning status</th>
             <th>Progress</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          {people.map((u) => {
-            const p = data.progress[u.id]?.find(
-              (p) => p.content_id === c.id && p.version === c.version,
-            );
-            const complete = isComplete(c, data.progress[u.id] || []);
+          {peopleFor(c).map((u) => {
+            const p = (data.progress[u.id] || []).find(
+                (p) => p.content_id === c.id && p.version === c.version,
+              ),
+              done = isComplete(c, data.progress[u.id] || []);
+            const target = learningTarget(c, u, data.groups, data.settings);
             return (
               <tr key={u.id}>
                 <td>
-                  <strong>{u.name}</strong>
-                  <small>
-                    {u.email}
-                    {!u.active ? " · Inactive" : ""}
-                  </small>
+                  {u.name}
+                  <small>{u.email}</small>
                 </td>
                 <td>
-                  {assignmentInfo(c, u, data.groups).dueDate || "No deadline"}
+                  {done
+                    ? "Current"
+                    : target && target < new Date().toISOString().slice(0, 10)
+                      ? "Needs attention"
+                      : "On track"}
+                  {!done && target && <small>Target {target}</small>}
                 </td>
                 <td>
-                  {complete
+                  {done
                     ? "Complete"
-                    : p?.lessons.length
-                      ? `${p.lessons.length} of ${c.lessons.length} lessons`
-                      : "Not started"}
+                    : `${p?.lessons.length || 0} of ${c.lessons.length} lessons`}
                 </td>
                 <td>
                   <div className="assignment-actions">
                     <button
-                      disabled={busy || complete}
-                      onClick={() =>
-                        confirmAction({
-                          operation: "complete",
-                          contentId: c.id,
-                          expected: versioned(c),
-                          userId: u.id,
-                          version: c.version,
-                          progressExpected: p?.revision || 0,
-                        })
-                      }
+                      disabled={busy || done}
+                      onClick={() => {
+                        if (confirm(`Mark ${c.title} complete for ${u.name}?`))
+                          void act({
+                            operation: "complete",
+                            contentId: c.id,
+                            expected: currentRevision(c),
+                            userId: u.id,
+                            version: c.version,
+                            progressExpected: p?.revision || 0,
+                          });
+                      }}
                     >
                       Mark complete
                     </button>
                     <button
                       disabled={busy || !p}
-                      onClick={() =>
-                        confirmAction({
-                          operation: "reset",
-                          contentId: c.id,
-                          expected: versioned(c),
-                          userId: u.id,
-                          version: c.version,
-                          progressExpected: p?.revision || 0,
-                        })
-                      }
+                      onClick={() => {
+                        if (
+                          confirm(
+                            `Reset lessons, quiz attempts and completion for ${u.name} on ${c.title}? Previous state is retained in the audit record.`,
+                          )
+                        )
+                          void act({
+                            operation: "reset",
+                            contentId: c.id,
+                            expected: currentRevision(c),
+                            userId: u.id,
+                            version: c.version,
+                            progressExpected: p?.revision || 0,
+                          });
+                      }}
                     >
                       Reset progress
                     </button>
@@ -251,424 +217,249 @@ export function Assignments({
           })}
         </tbody>
       </table>
-      {!people.length && (
-        <p className="muted">
-          No people in this assignment yet. Future group members will inherit
-          it.
-        </p>
-      )}
     </div>
   );
   return (
     <section className="assignments-panel">
-      {sourceGroup && (
-        <button
-          onClick={() => {
-            setSourceGroup(null);
-            setDetail(null);
-          }}
-        >
-          Back to course assignments
-        </button>
-      )}
       <div className="assignment-heading">
         <div>
-          <h2>
-            {person
-              ? `${person.name} · Assignments`
-              : group
-                ? `${group.name} · Assignments`
-                : "Assignments"}
-          </h2>
+          <h2>{person ? "Learning & progress" : "Required learning"}</h2>
           <p className="muted">
-            Assign learning, set deadlines, and manage completion. Published
-            courses remain available to everyone.
+            {person
+              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Learning comes from group membership.`
+              : "Choose the learning each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
           </p>
         </div>
-        <button
-          className="primary"
-          disabled={!courses.length || busy}
-          onClick={() => openForm()}
-        >
-          Assign course
-        </button>
       </div>
-      {message && (
-        <div role="status" className="success">
-          {message}
-        </div>
-      )}
-      <div className="assignment-filters">
+      {!person && !scope.groupId && (
         <label>
-          Search assignments
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Course or recipient"
-          />
-        </label>
-        {!scope.userId && !scope.groupId && (
-          <label>
-            Assigned to
-            <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-              <option value="all">All groups and people</option>
-              <optgroup label="Groups">
-                {data.groups.map((g) => (
-                  <option key={g.id} value={`group:${g.id}`}>
-                    {g.name}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="People">
-                {data.users.map((u) => (
-                  <option key={u.id} value={`user:${u.id}`}>
-                    {u.name}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </label>
-        )}
-        <label>
-          Deadline
+          Group
           <select
-            value={deadline}
-            onChange={(e) => setDeadline(e.target.value)}
+            value={selected}
+            onChange={(e) => {
+              setSelected(e.target.value);
+              setDetail(null);
+            }}
           >
-            <option value="all">All deadlines</option>
-            <option value="none">No deadline</option>
-            <option value="date">Specific date</option>
-            <option value="days">Days after assignment</option>
+            {data.groups.map((g) => (
+              <option key={g.id} value={g.id}>
+                {g.name}
+              </option>
+            ))}
           </select>
         </label>
-      </div>
+      )}
+      {!person && group && (
+        <form
+          className="assignment-filters"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const c = available.find((c) => c.id === courseId) || available[0];
+            if (c)
+              void act({
+                operation: "assign",
+                contentId: c.id,
+                expected: currentRevision(c),
+                groupId,
+                due: { type: "none" },
+              });
+          }}
+        >
+          <label>
+            Add required course
+            <select
+              value={
+                available.some((c) => c.id === courseId)
+                  ? courseId
+                  : available[0]?.id || ""
+              }
+              onChange={(e) => setCourseId(e.target.value)}
+              disabled={!available.length}
+            >
+              {available.length ? (
+                available.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))
+              ) : (
+                <option value="">No additional published courses</option>
+              )}
+            </select>
+          </label>
+          <button className="primary" disabled={busy || !available.length}>
+            Add to required learning
+          </button>
+        </form>
+      )}
+      {!person && !group && (
+        <p>Create a group to define its required learning.</p>
+      )}
+      <p className="muted">
+        {data.settings?.onboardingDays ?? 90} days for new hires ·{" "}
+        {data.settings?.catchUpDays ?? 30} days to catch up with new required
+        learning. Manage these windows in Settings.
+      </p>
+      {notice && <p role="status">{notice}</p>}
+      <label>
+        Find a course
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search required learning"
+        />
+      </label>
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
               <th>Course</th>
-              <th>Assigned through</th>
-              <th>Deadline</th>
+              <th>Required through</th>
               <th>Completion</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {shown.map(({ c, a }) => {
-              const people = scope.userId && person ? [person] : recipients(a);
-              return (
-                <tr key={c.id + assignmentKey(a)}>
-                  <td>
-                    <button
-                      className="text-button"
-                      onClick={() =>
-                        setDetail({ courseId: c.id, key: assignmentKey(a) })
-                      }
-                    >
-                      {c.title}
-                    </button>
-                  </td>
-                  <td>
-                    {targetName(a)}
-                    <small>
-                      {a.userId
-                        ? "Direct assignment"
-                        : inherited(a)
-                          ? "Inherited from group"
-                          : "Group and descendants"}
-                    </small>
-                  </td>
-                  <td>{deadlineLabel(a.due)}</td>
-                  <td>
-                    {
-                      people.filter((u) =>
-                        isComplete(c, data.progress[u.id] || []),
-                      ).length
-                    }{" "}
-                    of {people.length} complete
-                  </td>
-                  <td>
-                    <div className="assignment-actions">
+            {ordered
+              .filter(
+                (c) =>
+                  (!scope.courseId || c.id === scope.courseId) &&
+                  c.title.toLowerCase().includes(query.toLowerCase()),
+              )
+              .map((c) => {
+                const sources = assignmentRules(c).filter(
+                  (a) =>
+                    a.groupId &&
+                    (person
+                      ? effectiveGroups(person, data.groups).has(a.groupId)
+                      : ancestorIds(groupId, data.groups).has(a.groupId)),
+                );
+                const local = sources.some((a) => a.groupId === groupId),
+                  people = peopleFor(c),
+                  index = direct.findIndex((d) => d.id === c.id);
+                return (
+                  <tr key={c.id}>
+                    <td>
                       <button
-                        onClick={() =>
-                          setDetail({ courseId: c.id, key: assignmentKey(a) })
-                        }
+                        className="text-button"
+                        onClick={() => setDetail(detail === c.id ? null : c.id)}
                       >
-                        View
+                        {c.title}
                       </button>
-                      {inherited(a) ? (
-                        <button onClick={() => openGroup(a.groupId!)}>
-                          Manage source group
+                    </td>
+                    <td>
+                      {sources.map((a) => (
+                        <div key={a.groupId}>
+                          {data.groups.find((g) => g.id === a.groupId)?.name}
+                          {a.groupId !== groupId && !person
+                            ? " · inherited"
+                            : ""}
+                        </div>
+                      ))}
+                    </td>
+                    <td>
+                      {
+                        people.filter((u) =>
+                          isComplete(c, data.progress[u.id] || []),
+                        ).length
+                      }{" "}
+                      of {people.length} complete
+                    </td>
+                    <td>
+                      <div className="assignment-actions">
+                        <button
+                          onClick={() =>
+                            setDetail(detail === c.id ? null : c.id)
+                          }
+                        >
+                          View progress
                         </button>
-                      ) : (
-                        <>
+                        {!person && local && (
+                          <>
+                            <button
+                              aria-label={`Move ${c.title} earlier`}
+                              disabled={busy || index === 0 || !onChange}
+                              onClick={() => move(c, -1)}
+                            >
+                              ↑
+                            </button>
+                            <button
+                              aria-label={`Move ${c.title} later`}
+                              disabled={
+                                busy || index === direct.length - 1 || !onChange
+                              }
+                              onClick={() => move(c, 1)}
+                            >
+                              ↓
+                            </button>
+                            <button
+                              disabled={busy}
+                              onClick={() => {
+                                if (
+                                  confirm(
+                                    `Remove ${c.title} from ${group?.name} required learning? Progress and other group requirements are preserved.`,
+                                  )
+                                )
+                                  void act({
+                                    operation: "unassign",
+                                    contentId: c.id,
+                                    expected: currentRevision(c),
+                                    groupId,
+                                  });
+                              }}
+                            >
+                              Remove requirement
+                            </button>
+                          </>
+                        )}
+                        {!person && !local && sources[0]?.groupId && (
                           <button
-                            disabled={busy}
-                            onClick={() => openForm(c, a)}
-                          >
-                            Edit deadline
-                          </button>
-                          <button
-                            disabled={busy}
                             onClick={() =>
-                              confirmAction({
-                                operation: "unassign",
-                                contentId: c.id,
-                                expected: versioned(c),
-                                groupId: a.groupId,
-                                userId: a.userId,
-                              })
+                              onOpenGroup
+                                ? onOpenGroup(sources[0].groupId!)
+                                : setSelected(sources[0].groupId!)
                             }
                           >
-                            Unassign
+                            Manage parent group
                           </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
-        {!shown.length && (
+        {!ordered.length && (
           <p className="empty">
-            No assignments match. Assign a published course to get started.
+            No required learning yet. The full library remains available.
           </p>
         )}
       </div>
+      {detail && courses.find((c) => c.id === detail) && (
+        <section className="assignment-detail">
+          <h3>{courses.find((c) => c.id === detail)!.title}</h3>
+          {progressTable(courses.find((c) => c.id === detail)!)}
+        </section>
+      )}
       {person && (
         <>
-          <h3>Learning progress</h3>
-          <p className="muted">
-            Includes assigned courses and voluntary learning. Completion
-            controls apply to the current published version.
-          </p>
+          <h3>Learning history</h3>
           {courses
             .filter(
               (c) =>
-                assignmentRules(c).some(relevant) ||
+                !required.some((r) => r.id === c.id) &&
                 (data.progress[person.id] || []).some(
                   (p) => p.content_id === c.id && p.version === c.version,
                 ),
             )
             .map((c) => (
               <section key={c.id}>
-                <h4>{c.title}</h4>
-                {progressRows(c, [person])}
+                <h4>{c.title} · Optional learning</h4>
+                {progressTable(c)}
               </section>
             ))}
         </>
-      )}
-      {active && (
-        <section className="assignment-detail">
-          <div className="assignment-heading">
-            <div>
-              <h3>{active.c.title}</h3>
-              <p>
-                {targetName(active.a)} · {deadlineLabel(active.a.due)}
-              </p>
-            </div>
-            <button onClick={() => setDetail(null)}>Close details</button>
-          </div>
-          {progressRows(
-            active.c,
-            scope.userId && person ? [person] : recipients(active.a),
-          )}
-        </section>
-      )}
-      {form && (
-        <div className="modal-backdrop" ref={dialogRef}>
-          <form
-            className="modal assignment-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Assign course"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const c = courses.find((c) => c.id === form.contentId);
-              if (!c) return;
-              const [kind, ...ids] = form.target.split(":");
-              act({
-                operation: "assign",
-                contentId: c.id,
-                expected: versioned(c),
-                ...(kind === "group"
-                  ? { groupId: ids.join(":") }
-                  : { userId: ids.join(":") }),
-                due: form.due,
-              });
-            }}
-          >
-            <h2>Assign course</h2>
-            <label>
-              Course
-              <select
-                required
-                disabled={form.editing}
-                value={form.contentId}
-                onChange={(e) =>
-                  setForm({ ...form, contentId: e.target.value })
-                }
-              >
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Assign to
-              <select
-                required
-                disabled={form.editing}
-                value={form.target}
-                onChange={(e) => setForm({ ...form, target: e.target.value })}
-              >
-                <option value="">Choose a group or person</option>
-                <optgroup label="Groups">
-                  {data.groups.map((g) => (
-                    <option key={g.id} value={`group:${g.id}`}>
-                      {g.name}
-                    </option>
-                  ))}
-                </optgroup>
-                <optgroup label="People">
-                  {data.users
-                    .filter((u) => u.active)
-                    .map((u) => (
-                      <option key={u.id} value={`user:${u.id}`}>
-                        {u.name} ({u.email})
-                      </option>
-                    ))}
-                </optgroup>
-              </select>
-            </label>
-            <label>
-              Deadline
-              <select
-                value={form.due.type}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    due:
-                      e.target.value === "date"
-                        ? {
-                            type: "date",
-                            date: new Date().toISOString().slice(0, 10),
-                          }
-                        : e.target.value === "days"
-                          ? { type: "days", days: 7 }
-                          : { type: "none" },
-                  })
-                }
-              >
-                <option value="none">No deadline</option>
-                <option value="date">Specific date</option>
-                <option value="days">Days after assignment</option>
-              </select>
-            </label>
-            {form.due.type === "date" && (
-              <label>
-                Due date
-                <input
-                  type="date"
-                  required
-                  value={form.due.date}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      due: { type: "date", date: e.target.value },
-                    })
-                  }
-                />
-              </label>
-            )}
-            {form.due.type === "days" && (
-              <label>
-                Days after assignment
-                <input
-                  type="number"
-                  required
-                  min={1}
-                  max={3650}
-                  value={form.due.days}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      due: { type: "days", days: Number(e.target.value) },
-                    })
-                  }
-                />
-              </label>
-            )}
-            <p className="muted">
-              Group assignments include descendants and future members. If a
-              person has overlapping assignments, the earliest deadline applies.
-            </p>
-            {message && <p role="alert">{message}</p>}
-            <div className="assignment-actions">
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => setForm(null)}
-              >
-                Cancel
-              </button>
-              <button className="primary" disabled={busy}>
-                {busy ? "Saving…" : "Save assignment"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-      {pending && (
-        <div className="modal-backdrop" ref={dialogRef}>
-          <section
-            className="modal assignment-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Confirm learning change"
-          >
-            <h2>
-              {pending.operation === "reset"
-                ? "Reset progress?"
-                : pending.operation === "complete"
-                  ? "Mark course complete?"
-                  : "Remove assignment?"}
-            </h2>
-            <p>
-              <strong>
-                {courses.find((c) => c.id === pending.contentId)?.title}
-              </strong>{" "}
-              ·{" "}
-              {pending.userId
-                ? data.users.find((u) => u.id === pending.userId)?.name
-                : data.groups.find((g) => g.id === pending.groupId)?.name}
-            </p>
-            <p>
-              {pending.operation === "reset"
-                ? "This clears lessons, completion, and quiz attempts for this person’s current course version. An audit record preserves the prior state."
-                : pending.operation === "complete"
-                  ? "This records an administrator completion for this person without requiring a quiz attempt."
-                  : "This removes only this assignment source. Other direct or group assignments still apply. Learning history is preserved."}
-            </p>
-            {message && <p role="alert">{message}</p>}
-            <div className="assignment-actions">
-              <button disabled={busy} onClick={() => setPending(null)}>
-                Cancel
-              </button>
-              <button
-                className="primary"
-                disabled={busy}
-                onClick={() => act(pending)}
-              >
-                {busy ? "Saving…" : "Confirm"}
-              </button>
-            </div>
-          </section>
-        </div>
       )}
     </section>
   );

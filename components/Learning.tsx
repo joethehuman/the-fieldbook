@@ -9,6 +9,9 @@ import {
   type Group,
   type Progress,
 } from "@/lib/types";
+import { learningState, requiredSequence } from "@/lib/learning";
+import type { SiteSettings } from "@/lib/settings";
+import { ancestorIds, effectiveGroups } from "@/lib/types";
 import { CourseCard } from "./CourseCard";
 
 function CourseRow({
@@ -59,6 +62,7 @@ function CourseRow({
 }
 
 export default function Learning({
+  settings,
   courses,
   user,
   groups,
@@ -70,6 +74,7 @@ export default function Learning({
   guest = false,
   onSignIn,
 }: {
+  settings?: SiteSettings;
   publicLearning?: boolean;
   guest?: boolean;
   onSignIn?: () => void;
@@ -84,7 +89,8 @@ export default function Learning({
   const [view, setView] = useState<"home" | "all" | "completed">("home");
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState("All topics");
-  const [sort, setSort] = useState("due");
+  const [sort, setSort] = useState("recommended");
+  const state = learningState(courses, user, groups, progress, settings);
   const completed = assigned.filter((c) => isComplete(c, progress));
   const outstanding = assigned.filter((c) => !isComplete(c, progress));
   const pct = assigned.length
@@ -99,17 +105,14 @@ export default function Learning({
         : courses;
   const ordered = (items: Content[]) =>
     [...items].sort((a, b) => {
-      if (sort === "due")
+      if (sort === "recommended") {
+        const ids = requiredSequence(courses, user, groups).map((c) => c.id);
+        const ai = ids.indexOf(a.id),
+          bi = ids.indexOf(b.id);
         return (
-          (assignmentInfo(a, user, groups).dueDate || "9999").localeCompare(
-            assignmentInfo(b, user, groups).dueDate || "9999",
-          ) || a.title.localeCompare(b.title)
+          (ai < 0 ? 99999 : ai) - (bi < 0 ? 99999 : bi) ||
+          a.title.localeCompare(b.title)
         );
-      if (sort === "assigned" || sort === "assigned-oldest") {
-        const comparison = (
-          assignmentInfo(b, user, groups).assignedAt || ""
-        ).localeCompare(assignmentInfo(a, user, groups).assignedAt || "");
-        return sort === "assigned" ? comparison : -comparison;
       }
       if (sort === "added")
         return (b.createdAt || b.updatedAt).localeCompare(
@@ -135,7 +138,6 @@ export default function Learning({
     <CourseCard
       key={c.id}
       course={c}
-      dueDate={assignmentInfo(c, user, groups).dueDate}
       complete={isComplete(c, progress)}
       progress={
         progress.find((p) => p.content_id === c.id && p.version === c.version)
@@ -160,7 +162,7 @@ export default function Learning({
         <span className="eyebrow">A LITTLE LEARNING. A LOT OF MOMENTUM.</span>
         <h1>
           {view === "all"
-            ? "Your assignments."
+            ? "Your required learning."
             : view === "completed"
               ? "Look how far you’ve come."
               : "Make your next move a great one."}
@@ -169,7 +171,7 @@ export default function Learning({
           {view === "completed"
             ? "Revisit your completed courses. Your progress stays with you."
             : view === "all"
-              ? "Everything assigned to you, organized by topic."
+              ? "Your role’s learning, in a recommended order. You can explore ahead at any time."
               : "Build your knowledge, sharpen your skills, and stay one step ahead."}
         </p>
       </div>
@@ -178,9 +180,7 @@ export default function Learning({
         <label className="learning-sort">
           Sort courses
           <select value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="due">Due date: earliest first</option>
-            <option value="assigned">Recently assigned</option>
-            <option value="assigned-oldest">Oldest assignment first</option>
+            <option value="recommended">Recommended order</option>
             <option value="added">Recently added</option>
             <option value="title">Title A–Z</option>
             <option value="updated">Recently updated</option>
@@ -232,7 +232,11 @@ export default function Learning({
               <h2>
                 For you <span className="count-pill">{outstanding.length}</span>
               </h2>
-              <p>Your next steps to staying current.</p>
+              <p>
+                {state.onboarding
+                  ? "Get up to speed at your pace."
+                  : "Build your knowledge and stay current."}
+              </p>
             </div>
           </div>
           <div className="assigned-layout learning-assigned">
@@ -254,13 +258,33 @@ export default function Learning({
                 </div>
               </div>
               <h3>
-                {pct === 100 ? "You’re all caught up." : "Keep your momentum."}
+                {state.onboarding
+                  ? "Get up to speed"
+                  : pct === 100
+                    ? "You’re up to date"
+                    : "Stay current"}
               </h3>
               <p>
-                {completed.length} of {assigned.length} assigned courses
+                {completed.length} of {assigned.length} required courses
                 complete
               </p>
-              <span className="current-caption">The goal? Stay at 100%.</span>
+              <span className="current-caption">
+                {state.overdue.length
+                  ? `${state.overdue.length} courses need attention`
+                  : state.onboarding
+                    ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days remaining · Onboarding target ${state.target}`
+                    : outstanding.length
+                      ? `${outstanding.length} courses to catch up on · You’re on track`
+                      : "The goal? Stay current."}
+              </span>
+              {!!outstanding.length && (
+                <button
+                  className="primary"
+                  onClick={() => onOpen(state.remaining[0].id)}
+                >
+                  Continue learning
+                </button>
+              )}
             </div>
             {outstanding.length ? (
               <CourseRow title="For you">
@@ -277,9 +301,34 @@ export default function Learning({
               </div>
             )}
           </div>
+          {groups
+            .filter((g) => effectiveGroups(user, groups).has(g.id))
+            .sort(
+              (a, b) =>
+                ancestorIds(a.id, groups).size -
+                  ancestorIds(b.id, groups).size ||
+                a.name.localeCompare(b.name),
+            )
+            .map((g) => {
+              const items = requiredSequence(
+                courses,
+                { ...user, groups: [g.id] },
+                [{ ...g, parentId: undefined }],
+              ).filter((c) => !isComplete(c, progress));
+              return items.length ? (
+                <div className="channel" key={g.id}>
+                  <div className="channel-title">
+                    <BookOpen size={19} />
+                    <h3>{g.name}</h3>
+                    <span>Recommended order</span>
+                  </div>
+                  <CourseRow title={g.name}>{items.map(card)}</CourseRow>
+                </div>
+              ) : null;
+            })}
           <div className="learning-links">
             <button className="text-button" onClick={() => changeView("all")}>
-              View all assignments <ArrowRight size={16} />
+              View required learning <ArrowRight size={16} />
             </button>
             <button
               className="text-button"
@@ -297,7 +346,7 @@ export default function Learning({
               {view === "home"
                 ? "Explore the library"
                 : view === "all"
-                  ? "All assignments"
+                  ? "Required learning"
                   : "Completed courses"}
             </h2>
             <p>

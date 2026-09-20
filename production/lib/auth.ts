@@ -35,6 +35,7 @@ export function profile(row: any): User {
     active: row.active,
     groups: row.groups,
     teamId: row.team_id || undefined,
+    onboardingStart: row.onboarding_start || undefined,
     groupJoinedAt: row.group_joined_at,
     effectiveGroupJoinedAt: row.effective_group_joined_at,
   };

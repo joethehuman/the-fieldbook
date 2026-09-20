@@ -627,10 +627,11 @@ export default function Fieldbook({
               user={user}
               groups={data.groups}
               assigned={assigned}
+              settings={data.settings}
               progress={progress}
               onOpen={(id) => navigate("learn", id)}
               onKnowledge={() => navigate("docs")}
-              publicLearning={!!runtime && assigned.length === 0}
+              publicLearning={!!runtime && uid === "guest"}
               guest={!!runtime && uid === "guest"}
               onSignIn={runtime?.signIn}
             />

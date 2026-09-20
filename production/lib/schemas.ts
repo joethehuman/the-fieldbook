@@ -88,6 +88,9 @@ const publishedPrivacySchema = privacyDocumentSchema.refine(
   "Published policies require text, operator and an email or contact page, or an HTTPS policy URL.",
 );
 export const settingsSchema = z.object({
+  newUserStage: z.enum(["existing", "newhire"]).default("existing"),
+  onboardingDays: z.number().int().min(1).max(365).default(90),
+  catchUpDays: z.number().int().min(1).max(365).default(30),
   privacy: z
     .object({
       draft: privacyDocumentSchema,

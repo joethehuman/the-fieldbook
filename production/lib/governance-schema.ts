@@ -4,6 +4,7 @@ const node = z.object({
   id,
   name: z.string().trim().min(1).max(80),
   parentId: id.optional(),
+  requiredCourseIds: z.array(z.uuid()).max(1000).optional(),
 });
 export const governanceSchema = z
   .object({
@@ -20,6 +21,7 @@ export const governanceSchema = z
           active: z.boolean(),
           groups: z.array(id).max(100),
           teamId: id.optional(),
+          onboardingStart: z.iso.date().optional(),
         }),
       )
       .max(10000),
@@ -72,5 +74,6 @@ export const pendingSchema = z.object({
   role: z.enum(["learner", "manager", "admin"]),
   groups: z.array(id).max(100),
   teamId: id.optional(),
+  onboardingStart: z.iso.date().optional(),
   revoke: z.boolean().optional(),
 });

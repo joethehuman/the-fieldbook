@@ -1,3 +1,7 @@
+# Current learning model
+
+The group-only required-learning model in [required-learning.md](required-learning.md) supersedes the individual-assignment and per-course-deadline iteration below. Its migration retires those rules while preserving progress and audit history.
+
 # Production governance
 
 ## Audit and scope

@@ -16,16 +16,7 @@ const schema = z
     userId: z.uuid().optional(),
     version: z.number().int().positive().optional(),
     progressExpected: z.number().int().nonnegative().optional(),
-    due: z
-      .discriminatedUnion("type", [
-        z.object({ type: z.literal("none") }),
-        z.object({ type: z.literal("date"), date: z.iso.date() }),
-        z.object({
-          type: z.literal("days"),
-          days: z.number().int().min(1).max(3650),
-        }),
-      ])
-      .optional(),
+    due: z.object({ type: z.literal("none") }).optional(),
   })
   .superRefine((a, ctx) => {
     if (!!a.groupId === !!a.userId)
@@ -38,8 +29,14 @@ const schema = z
         code: "custom",
         message: "Choose a person and current course progress.",
       });
-    if (a.operation === "assign" && !a.due)
-      ctx.addIssue({ code: "custom", message: "Choose a deadline." });
+    if (
+      ["assign", "unassign"].includes(a.operation) &&
+      (!a.groupId || a.userId)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Required learning belongs to a group.",
+      });
   });
 export async function POST(req: Request) {
   try {
@@ -54,7 +51,7 @@ export async function POST(req: Request) {
       );
     const { data, error } = await db().rpc("fb_manage_learning", {
       p_actor: user.id,
-      p_data: parsed.data,
+      p_data: { ...parsed.data, due: { type: "none" } },
     });
     if (error)
       throw new HttpError(

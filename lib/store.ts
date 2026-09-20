@@ -10,6 +10,7 @@ export type Workspace = {
     role: User["role"];
     groups: string[];
     teamId?: string;
+    onboardingStart?: string;
   }[];
   publishedContent?: Content[];
   schema: 1;
@@ -39,6 +40,7 @@ export function freshWorkspace(): Workspace {
     users: [
       {
         id: "demo-learner",
+        onboardingStart: new Date().toISOString().slice(0, 10),
         name: "Alex Morgan",
         email: "alex@example.com",
         role: "learner",

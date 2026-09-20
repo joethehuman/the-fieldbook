@@ -57,6 +57,13 @@ export async function saveContent(
       parsed.error.issues.map((i) => i.message).join(" "),
     );
   const c = parsed.data;
+  if (
+    c.assignments?.some((a) => !a.groupId || a.userId || a.due.type !== "none")
+  )
+    throw new HttpError(
+      400,
+      "Required learning uses groups and workspace learning windows.",
+    );
   const { data: old, error } = await db()
     .from("fb_documents")
     .select("*")

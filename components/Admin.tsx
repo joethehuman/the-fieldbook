@@ -1,6 +1,8 @@
 "use client";
 import { Assignments, type LearningHandler } from "./Assignments";
 import { assignmentRules, assignmentKey } from "@/lib/learning";
+import { defaultSettings } from "@/lib/settings";
+import { OnboardingFields } from "./OnboardingFields";
 import { PendingPeople } from "./PendingPeople";
 import { useState } from "react";
 import {
@@ -185,6 +187,7 @@ export default function Admin({
         onUpload={onUpload}
         production={production}
         onLearning={manageLearning}
+        onWorkspaceChange={onChange}
       />
     );
   if (detailScope) {
@@ -206,7 +209,7 @@ export default function Admin({
           <h1>{group?.name || person?.name}</h1>
           <p>
             {group
-              ? "Manage this group’s members and learning assignments."
+              ? "Manage this group’s members and required learning."
               : person?.email}
           </p>
         </div>
@@ -215,6 +218,7 @@ export default function Admin({
           data={data}
           scope={detailScope}
           onAction={manageLearning}
+          onChange={onChange}
           onOpenGroup={(groupId) => setDetailScope({ groupId })}
         />
         {group && (
@@ -243,7 +247,7 @@ export default function Admin({
                           <button
                             onClick={() => setDetailScope({ userId: u.id })}
                           >
-                            View assignments
+                            View learning
                           </button>
                         </td>
                       </tr>
@@ -252,8 +256,8 @@ export default function Admin({
               </table>
             </div>
             <p className="muted">
-              Manage group membership from People → Edit. Assignments also apply
-              to members of descendant groups.
+              Manage group membership from People → Edit. Requirements also
+              apply to members of descendant groups.
             </p>
           </section>
         )}
@@ -275,7 +279,7 @@ export default function Admin({
             name: production ? "People" : "Demo profiles",
             icon: Users,
           },
-          { id: "assignments", name: "Assignments", icon: Layers },
+          { id: "assignments", name: "Required learning", icon: Layers },
           { id: "groups", name: "Groups", icon: Layers },
           { id: "teams", name: "Teams", icon: Users },
           { id: "progress", name: "Progress", icon: BarChart3 },
@@ -493,6 +497,38 @@ export default function Admin({
         </>
       ) : tab === "people" ? (
         <>
+          <section className="editor-block">
+            <h2>New people</h2>
+            <label>
+              Default learning stage for new people
+              <select
+                value={data.settings?.newUserStage || "existing"}
+                onChange={async (e) => {
+                  try {
+                    await onChange({
+                      ...data,
+                      settings: {
+                        ...defaultSettings,
+                        ...data.settings,
+                        newUserStage: e.target.value as "existing" | "newhire",
+                      },
+                    });
+                    setNotice("Default saved. Existing people are unchanged.");
+                  } catch (error) {
+                    setNotice((error as Error).message);
+                  }
+                }}
+              >
+                <option value="existing">Existing team — stay current</option>
+                <option value="newhire">New hire — onboarding window</option>
+              </select>
+            </label>
+            <p className="muted">
+              Applies to newly added people and new self-registrations. You can
+              override the stage and start date for each person. Group
+              membership still determines required learning.
+            </p>
+          </section>
           {production && <PendingPeople data={data} onChange={onChange} />}
           <div className="admin-toolbar">
             <p className="muted">
@@ -509,6 +545,10 @@ export default function Admin({
                     name: "",
                     email: "",
                     role: "learner",
+                    onboardingStart:
+                      data.settings?.newUserStage === "newhire"
+                        ? new Date().toISOString().slice(0, 10)
+                        : undefined,
                     groups: [],
                     active: true,
                   })
@@ -627,7 +667,7 @@ export default function Admin({
                           className="text-button"
                           onClick={() => setDetailScope({ userId: u.id })}
                         >
-                          Assignments & progress
+                          Learning & progress
                         </button>
                       </td>
                     </tr>
@@ -640,6 +680,7 @@ export default function Admin({
         <Assignments
           data={data}
           onAction={manageLearning}
+          onChange={onChange}
           onOpenGroup={(groupId) => setDetailScope({ groupId })}
         />
       ) : tab === "groups" ? (
@@ -736,7 +777,9 @@ export default function Admin({
                       ))}
                   </select>
                 </label>
-                <small>Members inherit assignments from parent groups.</small>
+                <small>
+                  Members inherit required learning from parent groups.
+                </small>
                 <p>
                   {data.users.filter((u) => u.groups.includes(g.id)).length}{" "}
                   profiles ·{" "}
@@ -748,7 +791,7 @@ export default function Admin({
                         c.status === "published",
                     ).length
                   }{" "}
-                  assigned courses
+                  required courses
                 </p>
                 <button
                   className="primary"
@@ -824,6 +867,12 @@ export default function Admin({
                 }
               />
             </label>
+            <OnboardingFields
+              value={person.onboardingStart}
+              onChange={(onboardingStart) =>
+                setPerson({ ...person, onboardingStart })
+              }
+            />
             <label>
               Access
               <select
@@ -896,6 +945,7 @@ export default function Admin({
   );
 }
 export function Editor({
+  onWorkspaceChange,
   onLearning,
   content,
   data,
@@ -911,6 +961,7 @@ export function Editor({
   onSave: (c: Content) => void | Promise<void>;
   onCancel: () => void;
   onLearning?: LearningHandler;
+  onWorkspaceChange?: (data: Workspace) => void | Promise<void>;
 }) {
   const [c, setC] = useState<Content>(() => ({
       ...content,
@@ -989,6 +1040,7 @@ export function Editor({
           data={data}
           scope={{ courseId: c.id }}
           onAction={onLearning}
+          onChange={onWorkspaceChange}
         />
       </>
     );
@@ -1344,10 +1396,10 @@ export function Editor({
                 />
               </label>
               <section>
-                <h3>Assignments</h3>
+                <h3>Required learning</h3>
                 <p className="muted">
-                  Manage group and individual assignments separately from course
-                  edits.
+                  Choose which groups require this course. Learning windows are
+                  managed in workspace settings.
                 </p>
                 {existing &&
                 (data.publishedContent ?? data.content).some(
@@ -1360,10 +1412,13 @@ export function Editor({
                       setEditorTab("assignments");
                     }}
                   >
-                    Manage assignments
+                    Manage required learning
                   </button>
                 ) : (
-                  <p>Publish this course to assign it.</p>
+                  <p>
+                    Publish this course to add it to a group’s required
+                    learning.
+                  </p>
                 )}
               </section>
               {existing && (

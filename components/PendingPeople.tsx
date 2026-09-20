@@ -1,4 +1,5 @@
 "use client";
+import { OnboardingFields } from "./OnboardingFields";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
 type Pending = NonNullable<Workspace["pendingUsers"]>[number];
@@ -41,7 +42,16 @@ export function PendingPeople({
         className="secondary"
         disabled={busy}
         onClick={() =>
-          setEditing({ email: "", name: "", role: "learner", groups: [] })
+          setEditing({
+            email: "",
+            name: "",
+            role: "learner",
+            groups: [],
+            onboardingStart:
+              data.settings?.newUserStage === "newhire"
+                ? new Date().toISOString().slice(0, 10)
+                : undefined,
+          })
         }
       >
         Pre-register account
@@ -101,6 +111,12 @@ export function PendingPeople({
               }
             />
           </label>
+          <OnboardingFields
+            value={editing.onboardingStart}
+            onChange={(onboardingStart) =>
+              setEditing({ ...editing, onboardingStart })
+            }
+          />
           <label>
             Role
             <select

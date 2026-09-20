@@ -96,6 +96,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
       role: p.role,
       groups: p.groups,
       teamId: p.team_id || undefined,
+      onboardingStart: p.onboarding_start || undefined,
     })),
   };
 }

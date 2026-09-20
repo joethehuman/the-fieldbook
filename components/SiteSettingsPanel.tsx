@@ -107,6 +107,46 @@ export default function SiteSettingsPanel({
           </button>
         </div>
       )}
+      <fieldset>
+        <legend>Learning windows</legend>
+        <p>
+          Publishing adds to the library. Only courses selected for a group
+          become required learning.
+        </p>
+        <label>
+          New hire onboarding window (days)
+          <input
+            type="number"
+            required
+            min={1}
+            max={365}
+            value={settings.onboardingDays ?? 90}
+            onChange={(e) =>
+              setSettings({
+                ...settings,
+                onboardingDays: Number(e.target.value),
+              })
+            }
+          />
+        </label>
+        <label>
+          Ongoing catch-up window (days)
+          <input
+            type="number"
+            required
+            min={1}
+            max={365}
+            value={settings.catchUpDays ?? 30}
+            onChange={(e) =>
+              setSettings({ ...settings, catchUpDays: Number(e.target.value) })
+            }
+          />
+        </label>
+        <small>
+          New learning gets a full catch-up window, even near the end of
+          onboarding. Changes recalculate targets for everyone.
+        </small>
+      </fieldset>
       <PrivacySettingsPanel
         settings={settings}
         onChange={setSettings}

@@ -37,6 +37,7 @@ export type User = {
   role: "admin" | "learner" | "manager";
   groups: string[];
   active: boolean;
+  onboardingStart?: string;
   teamId?: string;
   groupJoinedAt?: Record<string, string>;
   effectiveGroupJoinedAt?: Record<string, string>;
@@ -49,7 +50,12 @@ export type Progress = {
   passed: boolean;
   attempts?: { at: string; passed: boolean }[];
 };
-export type Group = { id: string; name: string; parentId?: string };
+export type Group = {
+  id: string;
+  name: string;
+  parentId?: string;
+  requiredCourseIds?: string[];
+};
 export type Team = {
   id: string;
   name: string;
@@ -107,10 +113,7 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       due: { type: "none" },
     }));
   const matches = rules
-    .filter(
-      (r) =>
-        r.userId === user.id || (!!r.groupId && memberships.has(r.groupId)),
-    )
+    .filter((r) => !!r.groupId && memberships.has(r.groupId))
     .map((r) => {
       const joined =
         (r.groupId ? user.effectiveGroupJoinedAt?.[r.groupId] : r.assignedAt) ||
@@ -176,11 +179,7 @@ export function assignedCourses(
       c.kind === "course" &&
       c.status === "published" &&
       (c.assignments
-        ? c.assignments.some(
-            (a) =>
-              a.userId === user.id ||
-              (!!a.groupId && memberships.has(a.groupId)),
-          )
+        ? c.assignments.some((a) => !!a.groupId && memberships.has(a.groupId))
         : c.groups.some((g) => memberships.has(g))),
   );
 }

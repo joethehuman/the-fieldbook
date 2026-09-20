@@ -24,6 +24,20 @@ export async function POST(req: Request) {
         400,
         parsed.error.issues.map((i) => i.message).join(" "),
       );
+    if (
+      body.onboardingStart ||
+      body.users?.some((u: any) => u.onboardingStart)
+    ) {
+      const { error: setupError } = await db()
+        .from("fb_profiles")
+        .select("onboarding_start")
+        .limit(0);
+      if (setupError)
+        throw new HttpError(
+          503,
+          "Preview setup is incomplete. Onboarding changes are not available yet.",
+        );
+    }
     const { data, error } = await db().rpc("fb_save_governance", {
       p_actor: user.id,
       p_expected: parsed.data.expected,
