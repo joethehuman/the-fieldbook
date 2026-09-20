@@ -32,6 +32,10 @@ function readGuest(): Progress[] {
 }
 let currentUser: User | null = null;
 const runtime: FieldbookRuntime = {
+  async manageLearning(action) {
+    await request("/api/assignments", action);
+    return (await runtime.load()).data;
+  },
   async load() {
     const state = await request("/api/workspace");
     currentUser = state.user;
@@ -73,9 +77,37 @@ const runtime: FieldbookRuntime = {
       JSON.stringify(before.groups) !== JSON.stringify(after.groups) ||
       JSON.stringify(before.teams) !== JSON.stringify(after.teams)
     )
-      throw new Error(
-        "Group and team administration is still being connected. No changes to people or groups were saved.",
-      );
+      await request("/api/governance", {
+        expected: before.governanceRevision,
+        users: after.users,
+        groups: after.groups,
+        teams: after.teams || [],
+      });
+    const pendingBefore = before.pendingUsers || [],
+      pendingAfter = after.pendingUsers || [];
+    const changed = pendingAfter.filter(
+      (p) =>
+        JSON.stringify(p) !==
+        JSON.stringify(pendingBefore.find((x) => x.email === p.email)),
+    );
+    const removed = pendingBefore.filter(
+      (p) => !pendingAfter.some((x) => x.email === p.email),
+    );
+    if (changed.length + removed.length > 1)
+      throw new Error("Save one pending account at a time.");
+    for (const p of changed)
+      await request("/api/governance", {
+        operation: "pending",
+        expected: before.governanceRevision,
+        ...p,
+      });
+    for (const p of removed)
+      await request("/api/governance", {
+        operation: "pending",
+        expected: before.governanceRevision,
+        ...p,
+        revoke: true,
+      });
     return (await runtime.load()).data;
   },
   async progress(course, current, lessonId, answers) {

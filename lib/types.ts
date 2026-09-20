@@ -37,17 +37,25 @@ export type User = {
   role: "admin" | "learner" | "manager";
   groups: string[];
   active: boolean;
+  onboardingStart?: string;
   teamId?: string;
   groupJoinedAt?: Record<string, string>;
+  effectiveGroupJoinedAt?: Record<string, string>;
 };
 export type Progress = {
+  revision?: number;
   content_id: string;
   version: number;
   lessons: string[];
   passed: boolean;
   attempts?: { at: string; passed: boolean }[];
 };
-export type Group = { id: string; name: string; parentId?: string };
+export type Group = {
+  id: string;
+  name: string;
+  parentId?: string;
+  requiredCourseIds?: string[];
+};
 export type Team = {
   id: string;
   name: string;
@@ -55,7 +63,8 @@ export type Team = {
   managerId?: string;
 };
 export type Assignment = {
-  groupId: string;
+  groupId?: string;
+  userId?: string;
   assignedAt: string;
   due:
     | { type: "none" }
@@ -104,13 +113,15 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       due: { type: "none" },
     }));
   const matches = rules
-    .filter((r) => memberships.has(r.groupId))
+    .filter((r) => !!r.groupId && memberships.has(r.groupId))
     .map((r) => {
       const joined =
+        (r.groupId ? user.effectiveGroupJoinedAt?.[r.groupId] : r.assignedAt) ||
         user.groups
-          .filter((id) => ancestorIds(id, groups).has(r.groupId))
+          .filter((id) => ancestorIds(id, groups).has(r.groupId || ""))
           .map((id) => user.groupJoinedAt?.[id] || r.assignedAt)
-          .sort()[0] || r.assignedAt;
+          .sort()[0] ||
+        r.assignedAt;
       const assignedAt = joined > r.assignedAt ? joined : r.assignedAt;
       let dueDate: string | undefined;
       if (r.due.type === "date") dueDate = r.due.date;
@@ -128,6 +139,7 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
 }
 export function reportTeamIds(user: User, teams: Team[]) {
   if (user.role === "admin") return new Set(teams.map((t) => t.id));
+  if (!user.active || user.role !== "manager") return new Set<string>();
   const roots = teams.filter((t) => t.managerId === user.id).map((t) => t.id);
   return new Set(
     teams
@@ -166,8 +178,8 @@ export function assignedCourses(
     (c) =>
       c.kind === "course" &&
       c.status === "published" &&
-      (c.assignments?.map((a) => a.groupId) ?? c.groups).some((g) =>
-        memberships.has(g),
-      ),
+      (c.assignments
+        ? c.assignments.some((a) => !!a.groupId && memberships.has(a.groupId))
+        : c.groups.some((g) => memberships.has(g))),
   );
 }

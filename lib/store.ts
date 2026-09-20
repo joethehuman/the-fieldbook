@@ -3,6 +3,15 @@ import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 export type Workspace = {
   settings?: import("./settings").SiteSettings;
   revision?: number;
+  governanceRevision?: number;
+  pendingUsers?: {
+    email: string;
+    name: string;
+    role: User["role"];
+    groups: string[];
+    teamId?: string;
+    onboardingStart?: string;
+  }[];
   publishedContent?: Content[];
   schema: 1;
   feedback?: Feedback[];
@@ -31,6 +40,7 @@ export function freshWorkspace(): Workspace {
     users: [
       {
         id: "demo-learner",
+        onboardingStart: new Date().toISOString().slice(0, 10),
         name: "Alex Morgan",
         email: "alex@example.com",
         role: "learner",

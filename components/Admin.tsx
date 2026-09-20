@@ -1,4 +1,9 @@
 "use client";
+import { Assignments, type LearningHandler } from "./Assignments";
+import { assignmentRules, assignmentKey } from "@/lib/learning";
+import { defaultSettings } from "@/lib/settings";
+import { OnboardingFields } from "./OnboardingFields";
+import { PendingPeople } from "./PendingPeople";
 import { useState } from "react";
 import {
   Plus,
@@ -30,6 +35,7 @@ type Props = {
   user: User;
   onChange: (d: Workspace) => void | Promise<void>;
   production?: boolean;
+  onLearning?: LearningHandler;
   onUpload?: UploadMedia;
 };
 const id = () => crypto.randomUUID();
@@ -39,6 +45,7 @@ export default function Admin({
   onChange,
   production = false,
   onUpload,
+  onLearning,
 }: Props) {
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
@@ -52,7 +59,44 @@ export default function Admin({
     [peopleRole, setPeopleRole] = useState("all"),
     [peopleGroup, setPeopleGroup] = useState("all"),
     [peopleStatus, setPeopleStatus] = useState("all"),
-    [groupParent, setGroupParent] = useState("");
+    [groupParent, setGroupParent] = useState(""),
+    [detailScope, setDetailScope] = useState<{
+      groupId?: string;
+      userId?: string;
+    } | null>(null);
+  const manageLearning: LearningHandler = async (action) => {
+    if (onLearning) return onLearning(action);
+    const next = structuredClone(data);
+    const c = next.content.find((c) => c.id === action.contentId)!;
+    if (action.operation === "assign" || action.operation === "unassign") {
+      c.assignments = assignmentRules(c).filter(
+        (a) => assignmentKey(a) !== assignmentKey(action),
+      );
+      if (action.operation === "assign")
+        c.assignments.push({
+          groupId: action.groupId,
+          userId: action.userId,
+          assignedAt: new Date().toISOString(),
+          due: action.due!,
+        });
+      c.groups = c.assignments.flatMap((a) => (a.groupId ? [a.groupId] : []));
+    } else {
+      const list = next.progress[action.userId!] || [];
+      next.progress[action.userId!] = [
+        ...list.filter((p) => p.content_id !== c.id || p.version !== c.version),
+        {
+          content_id: c.id,
+          version: c.version,
+          lessons:
+            action.operation === "complete" ? c.lessons.map((l) => l.id) : [],
+          passed: action.operation === "complete",
+          attempts: [],
+          revision: (action.progressExpected || 0) + 1,
+        },
+      ];
+    }
+    await onChange(next);
+  };
   function create(kind: Content["kind"]) {
     setEditing({
       id: id(),
@@ -94,7 +138,7 @@ export default function Admin({
     setEditing(null);
     setNotice(production ? "Content saved." : "Content saved in this browser.");
   }
-  function savePerson(e: React.FormEvent) {
+  async function savePerson(e: React.FormEvent) {
     e.preventDefault();
     if (!person) return;
     if (
@@ -104,7 +148,7 @@ export default function Admin({
           u.email.toLowerCase() === person.email.toLowerCase(),
       )
     ) {
-      setNotice("A demo profile already uses that email.");
+      setNotice("A profile already uses that email.");
       return;
     }
     const previous = data.users.find((u) => u.id === person.id);
@@ -119,14 +163,18 @@ export default function Admin({
         ]),
       ),
     };
-    onChange({
-      ...data,
-      users: data.users.some((u) => u.id === person.id)
-        ? data.users.map((u) => (u.id === person.id ? savedPerson : u))
-        : [...data.users, savedPerson],
-    });
-    setPerson(null);
-    setNotice("Demo profile saved.");
+    try {
+      await onChange({
+        ...data,
+        users: data.users.some((u) => u.id === person.id)
+          ? data.users.map((u) => (u.id === person.id ? savedPerson : u))
+          : [...data.users, savedPerson],
+      });
+      setPerson(null);
+      setNotice(production ? "Account saved." : "Demo profile saved.");
+    } catch (e) {
+      setNotice((e as Error).message);
+    }
   }
   if (editing)
     return (
@@ -138,8 +186,84 @@ export default function Admin({
         onCancel={() => setEditing(null)}
         onUpload={onUpload}
         production={production}
+        onLearning={manageLearning}
+        onWorkspaceChange={onChange}
       />
     );
+  if (detailScope) {
+    const group = data.groups.find((g) => g.id === detailScope.groupId);
+    const person = data.users.find((u) => u.id === detailScope.userId);
+    return (
+      <>
+        <button
+          className="text-button"
+          onClick={() => {
+            setTab(group ? "groups" : "people");
+            setDetailScope(null);
+          }}
+        >
+          <ArrowLeft size={16} />
+          Back to {group ? "groups" : "people"}
+        </button>
+        <div className="page-heading">
+          <h1>{group?.name || person?.name}</h1>
+          <p>
+            {group
+              ? "Manage this group’s members and required learning."
+              : person?.email}
+          </p>
+        </div>
+        <Assignments
+          key={JSON.stringify(detailScope)}
+          data={data}
+          scope={detailScope}
+          onAction={manageLearning}
+          onChange={onChange}
+          onOpenGroup={(groupId) => setDetailScope({ groupId })}
+        />
+        {group && (
+          <section>
+            <h2>Direct members</h2>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Person</th>
+                    <th>Role</th>
+                    <th>Learning</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.users
+                    .filter((u) => u.groups.includes(group.id))
+                    .map((u) => (
+                      <tr key={u.id}>
+                        <td>
+                          {u.name}
+                          <small>{u.email}</small>
+                        </td>
+                        <td>{u.role}</td>
+                        <td>
+                          <button
+                            onClick={() => setDetailScope({ userId: u.id })}
+                          >
+                            View learning
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="muted">
+              Manage group membership from People → Edit. Requirements also
+              apply to members of descendant groups.
+            </p>
+          </section>
+        )}
+      </>
+    );
+  }
   return (
     <>
       <div className="page-heading">
@@ -155,29 +279,26 @@ export default function Admin({
             name: production ? "People" : "Demo profiles",
             icon: Users,
           },
+          { id: "assignments", name: "Required learning", icon: Layers },
           { id: "groups", name: "Groups", icon: Layers },
           { id: "teams", name: "Teams", icon: Users },
           { id: "progress", name: "Progress", icon: BarChart3 },
           { id: "feedback", name: "Feedback", icon: FileText },
           { id: "settings", name: "Settings", icon: Layers },
-        ]
-          .filter(
-            (t) => !production || !["people", "groups", "teams"].includes(t.id),
-          )
-          .map((t) => (
-            <button
-              className={tab === t.id ? "selected" : ""}
-              key={t.id}
-              onClick={() => {
-                setTab(t.id);
-                setNotice("");
-                setQuery("");
-              }}
-            >
-              <t.icon size={17} />
-              {t.name}
-            </button>
-          ))}
+        ].map((t) => (
+          <button
+            className={tab === t.id ? "selected" : ""}
+            key={t.id}
+            onClick={() => {
+              setTab(t.id);
+              setNotice("");
+              setQuery("");
+            }}
+          >
+            <t.icon size={17} />
+            {t.name}
+          </button>
+        ))}
       </div>
       {notice && (
         <div className="success" role="status">
@@ -340,6 +461,7 @@ export default function Admin({
                         >
                           Edit
                         </button>
+
                         {production && c.publishedRevision && (
                           <button
                             className="text-button"
@@ -375,27 +497,67 @@ export default function Admin({
         </>
       ) : tab === "people" ? (
         <>
+          <section className="editor-block">
+            <h2>New users</h2>
+            <label>
+              Default learning stage for new users
+              <select
+                value={data.settings?.newUserStage || "existing"}
+                onChange={async (e) => {
+                  try {
+                    await onChange({
+                      ...data,
+                      settings: {
+                        ...defaultSettings,
+                        ...data.settings,
+                        newUserStage: e.target.value as "existing" | "newhire",
+                      },
+                    });
+                    setNotice("Default saved. Existing people are unchanged.");
+                  } catch (error) {
+                    setNotice((error as Error).message);
+                  }
+                }}
+              >
+                <option value="existing">Existing user — stay current</option>
+                <option value="newhire">New user — onboarding window</option>
+              </select>
+            </label>
+            <p className="muted">
+              Applies to newly added users and new self-registrations. You can
+              override the stage and start date for each person. Group
+              membership still determines required learning.
+            </p>
+          </section>
+          {production && <PendingPeople data={data} onChange={onChange} />}
           <div className="admin-toolbar">
             <p className="muted">
-              Sample profiles for trying role-based assignments. No accounts or
-              emails are created.
+              {production
+                ? "Manage signed-in accounts. Deactivation preserves learning history. Clear managed teams before removing a manager’s access."
+                : "Sample profiles for trying role-based assignments. No accounts or emails are created."}
             </p>
-            <button
-              className="primary"
-              onClick={() =>
-                setPerson({
-                  id: id(),
-                  name: "",
-                  email: "",
-                  role: "learner",
-                  groups: [],
-                  active: true,
-                })
-              }
-            >
-              <Plus size={16} />
-              Add demo profile
-            </button>
+            {!production && (
+              <button
+                className="primary"
+                onClick={() =>
+                  setPerson({
+                    id: id(),
+                    name: "",
+                    email: "",
+                    role: "learner",
+                    onboardingStart:
+                      data.settings?.newUserStage === "newhire"
+                        ? new Date().toISOString().slice(0, 10)
+                        : undefined,
+                    groups: [],
+                    active: true,
+                  })
+                }
+              >
+                <Plus size={16} />
+                Add demo profile
+              </button>
+            )}
           </div>
           <div className="filter-bar">
             <label>
@@ -501,6 +663,12 @@ export default function Admin({
                         >
                           Edit
                         </button>
+                        <button
+                          className="text-button"
+                          onClick={() => setDetailScope({ userId: u.id })}
+                        >
+                          Learning & progress
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -508,11 +676,18 @@ export default function Admin({
             </table>
           </div>
         </>
+      ) : tab === "assignments" ? (
+        <Assignments
+          data={data}
+          onAction={manageLearning}
+          onChange={onChange}
+          onOpenGroup={(groupId) => setDetailScope({ groupId })}
+        />
       ) : tab === "groups" ? (
         <>
           <form
             className="group-form"
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
               const name = groupName.trim();
               if (!name) return;
@@ -524,17 +699,21 @@ export default function Admin({
                 setNotice("That group already exists.");
                 return;
               }
-              onChange({
-                ...data,
-                groups: [
-                  ...data.groups,
-                  { id: id(), name, parentId: groupParent || undefined },
-                ],
-              });
-              setGroupName("");
-              setNotice(
-                "Group added. Assign profiles and courses to this group.",
-              );
+              try {
+                await onChange({
+                  ...data,
+                  groups: [
+                    ...data.groups,
+                    { id: id(), name, parentId: groupParent || undefined },
+                  ],
+                });
+                setGroupName("");
+                setNotice(
+                  "Group added. Assign profiles and courses to this group.",
+                );
+              } catch (e) {
+                setNotice((e as Error).message);
+              }
             }}
           >
             <label>
@@ -576,14 +755,16 @@ export default function Admin({
                   <select
                     value={g.parentId || ""}
                     onChange={(e) =>
-                      onChange({
-                        ...data,
-                        groups: data.groups.map((x) =>
-                          x.id === g.id
-                            ? { ...x, parentId: e.target.value || undefined }
-                            : x,
-                        ),
-                      })
+                      Promise.resolve(
+                        onChange({
+                          ...data,
+                          groups: data.groups.map((x) =>
+                            x.id === g.id
+                              ? { ...x, parentId: e.target.value || undefined }
+                              : x,
+                          ),
+                        }),
+                      ).catch((e) => setNotice(e.message))
                     }
                   >
                     <option value="">Top-level group</option>
@@ -596,7 +777,9 @@ export default function Admin({
                       ))}
                   </select>
                 </label>
-                <small>Members inherit assignments from parent groups.</small>
+                <small>
+                  Members inherit required learning from parent groups.
+                </small>
                 <p>
                   {data.users.filter((u) => u.groups.includes(g.id)).length}{" "}
                   profiles ·{" "}
@@ -608,20 +791,14 @@ export default function Admin({
                         c.status === "published",
                     ).length
                   }{" "}
-                  assigned courses
+                  required courses
                 </p>
-                <ul>
-                  {data.content
-                    .filter(
-                      (c) => c.kind === "course" && c.groups.includes(g.id),
-                    )
-                    .map((c) => (
-                      <li key={c.id}>
-                        {c.title}
-                        {c.status === "draft" ? " (draft)" : ""}
-                      </li>
-                    ))}
-                </ul>
+                <button
+                  className="primary"
+                  onClick={() => setDetailScope({ groupId: g.id })}
+                >
+                  Manage group
+                </button>
                 <button
                   onClick={() => {
                     const name = prompt("Group name", g.name)?.trim();
@@ -633,12 +810,14 @@ export default function Admin({
                           x.name.toLowerCase() === name.toLowerCase(),
                       )
                     )
-                      onChange({
-                        ...data,
-                        groups: data.groups.map((x) =>
-                          x.id === g.id ? { ...x, name } : x,
-                        ),
-                      });
+                      Promise.resolve(
+                        onChange({
+                          ...data,
+                          groups: data.groups.map((x) =>
+                            x.id === g.id ? { ...x, name } : x,
+                          ),
+                        }),
+                      ).catch((e) => setNotice(e.message));
                   }}
                 >
                   Rename group
@@ -661,9 +840,11 @@ export default function Admin({
             >
               <X />
             </button>
-            <h2>Demo profile</h2>
+            <h2>{production ? "Account" : "Demo profile"}</h2>
             <p className="muted">
-              Use fictional details. This does not create a secure account.
+              {production
+                ? "Changes apply to this verified account. Login email is read-only."
+                : "Use fictional details. This does not create a secure account."}
             </p>
             <label>
               Name
@@ -675,16 +856,23 @@ export default function Admin({
               />
             </label>
             <label>
-              Email label
+              {production ? "Login email" : "Email label"}
               <input
                 type="email"
                 required
+                disabled={production}
                 value={person.email}
                 onChange={(e) =>
                   setPerson({ ...person, email: e.target.value })
                 }
               />
             </label>
+            <OnboardingFields
+              value={person.onboardingStart}
+              onChange={(onboardingStart) =>
+                setPerson({ ...person, onboardingStart })
+              }
+            />
             <label>
               Access
               <select
@@ -757,6 +945,8 @@ export default function Admin({
   );
 }
 export function Editor({
+  onWorkspaceChange,
+  onLearning,
   content,
   data,
   onSave,
@@ -770,6 +960,8 @@ export function Editor({
   data: Workspace;
   onSave: (c: Content) => void | Promise<void>;
   onCancel: () => void;
+  onLearning?: LearningHandler;
+  onWorkspaceChange?: (data: Workspace) => void | Promise<void>;
 }) {
   const [c, setC] = useState<Content>(() => ({
       ...content,
@@ -781,6 +973,7 @@ export function Editor({
           due: { type: "none" },
         })),
     })),
+    [editorTab, setEditorTab] = useState("content"),
     [error, setError] = useState(""),
     [refresh, setRefresh] = useState(false),
     [saving, setSaving] = useState(false);
@@ -813,8 +1006,16 @@ export function Editor({
     setSaving(true);
     setError("");
     try {
+      const latest = data.content.find((x) => x.id === c.id);
       await onSave({
         ...c,
+        ...(latest
+          ? {
+              assignments: latest.assignments,
+              groups: latest.groups,
+              revision: latest.revision,
+            }
+          : {}),
         title: c.title.trim(),
         category: c.category.trim(),
         version: existing && refresh ? content.version + 1 : content.version,
@@ -827,6 +1028,22 @@ export function Editor({
   }
   const set = (key: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: value }));
+  if (editorTab === "assignments" && onLearning)
+    return (
+      <>
+        <button className="text-button" onClick={() => setEditorTab("content")}>
+          <ArrowLeft size={16} />
+          Back to course builder
+        </button>
+        <h1>{c.title}</h1>
+        <Assignments
+          data={data}
+          scope={{ courseId: c.id }}
+          onAction={onLearning}
+          onChange={onWorkspaceChange}
+        />
+      </>
+    );
   return (
     <form className="editor" onSubmit={submit}>
       <button type="button" className="text-button" onClick={onCancel}>
@@ -1178,119 +1395,32 @@ export function Editor({
                   onChange={(e) => set("duration", Number(e.target.value))}
                 />
               </label>
-              <fieldset>
-                <legend>Group assignments</legend>
+              <section>
+                <h3>Required learning</h3>
                 <p className="muted">
-                  Assignments include nested groups. If deadlines overlap, the
-                  earliest applies.
+                  Choose which groups require this course. Learning windows are
+                  managed in workspace settings.
                 </p>
-                {data.groups.map((g) => {
-                  const rule = c.assignments?.find((a) => a.groupId === g.id);
-                  const update = (patch: Partial<Assignment>) => {
-                    if (rule)
-                      set(
-                        "assignments",
-                        c.assignments!.map((a) =>
-                          a.groupId === g.id ? { ...a, ...patch } : a,
-                        ),
-                      );
-                  };
-                  return (
-                    <div className="assignment-rule" key={g.id}>
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={!!rule}
-                          onChange={(e) => {
-                            const rules = e.target.checked
-                              ? [
-                                  ...(c.assignments || []),
-                                  {
-                                    groupId: g.id,
-                                    assignedAt: new Date().toISOString(),
-                                    due: { type: "none" as const },
-                                  },
-                                ]
-                              : (c.assignments || []).filter(
-                                  (a) => a.groupId !== g.id,
-                                );
-                            setC((prev) => ({
-                              ...prev,
-                              assignments: rules,
-                              groups: rules.map((a) => a.groupId),
-                            }));
-                          }}
-                        />
-                        {g.name}
-                      </label>
-                      {rule && (
-                        <>
-                          <label>
-                            Due date for {g.name}
-                            <select
-                              value={rule.due.type}
-                              onChange={(e) =>
-                                update({
-                                  due:
-                                    e.target.value === "date"
-                                      ? {
-                                          type: "date",
-                                          date: new Date()
-                                            .toISOString()
-                                            .slice(0, 10),
-                                        }
-                                      : e.target.value === "days"
-                                        ? { type: "days", days: 7 }
-                                        : { type: "none" },
-                                })
-                              }
-                            >
-                              <option value="none">No deadline</option>
-                              <option value="date">Specific date</option>
-                              <option value="days">
-                                Days after assignment
-                              </option>
-                            </select>
-                          </label>
-                          {rule.due.type === "date" && (
-                            <input
-                              aria-label={`Deadline for ${g.name}`}
-                              required
-                              type="date"
-                              value={rule.due.date}
-                              onChange={(e) =>
-                                update({
-                                  due: { type: "date", date: e.target.value },
-                                })
-                              }
-                            />
-                          )}{" "}
-                          {rule.due.type === "days" && (
-                            <label>
-                              Days after assignment
-                              <input
-                                required
-                                type="number"
-                                min={1}
-                                max={3650}
-                                value={rule.due.days}
-                                onChange={(e) =>
-                                  update({
-                                    due: {
-                                      type: "days",
-                                      days: Number(e.target.value),
-                                    },
-                                  })
-                                }
-                              />
-                            </label>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  );
-                })}
-              </fieldset>
+                {existing &&
+                (data.publishedContent ?? data.content).some(
+                  (x) => x.id === c.id && x.status === "published",
+                ) &&
+                onLearning ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditorTab("assignments");
+                    }}
+                  >
+                    Manage required learning
+                  </button>
+                ) : (
+                  <p>
+                    Publish this course to add it to a group’s required
+                    learning.
+                  </p>
+                )}
+              </section>
               {existing && (
                 <label className="checkbox-label">
                   <input
@@ -1308,7 +1438,9 @@ export function Editor({
             </>
           )}
           <div className="demo-note">
-            <strong>{production ? "Saved to your workspace" : "Saved in your browser"}</strong>
+            <strong>
+              {production ? "Saved to your workspace" : "Saved in your browser"}
+            </strong>
             <p>
               {production
                 ? "Drafts are visible to administrators. Publish when you are ready to share with readers."

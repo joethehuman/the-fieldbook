@@ -519,6 +519,13 @@ export default function Fieldbook({
               data={data}
               user={user}
               onChange={persist}
+              onLearning={
+                runtime
+                  ? async (action) => {
+                      setData(await runtime.manageLearning(action));
+                    }
+                  : undefined
+              }
               production={!!runtime}
               onUpload={runtime?.upload}
             />
@@ -620,10 +627,11 @@ export default function Fieldbook({
               user={user}
               groups={data.groups}
               assigned={assigned}
+              settings={data.settings}
               progress={progress}
               onOpen={(id) => navigate("learn", id)}
               onKnowledge={() => navigate("docs")}
-              publicLearning={!!runtime && assigned.length === 0}
+              publicLearning={!!runtime && uid === "guest"}
               guest={!!runtime && uid === "guest"}
               onSignIn={runtime?.signIn}
             />

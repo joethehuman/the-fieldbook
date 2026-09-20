@@ -1,4 +1,5 @@
 "use client";
+import { learningState, learningTarget } from "@/lib/learning";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
 import {
@@ -16,12 +17,12 @@ export function TeamsAdmin({
   onChange,
 }: {
   data: Workspace;
-  onChange: (d: Workspace) => void;
+  onChange: (d: Workspace) => void | Promise<void>;
 }) {
   const teams = data.teams || [];
   const [editing, setEditing] = useState<Team | null>(null),
     [notice, setNotice] = useState("");
-  function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!editing) return;
     const name = editing.name.trim();
@@ -39,15 +40,19 @@ export function TeamsAdmin({
       setNotice("A team cannot sit inside itself or one of its subteams.");
       return;
     }
-    onChange({
-      ...data,
-      teams: [
-        ...teams.filter((t) => t.id !== editing.id),
-        { ...editing, name },
-      ],
-    });
-    setEditing(null);
-    setNotice("Team saved.");
+    try {
+      await onChange({
+        ...data,
+        teams: [
+          ...teams.filter((t) => t.id !== editing.id),
+          { ...editing, name },
+        ],
+      });
+      setEditing(null);
+      setNotice("Team saved.");
+    } catch (e) {
+      setNotice((e as Error).message);
+    }
   }
   return (
     <>
@@ -112,7 +117,10 @@ export function TeamsAdmin({
               >
                 <option value="">No manager</option>
                 {data.users
-                  .filter((u) => u.active)
+                  .filter(
+                    (u) =>
+                      u.active && (u.role === "manager" || u.role === "admin"),
+                  )
                   .map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name}
@@ -204,7 +212,11 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
       `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()),
   );
   const rows = users.map((u) => {
-    const assigned = assignedCourses(data.content, u, data.groups);
+    const assigned = assignedCourses(
+      data.publishedContent || data.content,
+      u,
+      data.groups,
+    );
     const completed = assigned.filter((c) =>
       isComplete(c, data.progress[u.id] || []),
     ).length;
@@ -269,7 +281,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             <tr>
               <th>Team member</th>
               <th>Team</th>
-              <th>Assigned</th>
+              <th>Required</th>
               <th>Completed</th>
               <th>Current</th>
               <th />
@@ -285,7 +297,20 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                 <td>
                   {teams.find((t) => t.id === u.teamId)?.name || "No team"}
                 </td>
-                <td>{assigned.length}</td>
+                <td>
+                  {assigned.length}
+                  <small>
+                    {
+                      learningState(
+                        data.publishedContent ?? data.content,
+                        u,
+                        data.groups,
+                        data.progress[u.id] || [],
+                        data.settings,
+                      ).status
+                    }
+                  </small>
+                </td>
                 <td>{completed}</td>
                 <td>
                   {assigned.length
@@ -315,27 +340,27 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             <h2>{u.name}’s assignments</h2>
             {assigned.map((c) => {
               const done = isComplete(c, data.progress[u.id] || []),
-                due = assignmentInfo(c, u, data.groups).dueDate;
+                due = learningTarget(c, u, data.groups, data.settings);
               return (
                 <div className="report-course" key={c.id}>
                   <div>
                     <strong>{c.title}</strong>
                     <small>
                       {c.category} · v{c.version}
-                      {due ? ` · Due ${due}` : ""}
+                      {due ? ` · Target ${due}` : ""}
                     </small>
                   </div>
                   <span>
                     {done
                       ? "Completed"
                       : due && due < new Date().toISOString().slice(0, 10)
-                        ? "Overdue"
+                        ? "Needs attention"
                         : "Outstanding"}
                   </span>
                 </div>
               );
             })}
-            {!assigned.length && <p>No assigned courses.</p>}
+            {!assigned.length && <p>No required courses.</p>}
           </section>
         ))}
     </>

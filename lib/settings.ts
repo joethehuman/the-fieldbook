@@ -25,6 +25,9 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
+  newUserStage?: "existing" | "newhire";
+  onboardingDays?: number;
+  catchUpDays?: number;
   privacy?: PrivacySettings;
   name: string;
   tagline: string;
@@ -34,6 +37,9 @@ export type SiteSettings = {
   registration: "open" | "closed";
 };
 export const defaultSettings: SiteSettings = {
+  newUserStage: "existing",
+  onboardingDays: 90,
+  catchUpDays: 30,
   name: "Fieldbook",
   tagline: "A shared place to get better.",
   logoUrl: "",
