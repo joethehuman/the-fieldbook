@@ -52,6 +52,7 @@ import {
   saveWorkspace,
   updateProgress,
   SESSION,
+  DEMO_PROFILE_IDS,
   type Workspace,
 } from "@/lib/store";
 import dynamic from "next/dynamic";
@@ -85,7 +86,8 @@ export default function Fieldbook({
     }
     try {
       setData(loadWorkspace());
-      setUid(sessionStorage.getItem(SESSION) || "demo-learner");
+      const savedProfile = sessionStorage.getItem(SESSION);
+      setUid(savedProfile && DEMO_PROFILE_IDS.includes(savedProfile) ? savedProfile : "demo-learner");
     } catch (e) {
       setError((e as Error).message);
     }
@@ -254,7 +256,8 @@ export default function Fieldbook({
             <p>Choose a demo profile to explore the organization.</p>
             <div className="profile-list">
               {data.users
-                .filter((u) => u.active)
+                .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
+                .sort((a, b) => DEMO_PROFILE_IDS.indexOf(a.id) - DEMO_PROFILE_IDS.indexOf(b.id))
                 .map((u) => (
                   <button key={u.id} onClick={() => login(u.id)}>
                     <span className="avatar">{initials(u.name)}</span>
@@ -262,11 +265,10 @@ export default function Fieldbook({
                       <strong>{u.name}</strong>
                       <small>
                         {u.role === "admin"
-                          ? "Admin · Manage the organization"
-                          : data.groups
-                              .filter((g) => u.groups.includes(g.id))
-                              .map((g) => g.name)
-                              .join(", ") || "Learner"}
+                          ? "Admin · Organization Admin"
+                          : u.role === "manager"
+                            ? "Manager · Sales Director"
+                            : "User · Account Executive"}
                       </small>
                     </span>
                     <ArrowRight size={18} />
@@ -415,12 +417,12 @@ export default function Fieldbook({
                 {user.role === "admin"
                   ? "Administrator"
                   : user.role === "manager"
-                    ? "Manager"
+                    ? "Sales Director"
                     : runtime
                       ? uid === "guest"
                         ? "Save progress across devices"
                         : "Learner"
-                      : "Field team"}
+                      : "Account Executive"}
               </small>
             </span>
             <LogOut size={16} />
