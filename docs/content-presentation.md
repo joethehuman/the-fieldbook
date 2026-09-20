@@ -2,11 +2,13 @@
 
 ## Docs section order
 
-Go to **Manage organization → Organization Settings → Docs navigation**. Use **Move up** and **Move down**, then **Save settings**. The saved order applies to both the Docs sidebar and overview. Editing an article no longer changes its section position.
+Go to **Manage organization → Organization Settings → Docs navigation**. Drag a section by its handle, use the arrow buttons, or focus its handle and press the up/down arrow keys. Select **Save settings** to keep the order. The Docs sidebar and overview share that order.
 
-Sections come from document categories. Before an order is saved, sections sort alphabetically. New or renamed categories not yet in the saved order appear after saved sections, alphabetically. Sections without visible documents are omitted for readers. Draft categories can be arranged by admins before publication. Article and nested-folder order are unchanged.
+Use **New section name → Create section** to add an empty section, then save settings. Empty sections stay available to administrators and in the content editor, but readers only see sections containing visible published documents. Existing document categories are included automatically; unsaved categories append alphabetically after saved sections.
 
-The order is stored as optional `docCategoryOrder` in the existing settings JSON and uses the existing administrator authorization and settings-revision check.
+In the document editor, **Organization → Section** lists all existing sections. **Create new section…** saves a section immediately and selects it; save the document separately to keep its selection. Canceling the document does not delete a created section. The simplified editor no longer exposes folder-path entry. Existing folder data and reader folder navigation are preserved.
+
+The shared section list and order use optional `docCategoryOrder` in the existing settings JSON, with administrator authorization and revision conflict checks. No migration or additional dependency is required.
 
 ## Course covers
 
@@ -35,3 +37,7 @@ No database migration or new service is required. Both fields are optional and u
 - An isolated browser harness exercised the upload controls with a simulated upload callback: upload, replacement, failed replacement preserving the previous cover, removal, and rejection of video files. This is not a live Supabase upload test.
 - Local checks used the available Node 24.19.0 and pnpm 11.25.0 runtime; the repository targets Node 22 and pnpm 10.17.1. Release-runtime CI and real storage upload/playback remain external checks.
 - No production deployment or database changes were performed.
+
+## Section management follow-up — September 19, 2026
+
+The follow-up passes 36 tests (26 shared, 10 production) and both builds, including TypeScript. New checks cover retained empty sections, reader filtering, name validation, and reorder behavior. The equivalent package-script commands ran directly with the available Node 24.19.0 runtime because the bundled pnpm version attempted to reinstall shared dependencies. Browser interaction and visual verification were blocked by an unavailable browser security policy check. No production content or database changes were made during testing.

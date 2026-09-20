@@ -2873,13 +2873,39 @@ select:focus-visible {
   border-radius: 8px;
 }
 .doc-order-list li > span {
+  flex: 1;
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.doc-section-drag {
+  touch-action: none;
+  cursor: grab;
+  flex-shrink: 0;
+}
+.doc-section-drag:active {
+  cursor: grabbing;
+}
+.doc-order-list li.doc-section-drop-target {
+  border-color: var(--accent);
+  background: var(--muted);
+}
+.doc-section-create {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0;
+}
+.doc-section-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.doc-section-create label {
+  margin: 0;
+}
 @media (max-width: 600px) {
   .doc-order-list li {
-    flex-direction: column;
-    align-items: flex-start;
+    gap: 6px;
+    padding: 8px;
   }
 }
 
