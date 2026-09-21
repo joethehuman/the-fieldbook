@@ -1,4 +1,4 @@
-import { actor, errorResponse } from "@production/lib/auth";
+import { actor, errorResponse, HttpError } from "@production/lib/auth";
 import { snapshot } from "@production/lib/snapshot";
 export const dynamic = "force-dynamic";
 export async function GET() {
@@ -9,6 +9,11 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
+    if (e instanceof HttpError && e.status === 401)
+      return Response.json(
+        { error: "Sign in to continue." },
+        { status: 401, headers: { "Cache-Control": "no-store" } },
+      );
     return errorResponse(e, "api/workspace");
   }
 }

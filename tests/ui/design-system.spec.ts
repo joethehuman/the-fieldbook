@@ -330,14 +330,14 @@ test("manager reporting uses shared filters and scoped people", async ({
   await expect(
     page.getByRole("combobox", { name: "Reporting team", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: /Alex Morgan/ })).toBeVisible();
-  const personCell = page.getByRole("cell", { name: /Alex Morgan/ });
+  await expect(page.getByRole("cell", { name: /Alex Edwards/ })).toBeVisible();
+  const personCell = page.getByRole("cell", { name: /Alex Edwards/ });
   const nameBox = await personCell.locator("strong").boundingBox();
   const emailBox = await personCell.locator("small").boundingBox();
   expect(emailBox!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height);
 
   await expect(
-    page.getByRole("cell", { name: /Organization Admin/ }),
+    page.getByRole("cell", { name: /Oliver Anderson/ }),
   ).toHaveCount(0);
   await noOverflow(page);
   await testInfo.attach("manager-report", {

@@ -30,6 +30,7 @@ export type SiteSettings = {
   onboardingDays?: number;
   catchUpDays?: number;
   privacy?: PrivacySettings;
+  welcomeDescription?: string;
   name: string;
   tagline: string;
   logoUrl: string;
@@ -41,6 +42,7 @@ export const defaultSettings: SiteSettings = {
   newUserStage: "existing",
   onboardingDays: 90,
   catchUpDays: 30,
+  welcomeDescription: "",
   name: "Fieldbook",
   tagline: "A shared place to get better.",
   logoUrl: "",

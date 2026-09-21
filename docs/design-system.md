@@ -35,7 +35,7 @@ Inputs, textareas and native choices retain browser form semantics. `Checkbox` a
 Shared controls are necessary but do not establish a consistent page by themselves. Use these patterns rather than arranging their children independently:
 
 - `SectionHeader` requires a `title`; `description` always stays below it. Children occupy the trailing action area. Use `CollectionToolbar` to separate collection filters from creation actions.
-- Sidebar tabs use a fixed icon size and left-aligned labels. Account identity uses `AccountButton`, with dedicated avatar, wrapping name/role and action columns. Do not style it as a generic navigation item.
+- Sidebar tabs use a fixed icon size and left-aligned labels. Account identity uses `AccountButton`, with noninteractive avatar/name/role and a separate, accessibly labeled icon button in its own column. Only that button triggers the account action. Optional help text spans the row; the demo uses it to explain simulated profile switching. Do not style it as a generic navigation item.
 - `ReorderRow` owns handle, flexible text and aligned action columns for both Docs and course sequences. Keep interaction/persistence handlers in the owning feature. Text length must not move action columns.
 - `CardFooter` keeps action copy and its arrow together and anchors metadata consistently. Use `StatusActions` for saved-state copy with an adjacent action; it supplies a real gap and wraps intentionally.
 - Application data uses `DataTable` with a declared view schema. Column widths are independent of the filtered records, counts use consistent numeric alignment, and narrow layouts scroll inside `TableContainer`. Plain Table remains appropriate for authored Markdown and primitive examples. Add a central schema for a new table rather than allowing content to choose its geometry.
@@ -103,3 +103,9 @@ Reference conventions: [shadcn composition](https://ui.shadcn.com/docs), [themin
 `LaunchList` presents a learner's ordered sequence: number, flexible title/description/status, and an aligned launch action. It is distinct from the editor's OrderedLearning. Curriculum detail pages use this simple list with a PageHeader and progress/next-course action. Do not add sorting, channel filters, nested accordions or course editing controls to a learner playlist.
 
 The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browser toolbar, and the ordered launch list. Verify mixed title lengths, metadata wrapping, equal card/footer alignment, header controls, keyboard focus, narrow screens and enlarged text whenever these patterns change.
+
+## Account identity
+
+`InitialsAvatar` is the shared circular initials marker for profile pickers, account buttons and compact attribution. Its neutral surface and border remain visible on white and muted backgrounds. Use the default 36px size for accounts or the compact 32px size for metadata. Always pair it with a visible name; initials are decorative and hidden from assistive technology to avoid duplicate announcements. Do not recreate avatar styling in feature CSS. The `/ui` catalog demonstrates both sizes.
+
+`InstallationIdentity` and `InstallationLogo` provide the workspace/account wordmark and failed-image fallback. `BrandedAccount` composes them with `AccountPage` and the published privacy link. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.

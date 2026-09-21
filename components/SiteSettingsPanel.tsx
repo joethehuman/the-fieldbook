@@ -5,13 +5,7 @@ import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import DocSectionCreate from "./DocSectionCreate";
-import {
-  Upload,
-  ImageIcon,
-  GripVertical,
-  ArrowUp,
-  ArrowDown,
-} from "lucide-react";
+import { Upload, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
 import { ActionGroup } from "./ui/action-group";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
@@ -19,7 +13,8 @@ import {
   availableDocSections,
   reorderDocSections,
 } from "@/lib/docs-navigation";
-import { defaultSettings } from "@/lib/settings";
+import { InstallationLogo } from "./patterns/installation-identity";
+import { defaultSettings, privacyHref } from "@/lib/settings";
 import type { Workspace } from "@/lib/store";
 import type { UploadMedia } from "./MarkdownEditor";
 export type SettingsSection =
@@ -95,12 +90,14 @@ export default function SiteSettingsPanel({
           tabIndex={-1}
           id="settings-identity"
         >
-          <h3>Organization identity</h3>
+          <h3>Installation branding</h3>
           <p className="muted">
-            Your identity, with the same simple home for docs and courses.
+            The same identity appears in your workspace and on account pages.
+            The saved name, logo, welcome description and published privacy link
+            are visible before sign-in, including on private installations.
           </p>
           <Field>
-            Site name
+            Installation name
             <Input
               required
               maxLength={60}
@@ -109,6 +106,33 @@ export default function SiteSettingsPanel({
                 setSettings({ ...settings, name: e.target.value })
               }
             />
+          </Field>
+          <Field>
+            Welcome description (optional)
+            <Input
+              maxLength={180}
+              value={settings.welcomeDescription || ""}
+              onChange={(e) =>
+                setSettings({ ...settings, welcomeDescription: e.target.value })
+              }
+            />
+            <FieldDescription>
+              A short welcome on the sign-in page. Authentication instructions
+              are provided by Fieldbook.
+            </FieldDescription>
+          </Field>
+          <Field>
+            Privacy-policy link
+            <Input
+              readOnly
+              value={privacyHref(settings) || ""}
+              placeholder="No published policy"
+            />
+            <FieldDescription>
+              Set or publish this link in Organization Settings → Privacy
+              policy. Hosted and external policies use the same published
+              setting across the application.
+            </FieldDescription>
           </Field>
           <Field>
             Footer tagline
@@ -158,14 +182,7 @@ export default function SiteSettingsPanel({
               <legend>Organization logo</legend>
               <div className="logo-control">
                 <div className="logo-preview">
-                  {settings.logoUrl ? (
-                    <img
-                      src={settings.logoUrl}
-                      alt="Organization logo preview"
-                    />
-                  ) : (
-                    <ImageIcon aria-hidden="true" size={26} />
-                  )}
+                  <InstallationLogo logoUrl={settings.logoUrl} />
                 </div>
                 <div className="logo-controls">
                   <ActionGroup>

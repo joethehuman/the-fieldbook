@@ -29,18 +29,16 @@
     display: grid;
     width: 2rem;
     height: 2rem;
+    flex-shrink: 0;
     place-items: center;
     border-radius: var(--radius);
     background: var(--brand);
     color: var(--primary-foreground);
   }
   .logo img {
-    max-width: 10rem;
+    max-width: 2rem;
     max-height: 2rem;
     object-fit: contain;
-  }
-  .logo-period {
-    color: var(--brand);
   }
   .nav-label,
   .admin-nav-label,
@@ -555,33 +553,6 @@
     gap: var(--space-6);
     padding: var(--space-6);
   }
-  .login-page {
-    display: grid;
-    min-height: 100dvh;
-    grid-template-columns: 1fr 1fr;
-  }
-  .login-story {
-    display: grid;
-    align-content: center;
-    gap: var(--space-8);
-    background: var(--muted);
-    padding: var(--space-12);
-  }
-  .login-inner {
-    display: grid;
-    gap: var(--space-6);
-    max-width: 30rem;
-  }
-  .login-form {
-    display: grid;
-    align-content: center;
-    gap: var(--space-6);
-    padding: var(--space-12);
-  }
-  .login-icons {
-    display: flex;
-    gap: var(--space-4);
-  }
   .profile-list {
     display: grid;
     gap: var(--space-3);
@@ -666,15 +637,6 @@
     .brief-list,
     .knowledge-grid {
       grid-template-columns: minmax(0, 1fr);
-    }
-    .login-page {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    .login-story {
-      display: none;
-    }
-    .login-form {
-      padding: var(--space-6);
     }
   }
 }

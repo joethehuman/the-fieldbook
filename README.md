@@ -71,6 +71,7 @@ The production application includes:
 - [Install on Vercel and Supabase](production/README.md)
 - [Connect your own MCP client](docs/mcp-setup.md)
 - [Configure or change your domain](docs/domains.md)
+- [Configure installation and account branding](docs/branding.md)
 - [Configure your privacy policy](docs/privacy-setup.md)
 - [Select a version and upgrade](docs/upgrading.md)
 - [Maintainer release process](docs/releases.md)

@@ -1,97 +1,27 @@
-"use client";
-import { Button } from "@/components/ui/button";
-import { ActionGroup } from "@/components/ui/action-group";
-import { Alert } from "@/components/ui/alert";
-import { AccountPage } from "@/components/patterns/layout";
-import { useEffect, useState } from "react";
-export default function Consent() {
-  const [details, setDetails] = useState<any>(null),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
-    [id, setId] = useState("");
-  useEffect(() => {
-    const value =
-      new URLSearchParams(window.location.search).get("authorization_id") || "";
-    setId(value);
-    fetch(`/api/consent?id=${encodeURIComponent(value)}`, { cache: "no-store" })
-      .then(async (r) => {
-        if (r.status === 401) {
-          window.location.href = `/auth/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-          return;
-        }
-        const d = await r.json();
-        if (!r.ok) throw new Error(d.error);
-        if (d.redirect_url) window.location.assign(d.redirect_url);
-        else setDetails(d);
-      })
-      .catch((e) => setError(e.message));
-  }, []);
-  async function decide(allow: boolean) {
-    setBusy(true);
-    try {
-      const r = await fetch("/api/consent", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, allow }),
-        }),
-        d = await r.json();
-      if (!r.ok) throw new Error(d.error);
-      window.location.assign(d.redirect_url);
-    } catch (e) {
-      setError((e as Error).message);
-      setBusy(false);
-    }
+import Consent from "./Consent";
+import { publicBranding } from "@production/lib/branding";
+import { errorResponse } from "@production/lib/errors";
+import { AccountUnavailable } from "@production/app/AccountUnavailable";
+export const dynamic = "force-dynamic";
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams))
+    if (typeof value === "string") query.set(key, value);
+  let branding;
+  try {
+    branding = await publicBranding();
+  } catch (e) {
+    const response = errorResponse(e, "oauth/consent/branding");
+    return (
+      <AccountUnavailable
+        reference={response.headers.get("X-Request-Id")!}
+        retry={"/oauth/consent?" + query.toString()}
+      />
+    );
   }
-  return (
-    <AccountPage>
-      <span className="eyebrow">CONNECT TO FIELDBOOK</span>
-      <h1>
-        {details
-          ? `Allow ${details.client.name} to manage content?`
-          : "Connecting your AI…"}
-      </h1>
-      {error && (
-        <Alert variant="destructive" role="alert">
-          {error}
-        </Alert>
-      )}
-      {details && (
-        <>
-          <p>
-            This connection acts as <strong>{details.user.email}</strong>.
-          </p>
-          <ul>
-            <li>Read published content and drafts.</li>
-            <li>Create and edit articles, notes, lessons, and quizzes.</li>
-            <li>Publish or unpublish content when you request it.</li>
-            <li>Read course progress and feedback summaries.</li>
-          </ul>
-          <p>
-            You can revoke this connection in Fieldbook at any time. The client
-            name is supplied by the connecting application; approve only a
-            connection you initiated.
-          </p>
-          <p className="muted">Requested identity access: {details.scope}</p>
-          <ActionGroup>
-            <Button
-              variant="default"
-              disabled={busy}
-
-              onClick={() => decide(true)}
-            >
-              Allow connection
-            </Button>
-            <Button
-              variant="outline"
-              disabled={busy}
-
-              onClick={() => decide(false)}
-            >
-              Deny
-            </Button>
-          </ActionGroup>
-        </>
-      )}
-    </AccountPage>
-  );
+  return <Consent branding={branding} />;
 }

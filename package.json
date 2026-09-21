@@ -11,7 +11,8 @@
     "dev:production": "next dev production -H 127.0.0.1",
     "check:ui": "node scripts/check-ui.mjs",
     "test:ui": "playwright test",
-    "test:authoring": "playwright test -c playwright.authoring.config.ts"
+    "test:authoring": "playwright test -c playwright.authoring.config.ts",
+    "test:accounts": "playwright test -c playwright.accounts.config.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",

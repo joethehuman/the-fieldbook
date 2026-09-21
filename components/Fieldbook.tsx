@@ -1,4 +1,9 @@
 "use client";
+import { InitialsAvatar } from "./ui/initials-avatar";
+import { RequestError } from "@/lib/workspace-save";
+import { BrandedAccount } from "./patterns/branded-account";
+import { InstallationIdentity as Logo } from "./patterns/installation-identity";
+import { brandingFromSettings } from "@/lib/branding";
 import { CurriculumPage } from "./CurriculumPage";
 import { Badge } from "@/components/ui/badge";
 import { SkipLink } from "./patterns/skip-link";
@@ -35,6 +40,7 @@ import {
   Clock,
   Settings,
   LogOut,
+  ArrowLeftRight,
   X,
   Menu,
   CheckCircle2,
@@ -105,6 +111,10 @@ export default function Fieldbook({
           setUid(user?.id || "guest");
         })
         .catch((e) => {
+          if (e instanceof RequestError && e.status === 401) {
+            runtime.signIn();
+            return;
+          }
           setError(e.message);
         });
       return;
@@ -263,8 +273,8 @@ export default function Fieldbook({
         {error &&
           (runtime ? (
             <>
-              <Button asChild variant="default">
-                <a href="/sign-in">Sign in</a>
+              <Button variant="default" onClick={() => runtime.signIn()}>
+                Sign in
               </Button>
               <Button variant="ghost" onClick={() => window.location.reload()}>
                 Try again
@@ -292,66 +302,46 @@ export default function Fieldbook({
   const branding = { ...defaultSettings, ...data.settings };
   if (!user)
     return (
-      <div className="login-page">
-        <div className="login-story">
-          <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
-          <div>
-            <span className="eyebrow">LEARNING AND KNOWLEDGE</span>
-            <h1>The Fieldbook</h1>
-            <p>Updates, courses, and docs in one place.</p>
-            <div className="login-icons">
-              <BookOpen />
-              <Newspaper />
-              <GraduationCap />
-            </div>
-          </div>
-          <small>Interactive demo with sample content.</small>
+      <BrandedAccount branding={brandingFromSettings(branding)}>
+        <Badge variant="default">INTERACTIVE DEMO</Badge>
+        <h1>Explore {branding.name}</h1>
+        <p>Choose a demo profile to explore the organization.</p>
+        <div className="profile-list">
+          {data.users
+            .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
+            .sort(
+              (a, b) =>
+                DEMO_PROFILE_IDS.indexOf(a.id) - DEMO_PROFILE_IDS.indexOf(b.id),
+            )
+            .map((u) => (
+              <NavigationButton
+                variant="ghost"
+                key={u.id}
+                onClick={() => login(u.id)}
+              >
+                <InitialsAvatar initials={initials(u.name)} />
+                <span>
+                  <strong>{u.name}</strong>
+                  <small>
+                    {u.role === "admin"
+                      ? "Admin · Org Admin"
+                      : u.role === "manager"
+                        ? "Manager · Sales Director"
+                        : "User · Account Executive"}
+                  </small>
+                </span>
+                <ArrowRight size={18} />
+              </NavigationButton>
+            ))}
         </div>
-        <main className="login-form">
-          <div className="login-inner">
-            <Badge variant="default">INTERACTIVE DEMO</Badge>
-            <h2>Welcome to Fieldbook</h2>
-            <p>Choose a demo profile to explore the organization.</p>
-            <div className="profile-list">
-              {data.users
-                .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
-                .sort(
-                  (a, b) =>
-                    DEMO_PROFILE_IDS.indexOf(a.id) -
-                    DEMO_PROFILE_IDS.indexOf(b.id),
-                )
-                .map((u) => (
-                  <NavigationButton
-                    variant="ghost"
-                    key={u.id}
-                    onClick={() => login(u.id)}
-                  >
-                    <span className="avatar">{initials(u.name)}</span>
-                    <span>
-                      <strong>{u.name}</strong>
-                      <small>
-                        {u.role === "admin"
-                          ? "Admin · Organization Admin"
-                          : u.role === "manager"
-                            ? "Manager · Sales Director"
-                            : "User · Account Executive"}
-                      </small>
-                    </span>
-                    <ArrowRight size={18} />
-                  </NavigationButton>
-                ))}
-            </div>
-            <div className="demo-note">
-              <strong>A working demo, on your terms.</strong>
-              <p>
-                Changes stay in this browser. Demo profiles are not secure
-                accounts, and data is not shared between devices. Use sample
-                content only.
-              </p>
-            </div>
-          </div>
-        </main>
-      </div>
+        <div className="demo-note">
+          <strong>A working demo, on your terms.</strong>
+          <p>
+            Changes stay in this browser. Demo profiles are not secure accounts,
+            and data is not shared between devices. Use sample content only.
+          </p>
+        </div>
+      </BrandedAccount>
     );
   const visible = (data.publishedContent || data.content).filter(
     (c) => c.status === "published",
@@ -468,7 +458,7 @@ export default function Fieldbook({
           )}
           <AccountButton
             onClick={logout}
-            title={
+            actionLabel={
               runtime
                 ? uid === "guest"
                   ? "Sign in"
@@ -490,7 +480,12 @@ export default function Fieldbook({
                       : "Learner"
                     : "Account Executive"
             }
-            icon={<LogOut size={16} />}
+            icon={runtime ? <LogOut size={16} /> : <ArrowLeftRight size={16} />}
+            helpText={
+              runtime
+                ? undefined
+                : "Demo workspace. Use the switch button to try learner, manager and admin views."
+            }
           />
         </div>
       </aside>
@@ -730,7 +725,7 @@ export default function Fieldbook({
               <h1>{item.title}</h1>
               <p className="article-lede">{item.summary}</p>
               <div className="article-meta">
-                <span className="avatar small">FB</span>
+                <InitialsAvatar initials={initials(branding.name)} size="sm" />
                 <span>{branding.name}</span>
                 <span>·</span>
                 <span>Updated {date(item.updatedAt)}</span>
@@ -890,27 +885,6 @@ export default function Fieldbook({
           </ActionGroup>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-function Logo({
-  name = "fieldbook",
-  logoUrl,
-}: {
-  name?: string;
-  logoUrl?: string;
-}) {
-  return (
-    <div className="logo">
-      <span>
-        {logoUrl ? (
-          <img src={logoUrl} alt="" />
-        ) : (
-          <BookOpen size={22} strokeWidth={2.3} />
-        )}
-      </span>
-      {name}
-      <span className="logo-period">.</span>
     </div>
   );
 }
