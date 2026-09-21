@@ -1,4 +1,5 @@
 "use client";
+import { useToast } from "@/components/ui/toast";
 import { useInteractionDialog } from "@/components/ui/interaction-dialog";
 import { CsvExport } from "@/components/patterns/csv-export";
 import { SearchResultCard } from "@/components/patterns/search-result";
@@ -68,6 +69,7 @@ const choices = (
   </>
 );
 export default function ComponentCatalog() {
+  const notify = useToast();
   const { prompt } = useInteractionDialog();
   const [emptyReport, setEmptyReport] = useState(false);
   const [group, setGroup] = useState("company");
@@ -88,6 +90,27 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <section className="grid gap-4" aria-label="Save confirmations">
+        <SectionHeader
+          title={<h2>Save confirmations</h2>}
+          description="One quiet confirmation, outside the page layout. New saves replace it; it fades after four seconds."
+        />
+        <ActionGroup>
+          <Button variant="outline" onClick={() => notify("Doc published.")}>
+            Preview confirmation
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() =>
+              notify(
+                "Your changes to the installation guide have been published and are available to everyone who can browse this installation.",
+              )
+            }
+          >
+            Preview long confirmation
+          </Button>
+        </ActionGroup>
+      </section>
       <section className="grid gap-4">
         <h2>Named creation dialog</h2>
         <Button

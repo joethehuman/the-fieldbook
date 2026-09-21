@@ -406,3 +406,30 @@ test("session expiration during recovery cannot replace the editor with a guest 
     "Keep this after expiry",
   );
 });
+
+test("draft saves and publication share one transient confirmation", async ({
+  page,
+}, info) => {
+  const production = info.project.name.startsWith("production");
+  await setup(page, production);
+  await page.getByLabel("Title", { exact: true }).fill("Notification fixture");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  const toast = page.locator('[data-slot="toast"]');
+  await expect(toast).toContainText("Doc draft saved");
+  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page.getByRole("combobox", { name: "Status", exact: true }).click();
+  await page.getByRole("option", { name: "Published", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save & publish", exact: true })
+    .click();
+  await expect(toast).toHaveCount(1);
+  await expect(toast).toContainText("Doc published");
+  await page.screenshot({
+    path: info.outputPath("published-confirmation.png"),
+    fullPage: false,
+  });
+  await expect(
+    page.getByRole("button", { name: "Dismiss message" }),
+  ).toHaveCount(0);
+  await expect(toast).toHaveCount(0, { timeout: 6000 });
+});

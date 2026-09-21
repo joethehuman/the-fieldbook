@@ -1,4 +1,6 @@
 "use client";
+import { Alert } from "./ui/alert";
+import { useToast } from "./ui/toast";
 import { CsvExport } from "./patterns/csv-export";
 import { courseProgressRow, courseProgressCsv } from "@/lib/reporting";
 import { DataTable } from "./patterns/data-table";
@@ -45,6 +47,7 @@ export function Assignments({
   onOpenGroup?: (id: string) => void;
   onChange?: (data: Workspace) => void | Promise<void>;
 }) {
+  const notify = useToast();
   const { confirm } = useInteractionDialog();
   const [selected, setSelected] = useState(
       scope.groupId || data.groups[0]?.id || "",
@@ -109,7 +112,8 @@ export function Assignments({
     try {
       await onAction(action);
       setReportError(false);
-      setNotice(
+      setNotice("");
+      notify(
         action.operation === "assign"
           ? "Assigned courses updated."
           : action.operation === "unassign"
@@ -139,7 +143,8 @@ export function Assignments({
         ),
       });
       setReportError(false);
-      setNotice("Recommended order saved.");
+      setNotice("");
+      notify("Recommended order saved.");
     } catch (e) {
       setReportError(true);
       setNotice((e as Error).message);
@@ -391,7 +396,7 @@ export function Assignments({
         {data.settings?.catchUpDays ?? 30} days to catch up with new assigned
         courses. Manage these windows in Settings.
       </p>
-      {notice && <p role="status">{notice}</p>}
+      {notice && <Alert variant="destructive">{notice}</Alert>}
       <Field>
         Find a course
         <Input

@@ -4,6 +4,11 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Action confirmations
+
+- Replace persistent save/publish banners with one shared confirmation that appears outside the page layout and fades after four seconds. Successive actions replace it instead of stacking. Use this across content, people, settings, groups, curricula, teams and assignments; keep errors and required next steps inline.
+- Standardize alert content layout and distinguish draft saves from publication in confirmation copy.
+
 ### Guest recommendations
 
 - Public installations can optionally select or explicitly create a learning group for signed-out For you in Updates and Courses. Reuse parent-group inheritance, curricula and deduplicated learning; keep guest progress local without people records or deadlines.

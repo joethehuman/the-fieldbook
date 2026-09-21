@@ -1,4 +1,5 @@
 "use client";
+import { useToast } from "./ui/toast";
 import { DataTable } from "./patterns/data-table";
 import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation";
 import { FilterOptions } from "./patterns/filter-options";
@@ -187,6 +188,7 @@ export default function Admin({
   registerNavigationGuard,
   onReload,
 }: Props) {
+  const notify = useToast();
   const { confirm } = useInteractionDialog();
   const [settingsPending, setSettingsPending] = useState(false);
   const [tab, setTab] = useState("content"),
@@ -280,7 +282,12 @@ export default function Admin({
         : [...data.content, updated],
     });
     setEditing(null);
-    setNotice(production ? "Content saved." : "Content saved in this browser.");
+    const label =
+      c.kind === "brief" ? "Update" : c.kind === "doc" ? "Doc" : "Course";
+    setNotice("");
+    notify(
+      `${label} ${c.status === "published" ? "published" : "draft saved"}${production ? "." : " in this browser."}`,
+    );
   }
   async function savePerson(e: React.FormEvent) {
     e.preventDefault();
@@ -315,7 +322,8 @@ export default function Admin({
           : [...data.users, savedPerson],
       });
       setPerson(null);
-      setNotice(production ? "Account saved." : "Demo profile saved.");
+      setNotice("");
+      notify(production ? "Account saved." : "Demo profile saved.");
     } catch (e) {
       setNotice((e as Error).message);
     }
@@ -466,19 +474,7 @@ export default function Admin({
               }
             ></SectionHeader>
           )}
-          {notice && (
-            <Alert variant="success" role="status">
-              {notice}
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Dismiss message"
-                onClick={() => setNotice("")}
-              >
-                <X size={15} />
-              </Button>
-            </Alert>
-          )}
+          {notice && <Alert variant="destructive">{notice}</Alert>}
           {tab.startsWith("settings-") ? (
             <SiteSettingsPanel
               section={
@@ -654,7 +650,8 @@ export default function Admin({
                                           (x) => x.id !== c.id,
                                         ),
                                       });
-                                      setNotice("Content unpublished.");
+                                      setNotice("");
+                                      notify("Content unpublished.");
                                     } catch (e) {
                                       setNotice((e as Error).message);
                                     }
@@ -689,9 +686,8 @@ export default function Admin({
                             newUserStage: value as "existing" | "newhire",
                           },
                         });
-                        setNotice(
-                          "Default saved. Existing people are unchanged.",
-                        );
+                        setNotice("");
+                        notify("Default saved. Existing people are unchanged.");
                       } catch (error) {
                         setNotice((error as Error).message);
                       }

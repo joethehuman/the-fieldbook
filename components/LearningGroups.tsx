@@ -1,4 +1,5 @@
 "use client";
+import { useToast } from "./ui/toast";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SelectField } from "./ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
@@ -35,6 +36,7 @@ export default function LearningGroups({
   onLearning: LearningHandler;
   initialGroup?: string;
 }) {
+  const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
   const [selected, setSelected] = useState(initialGroup || "");
   const [tab, setTab] = useState("learning");
@@ -52,7 +54,8 @@ export default function LearningGroups({
     setNotice("");
     try {
       await onChange(next);
-      setNotice(message);
+      setNotice("");
+      notify(message);
       return true;
     } catch (e) {
       setNotice((e as Error).message);
@@ -100,7 +103,7 @@ export default function LearningGroups({
     name.toLowerCase().includes(query.trim().toLowerCase());
   return (
     <section className="learning-admin">
-      {notice && <Alert role="status">{notice}</Alert>}
+      {notice && <Alert variant="destructive">{notice}</Alert>}
       {!group ? (
         <>
           <SectionHeader
@@ -548,7 +551,8 @@ export default function LearningGroups({
                                       c.revision ||
                                       1,
                                   });
-                                  setNotice("Update audience saved.");
+                                  setNotice("");
+                                  notify("Update audience saved.");
                                 } catch (e) {
                                   setNotice((e as Error).message);
                                 } finally {

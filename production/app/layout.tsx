@@ -1,3 +1,4 @@
+import { ToastProvider } from "../../components/ui/toast";
 import { InteractionDialogProvider } from "../../components/ui/interaction-dialog";
 import { GeistSans } from "geist/font/sans";
 import "../../app/globals.css";
@@ -10,7 +11,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={GeistSans.variable}>
       <body>
-        <InteractionDialogProvider>{children}</InteractionDialogProvider>
+        <ToastProvider>
+          <InteractionDialogProvider>{children}</InteractionDialogProvider>
+        </ToastProvider>
       </body>
     </html>
   );
