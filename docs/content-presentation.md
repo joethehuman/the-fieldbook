@@ -26,18 +26,4 @@ Updates retain their most-recently-updated ordering and featured first card. Dec
 
 ## Upgrade
 
-No database migration or new service is required. Both fields are optional and use existing JSON storage. Old content retains generated artwork. Deploying the branch is a separate operator decision.
-
-## Verification on the implementation branch
-
-- Demo and production builds passed, including TypeScript checks.
-- Docs ordering tests passed. All eight production tests passed, including cover authorization, media readiness/type validation, revision conflicts, draft isolation, publication and removal.
-- The full suite now passes: 23 shared tests and 8 production tests. Superseded individual-assignment/per-course-deadline expectations were replaced with group-only requirements and organization completion-window tests. The database assignment test now applies the required-learning migration and verifies that retired assignment rules are rejected. Application assignment behavior is unchanged.
-- Headless Chrome checked keyboard reordering, save/reload persistence, matching Docs sidebar/overview, desktop/mobile Update layouts, cover display/fallback, and removing a cover through the course editor. No browser JavaScript errors occurred.
-- An isolated browser harness exercised the upload controls with a simulated upload callback: upload, replacement, failed replacement preserving the previous cover, removal, and rejection of video files. This is not a live Supabase upload test.
-- Local checks used the available Node 24.19.0 and pnpm 11.25.0 runtime; the repository targets Node 22 and pnpm 10.17.1. Release-runtime CI and real storage upload/playback remain external checks.
-- No production deployment or database changes were performed.
-
-## Section management follow-up — September 19, 2026
-
-The follow-up passes 36 tests (26 shared, 10 production) and both builds, including TypeScript. New checks cover retained empty sections, reader filtering, name validation, and reorder behavior. The equivalent package-script commands ran directly with the available Node 24.19.0 runtime because the bundled pnpm version attempted to reinstall shared dependencies. Browser interaction and visual verification were blocked by an unavailable browser security policy check. No production content or database changes were made during testing.
+No database migration or new service is required. Both fields are optional and use existing JSON storage. Old content retains generated artwork. Follow the [upgrade guide](upgrading.md) when updating an installation.

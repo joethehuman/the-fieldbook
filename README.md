@@ -64,7 +64,7 @@ The production application includes:
 - Signed-in feedback, administrator progress/feedback views, branding, and privacy-policy settings.
 - Administrator-only MCP tools for content, aggregate reports, and existing media references.
 
-**Production governance** includes people administration, pre-registered Google accounts, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [permission rules and rollout checks](docs/user-content-governance.md). Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. See the [repository audit](docs/repository-audit.md) for evidence and limits.
+**Production governance** includes people administration, pre-registered Google accounts, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [roles and permissions](docs/permissions.md). Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. Catalog and feedback queries remain subject to the database API response limit; MCP search scans up to 500 recent items and returns at most 50 matches. These bounds can make results incomplete on larger installations.
 
 ## Documentation
 
@@ -73,8 +73,11 @@ The production application includes:
 - [Configure or change your domain](docs/domains.md)
 - [Configure your privacy policy](docs/privacy-setup.md)
 - [Select a version and upgrade](docs/upgrading.md)
-- [Maintainer release process](docs/releases.md) and [first-release checklist](docs/release-checklist.md)
-- [Learning groups and curricula](docs/learning-groups.md)
+- [Maintainer release process](docs/releases.md)
+- [Learning model](docs/learning-model.md), [groups and curricula](docs/learning-groups.md), and [course browsing](docs/learning-browser.md)
+- [Roles and permissions](docs/permissions.md)
+- [Content presentation controls](docs/content-presentation.md)
+- [Interface standards](docs/design-system.md) and [agent contribution instructions](AGENTS.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing and local development](CONTRIBUTING.md)
 - [Optional AI authoring instructions](docs/ai-authoring.md)
@@ -95,6 +98,8 @@ pnpm test
 pnpm build
 pnpm build:production
 ```
+
+For interface changes, also run `pnpm check:ui` and `pnpm test:ui` after installing Playwright Chromium. The demo component catalog is at `/ui`. See [CONTRIBUTING.md](CONTRIBUTING.md) for development rules and [interface standards](docs/design-system.md) for browser setup and screenshot review.
 
 ## Repository layout
 

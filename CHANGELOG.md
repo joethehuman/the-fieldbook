@@ -54,13 +54,13 @@ No versions have been released. Package and MCP version strings do not constitut
 - Update cards align artwork at the top, omit list-position numbers, and cycle through the existing background palette.
 - No database migration is required. See [content presentation controls](docs/content-presentation.md).
 
-### Interface redesign (review branch)
+### Interface redesign
 
 - Shared neutral theme, Geist typography, consistent spacing, compact actions, and responsive layout across learner, manager, and administrator views.
 - Grouped administration navigation and clearly separated settings sections.
 - shadcn-style owned Radix components for dropdowns, tabs, menus, buttons, and accessible dialogs.
 - Compact learning status, an accurate no-required-courses state, and expandable group-specific learning.
-- Preserved existing feature handlers; no database or permission changes. See [review scope and verification limits](docs/ui-redesign.md).
+- Preserved existing feature handlers; no database or permission changes.
 
 ### Current implementation
 

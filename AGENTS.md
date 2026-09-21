@@ -64,6 +64,7 @@ Report which checks passed, which could not run, and any remaining limitations. 
 ## Documentation and delivery
 
 - Update relevant documentation when behavior, configuration, or installation steps change.
+- Keep repository documentation useful to installers, operators and contributors. Keep task plans, one-off audits, branch verification logs, installation identifiers and editorial working copies outside the repository. Retain durable behavior, permission and upgrade guidance in the appropriate public guide; do not make contributors depend on private planning files.
 - Record user-visible changes under Unreleased in `CHANGELOG.md`.
 - Write clear, concrete instructions. Describe verified capabilities and identify limitations without inventing roadmap commitments.
 - Explain the problem, resulting behavior, and verification in the contribution summary. Include migration or compatibility implications where applicable.
