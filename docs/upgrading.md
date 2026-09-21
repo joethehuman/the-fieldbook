@@ -69,3 +69,7 @@ Keep the previous deployment available. Reverting to old code is safe only when 
 - [Vercel Git deployments and production branches](https://vercel.com/docs/git)
 - [GitHub forks and synchronization](https://docs.github.com/en/pull-requests/how-tos/work-with-forks)
 - [GitHub Releases](https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository)
+
+## Published-search migration
+
+Versions containing `20260921205449_published_search.sql` require that additive migration before the new application is deployed. Rehearse the complete migration transaction and published/private retrieval checks in isolation. See [search operating instructions](search.md) for backfill, rollback compatibility, index maintenance and performance verification.

@@ -33,6 +33,17 @@ const saveWorkspace = createWorkspaceSaver(
   async () => (await runtime.load()).data,
 );
 const runtime: FieldbookRuntime = {
+  async search(query, filter, signal) {
+    const response = await fetch(
+      `/api/search?q=${encodeURIComponent(query)}&type=${filter}`,
+      {
+        signal: AbortSignal.any([signal, AbortSignal.timeout(8000)]),
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) throw new Error("Search unavailable");
+    return response.json();
+  },
   async manageLearning(action) {
     await request("/api/assignments", action);
     return (await runtime.load()).data;

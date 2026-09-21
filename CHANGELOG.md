@@ -4,6 +4,12 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Published-content search
+
+- Search published Updates, Docs and course lessons with ranked matches, excerpts, type filters and stable lesson links. Support prefixes and limited typo correction, keyboard navigation, mobile layouts and recoverable failures.
+- Keep learner retrieval behind installation access checks, separate from administrator draft search; exclude quizzes and preserve published source revisions. Late responses cannot replace newer queries.
+- Add migration `20260921205449_published_search.sql` for transactional PostgreSQL indexing. Apply it before deploying this application version; see [search setup and limitations](docs/search.md). No external search service is required.
+
 ### Branded account experience
 
 - Limit sign-out to the explicit account action button; names and avatars are noninteractive. Explain profile switching beside the demo account and use a distinct switch icon.

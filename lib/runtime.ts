@@ -2,6 +2,7 @@ import type { Workspace } from "./store";
 import type { Content, User, Progress } from "./types";
 import type { UploadMedia } from "@/components/MarkdownEditor";
 export type FieldbookRuntime = {
+  search: import("./search").SearchProvider;
   manageLearning: (
     action: import("./learning").LearningAction,
   ) => Promise<Workspace>;

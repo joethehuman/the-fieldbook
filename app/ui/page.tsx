@@ -1,4 +1,5 @@
 "use client";
+import { SearchResultCard } from "@/components/patterns/search-result";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
 import { LearningCard } from "@/components/patterns/learning-card";
@@ -84,6 +85,25 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <section className="grid gap-4">
+        <h2>Search results</h2>
+        <SearchResultCard
+          result={{
+            contentId: "example",
+            passageId: "lesson:one",
+            kind: "course",
+            title: "Service recovery",
+            lessonId: "one",
+            lessonTitle: "Restore a backup",
+            excerpt:
+              "Restore a backup and verify the service before reopening traffic.",
+            highlights: ["backup"],
+            href: "#",
+            contentDate: null,
+            publishedRevision: 1,
+          }}
+        />
+      </section>
       <section className="grid min-w-0 gap-4">
         <h2>Initials avatars</h2>
         <Card>
