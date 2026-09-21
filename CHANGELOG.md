@@ -4,6 +4,13 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Authoring safety and recovery
+
+- Keep content edits open after failed saves, protect dirty edits during navigation, and block saving or leaving while inline images, videos or covers upload.
+- Offer a draft download and explicit review of the latest saved copy. Distinguish revision conflicts, partial saves, uncertain network outcomes and confirmed saves whose refresh failed; do not automatically replay writes.
+- Report handled server failures with a correlation ID and redacted structured diagnostics. Authentication outages are reported as unavailable rather than treated as signed-out visitors.
+- No database migration or new dependency is required.
+
 - Assigned curricula now replace their courses with one progress card and open a simple ordered course-launch page. Course return navigation preserves curriculum context.
 - Shared learning cards, collection toolbars, header-owned scrolling controls and launch lists reduce layout drift; channel dropdowns replace repeated filter buttons.
 

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import Fieldbook from "@/components/Fieldbook";
 import { createBrowserClient } from "@supabase/ssr";
 import type { FieldbookRuntime } from "@/lib/runtime";
-import type { Workspace } from "@/lib/store";
 import type { Progress, User } from "@/lib/types";
 import { useEffect, useState } from "react";
 import {
@@ -13,18 +12,13 @@ import {
   type GuestProgress,
 } from "@/lib/guest-progress";
 
+import {
+  request,
+  createWorkspaceSaver,
+  RequestError,
+} from "@/lib/workspace-save";
+
 const GUEST_KEY = "fieldbook.guest-progress.v1";
-async function request(path: string, body?: unknown) {
-  const r = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
-    headers: body === undefined ? {} : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: "no-store",
-  });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.error || "Request failed.");
-  return data;
-}
 function readGuest(): Progress[] {
   try {
     const p = JSON.parse(localStorage.getItem(GUEST_KEY) || "[]");
@@ -34,6 +28,10 @@ function readGuest(): Progress[] {
   }
 }
 let currentUser: User | null = null;
+const saveWorkspace = createWorkspaceSaver(
+  request,
+  async () => (await runtime.load()).data,
+);
 const runtime: FieldbookRuntime = {
   async manageLearning(action) {
     await request("/api/assignments", action);
@@ -41,80 +39,26 @@ const runtime: FieldbookRuntime = {
   },
   async load() {
     const state = await request("/api/workspace");
+    const refreshedUser = state.data.users.find(
+      (user: User) => user.id === currentUser?.id,
+    );
+    if (
+      currentUser &&
+      (!state.user ||
+        state.user.id !== currentUser.id ||
+        !refreshedUser?.active ||
+        refreshedUser.role !== currentUser.role)
+    )
+      throw new RequestError(
+        "Your sign-in or account access changed. Download your draft before signing in again; the open edits have been kept.",
+        401,
+      );
     currentUser = state.user;
     if (!currentUser) state.data.progress.guest = readGuest();
     return state;
   },
-  async save(before, after) {
-    if (JSON.stringify(before.settings) !== JSON.stringify(after.settings))
-      await request("/api/settings", {
-        settings: after.settings,
-        expected: before.revision,
-      });
-    for (const c of after.content) {
-      const old = before.content.find((x) => x.id === c.id);
-      if (JSON.stringify(c) !== JSON.stringify(old))
-        await request("/api/content", {
-          content: c,
-          expected: old?.revision || 0,
-          publish: c.status === "published",
-        });
-    }
-    for (const c of before.content.filter(
-      (c) => !after.content.some((x) => x.id === c.id),
-    ))
-      await request("/api/content", {
-        content: { ...c, status: "draft" },
-        expected: c.revision,
-        unpublish: true,
-      });
-    for (const rating of after.feedback || []) {
-      if (
-        JSON.stringify(rating) !==
-        JSON.stringify(before.feedback?.find((x) => x.id === rating.id))
-      )
-        await request("/api/feedback", rating);
-    }
-    if (
-      JSON.stringify(before.users) !== JSON.stringify(after.users) ||
-      JSON.stringify(before.groups) !== JSON.stringify(after.groups) ||
-      JSON.stringify(before.teams) !== JSON.stringify(after.teams) ||
-      JSON.stringify(before.curricula) !== JSON.stringify(after.curricula)
-    )
-      await request("/api/governance", {
-        expected: before.governanceRevision,
-        users: after.users,
-        groups: after.groups,
-        teams: after.teams || [],
-        curricula: after.curricula || [],
-      });
-    const pendingBefore = before.pendingUsers || [],
-      pendingAfter = after.pendingUsers || [];
-    const changed = pendingAfter.filter(
-      (p) =>
-        JSON.stringify(p) !==
-        JSON.stringify(pendingBefore.find((x) => x.email === p.email)),
-    );
-    const removed = pendingBefore.filter(
-      (p) => !pendingAfter.some((x) => x.email === p.email),
-    );
-    if (changed.length + removed.length > 1)
-      throw new Error("Save one pending account at a time.");
-    for (const p of changed)
-      await request("/api/governance", {
-        operation: "pending",
-        expected: before.governanceRevision,
-        ...p,
-      });
-    for (const p of removed)
-      await request("/api/governance", {
-        operation: "pending",
-        expected: before.governanceRevision,
-        ...p,
-        revoke: true,
-      });
-    return (await runtime.load()).data;
-  },
+  save: saveWorkspace,
+  refresh: saveWorkspace.refresh,
   async progress(course, current, lessonId, answers) {
     const prior = current.find(
       (p) => p.content_id === course.id && p.version === course.version,

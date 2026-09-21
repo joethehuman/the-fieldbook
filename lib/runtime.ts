@@ -6,6 +6,7 @@ export type FieldbookRuntime = {
     action: import("./learning").LearningAction,
   ) => Promise<Workspace>;
   load: () => Promise<{ data: Workspace; user: User | null }>;
+  refresh?: () => Promise<Workspace>;
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
   progress: (
     course: Content,

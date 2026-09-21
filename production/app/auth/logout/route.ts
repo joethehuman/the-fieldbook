@@ -5,6 +5,6 @@ export async function POST(req: Request) {
     await (await authClient()).auth.signOut();
     return Response.json({ ok: true });
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "auth/logout");
   }
 }

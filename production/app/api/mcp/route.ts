@@ -96,7 +96,7 @@ async function handle(req: Request) {
       await server.close();
     }
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/mcp");
   }
 }
 export const POST = handle;

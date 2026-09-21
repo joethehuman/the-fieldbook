@@ -15,7 +15,7 @@ export default function CourseCoverEditor({
   url?: string;
   onUpload?: UploadMedia;
   onChange: (url: string) => void;
-  onBusyChange: (busy: boolean) => void;
+  onBusyChange?: (busy: boolean) => void;
   disabled: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
@@ -93,7 +93,7 @@ export default function CourseCoverEditor({
                 return;
               }
               setUploading(true);
-              onBusyChange(true);
+              onBusyChange?.(true);
               setNotice("");
               try {
                 onChange(await onUpload(file));
@@ -106,7 +106,7 @@ export default function CourseCoverEditor({
                 );
               } finally {
                 setUploading(false);
-                onBusyChange(false);
+                onBusyChange?.(false);
               }
             }}
           />

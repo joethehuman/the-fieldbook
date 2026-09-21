@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import {
   BookOpen,
   GraduationCap,
@@ -67,12 +67,26 @@ import {
   type Workspace,
 } from "@/lib/store";
 import dynamic from "next/dynamic";
+import { SaveRecoveryError } from "@/lib/save-recovery";
+import type { NavigationGuard } from "@/lib/navigation-guard";
 const Admin = dynamic(() => import("./Admin"));
 type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook({
   runtime,
 }: { runtime?: FieldbookRuntime } = {}) {
   const { confirm } = useInteractionDialog();
+  const navigationGuard = useRef<NavigationGuard | null>(null);
+  const acceptedUrl = useRef("");
+  const checkingNavigation = useRef(false);
+  async function canLeave() {
+    if (checkingNavigation.current) return false;
+    checkingNavigation.current = true;
+    try {
+      return await (navigationGuard.current?.() ?? true);
+    } finally {
+      checkingNavigation.current = false;
+    }
+  }
   const [data, setData] = useState<Workspace | null>(null),
     [uid, setUid] = useState<string | null>(null),
     [view, setView] = useState<View>("learn"),
@@ -108,25 +122,40 @@ export default function Fieldbook({
     }
   }, []);
   useEffect(() => {
-    const onHash = () => {
-      let [v, id] = window.location.hash.slice(1).split("/");
-      if (runtime && !window.location.hash) {
-        const parts = window.location.pathname.split("/");
-        v = parts[1] || "courses";
-        id = parts[2];
-      }
-      const section = resolveSection(v);
-      if (section) {
-        setView(section);
-        setSelected(
-          id
-            ? (v === "curricula" ? "curriculum:" : "") + decodeURIComponent(id)
-            : null,
-        );
-        setCourseOrigin(
-          new URLSearchParams(window.location.search).get("curriculum") ||
-            undefined,
-        );
+    acceptedUrl.current = window.location.href;
+    let checkingHistory = false;
+    const onHash = async () => {
+      if (checkingHistory) return;
+      checkingHistory = true;
+      try {
+        const destination = window.location.href;
+        if (destination !== acceptedUrl.current && !(await canLeave())) {
+          window.history.pushState(null, "", acceptedUrl.current);
+          return;
+        }
+        acceptedUrl.current = destination;
+        let [v, id] = window.location.hash.slice(1).split("/");
+        if (runtime && !window.location.hash) {
+          const parts = window.location.pathname.split("/");
+          v = parts[1] || "courses";
+          id = parts[2];
+        }
+        const section = resolveSection(v);
+        if (section) {
+          setView(section);
+          setSelected(
+            id
+              ? (v === "curricula" ? "curriculum:" : "") +
+                  decodeURIComponent(id)
+              : null,
+          );
+          setCourseOrigin(
+            new URLSearchParams(window.location.search).get("curriculum") ||
+              undefined,
+          );
+        }
+      } finally {
+        checkingHistory = false;
       }
     };
     onHash();
@@ -137,7 +166,9 @@ export default function Fieldbook({
       window.removeEventListener("popstate", onHash);
     };
   }, []);
-  function navigate(v: View, id?: string, origin?: string) {
+  async function navigate(v: View, id?: string, origin?: string) {
+    setMenu(false);
+    if (!(await canLeave())) return;
     setView(v);
     setSelected(id || null);
     setCourseOrigin(origin);
@@ -155,6 +186,7 @@ export default function Fieldbook({
         ? `/${path}${query}`
         : `${window.location.pathname}${query}#${path}`,
     );
+    acceptedUrl.current = window.location.href;
     window.scrollTo({ top: 0 });
   }
   async function persist(next: Workspace) {
@@ -163,7 +195,8 @@ export default function Fieldbook({
         setData(await runtime.save(data, next));
         setError("");
       } catch (e) {
-        setError((e as Error).message);
+        if (e instanceof SaveRecoveryError && e.snapshot) setData(e.snapshot);
+        setError(navigationGuard.current ? "" : (e as Error).message);
         throw e;
       }
       return;
@@ -174,17 +207,21 @@ export default function Fieldbook({
       setData(reconciled);
       setError("");
     } catch {
-      setError(
-        "Your browser could not save this change. Storage may be full or disabled.",
+      const failure = new Error(
+        "Your browser could not save this change. Storage may be full or disabled. Your edits remain open.",
       );
+      setError(navigationGuard.current ? "" : failure.message);
+      throw failure;
     }
   }
-  function login(id: string) {
+  async function login(id: string) {
+    if (!(await canLeave())) return;
     sessionStorage.setItem(SESSION, id);
     setUid(id);
     navigate("learn");
   }
-  function logout() {
+  async function logout() {
+    if (!(await canLeave())) return;
     if (runtime) {
       if (uid === "guest") runtime.signIn();
       else void runtime.signOut();
@@ -194,13 +231,14 @@ export default function Fieldbook({
     setUid(null);
   }
   async function reset() {
+    if (!(await canLeave())) return;
     if (
       await confirm(
         "Reset this browser’s sample content, profiles, and progress?",
       )
     ) {
       const next = freshWorkspace();
-      persist(next);
+      await persist(next);
       logout();
       setShowDemo(false);
       navigate("learn");
@@ -492,7 +530,11 @@ export default function Fieldbook({
                 aria-label="Search all content"
                 placeholder="Search fieldbook…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={async (e) => {
+                  const next = e.target.value;
+                  if (!navigationGuard.current || (await canLeave()))
+                    setSearch(next);
+                }}
               />
               {search && (
                 <Button
@@ -591,6 +633,19 @@ export default function Fieldbook({
               }
               production={!!runtime}
               onUpload={runtime?.upload}
+              registerNavigationGuard={(guard) => {
+                navigationGuard.current = guard;
+              }}
+              onReload={async () => {
+                const latest = runtime
+                  ? runtime.refresh
+                    ? await runtime.refresh()
+                    : (await runtime.load()).data
+                  : loadWorkspace();
+                setData(latest);
+                setError("");
+                return latest;
+              }}
             />
           ) : view === "admin" && runtime ? (
             <EmptyState>

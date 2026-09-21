@@ -18,7 +18,7 @@ export async function GET(req: Request) {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/content");
   }
 }
 export async function POST(req: Request) {
@@ -42,6 +42,6 @@ export async function POST(req: Request) {
       ),
     );
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/content");
   }
 }

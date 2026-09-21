@@ -1,5 +1,17 @@
 # Content presentation controls
 
+## Save, leave and recover
+
+Content changes are saved only when you choose **Save draft** or **Save & publish**. Uploading a file does not save its content reference. Keep the editor open until the upload finishes, then save. While an upload or save is pending, editing, saving and in-app navigation are blocked so the returned reference cannot land in a removed lesson or closed editor. Failed uploads keep the existing text or media reference; choose the file again to retry.
+
+Leaving edited content asks whether to discard it. **Cancel** keeps the editor and its changes. Save first if you want to keep them. Browser reload/close uses the browser's own unsaved-change warning; browsers may suppress that warning, and it cannot protect against crashes or forced closure. There is no automatic draft backup.
+
+If saving fails, the editor stays open. **Download draft** saves the current content as a JSON recovery copy on your device; it can contain private draft text and quiz answers. It does not download the media files or publish anything. Use the copy to compare and manually reapply edits; there is no draft-import button.
+
+**Review saved copy** fetches the current state and asks before replacing your open edits. Download first if you need both versions. A revision conflict does not overwrite another author's work. If the connection fails, the last write may have reached the server; if saving succeeded but refreshing failed, the message says so. Review the saved copy before retrying. Multi-item operations can partially succeed; their error reports how many writes were confirmed and refreshes the saved state when possible. Writes are not automatically replayed. If sign-in expires or account access changes, recovery keeps the editor open so you can download your edits before signing in again.
+
+Section creation and learning-group changes save separately from content. Discarding content edits does not undo those saved changes.
+
 ## Docs section order
 
 Go to **Manage organization → Organization Settings → Docs navigation**. Drag a section by its handle, use the arrow buttons, or focus its handle and press the up/down arrow keys. Select **Save settings** to keep the order. The Docs sidebar and overview share that order.

@@ -14,7 +14,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
+import { Field, FieldGroup } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 import {
   PageHeader,
@@ -34,7 +34,8 @@ import { availableDocSections } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
 import { PendingPeople } from "./PendingPeople";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import { ActionGroup } from "./ui/action-group";
 import { GroupPicker } from "./patterns/group-picker";
 import { Button } from "./ui/button";
@@ -171,6 +172,8 @@ type Props = {
   production?: boolean;
   onLearning?: LearningHandler;
   onUpload?: UploadMedia;
+  registerNavigationGuard?: RegisterNavigationGuard;
+  onReload?: () => Promise<Workspace>;
 };
 const id = () => crypto.randomUUID();
 export default function Admin({
@@ -180,6 +183,8 @@ export default function Admin({
   production = false,
   onUpload,
   onLearning,
+  registerNavigationGuard,
+  onReload,
 }: Props) {
   const { confirm } = useInteractionDialog();
   const [settingsPending, setSettingsPending] = useState(false);
@@ -326,6 +331,8 @@ export default function Admin({
         production={production}
         onLearning={manageLearning}
         onWorkspaceChange={onChange}
+        registerNavigationGuard={registerNavigationGuard}
+        onReload={onReload}
       />
     );
   if (detailScope?.groupId)
@@ -999,8 +1006,12 @@ export function Editor({
   onCancel,
   onUpload,
   production = false,
+  registerNavigationGuard,
+  onReload,
 }: {
   onUpload?: UploadMedia;
+  registerNavigationGuard?: RegisterNavigationGuard;
+  onReload?: () => Promise<Workspace>;
   production?: boolean;
   content: Content;
   data: Workspace;
@@ -1025,9 +1036,113 @@ export function Editor({
     [error, setError] = useState(""),
     [refresh, setRefresh] = useState(false),
     [saving, setSaving] = useState(false),
-    [coverUploading, setCoverUploading] = useState(false),
+    [uploadCount, setUploadCount] = useState(0),
     [creatingSection, setCreatingSection] = useState(false),
     [sectionSaving, setSectionSaving] = useState(false);
+  const { confirm } = useInteractionDialog();
+  const baseline = useRef(c);
+  const original = useRef(content);
+  const pendingUploads = useRef(0);
+  const savingNow = useRef(false);
+  const [recovering, setRecovering] = useState(false);
+  const busy = saving || uploadCount > 0 || sectionSaving || recovering;
+  const dirty =
+    JSON.stringify(c) !== JSON.stringify(baseline.current) || refresh;
+  const guard = useRef(async () => true);
+  guard.current = async () => {
+    if (
+      pendingUploads.current ||
+      savingNow.current ||
+      sectionSaving ||
+      recovering
+    ) {
+      return false;
+    }
+    return (
+      !dirty ||
+      (await confirm(
+        "Discard unsaved content changes? Cancel to keep editing or save first. Changes already saved to sections or learning groups are kept.",
+      ))
+    );
+  };
+  useEffect(() => {
+    registerNavigationGuard?.(() => guard.current());
+    return () => registerNavigationGuard?.(null);
+  }, [registerNavigationGuard]);
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirty || busy) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [dirty, busy]);
+  const upload: UploadMedia | undefined = onUpload
+    ? async (file) => {
+        pendingUploads.current++;
+        setUploadCount(pendingUploads.current);
+        try {
+          return await onUpload(file);
+        } finally {
+          pendingUploads.current--;
+          setUploadCount(pendingUploads.current);
+        }
+      }
+    : undefined;
+  function downloadDraft() {
+    const url = URL.createObjectURL(
+      new Blob(
+        [
+          JSON.stringify(
+            {
+              ...c,
+              version: refresh ? original.current.version + 1 : c.version,
+            },
+            null,
+            2,
+          ),
+        ],
+        { type: "application/json" },
+      ),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "fieldbook-unsaved-draft.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+  async function reloadSaved() {
+    if (!onReload || busy) return;
+    setRecovering(true);
+    try {
+      const latest = (await onReload()).content.find(
+        (item) => item.id === c.id,
+      );
+      if (!latest) {
+        setError(
+          "No saved copy was found. Your edits remain here; you can retry saving.",
+        );
+        return;
+      }
+      if (
+        !(await confirm(
+          "Replace the open edits with the latest saved copy? Cancel to keep your edits. Download your draft first if you need to compare or reapply changes.",
+        ))
+      )
+        return;
+      original.current = latest;
+      baseline.current = latest;
+      setC(latest);
+      setRefresh(false);
+      setError("");
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      setRecovering(false);
+    }
+  }
   const docSections = availableDocSections(
     [
       ...data.content.filter((item) => item.kind === "doc"),
@@ -1038,7 +1153,7 @@ export function Editor({
   const existing = data.content.some((x) => x.id === c.id);
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (coverUploading || sectionSaving) return;
+    if (busy || pendingUploads.current || savingNow.current) return;
     if (
       c.kind === "course" &&
       c.status === "published" &&
@@ -1062,6 +1177,7 @@ export function Editor({
       setError("Use a supported HTTPS YouTube, Vimeo, MP4, or WebM URL.");
       return;
     }
+    savingNow.current = true;
     setSaving(true);
     setError("");
     try {
@@ -1075,11 +1191,14 @@ export function Editor({
           updatedAt,
           ...body
         } = item;
-        return JSON.stringify(body);
+        return JSON.stringify({
+          ...body,
+          ...(item.kind === "course" ? {} : { groups }),
+        });
       };
-      if (latest && editable(latest) !== editable(content))
+      if (latest && editable(latest) !== editable(original.current))
         throw new Error(
-          "This content changed while you were editing. Reopen it before saving so those changes are preserved.",
+          "This content changed while you were editing. Download your draft, then review the saved copy before reapplying changes.",
         );
       await onSave({
         ...c,
@@ -1092,11 +1211,15 @@ export function Editor({
           : {}),
         title: c.title.trim(),
         category: c.category.trim(),
-        version: existing && refresh ? content.version + 1 : content.version,
+        version:
+          existing && refresh
+            ? original.current.version + 1
+            : original.current.version,
       });
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      savingNow.current = false;
       setSaving(false);
     }
   }
@@ -1121,7 +1244,14 @@ export function Editor({
     );
   return (
     <form className="editor" onSubmit={submit}>
-      <Button variant="link" type="button" onClick={onCancel}>
+      <Button
+        variant="link"
+        type="button"
+        disabled={busy}
+        onClick={async () => {
+          if (await guard.current()) onCancel();
+        }}
+      >
         <ArrowLeft size={16} />
         Back to content
       </Button>
@@ -1137,16 +1267,39 @@ export function Editor({
           </span>
           <h1>{existing ? c.title : "Something worth sharing."}</h1>
         </div>
-        <Button
-          variant="default"
-          disabled={saving || coverUploading || sectionSaving}
-        >
+        <Button variant="default" disabled={busy}>
           <Save size={16} />
           Save {c.status === "published" ? "& publish" : "draft"}
         </Button>
       </div>
-      {error && <Alert variant="destructive">{error}</Alert>}
-      <div className="editor-layout">
+      {error && (
+        <Alert variant="destructive" role="alert">
+          {error}
+        </Alert>
+      )}
+      <ActionGroup>
+        <Button type="button" variant="ghost" onClick={downloadDraft}>
+          Download draft
+        </Button>
+        {onReload && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={reloadSaved}
+          >
+            Review saved copy
+          </Button>
+        )}
+      </ActionGroup>
+      {busy && (
+        <p role="status">
+          {uploadCount
+            ? "Uploading media. Keep this page open; save when the upload finishes."
+            : "Saving or refreshing. Keep this page open."}
+        </p>
+      )}
+      <FieldGroup disabled={busy} className="editor-layout">
         <section className="editor-main">
           <Field>
             Title
@@ -1174,7 +1327,7 @@ export function Editor({
               label="Doc content"
               value={c.body}
               onChange={(value) => set("body", value)}
-              onUpload={onUpload}
+              onUpload={upload}
             />
           ) : (
             <>
@@ -1246,14 +1399,14 @@ export function Editor({
                     label={`Lesson ${i + 1} text`}
                     rows={8}
                     value={l.body}
-                    onUpload={onUpload}
+                    onUpload={upload}
                     onChange={(value) =>
-                      set(
-                        "lessons",
-                        c.lessons.map((x) =>
+                      setC((current) => ({
+                        ...current,
+                        lessons: current.lessons.map((x) =>
                           x.id === l.id ? { ...x, body: value } : x,
                         ),
-                      )
+                      }))
                     }
                   />
                   {onUpload && (
@@ -1266,9 +1419,10 @@ export function Editor({
                         onChange={async (e) => {
                           const f = e.target.files?.[0];
                           if (!f) return;
-                          setSaving(true);
+                          e.target.value = "";
+                          setError("");
                           try {
-                            const url = await onUpload(f);
+                            const url = await upload!(f);
                             setC((prev) => ({
                               ...prev,
                               lessons: prev.lessons.map((x) =>
@@ -1277,8 +1431,6 @@ export function Editor({
                             }));
                           } catch (error) {
                             setError((error as Error).message);
-                          } finally {
-                            setSaving(false);
                           }
                         }}
                       />
@@ -1524,9 +1676,8 @@ export function Editor({
                 <h3>Course details</h3>
                 <CourseCoverEditor
                   url={c.coverImageUrl}
-                  onUpload={onUpload}
-                  disabled={saving || coverUploading || sectionSaving}
-                  onBusyChange={setCoverUploading}
+                  onUpload={upload}
+                  disabled={busy}
                   onChange={(url) =>
                     setC((current) => ({ ...current, coverImageUrl: url }))
                   }
@@ -1600,7 +1751,7 @@ export function Editor({
             </p>
           </div>
         </aside>
-      </div>
+      </FieldGroup>
     </form>
   );
 }

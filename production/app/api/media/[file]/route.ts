@@ -45,6 +45,6 @@ export async function GET(
       },
     });
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/media/[file]");
   }
 }

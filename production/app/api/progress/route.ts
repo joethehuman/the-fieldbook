@@ -26,6 +26,6 @@ export async function POST(req: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/progress");
   }
 }

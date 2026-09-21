@@ -23,6 +23,8 @@ Never commit secrets, exports containing personal data, `.env.local`, or provide
 
 Read [Fieldbook interface standards](docs/design-system.md) before changing UI. Reuse shared controls and layout patterns across both applications; add missing patterns centrally instead of introducing feature-specific styling. Run `pnpm check:ui` and, after the demo build, `pnpm test:ui`; inspect the screenshot report for affected surfaces.
 
+For authoring changes, also run `pnpm test:authoring` after both builds. Build the server test bundle with `NEXT_PUBLIC_SUPABASE_URL=https://test.supabase.co` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=synthetic-test-key`. The suite serves both built applications, intercepts API/Storage traffic with synthetic fixtures, and checks navigation, pending uploads, save failures and recovery on desktop and phone. Do not supply real backend credentials. This does not establish hosted Auth/Storage behavior. Use `FIELDBOOK_TEST_PORT` and `FIELDBOOK_SERVER_TEST_PORT` for unused local ports, and `PLAYWRIGHT_CHANNEL=chrome` to use installed Chrome. CI runs this suite and uploads its screenshots/traces alongside the existing UI report.
+
 ## Reporting problems
 
 Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. A private security-reporting channel must be established before public release; see the [release process](docs/releases.md).
