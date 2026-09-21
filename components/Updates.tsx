@@ -24,21 +24,27 @@ export default function Updates({
   const { forYou, other } = updatesForUser(content, user, groups);
   return (
     <>
-      {!guest && (
+      {
         <section className="updates-section">
           <SectionHeader
             title={<h2>For you</h2>}
-            description={<> The latest updates for your learning groups. </>}
+            description={
+              guest
+                ? "Updates recommended for visitors."
+                : "The latest updates for your learning groups."
+            }
           ></SectionHeader>
           {forYou.length ? (
             <UpdateCards items={forYou} onOpen={onOpen} />
           ) : (
             <EmptyState>
-              No updates for your groups yet. Explore all updates below.
+              {guest
+                ? "No guest recommendations yet. Explore all updates below."
+                : "No updates for your groups yet. Explore all updates below."}
             </EmptyState>
           )}
         </section>
-      )}
+      }
       <section className="updates-section">
         <SectionHeader
           title={<h2>{forYou.length ? "Other updates" : "All updates"}</h2>}

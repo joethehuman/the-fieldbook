@@ -94,6 +94,7 @@ const publishedPrivacySchema = privacyDocumentSchema.refine(
   "Published policies require text, operator and an email or contact page, or an HTTPS policy URL.",
 );
 export const settingsSchema = z.object({
+  guestGroupId: text(80).min(1).nullable().optional(),
   docCategoryOrder: z
     .array(text(80).trim().min(1))
     .max(500)

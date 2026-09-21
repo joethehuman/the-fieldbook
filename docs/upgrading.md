@@ -73,3 +73,7 @@ Keep the previous deployment available. Reverting to old code is safe only when 
 ## Published-search migration
 
 Versions containing `20260921205449_published_search.sql` require that additive migration before the new application is deployed. Rehearse the complete migration transaction and published/private retrieval checks in isolation. See [search operating instructions](search.md) for backfill, rollback compatibility, index maintenance and performance verification.
+
+## Optional guest recommendations
+
+This feature needs no new migration or environment variables. Older public installations start with no guest selection and continue to support public browsing. After deploying the application update, an administrator may choose a group in Organization Settings → Access and save. Group creation is explicit and separate from saving the selection. Review [guest recommendations](guest-recommendations.md) for fallback, sign-in and verification behavior.

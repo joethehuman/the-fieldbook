@@ -7,14 +7,8 @@ import { canRead, document, redact } from "./content";
 import type { User } from "@/lib/types";
 import type { Workspace } from "@/lib/store";
 
-export const guest: User = {
-  id: "guest",
-  name: "Guest",
-  email: "",
-  role: "learner",
-  groups: [],
-  active: true,
-};
+import { guest, guestRecommendations } from "@/lib/guest-recommendations";
+export { guest };
 export async function snapshot(user: User | null): Promise<Workspace> {
   const config = await canRead(user);
   let admin = false;
@@ -72,6 +66,32 @@ export async function snapshot(user: User | null): Promise<Workspace> {
     (a, b) =>
       b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id),
   );
+  if (!user) {
+    const projected = guestRecommendations({
+      settings: config.settings,
+      groups: config.groups || [],
+      curricula: config.curricula || [],
+      content: documents
+        .filter((r) => r.published)
+        .map((r) => {
+          const c = document(r);
+          return { ...redact(c), groups: c.groups, assignments: c.assignments };
+        }),
+    });
+    return {
+      schema: 1,
+      settings: projected.settings,
+      content: projected.content,
+      publishedContent: projected.content,
+      users: [projected.user],
+      groups: projected.groups,
+      curricula: projected.curricula,
+      progress: {},
+      feedback: [],
+      teams: [],
+      pendingUsers: [],
+    };
+  }
   // Include only assignment rules relevant to the server-authorized people.
   // This affects assignment metadata, never the published content catalog.
   const groupIds = new Set(governance.groups.map((g: any) => g.id));

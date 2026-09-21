@@ -4,6 +4,11 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Guest recommendations
+
+- Public installations can optionally select or explicitly create a learning group for signed-out For you in Updates and Courses. Reuse parent-group inheritance, curricula and deduplicated learning; keep guest progress local without people records or deadlines.
+- Add equivalent synthetic demo behavior, safe empty/deleted-group/private-mode fallbacks and minimal anonymous data projection. Signing in uses account groups and preserves the existing explicit progress-import flow. No migration is required. See [guest recommendations](docs/guest-recommendations.md).
+
 ### Reporting exports
 
 - Add Export CSV to organization/team progress, person assignments, course progress and optional history, and administrator feedback. Reuse the displayed filters, order and calculations with all matching rows and the existing server scope.

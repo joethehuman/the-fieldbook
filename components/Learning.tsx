@@ -261,7 +261,7 @@ export default function Learning({
             </p>
             {guest && (
               <Button variant="default" onClick={onSignIn}>
-                Sign in with Google
+                {onSignIn ? "Sign in" : "Sign in with Google"}
               </Button>
             )}
           </div>
@@ -275,7 +275,7 @@ export default function Learning({
           </div>
         </Callout>
       )}
-      {view === "home" && !publicLearning && (
+      {view === "home" && (
         <section className="for-you">
           <CourseRow
             title="For you"
@@ -311,16 +311,20 @@ export default function Learning({
                   <p>
                     {assigned.length
                       ? `${completed.length} of ${assigned.length} assigned courses complete`
-                      : "No assigned courses yet."}
+                      : guest
+                        ? "No guest recommendations yet. Explore the library below."
+                        : "No assigned courses yet."}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {state.overdue.length
-                      ? `${state.overdue.length} courses past their target`
-                      : state.onboarding
-                        ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`
-                        : outstanding.length
-                          ? "You’re on track"
-                          : "Explore the library at your own pace."}
+                    {guest
+                      ? "Learn at your own pace. There are no deadlines."
+                      : state.overdue.length
+                        ? `${state.overdue.length} courses past their target`
+                        : state.onboarding
+                          ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`
+                          : outstanding.length
+                            ? "You’re on track"
+                            : "Explore the library at your own pace."}
                   </p>
                 </div>
                 {nextCourse && (
@@ -361,7 +365,7 @@ export default function Learning({
             value={view}
             onValueChange={(value) => changeView(value as LearningCollection)}
             options={[
-              ...(!guest ? [{ value: "assigned", label: "For you" }] : []),
+              { value: "assigned", label: "For you" },
               { value: "in-progress", label: "In progress" },
               { value: "completed", label: "Completed" },
               { value: "all", label: "All courses" },
@@ -372,7 +376,9 @@ export default function Learning({
           title={<h2>{view === "home" ? "Explore the library" : viewTitle}</h2>}
           description={
             view === "assigned"
-              ? "Courses and curricula assigned to your learning groups."
+              ? guest
+                ? "Courses and curricula recommended for visitors."
+                : "Courses and curricula assigned to your learning groups."
               : view === "in-progress"
                 ? "Continue any course you’ve started, assigned or optional."
                 : view === "completed"
@@ -483,7 +489,9 @@ export default function Learning({
                 : view === "assigned" && hideCompleted && assigned.length
                   ? "You’re up to date"
                   : view === "assigned"
-                    ? "No assigned courses yet"
+                    ? guest
+                      ? "No guest recommendations yet"
+                      : "No assigned courses yet"
                     : view === "in-progress"
                       ? "No courses in progress"
                       : view === "completed"

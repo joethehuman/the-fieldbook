@@ -132,7 +132,11 @@ export function SelectField({
   return (
     <Select
       value={`option:${value}`}
-      onValueChange={(next) => onValueChange(next.slice(7))}
+      onValueChange={(next) => {
+        // Radix's native form bridge can emit an empty value while options
+        // refresh. Every real option (including empty-string IDs) is prefixed.
+        if (next.startsWith("option:")) onValueChange(next.slice(7));
+      }}
       disabled={disabled}
       required={required}
     >

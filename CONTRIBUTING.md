@@ -38,3 +38,5 @@ Include expected/actual behavior, version or commit, deployment mode, and minima
 ## Scope and releases
 
 The documented stack is Vercel, hosted Supabase, and Google sign-in. Do not describe alternative providers or demo-only functionality as supported production features. There is no promised roadmap or release schedule. Record user-visible changes under Unreleased in [CHANGELOG.md](CHANGELOG.md); use the [manual release process](docs/releases.md) when preparing a release.
+
+For guest recommendation changes, also run `pnpm test:guests` after both builds with the synthetic production build variables above. It covers demo/production desktop and phone settings, explicit group creation, recommendation states, local progress and simulated sign-in transitions. See [guest recommendation verification](docs/guest-recommendations.md#verification).

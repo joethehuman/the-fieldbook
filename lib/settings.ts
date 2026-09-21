@@ -25,6 +25,7 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
+  guestGroupId?: string | null;
   docCategoryOrder?: string[];
   newUserStage?: "existing" | "newhire";
   onboardingDays?: number;
@@ -39,6 +40,7 @@ export type SiteSettings = {
   registration: "open" | "closed";
 };
 export const defaultSettings: SiteSettings = {
+  guestGroupId: null,
   newUserStage: "existing",
   onboardingDays: 90,
   catchUpDays: 30,
@@ -53,8 +55,9 @@ export const defaultSettings: SiteSettings = {
 
 // Public responses must never include an administrator's unpublished policy.
 export function publicSettings(settings: SiteSettings): SiteSettings {
+  const { guestGroupId: _guestGroupId, ...visible } = settings;
   return {
-    ...settings,
+    ...visible,
     privacy: settings.privacy
       ? {
           ...settings.privacy,

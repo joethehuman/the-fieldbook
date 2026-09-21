@@ -125,3 +125,7 @@ Events contain only the generated ID, a code-owned operation name (for example `
 - `application`: use the operation, status and reference to investigate; unexpected error details are withheld from public responses and logs.
 
 These diagnostics cover handled browser API errors and the MCP HTTP boundary. MCP tool execution errors caught inside its SDK, platform-level failures before a handler, and direct browser-to-Storage failures do not necessarily have an application correlation ID. A network failure can also prevent the browser receiving one. See [content recovery](../docs/content-presentation.md#save-leave-and-recover) before retrying a save with an uncertain outcome.
+
+## Guest recommendations
+
+Public browsing works without a learning-group selection. To populate For you in Updates and Courses for signed-out visitors, optionally choose or explicitly create a learning group in Organization Settings → Access → Guest recommendations, then save settings. No new migration is required. See [configuration, privacy and verification](../docs/guest-recommendations.md).

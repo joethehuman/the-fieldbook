@@ -552,6 +552,38 @@ test("learning-groups migration preserves history and enforces atomic, scoped te
       (await pg.query("select * from public.fb_documents")).rows.length,
       3,
     );
+    // An optional guest selection never enrolls a newly registered account.
+    await save({
+      groups: [
+        { id: "visitors", name: "Visitors", learningItems: [], teamIds: [] },
+      ],
+    });
+    await pg.exec(
+      `update public.fb_config set settings=settings || '{"access":"public","registration":"open","guestGroupId":"visitors"}'::jsonb`,
+    );
+    const registrant = "00000000-0000-4000-8000-000000000099";
+    await pg.query("insert into auth.users values($1)", [registrant]);
+    const profilesBefore = (await pg.query("select id from public.fb_profiles"))
+      .rows.length;
+    await pg.query(
+      "select public.fb_register_profile($1,'registrant@example.test','Registrant',false)",
+      [registrant],
+    );
+    const registered = await pg.query<any>(
+      "select groups,team_id,effective_group_joined_at from public.fb_profiles where id=$1",
+      [registrant],
+    );
+    assert.deepEqual(registered.rows[0].groups, []);
+    assert.deepEqual(registered.rows[0].effective_group_joined_at, {});
+    assert.equal(registered.rows[0].team_id, null);
+    assert.equal(
+      (await pg.query("select id from public.fb_profiles")).rows.length,
+      profilesBefore + 1,
+    );
+    assert.deepEqual(
+      (await pg.query("select * from public.fb_progress")).rows,
+      progressBefore,
+    );
     const permissions = await pg.query<any>(
       "select has_function_privilege('authenticated','public.fb_save_governance(uuid,integer,text,jsonb)','execute') as allowed",
     );

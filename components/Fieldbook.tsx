@@ -1,4 +1,5 @@
 "use client";
+import { guestRecommendations } from "@/lib/guest-recommendations";
 import { ReportAvailability } from "./patterns/csv-export";
 import { ContentSearch } from "./ContentSearch";
 import { InitialsAvatar } from "./ui/initials-avatar";
@@ -127,7 +128,8 @@ export default function Fieldbook({
       setData(loadWorkspace());
       const savedProfile = sessionStorage.getItem(SESSION);
       setUid(
-        savedProfile && DEMO_PROFILE_IDS.includes(savedProfile)
+        savedProfile &&
+          (DEMO_PROFILE_IDS.includes(savedProfile) || savedProfile === "guest")
           ? savedProfile
           : "demo-learner",
       );
@@ -314,18 +316,16 @@ export default function Fieldbook({
           ))}
       </div>
     );
+  const demoGuest =
+    !runtime && uid === "guest" && data.settings?.access !== "private"
+      ? guestRecommendations({
+          ...data,
+          content: data.publishedContent || data.content,
+        })
+      : undefined;
   const user =
-    data.users.find((u) => u.id === uid && u.active) ||
-    (runtime && uid === "guest"
-      ? {
-          id: "guest",
-          name: "Guest",
-          email: "",
-          role: "learner" as const,
-          groups: [],
-          active: true,
-        }
-      : undefined);
+    demoGuest?.user || data.users.find((u) => u.id === uid && u.active);
+  const learningGroups = demoGuest?.groups || data.groups;
   const branding = { ...defaultSettings, ...data.settings };
   if (!user)
     return (
@@ -361,6 +361,11 @@ export default function Fieldbook({
               </NavigationButton>
             ))}
         </div>
+        {branding.access === "public" && (
+          <Button variant="outline" onClick={() => login("guest")}>
+            Continue as guest
+          </Button>
+        )}
         <div className="demo-note">
           <strong>A working demo, on your terms.</strong>
           <p>
@@ -370,11 +375,13 @@ export default function Fieldbook({
         </div>
       </BrandedAccount>
     );
-  const visible = (data.publishedContent || data.content).filter(
-    (c) => c.status === "published",
-  );
+  const visible = (
+    demoGuest?.content ||
+    data.publishedContent ||
+    data.content
+  ).filter((c) => c.status === "published");
   const progress = data.progress[user.id] || [];
-  const assigned = assignedCourses(visible, user, data.groups);
+  const assigned = assignedCourses(visible, user, learningGroups);
   const completed = assigned.filter((c) => isComplete(c, progress)).length;
   const query = search.trim().toLowerCase();
   const curriculum =
@@ -753,7 +760,7 @@ export default function Fieldbook({
               <div className="markdown">
                 <ReactMarkdown>{item.body}</ReactMarkdown>
               </div>
-              {(!runtime || user.id !== "guest") && (
+              {user.id !== "guest" && (
                 <Feedback
                   key={item.id + user.id}
                   content={item}
@@ -773,16 +780,16 @@ export default function Fieldbook({
               courses={courses}
               curricula={data.curricula || []}
               user={user}
-              groups={data.groups}
+              groups={learningGroups}
               assigned={assigned}
               settings={data.settings}
               progress={progress}
               onOpen={(id) => navigate("learn", id)}
               onCurriculum={(id) => navigate("learn", `curriculum:${id}`)}
               onKnowledge={() => navigate("docs")}
-              publicLearning={!!runtime && uid === "guest"}
-              guest={!!runtime && uid === "guest"}
-              onSignIn={runtime?.signIn}
+              publicLearning={uid === "guest"}
+              guest={uid === "guest"}
+              onSignIn={runtime?.signIn || logout}
             />
           ) : view === "docs" ? (
             <>
@@ -851,8 +858,8 @@ export default function Fieldbook({
               <Updates
                 content={visible}
                 user={user}
-                groups={data.groups}
-                guest={!!runtime && uid === "guest"}
+                groups={learningGroups}
+                guest={uid === "guest"}
                 onOpen={(id) => navigate("briefs", id)}
               />
             </>
@@ -1214,7 +1221,7 @@ export function Course({
                   <Check size={16} />
                 </Button>
               </ActionGroup>
-              {(!runtime || user.id !== "guest") && (
+              {user.id !== "guest" && (
                 <Feedback
                   key={c.id + user.id}
                   content={c}
