@@ -102,7 +102,7 @@ export function freshWorkspace(): Workspace {
       },
       {
         id: "demo-admin",
-        name: "Organization Admin",
+        name: "Org Admin",
         email: "admin@example.com",
         role: "admin",
         groups: ["sales"],
@@ -153,6 +153,9 @@ export function loadWorkspace(): Workspace {
     throw new Error(
       "Saved demo data could not be opened. Export or reset this browser’s demo.",
     );
+  // Refresh the original demo label without replacing a visitor's custom name.
+  const admin = data.users.find((user: User) => user.id === "demo-admin");
+  if (admin?.name === "Organization Admin") admin.name = "Org Admin";
   return data;
 }
 export function saveWorkspace(data: Workspace) {

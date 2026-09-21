@@ -324,7 +324,7 @@ export default function Fieldbook({
                   <strong>{u.name}</strong>
                   <small>
                     {u.role === "admin"
-                      ? "Admin · Organization Admin"
+                      ? "Admin · Org Admin"
                       : u.role === "manager"
                         ? "Manager · Sales Director"
                         : "User · Account Executive"}

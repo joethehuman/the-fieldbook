@@ -337,7 +337,7 @@ test("manager reporting uses shared filters and scoped people", async ({
   expect(emailBox!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height);
 
   await expect(
-    page.getByRole("cell", { name: /Organization Admin/ }),
+    page.getByRole("cell", { name: /Org Admin/ }),
   ).toHaveCount(0);
   await noOverflow(page);
   await testInfo.attach("manager-report", {
