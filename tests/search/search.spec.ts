@@ -112,7 +112,9 @@ test("rapid queries, loading, failure recovery, keyboard and empty results", asy
     await route.fulfill({ response });
   });
   await input.fill("quorum");
-  await expect(page.getByRole("status")).toContainText("Searching");
+  await expect(
+    page.getByRole("region", { name: "Search results" }).getByRole("status"),
+  ).toContainText("Searching");
   await page.screenshot({
     path: info.outputPath("search-loading.png"),
     fullPage: true,
