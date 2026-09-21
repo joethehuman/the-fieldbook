@@ -64,13 +64,14 @@ The production application includes:
 - Signed-in feedback, administrator progress/feedback views, branding, and privacy-policy settings.
 - Administrator-only MCP tools for content, aggregate reports, and existing media references.
 
-**Production governance** includes people administration, pre-registered Google accounts, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [roles and permissions](docs/permissions.md). Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. Catalog, feedback and aggregate reporting reads paginate past the database API response cap and fail if a page cannot be retrieved. MCP search still scans up to 500 recent items and returns at most 50 matches. Those search bounds can omit matches on larger installations.
+**Production governance** includes people administration, pre-registered Google accounts, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [roles and permissions](docs/permissions.md). Navigation labels are currently fixed. Published search uses PostgreSQL indexes across the full published library and returns the best 30 content matches, including lesson destinations. See [search behavior and setup](docs/search.md). Catalog, feedback and aggregate reporting reads paginate past the database API response cap and fail if a page cannot be retrieved. MCP search still scans up to 500 recent items and returns at most 50 matches. Those administrator MCP search bounds can omit matches on larger installations.
 
 ## Documentation
 
 - [Install on Vercel and Supabase](production/README.md)
 - [Connect your own MCP client](docs/mcp-setup.md)
 - [Configure or change your domain](docs/domains.md)
+- [Set up published-content search](docs/search.md)
 - [Configure installation and account branding](docs/branding.md)
 - [Configure your privacy policy](docs/privacy-setup.md)
 - [Select a version and upgrade](docs/upgrading.md)

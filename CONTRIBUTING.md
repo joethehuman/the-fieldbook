@@ -27,6 +27,8 @@ For authoring changes, also run `pnpm test:authoring` after both builds. Build t
 
 For account and branding changes, also run `pnpm test:accounts` after both builds using the synthetic production build variables above. This suite starts a local fixture service on port 3130, the server app on 3131 and the demo on 3132. A test-only preload redirects server-side requests for `test.supabase.co` to that fixture; browser provider navigation is simulated. Never load this preload in an installation or supply real credentials. Screenshots cover desktop and phone account pages. These checks do not establish hosted authentication or Storage behavior.
 
+For search changes, run `pnpm test:search` after both builds with the synthetic build variables above. This runs the server API against a local HTTP fixture backed by embedded PostgreSQL, including the larger search corpus, publication/access checks, delayed responses and mobile screenshots. See [search verification](docs/search.md).
+
 ## Reporting problems
 
 Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. A private security-reporting channel must be established before public release; see the [release process](docs/releases.md).

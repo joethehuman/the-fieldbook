@@ -534,17 +534,6 @@
     padding: var(--space-4);
     border-bottom: 1px solid var(--border);
   }
-  .result-list {
-    display: grid;
-    gap: var(--space-2);
-  }
-  .result-list small {
-    display: block;
-    color: var(--muted-foreground);
-  }
-  .result-icon {
-    color: var(--muted-foreground);
-  }
   .loading {
     display: grid;
     min-height: 70dvh;

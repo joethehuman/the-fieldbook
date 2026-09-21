@@ -1,4 +1,5 @@
 "use client";
+import { ContentSearch } from "./ContentSearch";
 import { InitialsAvatar } from "./ui/initials-avatar";
 import { RequestError } from "@/lib/workspace-save";
 import { BrandedAccount } from "./patterns/branded-account";
@@ -99,6 +100,7 @@ export default function Fieldbook({
     [courseOrigin, setCourseOrigin] = useState<string | undefined>(undefined),
     [selected, setSelected] = useState<string | null>(null),
     [search, setSearch] = useState(""),
+    [targetLesson, setTargetLesson] = useState<string | undefined>(undefined),
     [error, setError] = useState(""),
     [menu, setMenu] = useState(false),
     [showDemo, setShowDemo] = useState(false);
@@ -150,6 +152,10 @@ export default function Fieldbook({
           v = parts[1] || "courses";
           id = parts[2];
         }
+        setTargetLesson(
+          new URLSearchParams(window.location.search).get("lesson") ||
+            undefined,
+        );
         const section = resolveSection(v);
         if (section) {
           setView(section);
@@ -176,19 +182,29 @@ export default function Fieldbook({
       window.removeEventListener("popstate", onHash);
     };
   }, []);
-  async function navigate(v: View, id?: string, origin?: string) {
+  async function navigate(
+    v: View,
+    id?: string,
+    origin?: string,
+    lesson?: string,
+  ) {
     setMenu(false);
     if (!(await canLeave())) return;
     setView(v);
     setSelected(id || null);
     setCourseOrigin(origin);
+    setTargetLesson(lesson);
     setSearch("");
     setMenu(false);
     const curriculum = v === "learn" && id?.startsWith("curriculum:");
     const path = curriculum
       ? `curricula/${encodeURIComponent(id!.slice(11))}`
       : sectionPaths[v] + (id ? "/" + encodeURIComponent(id) : "");
-    const query = origin ? `?curriculum=${encodeURIComponent(origin)}` : "";
+    const query = lesson
+      ? `?lesson=${encodeURIComponent(lesson)}`
+      : origin
+        ? `?curriculum=${encodeURIComponent(origin)}`
+        : "";
     window.history.pushState(
       null,
       "",
@@ -350,12 +366,6 @@ export default function Fieldbook({
   const assigned = assignedCourses(visible, user, data.groups);
   const completed = assigned.filter((c) => isComplete(c, progress)).length;
   const query = search.trim().toLowerCase();
-  const results = visible.filter((c) =>
-    [c.title, c.summary, c.body, c.category, c.folder]
-      .join(" ")
-      .toLowerCase()
-      .includes(query),
-  );
   const curriculum =
     view === "learn" && selected?.startsWith("curriculum:")
       ? data.curricula?.find(
@@ -523,6 +533,19 @@ export default function Fieldbook({
             <SearchField>
               <Input
                 aria-label="Search all content"
+                maxLength={160}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setSearch("");
+                  if (e.key === "ArrowDown") {
+                    const first = document.querySelector<HTMLAnchorElement>(
+                      '[aria-label="Search results"] a',
+                    );
+                    if (first) {
+                      e.preventDefault();
+                      first.focus();
+                    }
+                  }
+                }}
                 placeholder="Search fieldbook…"
                 value={search}
                 onChange={async (e) => {
@@ -563,56 +586,26 @@ export default function Fieldbook({
             <>
               <PageHeading
                 eyebrow="FIND YOUR NEXT ANSWER"
-                title="Search fieldbook"
-                description={`${results.length} results for “${search}”`}
+                title="Search Fieldbook"
+                description="Search published Updates, Docs and course lessons."
               />
-              <div className="result-list">
-                {results.map((c) => (
-                  <NavigationButton
-                    variant="ghost"
-                    key={c.id}
-                    onClick={() =>
-                      navigate(
-                        c.kind === "course"
-                          ? "learn"
-                          : c.kind === "doc"
-                            ? "docs"
-                            : "briefs",
-                        c.id,
-                      )
-                    }
-                  >
-                    <span className="result-icon">
-                      {c.kind === "course" ? (
-                        <GraduationCap />
-                      ) : c.kind === "doc" ? (
-                        <BookOpen />
-                      ) : (
-                        <Newspaper />
-                      )}
-                    </span>
-                    <span>
-                      <small>
-                        {c.kind === "course"
-                          ? "Courses"
-                          : c.kind === "doc"
-                            ? "Docs"
-                            : "Updates"}{" "}
-                        / {c.category}
-                      </small>
-                      <h3>{c.title}</h3>
-                      <p>{c.summary}</p>
-                    </span>
-                    <ArrowUpRight />
-                  </NavigationButton>
-                ))}
-                {!results.length && (
-                  <Empty
-                    title="No results yet"
-                    description="Try a different word or browse the organization."
-                  />
-                )}
-              </div>
+              <ContentSearch
+                query={search}
+                content={data.publishedContent || data.content}
+                runtime={runtime}
+                onOpen={(r) =>
+                  navigate(
+                    r.kind === "course"
+                      ? "learn"
+                      : r.kind === "doc"
+                        ? "docs"
+                        : "briefs",
+                    r.contentId,
+                    undefined,
+                    r.lessonId || undefined,
+                  )
+                }
+              />
             </>
           ) : view === "admin" && user.role === "admin" ? (
             <Admin
@@ -677,7 +670,7 @@ export default function Fieldbook({
             />
           ) : item?.kind === "course" ? (
             <Course
-              key={item.id + item.version}
+              key={item.id + item.version + (targetLesson || "")}
               course={item}
               data={data}
               user={user}
@@ -951,7 +944,16 @@ export function Course({
   onBack: () => void;
   backLabel: string;
 }) {
-  const [step, setStep] = useState(0),
+  const [step, setStep] = useState(() => {
+      const id =
+        typeof window !== "undefined"
+          ? new URLSearchParams(window.location.search).get("lesson")
+          : null;
+      return Math.max(
+        0,
+        c.lessons.findIndex((l) => l.id === id),
+      );
+    }),
     [answers, setAnswers] = useState<number[]>([]),
     [result, setResult] = useState<string | null>(null),
     [resultPassed, setResultPassed] = useState(false),
