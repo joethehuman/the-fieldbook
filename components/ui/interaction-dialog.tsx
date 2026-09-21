@@ -15,14 +15,24 @@ import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Button } from "./button";
 
+type PromptOptions = {
+  title?: string;
+  description?: string;
+  submitLabel?: string;
+};
 type Request = {
+  options?: PromptOptions;
   kind: "confirm" | "prompt";
   message: string;
   initial?: string;
 };
 type Interactions = {
   confirm: (message: string) => Promise<boolean>;
-  prompt: (message: string, initial?: string) => Promise<string | null>;
+  prompt: (
+    message: string,
+    initial?: string,
+    options?: PromptOptions,
+  ) => Promise<string | null>;
 };
 const Context = createContext<Interactions | null>(null);
 export function useInteractionDialog() {
@@ -62,8 +72,8 @@ export function InteractionDialogProvider({
     [ask],
   );
   const prompt = useCallback(
-    async (message: string, initial?: string) => {
-      const result = await ask({ kind: "prompt", message, initial });
+    async (message: string, initial?: string, options?: PromptOptions) => {
+      const result = await ask({ kind: "prompt", message, initial, options });
       return typeof result === "string" ? result : null;
     },
     [ask],
@@ -130,10 +140,11 @@ export function InteractionDialogProvider({
             onCloseAutoFocus={restoreFocus}
           >
             <Dialog.Title className="text-lg font-semibold tracking-tight">
-              Rename group
+              {request?.options?.title || "Rename group"}
             </Dialog.Title>
             <Dialog.Description className="text-sm leading-relaxed text-muted-foreground">
-              Choose a clear, unique name for this group.
+              {request?.options?.description ||
+                "Choose a clear, unique name for this group."}
             </Dialog.Description>
             <form
               onSubmit={(event) => {
@@ -159,7 +170,9 @@ export function InteractionDialogProvider({
                 >
                   Cancel
                 </Button>
-                <Button type="submit">Save name</Button>
+                <Button type="submit">
+                  {request?.options?.submitLabel || "Save name"}
+                </Button>
               </div>
             </form>
           </Dialog.Content>

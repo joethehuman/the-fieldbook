@@ -14,6 +14,7 @@
     "test:authoring": "playwright test -c playwright.authoring.config.ts",
     "test:accounts": "playwright test -c playwright.accounts.config.ts",
     "test:search": "playwright test -c playwright.search.config.ts",
+    "test:guests": "playwright test -c playwright.guests.config.ts",
     "test:reporting": "playwright test -c playwright.reporting.config.ts"
   },
   "dependencies": {

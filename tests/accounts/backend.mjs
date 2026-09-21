@@ -103,7 +103,13 @@ createServer(async (req, res) => {
         policyMode: settings.privacy?.published?.mode ?? null,
         policyUrl: settings.privacy?.published?.url ?? null,
       });
-    return send(res, { settings, revision, curricula: [] });
+    return send(res, {
+      settings,
+      revision,
+      governance_revision: 1,
+      groups: [],
+      curricula: [],
+    });
   }
   if (url.pathname === "/rest/v1/fb_media")
     return send(res, { path: `uploads/${file}`, mime: "image/png" });

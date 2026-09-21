@@ -1,4 +1,5 @@
 "use client";
+import { useInteractionDialog } from "@/components/ui/interaction-dialog";
 import { CsvExport } from "@/components/patterns/csv-export";
 import { SearchResultCard } from "@/components/patterns/search-result";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
@@ -67,6 +68,7 @@ const choices = (
   </>
 );
 export default function ComponentCatalog() {
+  const { prompt } = useInteractionDialog();
   const [emptyReport, setEmptyReport] = useState(false);
   const [group, setGroup] = useState("company");
   const [dialog, setDialog] = useState(false);
@@ -86,6 +88,21 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <section className="grid gap-4">
+        <h2>Named creation dialog</h2>
+        <Button
+          variant="outline"
+          onClick={() =>
+            void prompt("Group name", "Guests", {
+              title: "Create guest group",
+              description: "Name the group before explicitly creating it.",
+              submitLabel: "Create group",
+            })
+          }
+        >
+          Preview creation dialog
+        </Button>
+      </section>
       <section className="grid gap-4">
         <SectionHeader
           title={<h2>Report exports</h2>}

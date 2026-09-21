@@ -117,3 +117,7 @@ The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browse
 ## Report exports
 
 `CsvExport` composes the shared outline Button with a download icon, preparation state and an associated accessible error. Place it in the report's `SectionHeader` action slot; use a separate header for an expanded report. Supply a lazy, explicitly projected CSV from the same filtered/sorted row objects used by the display. Never serialize an entire workspace or raw server record. `ReportAvailability` supplies workspace update/failure state; local report owners can additionally disable exports during their own updates. The pattern does not fetch data or own authorization. The `/ui` catalog demonstrates ready and unavailable exports.
+
+## Explicit named creation
+
+The shared interaction dialog accepts optional title, description and submit-label options for named creation as well as renaming. Keep the naming field concise; place save-flow guidance in the description. The caller owns validation and persistence, selects a created item only after success, and explains any separate settings save. The `/ui` catalog includes a guest-group creation example.

@@ -23,3 +23,7 @@ Course assignment changes through ordinary content/MCP writes are rejected with 
 5. Prefer a forward fix. A code rollback does not reverse group plans, new links or the migration. A full pre-upgrade database restore loses later changes and must be planned separately.
 
 No new environment variables or dependencies are required. If the migration is missing, governance writes fail with a setup message instead of silently dropping curriculum changes. The fresh browser demo includes a sample playlist and targeted updates; existing browser-local data remains intact and acquires the expanded model when saved. Reset demo only when intentionally replacing saved demo work.
+
+## Anonymous visitors
+
+Public installations may select one existing group, or explicitly create one, under Organization Settings → Access → Guest recommendations. It is optional; no selection leaves For you empty while the library remains usable. The same parent inheritance, curriculum expansion and course deduplication apply, without creating memberships, deadlines or reporting entries. See [guest recommendations](guest-recommendations.md).

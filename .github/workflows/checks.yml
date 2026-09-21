@@ -31,6 +31,7 @@ jobs:
       - run: pnpm test:authoring
       - run: pnpm test:accounts
       - run: pnpm test:search
+      - run: pnpm test:guests
       - run: pnpm test:reporting
       - uses: actions/upload-artifact@v4
         if: always()

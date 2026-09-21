@@ -1,4 +1,5 @@
 "use client";
+import { useInteractionDialog } from "./ui/interaction-dialog";
 import { ReorderRow } from "./patterns/reorder-row";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
@@ -34,6 +35,7 @@ export default function SiteSettingsPanel({
   section: SettingsSection;
   onPendingChange: (pending: boolean) => void;
 }) {
+  const { prompt } = useInteractionDialog();
   const [settings, setSettings] = useState({
       ...defaultSettings,
       ...data.settings,
@@ -67,6 +69,7 @@ export default function SiteSettingsPanel({
       className="settings-panel"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (busy) return;
         setBusy(true);
         setNotice("");
         try {
@@ -430,6 +433,7 @@ export default function SiteSettingsPanel({
           <Field>
             Who can browse?
             <SelectField
+              disabled={busy}
               value={settings.access}
               onValueChange={(value) =>
                 setSettings({
@@ -442,9 +446,114 @@ export default function SiteSettingsPanel({
               <option value="private">Signed-in members only</option>
             </SelectField>
           </Field>
+          {settings.access === "public" && (
+            <FieldGroup disabled={busy}>
+              <legend>Guest recommendations</legend>
+              <FieldDescription id="guest-recommendations-help">
+                Choose a group to personalize For you in Updates and Courses for
+                visitors who aren’t signed in.
+              </FieldDescription>
+              <Field>
+                Learning group for guests
+                <SelectField
+                  value={
+                    settings.guestGroupId
+                      ? `group:${settings.guestGroupId}`
+                      : "none"
+                  }
+                  aria-describedby="guest-recommendations-help guest-recommendations-status"
+                  onValueChange={(value) =>
+                    setSettings({
+                      ...settings,
+                      guestGroupId: value === "none" ? null : value.slice(6),
+                    })
+                  }
+                >
+                  <option value="none">
+                    None — no personalized recommendations.
+                  </option>
+                  {settings.guestGroupId &&
+                    !data.groups.some(
+                      (g) => g.id === settings.guestGroupId,
+                    ) && (
+                      <option value={`group:${settings.guestGroupId}`}>
+                        Unavailable group — choose another
+                      </option>
+                    )}
+                  {data.groups.map((g) => (
+                    <option key={g.id} value={`group:${g.id}`}>
+                      {g.name}
+                    </option>
+                  ))}
+                </SelectField>
+              </Field>
+              <FieldDescription id="guest-recommendations-status">
+                {!settings.guestGroupId
+                  ? "Your library is public. Select a group to recommend content to guests."
+                  : !data.groups.some((g) => g.id === settings.guestGroupId)
+                    ? "The selected group is unavailable. Choose another group or None; guests currently have no personalized recommendations."
+                    : "Save settings to apply this selection. Published content stays available to everyone."}
+              </FieldDescription>
+              <ActionGroup>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={async () => {
+                    const name = (
+                      await prompt("Group name", "Guests", {
+                        title: "Create guest group",
+                        description:
+                          "Create a learning group, then save settings to use it for guest recommendations.",
+                        submitLabel: "Create group",
+                      })
+                    )?.trim();
+                    if (!name) return;
+                    if (
+                      name.length > 80 ||
+                      data.groups.some(
+                        (g) => g.name.toLowerCase() === name.toLowerCase(),
+                      )
+                    ) {
+                      setNotice(
+                        "Use a unique group name of 80 characters or fewer.",
+                      );
+                      return;
+                    }
+                    setBusy(true);
+                    setNotice("");
+                    const id = crypto.randomUUID();
+                    try {
+                      await onChange({
+                        ...data,
+                        groups: [
+                          ...data.groups,
+                          { id, name, learningItems: [], teamIds: [] },
+                        ],
+                      });
+                      setSettings((current) => ({
+                        ...current,
+                        guestGroupId: id,
+                      }));
+                      setNotice(
+                        `${name} created and selected. Save settings to use it for guests. Add courses and updates in Learning groups.`,
+                      );
+                    } catch (error) {
+                      setNotice((error as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Create guest group
+                </Button>
+              </ActionGroup>
+            </FieldGroup>
+          )}
           <Field>
             New learner accounts
             <SelectField
+              disabled={busy}
               value={settings.registration}
               onValueChange={(value) =>
                 setSettings({
