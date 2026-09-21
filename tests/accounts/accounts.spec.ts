@@ -114,10 +114,10 @@ test("public browse, alternate brand, defaults and failed image fallback", async
   if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(
-    page.getByRole("button", { name: /Sign in with Google/ }).first(),
+    page.getByRole("button", { name: "Sign in", exact: true }).first(),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: /Sign in with Google/ })
+    .getByRole("button", { name: "Sign in", exact: true })
     .first()
     .click();
   await expect(
@@ -307,7 +307,15 @@ test("consent and connection identity preserve purpose and demo stays simulated"
   await page.goto("http://127.0.0.1:3132");
   if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
-  await page.getByRole("button", { name: /Alex Morgan/ }).click();
+  const account = page.locator('[data-slot="account-button"]');
+  await account.getByText("Alex Morgan", { exact: true }).click();
+  await account.locator('[data-slot="initials-avatar"]').click();
+  await expect(
+    page.getByRole("heading", { name: "Explore Fieldbook" }),
+  ).toHaveCount(0);
+  await expect(account.getByText(/Demo workspace/)).toBeVisible();
+  await account.screenshot({ path: info.outputPath("demo-account-action.png") });
+  await page.getByRole("button", { name: "Switch demo profile" }).click();
   await expect(
     page.getByText("INTERACTIVE DEMO", { exact: true }),
   ).toBeVisible();
@@ -403,4 +411,36 @@ test("expired, denied and provider-failed callback outcomes remain distinct", as
       )!.value,
     ),
   ).toBe("/docs/guide");
+});
+
+test("only the account action signs out; identity is inert", async ({
+  page,
+}, info) => {
+  await login(page);
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  const account = page.locator('[data-slot="account-button"]');
+  let signOuts = 0;
+  await page.route("**/auth/logout", async (route) => {
+    signOuts++;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: "{}",
+    });
+  });
+  await account.locator('[data-slot="initials-avatar"]').click();
+  await account.getByText("Administrator", { exact: true }).click();
+  await account.locator(".font-semibold").last().click();
+  await expect(
+    page.getByRole("button", { name: "Sign out", exact: true }),
+  ).toBeVisible();
+  expect(signOuts).toBe(0);
+  await expect(account.getByText(/Demo workspace/)).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("account-action.png") });
+  const signOut = page.getByRole("button", { name: "Sign out", exact: true });
+  await signOut.focus();
+  await page.keyboard.press("Enter");
+  await expect.poll(() => signOuts).toBe(1);
+  await page.waitForURL("/");
 });

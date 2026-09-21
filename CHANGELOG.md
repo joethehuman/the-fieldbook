@@ -6,6 +6,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ### Branded account experience
 
+- Limit sign-out to the explicit account action button; names and avatars are noninteractive. Explain profile switching beside the demo account and use a distinct switch icon.
+
 - Use a shared circular initials avatar in demo profiles, sidebar accounts and article attribution, with a visible border and consistent sizing.
 
 - Share the installation identity across the workspace, sign-in, consent, connections and simulated demo profile picker. Add an optional welcome description to existing organization branding settings; reuse the published privacy-policy link.

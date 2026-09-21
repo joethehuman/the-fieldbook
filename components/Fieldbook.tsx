@@ -40,6 +40,7 @@ import {
   Clock,
   Settings,
   LogOut,
+  ArrowLeftRight,
   X,
   Menu,
   CheckCircle2,
@@ -457,7 +458,7 @@ export default function Fieldbook({
           )}
           <AccountButton
             onClick={logout}
-            title={
+            actionLabel={
               runtime
                 ? uid === "guest"
                   ? "Sign in"
@@ -479,7 +480,12 @@ export default function Fieldbook({
                       : "Learner"
                     : "Account Executive"
             }
-            icon={<LogOut size={16} />}
+            icon={runtime ? <LogOut size={16} /> : <ArrowLeftRight size={16} />}
+            helpText={
+              runtime
+                ? undefined
+                : "Demo workspace. Use the switch button to try learner, manager and admin views."
+            }
           />
         </div>
       </aside>

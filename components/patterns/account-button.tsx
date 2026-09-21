@@ -8,22 +8,24 @@ export function AccountButton({
   description,
   icon,
   className,
+  actionLabel,
+  helpText,
   ...props
 }: ComponentProps<typeof Button> & {
   initials: string;
   name: string;
   description: string;
   icon: ReactNode;
+  actionLabel: string;
+  helpText?: string;
 }) {
   return (
-    <Button
-      variant="ghost"
+    <div
       data-slot="account-button"
       className={cn(
-        "grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_1rem] items-center gap-3 border-t border-border px-2 py-4 text-left",
+        "grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-3 border-t border-border px-2 py-4 text-left",
         className,
       )}
-      {...props}
     >
       <InitialsAvatar initials={initials} />
       <span className="min-w-0">
@@ -34,7 +36,21 @@ export function AccountButton({
           {description}
         </span>
       </span>
-      {icon}
-    </Button>
+      <Button
+        {...props}
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={actionLabel}
+        title={actionLabel}
+      >
+        {icon}
+      </Button>
+      {helpText && (
+        <p className="col-span-3 text-xs leading-relaxed text-muted-foreground">
+          {helpText}
+        </p>
+      )}
+    </div>
   );
 }

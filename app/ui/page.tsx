@@ -364,6 +364,7 @@ export default function ComponentCatalog() {
               </TabsList>
             </Tabs>
             <AccountButton
+              actionLabel="Sign out"
               initials="OA"
               name="Organization Administrator with a long name"
               description="Administrator"
