@@ -57,7 +57,7 @@ export function freshWorkspace(): Workspace {
       {
         id: "demo-learner",
         onboardingStart: new Date().toISOString().slice(0, 10),
-        name: "Alex Morgan",
+        name: "Alex Edwards",
         email: "alex@example.com",
         role: "learner",
         groups: ["sales"],
@@ -102,7 +102,7 @@ export function freshWorkspace(): Workspace {
       },
       {
         id: "demo-admin",
-        name: "Org Admin",
+        name: "Oliver Anderson",
         email: "admin@example.com",
         role: "admin",
         groups: ["sales"],
@@ -110,7 +110,7 @@ export function freshWorkspace(): Workspace {
       },
       {
         id: "demo-manager",
-        name: "Jordan Lee",
+        name: "Sara Downy",
         email: "jordan@example.com",
         role: "manager",
         groups: ["sales"],
@@ -153,9 +153,19 @@ export function loadWorkspace(): Workspace {
     throw new Error(
       "Saved demo data could not be opened. Export or reset this browser’s demo.",
     );
-  // Refresh the original demo label without replacing a visitor's custom name.
-  const admin = data.users.find((user: User) => user.id === "demo-admin");
-  if (admin?.name === "Organization Admin") admin.name = "Org Admin";
+  // Refresh saved default personas without replacing visitors' custom names.
+  const renamedProfiles: Record<string, { previous: string[]; name: string }> = {
+    "demo-learner": { previous: ["Alex Morgan"], name: "Alex Edwards" },
+    "demo-manager": { previous: ["Jordan Lee"], name: "Sara Downy" },
+    "demo-admin": {
+      previous: ["Organization Admin", "Org Admin"],
+      name: "Oliver Anderson",
+    },
+  };
+  for (const user of data.users as User[]) {
+    const renamed = renamedProfiles[user.id];
+    if (renamed?.previous.includes(user.name)) user.name = renamed.name;
+  }
   return data;
 }
 export function saveWorkspace(data: Workspace) {

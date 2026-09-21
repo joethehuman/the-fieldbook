@@ -308,7 +308,7 @@ test("consent and connection identity preserve purpose and demo stays simulated"
   if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
   const account = page.locator('[data-slot="account-button"]');
-  await account.getByText("Alex Morgan", { exact: true }).click();
+  await account.getByText("Alex Edwards", { exact: true }).click();
   await account.locator('[data-slot="initials-avatar"]').click();
   await expect(
     page.getByRole("heading", { name: "Explore Fieldbook" }),

@@ -88,8 +88,8 @@ export default function ComponentCatalog() {
         <h2>Initials avatars</h2>
         <Card>
           <div className="flex items-center gap-4">
-            <InitialsAvatar initials="AM" />
-            <span>Alex Morgan</span>
+            <InitialsAvatar initials="AE" />
+            <span>Alex Edwards</span>
           </div>
           <div className="flex items-center gap-4">
             <InitialsAvatar initials="FB" size="sm" />
