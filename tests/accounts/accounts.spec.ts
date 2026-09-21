@@ -8,16 +8,29 @@ async function bounds(page: Page) {
     ),
   ).toBe(true);
 }
+async function simulateOAuthReturn(page: Page, next: string) {
+  // Intercept the first-party request: Chromium does not reliably route a
+  // subsequent redirect request, which could otherwise reach a real hostname.
+  await page.route("**/auth/login", async (route) => {
+    const response = await route.fetch({ maxRedirects: 0 });
+    expect(response.status()).toBe(302);
+    const provider = new URL(response.headers().location);
+    expect(provider.origin).toBe("https://test.supabase.co");
+    expect(provider.searchParams.get("provider")).toBe("google");
+    expect(provider.searchParams.get("code_challenge")).toBeTruthy();
+    const callback = new URL(provider.searchParams.get("redirect_to")!);
+    expect(callback.origin).toBe("http://localhost:3131");
+    expect(callback.searchParams.get("next")).toBe(next);
+    callback.searchParams.set("code", "synthetic");
+    await route.fulfill({
+      response,
+      headers: { ...response.headers(), location: callback.toString() },
+    });
+  });
+}
 async function login(page: Page, next = "/admin") {
   await page.goto(`/auth/sign-in?next=${encodeURIComponent(next)}`);
-  await page.route("https://test.supabase.co/auth/v1/authorize**", (route) =>
-    route.fulfill({
-      status: 302,
-      headers: {
-        location: `http://localhost:3131/auth/callback?code=synthetic&next=${encodeURIComponent(next)}`,
-      },
-    }),
-  );
+  await simulateOAuthReturn(page, next);
   await page.getByRole("link", { name: "Continue with Google" }).click();
   await expect(page).toHaveURL(new RegExp(next.split("?")[0]));
 }
@@ -80,16 +93,7 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
     path: info.outputPath("private-sign-in.png"),
     fullPage: true,
   });
-  await page.route("https://test.supabase.co/auth/v1/authorize**", (route) => {
-    const target = new URL(route.request().url()).searchParams.get(
-      "redirect_to",
-    )!;
-    expect(new URL(target).searchParams.get("next")).toBe(next);
-    return route.fulfill({
-      status: 302,
-      headers: { location: target + "&code=synthetic" },
-    });
-  });
+  await simulateOAuthReturn(page, next);
   await page.getByRole("link", { name: "Continue with Google" }).click();
   await expect(page).toHaveURL(next);
 });
@@ -218,7 +222,7 @@ test("settings authorization, saved identity and private content protection", as
   ).toBe(401);
   await login(page);
   const picker = page.getByRole("combobox", { name: "Administration section" });
-  if (await picker.isVisible()) {
+  if ((page.viewportSize()?.width || 0) < 1024) {
     await picker.click();
     await page.getByRole("option", { name: /Identity/ }).click();
   } else await page.getByRole("tab", { name: /Identity/ }).click();
