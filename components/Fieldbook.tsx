@@ -1,4 +1,5 @@
 "use client";
+import { InitialsAvatar } from "./ui/initials-avatar";
 import { RequestError } from "@/lib/workspace-save";
 import { BrandedAccount } from "./patterns/branded-account";
 import { InstallationIdentity as Logo } from "./patterns/installation-identity";
@@ -317,7 +318,7 @@ export default function Fieldbook({
                 key={u.id}
                 onClick={() => login(u.id)}
               >
-                <span className="avatar">{initials(u.name)}</span>
+                <InitialsAvatar initials={initials(u.name)} />
                 <span>
                   <strong>{u.name}</strong>
                   <small>
@@ -718,7 +719,7 @@ export default function Fieldbook({
               <h1>{item.title}</h1>
               <p className="article-lede">{item.summary}</p>
               <div className="article-meta">
-                <span className="avatar small">FB</span>
+                <InitialsAvatar initials={initials(branding.name)} size="sm" />
                 <span>{branding.name}</span>
                 <span>·</span>
                 <span>Updated {date(item.updatedAt)}</span>

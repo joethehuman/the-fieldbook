@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
+import { InitialsAvatar } from "../ui/initials-avatar";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
 export function AccountButton({
@@ -24,9 +25,7 @@ export function AccountButton({
       )}
       {...props}
     >
-      <span className="grid size-9 place-items-center rounded-full bg-secondary text-xs font-semibold">
-        {initials}
-      </span>
+      <InitialsAvatar initials={initials} />
       <span className="min-w-0">
         <span className="block break-words text-sm font-semibold leading-snug">
           {name}

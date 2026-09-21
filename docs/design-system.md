@@ -106,4 +106,6 @@ The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browse
 
 ## Account identity
 
+`InitialsAvatar` is the shared circular initials marker for profile pickers, account buttons and compact attribution. Its neutral surface and border remain visible on white and muted backgrounds. Use the default 36px size for accounts or the compact 32px size for metadata. Always pair it with a visible name; initials are decorative and hidden from assistive technology to avoid duplicate announcements. Do not recreate avatar styling in feature CSS. The `/ui` catalog demonstrates both sizes.
+
 `InstallationIdentity` and `InstallationLogo` provide the workspace/account wordmark and failed-image fallback. `BrandedAccount` composes them with `AccountPage` and the published privacy link. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.

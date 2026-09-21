@@ -6,6 +6,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ### Branded account experience
 
+- Use a shared circular initials avatar in demo profiles, sidebar accounts and article attribution, with a visible border and consistent sizing.
+
 - Share the installation identity across the workspace, sign-in, consent, connections and simulated demo profile picker. Add an optional welcome description to existing organization branding settings; reuse the published privacy-policy link.
 - Redirect signed-out private visitors directly to sign-in with their original destination preserved. Public browsing remains available. Missing sessions are expected; service failures and denied accounts retain distinct recovery messages.
 - Make only the configured ready logo available before sign-in through a dedicated endpoint; keep content, other media and settings protected. Missing or failed images use the book mark.

@@ -1,4 +1,5 @@
 "use client";
+import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
 import { LearningCard } from "@/components/patterns/learning-card";
 import { BrowseToolbar } from "@/components/patterns/layout";
@@ -83,6 +84,23 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <section className="grid min-w-0 gap-4">
+        <h2>Initials avatars</h2>
+        <Card>
+          <div className="flex items-center gap-4">
+            <InitialsAvatar initials="AM" />
+            <span>Alex Morgan</span>
+          </div>
+          <div className="flex items-center gap-4">
+            <InitialsAvatar initials="FB" size="sm" />
+            <span>Fieldbook · compact</span>
+          </div>
+          <p>
+            Use beside a visible name. The circular marker is decorative and is
+            not repeated by screen readers.
+          </p>
+        </Card>
+      </section>
       <section className="grid min-w-0 gap-4">
         <h2>Installation identity</h2>
         <Card>
