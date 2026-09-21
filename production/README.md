@@ -110,3 +110,16 @@ For local development with Google sign-in, configure a dedicated development Sup
 Set `FIELDBOOK_ENVIRONMENT=preview` and `FIELDBOOK_PREVIEW_SUPABASE_REF` to the dedicated test project reference. Vercel preview deployments require the explicit reference and reject a different backend URL. Configure all five ordinary environment values using only the test backend and test origin. Run all migrations in filename order; the optional `supabase/fixtures/governance-preview.sql` is strictly for an empty isolated backend, not production or a migration. Enable its guard with `SET fieldbook.preview_seed = 'isolated-test-only';` in the same SQL session. Synthetic accounts have no sign-in credentials. Configure a dedicated Google OAuth client/callback for real test sign-ins; pre-register test users in Admin → People.
 
 Learning group and curriculum upgrades require coordinated code/database deployment; see [learning groups](../docs/learning-groups.md).
+
+## Troubleshooting handled request failures
+
+Failed API responses include a `requestId` in the JSON body and `X-Request-Id` header. Save and upload messages include that reference. Search your server/function logs for the same ID in a `fieldbook_request_failed` event.
+
+Events contain only the generated ID, a code-owned operation name (for example `api/content`), HTTP status, service category and an allowlisted provider code. They do not include request URLs/query strings, content, learner records, credentials, exception messages or stacks. An unrecognized code is recorded as `unavailable`. Review provider diagnostics in their protected dashboards when the safe event is insufficient; do not enable raw payload logging or paste sensitive provider output into bug reports.
+
+- `configuration`: verify the required environment variables and, for a preview, its isolated backend configuration. Never point a preview at production to bypass this check.
+- `auth`: identity verification failed or was rate-limited. Check provider availability and Auth configuration. Missing/expired sessions can be signed out; other provider failures are reported as unavailable.
+- `database`: check connectivity, applied migrations and permissions. A `409` content/revision conflict instead means the author must review the latest saved copy.
+- `application`: use the operation, status and reference to investigate; unexpected error details are withheld from public responses and logs.
+
+These diagnostics cover handled browser API errors and the MCP HTTP boundary. MCP tool execution errors caught inside its SDK, platform-level failures before a handler, and direct browser-to-Storage failures do not necessarily have an application correlation ID. A network failure can also prevent the browser receiving one. See [content recovery](../docs/content-presentation.md#save-leave-and-recover) before retrying a save with an uncertain outcome.

@@ -24,8 +24,11 @@ jobs:
       - run: pnpm build:production
         env:
           NEXT_TELEMETRY_DISABLED: 1
+          NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: synthetic-test-key
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:ui
+      - run: pnpm test:authoring
       - uses: actions/upload-artifact@v4
         if: always()
         with:

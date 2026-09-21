@@ -5,14 +5,8 @@ import { db, check } from "./db";
 import { env } from "./env";
 import type { User } from "@/lib/types";
 
-export class HttpError extends Error {
-  constructor(
-    public status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+import { HttpError, ServiceError, isAbsentSession } from "./errors";
+export { HttpError, errorResponse } from "./errors";
 export async function authClient() {
   const jar = await cookies();
   const { url, key } = env();
@@ -42,8 +36,25 @@ export function profile(row: any): User {
 }
 export async function actor(token?: string): Promise<User | null> {
   const client = token ? db() : await authClient();
-  const { data, error } = await client.auth.getUser(token);
-  if (error || !data.user) return null;
+  let result;
+  try {
+    result = await client.auth.getUser(token);
+  } catch {
+    throw new ServiceError(
+      "Sign-in verification is unavailable. Try again shortly; contact an administrator if it continues.",
+      "auth",
+    );
+  }
+  const { data, error } = result;
+  if (error) {
+    if (isAbsentSession(error)) return null;
+    throw new ServiceError(
+      "Sign-in verification is unavailable. Try again shortly; contact an administrator if it continues.",
+      "auth",
+      error.code,
+    );
+  }
+  if (!data.user) return null;
   const u = data.user;
   if (!u.email || !u.email_confirmed_at)
     throw new HttpError(403, "A verified account is required.");
@@ -74,6 +85,8 @@ export async function actor(token?: string): Promise<User | null> {
       p_owner: u.email.toLowerCase() === env().owner,
     },
   );
+  if (registrationError && registrationError.code !== "P0001")
+    check(registrationError);
   if (registrationError)
     throw new HttpError(
       403,
@@ -93,20 +106,4 @@ export function sameOrigin(req: Request) {
       403,
       "This request must come from your Fieldbook site.",
     );
-}
-export function errorResponse(e: unknown) {
-  return Response.json(
-    {
-      error:
-        e instanceof HttpError
-          ? e.message
-          : e instanceof Error && e.message.startsWith("This item changed")
-            ? e.message
-            : "Unable to complete this request. Please try again.",
-    },
-    {
-      status: e instanceof HttpError ? e.status : 500,
-      headers: { "Cache-Control": "no-store" },
-    },
-  );
 }

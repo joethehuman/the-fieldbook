@@ -9,6 +9,6 @@ export async function GET() {
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/workspace");
   }
 }

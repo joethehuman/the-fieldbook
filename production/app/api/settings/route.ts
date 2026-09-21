@@ -30,6 +30,6 @@ export async function POST(req: Request) {
       throw new HttpError(409, "Settings changed. Reload before saving.");
     return Response.json(data);
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/settings");
   }
 }

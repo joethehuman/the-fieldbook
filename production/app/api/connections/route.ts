@@ -18,7 +18,7 @@ export async function GET() {
     check(error);
     return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/connections");
   }
 }
 export async function POST(req: Request) {
@@ -45,6 +45,6 @@ export async function POST(req: Request) {
       );
     return Response.json({ revoked: true });
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/connections");
   }
 }

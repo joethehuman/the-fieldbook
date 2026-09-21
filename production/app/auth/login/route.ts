@@ -29,6 +29,6 @@ export async function GET(req: Request) {
     cookieStore.delete(SIGN_IN_RETURN_COOKIE);
     return Response.redirect(data.url);
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "auth/login");
   }
 }

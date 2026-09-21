@@ -37,6 +37,6 @@ export async function POST(req: Request) {
     check(error);
     return Response.json({ saved: true });
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/feedback");
   }
 }

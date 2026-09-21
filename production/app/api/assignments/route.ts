@@ -67,6 +67,6 @@ export async function POST(req: Request) {
       );
     return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
-    return errorResponse(e);
+    return errorResponse(e, "api/assignments");
   }
 }
