@@ -1,3 +1,6 @@
+import { teamProgressRows, teamProgressCsv } from "../lib/reporting";
+import { serializeCsv } from "../lib/csv";
+import type { Workspace } from "../lib/store";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -385,6 +388,46 @@ test("learning-groups migration preserves history and enforces atomic, scoped te
       (await snap(manager)).users.map((u: any) => u.id).sort(),
       [learner, manager].sort(),
     );
+    // CSV consumes the real SQL scope, including a JSON response larger than
+    // the usual Data API row cap; it never fetches people independently.
+    const reportWorkspace = async (actor: string): Promise<Workspace> => {
+      const scoped = await snap(actor);
+      return {
+        schema: 1,
+        groups: scoped.groups,
+        teams: scoped.teams,
+        content: [(await row(a)).published, (await row(b)).published],
+        users: scoped.users.map((u: any) => ({
+          ...u,
+          teamId: u.team_id,
+          onboardingStart: u.onboarding_start,
+          effectiveGroupJoinedAt: u.effective_group_joined_at,
+        })),
+        progress: Object.fromEntries(
+          scoped.users.map((u: any) => [
+            u.id,
+            scoped.progress.filter((p: any) => p.user_id === u.id),
+          ]),
+        ),
+      };
+    };
+    let reportData = await reportWorkspace(manager);
+    const reportActor = reportData.users.find((u) => u.id === manager)!;
+    const csv = teamProgressCsv(teamProgressRows(reportData, reportActor));
+    assert.equal(csv.rows.length, 1);
+    assert.equal(csv.rows[0][0], "Learner");
+    assert.ok(!serializeCsv(csv).includes("other@example.test"));
+    const learnerData = await reportWorkspace(learner);
+    assert.equal(teamProgressRows(learnerData, learnerData.users[0]).length, 0);
+    await pg.exec("begin");
+    await pg.exec(`insert into auth.users select ('00000000-0000-4000-8001-' || lpad(i::text,12,'0'))::uuid from generate_series(1,1505) i;
+      insert into public.fb_profiles(id,name,email,role,team_id) select id,'Large person ' || id::text,id::text || '@example.test','learner','sales-team' from auth.users where id::text like '00000000-0000-4000-8001-%';`);
+    reportData = await reportWorkspace(manager);
+    assert.equal(
+      teamProgressCsv(teamProgressRows(reportData, reportActor)).rows.length,
+      1506,
+    );
+    await pg.exec("rollback");
     users[1].groups = [];
     await save();
     assert.equal((await snap(learner)).groups[0].id, "sales");

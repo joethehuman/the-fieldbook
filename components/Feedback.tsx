@@ -1,4 +1,6 @@
 "use client";
+import { CsvExport } from "./patterns/csv-export";
+import { feedbackRows, feedbackCsv } from "@/lib/reporting";
 import { Input } from "@/components/ui/input";
 import {
   FilterBar,
@@ -142,26 +144,16 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
     [rating, setRating] = useState("all"),
     [query, setQuery] = useState(""),
     [sort, setSort] = useState("newest");
-  const records = (data.feedback || [])
-    .filter((f) => {
-      const c = data.content.find((c) => c.id === f.contentId);
-      return (
-        (kind === "all" || c?.kind === kind) &&
-        (item === "all" || f.contentId === item) &&
-        (rating === "all" || f.rating === rating) &&
-        `${c?.title || ""} ${f.comment}`
-          .toLowerCase()
-          .includes(query.toLowerCase())
-      );
-    })
-    .sort((a, b) =>
-      sort === "newest"
-        ? b.updatedAt.localeCompare(a.updatedAt)
-        : a.updatedAt.localeCompare(b.updatedAt),
-    );
+  const records = feedbackRows(data, kind, item, rating, query, sort);
   const positive = records.filter((f) => f.rating === "up").length;
   return (
     <>
+      <SectionHeader
+        title={<h2>Feedback</h2>}
+        description="See what readers and learners are telling you."
+      >
+        <CsvExport filename="feedback" report={() => feedbackCsv(records)} />
+      </SectionHeader>
       <FilterBar>
         <Field>
           Search feedback
@@ -231,19 +223,12 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
       <div className="feedback-list">
         {records.map((f) => (
           <article className="feedback-box" key={f.id}>
-            <SectionHeader
-              title={
-                <h3>
-                  {data.content.find((c) => c.id === f.contentId)?.title ||
-                    "Removed content"}
-                </h3>
-              }
-            >
-              <span>{f.rating === "up" ? "👍 Useful" : "👎 Not useful"}</span>
+            <SectionHeader title={<h3>{f.title}</h3>}>
+              <span>{f.ratingLabel}</span>
             </SectionHeader>
             <small>
-              {data.users.find((u) => u.id === f.userId)?.name || "Former user"}{" "}
-              · v{f.version} · {new Date(f.updatedAt).toLocaleDateString()}
+              {f.person} · v{f.version} ·{" "}
+              {new Date(f.updatedAt).toLocaleDateString()}
             </small>
             <p className="feedback-comment">
               {f.comment || "No written comment."}

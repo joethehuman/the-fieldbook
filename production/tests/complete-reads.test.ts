@@ -1,3 +1,5 @@
+import { feedbackRows, feedbackCsv } from "../../lib/reporting";
+import { serializeCsv } from "../../lib/csv";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
@@ -283,6 +285,11 @@ test("complete snapshots preserve older published items and scope drafts, answer
         assert.ok(!workspace.users.some((u) => u.id === peer.id));
         assert.ok(!workspace.progress[peer.id]);
         assert.ok(workspace.feedback!.every((r) => r.userId === user?.id));
+      }
+      if (user === admin) {
+        const exportRows = feedbackCsv(feedbackRows(workspace));
+        assert.equal(exportRows.rows.length, 1206);
+        assert.ok(serializeCsv(exportRows).includes("Synthetic"));
       }
       const same = await snapshot(user);
       assert.deepEqual(

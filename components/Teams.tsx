@@ -1,4 +1,11 @@
 "use client";
+import { CsvExport } from "./patterns/csv-export";
+import {
+  teamProgressRows,
+  teamProgressCsv,
+  courseProgressRow,
+  courseProgressCsv,
+} from "@/lib/reporting";
 import { DataTable } from "./patterns/data-table";
 import { Card } from "@/components/ui/card";
 import {
@@ -12,25 +19,18 @@ import {
 import { ActionGroup } from "@/components/ui/action-group";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
-import { Toolbar, FilterBar, EmptyState } from "@/components/patterns/layout";
+import {
+  Toolbar,
+  FilterBar,
+  EmptyState,
+  SectionHeader,
+} from "@/components/patterns/layout";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
-import {
-  completionPercent,
-  learningState,
-  learningTarget,
-} from "@/lib/learning";
+import { completionPercent } from "@/lib/learning";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
-import {
-  ancestorIds,
-  assignedCourses,
-  canParent,
-  isComplete,
-  reportTeamIds,
-  type Team,
-  type User,
-} from "@/lib/types";
+import { canParent, reportTeamIds, type Team, type User } from "@/lib/types";
 export function TeamsAdmin({
   data,
   onChange,
@@ -226,29 +226,27 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
   const [teamId, setTeamId] = useState("all"),
     [query, setQuery] = useState(""),
     [person, setPerson] = useState("");
-  const users = data.users.filter(
-    (u) =>
-      u.active &&
-      (user.role === "admin" || (!!u.teamId && allowed.has(u.teamId))) &&
-      (teamId === "all" ||
-        (!!u.teamId && ancestorIds(u.teamId, teams).has(teamId))) &&
-      `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()),
-  );
-  const rows = users.map((u) => {
-    const assigned = assignedCourses(
-      data.publishedContent || data.content,
-      u,
-      data.groups,
-    );
-    const completed = assigned.filter((c) =>
-      isComplete(c, data.progress[u.id] || []),
-    ).length;
-    return { u, assigned, completed };
-  });
+  const rows = teamProgressRows(data, user, teamId, query);
+  const users = rows.map((r) => r.u);
   const total = rows.reduce((n, r) => n + r.assigned.length, 0),
     done = rows.reduce((n, r) => n + r.completed, 0);
+  if (!user.active || !["admin", "manager"].includes(user.role))
+    return (
+      <EmptyState>
+        Reporting requires an administrator or manager account.
+      </EmptyState>
+    );
   return (
     <>
+      <SectionHeader
+        title={<h2>People & completion</h2>}
+        description="Understand completion across your reporting scope."
+      >
+        <CsvExport
+          filename="team-progress"
+          report={() => teamProgressCsv(rows)}
+        />
+      </SectionHeader>
       <FilterBar>
         <Field>
           Reporting team
@@ -312,34 +310,20 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map(({ u, assigned, completed }) => (
+            {rows.map(({ u, assigned, completed, team, percent, status }) => (
               <TableRow key={u.id}>
                 <TableCell>
                   <strong>{u.name}</strong>
                   <small>{u.email}</small>
                 </TableCell>
-                <TableCell>
-                  {teams.find((t) => t.id === u.teamId)?.name || "No team"}
-                </TableCell>
+                <TableCell>{team}</TableCell>
                 <TableCell align="right">
                   {assigned.length}
-                  <small>
-                    {
-                      learningState(
-                        data.publishedContent ?? data.content,
-                        u,
-                        data.groups,
-                        data.progress[u.id] || [],
-                        data.settings,
-                      ).status
-                    }
-                  </small>
+                  <small>{status}</small>
                 </TableCell>
                 <TableCell align="right">{completed}</TableCell>
                 <TableCell align="right">
-                  {assigned.length
-                    ? completionPercent(completed, assigned.length) + "%"
-                    : "—"}
+                  {percent !== null ? percent + "%" : "—"}
                 </TableCell>
                 <TableCell>
                   <Button variant="link" onClick={() => setPerson(u.id)}>
@@ -356,34 +340,36 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
       )}
       {rows
         .filter((r) => r.u.id === person)
-        .map(({ u, assigned }) => (
-          <Card className="grid gap-4" key={u.id}>
-            <h2>{u.name}’s assignments</h2>
-            {assigned.map((c) => {
-              const done = isComplete(c, data.progress[u.id] || []),
-                due = learningTarget(c, u, data.groups, data.settings);
-              return (
-                <div className="report-course" key={c.id}>
-                  <div>
-                    <strong>{c.title}</strong>
-                    <small className="block text-muted-foreground">
-                      {c.category} · v{c.version}
-                      {due ? ` · Target ${due}` : ""}
-                    </small>
+        .map(({ u, assigned }) => {
+          const courses = assigned.map((c) =>
+            courseProgressRow(data, u, c, "team"),
+          );
+          return (
+            <Card className="grid gap-4" key={u.id}>
+              <SectionHeader title={<h2>{u.name}’s assignments</h2>}>
+                <CsvExport
+                  filename={`${u.name}-assignments`}
+                  report={() => courseProgressCsv(courses, "team")}
+                />
+              </SectionHeader>
+              {courses.map(({ c, target, status }) => {
+                return (
+                  <div className="report-course" key={c.id}>
+                    <div>
+                      <strong>{c.title}</strong>
+                      <small className="block text-muted-foreground">
+                        {c.category} · v{c.version}
+                        {target ? ` · Target ${target}` : ""}
+                      </small>
+                    </div>
+                    <span>{status}</span>
                   </div>
-                  <span>
-                    {done
-                      ? "Completed"
-                      : due && due < new Date().toISOString().slice(0, 10)
-                        ? "Needs attention"
-                        : "Outstanding"}
-                  </span>
-                </div>
-              );
-            })}
-            {!assigned.length && <p>No assigned courses.</p>}
-          </Card>
-        ))}
+                );
+              })}
+              {!assigned.length && <p>No assigned courses.</p>}
+            </Card>
+          );
+        })}
     </>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import { ReportAvailability } from "./patterns/csv-export";
 import { ContentSearch } from "./ContentSearch";
 import { InitialsAvatar } from "./ui/initials-avatar";
 import { RequestError } from "@/lib/workspace-save";
@@ -102,6 +103,7 @@ export default function Fieldbook({
     [search, setSearch] = useState(""),
     [targetLesson, setTargetLesson] = useState<string | undefined>(undefined),
     [error, setError] = useState(""),
+    [reportIssue, setReportIssue] = useState<string | undefined>(),
     [menu, setMenu] = useState(false),
     [showDemo, setShowDemo] = useState(false);
   useEffect(() => {
@@ -216,11 +218,16 @@ export default function Fieldbook({
     window.scrollTo({ top: 0 });
   }
   async function persist(next: Workspace) {
+    setReportIssue("Updating report…");
     if (runtime && data) {
       try {
         setData(await runtime.save(data, next));
+        setReportIssue(undefined);
         setError("");
       } catch (e) {
+        setReportIssue(
+          "Reload the report before exporting after a failed change.",
+        );
         if (e instanceof SaveRecoveryError && e.snapshot) setData(e.snapshot);
         setError(navigationGuard.current ? "" : (e as Error).message);
         throw e;
@@ -231,8 +238,12 @@ export default function Fieldbook({
       const reconciled = reconcileLearning(data || next, next);
       saveWorkspace(reconciled);
       setData(reconciled);
+      setReportIssue(undefined);
       setError("");
     } catch {
+      setReportIssue(
+        "Reload the report before exporting after a failed change.",
+      );
       const failure = new Error(
         "Your browser could not save this change. Storage may be full or disabled. Your edits remain open.",
       );
@@ -608,33 +619,45 @@ export default function Fieldbook({
               />
             </>
           ) : view === "admin" && user.role === "admin" ? (
-            <Admin
-              data={data}
-              user={user}
-              onChange={persist}
-              onLearning={
-                runtime
-                  ? async (action) => {
-                      setData(await runtime.manageLearning(action));
-                    }
-                  : undefined
-              }
-              production={!!runtime}
-              onUpload={runtime?.upload}
-              registerNavigationGuard={(guard) => {
-                navigationGuard.current = guard;
-              }}
-              onReload={async () => {
-                const latest = runtime
-                  ? runtime.refresh
-                    ? await runtime.refresh()
-                    : (await runtime.load()).data
-                  : loadWorkspace();
-                setData(latest);
-                setError("");
-                return latest;
-              }}
-            />
+            <ReportAvailability.Provider value={reportIssue}>
+              <Admin
+                data={data}
+                user={user}
+                onChange={persist}
+                onLearning={
+                  runtime
+                    ? async (action) => {
+                        setReportIssue("Updating report…");
+                        try {
+                          setData(await runtime.manageLearning(action));
+                          setReportIssue(undefined);
+                        } catch (e) {
+                          setReportIssue(
+                            "Reload the report before exporting after a failed change.",
+                          );
+                          throw e;
+                        }
+                      }
+                    : undefined
+                }
+                production={!!runtime}
+                onUpload={runtime?.upload}
+                registerNavigationGuard={(guard) => {
+                  navigationGuard.current = guard;
+                }}
+                onReload={async () => {
+                  const latest = runtime
+                    ? runtime.refresh
+                      ? await runtime.refresh()
+                      : (await runtime.load()).data
+                    : loadWorkspace();
+                  setData(latest);
+                  setReportIssue(undefined);
+                  setError("");
+                  return latest;
+                }}
+              />
+            </ReportAvailability.Provider>
           ) : view === "admin" && runtime ? (
             <EmptyState>
               <h2>Administration requires an authorized account.</h2>
@@ -653,7 +676,9 @@ export default function Fieldbook({
                 title="Team progress"
                 description="A shared view of progress and what’s next."
               />
-              <TeamProgress data={data} user={user} />
+              <ReportAvailability.Provider value={reportIssue}>
+                <TeamProgress data={data} user={user} />
+              </ReportAvailability.Provider>
             </>
           ) : curriculum ? (
             <CurriculumPage

@@ -14,6 +14,8 @@ Guests keep learning progress in their browser. Signed-in learners have account-
 - **Managers** additionally report on active people in teams they explicitly manage and those teams' descendants. Team membership alone grants no reporting access. A manager without a managed team receives no additional people or progress data. Managers do not administer content, people or learning groups; feedback remains their own.
 - **Administrators** manage content, settings, people, learning groups, curricula and reporting teams, and access organization reports and feedback. They can mark a current course version complete or reset progress through revision-checked, audited operations.
 
+CSV exports use the same authorized report data and do not broaden server scope. Managers can export their team progress and person assignment details; administrator feedback and person-management details remain administrator-only. See [report exports](reporting.md).
+
 A person has one optional reporting team. Learning-group membership is separate and can come from individual membership, parent groups or live links to teams. See [groups and curricula](learning-groups.md).
 
 Administrators can pre-register a Google email without sending an invitation email. Verified sign-in claims that pending account even when general registration is closed. Existing sign-in emails cannot be changed through people administration. Account deactivation is distinct from deletion; hard account deletion is not exposed. Self-demotion/deactivation and removing the last active administrator are rejected.
