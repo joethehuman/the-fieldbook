@@ -128,7 +128,8 @@ const adminSections = [
       {
         id: "settings-identity",
         name: "Identity",
-        description: "Your organization’s name, logo, and accent color.",
+        description:
+          "Installation name, logo, welcome description and privacy link.",
         icon: Settings,
       },
       {

@@ -6,6 +6,7 @@ import {
   HttpError,
 } from "@production/lib/auth";
 import { db, check } from "@production/lib/db";
+import { readyLogo } from "@production/lib/branding-logo";
 import { settingsSchema } from "@production/lib/schemas";
 export async function POST(req: Request) {
   try {
@@ -18,6 +19,7 @@ export async function POST(req: Request) {
       throw new HttpError(400, "Check the branding and access settings.");
     if (!Number.isInteger(a.expected) || a.expected < 1)
       throw new HttpError(400, "A settings revision is required.");
+    if (parsed.data.logoUrl) await readyLogo(parsed.data.logoUrl);
     const { data, error } = await db()
       .from("fb_config")
       .update({ settings: parsed.data, revision: a.expected + 1 })

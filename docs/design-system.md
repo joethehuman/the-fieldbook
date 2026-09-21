@@ -103,3 +103,7 @@ Reference conventions: [shadcn composition](https://ui.shadcn.com/docs), [themin
 `LaunchList` presents a learner's ordered sequence: number, flexible title/description/status, and an aligned launch action. It is distinct from the editor's OrderedLearning. Curriculum detail pages use this simple list with a PageHeader and progress/next-course action. Do not add sorting, channel filters, nested accordions or course editing controls to a learner playlist.
 
 The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browser toolbar, and the ordered launch list. Verify mixed title lengths, metadata wrapping, equal card/footer alignment, header controls, keyboard focus, narrow screens and enlarged text whenever these patterns change.
+
+## Account identity
+
+`InstallationIdentity` and `InstallationLogo` provide the workspace/account wordmark and failed-image fallback. `BrandedAccount` composes them with `AccountPage` and the published privacy link. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.

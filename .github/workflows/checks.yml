@@ -29,6 +29,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:ui
       - run: pnpm test:authoring
+      - run: pnpm test:accounts
       - uses: actions/upload-artifact@v4
         if: always()
         with:

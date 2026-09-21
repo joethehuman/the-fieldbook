@@ -1,4 +1,5 @@
 "use client";
+import { InstallationIdentity } from "@/components/patterns/installation-identity";
 import { LearningCard } from "@/components/patterns/learning-card";
 import { BrowseToolbar } from "@/components/patterns/layout";
 import { LaunchList } from "@/components/patterns/launch-list";
@@ -82,6 +83,16 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <section className="grid min-w-0 gap-4">
+        <h2>Installation identity</h2>
+        <Card>
+          <InstallationIdentity name="Example Academy" />
+          <p>
+            Shared by the workspace, sign-in, consent and connection pages.
+            Missing or failed logos use the book mark.
+          </p>
+        </Card>
+      </section>
       <section className="grid min-w-0 gap-4">
         <CourseRow
           title="Example"

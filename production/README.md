@@ -88,6 +88,8 @@ For a public installation, set the app name, public homepage and privacy link in
 
 Google supports a non-Gmail support address registered as a Google account. Email can remain hosted by another provider. Sign in with that account and grant only the Google project permissions it needs (OAuth Config Editor worked for the initial deployment), then select the address in Branding. Account creation and Google Cloud may have separate terms. A custom mailbox is optional infrastructure for the operator; Fieldbook does not provision email or require Google Workspace.
 
+Fieldbook’s own sign-in, consent and connection pages use the installation identity configured in **Organization Settings → Identity**. Name, logo, optional welcome description and the published privacy link are shared with the application. Private visitors go directly to branded sign-in with their destination preserved; public visitors can keep browsing. No migration is required. See [installation branding](../docs/branding.md) for logo visibility, validation and configuration.
+
 Keep private developer notification contacts separate from the public support contact. An installation-specific policy is configured in Admin → Settings; see [privacy setup](../docs/privacy-setup.md). The maintainer's policy must not become your default.
 
 Official references: [Google sign-in with Supabase](https://supabase.com/docs/guides/auth/social-login/auth-google), [Google branding](https://support.google.com/cloud/answer/15549049), [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
