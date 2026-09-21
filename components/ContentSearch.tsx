@@ -9,7 +9,10 @@ import {
 import type { Content } from "@/lib/types";
 import type { FieldbookRuntime } from "@/lib/runtime";
 import { FilterOptions } from "./patterns/filter-options";
-import { SearchResultCard } from "./patterns/search-result";
+import {
+  SearchResultCard,
+  SearchResultSkeleton,
+} from "./patterns/search-result";
 import { EmptyState } from "./patterns/layout";
 import { Alert } from "./ui/alert";
 import { Button } from "./ui/button";
@@ -66,29 +69,37 @@ export function ContentSearch({
   const pending = completed !== key || state === "loading";
   return (
     <section
-      className="grid gap-4"
+      className="grid gap-4 p-4"
       aria-label="Search results"
       aria-busy={pending}
     >
-      <FilterOptions
-        label="Content type"
-        options={[
-          { value: "all", label: "All" },
-          { value: "brief", label: "Updates" },
-          { value: "doc", label: "Docs" },
-          { value: "course", label: "Courses" },
-        ]}
-        value={filter}
-        onValueChange={(v) => setFilter(v as SearchFilter)}
-      />
-      <p role="status" className="text-sm text-muted-foreground">
-        {pending
-          ? "Searching…"
-          : state === "error"
-            ? "Search unavailable"
-            : `${response.results.length}${response.hasMore ? " top" : ""} result${response.results.length === 1 ? "" : "s"} for “${query}”`}
-      </p>
-      {pending ? null : state === "error" ? (
+      <div className="sticky top-0 z-10 grid gap-3 bg-card pb-3 pt-1">
+        <FilterOptions
+          label="Content type"
+          options={[
+            { value: "all", label: "All" },
+            { value: "brief", label: "Updates" },
+            { value: "doc", label: "Docs" },
+            { value: "course", label: "Courses" },
+          ]}
+          value={filter}
+          onValueChange={(v) => setFilter(v as SearchFilter)}
+        />
+        <p role="status" className="text-sm text-muted-foreground">
+          {pending
+            ? "Searching…"
+            : state === "error"
+              ? "Search unavailable"
+              : `${response.results.length}${response.hasMore ? " top" : ""} result${response.results.length === 1 ? "" : "s"} for “${query}”`}
+        </p>
+      </div>
+      {pending ? (
+        <div aria-hidden="true" className="grid gap-3">
+          <SearchResultSkeleton />
+          <SearchResultSkeleton />
+          <SearchResultSkeleton />
+        </div>
+      ) : state === "error" ? (
         <Alert variant="destructive">
           <p>
             Search could not load. Try again. If your access changed, sign in
@@ -134,7 +145,7 @@ export function ContentSearch({
                   ? r.href
                   : `/?${r.lessonId ? `lesson=${encodeURIComponent(r.lessonId)}` : ""}#${r.href.split("?")[0].slice(1)}`
               }
-              onOpen={runtime ? undefined : () => onOpen(r)}
+              onOpen={() => onOpen(r)}
             />
           ))}
         </div>

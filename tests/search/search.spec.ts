@@ -111,7 +111,17 @@ test("rapid queries, loading, failure recovery, keyboard and empty results", asy
       await new Promise((r) => setTimeout(r, 700));
     await route.fulfill({ response });
   });
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await input.fill("quorum");
+  await expect(
+    page.locator('[data-slot="search-panel"] [data-slot="skeleton"]'),
+  ).toHaveCount(12);
+  expect(
+    await page
+      .locator('[data-slot="skeleton"]')
+      .first()
+      .evaluate((el) => getComputedStyle(el).animationName),
+  ).toBe("none");
   await expect(
     page.getByRole("region", { name: "Search results" }).getByRole("status"),
   ).toContainText("Searching");

@@ -20,14 +20,59 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
   }, data);
   await page.goto("/#courses");
   const input = page.getByRole("textbox", { name: "Search all content" });
+  const originalPage = await page.locator("main").innerText();
+  await page.locator("main").evaluate((main) => {
+    main.firstElementChild!.setAttribute(
+      "data-search-preservation",
+      "retained",
+    );
+  });
   await input.fill("quorum");
   const result = page.getByRole("link", { name: /Distributed systems/ });
+  await expect(result).toBeVisible();
+  expect(await page.locator("main").innerText()).toBe(originalPage);
+  await expect(
+    page.locator('[data-search-preservation="retained"]'),
+  ).toHaveCount(1);
+  const panel = page.locator('[data-slot="search-panel"]');
+  const bounds = (await panel.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
+  expect(bounds.height).toBeLessThanOrEqual(viewport.height * 0.65 + 1);
+  if (viewport.width > 1000)
+    expect(bounds.width).toBeLessThan(viewport.width * 0.8);
+  await input.press("Escape");
+  await expect(panel).toHaveCount(0);
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue("quorum");
+  await input.blur();
+  await input.focus();
+  await expect(result).toBeVisible();
+  await page.mouse.click(4, 4);
+  await expect(panel).toHaveCount(0);
+  await input.focus();
+  await expect(result).toBeVisible();
+  await input.fill("a");
+  await expect(panel.getByRole("status")).not.toContainText("Searching");
+  expect(await panel.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
+    true,
+  );
+  await panel.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+  const filters = await panel
+    .getByRole("group", { name: "Content type" })
+    .boundingBox();
+  expect(filters!.y).toBeGreaterThanOrEqual(bounds.y);
+  expect(filters!.y).toBeLessThan(bounds.y + 50);
+  await input.fill("quorum");
   await expect(result).toBeVisible();
   await expect(result.locator("mark")).toContainText(["quorum"]);
   await expect(result).toContainText("Lesson: Consensus");
   await page.screenshot({
     path: info.outputPath("search-results.png"),
-    fullPage: true,
+    fullPage: false,
   });
   await page
     .getByRole("group", { name: "Content type" })
@@ -61,11 +106,38 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
   ).toBeVisible();
   await page.screenshot({
     path: info.outputPath("search-empty.png"),
-    fullPage: true,
+    fullPage: false,
   });
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("search preserves an unsaved editor and guards result navigation", async ({
+  page,
+}) => {
+  const data = freshWorkspace();
+  data.content[1].title = "Published destination";
+  data.content[1].status = "published";
+  await page.addInitScript((data) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+  }, data);
+  await page.goto("/#admin");
+  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  const title = page.getByRole("textbox", { name: "Title", exact: true });
+  await title.fill("Unsaved work survives search");
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  await input.fill("Published destination");
+  const result = page.getByRole("link", { name: /Published destination/ });
+  await expect(result).toBeVisible();
+  await expect(title).toHaveValue("Unsaved work survives search");
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await result.click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(title).toHaveValue("Unsaved work survives search");
+  await expect(page).toHaveURL(/#admin/);
 });

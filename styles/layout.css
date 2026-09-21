@@ -69,6 +69,7 @@
     margin-left: var(--sidebar-width);
   }
   .topbar {
+    position: relative;
     display: flex;
     min-height: 4rem;
     align-items: center;
