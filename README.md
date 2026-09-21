@@ -64,7 +64,7 @@ The production application includes:
 - Signed-in feedback, administrator progress/feedback views, branding, and privacy-policy settings.
 - Administrator-only MCP tools for content, aggregate reports, and existing media references.
 
-**Production governance** includes people administration, pre-registered Google accounts, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [roles and permissions](docs/permissions.md). Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. Catalog and feedback queries remain subject to the database API response limit; MCP search scans up to 500 recent items and returns at most 50 matches. These bounds can make results incomplete on larger installations.
+**Production governance** includes people administration, pre-registered Google accounts, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [roles and permissions](docs/permissions.md). Navigation labels are currently fixed. Search is a bounded built-in implementation, not an external search service. Catalog, feedback and aggregate reporting reads paginate past the database API response cap and fail if a page cannot be retrieved. MCP search still scans up to 500 recent items and returns at most 50 matches. Those search bounds can omit matches on larger installations.
 
 ## Documentation
 

@@ -1,6 +1,7 @@
 import "server-only";
 import { publicSettings } from "@/lib/settings";
 import { db, check } from "./db";
+import { readAll } from "./read-all";
 import { profile } from "./auth";
 import { canRead, document, redact } from "./content";
 import type { User } from "@/lib/types";
@@ -17,11 +18,6 @@ export const guest: User = {
 export async function snapshot(user: User | null): Promise<Workspace> {
   const config = await canRead(user);
   let admin = false;
-  const documents = await db()
-    .from("fb_documents")
-    .select("*")
-    .order("updated_at", { ascending: false });
-  check(documents.error);
   let users = [user || guest],
     progress: Workspace["progress"] = {},
     feedback: NonNullable<Workspace["feedback"]> = [],
@@ -45,11 +41,12 @@ export async function snapshot(user: User | null): Promise<Workspace> {
         attempts: p.attempts,
         revision: p.revision,
       });
-    const ratings = admin
-      ? await db().from("fb_feedback").select("*")
-      : await db().from("fb_feedback").select("*").eq("user_id", user.id);
-    check(ratings.error);
-    feedback = (ratings.data || []).map((r) => ({
+    const ratings = await readAll((from, to) => {
+      let query = db().from("fb_feedback").select("*", { count: "exact" });
+      if (!admin) query = query.eq("user_id", user.id);
+      return query.order("id").range(from, to);
+    });
+    feedback = ratings.map((r) => ({
       id: r.id,
       userId: r.user_id,
       contentId: r.content_id,
@@ -59,10 +56,26 @@ export async function snapshot(user: User | null): Promise<Workspace> {
       updatedAt: r.updated_at,
     }));
   }
+  const documents = await readAll((from, to) => {
+    const query = admin
+      ? db().from("fb_documents").select("*", { count: "exact" })
+      : db()
+          .from("fb_documents")
+          .select("id,published,revision,published_revision,updated_at", {
+            count: "exact",
+          })
+          .not("published", "is", null);
+    return query.order("id").range(from, to);
+  });
+  // Keep catalog presentation order, with a deterministic tie-breaker.
+  documents.sort(
+    (a, b) =>
+      b.updated_at.localeCompare(a.updated_at) || a.id.localeCompare(b.id),
+  );
   // Include only assignment rules relevant to the server-authorized people.
   // This affects assignment metadata, never the published content catalog.
   const groupIds = new Set(governance.groups.map((g: any) => g.id));
-  const learningContent = (documents.data || [])
+  const learningContent = documents
     .filter((r) => r.published)
     .map((r) => {
       const c = document(r);
@@ -80,9 +93,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
     schema: 1,
     settings: admin ? config.settings : publicSettings(config.settings),
     revision: config.revision,
-    content: admin
-      ? (documents.data || []).map((r) => document(r, true))
-      : learningContent,
+    content: admin ? documents.map((r) => document(r, true)) : learningContent,
     publishedContent: learningContent,
     users,
     progress,
