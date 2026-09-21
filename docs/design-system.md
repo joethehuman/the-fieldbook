@@ -113,3 +113,7 @@ The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browse
 ## Search results
 
 `SearchResultCard` composes the shared `ContentAction` link variant with content type, title, optional published-content date, matched lesson and excerpt. `Highlight` renders plain text with semantic mark styling; never inject database-generated HTML. Use `FilterOptions` for content types, `EmptyState` for no matches and `Alert` for failures. The `/ui` catalog includes a lesson result. Preserve real links, visible focus and narrow-screen wrapping.
+
+## Report exports
+
+`CsvExport` composes the shared outline Button with a download icon, preparation state and an associated accessible error. Place it in the report's `SectionHeader` action slot; use a separate header for an expanded report. Supply a lazy, explicitly projected CSV from the same filtered/sorted row objects used by the display. Never serialize an entire workspace or raw server record. `ReportAvailability` supplies workspace update/failure state; local report owners can additionally disable exports during their own updates. The pattern does not fetch data or own authorization. The `/ui` catalog demonstrates ready and unavailable exports.

@@ -29,6 +29,8 @@ For account and branding changes, also run `pnpm test:accounts` after both build
 
 For search changes, run `pnpm test:search` after both builds with the synthetic build variables above. This runs the server API against a local HTTP fixture backed by embedded PostgreSQL, including the larger search corpus, publication/access checks, delayed responses and mobile screenshots. See [search verification](docs/search.md).
 
+For reporting changes, run `pnpm test:reporting` after both builds with the same synthetic build variables. It serves demo and production UI fixtures on ports 3147/3148 and captures actual CSV downloads and desktop/phone screenshots. Use `FIELDBOOK_TEST_PORT` and `FIELDBOOK_SERVER_TEST_PORT` to select unused ports. Run browser suites sequentially to preserve their nested output folders. See [reporting verification](docs/reporting.md).
+
 ## Reporting problems
 
 Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. A private security-reporting channel must be established before public release; see the [release process](docs/releases.md).

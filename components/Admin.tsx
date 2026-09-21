@@ -444,7 +444,7 @@ export default function Admin({
           ))}
         </ResponsiveTabsNavigation>
         <TabsContent value={tab} className="admin-panel mt-0" key={tab}>
-          {!["groups", "curricula"].includes(tab) && (
+          {!["groups", "curricula", "progress", "feedback"].includes(tab) && (
             <SectionHeader
               title={
                 <h2>

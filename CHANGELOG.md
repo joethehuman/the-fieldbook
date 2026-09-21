@@ -4,6 +4,11 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Reporting exports
+
+- Add Export CSV to organization/team progress, person assignments, course progress and optional history, and administrator feedback. Reuse the displayed filters, order and calculations with all matching rows and the existing server scope.
+- Share UTF-8 CSV escaping, formula-text protection, UTC timestamps/filenames, header-only empty files and loading/failure handling across demo and production. No migration or new endpoint is required. See [reporting](docs/reporting.md).
+
 ### Published-content search
 
 - Search published Updates, Docs and course lessons with ranked matches, excerpts, type filters and stable lesson links. Support prefixes and limited typo correction, keyboard navigation, mobile layouts and recoverable failures.

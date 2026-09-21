@@ -77,6 +77,7 @@ The production application includes:
 - [Select a version and upgrade](docs/upgrading.md)
 - [Maintainer release process](docs/releases.md)
 - [Learning model](docs/learning-model.md), [groups and curricula](docs/learning-groups.md), and [course browsing](docs/learning-browser.md)
+- [Reports and CSV exports](docs/reporting.md)
 - [Roles and permissions](docs/permissions.md)
 - [Content presentation controls](docs/content-presentation.md)
 - [Interface standards](docs/design-system.md) and [agent contribution instructions](AGENTS.md)

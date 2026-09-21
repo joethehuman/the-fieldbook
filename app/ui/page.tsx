@@ -1,4 +1,5 @@
 "use client";
+import { CsvExport } from "@/components/patterns/csv-export";
 import { SearchResultCard } from "@/components/patterns/search-result";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
@@ -85,6 +86,25 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <section className="grid gap-4">
+        <SectionHeader
+          title={<h2>Report exports</h2>}
+          description="CSV uses the current report rows. Timestamps and filename dates use UTC."
+        >
+          <CsvExport
+            filename="example-report"
+            report={() => ({
+              headings: ["Person", "Completed courses"],
+              rows: [["Alex Example", 2]],
+            })}
+          />
+        </SectionHeader>
+        <CsvExport
+          filename="unavailable-report"
+          disabledReason="Report data is unavailable. Reload and try again."
+          report={() => ({ headings: ["Person"], rows: [] })}
+        />
+      </section>
       <section className="grid gap-4">
         <h2>Search results</h2>
         <SearchResultCard

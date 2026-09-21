@@ -1,4 +1,6 @@
 "use client";
+import { CsvExport } from "./patterns/csv-export";
+import { courseProgressRow, courseProgressCsv } from "@/lib/reporting";
 import { DataTable } from "./patterns/data-table";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
@@ -26,7 +28,6 @@ import {
 import {
   assignmentRules,
   learningState,
-  learningTarget,
   type LearningAction,
 } from "@/lib/learning";
 export type LearningHandler = (action: LearningAction) => Promise<void>;
@@ -52,6 +53,7 @@ export function Assignments({
     [query, setQuery] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false),
+    [reportError, setReportError] = useState(false),
     [detail, setDetail] = useState<string | null>(null);
   const groupId = scope.groupId || selected,
     group = data.groups.find((g) => g.id === groupId),
@@ -106,6 +108,7 @@ export function Assignments({
     setNotice("");
     try {
       await onAction(action);
+      setReportError(false);
       setNotice(
         action.operation === "assign"
           ? "Assigned courses updated."
@@ -116,6 +119,7 @@ export function Assignments({
               : "Progress reset.",
       );
     } catch (e) {
+      setReportError(true);
       setNotice((e as Error).message);
     } finally {
       setBusy(false);
@@ -134,8 +138,10 @@ export function Assignments({
           g.id === group.id ? { ...g, requiredCourseIds: order } : g,
         ),
       });
+      setReportError(false);
       setNotice("Recommended order saved.");
     } catch (e) {
+      setReportError(true);
       setNotice((e as Error).message);
     } finally {
       setBusy(false);
@@ -152,96 +158,131 @@ export function Assignments({
                 a.groupId && effectiveGroups(u, data.groups).has(a.groupId),
             ),
         );
-  const progressTable = (c: Content) => (
-    <TableContainer>
-      <DataTable layout="assignments">
-        <TableHeader>
-          <TableRow>
-            <TableHead>Person</TableHead>
-            <TableHead>Course status</TableHead>
-            <TableHead>Progress</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {peopleFor(c).map((u) => {
-            const p = (data.progress[u.id] || []).find(
-                (p) => p.content_id === c.id && p.version === c.version,
-              ),
-              done = isComplete(c, data.progress[u.id] || []);
-            const target = learningTarget(c, u, data.groups, data.settings);
-            return (
-              <TableRow key={u.id}>
-                <TableCell>
-                  {u.name}
-                  <small>{u.email}</small>
-                </TableCell>
-                <TableCell>
-                  {done
-                    ? "Complete"
-                    : target && target < new Date().toISOString().slice(0, 10)
-                      ? "Needs attention"
-                      : "On track"}
-                  {!done && target && <small>Target {target}</small>}
-                </TableCell>
-                <TableCell>
-                  {done
-                    ? "Complete"
-                    : `${p?.lessons.length || 0} of ${c.lessons.length} lessons`}
-                </TableCell>
-                <TableCell>
-                  <ActionGroup>
-                    <Button
-                      variant="ghost"
-                      disabled={busy || done}
-                      onClick={async () => {
-                        if (
-                          await confirm(
-                            `Mark ${c.title} complete for ${u.name}?`,
-                          )
-                        )
-                          void act({
-                            operation: "complete",
-                            contentId: c.id,
-                            expected: currentRevision(c),
-                            userId: u.id,
-                            version: c.version,
-                            progressExpected: p?.revision || 0,
-                          });
-                      }}
-                    >
-                      Mark complete
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={busy || !p}
-                      onClick={async () => {
-                        if (
-                          await confirm(
-                            `Reset lessons, quiz attempts and completion for ${u.name} on ${c.title}? Previous state is retained in the audit record.`,
-                          )
-                        )
-                          void act({
-                            operation: "reset",
-                            contentId: c.id,
-                            expected: currentRevision(c),
-                            userId: u.id,
-                            version: c.version,
-                            progressExpected: p?.revision || 0,
-                          });
-                      }}
-                    >
-                      Reset progress
-                    </Button>
-                  </ActionGroup>
-                </TableCell>
+  const disabledReason = busy
+    ? "Updating report…"
+    : reportError
+      ? "Reload the report before exporting after a failed change."
+      : undefined;
+  const rows = ordered
+    .filter(
+      (c) =>
+        (!scope.courseId || c.id === scope.courseId) &&
+        c.title.toLowerCase().includes(query.toLowerCase()),
+    )
+    .map((c) => {
+      const sources = assignmentRules(c).filter(
+        (a) =>
+          a.groupId &&
+          (person
+            ? effectiveGroups(person, data.groups).has(a.groupId)
+            : ancestorIds(groupId, data.groups).has(a.groupId)),
+      );
+      const people = peopleFor(c);
+      return {
+        c,
+        sources,
+        people,
+        completed: people.filter((u) =>
+          isComplete(c, data.progress[u.id] || []),
+        ).length,
+        sourceLabels: sources.map(
+          (a) =>
+            `${data.groups.find((g) => g.id === a.groupId)?.name || ""}${a.groupId !== groupId && !person ? " · inherited" : ""}`,
+        ),
+      };
+    });
+  const progressTable = (c: Content, optional = false) => {
+    const progressRows = peopleFor(c).map((u) => courseProgressRow(data, u, c));
+    return (
+      <section className="grid gap-4">
+        <SectionHeader
+          title={<h3>{c.title}</h3>}
+          description={optional ? "Optional course" : undefined}
+        >
+          <CsvExport
+            disabledReason={disabledReason}
+            filename={`${person?.name || group?.name || "group"}-${c.title}-progress`}
+            report={() => courseProgressCsv(progressRows)}
+          />
+        </SectionHeader>
+        <TableContainer>
+          <DataTable layout="assignments">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Person</TableHead>
+                <TableHead>Course status</TableHead>
+                <TableHead>Progress</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            );
-          })}
-        </TableBody>
-      </DataTable>
-    </TableContainer>
-  );
+            </TableHeader>
+            <TableBody>
+              {progressRows.map(({ u, p, done, target, status, progress }) => {
+                return (
+                  <TableRow key={u.id}>
+                    <TableCell>
+                      {u.name}
+                      <small>{u.email}</small>
+                    </TableCell>
+                    <TableCell>
+                      {status}
+                      {!done && target && <small>Target {target}</small>}
+                    </TableCell>
+                    <TableCell>{progress}</TableCell>
+                    <TableCell>
+                      <ActionGroup>
+                        <Button
+                          variant="ghost"
+                          disabled={busy || done}
+                          onClick={async () => {
+                            if (
+                              await confirm(
+                                `Mark ${c.title} complete for ${u.name}?`,
+                              )
+                            )
+                              void act({
+                                operation: "complete",
+                                contentId: c.id,
+                                expected: currentRevision(c),
+                                userId: u.id,
+                                version: c.version,
+                                progressExpected: p?.revision || 0,
+                              });
+                          }}
+                        >
+                          Mark complete
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          disabled={busy || !p}
+                          onClick={async () => {
+                            if (
+                              await confirm(
+                                `Reset lessons, quiz attempts and completion for ${u.name} on ${c.title}? Previous state is retained in the audit record.`,
+                              )
+                            )
+                              void act({
+                                operation: "reset",
+                                contentId: c.id,
+                                expected: currentRevision(c),
+                                userId: u.id,
+                                version: c.version,
+                                progressExpected: p?.revision || 0,
+                              });
+                          }}
+                        >
+                          Reset progress
+                        </Button>
+                      </ActionGroup>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </DataTable>
+        </TableContainer>
+      </section>
+    );
+  };
   return (
     <section className="assignments-panel">
       <SectionHeader
@@ -253,7 +294,34 @@ export function Assignments({
               : "Choose the courses each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
           </>
         }
-      ></SectionHeader>
+      >
+        <CsvExport
+          disabledReason={disabledReason}
+          filename={`${person?.name || group?.name || "group"}-assigned-courses`}
+          report={() => ({
+            headings: [
+              "Learning group",
+              "Person",
+              "Email",
+              "Course",
+              "Published version",
+              "Assigned through",
+              "Completed people",
+              "Total people",
+            ],
+            rows: rows.map(({ c, sourceLabels, completed, people }) => [
+              person ? "" : group?.name,
+              person?.name,
+              person?.email,
+              c.title,
+              c.version,
+              sourceLabels.join("; "),
+              completed,
+              people.length,
+            ]),
+          })}
+        />
+      </SectionHeader>
       {!person && !scope.groupId && (
         <Field>
           Group
@@ -343,136 +411,109 @@ export function Assignments({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {ordered
-              .filter(
-                (c) =>
-                  (!scope.courseId || c.id === scope.courseId) &&
-                  c.title.toLowerCase().includes(query.toLowerCase()),
-              )
-              .map((c) => {
-                const sources = assignmentRules(c).filter(
-                  (a) =>
-                    a.groupId &&
-                    (person
-                      ? effectiveGroups(person, data.groups).has(a.groupId)
-                      : ancestorIds(groupId, data.groups).has(a.groupId)),
-                );
-                const local = sources.some((a) => a.groupId === groupId),
-                  people = peopleFor(c),
-                  index = direct.findIndex((d) => d.id === c.id);
-                return (
-                  <TableRow key={c.id}>
-                    <TableCell>
+            {rows.map(({ c, sources, sourceLabels, completed, people }) => {
+              const local = sources.some((a) => a.groupId === groupId),
+                index = direct.findIndex((d) => d.id === c.id);
+              return (
+                <TableRow key={c.id}>
+                  <TableCell>
+                    <Button
+                      variant="link"
+                      onClick={() => setDetail(detail === c.id ? null : c.id)}
+                    >
+                      {c.title}
+                    </Button>
+                  </TableCell>
+                  <TableCell>
+                    {sourceLabels.map((label, i) => (
+                      <div key={i}>{label}</div>
+                    ))}
+                  </TableCell>
+                  <TableCell>
+                    {completed} of {people.length} complete
+                  </TableCell>
+                  <TableCell>
+                    <ActionGroup>
                       <Button
-                        variant="link"
+                        variant="ghost"
                         onClick={() => setDetail(detail === c.id ? null : c.id)}
                       >
-                        {c.title}
+                        View progress
                       </Button>
-                    </TableCell>
-                    <TableCell>
-                      {sources.map((a) => (
-                        <div key={a.groupId}>
-                          {data.groups.find((g) => g.id === a.groupId)?.name}
-                          {a.groupId !== groupId && !person
-                            ? " · inherited"
-                            : ""}
-                        </div>
-                      ))}
-                    </TableCell>
-                    <TableCell>
-                      {
-                        people.filter((u) =>
-                          isComplete(c, data.progress[u.id] || []),
-                        ).length
-                      }{" "}
-                      of {people.length} complete
-                    </TableCell>
-                    <TableCell>
-                      <ActionGroup>
+                      {!person && local && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            aria-label={`Move ${c.title} earlier`}
+                            disabled={busy || index === 0 || !onChange}
+                            onClick={() => move(c, -1)}
+                          >
+                            ↑
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            aria-label={`Move ${c.title} later`}
+                            disabled={
+                              busy || index === direct.length - 1 || !onChange
+                            }
+                            onClick={() => move(c, 1)}
+                          >
+                            ↓
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            disabled={busy}
+                            onClick={async () => {
+                              if (
+                                await confirm(
+                                  `Remove ${c.title} from ${group?.name} assigned courses? Progress and other group requirements are preserved.`,
+                                )
+                              )
+                                void act({
+                                  operation: "unassign",
+                                  contentId: c.id,
+                                  expected: currentRevision(c),
+                                  groupId,
+                                });
+                            }}
+                          >
+                            Remove assignment
+                          </Button>
+                        </>
+                      )}
+                      {!person && !local && sources[0]?.groupId && (
                         <Button
                           variant="ghost"
                           onClick={() =>
-                            setDetail(detail === c.id ? null : c.id)
+                            onOpenGroup
+                              ? onOpenGroup(sources[0].groupId!)
+                              : setSelected(sources[0].groupId!)
                           }
                         >
-                          View progress
+                          Manage parent group
                         </Button>
-                        {!person && local && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              aria-label={`Move ${c.title} earlier`}
-                              disabled={busy || index === 0 || !onChange}
-                              onClick={() => move(c, -1)}
-                            >
-                              ↑
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              aria-label={`Move ${c.title} later`}
-                              disabled={
-                                busy || index === direct.length - 1 || !onChange
-                              }
-                              onClick={() => move(c, 1)}
-                            >
-                              ↓
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              disabled={busy}
-                              onClick={async () => {
-                                if (
-                                  await confirm(
-                                    `Remove ${c.title} from ${group?.name} assigned courses? Progress and other group requirements are preserved.`,
-                                  )
-                                )
-                                  void act({
-                                    operation: "unassign",
-                                    contentId: c.id,
-                                    expected: currentRevision(c),
-                                    groupId,
-                                  });
-                              }}
-                            >
-                              Remove assignment
-                            </Button>
-                          </>
-                        )}
-                        {!person && !local && sources[0]?.groupId && (
-                          <Button
-                            variant="ghost"
-                            onClick={() =>
-                              onOpenGroup
-                                ? onOpenGroup(sources[0].groupId!)
-                                : setSelected(sources[0].groupId!)
-                            }
-                          >
-                            Manage parent group
-                          </Button>
-                        )}
-                      </ActionGroup>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+                      )}
+                    </ActionGroup>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </DataTable>
-        {!ordered.length && (
+        {!rows.length && (
           <EmptyState>
             No assigned courses yet. The full library remains available.
           </EmptyState>
         )}
       </TableContainer>
-      {detail && courses.find((c) => c.id === detail) && (
+      {detail && rows.some(({ c }) => c.id === detail) && (
         <section className="assignment-detail">
-          <h3>{courses.find((c) => c.id === detail)!.title}</h3>
           {progressTable(courses.find((c) => c.id === detail)!)}
         </section>
       )}
       {person && (
         <>
-          <h3>Course history</h3>
+          <h2>Course history</h2>
           {courses
             .filter(
               (c) =>
@@ -482,10 +523,7 @@ export function Assignments({
                 ),
             )
             .map((c) => (
-              <section key={c.id}>
-                <h4>{c.title} · Optional course</h4>
-                {progressTable(c)}
-              </section>
+              <section key={c.id}>{progressTable(c, true)}</section>
             ))}
         </>
       )}
