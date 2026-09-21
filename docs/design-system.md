@@ -121,3 +121,9 @@ The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browse
 ## Explicit named creation
 
 The shared interaction dialog accepts optional title, description and submit-label options for named creation as well as renaming. Keep the naming field concise; place save-flow guidance in the description. The caller owns validation and persistence, selects a created item only after success, and explains any separate settings save. The `/ui` catalog includes a guest-group creation example.
+
+## Save confirmations and errors
+
+Use `useToast()` from `components/ui/toast` after a successful save, publish, assignment or deletion. Both app layouts own one `ToastProvider`. It displays one compact, neutral confirmation in the bottom-right corner (inset on phones), outside document flow. Each new success replaces the previous message and restarts the four-second lifetime, including identical repeated messages. It fades out, respects reduced motion, pauses while hovered and announces politely without moving focus. There is no stack to dismiss. Keep messages short and describe the completed action accurately.
+
+Do not use transient confirmations for errors, validation, pending work, quiz results or instructions needed to finish an action. Keep those beside the relevant controls using `Alert` or field descriptions. `Alert` owns a vertical content layout so prose wraps naturally and optional actions stay separate. Never insert a loose dismiss button after alert text. The `/ui` catalog demonstrates short and long confirmations.

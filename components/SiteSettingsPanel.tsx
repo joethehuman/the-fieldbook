@@ -1,4 +1,6 @@
 "use client";
+import { Alert } from "./ui/alert";
+import { useToast } from "./ui/toast";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { ReorderRow } from "./patterns/reorder-row";
 import { Input } from "@/components/ui/input";
@@ -35,6 +37,7 @@ export default function SiteSettingsPanel({
   section: SettingsSection;
   onPendingChange: (pending: boolean) => void;
 }) {
+  const notify = useToast();
   const { prompt } = useInteractionDialog();
   const [settings, setSettings] = useState({
       ...defaultSettings,
@@ -79,7 +82,7 @@ export default function SiteSettingsPanel({
               : settings;
           await onChange({ ...data, settings: next });
           setSettings(next);
-          setNotice("Settings saved.");
+          notify("Settings saved.");
         } catch (e) {
           setNotice((e as Error).message);
         } finally {
@@ -590,7 +593,7 @@ export default function SiteSettingsPanel({
               try {
                 await onChange({ ...data, settings: next });
                 setSettings(next);
-                setNotice("Privacy policy published.");
+                notify("Privacy policy published.");
               } catch (e) {
                 setNotice((e as Error).message);
               } finally {
@@ -606,7 +609,7 @@ export default function SiteSettingsPanel({
           <Button variant="default" disabled={busy}>
             {busy ? "Saving…" : "Save settings"}
           </Button>
-          <p role="status">{notice}</p>
+          {notice && <Alert role="status">{notice}</Alert>}
         </div>
       )}
     </form>

@@ -1,4 +1,5 @@
 "use client";
+import { useToast } from "./ui/toast";
 import { SelectField } from "./ui/select";
 import { Card } from "@/components/ui/card";
 import { SectionHeader, EmptyState } from "@/components/patterns/layout";
@@ -24,6 +25,7 @@ export default function Curricula({
   data: Workspace;
   onChange: (data: Workspace) => void | Promise<void>;
 }) {
+  const notify = useToast();
   const [editing, setEditing] = useState<Curriculum | null>(null);
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
@@ -71,7 +73,8 @@ export default function Curricula({
         ],
       });
       setEditing(null);
-      setNotice("Curriculum saved.");
+      setNotice("");
+      notify("Curriculum saved.");
     } catch (e) {
       setNotice((e as Error).message);
     } finally {
@@ -97,7 +100,8 @@ export default function Curricula({
           ),
         })),
       });
-      setNotice("Curriculum deleted. Learning history preserved.");
+      setNotice("");
+      notify("Curriculum deleted. Learning history preserved.");
     } catch (e) {
       setNotice((e as Error).message);
     } finally {
@@ -106,7 +110,7 @@ export default function Curricula({
   }
   return (
     <section className="learning-admin">
-      {notice && <Alert role="status">{notice}</Alert>}
+      {notice && <Alert variant="destructive">{notice}</Alert>}
       {editing ? (
         <form
           onSubmit={(e) => {

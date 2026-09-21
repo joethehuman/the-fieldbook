@@ -1,3 +1,4 @@
+import { ToastProvider } from "../components/ui/toast";
 import { InteractionDialogProvider } from "../components/ui/interaction-dialog";
 import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={GeistSans.variable}>
       <body>
-        <InteractionDialogProvider>{children}</InteractionDialogProvider>
+        <ToastProvider>
+          <InteractionDialogProvider>{children}</InteractionDialogProvider>
+        </ToastProvider>
       </body>
     </html>
   );

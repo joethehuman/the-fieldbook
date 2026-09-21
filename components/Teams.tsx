@@ -1,4 +1,6 @@
 "use client";
+import { Alert } from "./ui/alert";
+import { useToast } from "./ui/toast";
 import { CsvExport } from "./patterns/csv-export";
 import {
   teamProgressRows,
@@ -39,6 +41,7 @@ export function TeamsAdmin({
   onChange: (d: Workspace) => void | Promise<void>;
 }) {
   const teams = data.teams || [];
+  const notify = useToast();
   const [editing, setEditing] = useState<Team | null>(null),
     [notice, setNotice] = useState("");
   async function save(e: React.FormEvent) {
@@ -68,7 +71,8 @@ export function TeamsAdmin({
         ],
       });
       setEditing(null);
-      setNotice("Team saved.");
+      setNotice("");
+      notify("Team saved.");
     } catch (e) {
       setNotice((e as Error).message);
     }
@@ -87,7 +91,7 @@ export function TeamsAdmin({
           Add team
         </Button>
       </Toolbar>
-      {notice && <p role="status">{notice}</p>}
+      {notice && <Alert variant="destructive">{notice}</Alert>}
       {editing && (
         <form className="grid gap-4" onSubmit={save}>
           <FilterBar>
