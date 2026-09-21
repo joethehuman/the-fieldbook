@@ -21,11 +21,11 @@ Never commit secrets, exports containing personal data, `.env.local`, or provide
 
 ## Interface contributions
 
-Read [Fieldbook interface standards](docs/design-system.md) before changing UI. Reuse shared controls and layout patterns across both applications; add missing patterns centrally instead of introducing feature-specific styling. The [design-system audit and migration proposal](docs/design-system-audit.md) records the original gaps and the implementation. Run `pnpm check:ui` and, after the demo build, `pnpm test:ui`; inspect the screenshot report for affected surfaces.
+Read [Fieldbook interface standards](docs/design-system.md) before changing UI. Reuse shared controls and layout patterns across both applications; add missing patterns centrally instead of introducing feature-specific styling. Run `pnpm check:ui` and, after the demo build, `pnpm test:ui`; inspect the screenshot report for affected surfaces.
 
 ## Reporting problems
 
-Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. A private security-reporting channel must be established before public release; see the release checklist.
+Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. A private security-reporting channel must be established before public release; see the [release process](docs/releases.md).
 
 ## Scope and releases
 

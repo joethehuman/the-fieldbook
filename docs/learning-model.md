@@ -11,11 +11,11 @@ Everyone with access to an installation can explore its full published library. 
 
 ## For you and completion
 
-The Courses page starts with For you for signed-in users, then offers published curricula and the full course library. For you shows outstanding assigned courses and a completion card. The card reports completed designated courses divided by all currently published designated courses. A valid completion counts regardless of where the learner originally took the course. A percentage is never rounded to 100 while a course remains unfinished. People with no designated learning see “No assigned courses yet,” without an earned completion percentage.
+The Courses page starts with For you for signed-in users, then offers published curricula and the full course library. The home For you queue shows outstanding assigned courses or curriculum cards and a completion summary. The card reports completed designated courses divided by all currently published designated courses. A valid completion counts regardless of where the learner originally took the course. A percentage is never rounded to 100 while a course remains unfinished. People with no designated learning see “No assigned courses yet,” without an earned completion percentage.
 
 ### Browsing courses and personal activity
 
-“View all for you” opens the shared course browser with **For you** selected. It contains every assigned published course, grouped by channel, including completed courses. **Hide completed** defaults off and filters only this view. The home For you row always shows unfinished assigned courses in recommended order; its Start/Continue action opens the next course in that same order.
+“View all for you” opens the shared course browser with **For you** selected. It contains assigned published courses and curriculum cards, including completed cards; the curriculum presentation rules below describe how these are combined. **Hide completed** defaults off and filters only this view. The home For you row shows unfinished assigned cards in recommended order; a curriculum card opens its ordered course list.
 
 The browser also provides **In progress** (any started, unfinished course), **Completed** (all current-version completions, assigned or optional), and **All courses** (the published course library). Switching views clears search/channel filters and resets Hide completed. Search and sorting apply within the selected collection. These views use the same saved progress; they do not enroll learners or change assignments.
 

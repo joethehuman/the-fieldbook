@@ -18,16 +18,8 @@ Course assignment changes through ordinary content/MCP writes are rejected with 
 
 1. Back up the installation and record the current code and migration versions.
 2. Apply the migration to an isolated Supabase preview, never a preview pointing at the production backend. The migration can also be exercised by the local PGlite integration test with synthetic data.
-3. Deploy this branch to that preview and exercise admin saves, Google sign-in, manager scope, progress and course publication. A passing build does not establish provider behavior.
-4. After review and explicit production authorization, use a maintenance window: pause writes, apply the migration, deploy the matching code, reload old clients, and verify before reopening writes. Old governance clients do not understand curriculum fields; do not run mixed writers.
+3. Deploy the candidate code to that preview and exercise admin saves, Google sign-in, manager scope, progress and course publication. A passing build does not establish provider behavior.
+4. After the operator approves the upgrade, use a maintenance window: pause writes, apply the migration, deploy the matching code, reload old clients, and verify before reopening writes. Old governance clients do not understand curriculum fields; do not run mixed writers.
 5. Prefer a forward fix. A code rollback does not reverse group plans, new links or the migration. A full pre-upgrade database restore loses later changes and must be planned separately.
 
 No new environment variables or dependencies are required. If the migration is missing, governance writes fail with a setup message instead of silently dropping curriculum changes. The fresh browser demo includes a sample playlist and targeted updates; existing browser-local data remains intact and acquires the expanded model when saved. Reset demo only when intentionally replacing saved demo work.
-
-## Verification for this review branch
-
-- Existing tests plus new model, schema, database and snapshot checks exercise overlap/deduplication, 100% completion, chronological Update partitioning, legacy migration, live teams, registration, curriculum ordering/removal, preserved drafts/progress, version changes, stale revisions and manager scope.
-- Demo and production builds have passed locally; final checks are recorded in the PR.
-- Local runtime is the bundled Node 24, while the repository targets Node 22. CI must verify the declared version.
-- Browser inspection was blocked because the browser tool could not verify its admin-enforced security policy. Visual layout, actual drag/keyboard interaction and the hosted signed-in flow remain unverified.
-- No production migration, content publication, merge or release is performed as part of preparing this branch.

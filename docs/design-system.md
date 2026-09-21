@@ -76,7 +76,7 @@ pnpm exec playwright install chromium
 pnpm test:ui
 ```
 
-The browser suite serves the built demo, or reuses an existing local demo on port 3117 outside CI. To use installed Chrome locally, set `PLAYWRIGHT_CHANNEL=chrome`. CI installs Chromium, runs the suite and uploads screenshots/traces and the HTML report for review.
+The browser suite serves the built demo, or reuses an existing local demo on port 3117 outside CI. Set `FIELDBOOK_TEST_PORT` to use a different port when working in multiple checkouts. To use installed Chrome locally, set `PLAYWRIGHT_CHANNEL=chrome`. CI installs Chromium, runs the suite and uploads screenshots/traces and the HTML report for review.
 
 `check:ui` parses TSX and CSS. It rejects raw feature controls, hard-coded interface colors, retired class hooks, static inline feature styling, native-control overrides in the layout sheet and `!important`. There is no legacy allowlist for feature controls. Explicit implementation exceptions are confined to UI primitives, the rich-content tile and the runtime branding token. Do not weaken the check to ship a feature.
 
@@ -90,7 +90,7 @@ Browser tests cover desktop, tablet and phone layouts, keyboard Select/Tabs, lon
 4. Remove superseded CSS and unused imports/components in the same change.
 5. Record checks and limitations. Distinguish demo tests, server builds, isolated-backend tests and live installation checks.
 
-See [the initial audit and implementation record](design-system-audit.md). Reference conventions: [shadcn composition](https://ui.shadcn.com/docs), [theming](https://ui.shadcn.com/docs/theming), [configuration](https://ui.shadcn.com/docs/components-json).
+Reference conventions: [shadcn composition](https://ui.shadcn.com/docs), [theming](https://ui.shadcn.com/docs/theming), [configuration](https://ui.shadcn.com/docs/components-json).
 
 ## Learning collections and launch pages
 
