@@ -1,7 +1,8 @@
 import "server-only";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { isComplete, type User, type Content } from "@/lib/types";
+import { type User } from "@/lib/types";
+import { contentReport } from "./reports";
 import { getContent, saveContent } from "./content";
 import { contentSchema, contentBaseSchema } from "./schemas";
 import { db, check } from "./db";
@@ -187,43 +188,7 @@ export function createMcp(user: User, clientId: string) {
       inputSchema: {},
       annotations: read,
     },
-    async () => {
-      const [p, f, c] = await Promise.all([
-        db().from("fb_progress").select("content_id,version,passed,lessons"),
-        db().from("fb_feedback").select("content_id,rating"),
-        db().from("fb_documents").select("id,published"),
-      ]);
-      check(p.error);
-      check(f.error);
-      check(c.error);
-      return result({
-        courses: (c.data || [])
-          .filter((d) => d.published?.kind === "course")
-          .map((d) => {
-            const course = d.published as Content,
-              records = (p.data || []).filter(
-                (p) => p.content_id === d.id && p.version === course.version,
-              );
-            return {
-              id: d.id,
-              title: course.title,
-              version: course.version,
-              started: records.length,
-              completed: records.filter((p) => isComplete(course, [p])).length,
-            };
-          }),
-        feedback: (c.data || []).map((d) => ({
-          id: d.id,
-          positive: (f.data || []).filter(
-            (f) => f.content_id === d.id && f.rating === "up",
-          ).length,
-          negative: (f.data || []).filter(
-            (f) => f.content_id === d.id && f.rating === "down",
-          ).length,
-        })),
-        recordLimit: 1000,
-      });
-    },
+    async () => result(await contentReport(user)),
   );
   server.registerTool(
     "list_media",

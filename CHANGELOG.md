@@ -4,6 +4,13 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Complete catalog and reporting reads
+
+- Read all pages of published content, administrator drafts and authorized feedback, including installations with lower database response caps. Failed or detectably changing reads return an error instead of partial results.
+- Authorize published article, lesson and cover media by querying the requested reference directly, so older content retains media access in larger libraries.
+- Read all aggregate MCP reporting data and align current-version started/completed counts with learner course cards. Empty reset records no longer count as started; quiz attempts do.
+- MCP reports now return `complete: true` instead of `recordLimit: 1000`. Reads are not a transactional snapshot of concurrent edits. No database migration or new dependency is required.
+
 ### Authoring safety and recovery
 
 - Keep content edits open after failed saves, protect dirty edits during navigation, and block saving or leaving while inline images, videos or covers upload.

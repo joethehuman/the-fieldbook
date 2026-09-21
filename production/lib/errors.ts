@@ -22,6 +22,7 @@ export class ServiceError extends HttpError {
 // Only code-owned operation names and allowlisted provider codes enter the log.
 const codes = new Set([
   "unavailable",
+  "incomplete_read",
   "configuration_missing",
   "preview_backend",
   "42703",

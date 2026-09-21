@@ -53,6 +53,7 @@ test("workspace serialization preserves public catalog but scopes assignments, d
   };
   const row = {
     id: "course",
+    updated_at: "2026-09-01T00:00:00Z",
     revision: 2,
     draft: { ...course, title: "Private draft" },
     published: course,
@@ -101,7 +102,12 @@ test("workspace serialization preserves public catalog but scopes assignments, d
       body = [];
     } else throw new Error(`Unexpected request ${url}`);
     return new Response(JSON.stringify(body), {
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(Array.isArray(body)
+          ? { "Content-Range": `0-${body.length - 1}/${body.length}` }
+          : {}),
+      },
     });
   };
   try {
