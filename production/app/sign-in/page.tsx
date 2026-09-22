@@ -1,3 +1,7 @@
+import { cookies } from "next/headers";
+import { SIGN_IN_RETURN_COOKIE } from "@production/lib/sign-in";
+import { safeNext } from "@production/lib/redirect";
+import { ReturnFragment } from "./ReturnFragment";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { BrandedAccount } from "@/components/patterns/branded-account";
@@ -30,6 +34,11 @@ export default async function SignIn({
     q.reference && /^[a-f0-9-]{36}$/.test(q.reference) ? q.reference : null;
   return (
     <BrandedAccount branding={branding}>
+      <ReturnFragment
+        destination={safeNext(
+          (await cookies()).get(SIGN_IN_RETURN_COOKIE)?.value,
+        )}
+      />
       <header className="sign-in-heading">
         <h1>Sign in to {branding.name}</h1>
         <p>

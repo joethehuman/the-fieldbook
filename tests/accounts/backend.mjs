@@ -28,6 +28,8 @@ const initial = () => ({
     publishedAt: null,
   },
 });
+let documents = [],
+  reads = 0;
 let settings = initial(),
   fail = false,
   brokenLogo = false,
@@ -63,6 +65,8 @@ createServer(async (req, res) => {
   for await (const chunk of req) body += chunk;
   if (url.pathname === "/fixture") {
     const change = JSON.parse(body || "{}");
+    documents = change.documents || [];
+    reads = 0;
     settings = { ...initial(), ...change.settings };
     fail = !!change.fail;
     brokenLogo = !!change.brokenLogo;
@@ -70,6 +74,7 @@ createServer(async (req, res) => {
     revision = 1;
     return send(res, { ok: true });
   }
+  if (url.pathname === "/reads") return send(res, { reads });
   if (url.pathname === "/health") return send(res, { ok: true });
   if (url.pathname === "/logo") {
     if (brokenLogo) return send(res, {}, 404);
@@ -115,6 +120,19 @@ createServer(async (req, res) => {
     return send(res, { path: `uploads/${file}`, mime: "image/png" });
   if (url.pathname.startsWith("/storage/v1/object/sign/"))
     return send(res, { signedURL: "/object/sign/synthetic" });
+  if (url.pathname === "/rest/v1/fb_documents") {
+    reads++;
+    let rows = documents;
+    const id = url.searchParams.get("id");
+    if (id) rows = rows.filter((row) => row.id === id.slice(3));
+    if (url.searchParams.has("published"))
+      rows = rows.filter((row) => row.published);
+    return send(res, rows, 200, {
+      "Content-Range": `0-${rows.length - 1}/${rows.length}`,
+    });
+  }
+  if (url.pathname === "/rest/v1/rpc/fb_allow_request") return send(res, true);
+  if (url.pathname === "/rest/v1/rpc/fb_record_progress") return send(res, {});
   if (url.pathname === "/rest/v1/fb_profiles") return send(res, profile());
   if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot")
     return send(res, {

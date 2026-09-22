@@ -1,4 +1,6 @@
 "use client";
+import { Article, CourseOverview } from "@/components/patterns/reading";
+import { seedContent } from "@/lib/seed";
 import { useToast } from "@/components/ui/toast";
 import { useInteractionDialog } from "@/components/ui/interaction-dialog";
 import { CsvExport } from "@/components/patterns/csv-export";
@@ -553,6 +555,18 @@ export default function ComponentCatalog() {
           </ActionGroup>
         </DialogContent>
       </Dialog>
+      <section className="grid gap-8" aria-label="Reading presentation">
+        <SectionHeader title={<h2>Reading presentation</h2>} />
+        <Article
+          item={seedContent.find((item) => item.kind === "doc")!}
+          name="Sample Fieldbook"
+          back={<Button variant="link">← Back to docs</Button>}
+        />
+        <CourseOverview
+          item={seedContent.find((item) => item.kind === "course")!}
+          back={<Button variant="link">← Back to courses</Button>}
+        />
+      </section>
     </ReadingPage>
   );
 }

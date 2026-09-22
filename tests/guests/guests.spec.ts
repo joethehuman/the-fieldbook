@@ -44,6 +44,19 @@ async function setup(
     return { data, user };
   };
   if (production) {
+    await page.request.post("http://127.0.0.1:3130/fixture", {
+      data: {
+        settings: data.settings,
+        documents: data.content.map((item) => ({
+          id: item.id,
+          published: item.status === "published" ? item : null,
+          draft: item,
+          revision: 1,
+          published_revision: 1,
+          updated_at: item.updatedAt,
+        })),
+      },
+    });
     await page.route("**/api/workspace", async (route) => {
       if (fail === "load")
         return route.fulfill({
@@ -302,6 +315,8 @@ test("guest Updates and curriculum learning, browser progress and account transi
     .getByRole("button", { name: "Start curriculum", exact: true })
     .first()
     .click();
+  if (f.production)
+    await page.getByRole("link", { name: /One lesson/ }).click();
   await page.getByRole("button", { name: "Continue to quiz" }).click();
   await page.getByRole("radio", { name: "Correct", exact: true }).check();
   await page.getByRole("button", { name: "Check answers" }).click();

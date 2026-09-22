@@ -80,6 +80,7 @@ The production application includes:
 - [Optional guest recommendations](docs/guest-recommendations.md)
 - [Reports and CSV exports](docs/reporting.md)
 - [Roles and permissions](docs/permissions.md)
+- [Server-rendered reading pages, metadata and caching](docs/reading-pages.md)
 - [Content presentation controls](docs/content-presentation.md)
 - [Interface standards](docs/design-system.md) and [agent contribution instructions](AGENTS.md)
 - [Changelog](CHANGELOG.md)

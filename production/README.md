@@ -129,3 +129,7 @@ These diagnostics cover handled browser API errors and the MCP HTTP boundary. MC
 ## Guest recommendations
 
 Public browsing works without a learning-group selection. To populate For you in Updates and Courses for signed-out visitors, optionally choose or explicitly create a learning group in Organization Settings → Access → Guest recommendations, then save settings. No new migration is required. See [configuration, privacy and verification](../docs/guest-recommendations.md).
+
+## Reading pages
+
+Published Docs, Updates and course overviews render on the server and follow the existing public/private setting. No new settings or migration are needed. Keep the supplied private/no-store cache policy when operating behind a CDN. See [reading architecture and verification](../docs/reading-pages.md).

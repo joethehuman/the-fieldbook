@@ -7,13 +7,14 @@ import type { User } from "@/lib/types";
 
 import { HttpError, ServiceError, isAbsentSession } from "./errors";
 export { HttpError, errorResponse } from "./errors";
-export async function authClient() {
+export async function authClient(readOnly = false) {
   const jar = await cookies();
   const { url, key } = env();
   return createServerClient(url, key, {
     cookies: {
       getAll: () => jar.getAll(),
       setAll: (values) => {
+        if (readOnly) return; // Reading pages refresh cookies in proxy before rendering.
         for (const { name, value, options } of values)
           jar.set(name, value, options);
       },
@@ -34,8 +35,11 @@ export function profile(row: any): User {
     effectiveGroupJoinedAt: row.effective_group_joined_at,
   };
 }
-export async function actor(token?: string): Promise<User | null> {
-  const client = token ? db() : await authClient();
+export async function actor(
+  token?: string,
+  readOnly = false,
+): Promise<User | null> {
+  const client = token ? db() : await authClient(readOnly);
   let result;
   try {
     result = await client.auth.getUser(token);

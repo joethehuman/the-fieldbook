@@ -1,4 +1,3 @@
-"use client";
 import { Table } from "@/components/ui/table";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
