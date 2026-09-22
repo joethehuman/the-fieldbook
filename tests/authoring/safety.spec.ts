@@ -25,6 +25,9 @@ async function setup(
     releaseUpload: () => {},
   };
   if (production) {
+    await page.route("**/api/search?**", (route) =>
+      route.fulfill({ json: { results: [], hasMore: false } }),
+    );
     await page.route("**/api/media/**", (route) =>
       route.fulfill({
         contentType: "image/png",
@@ -118,7 +121,7 @@ async function openNav(page: Page) {
   if (await menu.isVisible()) await menu.click();
 }
 
-test("canceled Back, search, shell navigation and reload keep dirty edits; discard is explicit", async ({
+test("search preserves dirty edits; canceled navigation and reload keep them until explicit discard", async ({
   page,
 }, info) => {
   await setup(page, info.project.name.startsWith("production"));
@@ -131,10 +134,14 @@ test("canceled Back, search, shell navigation and reload keep dirty edits; disca
   await page
     .getByRole("textbox", { name: "Search all content" })
     .fill("search");
-  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Search results" })).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep these edits",
   );
+  await page.getByRole("textbox", { name: "Search all content" }).press("Escape");
+  await expect(page.getByRole("region", { name: "Search results" })).toHaveCount(0);
+  await expect(page.getByRole("textbox", { name: "Search all content" })).toBeFocused();
   await openNav(page);
   await page
     .getByRole("navigation")
