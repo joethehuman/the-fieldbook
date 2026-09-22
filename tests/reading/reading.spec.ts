@@ -1,4 +1,5 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
+import { freshWorkspace } from "../../lib/store";
 const backend = "http://127.0.0.1:3130";
 const ids = [
   "00000000-0000-4000-8000-000000000021",
@@ -204,6 +205,7 @@ test("reading without JavaScript, responsive layout and native breadcrumbs", asy
   await expect(
     page.locator('nav[aria-label="Breadcrumb"] a[href="/docs"]'),
   ).toHaveAttribute("href", "/docs");
+  await expectReadingWidth(page);
   await page.screenshot({
     path: info.outputPath("article-no-js.png"),
     fullPage: true,
@@ -379,4 +381,89 @@ test("republishing during hydration keeps article and metadata on one revision",
   await expect(page.getByRole("heading", { name: items[0].title })).toHaveCount(
     0,
   );
+});
+
+async function expectReadingWidth(page: Page) {
+  const geometry = await page.locator("article.article").evaluate((article) => {
+    const main = article.closest("main")!;
+    const style = getComputedStyle(main);
+    const available =
+      main.clientWidth -
+      parseFloat(style.paddingLeft) -
+      parseFloat(style.paddingRight);
+    const rect = article.getBoundingClientRect();
+    const mainRect = main.getBoundingClientRect();
+    return {
+      actual: rect.width,
+      expected: Math.min(
+        available,
+        parseFloat(getComputedStyle(article).maxWidth),
+      ),
+      center: rect.x + rect.width / 2,
+      mainCenter: mainRect.x + mainRect.width / 2,
+      overflow:
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    };
+  });
+  expect(Math.abs(geometry.actual - geometry.expected)).toBeLessThan(2);
+  expect(Math.abs(geometry.center - geometry.mainCenter)).toBeLessThan(2);
+  expect(geometry.overflow).toBe(false);
+}
+
+test("short and long articles fill the shared reading width in both apps", async ({
+  page,
+  request,
+}, info) => {
+  for (const app of ["production", "demo"]) {
+    for (const [index, section] of ["docs", "updates"].entries()) {
+      for (const length of ["short", "long"]) {
+        const item = {
+          ...items[index],
+          title:
+            length === "short"
+              ? "Test update"
+              : "A longer reading title with useful details for everyone",
+          summary:
+            length === "short"
+              ? "la, la, la"
+              : "Useful information for the reader. ".repeat(12),
+          body:
+            length === "short"
+              ? "This is text."
+              : "A longer paragraph explaining the published information. ".repeat(
+                  30,
+                ),
+        };
+        if (app === "production") {
+          await fixture(request, { documents: documents([item]) });
+          await page.goto(`/${section}/${item.id}`);
+        } else {
+          await page.goto("http://localhost:3132");
+          const data = freshWorkspace();
+          data.content = [item] as typeof data.content;
+          await page.evaluate((data) => {
+            localStorage.setItem(
+              "fieldbook.workspace.v1",
+              JSON.stringify(data),
+            );
+            sessionStorage.setItem("fieldbook.profile.v1", "demo-learner");
+          }, data);
+          await page.goto(`http://localhost:3132/#${section}/${item.id}`);
+          await page.reload();
+        }
+        await expect(page.locator("article h1")).toHaveText(item.title);
+        await expectReadingWidth(page);
+        if (length === "short")
+          await page.screenshot({
+            path: info.outputPath(`${app}-${section}-short.png`),
+            fullPage: true,
+          });
+        await page.evaluate(() => {
+          document.documentElement.style.fontSize = "200%";
+        });
+        await expectReadingWidth(page);
+      }
+    }
+  }
 });
