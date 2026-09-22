@@ -138,6 +138,21 @@ export default function Fieldbook({
       runtime
         .load()
         .then(({ data, user }) => {
+          if (initialReading) {
+            const rendered = initialReading.data.publishedContent?.[0];
+            const latest = data.publishedContent?.find(
+              (item) => item.id === initialReading.id,
+            );
+            // Keep body and metadata on the same published revision, including
+            // publication changes while the interactive workspace is loading.
+            if (
+              !latest ||
+              latest.publishedRevision !== rendered?.publishedRevision
+            ) {
+              window.location.reload();
+              return;
+            }
+          }
           setData(data);
           setUid(user?.id || "guest");
           onLoaded?.(user);

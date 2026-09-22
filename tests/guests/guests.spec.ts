@@ -16,6 +16,10 @@ async function setup(
     fail = "",
     delay = 0;
   const production = info.project.name.startsWith("production");
+  if (production) {
+    for (const item of [...data.content, ...(data.publishedContent || [])])
+      item.publishedRevision = 1;
+  }
   const savedUsers = JSON.stringify(data.users);
   const workspace = () => {
     if (current === "guest") {

@@ -354,3 +354,29 @@ test("legacy aliases, curriculum destinations and existing logo metadata", async
     }
   }
 });
+
+test("republishing during hydration keeps article and metadata on one revision", async ({
+  page,
+  request,
+}) => {
+  let changed = false;
+  await page.route("**/api/workspace", async (route) => {
+    if (!changed) {
+      changed = true;
+      await fixture(request, {
+        documents: documents(
+          items.map((item) => ({ ...item, title: "New published revision" })),
+        ).map((row) => ({ ...row, published_revision: 2, revision: 3 })),
+      });
+    }
+    await route.continue();
+  });
+  await page.goto(`/docs/${ids[0]}`);
+  await expect(page).toHaveTitle("New published revision | Acme Learning");
+  await expect(
+    page.getByRole("heading", { name: "New published revision" }),
+  ).toHaveCount(1);
+  await expect(page.getByRole("heading", { name: items[0].title })).toHaveCount(
+    0,
+  );
+});
