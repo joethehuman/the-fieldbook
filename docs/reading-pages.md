@@ -25,3 +25,15 @@ Cookie sessions are refreshed in the Next.js request proxy for reading routes, b
 Run `pnpm test:reading` after both builds, using the synthetic production build values documented in CONTRIBUTING. It exercises the built application against a local protocol fixture, including raw HTML/metadata/status checks, public/private transitions, redaction, simulated session refresh, no-JavaScript rendering and desktop/phone interactions. It uses the same local fixture ports as account tests, so run suites sequentially. No hosted credentials are needed or permitted.
 
 These checks do not establish hosted Google OAuth, production provider behavior, search-engine rankings or actual third-party previews. No migration or extra service is required. Sitemaps, robots expansion and SEO administration remain outside this behavior.
+
+## Docs reading navigation
+
+Docs use left-aligned section/folder navigation with the current document highlighted. On desktop the document tree scrolls independently of application navigation and account controls. Tab-local scroll/disclosure preferences are optional and do not change document order or access. Short screens and larger text retain an outer-sidebar scrolling fallback.
+
+Articles with H2/H3 headings have an **On this page** outline. It stays beside the article on wide screens and becomes a compact disclosure on smaller screens. Headings have shareable links; repeated headings receive unique suffixes. These links derive from the rendered Markdown rules, so code examples are never mistaken for headings. Editing a heading can change its anchor; unchanged headings retain their anchors unless an earlier duplicate changes their suffix.
+
+Previous and next links follow the same published document sequence as the sidebar, crossing section and folder boundaries. Search and collapsed sections do not change the sequence. The first and last document omit their unavailable direction. Publication changes appear on a fresh server request; the loaded client catalog refreshes through the existing workspace load flow.
+
+The server authorizes access before fetching the Docs navigation catalog. The additional paginated read projects only published navigation fields, excludes drafts and uses the existing catalog ordering. Content and metadata remain request-time, without a persistent user/content cache. Navigation fields scale with catalog size; this is not a transactional snapshot across simultaneous publication changes. As with any document link, a document unpublished after rendering returns the existing missing-page response when opened.
+
+Run `pnpm test:reading` after both builds for server HTML/private redaction, publication changes, no-JavaScript links, repeated-heading fragments, browser history, large document trees and responsive reading checks. Fixtures use synthetic local services, not hosted authentication or production data.

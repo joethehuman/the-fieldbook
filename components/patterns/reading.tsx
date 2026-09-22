@@ -1,3 +1,6 @@
+import { markdownHeadings } from "@/lib/markdown-headings";
+import { orderedDocs, type DocLink } from "@/lib/docs-navigation";
+import { ReadingOutline } from "./reading-outline";
 import type { ReactNode } from "react";
 import ReactMarkdown from "../Markdown";
 import { CheckCircle2, Clock } from "lucide-react";
@@ -13,50 +16,127 @@ export function Article({
   name,
   back,
   children,
+  documents = [],
+  sectionOrder,
+  demo = false,
+  onDocument,
 }: {
   item: Content;
   name: string;
   back: ReactNode;
   children?: ReactNode;
+  documents?: DocLink[];
+  sectionOrder?: string[];
+  demo?: boolean;
+  onDocument?: (id: string) => void;
 }) {
+  const isDoc = item.kind === "doc";
+  const headings = isDoc ? markdownHeadings(item.body) : [];
+  const prefix = demo ? `#docs/${encodeURIComponent(item.id)}?heading=` : "#";
+  const ordered = orderedDocs(documents, sectionOrder);
+  const index = ordered.findIndex((doc) => doc.id === item.id);
+  const neighbors = index < 0 ? [] : [ordered[index - 1], ordered[index + 1]];
   return (
-    <article className="article">
-      {back}
-      <span className="eyebrow">{item.category}</span>
-      <h1>{item.title}</h1>
-      <p className="article-lede">{item.summary}</p>
-      <div className="article-meta">
-        <InitialsAvatar
-          initials={name
-            .split(" ")
-            .map((x) => x[0])
-            .slice(0, 2)
-            .join("")}
-          size="sm"
-        />
-        <span>{name}</span>
-        <span>·</span>
-        <span>
-          Updated{" "}
-          {new Date(item.updatedAt).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-            timeZone: "UTC",
-          })}
-        </span>
-        <span>·</span>
-        <span>v{item.version}</span>
-      </div>
-      <div className="markdown">
-        <ReactMarkdown>{item.body}</ReactMarkdown>
-      </div>
-      {children}
-      <div className="article-end">
-        <CheckCircle2 size={18} />
-        You’re at the end. Put it into practice.
-      </div>
-    </article>
+    <div
+      className={
+        isDoc
+          ? `reading-layout${headings.length ? " has-outline" : ""}`
+          : undefined
+      }
+    >
+      <article className="article">
+        {back}
+        <span className="eyebrow">{item.category}</span>
+        <h1>{item.title}</h1>
+        <p className="article-lede">{item.summary}</p>
+        <div className="article-meta">
+          <InitialsAvatar
+            initials={name
+              .split(" ")
+              .map((x) => x[0])
+              .slice(0, 2)
+              .join("")}
+            size="sm"
+          />
+          <span>{name}</span>
+          <span>·</span>
+          <span>
+            Updated{" "}
+            {new Date(item.updatedAt).toLocaleDateString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+              timeZone: "UTC",
+            })}
+          </span>
+          <span>·</span>
+          <span>v{item.version}</span>
+        </div>
+        <div className="markdown">
+          <ReactMarkdown headingPrefix={isDoc ? prefix : undefined}>
+            {item.body}
+          </ReactMarkdown>
+        </div>
+        {children}
+        {isDoc && neighbors.some(Boolean) && (
+          <nav
+            className="document-pagination"
+            aria-label="Previous and next documents"
+          >
+            {neighbors.map(
+              (doc, direction) =>
+                doc && (
+                  <Button
+                    asChild
+                    variant="ghost"
+                    key={doc.id}
+                    className="min-w-0 w-full flex-col items-start justify-start gap-2 whitespace-normal p-4 text-left h-auto"
+                  >
+                    <a
+                      data-direction={direction === 0 ? "previous" : "next"}
+                      href={
+                        demo
+                          ? `#docs/${encodeURIComponent(doc.id)}`
+                          : contentPath("doc", doc.id)
+                      }
+                      onClick={
+                        onDocument
+                          ? (event) => {
+                              if (
+                                event.button ||
+                                event.metaKey ||
+                                event.ctrlKey ||
+                                event.shiftKey ||
+                                event.altKey
+                              )
+                                return;
+                              event.preventDefault();
+                              onDocument(doc.id);
+                            }
+                          : undefined
+                      }
+                    >
+                      <span className="text-xs font-normal text-muted-foreground">
+                        {direction === 0 ? "← Previous" : "Next →"}
+                      </span>
+                      <span className="[overflow-wrap:anywhere]">
+                        {doc.title}
+                      </span>
+                    </a>
+                  </Button>
+                ),
+            )}
+          </nav>
+        )}
+        <div className="article-end">
+          <CheckCircle2 size={18} />
+          You’re at the end. Put it into practice.
+        </div>
+      </article>
+      {isDoc && (
+        <ReadingOutline key={item.id} headings={headings} prefix={prefix} />
+      )}
+    </div>
   );
 }
 export function CourseOverview({

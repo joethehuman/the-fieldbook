@@ -1,3 +1,5 @@
+import type { Content } from "./types";
+
 // Saved sections come first; new sections append in a stable alphabetical order.
 // Only categories present in the reader's visible documents are returned.
 export function orderedDocCategories(
@@ -50,4 +52,53 @@ export function reorderDocSections(
   const [name] = next.splice(from, 1);
   next.splice(to, 0, name);
   return next;
+}
+
+export type DocLink = Pick<
+  Content,
+  "id" | "title" | "category" | "folder" | "kind" | "status"
+>;
+export type DocBranch = { name: string; docs: DocLink[]; folders: DocBranch[] };
+export function docBranches(
+  docs: DocLink[],
+  depth = 0,
+): Omit<DocBranch, "name"> {
+  const path = (doc: DocLink) =>
+    doc.folder
+      .split("/")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  const names = [
+    ...new Set(docs.map((doc) => path(doc)[depth]).filter(Boolean)),
+  ];
+  return {
+    docs: docs.filter((doc) => path(doc).length === depth),
+    folders: names.map((name) => ({
+      name,
+      ...docBranches(
+        docs.filter((doc) => path(doc)[depth] === name),
+        depth + 1,
+      ),
+    })),
+  };
+}
+// Preserve catalog order within each section/folder. Expansion and search never affect it.
+export function docSections(
+  docs: DocLink[],
+  saved: string[] = [],
+): DocBranch[] {
+  const published = docs.filter(
+    (doc) => doc.kind === "doc" && doc.status === "published",
+  );
+  return orderedDocCategories(published, saved).map((name) => ({
+    name,
+    ...docBranches(published.filter((doc) => doc.category === name)),
+  }));
+}
+export function orderedDocs(docs: DocLink[], saved: string[] = []): DocLink[] {
+  const flatten = (branch: DocBranch): DocLink[] => [
+    ...branch.docs,
+    ...branch.folders.flatMap(flatten),
+  ];
+  return docSections(docs, saved).flatMap(flatten);
 }

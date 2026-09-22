@@ -1,4 +1,5 @@
 "use client";
+import { DocumentTree } from "./patterns/document-tree";
 import type { ReadingState } from "@/lib/reading";
 import { Article, CourseOverview } from "./patterns/reading";
 import { guestRecommendations } from "@/lib/guest-recommendations";
@@ -62,7 +63,7 @@ import {
 } from "lucide-react";
 import ReactMarkdown from "./Markdown";
 import type { FieldbookRuntime } from "@/lib/runtime";
-import { sectionPaths, resolveSection } from "@/lib/navigation";
+import { sectionPaths, resolveSection, contentPath } from "@/lib/navigation";
 import { orderedDocCategories } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
@@ -103,6 +104,8 @@ export default function Fieldbook({
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+  const menuClose = useRef<HTMLButtonElement>(null);
   const checkingNavigation = useRef(false);
   async function canLeave() {
     if (checkingNavigation.current) return false;
@@ -180,6 +183,18 @@ export default function Fieldbook({
     }
   }, []);
   useEffect(() => {
+    if (!menu) return;
+    menuClose.current?.focus();
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenu(false);
+        menuTrigger.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [menu]);
+  useEffect(() => {
     acceptedUrl.current = window.location.href;
     let checkingHistory = false;
     const onHash = async () => {
@@ -192,8 +207,8 @@ export default function Fieldbook({
           return;
         }
         acceptedUrl.current = destination;
-        let [v, id] = window.location.hash.slice(1).split("/");
-        if (runtime && !window.location.hash) {
+        let [v, id] = window.location.hash.slice(1).split("?")[0].split("/");
+        if (runtime) {
           const parts = window.location.pathname.split("/");
           v = parts[1] || "courses";
           id = parts[2];
@@ -480,9 +495,24 @@ export default function Fieldbook({
         Skip to content
       </SkipLink>
       <aside className={"sidebar " + (menu ? "open" : "")}>
-        <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+          <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
+          <Button
+            ref={menuClose}
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            aria-label="Close navigation"
+            onClick={() => {
+              setMenu(false);
+              menuTrigger.current?.focus();
+            }}
+          >
+            <X />
+          </Button>
+        </div>
         <span className="nav-label">YOUR ORGANIZATION</span>
-        <nav>
+        <nav className="primary-navigation" aria-label="Primary">
           {(
             [
               { key: "briefs", title: "Updates", icon: Newspaper },
@@ -505,20 +535,26 @@ export default function Fieldbook({
           ))}
         </nav>
         {view === "docs" && (
-          <div className="doc-nav">
-            {orderedDocCategories(docs, branding.docCategoryOrder).map(
-              (cat) => (
-                <details open key={cat}>
-                  <summary>{cat}</summary>
-                  <DocFolders
-                    docs={docs.filter((d) => d.category === cat)}
-                    selected={selected}
-                    onOpen={(id) => navigate("docs", id)}
-                  />
-                </details>
-              ),
-            )}
-          </div>
+          <DocumentTree
+            docs={
+              initialReading && data === initialReading.data
+                ? initialReading.documents || docs
+                : docs
+            }
+            order={branding.docCategoryOrder}
+            selected={selected}
+            href={(id) =>
+              runtime
+                ? contentPath("doc", id)
+                : `#docs/${encodeURIComponent(id)}`
+            }
+            onOpen={(id) => navigate("docs", id)}
+            storageKey={
+              runtime
+                ? "fieldbook.documents.production"
+                : "fieldbook.documents.demo"
+            }
+          />
         )}
         <div className="sidebar-bottom">
           {user.role === "admin" && (
@@ -578,8 +614,9 @@ export default function Fieldbook({
       {menu && (
         <Button
           variant="ghost"
-          className="fixed inset-0 z-20 rounded-none bg-overlay p-0 hover:bg-overlay md:hidden"
-          aria-label="Close navigation"
+          className="fixed inset-0 z-20 h-full w-full rounded-none bg-overlay p-0 hover:bg-overlay md:hidden"
+          aria-label="Dismiss navigation"
+          tabIndex={-1}
           onClick={() => setMenu(false)}
         />
       )}
@@ -589,6 +626,8 @@ export default function Fieldbook({
             variant="ghost"
             size="icon"
             className="md:hidden"
+            ref={menuTrigger}
+            aria-expanded={menu}
             aria-label="Open navigation"
             onClick={() => setMenu(!menu)}
           >
@@ -869,6 +908,11 @@ export default function Fieldbook({
             />
           ) : item ? (
             <Article
+              key={item.id}
+              documents={docs}
+              sectionOrder={branding.docCategoryOrder}
+              demo={!runtime}
+              onDocument={(id) => navigate("docs", id)}
               item={item}
               name={branding.name}
               back={
@@ -1350,53 +1394,5 @@ export function Course({
         </Card>
       </div>
     </div>
-  );
-}
-
-function DocFolders({
-  docs,
-  selected,
-  onOpen,
-  depth = 0,
-}: {
-  docs: Content[];
-  selected: string | null;
-  onOpen: (id: string) => void;
-  depth?: number;
-}) {
-  const path = (d: Content) =>
-    d.folder
-      .split("/")
-      .map((s) => s.trim())
-      .filter(Boolean);
-  const folders = Array.from(
-    new Set(docs.map((d) => path(d)[depth]).filter(Boolean)),
-  );
-  return (
-    <>
-      {docs
-        .filter((d) => path(d).length === depth)
-        .map((d) => (
-          <Button
-            variant="ghost"
-            key={d.id}
-            className={selected === d.id ? "selected" : ""}
-            onClick={() => onOpen(d.id)}
-          >
-            {d.title}
-          </Button>
-        ))}
-      {folders.map((folder) => (
-        <details className="nested-folder" open key={folder}>
-          <summary>{folder}</summary>
-          <DocFolders
-            docs={docs.filter((d) => path(d)[depth] === folder)}
-            selected={selected}
-            onOpen={onOpen}
-            depth={depth + 1}
-          />
-        </details>
-      ))}
-    </>
   );
 }
