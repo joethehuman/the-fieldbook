@@ -169,9 +169,15 @@ for (const app of ["demo", "production"] as const) {
     await page.goto(url(0));
     const marker = page.locator("#heading-overview > .heading-permalink");
     await page.mouse.move(0, 0);
+    await expect(marker).toHaveText("");
+    await expect(marker.locator("svg")).toHaveCount(1);
     await expect(marker).toHaveCSS("opacity", "0");
     await marker.focus();
     await expect(marker).toHaveCSS("opacity", "1");
+    await page.screenshot({
+      animations: "disabled",
+      path: info.outputPath(`${app}-heading-focus.png`),
+    });
     await marker.press("Tab");
     const outline = page.getByRole("complementary", { name: "On this page" });
     if (info.project.name === "phone") await outline.locator("summary").click();

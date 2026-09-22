@@ -1,3 +1,4 @@
+import { Link2 } from "lucide-react";
 import { remarkHeadingAnchors } from "@/lib/markdown-headings";
 import { Table } from "@/components/ui/table";
 import ReactMarkdown from "react-markdown";
@@ -38,7 +39,7 @@ export default function Markdown({
                         href={`${headingPrefix}${id}`}
                         aria-label="Link to this heading"
                       >
-                        #
+                        <Link2 aria-hidden="true" className="h-[1em] w-[1em]" />
                       </a>
                     </Tag>
                   );
