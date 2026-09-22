@@ -1,4 +1,5 @@
 "use client";
+import { DocumentTree } from "@/components/patterns/document-tree";
 import { Article, CourseOverview } from "@/components/patterns/reading";
 import { seedContent } from "@/lib/seed";
 import { useToast } from "@/components/ui/toast";
@@ -557,8 +558,18 @@ export default function ComponentCatalog() {
       </Dialog>
       <section className="grid gap-8" aria-label="Reading presentation">
         <SectionHeader title={<h2>Reading presentation</h2>} />
+        <DocumentTree
+          docs={seedContent}
+          selected={seedContent.find((item) => item.kind === "doc")!.id}
+          href={(id) => `#docs/${id}`}
+          onOpen={() => {}}
+        />
         <Article
-          item={seedContent.find((item) => item.kind === "doc")!}
+          documents={seedContent}
+          item={{
+            ...seedContent.find((item) => item.kind === "doc")!,
+            body: "## Start here\n\nA readable article with a shared heading outline.\n\n### A useful detail\n\nSubheadings retain their hierarchy.\n\n## Start here\n\nRepeated headings have unique links.",
+          }}
           name="Sample Fieldbook"
           back={<Button variant="link">← Back to docs</Button>}
         />

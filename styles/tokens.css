@@ -25,7 +25,9 @@
   --brand: #0069ff;
   --overlay: #18181b66;
   --radius: 0.5rem;
-  --sidebar-width: 14rem;
+  --sidebar-width: 16rem;
+  --outline-width: 13rem;
+  --anchor-offset: 6rem;
   --reading-width: 48rem;
   --form-width: 48rem;
   --page-width: 90rem;

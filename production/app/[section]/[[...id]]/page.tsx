@@ -52,10 +52,17 @@ export async function generateMetadata(props: Props): Promise<Metadata> {
 export default async function Page(props: Props) {
   const { result, lesson, curriculum } = await resolve(props);
   if (!result) return <ProductionApp />;
-  const { item, branding, data, section } = result;
+  const { item, branding, data, documents, section } = result;
   return (
     <ProductionApp
-      initialReading={{ data, section, id: item.id, lesson, curriculum }}
+      initialReading={{
+        data,
+        documents,
+        section,
+        id: item.id,
+        lesson,
+        curriculum,
+      }}
     >
       {item.kind === "course" ? (
         <CourseOverview
@@ -65,6 +72,8 @@ export default async function Page(props: Props) {
         />
       ) : (
         <Article
+          documents={documents}
+          sectionOrder={data.settings?.docCategoryOrder}
           item={item}
           name={branding.name}
           back={<ReadingBack kind={item.kind} />}

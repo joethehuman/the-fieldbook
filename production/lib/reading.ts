@@ -2,6 +2,9 @@ import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { db } from "./db";
+import { readAll } from "./read-all";
+import { orderedDocCategories, type DocLink } from "@/lib/docs-navigation";
 import { actor } from "./auth";
 import { canRead, getContent } from "./content";
 import { brandingFromSettings } from "@/lib/branding";
@@ -43,6 +46,37 @@ export const reading = cache(
     const kind =
       view === "learn" ? "course" : view === "docs" ? "doc" : "brief";
     if (item.kind !== kind) notFound();
+    // Authorization above precedes every catalog read. Project only published
+    // navigation fields; never serialize draft titles, bodies or group metadata.
+    let documents: DocLink[] = [];
+    if (kind === "doc") {
+      const rows = await readAll((from, to) =>
+        db()
+          .from("fb_documents")
+          .select(
+            "id,updated_at,title:published->>title,category:published->>category,folder:published->>folder,kind:published->>kind,status:published->>status",
+            { count: "exact" },
+          )
+          .not("published", "is", null)
+          .order("id")
+          .range(from, to),
+      );
+      documents = rows
+        .sort(
+          (a, b) =>
+            b.updated_at.localeCompare(a.updated_at) ||
+            a.id.localeCompare(b.id),
+        )
+        .filter((row) => row.kind === "doc" && row.status === "published")
+        .map((row) => ({
+          id: row.id,
+          title: row.title,
+          category: row.category,
+          folder: row.folder || "",
+          kind: "doc",
+          status: "published",
+        }));
+    }
     const branding = brandingFromSettings(config.settings);
     if (branding.logoUrl)
       branding.logoUrl = `/api/branding/logo?v=${encodeURIComponent(branding.logoUrl.split("/").pop()!)}`;
@@ -51,6 +85,10 @@ export const reading = cache(
       settings: {
         ...defaultSettings,
         name: branding.name,
+        docCategoryOrder: orderedDocCategories(
+          documents,
+          config.settings.docCategoryOrder || [],
+        ),
         tagline: config.settings.tagline || "",
         accent: config.settings.accent || defaultSettings.accent,
         privacy: config.settings.privacy
@@ -75,7 +113,7 @@ export const reading = cache(
       groups: [],
       progress: {},
     };
-    return { item, branding, data, section: view };
+    return { item, branding, data, documents, section: view };
   },
 );
 export function readingMetadata(

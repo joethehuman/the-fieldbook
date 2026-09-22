@@ -127,6 +127,17 @@ createServer(async (req, res) => {
     if (id) rows = rows.filter((row) => row.id === id.slice(3));
     if (url.searchParams.has("published"))
       rows = rows.filter((row) => row.published);
+    if ((url.searchParams.get("select") || "").includes("title:published"))
+      rows = rows.map((row) => ({
+        id: row.id,
+        updated_at: row.updated_at,
+        ...Object.fromEntries(
+          ["title", "category", "folder", "kind", "status"].map((key) => [
+            key,
+            row.published[key],
+          ]),
+        ),
+      }));
     return send(res, rows, 200, {
       "Content-Range": `0-${rows.length - 1}/${rows.length}`,
     });

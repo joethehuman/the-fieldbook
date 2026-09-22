@@ -68,7 +68,7 @@ async function fixture(request: any, extra = {}) {
   });
 }
 test.beforeEach(async ({ request }) => fixture(request));
-test("server HTML, metadata, redaction and one item read per request", async ({
+test("server HTML, metadata, redaction and one item read and a Docs navigation read per request", async ({
   request,
 }) => {
   for (const [index, section] of ["docs", "updates", "courses"].entries()) {
@@ -97,7 +97,7 @@ test("server HTML, metadata, redaction and one item read per request", async ({
     expect(html).not.toContain("Synthetic Admin");
     expect(html).not.toMatch(/\\"answer\\":/);
     expect((await (await request.get(`${backend}/reads`)).json()).reads).toBe(
-      1,
+      section === "docs" ? 2 : 1,
     );
   }
 });
@@ -302,6 +302,11 @@ test("private verified sessions refresh and do not contaminate anonymous respons
     await expect(
       page.getByRole("heading", { name: items[0].title }),
     ).toBeVisible();
+    const openNavigation = page.getByRole("button", {
+      name: "Open navigation",
+      exact: true,
+    });
+    if (await openNavigation.isVisible()) await openNavigation.click();
     await expect(
       page.getByText("Synthetic Admin", { exact: true }),
     ).toBeVisible();
