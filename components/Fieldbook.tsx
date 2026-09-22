@@ -1,4 +1,6 @@
 "use client";
+import type { ReadingState } from "@/lib/reading";
+import { Article, CourseOverview } from "./patterns/reading";
 import { guestRecommendations } from "@/lib/guest-recommendations";
 import { ReportAvailability } from "./patterns/csv-export";
 import { SearchPanel } from "./patterns/search-panel";
@@ -32,7 +34,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type CSSProperties,
+} from "react";
 import {
   BookOpen,
   GraduationCap,
@@ -83,7 +91,15 @@ const Admin = dynamic(() => import("./Admin"));
 type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook({
   runtime,
-}: { runtime?: FieldbookRuntime } = {}) {
+  initialReading,
+  children,
+  onLoaded,
+}: {
+  runtime?: FieldbookRuntime;
+  initialReading?: ReadingState;
+  children?: ReactNode;
+  onLoaded?: (user: User | null) => void;
+} = {}) {
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
@@ -97,14 +113,22 @@ export default function Fieldbook({
       checkingNavigation.current = false;
     }
   }
-  const [data, setData] = useState<Workspace | null>(null),
-    [uid, setUid] = useState<string | null>(null),
-    [view, setView] = useState<View>("learn"),
-    [courseOrigin, setCourseOrigin] = useState<string | undefined>(undefined),
-    [selected, setSelected] = useState<string | null>(null),
+  const [data, setData] = useState<Workspace | null>(
+      initialReading?.data || null,
+    ),
+    [uid, setUid] = useState<string | null>(initialReading ? "guest" : null),
+    [view, setView] = useState<View>(initialReading?.section || "learn"),
+    [courseOrigin, setCourseOrigin] = useState<string | undefined>(
+      initialReading?.curriculum,
+    ),
+    [selected, setSelected] = useState<string | null>(
+      initialReading?.id || null,
+    ),
     [search, setSearch] = useState(""),
     [searchOpen, setSearchOpen] = useState(false),
-    [targetLesson, setTargetLesson] = useState<string | undefined>(undefined),
+    [targetLesson, setTargetLesson] = useState<string | undefined>(
+      initialReading?.lesson,
+    ),
     [error, setError] = useState(""),
     [reportIssue, setReportIssue] = useState<string | undefined>(),
     [menu, setMenu] = useState(false),
@@ -114,8 +138,24 @@ export default function Fieldbook({
       runtime
         .load()
         .then(({ data, user }) => {
+          if (initialReading) {
+            const rendered = initialReading.data.publishedContent?.[0];
+            const latest = data.publishedContent?.find(
+              (item) => item.id === initialReading.id,
+            );
+            // Keep body and metadata on the same published revision, including
+            // publication changes while the interactive workspace is loading.
+            if (
+              !latest ||
+              latest.publishedRevision !== rendered?.publishedRevision
+            ) {
+              window.location.reload();
+              return;
+            }
+          }
           setData(data);
           setUid(user?.id || "guest");
+          onLoaded?.(user);
         })
         .catch((e) => {
           if (e instanceof RequestError && e.status === 401) {
@@ -196,6 +236,22 @@ export default function Fieldbook({
   ) {
     setMenu(false);
     if (!(await canLeave())) return;
+    if (
+      runtime &&
+      (initialReading ||
+        (id &&
+          !id.startsWith("curriculum:") &&
+          ["learn", "docs", "briefs"].includes(v)))
+    ) {
+      const path = id?.startsWith("curriculum:")
+        ? `curricula/${encodeURIComponent(id.slice(11))}`
+        : sectionPaths[v] + (id ? `/${encodeURIComponent(id)}` : "");
+      const query = new URLSearchParams();
+      if (lesson) query.set("lesson", lesson);
+      if (origin) query.set("curriculum", origin);
+      window.location.assign(`/${path}${query.size ? `?${query}` : ""}`);
+      return;
+    }
     setView(v);
     setSelected(id || null);
     setCourseOrigin(origin);
@@ -538,17 +594,55 @@ export default function Fieldbook({
           >
             <Menu />
           </Button>
-          <div className="breadcrumb">
-            <span>Organization</span>
+          <nav className="breadcrumb" aria-label="Breadcrumb">
+            <Button asChild variant="link">
+              <a
+                href={runtime ? "/courses" : "#courses"}
+                onClick={(event) => {
+                  if (
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  )
+                    return;
+                  event.preventDefault();
+                  void navigate("learn");
+                }}
+              >
+                Organization
+              </a>
+            </Button>
             <ChevronRight size={14} />
-            <strong>{currentTitle}</strong>
+            <Button asChild variant="link">
+              <a
+                href={
+                  runtime ? `/${sectionPaths[view]}` : `#${sectionPaths[view]}`
+                }
+                onClick={(event) => {
+                  if (
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  )
+                    return;
+                  event.preventDefault();
+                  void navigate(view);
+                }}
+              >
+                {currentTitle}
+              </a>
+            </Button>
             {item && (
               <>
                 <ChevronRight size={14} />
-                <span className="crumb-item">{item.title}</span>
+                <span className="crumb-item" aria-current="page">
+                  {item.title}
+                </span>
               </>
             )}
-          </div>
+          </nav>
           <SearchPanel
             id="global-search-results"
             open={!!query && searchOpen}
@@ -717,6 +811,26 @@ export default function Fieldbook({
               title="This content isn’t available"
               description="It may be a draft or have been removed."
             />
+          ) : initialReading && data === initialReading.data ? (
+            children
+          ) : item?.kind === "course" && initialReading && !targetLesson ? (
+            <CourseOverview
+              curriculum={courseOrigin}
+              item={item}
+              back={
+                <Button
+                  variant="link"
+                  onClick={() =>
+                    navigate(
+                      "learn",
+                      courseOrigin ? `curriculum:${courseOrigin}` : undefined,
+                    )
+                  }
+                >
+                  ← Back to {courseOrigin ? "curriculum" : "courses"}
+                </Button>
+              }
+            />
           ) : item?.kind === "course" ? (
             <Course
               key={item.id + item.version + (targetLesson || "")}
@@ -754,29 +868,20 @@ export default function Fieldbook({
               }}
             />
           ) : item ? (
-            <article className="article">
-              <Button
-                variant="link"
-                onClick={() =>
-                  navigate(item.kind === "doc" ? "docs" : "briefs")
-                }
-              >
-                ← Back to {item.kind === "doc" ? "docs" : "updates"}
-              </Button>
-              <span className="eyebrow">{item.category}</span>
-              <h1>{item.title}</h1>
-              <p className="article-lede">{item.summary}</p>
-              <div className="article-meta">
-                <InitialsAvatar initials={initials(branding.name)} size="sm" />
-                <span>{branding.name}</span>
-                <span>·</span>
-                <span>Updated {date(item.updatedAt)}</span>
-                <span>·</span>
-                <span>v{item.version}</span>
-              </div>
-              <div className="markdown">
-                <ReactMarkdown>{item.body}</ReactMarkdown>
-              </div>
+            <Article
+              item={item}
+              name={branding.name}
+              back={
+                <Button
+                  variant="link"
+                  onClick={() =>
+                    navigate(item.kind === "doc" ? "docs" : "briefs")
+                  }
+                >
+                  ← Back to {item.kind === "doc" ? "docs" : "updates"}
+                </Button>
+              }
+            >
               {user.id !== "guest" && (
                 <Feedback
                   key={item.id + user.id}
@@ -786,11 +891,7 @@ export default function Fieldbook({
                   onChange={persist}
                 />
               )}
-              <div className="article-end">
-                <CheckCircle2 size={18} />
-                You’re at the end. Put it into practice.
-              </div>
-            </article>
+            </Article>
           ) : view === "learn" ? (
             <Learning
               key={user.id}
@@ -936,14 +1037,6 @@ function initials(name: string) {
     .map((s) => s[0])
     .slice(0, 2)
     .join("");
-}
-function date(s: string) {
-  return new Date(s).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
 }
 function PageHeading({
   eyebrow,

@@ -29,6 +29,7 @@ jobs:
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:ui
       - run: pnpm test:authoring
+      - run: pnpm test:reading
       - run: pnpm test:accounts
       - run: pnpm test:search
       - run: pnpm test:guests

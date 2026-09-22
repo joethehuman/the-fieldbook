@@ -2,6 +2,8 @@
 @layer components {
   .article {
     display: grid;
+    width: 100%;
+    min-width: 0;
     max-width: var(--reading-width);
     gap: var(--space-6);
     margin-inline: auto;

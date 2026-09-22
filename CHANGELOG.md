@@ -4,6 +4,14 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+### Reading pages
+
+- Keep short and long Docs and Updates at the shared responsive reading width in both demo and production.
+
+- Server-render published Docs, Updates and course overviews with item metadata and real missing-page responses. Private installations authorize content and metadata before rendering, using uncached request-time reads.
+- Make breadcrumbs navigable, preserve lesson destinations and retain interactive learning, guest progress and editor guards.
+
+
 ### Contained search
 
 - Highlight the search result container on hover instead of underlining its text; keep a visible keyboard focus ring.

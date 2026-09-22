@@ -6,7 +6,8 @@ import Fieldbook from "@/components/Fieldbook";
 import { createBrowserClient } from "@supabase/ssr";
 import type { FieldbookRuntime } from "@/lib/runtime";
 import type { Progress, User } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import type { ReadingState } from "@/lib/reading";
 import {
   guestAnswersForImport,
   type GuestProgress,
@@ -134,15 +135,22 @@ const runtime: FieldbookRuntime = {
     window.location.replace("/");
   },
 };
-export default function ProductionApp() {
+export default function ProductionApp({
+  initialReading,
+  children,
+}: {
+  initialReading?: ReadingState;
+  children?: ReactNode;
+}) {
   const [importable, setImportable] = useState(false),
     [importing, setImporting] = useState(false),
     [error, setError] = useState("");
   useEffect(() => {
-    if (readGuest().length)
-      request("/api/workspace")
-        .then((s) => setImportable(!!s.user))
-        .catch(() => {});
+    const restore = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", restore);
+    return () => window.removeEventListener("pageshow", restore);
   }, []);
   async function importProgress() {
     setImporting(true);
@@ -202,7 +210,13 @@ export default function ProductionApp() {
           {error && <Alert variant="destructive">{error}</Alert>}
         </Callout>
       )}
-      <Fieldbook runtime={runtime} />
+      <Fieldbook
+        runtime={runtime}
+        initialReading={initialReading}
+        onLoaded={(user) => setImportable(!!user && readGuest().length > 0)}
+      >
+        {children}
+      </Fieldbook>
     </>
   );
 }

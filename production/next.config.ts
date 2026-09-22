@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import path from "node:path";
 const config: NextConfig = {
   output: "standalone",
+  // Resolve access, existence and metadata before committing HTTP status.
+  htmlLimitedBots: /.*/,
   outputFileTracingRoot: path.join(
     process.cwd(),
     process.cwd().endsWith("production") ? ".." : ".",

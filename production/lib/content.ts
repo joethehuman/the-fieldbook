@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { Content, User } from "@/lib/types";
 import { db, check } from "./db";
 import { requireAdmin, HttpError } from "./auth";
@@ -20,13 +21,13 @@ export function document(row: any, draft = false): Content {
     publishedRevision: row.published_revision,
   };
 }
-export async function canRead(user: User | null) {
+export const canRead = cache(async (user: User | null) => {
   const { data, error } = await db().from("fb_config").select("*").single();
   check(error);
   if (data.settings.access === "private" && !user)
     throw new HttpError(401, "Sign in to view this Fieldbook.");
   return data;
-}
+});
 export async function getContent(id: string, user: User | null, draft = false) {
   await canRead(user);
   if (draft) requireAdmin(user);
