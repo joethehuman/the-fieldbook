@@ -2,7 +2,11 @@
 import { useToast } from "@/components/ui/toast";
 import { useInteractionDialog } from "@/components/ui/interaction-dialog";
 import { CsvExport } from "@/components/patterns/csv-export";
-import { SearchResultCard } from "@/components/patterns/search-result";
+import { SearchPanel } from "@/components/patterns/search-panel";
+import {
+  SearchResultCard,
+  SearchResultSkeleton,
+} from "@/components/patterns/search-result";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
 import { LearningCard } from "@/components/patterns/learning-card";
@@ -147,6 +151,12 @@ export default function ComponentCatalog() {
       </section>
       <section className="grid gap-4">
         <h2>Search results</h2>
+        <p>
+          Contained search keeps the current page in place. Loading placeholders
+          respect reduced motion.
+        </p>
+        <SearchPanelExample />
+        <SearchResultSkeleton />
         <SearchResultCard
           result={{
             contentId: "example",
@@ -544,5 +554,40 @@ export default function ComponentCatalog() {
         </DialogContent>
       </Dialog>
     </ReadingPage>
+  );
+}
+
+function SearchPanelExample() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative flex justify-end">
+      <SearchPanel
+        id="catalog-search-results"
+        open={open}
+        onDismiss={() => setOpen(false)}
+        trigger={
+          <SearchField>
+            <Input
+              aria-label="Example contained search"
+              aria-expanded={open}
+              aria-controls={open ? "catalog-search-results" : undefined}
+              placeholder="Focus to preview loading…"
+              onFocus={() => setOpen(true)}
+            />
+          </SearchField>
+        }
+      >
+        <div
+          className="grid gap-4 p-4"
+          role="region"
+          aria-label="Example search loading"
+          aria-busy="true"
+        >
+          <p role="status">Searching…</p>
+          <SearchResultSkeleton />
+          <SearchResultSkeleton />
+        </div>
+      </SearchPanel>
+    </div>
   );
 }

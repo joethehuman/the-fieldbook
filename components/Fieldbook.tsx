@@ -1,6 +1,7 @@
 "use client";
 import { guestRecommendations } from "@/lib/guest-recommendations";
 import { ReportAvailability } from "./patterns/csv-export";
+import { SearchPanel } from "./patterns/search-panel";
 import { ContentSearch } from "./ContentSearch";
 import { InitialsAvatar } from "./ui/initials-avatar";
 import { RequestError } from "@/lib/workspace-save";
@@ -102,6 +103,7 @@ export default function Fieldbook({
     [courseOrigin, setCourseOrigin] = useState<string | undefined>(undefined),
     [selected, setSelected] = useState<string | null>(null),
     [search, setSearch] = useState(""),
+    [searchOpen, setSearchOpen] = useState(false),
     [targetLesson, setTargetLesson] = useState<string | undefined>(undefined),
     [error, setError] = useState(""),
     [reportIssue, setReportIssue] = useState<string | undefined>(),
@@ -547,52 +549,92 @@ export default function Fieldbook({
               </>
             )}
           </div>
-          <Toolbar>
-            <SearchField>
-              <Input
-                aria-label="Search all content"
-                maxLength={160}
-                onKeyDown={(e) => {
-                  if (e.key === "Escape") setSearch("");
-                  if (e.key === "ArrowDown") {
-                    const first = document.querySelector<HTMLAnchorElement>(
-                      '[aria-label="Search results"] a',
-                    );
-                    if (first) {
-                      e.preventDefault();
-                      first.focus();
+          <SearchPanel
+            id="global-search-results"
+            open={!!query && searchOpen}
+            onDismiss={() => setSearchOpen(false)}
+            trigger={
+              <Toolbar>
+                <SearchField>
+                  <Input
+                    aria-label="Search all content"
+                    aria-expanded={!!query && searchOpen}
+                    aria-controls={
+                      query && searchOpen ? "global-search-results" : undefined
                     }
-                  }
-                }}
-                placeholder="Search fieldbook…"
-                value={search}
-                onChange={async (e) => {
-                  const next = e.target.value;
-                  if (!navigationGuard.current || (await canLeave()))
-                    setSearch(next);
-                }}
-              />
-              {search && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Clear search"
-                  onClick={() => setSearch("")}
-                >
-                  <X size={14} />
-                </Button>
-              )}
-            </SearchField>
-            {!runtime && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowDemo(true)}
-              >
-                Demo organization
-              </Button>
-            )}
-          </Toolbar>
+                    onFocus={() => setSearchOpen(true)}
+                    maxLength={160}
+                    onKeyDown={(e) => {
+                      if (e.key === "ArrowDown" && query) setSearchOpen(true);
+                      if (e.key === "ArrowDown") {
+                        const first = document.querySelector<HTMLAnchorElement>(
+                          '[aria-label="Search results"] a',
+                        );
+                        if (first) {
+                          e.preventDefault();
+                          first.focus();
+                        }
+                      }
+                    }}
+                    placeholder="Search fieldbook…"
+                    value={search}
+                    onChange={(e) => {
+                      setSearch(e.target.value);
+                      setSearchOpen(true);
+                    }}
+                  />
+                  {search && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Clear search"
+                      onClick={() => {
+                        setSearch("");
+                        document
+                          .querySelector<HTMLInputElement>(
+                            '[aria-label="Search all content"]',
+                          )
+                          ?.focus();
+                      }}
+                    >
+                      <X size={14} />
+                    </Button>
+                  )}
+                </SearchField>
+                {!runtime && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowDemo(true)}
+                  >
+                    Demo organization
+                  </Button>
+                )}
+              </Toolbar>
+            }
+          >
+            <ContentSearch
+              query={search}
+              content={data.publishedContent || data.content}
+              runtime={runtime}
+              onOpen={async (r) => {
+                if (runtime) {
+                  if (await canLeave()) window.location.assign(r.href);
+                  return;
+                }
+                await navigate(
+                  r.kind === "course"
+                    ? "learn"
+                    : r.kind === "doc"
+                      ? "docs"
+                      : "briefs",
+                  r.contentId,
+                  undefined,
+                  r.lessonId || undefined,
+                );
+              }}
+            />
+          </SearchPanel>
         </header>
         {error && (
           <Alert variant="destructive" role="alert">
@@ -600,32 +642,7 @@ export default function Fieldbook({
           </Alert>
         )}
         <main id="main-content" className="main-content" tabIndex={-1}>
-          {query ? (
-            <>
-              <PageHeading
-                eyebrow="FIND YOUR NEXT ANSWER"
-                title="Search Fieldbook"
-                description="Search published Updates, Docs and course lessons."
-              />
-              <ContentSearch
-                query={search}
-                content={data.publishedContent || data.content}
-                runtime={runtime}
-                onOpen={(r) =>
-                  navigate(
-                    r.kind === "course"
-                      ? "learn"
-                      : r.kind === "doc"
-                        ? "docs"
-                        : "briefs",
-                    r.contentId,
-                    undefined,
-                    r.lessonId || undefined,
-                  )
-                }
-              />
-            </>
-          ) : view === "admin" && user.role === "admin" ? (
+          {view === "admin" && user.role === "admin" ? (
             <ReportAvailability.Provider value={reportIssue}>
               <Admin
                 data={data}

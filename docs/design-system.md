@@ -112,6 +112,8 @@ The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browse
 
 ## Search results
 
+`SearchPanel` is the shared nonmodal anchored surface. It owns bounded scrolling, outside-pointer and focus-leave dismissal, and Escape focus return. Keep its mobile positioning ancestor relative (the application topbar does this), and associate the trigger with the panel through `aria-expanded` and `aria-controls`. `SearchResultSkeleton` uses the shared decorative `Skeleton` primitive; announce loading once through a status message and respect reduced motion. Both patterns are demonstrated in `/ui`.
+
 `SearchResultCard` composes the shared `ContentAction` link variant with content type, title, optional published-content date, matched lesson and excerpt. `Highlight` renders plain text with semantic mark styling; never inject database-generated HTML. Use `FilterOptions` for content types, `EmptyState` for no matches and `Alert` for failures. The `/ui` catalog includes a lesson result. Preserve real links, visible focus and narrow-screen wrapping.
 
 ## Report exports

@@ -1,5 +1,20 @@
 import { searchLabels, type SearchResult as Result } from "@/lib/search";
 import { ContentAction } from "./content-action";
+import { Skeleton } from "../ui/skeleton";
+
+export function SearchResultSkeleton() {
+  return (
+    <div
+      aria-hidden="true"
+      className="grid gap-3 rounded-lg border border-border p-4"
+    >
+      <Skeleton className="h-3 w-24" />
+      <Skeleton className="h-5 w-2/3" />
+      <Skeleton className="h-3 w-full" />
+      <Skeleton className="h-3 w-4/5" />
+    </div>
+  );
+}
 export function Highlight({ text, terms }: { text: string; terms: string[] }) {
   const escaped = terms
     .filter(Boolean)
