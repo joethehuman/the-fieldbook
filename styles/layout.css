@@ -84,6 +84,7 @@
     padding: var(--space-3) var(--space-6);
   }
   .topbar > [data-slot="search-root"] {
+    margin-left: auto;
     flex: 0 1 auto;
     min-width: 0;
   }
