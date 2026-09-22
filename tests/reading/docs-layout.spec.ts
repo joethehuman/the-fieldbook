@@ -103,6 +103,7 @@ for (const app of ["demo", "production"] as const) {
     const tree = page.getByRole("navigation", {
       name: "Documents",
       exact: true,
+      includeHidden: true,
     });
     await expect(
       tree.getByRole("link", { name: docs[39].title }),
