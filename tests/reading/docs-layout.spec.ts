@@ -167,6 +167,12 @@ for (const app of ["demo", "production"] as const) {
     await page.goBack();
     await expect(page.locator("article h1")).toHaveText(docs[39].title);
     await page.goto(url(0));
+    const marker = page.locator("#heading-overview > .heading-permalink");
+    await page.mouse.move(0, 0);
+    await expect(marker).toHaveCSS("opacity", "0");
+    await marker.focus();
+    await expect(marker).toHaveCSS("opacity", "1");
+    await marker.press("Tab");
     const outline = page.getByRole("complementary", { name: "On this page" });
     if (info.project.name === "phone") await outline.locator("summary").click();
     const lastHeading = outline.getByRole("link", {

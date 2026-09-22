@@ -94,6 +94,8 @@
   }
   .markdown th,
   .markdown td {
+    overflow-wrap: normal;
+    vertical-align: top;
     border: 1px solid var(--border);
     padding: var(--space-3);
   }
@@ -270,11 +272,16 @@
     outline: none;
   }
   .markdown .heading-permalink {
+    opacity: 0;
     margin-left: var(--space-2);
     color: var(--muted-foreground);
     text-decoration: none;
     font-size: 0.8em;
     font-weight: 400;
+  }
+  .markdown :is(h1, h2, h3, h4, h5, h6):hover > .heading-permalink,
+  .markdown :is(h1, h2, h3, h4, h5, h6):focus-within > .heading-permalink {
+    opacity: 1;
   }
   .markdown pre {
     max-width: 100%;

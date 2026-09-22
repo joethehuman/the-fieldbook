@@ -65,7 +65,12 @@ export default function Markdown({
             <img src={src} alt={alt || ""} loading="lazy" />
           ) : null,
         table: ({ children }) => (
-          <div className="markdown-table">
+          <div
+            className="markdown-table"
+            role="region"
+            aria-label="Table"
+            tabIndex={0}
+          >
             <Table>{children}</Table>
           </div>
         ),
