@@ -27,7 +27,7 @@
   --radius: 0.5rem;
   --sidebar-width: 16rem;
   --outline-width: 13rem;
-  --anchor-offset: 6rem;
+  --anchor-offset: calc(var(--app-bar-height, 4rem) + var(--space-6));
   --reading-width: 48rem;
   --form-width: 48rem;
   --page-width: 90rem;

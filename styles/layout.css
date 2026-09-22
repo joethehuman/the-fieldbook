@@ -69,14 +69,28 @@
     margin-left: var(--sidebar-width);
   }
   .topbar {
-    position: relative;
+    --search-panel-width: min(48rem, calc(100vw - var(--sidebar-width) - 3rem));
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    background: var(--background);
     display: flex;
+    flex-wrap: wrap;
     min-height: 4rem;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
     border-bottom: 1px solid var(--border);
     padding: var(--space-3) var(--space-6);
+  }
+  .topbar > [data-slot="search-root"] {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+  .breadcrumb {
+    flex: 1 1 12rem;
+    overflow: hidden;
+    white-space: nowrap;
   }
   .breadcrumb,
   .crumb-item {
@@ -87,12 +101,21 @@
     color: var(--muted-foreground);
     font-size: 0.75rem;
   }
+  .breadcrumb > a {
+    flex-shrink: 0;
+  }
+  .breadcrumb .crumb-item {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .breadcrumb strong {
     color: var(--foreground);
     overflow-wrap: anywhere;
   }
   .topbar [data-slot="search-field"] {
     width: min(24rem, 40vw);
+    max-width: 100%;
   }
   .main-content {
     display: grid;
@@ -157,7 +180,7 @@
   }
   .editor-settings {
     position: sticky;
-    top: var(--space-6);
+    top: var(--anchor-offset);
   }
   .editor-setting-section {
     display: grid;
@@ -483,7 +506,7 @@
     display: grid;
     gap: var(--space-2);
     position: sticky;
-    top: var(--space-6);
+    top: var(--anchor-offset);
   }
   .step-number {
     display: grid;
@@ -592,6 +615,9 @@
     }
   }
   @media (width < 48rem) {
+    .lesson-nav {
+      grid-template-columns: minmax(0, 1fr);
+    }
     .sidebar {
       visibility: hidden;
       transform: translateX(-100%);

@@ -539,3 +539,31 @@ test("preparation state prevents duplicate clicks and reports a changed filter w
   ).toBeVisible();
   expect(downloads).toEqual([]);
 });
+
+test("app bar stays visible over long administration reports", async ({
+  page,
+}, info) => {
+  const data = fixture();
+  data.users.push(
+    ...Array.from({ length: 60 }, (_, i) => ({
+      ...data.users[0],
+      id: `extra-${i}`,
+      name: `Report member ${i}`,
+      email: `member${i}@example.test`,
+    })),
+  );
+  await setup(page, info, "admin", data);
+  await section(page, "Progress");
+  await page.screenshot({ path: info.outputPath("bar-report-top.png") });
+  await page.evaluate(() => scrollTo(0, 1000));
+  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(100);
+  expect(
+    await page
+      .locator(".topbar")
+      .evaluate((el) => el.getBoundingClientRect().top),
+  ).toBe(0);
+  await page.screenshot({ path: info.outputPath("bar-report-scrolled.png") });
+  await page.getByRole("textbox", { name: "Search all content" }).fill("sales");
+  await expect(page.locator('[data-slot="search-panel"]')).toBeVisible();
+  await page.screenshot({ path: info.outputPath("bar-report-search.png") });
+});

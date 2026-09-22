@@ -15,7 +15,9 @@
   }
   html {
     scrollbar-gutter: stable;
-    scroll-padding-top: 5rem;
+  }
+  html:has(.topbar) {
+    scroll-padding-top: var(--app-bar-height, 4rem);
   }
   body {
     margin: 0;

@@ -32,7 +32,11 @@ export function ReadingOutline({
         window.innerHeight * 0.25,
         (targets[0]
           ? parseFloat(getComputedStyle(targets[0]).scrollMarginTop)
-          : 0) + 2,
+          : 0) +
+          (parseFloat(
+            getComputedStyle(document.documentElement).scrollPaddingTop,
+          ) || 0) +
+          2,
       );
       let current: HTMLElement | undefined = targets[0];
       for (const target of targets)

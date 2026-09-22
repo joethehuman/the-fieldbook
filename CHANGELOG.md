@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep the shared application bar visible while scrolling, with responsive search and document-heading offsets.
+
 ### Docs navigation
 
 - Give document sections and wrapping links a clearer hierarchy, with a separate tree scroll region and retained tab-local position.

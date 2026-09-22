@@ -146,6 +146,32 @@ for (const app of ["demo", "production"] as const) {
       await page
         .getByRole("button", { name: "Close navigation", exact: true })
         .click();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const bar = page.locator(".topbar");
+    await expect(bar).toHaveCSS("position", "sticky");
+    await page.screenshot({ path: info.outputPath(`${app}-bar-top.png`) });
+    await page.evaluate(() => window.scrollTo(0, 1400));
+    await expect
+      .poll(() => bar.evaluate((el) => el.getBoundingClientRect().top))
+      .toBe(0);
+    const search = page.getByRole("textbox", { name: "Search all content" });
+    await search.fill("readable");
+    const panel = page.locator('[data-slot="search-panel"]');
+    await expect(panel).toBeVisible();
+    expect(
+      await panel.evaluate((el) => el.getBoundingClientRect().top),
+    ).toBeGreaterThanOrEqual(
+      await search.evaluate((el) => el.getBoundingClientRect().bottom),
+    );
+    expect(
+      await panel.evaluate((el) => el.getBoundingClientRect().bottom),
+    ).toBeLessThanOrEqual(await page.evaluate(() => innerHeight));
+    await page.screenshot({
+      path: info.outputPath(`${app}-bar-scrolled-search.png`),
+    });
+    await search.press("Escape");
+    await expect(search).toBeFocused();
+    await search.fill("");
     const pagination = page.getByRole("navigation", {
       name: "Previous and next documents",
     });
@@ -188,6 +214,13 @@ for (const app of ["demo", "production"] as const) {
     await lastHeading.focus();
     await page.keyboard.press("Enter");
     await expect(page.locator("#heading-finish")).toBeInViewport();
+    expect(
+      await page
+        .locator("#heading-finish")
+        .evaluate((el) => el.getBoundingClientRect().top),
+    ).toBeGreaterThanOrEqual(
+      await bar.evaluate((el) => el.getBoundingClientRect().bottom),
+    );
     await expect(
       outline.getByRole("link", {
         name: "Finish",
