@@ -6,6 +6,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ### Contained search
 
+- Highlight the search result container on hover instead of underlining its text; keep a visible keyboard focus ring.
+
 - Search opens in a contained, scrollable panel with type filters and loading skeletons, preserving the current page and edits.
 
 ### Action confirmations

@@ -49,7 +49,7 @@ export function SearchResultCard({
   onOpen?: () => void;
 }) {
   return (
-    <ContentAction asChild className="grid gap-1 break-words p-4">
+    <ContentAction asChild className="grid gap-1 break-words p-4 hover:bg-muted hover:no-underline hover:shadow-none focus-visible:bg-muted">
       <a
         href={href || result.href}
         onClick={
