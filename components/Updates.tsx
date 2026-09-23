@@ -1,4 +1,5 @@
 "use client";
+import { useLayoutEffect, useRef, useState } from "react";
 import { ContentAction } from "@/components/patterns/content-action";
 import {
   SectionHeader,
@@ -6,8 +7,15 @@ import {
   CardFooter,
 } from "@/components/patterns/layout";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
-import { updatesForUser } from "@/lib/learning-groups";
-import type { Content, User, Group } from "@/lib/types";
+import {
+  updateFeedTimestamp,
+  updatesForUser,
+} from "@/lib/learning-groups";
+import { effectiveGroups, type Content, type User, type Group } from "@/lib/types";
+import { Button } from "@/components/ui/button";
+
+const PAGE_SIZE = 10;
+
 export default function Updates({
   content,
   user,
@@ -22,9 +30,44 @@ export default function Updates({
   guest: boolean;
 }) {
   const { forYou, other } = updatesForUser(content, user, groups);
+  const paginationKey = JSON.stringify({
+    viewer: user.id,
+    groups: [...effectiveGroups(user, groups)].sort(),
+    updates: [...forYou, ...other].map((item) => [
+      item.id,
+      item.updatedAt,
+      item.createdAt,
+      [...item.groups].sort(),
+    ]),
+  });
+  const [pagination, setPagination] = useState({ key: "", count: PAGE_SIZE });
+  const pendingScroll = useRef<{ key: string; top: number } | null>(null);
+  const visibleCount =
+    pagination.key === paginationKey ? pagination.count : PAGE_SIZE;
+  const visibleUpdates = other.slice(0, visibleCount);
+
+  useLayoutEffect(() => {
+    if (pendingScroll.current?.key === paginationKey) {
+      window.scrollTo(0, pendingScroll.current.top);
+      pendingScroll.current = null;
+    }
+  }, [paginationKey, visibleCount]);
+
+  function loadMore() {
+    pendingScroll.current = { key: paginationKey, top: window.scrollY };
+    setPagination((current) => ({
+      key: paginationKey,
+      count:
+        Math.min(
+          current.key === paginationKey ? current.count : PAGE_SIZE,
+          other.length,
+        ) + PAGE_SIZE,
+    }));
+  }
+
   return (
     <>
-      {
+      {forYou.length > 0 && (
         <section className="updates-section">
           <SectionHeader
             title={<h2>For you</h2>}
@@ -33,27 +76,29 @@ export default function Updates({
                 ? "Updates recommended for visitors."
                 : "The latest updates for your learning groups."
             }
-          ></SectionHeader>
-          {forYou.length ? (
-            <UpdateCards items={forYou} onOpen={onOpen} />
-          ) : (
-            <EmptyState>
-              {guest
-                ? "No guest recommendations yet. Explore all updates below."
-                : "No updates for your groups yet. Explore all updates below."}
-            </EmptyState>
-          )}
+          />
+          <UpdateCards items={forYou} onOpen={onOpen} />
         </section>
-      }
+      )}
       <section className="updates-section">
         <SectionHeader
-          title={<h2>{forYou.length ? "Other updates" : "All updates"}</h2>}
-        ></SectionHeader>
-        <UpdateCards items={other} onOpen={onOpen} />
+          title={<h2>{forYou.length ? "More updates" : "All updates"}</h2>}
+        />
+        <UpdateCards items={visibleUpdates} onOpen={onOpen} />
+        {other.length > 0 && (
+          <p className="sr-only" role="status" aria-live="polite">
+            Showing {visibleUpdates.length} of {other.length} updates.
+          </p>
+        )}
+        {visibleCount < other.length && (
+          <Button variant="outline" onClick={loadMore}>
+            Load more
+          </Button>
+        )}
         {!other.length && (
           <EmptyState>
             {forYou.length
-              ? "You’ve reached the rest of the updates."
+              ? "No other updates published yet."
               : "No updates published yet."}
           </EmptyState>
         )}
@@ -84,23 +129,30 @@ function UpdateCards({
             <span className="eyebrow">{b.category}</span>
             <h3>{b.title}</h3>
             <p>{b.summary}</p>
-            <CardFooter
+          <CardFooter
               action={
                 <>
                   Read the update <ArrowRight size={16} />
                 </>
               }
             >
-              {new Date(b.updatedAt).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-                timeZone: "UTC",
-              })}
+              {formatUpdateDate(b)}
             </CardFooter>
           </div>
         </ContentAction>
       ))}
     </div>
   );
+}
+
+function formatUpdateDate(item: Content) {
+  const timestamp = updateFeedTimestamp(item);
+  return timestamp === undefined
+    ? "Date unavailable"
+    : new Date(timestamp).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+        timeZone: "UTC",
+      });
 }
