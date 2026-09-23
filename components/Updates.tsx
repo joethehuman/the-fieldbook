@@ -7,11 +7,13 @@ import {
   CardFooter,
 } from "@/components/patterns/layout";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { updateFeedTimestamp, updatesForUser } from "@/lib/learning-groups";
 import {
-  updateFeedTimestamp,
-  updatesForUser,
-} from "@/lib/learning-groups";
-import { effectiveGroups, type Content, type User, type Group } from "@/lib/types";
+  effectiveGroups,
+  type Content,
+  type User,
+  type Group,
+} from "@/lib/types";
 import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 10;
@@ -41,27 +43,34 @@ export default function Updates({
     ]),
   });
   const [pagination, setPagination] = useState({ key: "", count: PAGE_SIZE });
-  const pendingScroll = useRef<{ key: string; top: number } | null>(null);
+  const pendingScroll = useRef<{
+    key: string;
+    left: number;
+    top: number;
+  } | null>(null);
   const visibleCount =
     pagination.key === paginationKey ? pagination.count : PAGE_SIZE;
   const visibleUpdates = other.slice(0, visibleCount);
 
   useLayoutEffect(() => {
-    if (pendingScroll.current?.key === paginationKey) {
-      window.scrollTo(0, pendingScroll.current.top);
-      pendingScroll.current = null;
-    }
+    const pending = pendingScroll.current;
+    pendingScroll.current = null;
+    if (pending?.key === paginationKey)
+      window.scrollTo(pending.left, pending.top);
   }, [paginationKey, visibleCount]);
 
   function loadMore() {
-    pendingScroll.current = { key: paginationKey, top: window.scrollY };
+    pendingScroll.current = {
+      key: paginationKey,
+      left: window.scrollX,
+      top: window.scrollY,
+    };
     setPagination((current) => ({
       key: paginationKey,
-      count:
-        Math.min(
-          current.key === paginationKey ? current.count : PAGE_SIZE,
-          other.length,
-        ) + PAGE_SIZE,
+      count: Math.min(
+        (current.key === paginationKey ? current.count : PAGE_SIZE) + PAGE_SIZE,
+        other.length,
+      ),
     }));
   }
 
@@ -129,7 +138,7 @@ function UpdateCards({
             <span className="eyebrow">{b.category}</span>
             <h3>{b.title}</h3>
             <p>{b.summary}</p>
-          <CardFooter
+            <CardFooter
               action={
                 <>
                   Read the update <ArrowRight size={16} />
