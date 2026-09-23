@@ -25,7 +25,9 @@ Optional activity never changes the assigned completion percentage. Someone who 
 
 Course-row arrows appear only when the row overflows and are disabled at each unavailable endpoint. Resizing and course-list changes recalculate their state. Compact progress indicators are shared UI primitives, with text status as well as color.
 
-The Updates page starts with matching group updates, newest updated first, followed by other updates in the same date order. Each update appears once. Updates do not affect course completion or create deadlines. Adding an audience tag does not change an update's editorial date. Users without matching groups still see all published updates. Guest users see the full unpersonalized library.
+The Updates page shows up to two recent published updates for the viewer's effective groups, including inherited groups and the configured guest group. Below that, the full published Updates library continues in the same order, excluding only the updates already featured; older relevant updates remain in the library. The library reveals ten more items at a time, without fetching another page because the catalog is already loaded. An update appears at most once. Updates have no completion requirement and do not affect course completion or deadlines. Users without matching groups see the full library without a For you section.
+
+The current content model does not store a first-publication timestamp. Ordering therefore uses the timestamp on the published snapshot (`updatedAt`), falling back to a valid creation timestamp and then a stable ID order for undated items. Draft-only edits do not change the published snapshot or move an update. Republishing an edited update does change its published timestamp and can move it higher in the feed. A separate first-publication date would require a future data-model change.
 
 Docs are organized by their navigation, without learning-group targeting.
 
