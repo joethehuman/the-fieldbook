@@ -1,6 +1,7 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
+
 import { dialogOverlayClass, dialogContentClass } from "./dialog";
 import { cn } from "@/lib/utils";
 import {
@@ -108,7 +109,7 @@ export function InteractionDialogProvider({
             <AlertDialog.Description className="text-sm leading-relaxed text-muted-foreground">
               {request?.message}
             </AlertDialog.Description>
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-6 flex flex-wrap justify-end gap-2">
               <AlertDialog.Cancel asChild>
                 <Button
                   type="button"
@@ -152,8 +153,7 @@ export function InteractionDialogProvider({
                 finish(value.trim());
               }}
             >
-              <Field>
-                {request?.message}
+              <FormField label={request?.message}>
                 <Input
                   autoFocus
                   required
@@ -161,8 +161,8 @@ export function InteractionDialogProvider({
                   value={value}
                   onChange={(event) => setValue(event.target.value)}
                 />
-              </Field>
-              <div className="mt-6 flex justify-end gap-2">
+              </FormField>
+              <div className="mt-6 flex flex-wrap justify-end gap-2">
                 <Button
                   type="button"
                   variant="outline"

@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import { LoaderCircle } from "lucide-react";
+import { Spinner } from "./spinner";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
@@ -55,12 +55,7 @@ export function Button({
         children
       ) : (
         <>
-          {loading && (
-            <LoaderCircle
-              aria-hidden="true"
-              className="absolute size-4 animate-spin motion-reduce:animate-none"
-            />
-          )}
+          {loading && <Spinner className="absolute" />}
           <span
             className={cn(
               "inline-flex items-center justify-center gap-2",

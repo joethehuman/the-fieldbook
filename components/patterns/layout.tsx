@@ -110,10 +110,7 @@ export function CardFooter({
       className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground"
     >
       {children}
-      <span
-        data-slot="card-action"
-        className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap"
-      >
+      <span data-slot="card-action" className="inline-flex items-center gap-2">
         {action}
       </span>
     </div>
@@ -145,7 +142,7 @@ export function EmptyState({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="empty"
       className={cn(
-        "grid gap-3 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h3]:text-base [&_h3]:font-medium [&_svg]:mx-auto",
+        "grid min-w-0 justify-items-center gap-3 rounded-lg border border-dashed border-border px-4 py-8 sm:px-8 text-center text-copy [overflow-wrap:anywhere] text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h3]:text-base [&_h3]:font-medium [&_svg]:mx-auto",
         className,
       )}
       {...props}

@@ -35,7 +35,7 @@ export function FieldGroup({
     <fieldset
       data-slot="field-group"
       className={cn(
-        "grid min-w-0 gap-4 border-0 p-0 disabled:opacity-60 [&>legend]:mb-4 [&>legend]:text-sm [&>legend]:font-semibold",
+        "grid min-w-0 gap-4 border-0 p-0 [&>legend]:mb-4 [&>legend]:text-sm [&>legend]:font-semibold",
         className,
       )}
       {...props}

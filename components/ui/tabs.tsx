@@ -31,7 +31,7 @@ export function TabsTrigger({
   return (
     <TabsPrimitive.Trigger
       className={cn(
-        "inline-flex min-h-9 items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs group-data-[variant=sidebar]/tabs:justify-start group-data-[variant=sidebar]/tabs:text-left group-data-[variant=sidebar]/tabs:[&_svg]:size-4 group-data-[variant=sidebar]/tabs:[&_svg]:shrink-0 group-data-[variant=sidebar]/tabs:data-[state=active]:bg-accent group-data-[variant=sidebar]/tabs:data-[state=active]:shadow-none",
+        "inline-flex min-h-control items-center justify-center gap-2 rounded-md px-3 py-2 text-label font-medium text-muted-foreground outline-none transition-colors motion-reduce:transition-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:text-disabled-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs group-data-[variant=sidebar]/tabs:justify-start group-data-[variant=sidebar]/tabs:text-left group-data-[variant=sidebar]/tabs:[&_svg]:size-4 group-data-[variant=sidebar]/tabs:[&_svg]:shrink-0 group-data-[variant=sidebar]/tabs:data-[state=active]:bg-accent group-data-[variant=sidebar]/tabs:data-[state=active]:shadow-none",
         className,
       )}
       {...props}
