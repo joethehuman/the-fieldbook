@@ -35,6 +35,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ### Docs navigation
 
+- Support two-level Docs sections in settings and a searchable full-path picker in the editor. Sections keep stable IDs through renames and moves; draft and published documents retain their placement. Reader navigation and previous/next links share the saved order. Existing flat sections remain top-level without a database migration.
+
 - Give document sections and wrapping links a clearer hierarchy, with a separate tree scroll region and retained tab-local position.
 - Add shared heading anchors, a responsive On this page outline and previous/next published-document links across sections.
 - Balance the sidebar, reading column and outline while preserving server-rendered content, access checks and existing fonts.

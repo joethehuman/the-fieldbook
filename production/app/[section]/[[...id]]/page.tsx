@@ -74,6 +74,7 @@ export default async function Page(props: Props) {
         <Article
           documents={documents}
           sectionOrder={data.settings?.docCategoryOrder}
+          sections={data.settings?.docSections}
           item={item}
           name={branding.name}
           back={<ReadingBack kind={item.kind} />}

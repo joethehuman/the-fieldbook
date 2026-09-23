@@ -27,6 +27,7 @@ export const defaultPrivacy: PrivacySettings = {
 export type SiteSettings = {
   guestGroupId?: string | null;
   docCategoryOrder?: string[];
+  docSections?: import("./docs-navigation").DocSection[];
   newUserStage?: "existing" | "newhire";
   onboardingDays?: number;
   catchUpDays?: number;
@@ -54,10 +55,35 @@ export const defaultSettings: SiteSettings = {
 };
 
 // Public responses must never include an administrator's unpublished policy.
-export function publicSettings(settings: SiteSettings): SiteSettings {
+export function publicSettings(
+  settings: SiteSettings,
+  content: DocLink[] = [],
+): SiteSettings {
   const { guestGroupId: _guestGroupId, ...visible } = settings;
+  const docs = content.filter(
+    (item) => item.kind === "doc" && item.status === "published",
+  );
+  const all = availableDocSections(
+    docs,
+    settings.docCategoryOrder,
+    settings.docSections,
+  );
+  const sectionIds = new Set<string>();
+  for (const doc of docs) {
+    const section = sectionForDoc(doc, all);
+    if (section) {
+      sectionIds.add(section.id);
+      if (section.parentId) sectionIds.add(section.parentId);
+    }
+  }
   return {
     ...visible,
+    docCategoryOrder: settings.docCategoryOrder?.filter((name) =>
+      docs.some((doc) => doc.category === name),
+    ),
+    docSections: settings.docSections?.filter((section) =>
+      sectionIds.has(section.id),
+    ),
     privacy: settings.privacy
       ? {
           ...settings.privacy,
@@ -71,3 +97,8 @@ export function privacyHref(settings: SiteSettings): string | null {
   if (!policy) return null;
   return policy.mode === "external" ? policy.url : "/privacy";
 }
+import {
+  availableDocSections,
+  sectionForDoc,
+  type DocLink,
+} from "./docs-navigation";

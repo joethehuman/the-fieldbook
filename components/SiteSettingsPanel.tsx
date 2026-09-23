@@ -5,20 +5,16 @@ import { SettingsSection as SettingsGroup } from "./patterns/settings-section";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
 import { useInteractionDialog } from "./ui/interaction-dialog";
-import { ReorderRow } from "./patterns/reorder-row";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
-import DocSectionCreate from "./DocSectionCreate";
-import { Upload, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
+import { DocSectionsSettings } from "./DocSectionsSettings";
+import { Upload } from "lucide-react";
 import { ActionGroup } from "./ui/action-group";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
-import {
-  availableDocSections,
-  reorderDocSections,
-} from "@/lib/docs-navigation";
+import { availableDocSections } from "@/lib/docs-navigation";
 import { InstallationLogo } from "./patterns/installation-identity";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import type { Workspace } from "@/lib/store";
@@ -58,17 +54,8 @@ export default function SiteSettingsPanel({
   const docSections = availableDocSections(
     data.content.filter((c) => c.kind === "doc"),
     settings.docCategoryOrder,
+    settings.docSections,
   );
-  const [dragging, setDragging] = useState<string | null>(null);
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
-  function moveDocSection(index: number, target: number) {
-    if (target < 0 || target >= docSections.length || index === target) return;
-    const next = reorderDocSections(docSections, index, target);
-    setSettings((current) => ({ ...current, docCategoryOrder: next }));
-    setNotice(
-      `${next[target]} moved to position ${target + 1}. Save settings to apply the order.`,
-    );
-  }
   const [nameError, setNameError] = useState("");
   const logoInput = useRef<HTMLInputElement>(null);
   const saveAction = (
@@ -87,7 +74,7 @@ export default function SiteSettingsPanel({
         try {
           const next =
             section === "docs"
-              ? { ...settings, docCategoryOrder: docSections }
+              ? { ...settings, docSections, docCategoryOrder: [] }
               : settings;
           await onChange({ ...data, settings: next });
           setSettings(next);
@@ -265,119 +252,26 @@ export default function SiteSettingsPanel({
         <SettingsGroup
           id="settings-docs"
           title={<h3>Document sections</h3>}
-          description="Arrange the sections in your Docs navigation."
-          guidance="Drag sections, use the arrow buttons, or focus a drag handle and press Up or Down. Empty sections remain available in the editor; readers see sections with published documents."
+          description="Organize top-level sections and their subsections. Documents can sit at either level."
+          guidance="Use the placement menu and arrow buttons to move sections. Move documents and subsections before deleting a section. Empty sections remain available in the editor; readers see sections with published documents."
           actions={saveAction}
         >
-          {docSections.length ? (
-            <ol className="doc-order-list">
-              {docSections.map((name, index) => (
-                <ReorderRow
-                  key={name}
-                  data-doc-section={name}
-                  className={
-                    dropTarget === name ? "ring-2 ring-ring" : undefined
-                  }
-                  handle={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="doc-section-drag"
-                      aria-label={`Reorder ${name}`}
-                      disabled={busy}
-                      onKeyDown={(e) => {
-                        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                          e.preventDefault();
-                          moveDocSection(
-                            index,
-                            index + (e.key === "ArrowUp" ? -1 : 1),
-                          );
-                        }
-                      }}
-                      onPointerDown={(e) => {
-                        if (e.button !== 0) return;
-                        e.currentTarget.setPointerCapture(e.pointerId);
-                        setDragging(name);
-                      }}
-                      onPointerMove={(e) => {
-                        if (dragging !== name) return;
-                        const row = document
-                          .elementFromPoint(e.clientX, e.clientY)
-                          ?.closest("[data-doc-section]");
-                        setDropTarget(
-                          row?.getAttribute("data-doc-section") ?? null,
-                        );
-                        if (e.clientY < 70) window.scrollBy(0, -18);
-                        else if (e.clientY > window.innerHeight - 70)
-                          window.scrollBy(0, 18);
-                      }}
-                      onPointerUp={(e) => {
-                        if (dragging === name) {
-                          const target = document
-                            .elementFromPoint(e.clientX, e.clientY)
-                            ?.closest("[data-doc-section]")
-                            ?.getAttribute("data-doc-section");
-                          moveDocSection(
-                            index,
-                            target ? docSections.indexOf(target) : -1,
-                          );
-                        }
-                        setDragging(null);
-                        setDropTarget(null);
-                      }}
-                      onPointerCancel={() => {
-                        setDragging(null);
-                        setDropTarget(null);
-                      }}
-                      onLostPointerCapture={() => {
-                        setDragging(null);
-                        setDropTarget(null);
-                      }}
-                    >
-                      <GripVertical size={18} aria-hidden="true" />
-                    </Button>
-                  }
-                  title={name}
-                  actions={
-                    <>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Move ${name} up`}
-                        disabled={busy || index === 0}
-                        onClick={() => moveDocSection(index, index - 1)}
-                      >
-                        <ArrowUp size={16} aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        aria-label={`Move ${name} down`}
-                        disabled={busy || index === docSections.length - 1}
-                        onClick={() => moveDocSection(index, index + 1)}
-                      >
-                        <ArrowDown size={16} aria-hidden="true" />
-                      </Button>
-                    </>
-                  }
-                />
-              ))}
-            </ol>
-          ) : (
-            <p>No sections yet. Create one below.</p>
-          )}
-          <DocSectionCreate
+          <DocSectionsSettings
             sections={docSections}
+            docs={[
+              ...data.content.filter((item) => item.kind === "doc"),
+              ...(data.publishedContent || []).filter(
+                (item) => item.kind === "doc",
+              ),
+            ]}
             disabled={busy}
-            onCreate={(name) => {
+            onChange={(next) => {
               setSettings((current) => ({
                 ...current,
-                docCategoryOrder: [...docSections, name],
+                docSections: next,
+                docCategoryOrder: [],
               }));
-              setNotice(`${name} created. Save settings to keep it.`);
+              setNotice("Save settings to apply the section changes.");
             }}
           />
         </SettingsGroup>

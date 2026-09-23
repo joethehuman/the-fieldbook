@@ -5,6 +5,11 @@ import { db, check } from "./db";
 import { requireAdmin, HttpError } from "./auth";
 import { contentSchema } from "./schemas";
 import { videoSource } from "@/lib/video";
+import {
+  availableDocSections,
+  sectionForDoc,
+  legacySectionConflict,
+} from "@/lib/docs-navigation";
 
 export function redact(c: Content): Content {
   return {
@@ -58,6 +63,41 @@ export async function saveContent(
       parsed.error.issues.map((i) => i.message).join(" "),
     );
   const c = parsed.data;
+  if (c.kind === "doc") {
+    const conflict = legacySectionConflict([c]);
+    if (conflict) throw new HttpError(400, conflict);
+    const { data: config, error: settingsError } = await db()
+      .from("fb_config")
+      .select("settings")
+      .eq("id", true)
+      .single();
+    check(settingsError);
+    if (!config) throw new HttpError(503, "Settings are unavailable. Try again.");
+    if (c.sectionId) {
+      const sections = availableDocSections(
+        [],
+        config.settings.docCategoryOrder || [],
+        config.settings.docSections || [],
+      );
+      let section = sectionForDoc(c, sections);
+      if (!section && c.sectionId.startsWith("legacy:")) {
+        // Old documents can still choose a legacy section before settings
+        // have been saved in the new format.
+        const legacy = availableDocSections(
+          [{ ...c, sectionId: undefined }],
+          config.settings.docCategoryOrder || [],
+          config.settings.docSections || [],
+        );
+        section = sectionForDoc(c, legacy);
+        if (section) sections.push(...legacy.filter((item) => !sections.some((saved) => saved.id === item.id)));
+      }
+      if (!section)
+        throw new HttpError(400, "Choose an existing Docs section.");
+      const parent = sections.find((item) => item.id === section.parentId);
+      c.category = parent?.name || section.name;
+      c.folder = parent ? section.name : "";
+    }
+  }
   if (
     c.assignments?.some((a) => !a.groupId || a.userId || a.due.type !== "none")
   )

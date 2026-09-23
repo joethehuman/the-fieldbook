@@ -1,5 +1,7 @@
 "use client";
 import { CreatableCombobox } from "./ui/creatable-combobox";
+import { DocSectionPicker } from "./DocSectionPicker";
+import DocSectionCreate from "./DocSectionCreate";
 import { WritingEditor } from "./patterns/writing-editor";
 import { hasUnpublishedEdits } from "@/lib/demo-publication";
 import {
@@ -49,7 +51,12 @@ import LearningGroups from "./LearningGroups";
 import Curricula from "./Curricula";
 import { groupItems } from "@/lib/learning-groups";
 import { Assignments, type LearningHandler } from "./Assignments";
-import { availableDocSections } from "@/lib/docs-navigation";
+import {
+  availableDocSections,
+  createDocSection,
+  sectionForDoc,
+  type DocSection,
+} from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
 import { PendingPeople } from "./PendingPeople";
@@ -1173,15 +1180,27 @@ export function Editor({
       setRecovering(false);
     }
   }
+  const [createdSections, setCreatedSections] = useState<DocSection[] | null>(
+    null,
+  );
+  const [creatingSection, setCreatingSection] = useState(false);
   const docSections = availableDocSections(
-    data.content.filter((item) => item.kind === "doc"),
+    [...data.content, ...(data.publishedContent || [])].filter(
+      (item) => item.kind === "doc",
+    ),
     data.settings?.docCategoryOrder,
+    createdSections || data.settings?.docSections,
   );
   const existing = data.content.some((x) => x.id === c.id);
   async function submit(e: React.FormEvent, intent?: "draft" | "published") {
     e.preventDefault();
     const saveStatus = intent || (c.kind === "course" ? c.status : "draft");
     if (busy || pendingUploads.current || savingNow.current) return;
+    if (c.kind === "doc" && !sectionForDoc(c, docSections)) {
+      setError("Choose a Docs section before saving.");
+      setSettingsOpen(true);
+      return;
+    }
     if (
       c.kind === "course" &&
       saveStatus === "published" &&
@@ -1749,43 +1768,97 @@ export function Editor({
                     : "Use a clear category to help readers find related content."
                 }
               >
-                <FormField
-                  label={
-                    c.kind === "doc"
-                      ? "Section"
-                      : c.kind === "course"
-                        ? "Channel"
-                        : "Category"
-                  }
-                >
-                  <CreatableCombobox
-                    required
-                    maxLength={c.kind === "doc" ? 80 : undefined}
-                    value={c.category}
-                    onValueChange={(value) => set("category", value)}
-                    options={
-                      c.kind === "doc"
-                        ? docSections
-                        : data.content
-                            .filter((item) => item.kind === c.kind)
-                            .map((item) => item.category)
-                    }
-                    listLabel={
-                      c.kind === "doc"
-                        ? "Sections"
-                        : c.kind === "course"
-                          ? "Channels"
-                          : "Categories"
-                    }
-                    placeholder={
-                      c.kind === "doc"
-                        ? "Choose or add section…"
-                        : c.kind === "course"
+                {c.kind === "doc" ? (
+                  <>
+                    <DocSectionPicker
+                      sections={docSections}
+                      value={sectionForDoc(c, docSections)?.id || ""}
+                      disabled={busy}
+                      onChange={(sectionId) => {
+                        const chosen = docSections.find(
+                          (item) => item.id === sectionId,
+                        )!;
+                        const parent = docSections.find(
+                          (item) => item.id === chosen.parentId,
+                        );
+                        setC((current) => ({
+                          ...current,
+                          sectionId,
+                          category: parent?.name || chosen.name,
+                          folder: parent ? chosen.name : "",
+                        }));
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => setCreatingSection((open) => !open)}
+                    >
+                      Create section
+                    </Button>
+                    {creatingSection && (
+                      <DocSectionCreate
+                        sections={docSections}
+                        disabled={busy || !onWorkspaceChange}
+                        onCancel={() => setCreatingSection(false)}
+                        onCreate={async (section) => {
+                          if (!onWorkspaceChange)
+                            throw new Error(
+                              "Section settings are unavailable.",
+                            );
+                          const next = createDocSection(
+                            docSections,
+                            section.name,
+                            section.parentId,
+                            section.id,
+                          );
+                          await onWorkspaceChange({
+                            ...data,
+                            settings: {
+                              ...defaultSettings,
+                              ...data.settings,
+                              docSections: next,
+                              docCategoryOrder: [],
+                            },
+                          });
+                          setCreatedSections(next);
+                          const parent = next.find(
+                            (item) => item.id === section.parentId,
+                          );
+                          setC((current) => ({
+                            ...current,
+                            sectionId: section.id,
+                            category: parent?.name || section.name,
+                            folder: parent ? section.name : "",
+                          }));
+                          setCreatingSection(false);
+                        }}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <FormField
+                    label={c.kind === "course" ? "Channel" : "Category"}
+                  >
+                    <CreatableCombobox
+                      required
+                      value={c.category}
+                      onValueChange={(value) => set("category", value)}
+                      options={data.content
+                        .filter((item) => item.kind === c.kind)
+                        .map((item) => item.category)}
+                      listLabel={
+                        c.kind === "course" ? "Channels" : "Categories"
+                      }
+                      placeholder={
+                        c.kind === "course"
                           ? "Choose or add channel…"
                           : "Choose or add category…"
-                    }
-                  />
-                </FormField>
+                      }
+                    />
+                  </FormField>
+                )}
               </SettingsSection>
               {c.kind === "brief" && (
                 <SettingsSection

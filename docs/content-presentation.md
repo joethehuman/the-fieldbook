@@ -12,15 +12,15 @@ If saving fails, the editor stays open. **Download draft** saves the current con
 
 Section creation and learning-group changes save separately from content. Discarding content edits does not undo those saved changes.
 
-## Docs section order
+## Docs sections
 
-Go to **Manage organization → Organization Settings → Docs navigation**. Drag a section by its handle, use the arrow buttons, or focus its handle and press the up/down arrow keys. Select **Save settings** to keep the order. The Docs sidebar and overview share that order.
+Go to **Manage organization → Organization Settings → Docs navigation** to create and organize top-level sections and their subsections. Each level can contain documents. Use the placement control to move a subsection to another parent or promote it. A top-level section can become a subsection after its own children have been moved. Use the up/down buttons to reorder siblings, then **Save settings**. Move documents and subsections before deleting a populated section.
 
-Use **New section name → Create section** to add an empty section, then save settings. Empty sections stay available to administrators and in the content editor, but readers only see sections containing visible published documents. Existing document categories are included automatically; unsaved categories append alphabetically after saved sections.
+Empty sections remain available to administrators and in the editor; readers see only branches with published documents. The Docs sidebar, overview and previous/next links use the same order. Documents directly in a section appear before its subsections. Existing flat sections remain top-level.
 
-In the document editor, **Organization → Section** lists all existing sections. **Create new section…** saves a section immediately and selects it; save the document separately to keep its selection. Canceling the document does not delete a created section. The simplified editor no longer exposes folder-path entry. Existing folder data and reader folder navigation are preserved.
+In the document editor, **Organization → Section** has one searchable picker with full paths, such as **Getting started → Installation**. **Create section** accepts a name and optional top-level parent, saves the new section separately, and selects it. Save the document to keep its placement. Canceling document edits does not delete a created section. A new document starts without a selected section.
 
-The shared section list and order use optional `docCategoryOrder` in the existing settings JSON, with administrator authorization and revision conflict checks. No migration or additional dependency is required.
+Section IDs and order live in optional `docSections` settings JSON; documents may reference a section ID. Legacy category and folder values remain readable without rewriting documents. Saving a hierarchy with an existing folder deeper than a subsection reports the affected document and path. No database migration or additional dependency is required.
 
 ## Course covers
 

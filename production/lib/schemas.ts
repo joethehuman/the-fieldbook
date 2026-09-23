@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validateDocSections } from "@/lib/docs-navigation";
 const text = (max: number) => z.string().max(max);
 export const contentBaseSchema = z.object({
   id: z.uuid(),
@@ -8,6 +9,7 @@ export const contentBaseSchema = z.object({
   body: text(200000),
   category: text(80).trim().min(1),
   folder: text(300),
+  sectionId: text(1500).optional(),
   status: z.enum(["draft", "published"]),
   version: z.number().int().min(1),
   coverImageUrl: text(2000)
@@ -93,37 +95,57 @@ const publishedPrivacySchema = privacyDocumentSchema.refine(
         !!(p.contactEmail || p.contactUrl),
   "Published policies require text, operator and an email or contact page, or an HTTPS policy URL.",
 );
-export const settingsSchema = z.object({
-  guestGroupId: text(80).min(1).nullable().optional(),
-  docCategoryOrder: z
-    .array(text(80).trim().min(1))
-    .max(500)
-    .refine(
-      (names) => new Set(names).size === names.length,
-      "Docs sections must be unique.",
-    )
-    .optional(),
-  newUserStage: z.enum(["existing", "newhire"]).default("existing"),
-  onboardingDays: z.number().int().min(1).max(365).default(90),
-  catchUpDays: z.number().int().min(1).max(365).default(30),
-  privacy: z
-    .object({
-      draft: privacyDocumentSchema,
-      published: publishedPrivacySchema.nullable(),
-      publishedAt: z.iso.datetime().nullable(),
-    })
-    .optional(),
-  name: text(60).trim().min(1),
-  tagline: text(180),
-  welcomeDescription: text(180).trim().default(""),
-  logoUrl: text(2000).refine(
-    (s) => !s || /^\/api\/media\/[a-f0-9-]{36}\.(png|jpg|webp|gif)$/.test(s),
-    "Upload a logo using Fieldbook.",
-  ),
-  accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  access: z.enum(["public", "private"]),
-  registration: z.enum(["open", "closed"]),
-});
+export const settingsSchema = z
+  .object({
+    guestGroupId: text(80).min(1).nullable().optional(),
+    docCategoryOrder: z
+      .array(text(80).trim().min(1))
+      .max(500)
+      .refine(
+        (names) => new Set(names).size === names.length,
+        "Docs sections must be unique.",
+      )
+      .optional(),
+    docSections: z
+      .array(
+        z.object({
+          id: text(1500).min(1),
+          name: text(80).trim().min(1),
+          parentId: text(1500).optional(),
+          legacyCategory: text(80).optional(),
+          legacyFolder: text(300).optional(),
+        }),
+      )
+      .max(500)
+      .optional(),
+    newUserStage: z.enum(["existing", "newhire"]).default("existing"),
+    onboardingDays: z.number().int().min(1).max(365).default(90),
+    catchUpDays: z.number().int().min(1).max(365).default(30),
+    privacy: z
+      .object({
+        draft: privacyDocumentSchema,
+        published: publishedPrivacySchema.nullable(),
+        publishedAt: z.iso.datetime().nullable(),
+      })
+      .optional(),
+    name: text(60).trim().min(1),
+    tagline: text(180),
+    welcomeDescription: text(180).trim().default(""),
+    logoUrl: text(2000).refine(
+      (s) => !s || /^\/api\/media\/[a-f0-9-]{36}\.(png|jpg|webp|gif)$/.test(s),
+      "Upload a logo using Fieldbook.",
+    ),
+    accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    access: z.enum(["public", "private"]),
+    registration: z.enum(["open", "closed"]),
+  })
+  .superRefine((settings, context) => {
+    try {
+      validateDocSections(settings.docSections || []);
+    } catch (error) {
+      context.addIssue({ code: "custom", message: (error as Error).message });
+    }
+  });
 export const progressSchema = z.object({
   contentId: z.uuid(),
   version: z.number().int().positive(),

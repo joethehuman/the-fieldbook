@@ -111,7 +111,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
     });
   return {
     schema: 1,
-    settings: admin ? config.settings : publicSettings(config.settings),
+    settings: admin ? config.settings : publicSettings(config.settings, learningContent),
     revision: config.revision,
     content: admin ? documents.map((r) => document(r, true)) : learningContent,
     publishedContent: learningContent,

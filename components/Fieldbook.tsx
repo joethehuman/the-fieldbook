@@ -67,7 +67,7 @@ import {
 import ReactMarkdown from "./Markdown";
 import type { FieldbookRuntime } from "@/lib/runtime";
 import { sectionPaths, resolveSection, contentPath } from "@/lib/navigation";
-import { orderedDocCategories } from "@/lib/docs-navigation";
+import { docSections } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
 import Feedback from "./Feedback";
@@ -542,6 +542,7 @@ export default function Fieldbook({
                 : docs
             }
             order={branding.docCategoryOrder}
+            sections={branding.docSections}
             selected={selected}
             href={(id) =>
               runtime
@@ -914,6 +915,7 @@ export default function Fieldbook({
               key={item.id}
               documents={docs}
               sectionOrder={branding.docCategoryOrder}
+              sections={branding.docSections}
               demo={!runtime}
               onDocument={(id) => navigate("docs", id)}
               item={item}
@@ -978,17 +980,36 @@ export default function Fieldbook({
                 </div>
               )}
               <div className="knowledge-grid">
-                {orderedDocCategories(docs, branding.docCategoryOrder).map(
-                  (cat) => (
-                    <section className="knowledge-section" key={cat}>
-                      <BookOpen size={22} />
-                      <h2>{cat}</h2>
-                      <p>
-                        {docs.filter((d) => d.category === cat).length} articles
-                      </p>
-                      {docs
-                        .filter((d) => d.category === cat)
-                        .map((d) => (
+                {docSections(
+                  docs,
+                  branding.docCategoryOrder,
+                  branding.docSections,
+                ).map((section) => (
+                  <section className="knowledge-section" key={section.id}>
+                    <BookOpen size={22} />
+                    <h2>{section.name}</h2>
+                    <p>
+                      {section.docs.length +
+                        section.folders.reduce(
+                          (count, child) => count + child.docs.length,
+                          0,
+                        )}{" "}
+                      articles
+                    </p>
+                    {section.docs.map((d) => (
+                      <NavigationButton
+                        variant="ghost"
+                        onClick={() => navigate("docs", d.id)}
+                        key={d.id}
+                      >
+                        {d.title}
+                        <ChevronRight size={16} />
+                      </NavigationButton>
+                    ))}
+                    {section.folders.map((child) => (
+                      <div key={child.id}>
+                        <h3>{child.name}</h3>
+                        {child.docs.map((d) => (
                           <NavigationButton
                             variant="ghost"
                             onClick={() => navigate("docs", d.id)}
@@ -998,9 +1019,10 @@ export default function Fieldbook({
                             <ChevronRight size={16} />
                           </NavigationButton>
                         ))}
-                    </section>
-                  ),
-                )}
+                      </div>
+                    ))}
+                  </section>
+                ))}
               </div>
             </>
           ) : (

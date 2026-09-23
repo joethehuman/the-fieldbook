@@ -1,59 +1,78 @@
 "use client";
-import { FormField } from "@/components/patterns/form-field";
-import { ActionGroup } from "@/components/ui/action-group";
-import { Input } from "@/components/ui/input";
-
-import { useState } from "react";
+import { FormField } from "./patterns/form-field";
+import { ActionGroup } from "./ui/action-group";
+import { Input } from "./ui/input";
+import { SelectField } from "./ui/select";
 import { Button } from "./ui/button";
-import { newDocSection } from "@/lib/docs-navigation";
+import { useState } from "react";
+import { createDocSection, type DocSection } from "@/lib/docs-navigation";
 
 export default function DocSectionCreate({
   sections,
   onCreate,
   onCancel,
   disabled = false,
-  onBusyChange,
 }: {
-  sections: string[];
-  onCreate: (name: string) => void | Promise<void>;
+  sections: DocSection[];
+  onCreate: (section: DocSection) => void | Promise<void>;
   onCancel?: () => void;
   disabled?: boolean;
-  onBusyChange?: (busy: boolean) => void;
 }) {
   const [name, setName] = useState("");
+  const [parentId, setParentId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function create() {
     if (busy || disabled) return;
     setError("");
     try {
-      const section = newDocSection(name, sections);
+      const next = createDocSection(sections, name, parentId || undefined);
+      const section = next[next.length - 1];
       setBusy(true);
-      onBusyChange?.(true);
       await onCreate(section);
       setName("");
+      setParentId("");
     } catch (error) {
       setError((error as Error).message);
     } finally {
       setBusy(false);
-      onBusyChange?.(false);
     }
   }
   return (
     <div className="doc-section-create">
-      <FormField label="New section name">
+      <FormField label="New section name" error={error}>
         <Input
           value={name}
           maxLength={80}
           disabled={disabled || busy}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
+          aria-invalid={!!error}
+          onChange={(event) => setName(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
               void create();
             }
           }}
         />
+      </FormField>
+      <FormField
+        label="Top-level parent"
+        description="Optional. Leave blank to create a top-level section."
+      >
+        <SelectField
+          value={parentId}
+          onValueChange={setParentId}
+          disabled={disabled || busy}
+        >
+          <option value="">No parent</option>
+          {sections
+            .filter((section) => !section.parentId)
+            .map((section) => (
+              <option value={section.id} key={section.id}>
+                {section.name}
+              </option>
+            ))}
+        </SelectField>
       </FormField>
       <ActionGroup>
         <Button
@@ -75,7 +94,6 @@ export default function DocSectionCreate({
           </Button>
         )}
       </ActionGroup>
-      {error && <p role="alert">{error}</p>}
     </div>
   );
 }

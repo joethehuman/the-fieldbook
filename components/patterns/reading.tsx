@@ -1,5 +1,12 @@
 import { markdownHeadings } from "@/lib/markdown-headings";
-import { orderedDocs, type DocLink } from "@/lib/docs-navigation";
+import {
+  availableDocSections,
+  orderedDocs,
+  sectionForDoc,
+  sectionPath,
+  type DocLink,
+} from "@/lib/docs-navigation";
+import type { DocSection } from "@/lib/docs-navigation";
 import { ReadingOutline } from "./reading-outline";
 import type { ReactNode } from "react";
 import ReactMarkdown from "../Markdown";
@@ -18,6 +25,7 @@ export function Article({
   children,
   documents = [],
   sectionOrder,
+  sections = [],
   demo = false,
   onDocument,
 }: {
@@ -27,13 +35,16 @@ export function Article({
   children?: ReactNode;
   documents?: DocLink[];
   sectionOrder?: string[];
+  sections?: DocSection[];
   demo?: boolean;
   onDocument?: (id: string) => void;
 }) {
   const isDoc = item.kind === "doc";
   const headings = isDoc ? markdownHeadings(item.body) : [];
   const prefix = demo ? `#docs/${encodeURIComponent(item.id)}?heading=` : "#";
-  const ordered = orderedDocs(documents, sectionOrder);
+  const ordered = orderedDocs(documents, sectionOrder, sections);
+  const allSections = availableDocSections(documents, sectionOrder, sections);
+  const placement = isDoc ? sectionForDoc(item, allSections) : undefined;
   const index = ordered.findIndex((doc) => doc.id === item.id);
   const neighbors = index < 0 ? [] : [ordered[index - 1], ordered[index + 1]];
   return (
@@ -49,7 +60,11 @@ export function Article({
           <header className="article-header">
             <div className="article-navigation">
               {back}
-              <span>{item.category}</span>
+              <span>
+                {placement
+                  ? sectionPath(placement, allSections)
+                  : item.category}
+              </span>
             </div>
             <h1>{item.title}</h1>
             <p className="article-lede">{item.summary}</p>

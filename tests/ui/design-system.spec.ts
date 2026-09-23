@@ -423,23 +423,24 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
   await page
     .getByRole("button", { name: "Create section", exact: true })
     .click();
-  const rows = page.locator(".doc-order-list [data-slot=reorder-row]");
+  const rows = page.locator(
+    ".doc-order-list > li > .doc-order-list > [data-slot=reorder-row]:first-child",
+  );
   const actionX = await rows
     .locator("[data-slot=reorder-actions]")
     .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().x));
   expect(Math.max(...actionX) - Math.min(...actionX)).toBeLessThan(1);
-  const firstText = await rows.first().innerText();
+  const firstText = await rows.first().locator("strong").innerText();
   await rows
     .first()
-    .getByRole("button", { name: /^Reorder / })
-    .focus();
-  await page.keyboard.press("ArrowDown");
-  await expect(rows.nth(1)).toHaveText(firstText);
+    .getByRole("button", { name: /^Move .* down$/ })
+    .click();
+  await expect(rows.nth(1).locator("strong")).toHaveText(firstText);
   await rows
     .nth(1)
-    .getByRole("button", { name: /^Reorder / })
-    .dragTo(rows.nth(2));
-  await expect(rows.nth(2)).toHaveText(firstText);
+    .getByRole("button", { name: /^Move .* down$/ })
+    .click();
+  await expect(rows.nth(2).locator("strong")).toHaveText(firstText);
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
@@ -448,7 +449,9 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
   await page.reload();
   await adminSection(page, "Docs navigation");
   await expect(
-    page.locator(".doc-order-list [data-slot=reorder-row]").nth(2),
+    page.locator(
+      ".doc-order-list > li > .doc-order-list > [data-slot=reorder-row]:first-child",
+    ).nth(2).locator("strong"),
   ).toHaveText(firstText);
 });
 

@@ -11,11 +11,13 @@ import {
   docSections,
   type DocLink,
   type DocBranch,
+  type DocSection,
 } from "@/lib/docs-navigation";
 
 export function DocumentTree({
   docs,
   order,
+  sections: configured = [],
   selected,
   href,
   onOpen,
@@ -23,6 +25,7 @@ export function DocumentTree({
 }: {
   docs: DocLink[];
   order?: string[];
+  sections?: DocSection[];
   selected: string | null;
   href: (id: string) => string;
   onOpen: (id: string) => void;
@@ -32,9 +35,14 @@ export function DocumentTree({
   const restored = useRef(false);
   const [closed, setClosed] = useState<string[]>([]);
   const catalogKey = docs
-    .map((doc) => `${doc.id}:${doc.category}:${doc.folder}`)
+    .map(
+      (doc) => `${doc.id}:${doc.category}:${doc.folder}:${doc.sectionId || ""}`,
+    )
     .join("|");
-  const sections = useMemo(() => docSections(docs, order), [docs, order]);
+  const sections = useMemo(
+    () => docSections(docs, order, configured),
+    [docs, order, configured],
+  );
   useEffect(() => {
     let savedClosed: string[] | undefined;
     if (!restored.current && storageKey) {
@@ -50,7 +58,7 @@ export function DocumentTree({
     restored.current = true;
     const ancestors: string[] = [];
     const containsSelected = (branch: DocBranch, path: string[]): boolean => {
-      const next = [...path, branch.name];
+      const next = [...path, branch.id];
       const nested = branch.folders
         .map((folder) => containsSelected(folder, next))
         .some(Boolean);
@@ -101,11 +109,11 @@ export function DocumentTree({
     onOpen(id);
   };
   const branch = (value: DocBranch, path: string[]): React.ReactNode => {
-    const key = JSON.stringify([...path, value.name]);
+    const key = JSON.stringify([...path, value.id]);
     return (
       <Collapsible
         open={!closed.includes(key)}
-        key={value.name}
+        key={value.id}
         data-branch={key}
         onOpenChange={(open) => {
           const next = open
@@ -137,7 +145,7 @@ export function DocumentTree({
               </a>
             </Button>
           ))}
-          {value.folders.map((folder) => branch(folder, [...path, value.name]))}
+          {value.folders.map((folder) => branch(folder, [...path, value.id]))}
         </CollapsibleContent>
       </Collapsible>
     );
@@ -149,7 +157,7 @@ export function DocumentTree({
       aria-label="Documents"
       onScroll={() => remember()}
     >
-      {docSections(docs, order).map((section) => branch(section, []))}
+      {sections.map((section) => branch(section, []))}
     </nav>
   );
 }
