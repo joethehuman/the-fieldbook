@@ -20,6 +20,7 @@ export type Content = {
   body: string;
   category: string;
   folder: string;
+  sectionId?: string;
   status: "draft" | "published";
   version: number;
   updatedAt: string;

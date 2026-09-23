@@ -11,7 +11,7 @@ import { brandingFromSettings } from "@/lib/branding";
 import { HttpError } from "./errors";
 import { env } from "./env";
 import { contentPath, resolveSection } from "@/lib/navigation";
-import { defaultSettings } from "@/lib/settings";
+import { defaultSettings, publicSettings } from "@/lib/settings";
 import { guest } from "./snapshot";
 import type { ReadingState } from "@/lib/reading";
 
@@ -54,7 +54,7 @@ export const reading = cache(
         db()
           .from("fb_documents")
           .select(
-            "id,updated_at,title:published->>title,category:published->>category,folder:published->>folder,kind:published->>kind,status:published->>status",
+            "id,updated_at,title:published->>title,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,kind:published->>kind,status:published->>status",
             { count: "exact" },
           )
           .not("published", "is", null)
@@ -73,11 +73,13 @@ export const reading = cache(
           title: row.title,
           category: row.category,
           folder: row.folder || "",
+          sectionId: row.sectionId || undefined,
           kind: "doc",
           status: "published",
         }));
     }
     const branding = brandingFromSettings(config.settings);
+    const visibleSettings = publicSettings(config.settings, documents);
     if (branding.logoUrl)
       branding.logoUrl = `/api/branding/logo?v=${encodeURIComponent(branding.logoUrl.split("/").pop()!)}`;
     const data: ReadingState["data"] = {
@@ -87,8 +89,10 @@ export const reading = cache(
         name: branding.name,
         docCategoryOrder: orderedDocCategories(
           documents,
-          config.settings.docCategoryOrder || [],
+          visibleSettings.docCategoryOrder || [],
+          visibleSettings.docSections || [],
         ),
+        docSections: visibleSettings.docSections || [],
         tagline: config.settings.tagline || "",
         accent: config.settings.accent || defaultSettings.accent,
         privacy: config.settings.privacy

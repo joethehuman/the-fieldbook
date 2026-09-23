@@ -92,6 +92,6 @@ export function guestRecommendations(
     groups,
     content,
     curricula,
-    settings: publicSettings(settings),
+    settings: publicSettings(settings, content),
   };
 }
