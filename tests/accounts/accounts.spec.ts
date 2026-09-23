@@ -326,6 +326,9 @@ test("consent and connection identity preserve purpose and demo stays simulated"
   ).toBeVisible();
   await expect(page.getByText(/Demo profiles are not secure/)).toBeVisible();
   await expect(
+    page.getByRole("button", { name: "Continue as guest" }),
+  ).toHaveCount(0);
+  await expect(
     page.getByRole("link", { name: "Continue with Google" }),
   ).toHaveCount(0);
   await bounds(page);
