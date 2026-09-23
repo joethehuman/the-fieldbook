@@ -486,7 +486,7 @@ test("guest workspace loading, failure and retry remain recoverable", async ({
   f.delay(900);
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Opening your fieldbook…" }),
+    page.getByRole("heading", { name: "Just a sec…" }),
   ).toBeVisible();
   await shot(page, info, "guest-loading");
   await expect(page.locator(".for-you")).toContainText("Guest introduction");

@@ -555,12 +555,56 @@
     scroll-margin-block-start: var(--anchor-offset);
   }
   .loading {
+    display: flex;
+    min-height: 100dvh;
+    align-items: flex-end;
+    padding: var(--space-12);
+  }
+  .loading-content {
     display: grid;
-    min-height: 70dvh;
-    align-content: center;
+    width: min(100%, 22.5rem);
+    gap: var(--space-4);
+  }
+  .loading-content h2 {
+    font-weight: var(--weight-medium);
+  }
+  .loading-bar {
+    height: 2px;
+    overflow: hidden;
+    border-radius: var(--radius-control);
+    background: var(--muted);
+  }
+  .loading-bar span {
+    display: block;
+    width: 34%;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--foreground);
+    animation: loading-sweep 1.8s ease-in-out infinite alternate;
+  }
+  .loading-error {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+  .loading-error .loading-content {
     justify-items: center;
-    gap: var(--space-6);
-    padding: var(--space-6);
+  }
+  @keyframes loading-sweep {
+    to {
+      transform: translateX(194%);
+    }
+  }
+  @media (max-width: 640px) {
+    .loading {
+      padding: var(--space-6);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .loading-bar span {
+      animation: none;
+      transform: translateX(95%);
+    }
   }
   .profile-list {
     display: grid;

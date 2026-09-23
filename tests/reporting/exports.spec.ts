@@ -431,7 +431,7 @@ test("unavailable or pending workspace never offers export", async ({
   });
   await page.goto("/admin");
   await expect(
-    page.getByRole("heading", { name: "Opening your fieldbook…" }),
+    page.getByRole("heading", { name: "Just a sec…" }),
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
   await screenshot(page, info, "loading");
