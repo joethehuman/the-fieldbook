@@ -175,16 +175,9 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
     .getByRole("button", { name: "Edit team details", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog
-    .getByRole("combobox", { name: "Parent team", exact: true })
-    .click();
   await expect(
-    page.getByRole("option", { name: "Child team", exact: true }),
+    dialog.getByRole("combobox", { name: "Parent team", exact: true }),
   ).toHaveCount(0);
-  await expect(
-    page.getByRole("option", { name: "Grandchild team", exact: true }),
-  ).toHaveCount(0);
-  await page.keyboard.press("Escape");
   await dialog
     .getByRole("textbox", { name: "Team name", exact: true })
     .fill("Sales renamed");

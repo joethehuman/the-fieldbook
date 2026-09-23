@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { HierarchyList } from "@/components/patterns/hierarchy-list";
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
@@ -34,6 +35,7 @@ import {
 import { ActionGroup } from "@/components/ui/action-group";
 
 export function LibraryExamples() {
+  const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const progressTarget = useRevealTarget<HTMLElement>();
   const [feedback, setFeedback] = useState<{
@@ -204,6 +206,57 @@ export function LibraryExamples() {
             label: `Example person ${index + 1}`,
             description: `person${index + 1}@example.test · Sample team`,
           }))}
+        />
+      </SettingsSection>
+      <SettingsSection
+        id="catalog-hierarchy"
+        title={<h3>Reporting hierarchy</h3>}
+        guidance="Use a disclosure list for nested teams. Search retains ancestor context; Tab and Enter operate ordinary buttons. Use single selection for branch moves, then review their reporting impact before saving."
+      >
+        <HierarchyList
+          label="Example teams"
+          onOpen={(id) => setMessage(`Open example team: ${id}`)}
+          items={[
+            {
+              id: "company",
+              label: "Commercial",
+              description: "Manager: Alex Morgan",
+              meta: "5 direct members · 1 subteam",
+            },
+            {
+              id: "regional",
+              parentId: "company",
+              label: "Regional account executives with a longer team name",
+              description: "Manager: Sam Lee",
+              meta: "50 direct members",
+            },
+            {
+              id: "success",
+              label: "Customer success",
+              description: "Manager: Unassigned",
+              meta: "12 direct members",
+            },
+          ]}
+        />
+        <SearchableSelectionList
+          label="Choose an example parent"
+          selectionMode="single"
+          placeholder="Team name"
+          emptyMessage="No matching teams."
+          value={selectedTeam}
+          onChange={setSelectedTeam}
+          options={[
+            {
+              id: "top",
+              label: "Top-level team",
+              description: "Keep the branch; remove its parent.",
+            },
+            {
+              id: "company",
+              label: "Commercial",
+              description: "Organization / Commercial",
+            },
+          ]}
         />
       </SettingsSection>
       <SettingsSection
