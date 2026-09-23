@@ -21,7 +21,7 @@ Guest progress stays in that browser. Guests have no onboarding dates, deadlines
 
 Signing in switches recommendations to the account's actual groups. It never adds the guest group or merges its assignments into the account. The existing progress-import offer is unchanged: **Save browser progress to my account** explicitly submits locally recorded lessons and retained quiz answers; the server checks the current published course/version and re-grades answers. Each successfully imported record is removed locally. A partial failure leaves remaining browser records available. **Not now** dismisses the offer without importing. This transfers learning evidence, not assignments or membership.
 
-The demo has **Continue as guest** in its profile picker. Its group settings, content, profiles and guest progress are synthetic and browser-local. Switching to a demo profile uses that profile's groups; the demo has no hosted account-import flow.
+The demo profile picker offers the named sample profiles. Public installations can still serve signed-out visitors and offer the browser progress-import flow described below.
 
 ## Upgrade and operation
 
