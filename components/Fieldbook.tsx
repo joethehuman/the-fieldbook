@@ -296,7 +296,11 @@ export default function Fieldbook({
     acceptedUrl.current = window.location.href;
     window.scrollTo({ top: 0 });
   }
-  async function persist(next: Workspace) {
+  async function persist(
+    next: Workspace,
+    options?: { locallyHandled?: boolean },
+  ) {
+    setError("");
     setReportIssue("Updating report…");
     if (runtime && data) {
       try {
@@ -308,7 +312,8 @@ export default function Fieldbook({
           "Reload the report before exporting after a failed change.",
         );
         if (e instanceof SaveRecoveryError && e.snapshot) setData(e.snapshot);
-        setError(navigationGuard.current ? "" : (e as Error).message);
+        if (!options?.locallyHandled)
+          setError(navigationGuard.current ? "" : (e as Error).message);
         throw e;
       }
       return;
@@ -329,7 +334,8 @@ export default function Fieldbook({
       const failure = new Error(
         "Your browser could not save this change. Storage may be full or disabled. Your edits remain open.",
       );
-      setError(navigationGuard.current ? "" : failure.message);
+      if (!options?.locallyHandled)
+        setError(navigationGuard.current ? "" : failure.message);
       throw failure;
     }
   }

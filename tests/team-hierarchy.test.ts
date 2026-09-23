@@ -114,6 +114,7 @@ test("guarded deletion migration: stored references, revision, authorization and
       "202609200003_required_learning.sql",
       "202609200004_learning_groups.sql",
       "20260923180607_guarded_team_deletion.sql",
+      "20260923230000_scope_pending_group_cleanup.sql",
     ])
       await pg.exec(
         await readFile(
@@ -253,6 +254,22 @@ test("guarded deletion migration: stored references, revision, authorization and
     ).rows[0];
     assert.equal(privilege.allowed, false);
     assert.equal(privilege.elevated, false);
+    await pg.query(
+      "update public.fb_pending_profiles set groups='[\"learning\"]'::jsonb where email='pending@example.test'",
+    );
+    await pg.query(
+      "insert into public.fb_pending_profiles(email,name,role,groups) values('unaffected@example.test','Unaffected','learner','[]')",
+    );
+    await save("empty", admin, 2, { teams: config.teams, groups: [] });
+    const pendingGroups = (
+      await pg.query<{ email: string; groups: string[] }>(
+        "select email,groups from public.fb_pending_profiles order by email",
+      )
+    ).rows;
+    assert.deepEqual(pendingGroups, [
+      { email: "pending@example.test", groups: [] },
+      { email: "unaffected@example.test", groups: [] },
+    ]);
   } finally {
     await pg.close();
   }

@@ -358,7 +358,7 @@ test("no selection and publication changes preserve a usable library with honest
 }, info) => {
   const f = await setup(page, info, "guest", null);
   await expect(page.locator(".for-you")).toContainText(
-    "No guest recommendations yet.",
+    "No recommendations yet",
   );
   await expect(
     page.getByRole("button", { name: /Foundation course/ }),
@@ -390,7 +390,7 @@ test("no selection and publication changes preserve a usable library with honest
   });
   await page.reload();
   await expect(page.locator(".for-you")).toContainText(
-    "No guest recommendations yet.",
+    "No recommendations yet",
   );
 });
 
@@ -465,7 +465,7 @@ test("public to private removes anonymous learning and keeps the saved group", a
   if (f.production) await expect(page).toHaveURL(/\/auth\/sign-in\?/);
   else
     await expect(
-      page.getByRole("heading", { name: "Explore Fieldbook" }),
+      page.getByRole("heading", { name: "Choose a demo profile" }),
     ).toBeVisible();
   await expect(page.locator(".for-you")).toHaveCount(0);
   await expect(
