@@ -15,7 +15,7 @@ export function PageHeader({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="page-header"
       className={cn(
-        "grid gap-2 [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:tracking-tight [&>p]:max-w-prose [&>p]:text-muted-foreground",
+        "grid gap-2 [&_h1]:text-page [&_h1]:font-semibold [&_h1]:tracking-tight [&>p]:max-w-prose [&>p]:text-muted-foreground",
         className,
       )}
       {...props}

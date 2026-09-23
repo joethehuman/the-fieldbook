@@ -238,6 +238,7 @@ test("settings authorization, saved identity and private content protection", as
   await expect(page.getByText("Settings saved.")).toBeVisible();
   await expect(page.locator(".logo")).toContainText("Updated Academy");
   await bounds(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("branding-settings.png"),
     fullPage: true,

@@ -1,4 +1,6 @@
 "use client";
+import { TextField } from "./patterns/text-field";
+import { SettingsSection as SettingsGroup } from "./patterns/settings-section";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
 import { useInteractionDialog } from "./ui/interaction-dialog";
@@ -66,6 +68,7 @@ export default function SiteSettingsPanel({
       `${next[target]} moved to position ${target + 1}. Save settings to apply the order.`,
     );
   }
+  const [nameError, setNameError] = useState("");
   const logoInput = useRef<HTMLInputElement>(null);
   return (
     <form
@@ -91,65 +94,63 @@ export default function SiteSettingsPanel({
       }}
     >
       {section === "identity" && (
-        <section
-          className="settings-section"
+        <SettingsGroup
           tabIndex={-1}
           id="settings-identity"
+          title={<h3>Installation branding</h3>}
+          description="The same identity appears in your workspace and on account pages. The saved name, logo, welcome description and published privacy link are visible before sign-in, including on private installations."
         >
-          <h3>Installation branding</h3>
-          <p className="muted">
-            The same identity appears in your workspace and on account pages.
-            The saved name, logo, welcome description and published privacy link
-            are visible before sign-in, including on private installations.
-          </p>
-          <Field>
-            Installation name
-            <Input
-              required
-              maxLength={60}
-              value={settings.name}
-              onChange={(e) =>
-                setSettings({ ...settings, name: e.target.value })
-              }
-            />
-          </Field>
-          <Field>
-            Welcome description (optional)
-            <Input
-              maxLength={180}
-              value={settings.welcomeDescription || ""}
-              onChange={(e) =>
-                setSettings({ ...settings, welcomeDescription: e.target.value })
-              }
-            />
-            <FieldDescription>
-              A short welcome on the sign-in page. Authentication instructions
-              are provided by Fieldbook.
-            </FieldDescription>
-          </Field>
-          <Field>
-            Privacy-policy link
-            <Input
-              readOnly
-              value={privacyHref(settings) || ""}
-              placeholder="No published policy"
-            />
-            <FieldDescription>
-              Set or publish this link in Organization Settings → Privacy
-              policy. Hosted and external policies use the same published
-              setting across the application.
-            </FieldDescription>
-          </Field>
-          <Field>
-            Footer tagline
-            <Input
-              maxLength={180}
-              value={settings.tagline}
-              onChange={(e) =>
-                setSettings({ ...settings, tagline: e.target.value })
-              }
-            />
-          </Field>
+          <TextField
+            id="installation-name"
+            label="Installation name"
+            description="Up to 60 characters."
+            required
+            maxLength={60}
+            value={settings.name}
+            error={nameError}
+            onBlur={(e) =>
+              setNameError(
+                e.target.validity.valueMissing
+                  ? "Installation name is required."
+                  : "",
+              )
+            }
+            onInvalid={() => setNameError("Installation name is required.")}
+            onChange={(e) => {
+              setSettings({ ...settings, name: e.target.value });
+              if (nameError)
+                setNameError(
+                  e.target.value ? "" : "Installation name is required.",
+                );
+            }}
+          />
+          <TextField
+            id="welcome-description"
+            label="Welcome description (optional)"
+            maxLength={180}
+            value={settings.welcomeDescription || ""}
+            description="A short welcome on the sign-in page. Authentication instructions are provided by Fieldbook."
+            onChange={(e) =>
+              setSettings({ ...settings, welcomeDescription: e.target.value })
+            }
+          />
+          <TextField
+            id="privacy-policy-link"
+            label="Privacy-policy link"
+            readOnly
+            value={privacyHref(settings) || ""}
+            placeholder="No published policy"
+            description="Set or publish this link in Organization Settings → Privacy policy. Hosted and external policies use the same published setting across the application."
+          />
+          <TextField
+            id="footer-tagline"
+            label="Footer tagline"
+            maxLength={180}
+            value={settings.tagline}
+            onChange={(e) =>
+              setSettings({ ...settings, tagline: e.target.value })
+            }
+          />
           <FieldGroup className="brand-control">
             <legend>Accent color</legend>
             <FieldDescription>
@@ -251,7 +252,7 @@ export default function SiteSettingsPanel({
               )}
             </FieldGroup>
           )}
-        </section>
+        </SettingsGroup>
       )}
       {section === "docs" && (
         <section className="settings-section" id="settings-docs">
@@ -606,7 +607,12 @@ export default function SiteSettingsPanel({
       {section === "mcp" && <McpSettings production={production} />}
       {section !== "mcp" && (
         <div className="settings-save-bar">
-          <Button variant="default" disabled={busy}>
+          <Button
+            type="submit"
+            variant="default"
+            disabled={section !== "identity" && busy}
+            loading={section === "identity" && busy}
+          >
             {busy ? "Saving…" : "Save settings"}
           </Button>
           {notice && <Alert role="status">{notice}</Alert>}

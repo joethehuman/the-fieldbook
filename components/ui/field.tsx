@@ -15,7 +15,7 @@ export function Field({
     <label
       data-slot="field"
       className={cn(
-        "min-w-0 text-sm font-medium text-foreground",
+        "min-w-0 text-label font-medium text-foreground",
         orientation === "horizontal"
           ? "flex items-start gap-3 [&>[data-slot=choice]]:mt-0.5"
           : "grid gap-2",
@@ -46,7 +46,18 @@ export function FieldDescription({ className, ...props }: ComponentProps<"p">) {
   return (
     <p
       data-slot="field-description"
-      className={cn("text-sm leading-relaxed text-muted-foreground", className)}
+      className={cn("text-copy font-normal text-muted-foreground", className)}
+      {...props}
+    />
+  );
+}
+
+/** Persistent validation copy. The owning field connects it with aria-describedby. */
+export function FieldError({ className, ...props }: ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="field-error"
+      className={cn("text-copy font-normal text-destructive", className)}
       {...props}
     />
   );

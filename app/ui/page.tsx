@@ -1,4 +1,5 @@
 "use client";
+import { ControlExamples } from "./control-examples";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { Article, CourseOverview } from "@/components/patterns/reading";
 import { seedContent } from "@/lib/seed";
@@ -97,6 +98,7 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <ControlExamples />
       <section className="grid gap-4" aria-label="Save confirmations">
         <SectionHeader
           title={<h2>Save confirmations</h2>}
@@ -282,7 +284,7 @@ export default function ComponentCatalog() {
             <Button variant="outline">Cancel</Button>
             <Button variant="ghost">More</Button>
             <Button variant="destructive">Delete group</Button>
-            <Button disabled>Saving…</Button>
+            <Button loading>Saving…</Button>
             <Button asChild variant="link">
               <a href="#fields">Jump to fields</a>
             </Button>
