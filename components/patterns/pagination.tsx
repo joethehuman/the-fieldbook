@@ -20,7 +20,7 @@ export function Pagination({
   return (
     <nav
       aria-label={`${label} pages`}
-      className="flex flex-wrap items-center justify-between gap-3"
+      className="flex min-w-0 flex-wrap items-center justify-between gap-3"
     >
       <p role="status" className="text-copy text-muted-foreground">
         {total
@@ -28,7 +28,7 @@ export function Pagination({
           : "0 results"}
       </p>
       {pages > 1 && (
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Button
             type="button"
             variant="outline"

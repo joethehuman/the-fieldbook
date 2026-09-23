@@ -188,6 +188,9 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   const bold = page.getByRole("button", { name: "Bold", exact: true });
   const heading = page.getByRole("combobox", { name: "Heading level" });
   await heading.scrollIntoViewIfNeeded();
+  // At tablet widths the toolbar wraps. Reveal the destination button too,
+  // so native Tab scrolling does not immediately dismiss its focus tooltip.
+  await bold.scrollIntoViewIfNeeded();
   // Let native scroll notifications finish before opening a focus tooltip:
   // Radix intentionally dismisses tooltips when an ancestor scrolls.
   await page.evaluate(
