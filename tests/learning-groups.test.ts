@@ -141,6 +141,85 @@ test("Updates split once into relevant and other updates, independent of learnin
   assert.equal(guest.other.length, 3);
 });
 
+test("Update recommendations feature at most two recent inherited matches and retain every other published update", () => {
+  const data = freshWorkspace();
+  const base = data.content.find((c) => c.kind === "brief")!;
+  const many = Array.from({ length: 24 }, (_, index) => ({
+    ...base,
+    id: `update-${String(index).padStart(2, "0")}`,
+    groups: index === 23 ? ["parent"] : index % 3 === 0 ? ["sales"] : [],
+    updatedAt: `2026-09-${String(23 - index).padStart(2, "0")}T12:00:00.000Z`,
+  }));
+  const result = updatesForUser(many, data.users[0], [
+    { id: "parent", name: "Everyone" },
+    { id: "sales", name: "Sales", parentId: "parent" },
+  ]);
+  assert.deepEqual(
+    result.forYou.map((item) => item.id),
+    ["update-00", "update-03"],
+  );
+  assert.equal(result.other.length, 22);
+  assert.ok(result.other.some((item) => item.id === "update-23"));
+  assert.equal(
+    new Set([...result.forYou, ...result.other].map((item) => item.id)).size,
+    24,
+  );
+  assert.deepEqual(
+    [...result.other].map((item) => item.id),
+    many
+      .filter((item) => item.id !== "update-00" && item.id !== "update-03")
+      .map((item) => item.id),
+  );
+});
+
+test("Update feed handles zero, one, two, draft-only edits, duplicate IDs and invalid dates deterministically", () => {
+  const data = freshWorkspace();
+  const base = data.content.find((c) => c.kind === "brief")!;
+  const group = [{ id: "sales", name: "Sales" }];
+  const make = (id: string, patch: Partial<typeof base> = {}) => ({
+    ...base,
+    id,
+    groups: ["sales"],
+    ...patch,
+  });
+  for (const count of [0, 1, 2]) {
+    const result = updatesForUser(
+      Array.from({ length: count }, (_, i) => make(`item-${i}`)),
+      data.users[0],
+      group,
+    );
+    assert.equal(result.forYou.length, count);
+    assert.equal(result.other.length, 0);
+  }
+
+  const result = updatesForUser(
+    [
+      make("valid", { updatedAt: "2026-09-20T00:00:00.000Z" }),
+      make("created-fallback", {
+        updatedAt: "invalid",
+        createdAt: "2026-09-21T00:00:00.000Z",
+      }),
+      make("undated-b", { updatedAt: "invalid", createdAt: undefined }),
+      make("undated-a", { updatedAt: "", createdAt: undefined }),
+      make("draft", {
+        status: "draft",
+        updatedAt: "2026-09-30T00:00:00.000Z",
+      }),
+      make("valid", { updatedAt: "2026-09-01T00:00:00.000Z" }),
+    ],
+    data.users[0],
+    group,
+  );
+  assert.deepEqual(
+    result.forYou.map((item) => item.id),
+    ["created-fallback", "valid"],
+  );
+  assert.deepEqual(
+    result.other.map((item) => item.id),
+    ["undated-a", "undated-b"],
+  );
+});
+
 test("learning governance rejects bad team links, duplicate items and unpublished curricula", () => {
   const cid = "00000000-0000-4000-8000-000000000010";
   const input = {
