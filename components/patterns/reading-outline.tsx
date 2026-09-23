@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { Heading } from "@/lib/markdown-headings";
 
 export function ReadingOutline({
@@ -13,13 +14,20 @@ export function ReadingOutline({
   const ref = useRef<HTMLDetailsElement>(null);
   const headingKey = headings.map((heading) => heading.id).join("|");
   useEffect(() => {
-    const wide = matchMedia("(min-width: 80rem)");
+    const container = ref.current?.closest(".reading-layout");
+    if (!container) return;
+    let previousWide: boolean | undefined;
     const adapt = () => {
-      if (ref.current) ref.current.open = wide.matches;
+      const wide =
+        container.clientWidth >=
+        60 * parseFloat(getComputedStyle(document.documentElement).fontSize);
+      if (ref.current && wide !== previousWide) ref.current.open = wide;
+      previousWide = wide;
     };
+    const observer = new ResizeObserver(adapt);
+    observer.observe(container);
     adapt();
-    wide.addEventListener("change", adapt);
-    return () => wide.removeEventListener("change", adapt);
+    return () => observer.disconnect();
   }, []);
   useEffect(() => {
     let frame = 0;
@@ -83,7 +91,10 @@ export function ReadingOutline({
   return (
     <aside className="reading-outline" aria-label="On this page">
       <details ref={ref} open>
-        <summary>On this page</summary>
+        <summary>
+          On this page
+          <ChevronRight size={14} aria-hidden="true" />
+        </summary>
         <nav aria-label="Article sections">
           {headings.map((heading) => (
             <a
@@ -92,7 +103,11 @@ export function ReadingOutline({
               data-depth={heading.depth}
               aria-current={active === heading.id ? "location" : undefined}
               onClick={() => {
-                if (matchMedia("(max-width: 79.99rem)").matches && ref.current)
+                if (
+                  ref.current &&
+                  getComputedStyle(ref.current.closest(".reading-outline")!)
+                    .position !== "sticky"
+                )
                   ref.current.open = false;
               }}
             >

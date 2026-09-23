@@ -3,7 +3,7 @@ import { orderedDocs, type DocLink } from "@/lib/docs-navigation";
 import { ReadingOutline } from "./reading-outline";
 import type { ReactNode } from "react";
 import ReactMarkdown from "../Markdown";
-import { CheckCircle2, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import type { Content } from "@/lib/types";
 import { contentPath } from "@/lib/navigation";
 import { Button } from "../ui/button";
@@ -44,98 +44,110 @@ export function Article({
           : undefined
       }
     >
-      <article className="article">
-        {back}
-        <span className="eyebrow">{item.category}</span>
-        <h1>{item.title}</h1>
-        <p className="article-lede">{item.summary}</p>
-        <div className="article-meta">
-          <InitialsAvatar
-            initials={name
-              .split(" ")
-              .map((x) => x[0])
-              .slice(0, 2)
-              .join("")}
-            size="sm"
-          />
-          <span>{name}</span>
-          <span>·</span>
-          <span>
-            Updated{" "}
-            {new Date(item.updatedAt).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              timeZone: "UTC",
-            })}
-          </span>
-          <span>·</span>
-          <span>v{item.version}</span>
-        </div>
-        <div className="markdown">
-          <ReactMarkdown headingPrefix={isDoc ? prefix : undefined}>
-            {item.body}
-          </ReactMarkdown>
-        </div>
-        {children}
-        {isDoc && neighbors.some(Boolean) && (
-          <nav
-            className="document-pagination"
-            aria-label="Previous and next documents"
-          >
-            {neighbors.map(
-              (doc, direction) =>
-                doc && (
-                  <Button
-                    asChild
-                    variant="ghost"
-                    key={doc.id}
-                    className="min-w-0 w-full flex-col items-start justify-start gap-2 whitespace-normal p-4 text-left h-auto"
-                  >
-                    <a
-                      data-direction={direction === 0 ? "previous" : "next"}
-                      href={
-                        demo
-                          ? `#docs/${encodeURIComponent(doc.id)}`
-                          : contentPath("doc", doc.id)
-                      }
-                      onClick={
-                        onDocument
-                          ? (event) => {
-                              if (
-                                event.button ||
-                                event.metaKey ||
-                                event.ctrlKey ||
-                                event.shiftKey ||
-                                event.altKey
-                              )
-                                return;
-                              event.preventDefault();
-                              onDocument(doc.id);
-                            }
-                          : undefined
-                      }
+      <div className="reading-columns">
+        <article className="article">
+          <header className="article-header">
+            <div className="article-navigation">
+              {back}
+              <span>{item.category}</span>
+            </div>
+            <h1>{item.title}</h1>
+            <p className="article-lede">{item.summary}</p>
+            <div className="article-meta">
+              <span className="article-author">
+                <InitialsAvatar
+                  initials={name
+                    .split(" ")
+                    .map((x) => x[0])
+                    .slice(0, 2)
+                    .join("")}
+                  size="sm"
+                />
+                <span>{name}</span>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                Updated{" "}
+                {new Date(item.updatedAt).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                  timeZone: "UTC",
+                })}
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>v{item.version}</span>
+            </div>
+          </header>
+          <div className="markdown">
+            <ReactMarkdown headingPrefix={isDoc ? prefix : undefined}>
+              {item.body}
+            </ReactMarkdown>
+          </div>
+          {children}
+          {isDoc && neighbors.some(Boolean) && (
+            <nav
+              className="document-pagination"
+              aria-label="Previous and next documents"
+            >
+              {neighbors.map(
+                (doc, direction) =>
+                  doc && (
+                    <Button
+                      asChild
+                      variant="ghost"
+                      key={doc.id}
+                      className="document-pagination-link h-auto min-w-0 justify-start whitespace-normal p-3 text-left"
                     >
-                      <span className="text-xs font-normal text-muted-foreground">
-                        {direction === 0 ? "← Previous" : "Next →"}
-                      </span>
-                      <span className="[overflow-wrap:anywhere]">
-                        {doc.title}
-                      </span>
-                    </a>
-                  </Button>
-                ),
-            )}
-          </nav>
+                      <a
+                        data-direction={direction === 0 ? "previous" : "next"}
+                        href={
+                          demo
+                            ? `#docs/${encodeURIComponent(doc.id)}`
+                            : contentPath("doc", doc.id)
+                        }
+                        onClick={
+                          onDocument
+                            ? (event) => {
+                                if (
+                                  event.button ||
+                                  event.metaKey ||
+                                  event.ctrlKey ||
+                                  event.shiftKey ||
+                                  event.altKey
+                                )
+                                  return;
+                                event.preventDefault();
+                                onDocument(doc.id);
+                              }
+                            : undefined
+                        }
+                      >
+                        {direction === 0 && (
+                          <ChevronLeft aria-hidden="true" size={16} />
+                        )}
+                        <span className="grid min-w-0 gap-1">
+                          <span className="text-xs font-normal text-muted-foreground">
+                            {direction === 0 ? "Previous" : "Next"}
+                          </span>
+                          <span className="[overflow-wrap:anywhere]">
+                            {doc.title}
+                          </span>
+                        </span>
+                        {direction === 1 && (
+                          <ChevronRight aria-hidden="true" size={16} />
+                        )}
+                      </a>
+                    </Button>
+                  ),
+              )}
+            </nav>
+          )}
+        </article>
+        {isDoc && (
+          <ReadingOutline key={item.id} headings={headings} prefix={prefix} />
         )}
-        <div className="article-end">
-          <CheckCircle2 size={18} />
-          You’re at the end. Put it into practice.
-        </div>
-      </article>
-      {isDoc && (
-        <ReadingOutline key={item.id} headings={headings} prefix={prefix} />
-      )}
+      </div>
     </div>
   );
 }

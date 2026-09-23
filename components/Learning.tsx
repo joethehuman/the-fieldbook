@@ -1,4 +1,5 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { Badge } from "@/components/ui/badge";
 import { SearchField } from "./patterns/search-field";
 import { Card } from "./ui/card";
@@ -25,7 +26,7 @@ import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { useState } from "react";
 import { CourseRow } from "./patterns/course-row";
-import { Checkbox } from "./ui/choice";
+import { Switch } from "./ui/switch";
 import {
   courseProgress,
   learningCollection,
@@ -398,9 +399,9 @@ export default function Learning({
           )}
           {view === "assigned" && (
             <Field orientation="horizontal">
-              <Checkbox
+              <Switch
                 checked={hideCompleted}
-                onChange={(event) => setHideCompleted(event.target.checked)}
+                onCheckedChange={(checked) => setHideCompleted(checked === true)}
               />
               Hide completed
             </Field>
@@ -425,8 +426,7 @@ export default function Learning({
             </SearchField>
           </Field>
           {view !== "home" && (
-            <Field>
-              Channel
+            <FormField label="Channel">
               <SelectField
                 aria-label="Channel"
                 value={topic}
@@ -438,10 +438,9 @@ export default function Learning({
                   </option>
                 ))}
               </SelectField>
-            </Field>
+            </FormField>
           )}
-          <Field>
-            Sort courses
+          <FormField label="Sort courses">
             <SelectField value={sort} onValueChange={setSort}>
               <option value="recommended">Recommended order</option>
               <option value="added">Recently added</option>
@@ -449,7 +448,7 @@ export default function Learning({
               <option value="updated">Recently updated</option>
               <option value="oldest">Oldest update first</option>
             </SelectField>
-          </Field>
+          </FormField>
         </BrowseToolbar>
         {view === "assigned" || view === "curricula" ? (
           <CardGrid>{browserCards.map(displayCard)}</CardGrid>

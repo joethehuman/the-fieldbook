@@ -1,4 +1,7 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
+import { TextField } from "./patterns/text-field";
+import { SettingsSection as SettingsGroup } from "./patterns/settings-section";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
 import { useInteractionDialog } from "./ui/interaction-dialog";
@@ -66,7 +69,13 @@ export default function SiteSettingsPanel({
       `${next[target]} moved to position ${target + 1}. Save settings to apply the order.`,
     );
   }
+  const [nameError, setNameError] = useState("");
   const logoInput = useRef<HTMLInputElement>(null);
+  const saveAction = (
+    <Button type="submit" loading={busy}>
+      {busy ? "Saving…" : "Save settings"}
+    </Button>
+  );
   return (
     <form
       className="settings-panel"
@@ -91,65 +100,64 @@ export default function SiteSettingsPanel({
       }}
     >
       {section === "identity" && (
-        <section
-          className="settings-section"
+        <SettingsGroup
           tabIndex={-1}
           id="settings-identity"
+          actions={saveAction}
+          title={<h3>Installation branding</h3>}
+          guidance="The same identity appears in your workspace and on account pages. The saved name, logo, welcome description and published privacy link are visible before sign-in, including on private installations."
         >
-          <h3>Installation branding</h3>
-          <p className="muted">
-            The same identity appears in your workspace and on account pages.
-            The saved name, logo, welcome description and published privacy link
-            are visible before sign-in, including on private installations.
-          </p>
-          <Field>
-            Installation name
-            <Input
-              required
-              maxLength={60}
-              value={settings.name}
-              onChange={(e) =>
-                setSettings({ ...settings, name: e.target.value })
-              }
-            />
-          </Field>
-          <Field>
-            Welcome description (optional)
-            <Input
-              maxLength={180}
-              value={settings.welcomeDescription || ""}
-              onChange={(e) =>
-                setSettings({ ...settings, welcomeDescription: e.target.value })
-              }
-            />
-            <FieldDescription>
-              A short welcome on the sign-in page. Authentication instructions
-              are provided by Fieldbook.
-            </FieldDescription>
-          </Field>
-          <Field>
-            Privacy-policy link
-            <Input
-              readOnly
-              value={privacyHref(settings) || ""}
-              placeholder="No published policy"
-            />
-            <FieldDescription>
-              Set or publish this link in Organization Settings → Privacy
-              policy. Hosted and external policies use the same published
-              setting across the application.
-            </FieldDescription>
-          </Field>
-          <Field>
-            Footer tagline
-            <Input
-              maxLength={180}
-              value={settings.tagline}
-              onChange={(e) =>
-                setSettings({ ...settings, tagline: e.target.value })
-              }
-            />
-          </Field>
+          <TextField
+            id="installation-name"
+            label="Installation name"
+            description="Up to 60 characters."
+            required
+            maxLength={60}
+            value={settings.name}
+            error={nameError}
+            onBlur={(e) =>
+              setNameError(
+                e.target.validity.valueMissing
+                  ? "Installation name is required."
+                  : "",
+              )
+            }
+            onInvalid={() => setNameError("Installation name is required.")}
+            onChange={(e) => {
+              setSettings({ ...settings, name: e.target.value });
+              if (nameError)
+                setNameError(
+                  e.target.value ? "" : "Installation name is required.",
+                );
+            }}
+          />
+          <TextField
+            id="welcome-description"
+            label="Welcome description (optional)"
+            maxLength={180}
+            value={settings.welcomeDescription || ""}
+            description="A short welcome on the sign-in page. Authentication instructions are provided by Fieldbook."
+            onChange={(e) =>
+              setSettings({ ...settings, welcomeDescription: e.target.value })
+            }
+          />
+          <TextField
+            id="privacy-policy-link"
+            label="Privacy-policy link"
+            readOnly
+            value={privacyHref(settings) || ""}
+            placeholder="No published policy"
+            description="Set or publish this link in Organization Settings → Privacy policy. Hosted and external policies use the same published setting across the application."
+          />
+          <TextField
+            id="footer-tagline"
+            label="Footer tagline"
+            maxLength={180}
+            value={settings.tagline}
+            onChange={(e) =>
+              setSettings({ ...settings, tagline: e.target.value })
+            }
+          />
           <FieldGroup className="brand-control">
             <legend>Accent color</legend>
             <FieldDescription>
@@ -251,15 +259,16 @@ export default function SiteSettingsPanel({
               )}
             </FieldGroup>
           )}
-        </section>
+        </SettingsGroup>
       )}
       {section === "docs" && (
-        <section className="settings-section" id="settings-docs">
-          <p>
-            Create sections and drag them into order for the Docs sidebar and
-            overview. You can also use the arrow buttons or focus a drag handle
-            and press the up and down arrow keys.
-          </p>
+        <SettingsGroup
+          id="settings-docs"
+          title={<h3>Document sections</h3>}
+          description="Arrange the sections in your Docs navigation."
+          guidance="Drag sections, use the arrow buttons, or focus a drag handle and press Up or Down. Empty sections remain available in the editor; readers see sections with published documents."
+          actions={saveAction}
+        >
           {docSections.length ? (
             <ol className="doc-order-list">
               {docSections.map((name, index) => (
@@ -371,26 +380,28 @@ export default function SiteSettingsPanel({
               setNotice(`${name} created. Save settings to keep it.`);
             }}
           />
-          <FieldDescription>
-            Empty sections stay available here and in the editor. Only sections
-            with published documents are shown to readers.
-          </FieldDescription>
-        </section>
+        </SettingsGroup>
       )}
       {section === "courses" && (
-        <FieldGroup
-          className="settings-section"
-          tabIndex={-1}
+        <SettingsGroup
           id="settings-courses"
+          actions={saveAction}
+          tabIndex={-1}
+          disabled={busy}
+          title={<h3>Course completion windows</h3>}
+          description="Set how long learners have to complete assigned courses."
+          guidance={
+            <div id="completion-window-help">
+              Publishing adds to the library. Only courses selected for a group
+              join that group’s assigned learning list. Newly assigned courses
+              get a full catch-up window, even near the end of onboarding.
+              Changes recalculate targets for everyone.
+            </div>
+          }
         >
-          <legend>Course completion windows</legend>
-          <p>
-            Publishing adds to the library. Only courses selected for a group
-            join that group’s assigned learning list.
-          </p>
-          <Field>
-            New user onboarding window (days)
+          <FormField label="New user onboarding window (days)">
             <Input
+              aria-describedby="completion-window-help"
               type="number"
               required
               min={1}
@@ -403,10 +414,10 @@ export default function SiteSettingsPanel({
                 })
               }
             />
-          </Field>
-          <Field>
-            Ongoing catch-up window (days)
+          </FormField>
+          <FormField label="Ongoing catch-up window (days)">
             <Input
+              aria-describedby="completion-window-help"
               type="number"
               required
               min={1}
@@ -419,22 +430,23 @@ export default function SiteSettingsPanel({
                 })
               }
             />
-          </Field>
-          <small>
-            Newly assigned courses get a full catch-up window, even near the end
-            of onboarding. Changes recalculate targets for everyone.
-          </small>
-        </FieldGroup>
+          </FormField>
+        </SettingsGroup>
       )}
       {section === "access" && (
-        <section
-          className="settings-section"
-          tabIndex={-1}
+        <SettingsGroup
           id="settings-access"
+          actions={saveAction}
+          tabIndex={-1}
+          disabled={busy}
+          title={<h3>Access and accounts</h3>}
+          guidance={
+            production
+              ? "Google is the sign-in provider. Provider credentials and the initial administrator are configured securely in the deployment settings."
+              : "Access settings are illustrative in the demo. Profiles remain browser-local simulations."
+          }
         >
-          <h3>Access and accounts</h3>
-          <Field>
-            Who can browse?
+          <FormField label="Who can browse?">
             <SelectField
               disabled={busy}
               value={settings.access}
@@ -448,7 +460,7 @@ export default function SiteSettingsPanel({
               <option value="public">Anyone — accounts are optional</option>
               <option value="private">Signed-in members only</option>
             </SelectField>
-          </Field>
+          </FormField>
           {settings.access === "public" && (
             <FieldGroup disabled={busy}>
               <legend>Guest recommendations</legend>
@@ -456,8 +468,7 @@ export default function SiteSettingsPanel({
                 Choose a group to personalize For you in Updates and Courses for
                 visitors who aren’t signed in.
               </FieldDescription>
-              <Field>
-                Learning group for guests
+              <FormField label="Learning group for guests">
                 <SelectField
                   value={
                     settings.guestGroupId
@@ -489,7 +500,7 @@ export default function SiteSettingsPanel({
                     </option>
                   ))}
                 </SelectField>
-              </Field>
+              </FormField>
               <FieldDescription id="guest-recommendations-status">
                 {!settings.guestGroupId
                   ? "Your library is public. Select a group to recommend content to guests."
@@ -553,8 +564,7 @@ export default function SiteSettingsPanel({
               </ActionGroup>
             </FieldGroup>
           )}
-          <Field>
-            New learner accounts
+          <FormField label="New learner accounts">
             <SelectField
               disabled={busy}
               value={settings.registration}
@@ -568,13 +578,8 @@ export default function SiteSettingsPanel({
               <option value="open">Allow registration with Google</option>
               <option value="closed">Existing members only</option>
             </SelectField>
-          </Field>
-          <p className="muted">
-            {production
-              ? "Google is the sign-in provider. Provider credentials and the initial administrator are configured securely in the deployment settings."
-              : "Access settings are illustrative in the demo. Profiles remain browser-local simulations."}
-          </p>
-        </section>
+          </FormField>
+        </SettingsGroup>
       )}
       {section === "privacy" && (
         <section
@@ -584,6 +589,7 @@ export default function SiteSettingsPanel({
         >
           {" "}
           <PrivacySettingsPanel
+            actions={saveAction}
             settings={settings}
             onChange={setSettings}
             busy={busy}
@@ -604,12 +610,9 @@ export default function SiteSettingsPanel({
         </section>
       )}
       {section === "mcp" && <McpSettings production={production} />}
-      {section !== "mcp" && (
+      {section !== "mcp" && notice && (
         <div className="settings-save-bar">
-          <Button variant="default" disabled={busy}>
-            {busy ? "Saving…" : "Save settings"}
-          </Button>
-          {notice && <Alert role="status">{notice}</Alert>}
+          <Alert role="status">{notice}</Alert>
         </div>
       )}
     </form>
@@ -624,26 +627,34 @@ function McpSettings({ production }: { production: boolean }) {
   }, []);
   if (!production)
     return (
-      <section className="settings-section">
-        <h3>Connect an AI tool</h3>
+      <SettingsGroup
+        id="mcp-demo"
+        title={<h3>Connect an AI tool</h3>}
+        guidance="Connections are available in an installed organization; this demo does not provide an MCP server."
+      >
         <p>
           MCP lets administrators connect tools such as ChatGPT and Claude to
-          their Fieldbook installation. Connections are available in an
-          installed organization; this demo does not provide an MCP server.
+          their Fieldbook installation.
         </p>
-      </section>
+      </SettingsGroup>
     );
   return (
-    <section className="settings-section mcp-settings">
-      <h3>Connect an AI tool</h3>
-      <p>
-        Add Fieldbook as a custom MCP server in ChatGPT, Claude, or another
-        compatible tool.
-      </p>
-      <Field>
-        Server address
+    <SettingsGroup
+      id="mcp-connection"
+      title={<h3>Connect an AI tool</h3>}
+      description="Add Fieldbook as a custom MCP server in ChatGPT, Claude, or another compatible tool."
+      guidance="Review or revoke access from connected AI tools."
+      actions={
+        <Button asChild variant="outline">
+          <a href="/connections">Manage connections →</a>
+        </Button>
+      }
+    >
+      <div className="grid gap-2">
+        <Field htmlFor="mcp-server-address">Server address</Field>
         <div className="mcp-address">
           <Input
+            id="mcp-server-address"
             readOnly
             value={address}
             aria-label="MCP server address"
@@ -664,22 +675,13 @@ function McpSettings({ production }: { production: boolean }) {
             Copy
           </Button>
         </div>
-      </Field>
+      </div>
       <FieldDescription role="status">{copied}</FieldDescription>
       <ol className="mcp-steps">
         <li>Add the server address in your AI tool’s connection settings.</li>
         <li>Sign in to Fieldbook as an administrator.</li>
         <li>Review and approve the requested connection.</li>
       </ol>
-      <div className="mcp-manage">
-        <div>
-          <h3>Connected tools</h3>
-          <p>Review or revoke access from connected AI tools.</p>
-        </div>
-        <Button asChild variant="outline">
-          <a href="/connections">Manage connections →</a>
-        </Button>
-      </div>
-    </section>
+    </SettingsGroup>
   );
 }

@@ -1,18 +1,22 @@
 import { CheckCircle2 } from "lucide-react";
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
+
+function percentage(value: number) {
+  return Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
+}
+
+/** Determinate progress only. Use Spinner/Skeleton for indeterminate activity. */
 export function Progress({
   value,
   className,
   ...props
 }: Omit<ComponentProps<"div">, "children"> & { value: number }) {
-  const percent = Math.max(
-    0,
-    Math.min(100, Number.isFinite(value) ? value : 0),
-  );
+  const percent = percentage(value);
   return (
     <div
       role="progressbar"
+      aria-label="Course progress"
       aria-valuenow={percent}
       aria-valuemin={0}
       aria-valuemax={100}
@@ -30,22 +34,71 @@ export function Progress({
   );
 }
 
-export function ProgressRing({ value }: { value: number }) {
-  const percent = Math.max(
-    0,
-    Math.min(100, Number.isFinite(value) ? value : 0),
+/** Shared ring geometry. The parent owns accessible progress and visible text. */
+function RingGraphic({
+  value,
+  summary = false,
+}: {
+  value: number;
+  summary?: boolean;
+}) {
+  return (
+    <svg
+      viewBox="0 0 40 40"
+      aria-hidden="true"
+      className={
+        summary
+          ? "absolute inset-0 size-full -rotate-90"
+          : "size-5 shrink-0 -rotate-90"
+      }
+    >
+      <circle
+        cx="20"
+        cy="20"
+        r="17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        className="text-border"
+      />
+      <circle
+        cx="20"
+        cy="20"
+        r="17"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="3"
+        pathLength="100"
+        strokeDasharray={`${value} 100`}
+        strokeLinecap={value ? "round" : "butt"}
+        className={summary ? "text-brand" : "text-primary"}
+      />
+    </svg>
   );
+}
+
+export function ProgressRing({
+  value,
+  label = "Assigned course progress",
+}: {
+  value: number;
+  label?: string;
+}) {
+  const percent = percentage(value);
   return (
     <div
-      className="grid aspect-square w-34 max-w-full shrink-0 place-items-center rounded-full p-2"
-      style={{
-        background: `conic-gradient(var(--brand) ${percent}%, var(--muted) 0)`,
-      }}
-      role="img"
-      aria-label={`${percent}% complete`}
+      data-slot="progress-ring"
+      className="relative grid aspect-square w-34 max-w-full shrink-0 place-items-center rounded-full p-4"
+      role="progressbar"
+      aria-label={label}
+      aria-valuenow={percent}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuetext={`${percent}% complete`}
     >
-      <div className="grid size-full place-content-center rounded-full bg-card text-center">
-        <strong className="text-3xl leading-tight">
+      <RingGraphic value={percent} summary />
+      <div aria-hidden="true" className="grid place-content-center text-center">
+        <strong className="text-3xl leading-tight tabular-nums">
           {percent}
           <small>%</small>
         </strong>
@@ -55,7 +108,7 @@ export function ProgressRing({ value }: { value: number }) {
   );
 }
 
-/** Compact companion to the summary ring, shared by course and curriculum cards. */
+/** Compact course/curriculum state. Completion remains the caller's version-aware result. */
 export function ProgressStatus({
   value,
   complete,
@@ -65,9 +118,7 @@ export function ProgressStatus({
   complete: boolean;
   started: boolean;
 }) {
-  const percent = complete
-    ? 100
-    : Math.min(99, Math.max(0, Number.isFinite(value) ? value : 0));
+  const percent = complete ? 100 : Math.min(99, percentage(value));
   const label = complete
     ? "Completed"
     : started
@@ -75,40 +126,18 @@ export function ProgressStatus({
       : "Not started";
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-2 text-xs font-medium text-muted-foreground"
+      className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground"
       data-slot="progress-status"
     >
       {complete ? (
-        <CheckCircle2 aria-hidden="true" className="size-5 text-success" />
+        <CheckCircle2
+          aria-hidden="true"
+          className="size-5 shrink-0 text-success"
+        />
       ) : (
-        <svg
-          viewBox="0 0 24 24"
-          className="size-5 -rotate-90"
-          role="img"
-          aria-label={`${percent}% complete`}
-        >
-          <circle
-            cx="12"
-            cy="12"
-            r="9"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            className="text-muted"
-          />
-          <circle
-            cx="12"
-            cy="12"
-            r="9"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="3"
-            pathLength="100"
-            strokeDasharray={`${percent} 100`}
-            strokeLinecap={percent ? "round" : "butt"}
-            className="text-primary"
-          />
-        </svg>
+        <span role="img" aria-label={`${percent}% complete`}>
+          <RingGraphic value={percent} />
+        </span>
       )}
       {label}
     </span>

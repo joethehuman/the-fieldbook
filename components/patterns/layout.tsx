@@ -15,7 +15,7 @@ export function PageHeader({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="page-header"
       className={cn(
-        "grid gap-2 [&_h1]:text-3xl [&_h1]:font-semibold [&_h1]:tracking-tight [&>p]:max-w-prose [&>p]:text-muted-foreground",
+        "grid gap-2 [&_h1]:text-page [&_h1]:font-semibold [&_h1]:tracking-tight [&>p]:max-w-prose [&>p]:text-muted-foreground",
         className,
       )}
       {...props}
@@ -97,7 +97,7 @@ export function StatusActions({
     </div>
   );
 }
-export function CardFooter({
+export function ContentCardFooter({
   children,
   action,
 }: {
@@ -110,10 +110,7 @@ export function CardFooter({
       className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground"
     >
       {children}
-      <span
-        data-slot="card-action"
-        className="inline-flex shrink-0 items-center gap-2 whitespace-nowrap"
-      >
+      <span data-slot="card-action" className="inline-flex items-center gap-2">
         {action}
       </span>
     </div>
@@ -133,7 +130,7 @@ export function FilterBar({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="filter-bar"
       className={cn(
-        "flex min-w-0 flex-wrap items-end gap-4 rounded-lg border border-border bg-muted/40 p-4 [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1",
+        "flex min-w-0 flex-wrap items-start gap-4 rounded-lg border border-border bg-muted/40 p-4 [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1",
         className,
       )}
       {...props}
@@ -145,7 +142,7 @@ export function EmptyState({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="empty"
       className={cn(
-        "grid gap-3 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h3]:text-base [&_h3]:font-medium [&_svg]:mx-auto",
+        "grid min-w-0 justify-items-center gap-3 rounded-lg border border-border px-4 py-8 sm:px-8 text-center text-copy [overflow-wrap:anywhere] text-muted-foreground [&_h2]:text-base [&_h2]:font-medium [&_h2]:text-foreground [&_h3]:text-base [&_h3]:font-medium [&_h3]:text-foreground [&_svg]:mx-auto",
         className,
       )}
       {...props}

@@ -18,7 +18,7 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex min-h-9 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-background px-3 py-2 text-left text-sm font-normal text-foreground shadow-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 [&>span:first-child]:truncate [&>svg]:shrink-0 [&>svg]:text-muted-foreground",
+        "flex min-h-control w-full min-w-0 items-center justify-between gap-2 rounded-control border border-control-border bg-background px-3 py-1.5 text-left text-label font-normal text-foreground outline-none transition-colors motion-reduce:transition-none hover:enabled:border-control-hover focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border aria-invalid:border-destructive [&>span:first-child]:min-w-0 [&>span:first-child]:whitespace-normal [&>span:first-child]:[overflow-wrap:anywhere] [&>svg]:shrink-0 [&>svg]:text-muted-foreground",
         className,
       )}
       {...props}
@@ -70,7 +70,7 @@ export function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex min-h-9 cursor-default select-none items-center rounded-sm py-2 pr-8 pl-3 text-sm outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:font-medium",
+        "relative flex min-h-9 cursor-default select-none items-center rounded-sm py-2 pr-8 pl-3 text-label [overflow-wrap:anywhere] outline-none data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground data-[state=checked]:font-medium",
         className,
       )}
       {...props}

@@ -1,4 +1,5 @@
 "use client";
+import { Note } from "@/components/ui/note";
 import { AppBar } from "./patterns/app-bar";
 import { DocumentTree } from "./patterns/document-tree";
 import type { ReadingState } from "@/lib/reading";
@@ -33,6 +34,7 @@ import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
@@ -47,7 +49,6 @@ import {
   BookOpen,
   GraduationCap,
   Newspaper,
-  ArrowUpRight,
   ArrowRight,
   ChevronRight,
   Check,
@@ -1081,7 +1082,7 @@ export default function Fieldbook({
             Profiles simulate login and roles; they are not secure accounts.
             Don’t enter private information. Nothing is synced to a server.
           </p>
-          <ActionGroup>
+          <DialogFooter>
             <Button variant="outline" onClick={exportData}>
               <Download size={16} />
               Export demo data
@@ -1090,7 +1091,7 @@ export default function Fieldbook({
               <RotateCcw size={16} />
               Reset sample data
             </Button>
-          </ActionGroup>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
@@ -1314,9 +1315,9 @@ export function Course({
                   Your browser does not support video playback.
                 </video>
               ) : lesson.videoUrl ? (
-                <Alert>
+                <Note>
                   This video URL is not supported. Ask an editor to update it.
-                </Alert>
+                </Note>
               ) : null}
               <div className="markdown">
                 <ReactMarkdown>{lesson.body}</ReactMarkdown>
@@ -1328,7 +1329,7 @@ export function Course({
                     Lesson completed
                   </Badge>
                 )}
-                <Button variant="default" onClick={mark} disabled={busy}>
+                <Button variant="default" onClick={mark} loading={busy}>
                   {step === c.lessons.length - 1
                     ? "Continue to quiz"
                     : "Complete & continue"}
@@ -1345,9 +1346,9 @@ export function Course({
                 try again as often as you need.
               </p>
               {!allDone && (
-                <Alert>
+                <Note>
                   Complete all lessons before submitting your answers.
-                </Alert>
+                </Note>
               )}
               {c.questions.map((q, i) => (
                 <FieldGroup className="quiz-question" key={q.id}>

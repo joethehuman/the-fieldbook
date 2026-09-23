@@ -1,11 +1,12 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
 import { CsvExport } from "./patterns/csv-export";
 import { courseProgressRow, courseProgressCsv } from "@/lib/reporting";
 import { DataTable } from "./patterns/data-table";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
+
 import { SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { ActionGroup } from "@/components/ui/action-group";
 import {
@@ -328,8 +329,7 @@ export function Assignments({
         />
       </SectionHeader>
       {!person && !scope.groupId && (
-        <Field>
-          Group
+        <FormField label="Group">
           <SelectField
             value={selected}
             onValueChange={(value) => {
@@ -343,7 +343,7 @@ export function Assignments({
               </option>
             ))}
           </SelectField>
-        </Field>
+        </FormField>
       )}
       {!person && group && (
         <form
@@ -361,8 +361,7 @@ export function Assignments({
               });
           }}
         >
-          <Field>
-            Add course
+          <FormField label="Add course">
             <SelectField
               value={
                 available.some((c) => c.id === courseId)
@@ -382,7 +381,7 @@ export function Assignments({
                 <option value="">No additional published courses</option>
               )}
             </SelectField>
-          </Field>
+          </FormField>
           <Button variant="default" disabled={busy || !available.length}>
             Add to assigned courses
           </Button>
@@ -397,14 +396,13 @@ export function Assignments({
         courses. Manage these windows in Settings.
       </p>
       {notice && <Alert variant="destructive">{notice}</Alert>}
-      <Field>
-        Find a course
+      <FormField label="Find a course">
         <Input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search assigned courses"
         />
-      </Field>
+      </FormField>
       <TableContainer>
         <DataTable layout="courses">
           <TableHeader>

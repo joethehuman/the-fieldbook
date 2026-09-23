@@ -130,14 +130,15 @@ for (const app of ["demo", "production"] as const) {
       "text-align",
       "left",
     );
-    await tree.locator("summary").last().click();
-    await expect(tree.locator("details").last()).not.toHaveAttribute(
-      "open",
-      "",
-    );
-    await tree.locator("summary").last().focus();
+    await tree.locator(".document-branch-trigger").last().click();
+    await expect(
+      tree.locator(".document-branch-trigger").last(),
+    ).toHaveAttribute("aria-expanded", "false");
+    await tree.locator(".document-branch-trigger").last().focus();
     await page.keyboard.press("Enter");
-    await expect(tree.locator("details").last()).toHaveAttribute("open", "");
+    await expect(
+      tree.locator(".document-branch-trigger").last(),
+    ).toHaveAttribute("aria-expanded", "true");
     await page.screenshot({
       animations: "disabled",
       path: info.outputPath(`${app}-tree-scrolled.png`),

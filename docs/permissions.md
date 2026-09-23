@@ -31,3 +31,14 @@ Before using an installation, verify these rules with separate administrator, le
 ## Guest recommendations
 
 Only administrators configure the optional guest learning group. Anonymous visitors receive a minimal synthetic recommendation projection of published content, never real group membership, team links or governance revisions. Public access is checked before reading the catalog. No people records, membership changes, deadlines or reporting entries are created. Signing in uses account groups; browser-progress import does not enroll an account. See [guest recommendations](guest-recommendations.md).
+
+
+## Managing the reporting hierarchy
+
+Administrators use **Teams** to search and expand the hierarchy, then open a team’s **Members** or **Subteams** view. Each person has one optional direct team; including subteams shows each person once. Pending accounts are managed in People. Team membership does not grant management access.
+
+**Create subteam** creates a new team. **Move existing team here** selects an existing branch. **Team actions → Move team** chooses a different parent or **Top-level team** to detach the branch. The review shows old/new paths, the number of teams and registered people involved, and the active managers who actually gain or lose scope. Overlapping management roots are accounted for; administrators retain organization-wide access. Self/descendant moves are rejected.
+
+Only the branch root’s parent changes. Subteams, managers and direct memberships stay attached to their stable team IDs. Learning-group links and saved course progress are unchanged by a hierarchy move. Adding an individual to a different direct team is a separate operation and can change team-linked learning assignments.
+
+**Delete empty team** is available only after direct members (including inactive accounts), pending-account assignments, immediate subteams and learning-group links have been removed or moved in separate saved changes. A manager assigned to an otherwise empty team does not block deletion. Deleting a team is different from detaching it. The server repeats these checks under the governance lock and retains administrator authorization, revision checks and audit history. Apply `20260923180607_guarded_team_deletion.sql` before using deletion in the server application.

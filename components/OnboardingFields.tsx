@@ -1,6 +1,7 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
-import { FieldGroup, Field } from "@/components/ui/field";
+import { FieldGroup, FieldDescription } from "@/components/ui/field";
 import { SelectField } from "./ui/select";
 export function OnboardingFields({
   value,
@@ -12,9 +13,9 @@ export function OnboardingFields({
   return (
     <FieldGroup>
       <legend>Onboarding</legend>
-      <Field>
-        Starting point
+      <FormField label="Starting point">
         <SelectField
+          aria-describedby="onboarding-target-help"
           value={value ? "new" : "existing"}
           onValueChange={(value) =>
             onChange(
@@ -27,22 +28,22 @@ export function OnboardingFields({
           <option value="existing">Existing user — stay current</option>
           <option value="new">New user — onboarding window</option>
         </SelectField>
-      </Field>
+      </FormField>
       {value && (
-        <Field>
-          Onboarding start date
+        <FormField label="Onboarding start date">
           <Input
+            aria-describedby="onboarding-target-help"
             type="date"
             required
             value={value}
             onChange={(e) => onChange(e.target.value)}
           />
-        </Field>
+        </FormField>
       )}
-      <small>
+      <FieldDescription id="onboarding-target-help">
         The organization course completion windows determine the target. First
         login does not start onboarding.
-      </small>
+      </FieldDescription>
     </FieldGroup>
   );
 }

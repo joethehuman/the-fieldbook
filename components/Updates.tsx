@@ -4,7 +4,7 @@ import { ContentAction } from "@/components/patterns/content-action";
 import {
   SectionHeader,
   EmptyState,
-  CardFooter,
+  ContentCardFooter,
 } from "@/components/patterns/layout";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { updateFeedTimestamp, updatesForUser } from "@/lib/learning-groups";
@@ -14,7 +14,7 @@ import {
   type User,
   type Group,
 } from "@/lib/types";
-import { Button } from "@/components/ui/button";
+import { LoadMore } from "@/components/patterns/load-more";
 
 const PAGE_SIZE = 10;
 
@@ -95,14 +95,12 @@ export default function Updates({
         />
         <UpdateCards items={visibleUpdates} onOpen={onOpen} />
         {other.length > 0 && (
-          <p className="sr-only" role="status" aria-live="polite">
-            Showing {visibleUpdates.length} of {other.length} updates.
-          </p>
-        )}
-        {visibleCount < other.length && (
-          <Button variant="outline" onClick={loadMore}>
-            Load more
-          </Button>
+          <LoadMore
+            shown={visibleUpdates.length}
+            total={other.length}
+            noun="updates"
+            onLoadMore={loadMore}
+          />
         )}
         {!other.length && (
           <EmptyState>
@@ -138,7 +136,7 @@ function UpdateCards({
             <span className="eyebrow">{b.category}</span>
             <h3>{b.title}</h3>
             <p>{b.summary}</p>
-            <CardFooter
+            <ContentCardFooter
               action={
                 <>
                   Read the update <ArrowRight size={16} />
@@ -146,7 +144,7 @@ function UpdateCards({
               }
             >
               {formatUpdateDate(b)}
-            </CardFooter>
+            </ContentCardFooter>
           </div>
         </ContentAction>
       ))}

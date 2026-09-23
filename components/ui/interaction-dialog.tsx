@@ -1,7 +1,8 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
-import { dialogOverlayClass, dialogContentClass } from "./dialog";
+
+import { DialogFooter, dialogOverlayClass, dialogContentClass } from "./dialog";
 import { cn } from "@/lib/utils";
 import {
   createContext,
@@ -108,7 +109,7 @@ export function InteractionDialogProvider({
             <AlertDialog.Description className="text-sm leading-relaxed text-muted-foreground">
               {request?.message}
             </AlertDialog.Description>
-            <div className="mt-6 flex justify-end gap-2">
+            <DialogFooter>
               <AlertDialog.Cancel asChild>
                 <Button
                   type="button"
@@ -123,7 +124,7 @@ export function InteractionDialogProvider({
                   Confirm
                 </Button>
               </AlertDialog.Action>
-            </div>
+            </DialogFooter>
           </AlertDialog.Content>
         </AlertDialog.Portal>
       </AlertDialog.Root>
@@ -152,8 +153,7 @@ export function InteractionDialogProvider({
                 finish(value.trim());
               }}
             >
-              <Field>
-                {request?.message}
+              <FormField label={request?.message}>
                 <Input
                   autoFocus
                   required
@@ -161,8 +161,8 @@ export function InteractionDialogProvider({
                   value={value}
                   onChange={(event) => setValue(event.target.value)}
                 />
-              </Field>
-              <div className="mt-6 flex justify-end gap-2">
+              </FormField>
+              <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
@@ -173,7 +173,7 @@ export function InteractionDialogProvider({
                 <Button type="submit">
                   {request?.options?.submitLabel || "Save name"}
                 </Button>
-              </div>
+              </DialogFooter>
             </form>
           </Dialog.Content>
         </Dialog.Portal>

@@ -77,3 +77,8 @@ Versions containing `20260921205449_published_search.sql` require that additive 
 ## Optional guest recommendations
 
 This feature needs no new migration or environment variables. Older public installations start with no guest selection and continue to support public browsing. After deploying the application update, an administrator may choose a group in Organization Settings → Access and save. Group creation is explicit and separate from saving the selection. Review [guest recommendations](guest-recommendations.md) for fallback, sign-in and verification behavior.
+
+
+## Guarded team deletion
+
+Apply `supabase/migrations/20260923180607_guarded_team_deletion.sql` after the earlier migrations before enabling this version’s server-side team deletion. It replaces `fb_save_governance` while retaining its grants, authorization, revision lock and audit behavior. It changes no existing team or profile data. A delete is accepted only when the stored team has no direct or pending members, child teams or learning-group links; cleanup must be saved separately. Without this migration, existing branch moves still work but team deletion is rejected by the older database guard. Rehearse on an isolated backend before an operator-approved production upgrade.

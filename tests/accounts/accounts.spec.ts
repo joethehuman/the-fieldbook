@@ -89,6 +89,7 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
   expect(html).not.toContain("SECRET POLICY DRAFT");
   expect(html).not.toContain('"registration"');
   await bounds(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("private-sign-in.png"),
     fullPage: true,
@@ -135,6 +136,7 @@ test("public browse, alternate brand, defaults and failed image fallback", async
     page.getByRole("link", { name: "Privacy policy" }),
   ).toHaveAttribute("href", "https://example.test/privacy");
   await bounds(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("public-sign-in.png"),
     fullPage: true,
@@ -153,6 +155,7 @@ test("public browse, alternate brand, defaults and failed image fallback", async
   await expect(page.locator(".logo img")).toHaveCount(0);
   await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
   await bounds(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("fallback-enlarged.png"),
     fullPage: true,
@@ -238,6 +241,8 @@ test("settings authorization, saved identity and private content protection", as
   await expect(page.getByText("Settings saved.")).toBeVisible();
   await expect(page.locator(".logo")).toContainText("Updated Academy");
   await bounds(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("branding-settings.png"),
     fullPage: true,
@@ -292,6 +297,7 @@ test("consent and connection identity preserve purpose and demo stays simulated"
     page.getByRole("button", { name: "Allow connection" }),
   ).toBeFocused();
   await bounds(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("consent.png"),
     fullPage: true,
@@ -302,7 +308,7 @@ test("consent and connection identity preserve purpose and demo stays simulated"
   await page.goto("/connections");
   await expect(page.locator(".logo")).toContainText("Acme Learning");
   await expect(
-    page.getByRole("heading", { name: "AI connections" }),
+    page.getByRole("heading", { name: "AI connections", exact: true }),
   ).toBeVisible();
   await page.goto("http://127.0.0.1:3132");
   if ((page.viewportSize()?.width || 0) < 768)
@@ -314,7 +320,9 @@ test("consent and connection identity preserve purpose and demo stays simulated"
     page.getByRole("heading", { name: "Explore Fieldbook" }),
   ).toHaveCount(0);
   await expect(account.getByText(/Demo workspace/)).toBeVisible();
-  await account.screenshot({ path: info.outputPath("demo-account-action.png") });
+  await account.screenshot({
+    path: info.outputPath("demo-account-action.png"),
+  });
   await page.getByRole("button", { name: "Switch demo profile" }).click();
   await expect(
     page.getByText("INTERACTIVE DEMO", { exact: true }),
@@ -324,6 +332,7 @@ test("consent and connection identity preserve purpose and demo stays simulated"
     page.getByRole("link", { name: "Continue with Google" }),
   ).toHaveCount(0);
   await bounds(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("demo-profiles.png"),
     fullPage: true,
@@ -437,10 +446,99 @@ test("only the account action signs out; identity is inert", async ({
   ).toBeVisible();
   expect(signOuts).toBe(0);
   await expect(account.getByText(/Demo workspace/)).toHaveCount(0);
+  await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: info.outputPath("account-action.png") });
   const signOut = page.getByRole("button", { name: "Sign out", exact: true });
   await signOut.focus();
   await page.keyboard.press("Enter");
   await expect.poll(() => signOuts).toBe(1);
   await page.waitForURL("/");
+});
+
+test("shared settings library and connection states work in the server app", async ({
+  page,
+}, info) => {
+  await login(page);
+  async function section(name: string) {
+    await expect(
+      page.getByRole("heading", { name: "Administration", exact: true }),
+    ).toBeVisible();
+    const picker = page.getByRole("combobox", {
+      name: "Administration section",
+    });
+    if (await picker.isVisible()) {
+      await picker.click();
+      await page.getByRole("option", { name, exact: true }).click();
+      await expect(picker).toBeFocused();
+    } else await page.getByRole("tab", { name, exact: true }).click();
+  }
+  await section("Assignment window");
+  await expect(
+    page.getByRole("spinbutton", { name: "New user onboarding window (days)" }),
+  ).toHaveAccessibleDescription(/Changes recalculate targets for everyone/);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: info.outputPath("server-settings-window.png"),
+    fullPage: true,
+  });
+  await section("Privacy");
+  await expect(
+    page.getByRole("textbox", { name: "Privacy contact email (optional)" }),
+  ).toHaveAccessibleDescription(
+    "Provide an email address, an HTTPS contact page, or both.",
+  );
+  const bold = page.getByRole("button", { name: "Bold", exact: true });
+  const heading = page.getByRole("combobox", { name: "Heading level" });
+  await heading.scrollIntoViewIfNeeded();
+  // Let native scroll notifications finish before opening a focus tooltip:
+  // Radix intentionally dismisses tooltips when an ancestor scrolls.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await heading.focus();
+  await page.keyboard.press("Tab");
+  await expect(bold).toBeFocused();
+  await expect(page.getByRole("tooltip")).toHaveText("Bold");
+  await page.keyboard.press("Escape");
+  await bounds(page);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: info.outputPath("server-settings-privacy.png"),
+    fullPage: true,
+  });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/connections", async (route) => {
+    await gate;
+    await route.fulfill({ json: [] });
+  });
+  await page.goto("/connections");
+  await expect(
+    page.getByRole("status", { name: "Loading connections" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("No AI connections yet.", { exact: true }),
+  ).toHaveCount(0);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: info.outputPath("server-connections-loading.png"),
+    fullPage: true,
+  });
+  release();
+  await expect(
+    page.getByRole("heading", { name: "No AI connections yet." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("status", { name: "Loading connections" }),
+  ).toHaveCount(0);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.screenshot({
+    path: info.outputPath("server-connections-empty.png"),
+    fullPage: true,
+  });
 });

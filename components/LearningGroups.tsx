@@ -1,10 +1,13 @@
 "use client";
+import { Note } from "@/components/ui/note";
+import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SelectField } from "./ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Checkbox } from "@/components/ui/choice";
-import { Card } from "@/components/ui/card";
+import { useRevealTarget } from "./patterns/use-reveal-target";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { SectionHeader, EmptyState } from "@/components/patterns/layout";
@@ -36,6 +39,7 @@ export default function LearningGroups({
   onLearning: LearningHandler;
   initialGroup?: string;
 }) {
+  const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
   const [selected, setSelected] = useState(initialGroup || "");
@@ -97,12 +101,19 @@ export default function LearningGroups({
       },
       "Learning group deleted. Learning history preserved.",
     );
-    if (ok) setSelected("");
+    if (ok) {
+      setSelected("");
+      destination.reveal();
+    }
   }
   const matches = (name: string) =>
     name.toLowerCase().includes(query.trim().toLowerCase());
   return (
-    <section className="learning-admin">
+    <section
+      {...destination.targetProps}
+      aria-label={group ? group.name : "Learning groups"}
+      className="learning-admin"
+    >
       {notice && <Alert variant="destructive">{notice}</Alert>}
       {!group ? (
         <>
@@ -144,11 +155,11 @@ export default function LearningGroups({
               ) {
                 setName("");
                 setSelected(id);
+                destination.reveal();
               }
             }}
           >
-            <Field>
-              New learning group
+            <FormField label="New learning group">
               <Input
                 required
                 maxLength={80}
@@ -156,41 +167,46 @@ export default function LearningGroups({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Account executives"
               />
-            </Field>
-            <Button disabled={busy} type="submit">
+            </FormField>
+            <Button loading={busy} type="submit">
               <Plus size={16} />
               Create group
             </Button>
           </form>
           <div className="group-grid">
             {data.groups.map((g) => (
-              <Card className="grid gap-4" key={g.id}>
-                <h3>{g.name}</h3>
-                <p>
-                  {
-                    data.users.filter(
-                      (u) =>
-                        u.active && effectiveGroups(u, data.groups).has(g.id),
-                    ).length
-                  }{" "}
-                  people ·{" "}
-                  {
-                    expandLearning(groupItems(g, content), curricula).filter(
-                      (id) => published.some((c) => c.id === id),
-                    ).length
-                  }{" "}
-                  assigned courses
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelected(g.id);
-                    setQuery("");
-                    setNotice("");
-                  }}
-                >
-                  Manage {g.name}
-                </Button>
+              <Card className="flex flex-col p-0 sm:p-0" key={g.id}>
+                <CardContent>
+                  <h3 className="font-semibold">{g.name}</h3>
+                </CardContent>
+                <CardFooter className="mt-auto">
+                  <p className="text-copy text-muted-foreground">
+                    {
+                      data.users.filter(
+                        (u) =>
+                          u.active && effectiveGroups(u, data.groups).has(g.id),
+                      ).length
+                    }{" "}
+                    people ·{" "}
+                    {
+                      expandLearning(groupItems(g, content), curricula).filter(
+                        (id) => published.some((c) => c.id === id),
+                      ).length
+                    }{" "}
+                    assigned courses
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelected(g.id);
+                      destination.reveal();
+                      setQuery("");
+                      setNotice("");
+                    }}
+                  >
+                    Manage {g.name}
+                  </Button>
+                </CardFooter>
               </Card>
             ))}
           </div>
@@ -201,6 +217,7 @@ export default function LearningGroups({
             variant="link"
             onClick={() => {
               setSelected("");
+              destination.reveal();
               setQuery("");
             }}
           >
@@ -250,6 +267,7 @@ export default function LearningGroups({
             value={tab}
             onValueChange={(value) => {
               setTab(value);
+              destination.reveal(false);
               setQuery("");
             }}
           >
@@ -264,8 +282,10 @@ export default function LearningGroups({
               <FieldGroup disabled={busy}>
                 {tab === "members" ? (
                   <>
-                    <Field>
-                      Parent learning group
+                    <FormField
+                      label="Parent learning group"
+                      description="Members also receive courses and updates from parent groups."
+                    >
                       <SelectField
                         disabled={busy}
                         value={group.parentId || ""}
@@ -282,13 +302,9 @@ export default function LearningGroups({
                             </option>
                           ))}
                       </SelectField>
-                    </Field>
-                    <FieldDescription>
-                      Members also receive courses and updates from parent
-                      groups.
-                    </FieldDescription>
+                    </FormField>
                     <h3>Teams</h3>
-                    <FieldDescription>
+                    <FieldDescription id="group-teams-help">
                       Team membership stays in sync. Each selected team includes
                       its direct members; select child teams separately.
                     </FieldDescription>
@@ -300,14 +316,16 @@ export default function LearningGroups({
                           key={t.id}
                         >
                           <Checkbox
+                            aria-describedby="group-teams-help"
                             checked={group.teamIds?.includes(t.id) || false}
-                            onChange={(e) =>
+                            onCheckedChange={(checked) =>
                               changeGroup({
-                                teamIds: e.target.checked
-                                  ? [...(group.teamIds || []), t.id]
-                                  : (group.teamIds || []).filter(
-                                      (id) => id !== t.id,
-                                    ),
+                                teamIds:
+                                  checked === true
+                                    ? [...(group.teamIds || []), t.id]
+                                    : (group.teamIds || []).filter(
+                                        (id) => id !== t.id,
+                                      ),
                               })
                             }
                           />
@@ -319,15 +337,14 @@ export default function LearningGroups({
                       <p>Create a team in Teams to link it here.</p>
                     )}
                     <h3>People</h3>
-                    <Field>
-                      Find a person
+                    <FormField label="Find a person">
                       <Input
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search name or email"
                       />
-                    </Field>
+                    </FormField>
                     <div className="membership-list">
                       {data.users
                         .filter((u) => matches(u.name + " " + u.email))
@@ -345,18 +362,19 @@ export default function LearningGroups({
                             >
                               <Checkbox
                                 checked={u.groups.includes(group.id)}
-                                onChange={(e) =>
+                                onCheckedChange={(checked) =>
                                   save({
                                     ...data,
                                     users: data.users.map((p) =>
                                       p.id === u.id
                                         ? {
                                             ...p,
-                                            groups: e.target.checked
-                                              ? [...p.groups, group.id]
-                                              : p.groups.filter(
-                                                  (id) => id !== group.id,
-                                                ),
+                                            groups:
+                                              checked === true
+                                                ? [...p.groups, group.id]
+                                                : p.groups.filter(
+                                                    (id) => id !== group.id,
+                                                  ),
                                           }
                                         : p,
                                     ),
@@ -397,10 +415,10 @@ export default function LearningGroups({
                       what to take next. Every course stays available.
                     </FieldDescription>
                     {group.parentId && (
-                      <Alert>
+                      <Note>
                         Courses from parent groups come first. Manage those
                         courses in the parent group.
-                      </Alert>
+                      </Note>
                     )}
                     <OrderedLearning
                       items={items.map((i) => ({
@@ -436,15 +454,14 @@ export default function LearningGroups({
                         below.
                       </EmptyState>
                     )}
-                    <Field>
-                      Search courses and curricula
+                    <FormField label="Search courses and curricula">
                       <Input
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search the library"
                       />
-                    </Field>
+                    </FormField>
                     <div className="learning-search-results">
                       {[
                         ...published
@@ -505,15 +522,14 @@ export default function LearningGroups({
                       These updates appear in For you, newest first. Updates
                       never affect learning completion.
                     </FieldDescription>
-                    <Field>
-                      Find an update
+                    <FormField label="Find an update">
                       <Input
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search updates"
                       />
-                    </Field>
+                    </FormField>
                     <div className="learning-search-results">
                       {published
                         .filter((c) => c.kind === "brief" && matches(c.title))

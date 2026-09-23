@@ -130,3 +130,30 @@ test("API request keeps safe correlation IDs for user recovery", async () => {
     globalThis.fetch = original;
   }
 });
+
+test("team member moves use one revision-checked governance write and keep other data", async () => {
+  const before = freshWorkspace();
+  before.governanceRevision = 7;
+  const after = structuredClone(before);
+  after.users[0].teamId = undefined;
+  after.users[1].teamId = undefined;
+  const writes: { path: string; body: unknown }[] = [];
+  const save = createWorkspaceSaver(
+    async (path, body) => {
+      writes.push({ path, body });
+      return {};
+    },
+    async () => after,
+  );
+  await save(before, after);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].path, "/api/governance");
+  assert.deepEqual(writes[0].body, {
+    expected: 7,
+    users: after.users,
+    groups: before.groups,
+    teams: before.teams,
+    curricula: before.curricula,
+  });
+  assert.deepEqual(after.progress, before.progress);
+});

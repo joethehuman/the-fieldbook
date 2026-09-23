@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { ContentAction } from "./content-action";
-import { CardFooter } from "./layout";
+import { ContentCardFooter } from "./layout";
 import { ProgressStatus } from "../ui/progress";
 
 /** Shared course/playlist anatomy. Text remains readable; actions align at the bottom. */
@@ -47,7 +47,7 @@ export function LearningCard({
         <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
           {description}
         </p>
-        <CardFooter
+        <ContentCardFooter
           action={
             <>
               {action}

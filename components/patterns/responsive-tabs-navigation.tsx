@@ -19,8 +19,8 @@ export function ResponsiveTabsNavigation({
   children: ReactNode;
 }) {
   return (
-    <div className="min-w-0 lg:sticky lg:top-6">
-      <Field className="lg:hidden">
+    <div data-slot="admin-navigation" className="min-w-0">
+      <Field className="@min-[48rem]/workspace:hidden">
         {label}
         <SelectField value={value} onValueChange={onValueChange}>
           {options.map((option) => (
@@ -30,7 +30,11 @@ export function ResponsiveTabsNavigation({
           ))}
         </SelectField>
       </Field>
-      <TabsList variant="sidebar" className="hidden lg:grid" aria-label={label}>
+      <TabsList
+        variant="sidebar"
+        className="hidden @min-[48rem]/workspace:grid"
+        aria-label={label}
+      >
         {children}
       </TabsList>
     </div>

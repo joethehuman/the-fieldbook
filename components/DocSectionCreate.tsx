@@ -1,7 +1,8 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { ActionGroup } from "@/components/ui/action-group";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
+
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { newDocSection } from "@/lib/docs-navigation";
@@ -40,8 +41,7 @@ export default function DocSectionCreate({
   }
   return (
     <div className="doc-section-create">
-      <Field>
-        New section name
+      <FormField label="New section name">
         <Input
           value={name}
           maxLength={80}
@@ -54,7 +54,7 @@ export default function DocSectionCreate({
             }
           }}
         />
-      </Field>
+      </FormField>
       <ActionGroup>
         <Button
           type="button"

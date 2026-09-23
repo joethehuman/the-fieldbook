@@ -1,4 +1,6 @@
 "use client";
+import { LibraryExamples } from "./library-examples";
+import { ControlExamples } from "./control-examples";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { Article, CourseOverview } from "@/components/patterns/reading";
 import { seedContent } from "@/lib/seed";
@@ -16,12 +18,12 @@ import { LearningCard } from "@/components/patterns/learning-card";
 import { BrowseToolbar } from "@/components/patterns/layout";
 import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
-import { ContentAction } from "@/components/patterns/content-action";
+
 import { DataTable } from "@/components/patterns/data-table";
 import { AccountButton } from "@/components/patterns/account-button";
 import { ArrowRight, Layers, LogOut, Settings } from "lucide-react";
 import {
-  CardFooter,
+  ContentCardFooter,
   StatusActions,
   CollectionToolbar,
 } from "@/components/patterns/layout";
@@ -41,6 +43,7 @@ import { Progress, ProgressStatus } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -51,6 +54,7 @@ import {
   SectionHeader,
   EmptyState,
   ReadingPage,
+  SplitPanel,
 } from "@/components/patterns/layout";
 import { OrderedLearning } from "@/components/patterns/ordered-learning";
 import {
@@ -87,7 +91,7 @@ export default function ComponentCatalog() {
     "Product foundations",
   ]);
   return (
-    <ReadingPage>
+    <ReadingPage className="max-w-7xl">
       <PageHeader>
         <span className="eyebrow">Fieldbook component library</span>
         <h1>Interface reference</h1>
@@ -97,6 +101,8 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
+      <ControlExamples />
+      <LibraryExamples />
       <section className="grid gap-4" aria-label="Save confirmations">
         <SectionHeader
           title={<h2>Save confirmations</h2>}
@@ -282,7 +288,7 @@ export default function ComponentCatalog() {
             <Button variant="outline">Cancel</Button>
             <Button variant="ghost">More</Button>
             <Button variant="destructive">Delete group</Button>
-            <Button disabled>Saving…</Button>
+            <Button loading>Saving…</Button>
             <Button asChild variant="link">
               <a href="#fields">Jump to fields</a>
             </Button>
@@ -465,11 +471,11 @@ export default function ComponentCatalog() {
             />
           </div>
           <StatusActions
-            actions={<Button variant="link">Edit example comment</Button>}
+            actions={<Button variant="link">Review saved changes</Button>}
           >
-            Thanks—your rating is saved.
+            Your changes are saved.
           </StatusActions>
-          <CardFooter
+          <ContentCardFooter
             action={
               <>
                 Read the update <ArrowRight size={16} />
@@ -477,7 +483,7 @@ export default function ComponentCatalog() {
             }
           >
             Sep 18, 2026
-          </CardFooter>
+          </ContentCardFooter>
         </Stack>
       </Card>
       <Card>
@@ -548,31 +554,33 @@ export default function ComponentCatalog() {
               {choices}
             </SelectField>
           </Field>
-          <ActionGroup>
-            <Button onClick={() => setDialog(false)}>Save example</Button>
+          <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(false)}>
               Cancel
             </Button>
-          </ActionGroup>
+            <Button onClick={() => setDialog(false)}>Save example</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       <section className="grid gap-8" aria-label="Reading presentation">
         <SectionHeader title={<h2>Reading presentation</h2>} />
-        <DocumentTree
-          docs={seedContent}
-          selected={seedContent.find((item) => item.kind === "doc")!.id}
-          href={(id) => `#docs/${id}`}
-          onOpen={() => {}}
-        />
-        <Article
-          documents={seedContent}
-          item={{
-            ...seedContent.find((item) => item.kind === "doc")!,
-            body: "## Start here\n\nA readable article with a shared heading outline.\n\n### A useful detail\n\nSubheadings retain their hierarchy.\n\n## Start here\n\nRepeated headings have unique links.",
-          }}
-          name="Sample Fieldbook"
-          back={<Button variant="link">← Back to docs</Button>}
-        />
+        <SplitPanel>
+          <DocumentTree
+            docs={seedContent}
+            selected={seedContent.find((item) => item.kind === "doc")!.id}
+            href={(id) => `#docs/${id}`}
+            onOpen={() => {}}
+          />
+          <Article
+            documents={seedContent}
+            item={{
+              ...seedContent.find((item) => item.kind === "doc")!,
+              body: "## Start here\n\nA readable article with a shared heading outline.\n\n### A useful detail\n\nSubheadings retain their hierarchy.\n\n## Start here\n\nRepeated headings have unique links.",
+            }}
+            name="Sample Fieldbook"
+            back={<Button variant="link">← Back to docs</Button>}
+          />
+        </SplitPanel>
         <CourseOverview
           item={seedContent.find((item) => item.kind === "course")!}
           back={<Button variant="link">← Back to courses</Button>}

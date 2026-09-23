@@ -13,7 +13,7 @@ export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   return (
     <thead
       className={cn(
-        "border-b border-border bg-muted/50 text-xs text-muted-foreground",
+        "border-b border-border bg-surface text-sm text-muted-foreground",
         className,
       )}
       {...props}
@@ -28,7 +28,10 @@ export function TableBody({ className, ...props }: ComponentProps<"tbody">) {
 export function TableRow({ className, ...props }: ComponentProps<"tr">) {
   return (
     <tr
-      className={cn("transition-colors hover:bg-muted/40", className)}
+      className={cn(
+        "transition-colors hover:bg-muted/40 focus-within:bg-muted/40 motion-reduce:transition-none",
+        className,
+      )}
       {...props}
     />
   );
@@ -69,8 +72,11 @@ export function TableCell({
 export function TableContainer({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
+      tabIndex={0}
+      role="region"
+      aria-label="Scrollable table"
       className={cn(
-        "relative w-full overflow-x-auto rounded-lg border border-border",
+        "relative w-full min-w-0 overflow-x-auto rounded-lg border border-border outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className,
       )}
       {...props}

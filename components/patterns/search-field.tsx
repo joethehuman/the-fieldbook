@@ -1,24 +1,22 @@
 import type { ComponentProps } from "react";
 import { Search } from "lucide-react";
-import { Field } from "../ui/field";
 import { cn } from "@/lib/utils";
 export function SearchField({
   className,
   children,
   ...props
-}: ComponentProps<typeof Field>) {
+}: ComponentProps<"div">) {
   return (
-    <Field
-      orientation="horizontal"
+    <div
       data-slot="search-field"
       className={cn(
-        "items-center gap-2 [&>svg]:text-muted-foreground",
+        "flex min-w-0 items-center gap-2 [&>svg]:text-muted-foreground",
         className,
       )}
       {...props}
     >
-      <Search size={16} />
+      <Search size={16} aria-hidden="true" />
       {children}
-    </Field>
+    </div>
   );
 }

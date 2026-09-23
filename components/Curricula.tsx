@@ -1,12 +1,16 @@
 "use client";
+import { Badge } from "./ui/badge";
+import { Note } from "@/components/ui/note";
+import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
 import { SelectField } from "./ui/select";
-import { Card } from "@/components/ui/card";
+import { useRevealTarget } from "./patterns/use-reveal-target";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { ActionGroup } from "@/components/ui/action-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { FieldGroup, Field, FieldDescription } from "@/components/ui/field";
+import { FieldGroup } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/store";
@@ -25,6 +29,7 @@ export default function Curricula({
   data: Workspace;
   onChange: (data: Workspace) => void | Promise<void>;
 }) {
+  const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
   const [editing, setEditing] = useState<Curriculum | null>(null);
   const [query, setQuery] = useState("");
@@ -73,6 +78,7 @@ export default function Curricula({
         ],
       });
       setEditing(null);
+      destination.reveal();
       setNotice("");
       notify("Curriculum saved.");
     } catch (e) {
@@ -109,7 +115,11 @@ export default function Curricula({
     }
   }
   return (
-    <section className="learning-admin">
+    <section
+      {...destination.targetProps}
+      aria-label={editing ? "Curriculum editor" : "Curricula"}
+      className="learning-admin"
+    >
       {notice && <Alert variant="destructive">{notice}</Alert>}
       {editing ? (
         <form
@@ -125,8 +135,7 @@ export default function Curricula({
                 : "New curriculum"}
             </h2>
             <p>A playlist of courses, in the order you recommend.</p>
-            <Field>
-              Name
+            <FormField label="Name">
               <Input
                 required
                 maxLength={80}
@@ -135,9 +144,8 @@ export default function Curricula({
                   setEditing({ ...editing, name: e.target.value })
                 }
               />
-            </Field>
-            <Field>
-              Description
+            </FormField>
+            <FormField label="Description">
               <Textarea
                 maxLength={1000}
                 rows={2}
@@ -146,7 +154,7 @@ export default function Curricula({
                   setEditing({ ...editing, description: e.target.value })
                 }
               />
-            </Field>
+            </FormField>
             <OrderedLearning
               items={editing.courseIds.map((id) => ({
                 id,
@@ -166,15 +174,14 @@ export default function Curricula({
                 })
               }
             />
-            <Field>
-              Find a course
+            <FormField label="Find a course">
               <Input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search the course library"
               />
-            </Field>
+            </FormField>
             <div className="learning-search-results">
               {content
                 .filter(
@@ -208,8 +215,10 @@ export default function Curricula({
                   </div>
                 ))}
             </div>
-            <Field>
-              Status
+            <FormField
+              label="Status"
+              description="Published curricula are available in the library and can be added to learning groups."
+            >
               <SelectField
                 disabled={busy}
                 value={editing.status}
@@ -225,21 +234,17 @@ export default function Curricula({
                 </option>
                 <option value="published">Published</option>
               </SelectField>
-            </Field>
-            <FieldDescription>
-              Published curricula are available in the library and can be added
-              to learning groups.
-            </FieldDescription>
+            </FormField>
             {!!linked(editing.id).length && (
-              <Alert>
+              <Note>
                 Saving updates {linked(editing.id).length} learning groups. New
                 courses join their assigned learning lists; existing completions
                 are preserved. Remove group links before returning this
                 curriculum to draft.
-              </Alert>
+              </Note>
             )}
             <ActionGroup>
-              <Button type="submit" disabled={busy}>
+              <Button type="submit" loading={busy}>
                 {busy ? "Saving…" : "Save curriculum"}
               </Button>
               <Button
@@ -248,6 +253,7 @@ export default function Curricula({
                 onClick={async () => {
                   if (await confirm("Discard unsaved curriculum changes?")) {
                     setEditing(null);
+                    destination.reveal();
                     setNotice("");
                   }
                 }}
@@ -274,6 +280,7 @@ export default function Curricula({
                   courseIds: [],
                   status: "draft",
                 });
+                destination.reveal();
                 setQuery("");
                 setNotice("");
               }}
@@ -283,34 +290,43 @@ export default function Curricula({
           </SectionHeader>
           <div className="group-grid">
             {all.map((c) => (
-              <Card className="grid gap-4" key={c.id}>
-                <span className="eyebrow">{c.status}</span>
-                <h3>{c.name}</h3>
-                <p>{c.description}</p>
-                <p>
-                  {c.courseIds.length} courses · {linked(c.id).length} learning
-                  groups
-                </p>
-                <ActionGroup>
-                  <Button
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => {
-                      setEditing(structuredClone(c));
-                      setQuery("");
-                      setNotice("");
-                    }}
+              <Card className="flex flex-col p-0 sm:p-0" key={c.id}>
+                <CardContent className="grid gap-4">
+                  <Badge
+                    variant={c.status === "published" ? "success" : "default"}
                   >
-                    Edit {c.name}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => remove(c)}
-                  >
-                    Delete
-                  </Button>
-                </ActionGroup>
+                    {c.status}
+                  </Badge>
+                  <h3>{c.name}</h3>
+                  <p>{c.description}</p>
+                </CardContent>
+                <CardFooter className="mt-auto">
+                  <p className="text-copy text-muted-foreground">
+                    {c.courseIds.length} courses · {linked(c.id).length}{" "}
+                    learning groups
+                  </p>
+                  <ActionGroup>
+                    <Button
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => {
+                        setEditing(structuredClone(c));
+                        destination.reveal();
+                        setQuery("");
+                        setNotice("");
+                      }}
+                    >
+                      Edit {c.name}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => remove(c)}
+                    >
+                      Delete
+                    </Button>
+                  </ActionGroup>
+                </CardFooter>
               </Card>
             ))}
           </div>
