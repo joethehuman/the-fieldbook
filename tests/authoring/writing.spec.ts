@@ -288,3 +288,58 @@ test("contextual headings, links and table cells serialize as reader-compatible 
     preview.getByRole("cell", { name: "Useful detail" }),
   ).toBeVisible();
 });
+
+test("Update category filters, creates, normalizes and survives draft saves", async ({
+  page,
+}, info) => {
+  const { read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "Category example",
+    "brief",
+  );
+  const settings = page.getByRole("button", { name: "Content settings" });
+  if (await settings.isVisible()) await settings.click();
+  const input = page.getByRole("combobox", { name: "Category", exact: true });
+  const existing = await input.inputValue();
+  await input.fill(existing.toLowerCase());
+  await expect(
+    page.getByRole("option", { name: existing, exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("option", { name: /^Add/ })).toHaveCount(0);
+  await input.press("ArrowDown");
+  await input.press("Enter");
+  await expect(input).toHaveValue(existing);
+  await expect(input).toBeFocused();
+  await input.fill("  Customer stories  ");
+  await page
+    .getByRole("option", { name: "Add “Customer stories”", exact: true })
+    .click();
+  await expect(input).toHaveValue("Customer stories");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  expect((await read()).content[0].category).toBe("Customer stories");
+  expect((await read()).publishedContent![0].category).toBe(existing);
+  await page
+    .getByRole("button", { name: "Show categories", exact: true })
+    .click();
+  await expect(
+    page.getByRole("option", { name: "Customer stories", exact: true }),
+  ).toBeVisible();
+  await input.press("Escape");
+  await expect(page.getByRole("listbox", { name: "Categories" })).toHaveCount(
+    0,
+  );
+  await page
+    .getByRole("button", { name: "Show categories", exact: true })
+    .click();
+  await expect(page.getByRole("listbox", { name: "Categories" })).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("category-dropdown.png"),
+    fullPage: true,
+  });
+  await input.press("Tab");
+  await expect(page.getByRole("listbox", { name: "Categories" })).toHaveCount(
+    0,
+  );
+});

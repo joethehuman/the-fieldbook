@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Replace native category/channel suggestions with a shared searchable, creatable dropdown.
+
 - Write Docs and Updates visually with formatting controls and a safe Markdown fallback. Separate draft saving from publication, keep saved work open, and organize settings into shared fieldsets. The demo now preserves a published copy while draft edits are saved.
 
 - Keep publication badges compact and show unpublished draft changes as separate supporting text in the content table.

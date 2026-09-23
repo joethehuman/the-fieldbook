@@ -3,12 +3,15 @@ import { useState } from "react";
 import { WritingEditor } from "@/components/patterns/writing-editor";
 import { SectionHeader } from "@/components/patterns/layout";
 import { Checkbox } from "@/components/ui/choice";
+import { CreatableCombobox } from "@/components/ui/creatable-combobox";
+import { FormField } from "@/components/patterns/form-field";
 import { Field } from "@/components/ui/field";
 
 export function WritingExamples() {
   const [body, setBody] = useState(
     "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.",
   );
+  const [category, setCategory] = useState("General");
   const [disabled, setDisabled] = useState(false);
   return (
     <section id="writing" className="grid gap-6">
@@ -23,6 +26,18 @@ export function WritingExamples() {
         />
         Read-only example
       </Field>
+      <FormField
+        label="Example category"
+        description="Type to find a category, or add a new name. Changes save with the content."
+      >
+        <CreatableCombobox
+          value={category}
+          onValueChange={setCategory}
+          options={["General", "Product news", "Company news"]}
+          listLabel="Categories"
+          disabled={disabled}
+        />
+      </FormField>
       <WritingEditor value={body} onChange={setBody} disabled={disabled} />
       <p className="text-copy text-muted-foreground">
         Saving a draft and publishing are separate actions in the authoring

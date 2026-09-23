@@ -285,3 +285,5 @@ Use a full-width SettingsSection for selecting and reviewing a branch move. Disp
 ## Visual writing
 
 Use `WritingEditor` for Docs/Updates body editing. It combines a lazy MDXEditor engine with Fieldbook buttons, tooltips, source textarea and reader preview. Keep save/publication intent outside the editor; use explicit actions rather than a status dropdown. See [authoring behavior and extension guidance](authoring.md). The catalog includes editable and read-only examples.
+
+Use `CreatableCombobox` for editable category/channel names: suggestions filter as you type, new names have an Add option, arrow keys/Enter select and Escape dismisses. Free text remains valid on blur; trim it and reuse an existing case-insensitive match. Pair with `FormField`. Category creation persists with its content save, not as a separate request.

@@ -1,4 +1,5 @@
 "use client";
+import { CreatableCombobox } from "./ui/creatable-combobox";
 import { WritingEditor } from "./patterns/writing-editor";
 import { hasUnpublishedEdits } from "@/lib/demo-publication";
 import {
@@ -1795,26 +1796,22 @@ export function Editor({
                     )}
                   </>
                 ) : (
-                  <Field>
-                    {c.kind === "course" ? "Channel" : "Category"}
-                    <Input
+                  <FormField
+                    label={c.kind === "course" ? "Channel" : "Category"}
+                  >
+                    <CreatableCombobox
                       required
-                      list="categories"
                       value={c.category}
-                      onChange={(e) => set("category", e.target.value)}
+                      onValueChange={(value) => set("category", value)}
+                      options={data.content
+                        .filter((item) => item.kind === c.kind)
+                        .map((item) => item.category)}
+                      listLabel={
+                        c.kind === "course" ? "Channels" : "Categories"
+                      }
+                      placeholder="Choose or add a name…"
                     />
-                    <datalist id="categories">
-                      {Array.from(
-                        new Set(
-                          data.content
-                            .filter((x) => x.kind === c.kind)
-                            .map((x) => x.category),
-                        ),
-                      ).map((x) => (
-                        <option key={x}>{x}</option>
-                      ))}
-                    </datalist>
-                  </Field>
+                  </FormField>
                 )}
               </SettingsSection>
               {c.kind === "brief" && (
