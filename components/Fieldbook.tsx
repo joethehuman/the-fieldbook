@@ -376,24 +376,36 @@ export default function Fieldbook({
   }
   if (!data)
     return (
-      <div className="loading">
-        <BookOpen size={32} />
-        <h2>{error || "Opening your fieldbook…"}</h2>
-        {error &&
-          (runtime ? (
-            <>
-              <Button variant="default" onClick={() => runtime.signIn()}>
-                Sign in
+      <div
+        className={error ? "loading loading-error" : "loading"}
+        role={error ? "alert" : "status"}
+      >
+        <div className="loading-content">
+          <h2>{error || "Just a sec…"}</h2>
+          {!error && (
+            <div className="loading-bar" aria-hidden="true">
+              <span />
+            </div>
+          )}
+          {error &&
+            (runtime ? (
+              <>
+                <Button variant="default" onClick={() => runtime.signIn()}>
+                  Sign in
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => window.location.reload()}
+                >
+                  Try again
+                </Button>
+              </>
+            ) : (
+              <Button variant="ghost" onClick={reset}>
+                Reset demo
               </Button>
-              <Button variant="ghost" onClick={() => window.location.reload()}>
-                Try again
-              </Button>
-            </>
-          ) : (
-            <Button variant="ghost" onClick={reset}>
-              Reset demo
-            </Button>
-          ))}
+            ))}
+        </div>
       </div>
     );
   const demoGuest =
