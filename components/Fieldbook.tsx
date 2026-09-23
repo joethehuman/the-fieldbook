@@ -440,11 +440,6 @@ export default function Fieldbook({
               </NavigationButton>
             ))}
         </div>
-        {branding.access === "public" && (
-          <Button variant="outline" onClick={() => login("guest")}>
-            Continue as guest
-          </Button>
-        )}
         <div className="demo-note">
           <p>
             Changes stay in this browser. Demo profiles are not secure accounts,
