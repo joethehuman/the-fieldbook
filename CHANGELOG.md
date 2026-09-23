@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Replace native category/channel suggestions with a shared searchable, creatable dropdown.
+- Use a shared searchable, creatable dropdown for categories, channels and Doc sections. New Docs and Updates start with an empty section/category prompt.
 
 - Write Docs and Updates visually with formatting controls and a safe Markdown fallback. Separate draft saving from publication, keep saved work open, and organize settings into shared fieldsets. The demo now preserves a published copy while draft edits are saved.
 

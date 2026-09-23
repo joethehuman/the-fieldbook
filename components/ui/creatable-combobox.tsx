@@ -188,7 +188,7 @@ export function CreatableCombobox({
           ))}
           {!items.length && (
             <p className="px-3 py-2 text-copy text-muted-foreground">
-              Type a name to add a category.
+              Type a name to add it.
             </p>
           )}
         </div>

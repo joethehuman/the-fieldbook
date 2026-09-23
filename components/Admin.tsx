@@ -49,7 +49,6 @@ import LearningGroups from "./LearningGroups";
 import Curricula from "./Curricula";
 import { groupItems } from "@/lib/learning-groups";
 import { Assignments, type LearningHandler } from "./Assignments";
-import DocSectionCreate from "./DocSectionCreate";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
@@ -283,7 +282,7 @@ export default function Admin({
       title: "",
       summary: "",
       body: "",
-      category: kind === "course" ? "New channel" : "General",
+      category: kind === "course" ? "New channel" : "",
       folder: "",
       status: "draft",
       version: 1,
@@ -1074,26 +1073,19 @@ export function Editor({
     [error, setError] = useState(""),
     [refresh, setRefresh] = useState(false),
     [saving, setSaving] = useState(false),
-    [uploadCount, setUploadCount] = useState(0),
-    [creatingSection, setCreatingSection] = useState(false),
-    [sectionSaving, setSectionSaving] = useState(false);
+    [uploadCount, setUploadCount] = useState(0);
   const { confirm } = useInteractionDialog();
   const baseline = useRef(c);
   const original = useRef(content);
   const pendingUploads = useRef(0);
   const savingNow = useRef(false);
   const [recovering, setRecovering] = useState(false);
-  const busy = saving || uploadCount > 0 || sectionSaving || recovering;
+  const busy = saving || uploadCount > 0 || recovering;
   const dirty =
     JSON.stringify(c) !== JSON.stringify(baseline.current) || refresh;
   const guard = useRef(async () => true);
   guard.current = async () => {
-    if (
-      pendingUploads.current ||
-      savingNow.current ||
-      sectionSaving ||
-      recovering
-    ) {
+    if (pendingUploads.current || savingNow.current || recovering) {
       return false;
     }
     return (
@@ -1182,10 +1174,7 @@ export function Editor({
     }
   }
   const docSections = availableDocSections(
-    [
-      ...data.content.filter((item) => item.kind === "doc"),
-      ...(c.kind === "doc" ? [c] : []),
-    ],
+    data.content.filter((item) => item.kind === "doc"),
     data.settings?.docCategoryOrder,
   );
   const existing = data.content.some((x) => x.id === c.id);
@@ -1293,6 +1282,17 @@ export function Editor({
       ref={form}
       className="editor"
       onSubmit={submit}
+      onInvalidCapture={(event) => {
+        const control = event.target as HTMLInputElement;
+        if (c.kind !== "course" && !control.getClientRects().length) {
+          event.preventDefault();
+          setSettingsOpen(true);
+          requestAnimationFrame(() => {
+            control.focus();
+            control.reportValidity();
+          });
+        }
+      }}
       onKeyDown={(event) => {
         if (
           (event.metaKey || event.ctrlKey) &&
@@ -1749,70 +1749,43 @@ export function Editor({
                     : "Use a clear category to help readers find related content."
                 }
               >
-                {c.kind === "doc" ? (
-                  <>
-                    <FormField label="Section">
-                      <SelectField
-                        aria-label="Section"
-                        value={`section:${c.category}`}
-                        disabled={saving || sectionSaving}
-                        onValueChange={(value) => {
-                          if (value === "create") setCreatingSection(true);
-                          else {
-                            set("category", value.slice(8));
-                            setCreatingSection(false);
-                          }
-                        }}
-                      >
-                        {docSections.map((name) => (
-                          <option key={name} value={`section:${name}`}>
-                            {name}
-                          </option>
-                        ))}
-                        {onWorkspaceChange && (
-                          <option value="create">Create new section…</option>
-                        )}
-                      </SelectField>
-                    </FormField>
-                    {creatingSection && onWorkspaceChange && (
-                      <DocSectionCreate
-                        sections={docSections}
-                        disabled={saving}
-                        onBusyChange={setSectionSaving}
-                        onCancel={() => setCreatingSection(false)}
-                        onCreate={async (name) => {
-                          await onWorkspaceChange({
-                            ...data,
-                            settings: {
-                              ...defaultSettings,
-                              ...data.settings,
-                              docCategoryOrder: [...docSections, name],
-                            },
-                          });
-                          set("category", name);
-                          setCreatingSection(false);
-                        }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <FormField
-                    label={c.kind === "course" ? "Channel" : "Category"}
-                  >
-                    <CreatableCombobox
-                      required
-                      value={c.category}
-                      onValueChange={(value) => set("category", value)}
-                      options={data.content
-                        .filter((item) => item.kind === c.kind)
-                        .map((item) => item.category)}
-                      listLabel={
-                        c.kind === "course" ? "Channels" : "Categories"
-                      }
-                      placeholder="Choose or add a name…"
-                    />
-                  </FormField>
-                )}
+                <FormField
+                  label={
+                    c.kind === "doc"
+                      ? "Section"
+                      : c.kind === "course"
+                        ? "Channel"
+                        : "Category"
+                  }
+                >
+                  <CreatableCombobox
+                    required
+                    maxLength={c.kind === "doc" ? 80 : undefined}
+                    value={c.category}
+                    onValueChange={(value) => set("category", value)}
+                    options={
+                      c.kind === "doc"
+                        ? docSections
+                        : data.content
+                            .filter((item) => item.kind === c.kind)
+                            .map((item) => item.category)
+                    }
+                    listLabel={
+                      c.kind === "doc"
+                        ? "Sections"
+                        : c.kind === "course"
+                          ? "Channels"
+                          : "Categories"
+                    }
+                    placeholder={
+                      c.kind === "doc"
+                        ? "Choose or add section…"
+                        : c.kind === "course"
+                          ? "Choose or add channel…"
+                          : "Choose or add category…"
+                    }
+                  />
+                </FormField>
               </SettingsSection>
               {c.kind === "brief" && (
                 <SettingsSection

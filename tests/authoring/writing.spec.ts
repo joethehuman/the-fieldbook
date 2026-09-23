@@ -56,11 +56,14 @@ async function setup(
     await page.route("**/api/content", (route) => {
       writes++;
       const request = route.request().postDataJSON();
-      expect(request.expected).toBe(state.content[0].revision);
+      const current = state.content.find(
+        (item) => item.id === request.content.id,
+      );
+      expect(request.expected).toBe(current?.revision ?? 0);
       const saved = {
         ...request.content,
-        revision: state.content[0].revision! + 1,
-        publishedRevision: state.content[0].publishedRevision,
+        revision: (current?.revision || 0) + 1,
+        publishedRevision: current?.publishedRevision,
       };
       if (request.publish) {
         saved.publishedRevision = saved.revision;
@@ -70,7 +73,10 @@ async function setup(
         state.publishedContent = [];
         saved.publishedRevision = undefined;
       }
-      state.content = [saved];
+      state.content = [
+        ...state.content.filter((item) => item.id !== saved.id),
+        saved,
+      ];
       return route.fulfill({ json: saved });
     });
   } else {
@@ -343,3 +349,65 @@ test("Update category filters, creates, normalizes and survives draft saves", as
     0,
   );
 });
+
+for (const kind of ["Doc", "Update"]) {
+  test(`new ${kind} starts with an empty organization field and saves a new name`, async ({
+    page,
+  }, info) => {
+    const { read } = await setup(
+      page,
+      info.project.name.startsWith("production"),
+      "Existing content",
+      kind === "Doc" ? "doc" : "brief",
+    );
+    const label = kind === "Doc" ? "Section" : "Category";
+    const settings = page.getByRole("button", { name: "Content settings" });
+    if (await settings.isVisible()) await settings.click();
+    const control = page.getByRole("combobox", { name: label, exact: true });
+    await expect(control).not.toHaveValue("");
+    await page
+      .getByRole("button", { name: "Back to content", exact: true })
+      .click();
+    await page.getByRole("button", { name: kind, exact: true }).click();
+    await page.getByLabel("Title", { exact: true }).fill(`New ${kind}`);
+    await page
+      .getByLabel("Short description", { exact: true })
+      .fill("A useful introduction.");
+    // Invalid hidden settings must reveal themselves on phones.
+    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await expect(control).toBeVisible();
+    await expect(control).toHaveValue("");
+    await expect(control).toHaveAttribute(
+      "placeholder",
+      kind === "Doc" ? "Choose or add section…" : "Choose or add category…",
+    );
+    await control.fill("New organization name");
+    await page
+      .getByRole("option", { name: "Add “New organization name”", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+    expect(
+      (await read()).content.find((item) => item.title === `New ${kind}`)
+        ?.category,
+    ).toBe("New organization name");
+    await page
+      .getByRole("button", { name: "Back to content", exact: true })
+      .click();
+    await page
+      .getByRole("row")
+      .filter({ hasText: `New ${kind}` })
+      .getByRole("button", { name: "Edit", exact: true })
+      .click();
+    if (await settings.isVisible()) await settings.click();
+    await expect(control).toHaveValue("New organization name");
+    await control.click();
+    await expect(
+      page.getByRole("option", { name: "New organization name", exact: true }),
+    ).toBeVisible();
+    await page.screenshot({
+      path: info.outputPath(`new-${kind.toLowerCase()}-section.png`),
+      fullPage: true,
+    });
+  });
+}

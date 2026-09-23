@@ -11,7 +11,7 @@ export function WritingExamples() {
   const [body, setBody] = useState(
     "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.",
   );
-  const [category, setCategory] = useState("General");
+  const [category, setCategory] = useState("");
   const [disabled, setDisabled] = useState(false);
   return (
     <section id="writing" className="grid gap-6">
@@ -35,6 +35,7 @@ export function WritingExamples() {
           onValueChange={setCategory}
           options={["General", "Product news", "Company news"]}
           listLabel="Categories"
+          placeholder="Choose or add category…"
           disabled={disabled}
         />
       </FormField>

@@ -6,7 +6,7 @@ The editor shows unsaved work and save results. Cmd/Ctrl+S saves a draft, never 
 
 The visual editor supports headings, emphasis, lists, quotes, links, tables, code blocks and images. Uploaded MP4/WebM media displays inline and remains an ordinary media link in storage. Markdown source is available for precise edits and unsupported constructs, including footnotes. Unsupported imports fall back to source and preserve the original text. Image resizing is intentionally unavailable because it would introduce HTML dimensions that the reader does not support.
 
-Docs settings choose a navigation section. Update settings choose a category and relevant learning groups. Groups personalize recommendations, never content access. Settings collapse on narrow screens. Course and privacy authoring retain their existing Markdown editors.
+New Docs and Updates start with an empty section/category field. Type to choose an existing name or add one; the name saves with the content. Existing items retain their saved values. Docs settings choose a navigation section, including saved empty sections; new sections appear in navigation when a document is published. Update settings choose a category and relevant learning groups. Groups personalize recommendations, never content access. Settings collapse on narrow screens. Course and privacy authoring retain their existing Markdown editors.
 
 ## Implementation and extension
 
