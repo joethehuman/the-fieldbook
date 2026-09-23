@@ -9,6 +9,10 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 async function adminSection(page: Page, name: string) {
+  // Reloads remount the lazy Administration bundle before its navigation.
+  await expect(
+    page.getByRole("heading", { name: "Administration", exact: true }),
+  ).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
