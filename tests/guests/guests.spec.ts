@@ -366,8 +366,17 @@ test("no selection and publication changes preserve a usable library with honest
   await shot(page, info, "guest-empty");
   await nav(page, "Updates");
   await expect(
-    page.getByText("No guest recommendations yet. Explore all updates below."),
+    page.getByRole("heading", { name: "For you", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "All updates", exact: true }),
   ).toBeVisible();
+  await expect(page.locator(".updates-section").first()).toContainText(
+    "Recommended update",
+  );
+  await expect(page.locator(".updates-section").first()).toContainText(
+    "Other update",
+  );
   await f.change((d) => {
     d.settings!.guestGroupId = "visitors";
     d.content[1].status = "draft";
