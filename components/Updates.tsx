@@ -23,13 +23,11 @@ export default function Updates({
   user,
   groups,
   onOpen,
-  guest,
 }: {
   content: Content[];
   user: User;
   groups: Group[];
   onOpen: (id: string) => void;
-  guest: boolean;
 }) {
   const { forYou, other } = updatesForUser(content, user, groups);
   const paginationKey = JSON.stringify({
@@ -78,14 +76,7 @@ export default function Updates({
     <>
       {forYou.length > 0 && (
         <section className="updates-section">
-          <SectionHeader
-            title={<h2>For you</h2>}
-            description={
-              guest
-                ? "Updates recommended for visitors."
-                : "The latest updates for your learning groups."
-            }
-          />
+          <SectionHeader title={<h2>For you</h2>} />
           <UpdateCards items={forYou} onOpen={onOpen} />
         </section>
       )}
@@ -129,7 +120,6 @@ function UpdateCards({
           onClick={() => onOpen(b.id)}
         >
           <div className={"brief-art art-" + (i % 6)}>
-            <span>UPDATES</span>
             <ArrowUpRight size={36} />
           </div>
           <div className="brief-copy">

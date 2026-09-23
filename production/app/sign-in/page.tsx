@@ -41,11 +41,9 @@ export default async function SignIn({
       />
       <header className="sign-in-heading">
         <h1>Sign in to {branding.name}</h1>
-        <p>
-          {branding.access === "private"
-            ? "Sign in to access your workspace"
-            : "Sign in to save your progress across devices"}
-        </p>
+        {branding.access === "public" && (
+          <p>Sign in to save course progress across devices.</p>
+        )}
         {branding.welcomeDescription && <p>{branding.welcomeDescription}</p>}
       </header>
       {q.error && (

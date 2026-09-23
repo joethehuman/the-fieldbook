@@ -152,13 +152,12 @@ export function ContentSearch({
       ) : (
         <EmptyState>
           <h2>No results</h2>
-          <p>Try fewer words, a different spelling or another content type.</p>
+          <p>Try another search or content type.</p>
         </EmptyState>
       )}
       {!pending && response.hasMore && (
         <p className="text-sm text-muted-foreground">
-          Showing the best 30 matches. Add a word or choose a content type to
-          narrow your search.
+          Showing 30 results. Refine your search to narrow the list.
         </p>
       )}
     </section>

@@ -46,7 +46,7 @@ export const defaultSettings: SiteSettings = {
   catchUpDays: 30,
   welcomeDescription: "",
   name: "Fieldbook",
-  tagline: "A shared place to get better.",
+  tagline: "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS",
   logoUrl: "",
   accent: "#0069ff",
   access: "public",

@@ -120,7 +120,7 @@ export function ContentFeedback({
   const panel = (
     <form
       id={`${id}-panel`}
-      aria-label="Give feedback"
+      aria-label="Did you find this useful?"
       aria-busy={pending}
       className="min-w-0"
       onKeyDown={(event) => {
@@ -134,12 +134,14 @@ export function ContentFeedback({
         if (rating) void persist(rating, comment, true);
       }}
     >
-      <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-2">
-        <span className="text-copy text-muted-foreground">Give feedback</span>
+      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+        <span className="min-w-0 flex-1 text-copy leading-snug text-muted-foreground">
+          Did you find this useful?
+        </span>
         <div
-          className="flex items-center gap-1"
+          className="flex shrink-0 items-center gap-1"
           role="group"
-          aria-label="Was this useful?"
+          aria-label="Rate this content"
         >
           {choices(true)}
         </div>
@@ -199,14 +201,14 @@ export function ContentFeedback({
         <PopoverAnchor asChild>
           <div
             className={cn(
-              "flex w-fit max-w-full flex-wrap items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm",
+              "flex w-full max-w-full min-w-0 items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 shadow-sm sm:w-fit",
               !desktop && open && "hidden",
             )}
           >
             <Button
               type="button"
               variant="ghost"
-              className="rounded-full font-normal text-muted-foreground"
+              className="h-auto min-h-9 min-w-0 flex-1 justify-start whitespace-normal rounded-full py-1.5 text-left leading-snug font-normal text-muted-foreground sm:flex-initial"
               disabled={disabled}
               aria-expanded={open}
               aria-controls={`${id}-panel`}
@@ -215,12 +217,12 @@ export function ContentFeedback({
                 setOpen(true);
               }}
             >
-              Give feedback
+              Did you find this useful?
             </Button>
             <div
-              className="flex gap-1"
+              className="flex shrink-0 gap-1"
               role="group"
-              aria-label="Was this useful?"
+              aria-label="Rate this content"
             >
               {choices(false)}
             </div>
@@ -229,7 +231,7 @@ export function ContentFeedback({
         {desktop && (
           <PopoverContent
             side="top"
-            aria-label="Give feedback"
+            aria-label="Did you find this useful?"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
               textarea.current?.focus();

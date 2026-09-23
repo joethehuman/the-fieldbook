@@ -509,7 +509,10 @@ test("content feedback saves ratings and comments with retry and focus return", 
   const region = page.getByRole("region", { name: "Content feedback" });
   const useful = region.getByRole("button", { name: "Useful", exact: true });
   await useful.click();
-  const form = page.getByRole("form", { name: "Give feedback", exact: true });
+  const form = page.getByRole("form", {
+    name: "Did you find this useful?",
+    exact: true,
+  });
   await expect(form.getByRole("textbox")).toBeFocused();
   await expect(
     form.getByRole("button", { name: "Send", exact: true }),
@@ -543,7 +546,7 @@ test("content feedback saves ratings and comments with retry and focus return", 
   await expect(useful).toBeFocused();
   await expect(region.getByRole("status")).toHaveText("Feedback saved.");
   await region
-    .getByRole("button", { name: "Give feedback", exact: true })
+    .getByRole("button", { name: "Did you find this useful?", exact: true })
     .click();
   await expect(form.getByRole("textbox")).toHaveValue(
     "Clear and useful. Keep this draft.",

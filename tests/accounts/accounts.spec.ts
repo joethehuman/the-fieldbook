@@ -60,9 +60,6 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
     page.getByRole("heading", { name: "Sign in to Acme Learning" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Sign in to access your workspace", { exact: true }),
-  ).toBeVisible();
-  await expect(
     page.getByRole("link", { name: "Back to browsing" }),
   ).toHaveCount(0);
   await expect(
@@ -125,7 +122,7 @@ test("public browse, alternate brand, defaults and failed image fallback", async
     page.getByRole("heading", { name: "Sign in to Northstar Academy" }),
   ).toBeVisible();
   await expect(
-    page.getByText("Sign in to save your progress across devices", {
+    page.getByText("Sign in to save course progress across devices.", {
       exact: true,
     }),
   ).toBeVisible();

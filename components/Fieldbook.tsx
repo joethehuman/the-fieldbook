@@ -411,8 +411,7 @@ export default function Fieldbook({
     return (
       <BrandedAccount branding={brandingFromSettings(branding)}>
         <Badge variant="default">INTERACTIVE DEMO</Badge>
-        <h1>Explore {branding.name}</h1>
-        <p>Choose a demo profile to explore the organization.</p>
+        <h1>Choose a demo profile</h1>
         <div className="profile-list">
           {data.users
             .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
@@ -447,7 +446,6 @@ export default function Fieldbook({
           </Button>
         )}
         <div className="demo-note">
-          <strong>A working demo, on your terms.</strong>
           <p>
             Changes stay in this browser. Demo profiles are not secure accounts,
             and data is not shared between devices. Use sample content only.
@@ -842,11 +840,7 @@ export default function Fieldbook({
             </EmptyState>
           ) : view === "team" ? (
             <>
-              <PageHeading
-                eyebrow="GROW TOGETHER"
-                title="Team progress"
-                description="A shared view of progress and what’s next."
-              />
+              <PageHeading title="Team progress" />
               <ReportAvailability.Provider value={reportIssue}>
                 <TeamProgress data={data} user={user} />
               </ReportAvailability.Provider>
@@ -962,18 +956,13 @@ export default function Fieldbook({
               progress={progress}
               onOpen={(id) => navigate("learn", id)}
               onCurriculum={(id) => navigate("learn", `curriculum:${id}`)}
-              onKnowledge={() => navigate("docs")}
               publicLearning={uid === "guest"}
               guest={uid === "guest"}
               onSignIn={runtime?.signIn || logout}
             />
           ) : view === "docs" ? (
             <>
-              <PageHeading
-                eyebrow="THE KNOWLEDGE THAT GOES WITH YOU"
-                title="Docs"
-                description="A shared source of truth. Built for the conversations that matter."
-              />
+              <PageHeading title="Docs" />
               {docs.some((d) => d.id === "start") && (
                 <div
                   className="knowledge-feature"
@@ -985,14 +974,9 @@ export default function Fieldbook({
                   }}
                 >
                   <div>
-                    <span className="eyebrow">START HERE</span>
-                    <h2>A good place to begin.</h2>
-                    <p>
-                      Get oriented, find your way, and make this fieldbook
-                      yours.
-                    </p>
+                    <h2>Start here</h2>
                     <span className="text-link">
-                      Open the guide <ArrowRight size={17} />
+                      Open guide <ArrowRight size={17} />
                     </span>
                   </div>
                   <BookOpen size={76} strokeWidth={1} />
@@ -1026,16 +1010,11 @@ export default function Fieldbook({
             </>
           ) : (
             <>
-              <PageHeading
-                eyebrow="LESS NOISE. MORE SIGNAL."
-                title="Updates"
-                description="The latest updates, launch briefs, and ideas worth sharing."
-              />
+              <PageHeading title="Updates" />
               <Updates
                 content={visible}
                 user={user}
                 groups={learningGroups}
-                guest={uid === "guest"}
                 onOpen={(id) => navigate("briefs", id)}
               />
             </>
@@ -1076,16 +1055,11 @@ export default function Fieldbook({
           >
             <X />
           </Button>
-          <span className="eyebrow">YOUR DEMO ORGANIZATION</span>
           <DialogTitle>About this demo</DialogTitle>
           <DialogDescription>
-            This Next.js demo runs entirely in your browser. Content, profiles,
-            assignments, and progress are saved here, on this device.
+            Changes stay in this browser and are not synced. Demo profiles are
+            not secure accounts. Use sample content only.
           </DialogDescription>
-          <p>
-            Profiles simulate login and roles; they are not secure accounts.
-            Don’t enter private information. Nothing is synced to a server.
-          </p>
           <DialogFooter>
             <Button variant="outline" onClick={exportData}>
               <Download size={16} />
@@ -1108,20 +1082,10 @@ function initials(name: string) {
     .slice(0, 2)
     .join("");
 }
-function PageHeading({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string;
-  title: string;
-  description: string;
-}) {
+function PageHeading({ title }: { title: string }) {
   return (
     <PageHeader>
-      <span className="eyebrow">{eyebrow}</span>
       <h1>{title}</h1>
-      <p>{description}</p>
     </PageHeader>
   );
 }
@@ -1229,11 +1193,7 @@ export function Course({
           <Clock size={16} />
           {c.duration} min <span>·</span>
           {c.lessons.length} lessons<span>·</span>
-          {complete ? (
-            <Badge variant="success">Completed</Badge>
-          ) : (
-            "At your own pace"
-          )}
+          {complete && <Badge variant="success">Completed</Badge>}
         </div>
       </div>
       {runtime && user.id === "guest" && (
@@ -1343,8 +1303,7 @@ export function Course({
             </>
           ) : (
             <>
-              <span className="eyebrow">PUT YOUR KNOWLEDGE TO WORK</span>
-              <h2>{complete ? "Nicely done." : "A quick quiz."}</h2>
+              <h2>{complete ? "Course complete" : "Knowledge check"}</h2>
               <p>
                 Answer every question correctly to complete the course. You can
                 try again as often as you need.
