@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
 import { Settings } from "lucide-react";
@@ -33,6 +34,7 @@ import {
 import { ActionGroup } from "@/components/ui/action-group";
 
 export function LibraryExamples() {
+  const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const progressTarget = useRevealTarget<HTMLElement>();
   const [feedback, setFeedback] = useState<{
     rating: "up" | "down";
@@ -187,6 +189,22 @@ export function LibraryExamples() {
           </DropdownMenu>
         </ActionGroup>
         <p role="status">{message}</p>
+      </SettingsSection>
+      <SettingsSection
+        id="catalog-member-selection"
+        title={<h3>Searchable member selection</h3>}
+        guidance="Use for selecting existing people. Search and pagination retain selections; the feature reviews team moves before applying them."
+      >
+        <SearchableSelectionList
+          label="Find example people"
+          value={selectedPeople}
+          onChange={setSelectedPeople}
+          options={Array.from({ length: 32 }, (_, index) => ({
+            id: String(index),
+            label: `Example person ${index + 1}`,
+            description: `person${index + 1}@example.test · Sample team`,
+          }))}
+        />
       </SettingsSection>
       <SettingsSection
         id="catalog-content-feedback"

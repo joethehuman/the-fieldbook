@@ -8,6 +8,14 @@ Search the course library to add individual courses or published curricula. Reor
 
 A curriculum is published when it is ready for the library and group use. Saving edits to a published playlist affects its linked groups; the editor shows how many. Unlink it before returning it to draft. Curriculum and group deletion dialogs describe their impact. Completion history is retained.
 
+## Reporting teams
+
+In Administration → Teams, open **Manage team** for a full-width member and hierarchy view. Members shows 25 people per page with name/email search. Direct members is the default; Include subteams adds descendants and identifies each person's direct team. Those rows link to their own team for management. Subteams lists immediate children; parent and Back to teams actions keep navigation explicit.
+
+Add members searches existing active accounts, keeps multiple selections across searches/pages, and reviews additions or moves before applying them together. Each person has one direct reporting team. Remove affects direct membership only: it does not delete or deactivate the account or erase progress. Inactive members remain labeled in the roster; pre-registered pending accounts continue to be managed in People. Team-linked learning group membership follows the existing direct-team links, so moving a person can change assignments while retaining completion history.
+
+Edit team details uses the shared dialog for name, parent and manager. Parent choices exclude the team and descendants. Unsaved changes require confirmation before leaving; saves disable duplicate submission and retain the draft on failure. These operations use the existing administrator-only, revision-checked governance save; no new permission or storage model is introduced.
+
 ## Storage and upgrade
 
 Apply `supabase/migrations/202609200004_learning_groups.sql` after all previous migrations, including `202609200002_assignments.sql` and `202609200003_required_learning.sql`. It is an additive, one-time transaction. It adds `fb_config.curricula`, imports existing group assignments into ordered `learningItems`, and stores `teamIds` on groups. Existing content groups/assignment rules remain the materialized result used for progress and reporting. `requiredCourseIds` remains an internal ordering field for compatibility, not user-facing terminology.

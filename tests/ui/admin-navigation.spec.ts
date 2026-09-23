@@ -75,20 +75,30 @@ test("admin destinations reveal details and keep filters and fieldset footers co
 
   await section(page, "Teams");
   await revealed(page.getByRole("tabpanel"));
-  const edit = page
-    .getByRole("button", { name: "Edit team", exact: true })
-    .first();
+  await page
+    .getByRole("button", { name: "Manage Sales team", exact: true })
+    .click();
+  const detail = page.getByRole("region", {
+    name: "Sales team management",
+    exact: true,
+  });
+  await revealed(detail);
+  const edit = page.getByRole("button", {
+    name: "Edit team details",
+    exact: true,
+  });
   await edit.focus();
   await page.keyboard.press("Enter");
-  const editor = page.locator("#team-editor");
-  await revealed(editor);
-  await expect(editor).toBeFocused();
-  await expect(editor.locator('[data-slot="card-footer"]')).toContainText(
+  const editor = page.getByRole("dialog");
+  await expect(
+    editor.getByRole("textbox", { name: "Team name", exact: true }),
+  ).toBeFocused();
+  await expect(editor.locator('[data-slot="dialog-footer"]')).toContainText(
     "Assigning a manager",
   );
   await expect(
     editor.getByRole("combobox", { name: "Manager", exact: true }),
-  ).toHaveAttribute("aria-describedby", /team-editor-guidance/);
+  ).toHaveAttribute("aria-describedby", /team-manager-guidance/);
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
 
   await section(page, "Feedback");

@@ -1,9 +1,6 @@
 "use client";
-import { SettingsSection } from "./patterns/settings-section";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
-import { Alert } from "./ui/alert";
-import { useToast } from "./ui/toast";
 import { CsvExport } from "./patterns/csv-export";
 import {
   teamProgressRows,
@@ -21,11 +18,9 @@ import {
   TableBody,
   TableCell,
 } from "@/components/ui/table";
-import { ActionGroup } from "@/components/ui/action-group";
 import { Input } from "@/components/ui/input";
 
 import {
-  Toolbar,
   FilterBar,
   EmptyState,
   SectionHeader,
@@ -35,211 +30,8 @@ import { SelectField } from "./ui/select";
 import { completionPercent } from "@/lib/learning";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
-import { canParent, reportTeamIds, type Team, type User } from "@/lib/types";
-export function TeamsAdmin({
-  data,
-  onChange,
-}: {
-  data: Workspace;
-  onChange: (d: Workspace) => void | Promise<void>;
-}) {
-  const editor = useRevealTarget<HTMLElement>();
-  const teams = data.teams || [];
-  const notify = useToast();
-  const [editing, setEditing] = useState<Team | null>(null),
-    [notice, setNotice] = useState("");
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    if (!editing) return;
-    const name = editing.name.trim();
-    if (
-      !name ||
-      teams.some(
-        (t) =>
-          t.id !== editing.id && t.name.toLowerCase() === name.toLowerCase(),
-      )
-    ) {
-      setNotice("Use a unique team name.");
-      return;
-    }
-    if (!canParent(editing.id, editing.parentId || "", teams)) {
-      setNotice("A team cannot sit inside itself or one of its subteams.");
-      return;
-    }
-    try {
-      await onChange({
-        ...data,
-        teams: [
-          ...teams.filter((t) => t.id !== editing.id),
-          { ...editing, name },
-        ],
-      });
-      setEditing(null);
-      setNotice("");
-      notify("Team saved.");
-    } catch (e) {
-      setNotice((e as Error).message);
-    }
-  }
-  return (
-    <>
-      <Toolbar>
-        <p>Teams organize reporting. Groups determine assignments.</p>
-        <Button
-          variant="default"
-          onClick={() => {
-            setEditing({ id: crypto.randomUUID(), name: "" });
-            editor.reveal();
-            setNotice("");
-          }}
-        >
-          Add team
-        </Button>
-      </Toolbar>
-      {notice && <Alert variant="destructive">{notice}</Alert>}
-      {editing && (
-        <form className="grid gap-4" onSubmit={save}>
-          <SettingsSection
-            {...editor.targetProps}
-            id="team-editor"
-            title={
-              <h3>
-                {teams.some((t) => t.id === editing.id)
-                  ? `Edit ${editing.name || "team"}`
-                  : "New team"}
-              </h3>
-            }
-            guidance="Assigning a manager grants reporting access for this team and its subteams."
-            actions={
-              <ActionGroup>
-                <Button type="submit">Save team</Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setEditing(null)}
-                >
-                  Cancel
-                </Button>
-              </ActionGroup>
-            }
-          >
-            <div className="grid items-start gap-4 md:grid-cols-3">
-              <FormField label="Team name">
-                <Input
-                  required
-                  maxLength={80}
-                  value={editing.name}
-                  onChange={(e) =>
-                    setEditing({ ...editing, name: e.target.value })
-                  }
-                />
-              </FormField>
-              <FormField label="Parent team">
-                <SelectField
-                  value={editing.parentId || ""}
-                  onValueChange={(value) =>
-                    setEditing({
-                      ...editing,
-                      parentId: value || undefined,
-                    })
-                  }
-                >
-                  <option value="">Top-level team</option>
-                  {teams
-                    .filter((t) => canParent(editing.id, t.id, teams))
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                </SelectField>
-              </FormField>
-              <FormField label="Manager">
-                <SelectField
-                  aria-describedby="team-editor-guidance"
-                  value={editing.managerId || ""}
-                  onValueChange={(value) =>
-                    setEditing({
-                      ...editing,
-                      managerId: value || undefined,
-                    })
-                  }
-                >
-                  <option value="">No manager</option>
-                  {data.users
-                    .filter(
-                      (u) =>
-                        u.active &&
-                        (u.role === "manager" || u.role === "admin"),
-                    )
-                    .map((u) => (
-                      <option key={u.id} value={u.id}>
-                        {u.name}
-                      </option>
-                    ))}
-                </SelectField>
-              </FormField>
-            </div>
-          </SettingsSection>
-        </form>
-      )}
-      <TableContainer>
-        <DataTable layout="teams">
-          <TableHeader>
-            <TableRow>
-              <TableHead>Team</TableHead>
-              <TableHead>Parent</TableHead>
-              <TableHead>Manager</TableHead>
-              <TableHead align="right">Direct members</TableHead>
-              <TableHead>
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {teams.map((t) => (
-              <TableRow key={t.id}>
-                <TableCell>
-                  <strong>{t.name}</strong>
-                </TableCell>
-                <TableCell>
-                  {teams.find((p) => p.id === t.parentId)?.name || "—"}
-                </TableCell>
-                <TableCell>
-                  {data.users.find((u) => u.id === t.managerId)?.name ||
-                    "Unassigned"}
-                </TableCell>
-                <TableCell align="right">
-                  {
-                    data.users.filter((u) => u.active && u.teamId === t.id)
-                      .length
-                  }
-                </TableCell>
-                <TableCell>
-                  <Button
-                    variant="link"
-                    onClick={() => {
-                      setEditing({ ...t });
-                      editor.reveal();
-                      setNotice("");
-                    }}
-                  >
-                    Edit team
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </DataTable>
-      </TableContainer>
-      {!teams.length && (
-        <EmptyState>
-          Create your first team, then assign its members in Profiles.
-        </EmptyState>
-      )}
-    </>
-  );
-}
+import { reportTeamIds, type User } from "@/lib/types";
+export { TeamsAdmin } from "./TeamManagement";
 export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
   const assignments = useRevealTarget<HTMLElement>();
   const teams = data.teams || [];

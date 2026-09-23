@@ -265,3 +265,10 @@ Use `SettingsSection guidance` for group-wide consequences and operational instr
 Use `CardContent` for a collection item's title and content, and `CardFooter` for its metadata and actions. Use `SettingsSection` for an editor with group guidance and save/cancel actions; a `FilterBar` is for collection filters, not an editing form. Filters align at the top so a long selected value cannot lift neighboring labels; let complete fields wrap on narrow screens.
 
 `useRevealTarget` connects an explicit tab or drill-in action to its rendered destination. Spread `targetProps` onto the destination heading or named region and call `reveal()` after accepting navigation guards. It focuses the destination without an extra jump, then scrolls below the sticky application bar. Call `reveal(false)` for tabs to retain Radix keyboard focus. The request runs after rendering, including repeated selections; reduced motion uses an immediate scroll. Do not trigger it from ordinary typing or filtering. Feedback item drill-ins clear conflicting filters, name the scope, and offer All feedback to return.
+
+
+### Large rosters and bounded selection
+
+Use a full-width detail view for a roster or hierarchy, with a small shared Dialog only for focused metadata editing. `Pagination` presents one-based pages of an already-loaded collection; the caller owns filtering, stable sorting, page clamping and destination reveal. It does not imply server pagination. Team members use the `teamMembers` DataTable schema with contained horizontal scrolling on narrow screens.
+
+`SearchableSelectionList` composes FormField, Input, Checkbox, Field and Pagination for existing-person selection. It displays ten matches per page and retains controlled selections across searches and pages. Keep changes in the feature until its explicit review/apply step; the pattern never mutates people or assigns teams. The catalog's Searchable member selection example exercises more than one page. Features own empty states, move descriptions, permission checks, errors and navigation guards.

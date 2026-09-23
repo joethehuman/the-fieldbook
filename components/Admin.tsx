@@ -39,8 +39,11 @@ import { availableDocSections } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
 import { PendingPeople } from "./PendingPeople";
-import { useEffect, useRef, useState } from "react";
-import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type {
+  NavigationGuard,
+  RegisterNavigationGuard,
+} from "@/lib/navigation-guard";
 import { ActionGroup } from "./ui/action-group";
 import { GroupPicker } from "./patterns/group-picker";
 import { Button } from "./ui/button";
@@ -197,6 +200,14 @@ export default function Admin({
   const notify = useToast();
   const { confirm } = useInteractionDialog();
   const adminPanel = useRevealTarget();
+  const teamGuard = useRef<NavigationGuard | null>(null);
+  const registerTeamGuard = useCallback<RegisterNavigationGuard>(
+    (guard) => {
+      teamGuard.current = guard;
+      registerNavigationGuard?.(guard);
+    },
+    [registerNavigationGuard],
+  );
   const [settingsPending, setSettingsPending] = useState(false);
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
@@ -401,6 +412,7 @@ export default function Admin({
   }
 
   async function changeAdminTab(next: string) {
+    if (teamGuard.current && !(await teamGuard.current())) return;
     if (
       settingsPending &&
       !(await confirm("Leave this page? Unsaved changes will be discarded."))
@@ -466,7 +478,9 @@ export default function Admin({
           className="admin-panel mt-0"
           key={tab}
         >
-          {!["groups", "curricula", "progress", "feedback"].includes(tab) && (
+          {!["groups", "curricula", "progress", "feedback", "teams"].includes(
+            tab,
+          ) && (
             <SectionHeader
               title={
                 <h2>
@@ -503,7 +517,11 @@ export default function Admin({
           ) : tab === "feedback" ? (
             <FeedbackAdmin data={data} />
           ) : tab === "teams" ? (
-            <TeamsAdmin data={data} onChange={onChange} />
+            <TeamsAdmin
+              data={data}
+              onChange={onChange}
+              registerNavigationGuard={registerTeamGuard}
+            />
           ) : tab === "content" ? (
             <>
               <CollectionToolbar

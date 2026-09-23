@@ -7,6 +7,7 @@ const layouts = {
   progress: ["w-[28%]", "w-[17%]", "w-[17%]", "w-[12%]", "w-[11%]", "w-[15%]"],
   content: ["w-[33%]", "w-[12%]", "w-[15%]", "w-[10%]", "w-[30%]"],
   people: ["w-[26%]", "w-[12%]", "w-[23%]", "w-[11%]", "w-[28%]"],
+  teamMembers: ["w-[45%]", "w-[30%]", "w-[25%]"],
   teams: ["w-[24%]", "w-[20%]", "w-[24%]", "w-[16%]", "w-[16%]"],
   assignments: ["w-[27%]", "w-[23%]", "w-[20%]", "w-[30%]"],
   courses: ["w-[30%]", "w-[24%]", "w-[18%]", "w-[28%]"],
@@ -21,7 +22,8 @@ export function DataTable({
     <Table
       data-layout={layout}
       className={cn(
-        "min-w-208 table-fixed [&_td]:[overflow-wrap:anywhere] [&_th]:[overflow-wrap:anywhere]",
+        "table-fixed [&_td]:[overflow-wrap:anywhere] [&_th]:[overflow-wrap:anywhere]",
+        layout === "teamMembers" ? "min-w-128" : "min-w-208",
         className,
       )}
       {...props}
