@@ -471,9 +471,9 @@ export default function ComponentCatalog() {
             />
           </div>
           <StatusActions
-            actions={<Button variant="link">Edit example comment</Button>}
+            actions={<Button variant="link">Review saved changes</Button>}
           >
-            Thanks—your rating is saved.
+            Your changes are saved.
           </StatusActions>
           <ContentCardFooter
             action={

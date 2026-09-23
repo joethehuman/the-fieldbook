@@ -159,7 +159,8 @@ async function setup(
   } else
     await page.addInitScript(
       ({ data, id }) => {
-        localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
+        if (!localStorage.getItem("fieldbook.workspace.v1"))
+          localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
         sessionStorage.setItem("fieldbook.profile.v1", id);
       },
       { data, id: user.id },
@@ -566,4 +567,50 @@ test("app bar stays visible over long administration reports", async ({
   await page.getByRole("textbox", { name: "Search all content" }).fill("sales");
   await expect(page.locator('[data-slot="search-panel"]')).toBeVisible();
   await page.screenshot({ path: info.outputPath("bar-report-search.png") });
+});
+
+test("People fieldset footers preserve default-stage saving in both applications", async ({
+  page,
+}, info) => {
+  const { data, production } = await setup(page, info);
+  if (production)
+    await page.route("**/api/settings", async (route) => {
+      data.settings = route.request().postDataJSON().settings;
+      await route.fulfill({ json: { saved: true } });
+    });
+  await section(page, production ? "People" : "Demo profiles");
+  const group = page.getByRole("region", { name: "New users", exact: true });
+  await expect(group.getByRole("combobox")).toHaveAccessibleDescription(
+    /Applies to newly added users/,
+  );
+  await expect(group.locator('[data-slot="card-footer"]')).toHaveCSS(
+    "background-color",
+    "rgb(250, 250, 250)",
+  );
+  await select(
+    page,
+    "Default onboarding stage for new users",
+    "New user — onboarding window",
+  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Default saved" }),
+  ).toBeVisible();
+  if (production) {
+    const pending = page.getByRole("region", {
+      name: "Pending accounts",
+      exact: true,
+    });
+    await expect(pending.locator('[data-slot="card-footer"]')).toContainText(
+      "No email is sent.",
+    );
+  }
+  await screenshot(page, info, "people-fieldset-footers");
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Administration", exact: true }),
+  ).toBeVisible();
+  await section(page, production ? "People" : "Demo profiles");
+  await expect(group.getByRole("combobox")).toContainText(
+    "New user — onboarding window",
+  );
 });

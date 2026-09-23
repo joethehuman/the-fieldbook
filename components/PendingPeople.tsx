@@ -2,7 +2,7 @@
 import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
 
-import { Card } from "@/components/ui/card";
+import { SettingsSection } from "./patterns/settings-section";
 import { ActionGroup } from "./ui/action-group";
 import { GroupPicker } from "./patterns/group-picker";
 import { Button } from "./ui/button";
@@ -40,12 +40,11 @@ export function PendingPeople({
     }
   }
   return (
-    <Card className="grid gap-4">
-      <h2>Pending accounts</h2>
-      <p>
-        Pre-register a Google email. The person claims this account on verified
-        sign-in, including when registration is closed. No email is sent.
-      </p>
+    <SettingsSection
+      id="pending-accounts"
+      title={<h2>Pending accounts</h2>}
+      guidance="Pre-register a Google email. The person claims this account on verified sign-in, including when registration is closed. No email is sent."
+    >
       <Button
         variant="outline"
         disabled={busy}
@@ -176,6 +175,6 @@ export function PendingPeople({
           </ActionGroup>
         </form>
       )}
-    </Card>
+    </SettingsSection>
   );
 }

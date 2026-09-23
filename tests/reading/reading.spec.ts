@@ -472,3 +472,95 @@ test("short and long articles fill the shared reading width in both apps", async
     }
   }
 });
+
+test("content feedback saves ratings and comments with retry and focus return", async ({
+  page,
+}, info) => {
+  const data = freshWorkspace();
+  data.content = items as typeof data.content;
+  data.publishedContent = data.content.map((item) => ({
+    ...item,
+    publishedRevision: 1,
+  }));
+  data.feedback = [];
+  const user = data.users.find((user) => user.id === "demo-admin")!;
+  await page.route("**/api/workspace", (route) =>
+    route.fulfill({ json: { data, user } }),
+  );
+  let fail = false;
+  const writes: Array<{ rating: string; comment: string }> = [];
+  await page.route("**/api/feedback", async (route) => {
+    const entry = route.request().postDataJSON();
+    writes.push(entry);
+    if (fail)
+      return route.fulfill({
+        status: 503,
+        json: { error: "Feedback temporarily unavailable. Try again." },
+      });
+    data.feedback = [
+      ...(data.feedback || []).filter(
+        (f) => !(f.userId === entry.userId && f.contentId === entry.contentId),
+      ),
+      entry,
+    ];
+    await route.fulfill({ json: { saved: true } });
+  });
+  await page.goto(`/updates/${ids[1]}`);
+  const region = page.getByRole("region", { name: "Content feedback" });
+  const useful = region.getByRole("button", { name: "Useful", exact: true });
+  await useful.click();
+  const form = page.getByRole("form", { name: "Give feedback", exact: true });
+  await expect(form.getByRole("textbox")).toBeFocused();
+  await expect(
+    form.getByRole("button", { name: "Send", exact: true }),
+  ).toBeEnabled();
+  expect(writes.at(-1)).toMatchObject({ rating: "up", comment: "" });
+  await form.getByRole("textbox").fill("Clear and useful. Keep this draft.");
+  {
+    fail = true;
+    await form.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(form.getByRole("alert")).toContainText(
+      "Feedback temporarily unavailable",
+    );
+    await expect(form.getByRole("textbox")).toHaveValue(
+      "Clear and useful. Keep this draft.",
+    );
+    await page.screenshot({
+      path: info.outputPath("feedback-save-error.png"),
+      fullPage: true,
+    });
+    await expect(
+      form.getByRole("button", { name: "Send", exact: true }),
+    ).toBeInViewport({ ratio: 1 });
+    fail = false;
+  }
+  await page.screenshot({
+    path: info.outputPath("content-feedback-open.png"),
+    fullPage: true,
+  });
+  await form.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(useful).toBeFocused();
+  await expect(region.getByRole("status")).toHaveText("Feedback saved.");
+  await region
+    .getByRole("button", { name: "Give feedback", exact: true })
+    .click();
+  await expect(form.getByRole("textbox")).toHaveValue(
+    "Clear and useful. Keep this draft.",
+  );
+  await form.getByRole("textbox").fill("Unsent draft");
+  await form.getByRole("button", { name: "Not useful", exact: true }).click();
+  await expect(
+    form.getByRole("button", { name: "Send", exact: true }),
+  ).toBeEnabled();
+  expect(writes.at(-1)).toMatchObject({
+    rating: "down",
+    comment: "Clear and useful. Keep this draft.",
+  });
+  await form.getByRole("textbox").press("Escape");
+  await expect(form).toBeHidden();
+  await page.screenshot({
+    path: info.outputPath("content-feedback-compact.png"),
+    fullPage: true,
+  });
+});

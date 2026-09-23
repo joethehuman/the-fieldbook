@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { ContentFeedback } from "@/components/patterns/content-feedback";
 import { Settings } from "lucide-react";
 import { FormField } from "@/components/patterns/form-field";
 import { SettingsSection } from "@/components/patterns/settings-section";
@@ -31,6 +32,11 @@ import {
 import { ActionGroup } from "@/components/ui/action-group";
 
 export function LibraryExamples() {
+  const [feedback, setFeedback] = useState<{
+    rating: "up" | "down";
+    comment: string;
+  }>();
+  const [failFeedback, setFailFeedback] = useState(false);
   const [choice, setChoice] = useState("long");
   const [enabled, setEnabled] = useState(false);
   const [count, setCount] = useState(10);
@@ -170,6 +176,29 @@ export function LibraryExamples() {
           </DropdownMenu>
         </ActionGroup>
         <p role="status">{message}</p>
+      </SettingsSection>
+      <SettingsSection
+        id="catalog-content-feedback"
+        title={<h3>Content feedback</h3>}
+        guidance="Use at the end of an article or completed lesson. Ratings save immediately. Send saves the optional plain-text comment and closes on success. Escape or Close dismisses without discarding the draft; errors remain open for retry. Desktop uses a popover; phones expand inline."
+      >
+        <Field orientation="horizontal">
+          <Switch checked={failFeedback} onCheckedChange={setFailFeedback} />
+          Simulate feedback save failure
+        </Field>
+        <ContentFeedback
+          saved={feedback}
+          onSave={async (rating, comment) => {
+            await new Promise((resolve) => setTimeout(resolve, 700));
+            if (failFeedback)
+              throw new Error(
+                "Could not save feedback. Turn off the simulated failure and try again.",
+              );
+            setFeedback({ rating, comment });
+          }}
+        />
+        <p className="text-copy text-muted-foreground">Disabled example</p>
+        <ContentFeedback disabled onSave={() => {}} />
       </SettingsSection>
       <SettingsSection
         id="catalog-progress"

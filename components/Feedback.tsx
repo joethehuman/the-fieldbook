@@ -1,22 +1,17 @@
 "use client";
 import { FormField } from "@/components/patterns/form-field";
+import { ContentFeedback } from "./patterns/content-feedback";
 import { CsvExport } from "./patterns/csv-export";
 import { feedbackRows, feedbackCsv } from "@/lib/reporting";
 import { Input } from "@/components/ui/input";
 import {
   FilterBar,
   SectionHeader,
-  StatusActions,
   EmptyState,
 } from "@/components/patterns/layout";
-import { Textarea } from "@/components/ui/textarea";
-import { Field } from "@/components/ui/field";
-import { ActionGroup } from "@/components/ui/action-group";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { useState } from "react";
-import { ThumbsDown, ThumbsUp } from "lucide-react";
 import type { Content, User, Feedback as Entry } from "@/lib/types";
 import type { Workspace } from "@/lib/store";
 export default function Feedback({
@@ -33,10 +28,7 @@ export default function Feedback({
   const saved = data.feedback?.find(
     (f) => f.userId === user.id && f.contentId === content.id,
   );
-  const [error, setError] = useState("");
-  const [expanded, setExpanded] = useState(false);
-  const [comment, setComment] = useState(saved?.comment || "");
-  async function save(rating: Entry["rating"], text = comment) {
+  async function save(rating: Entry["rating"], text: string) {
     const next: Entry = {
       id: saved?.id || crypto.randomUUID(),
       userId: user.id,
@@ -46,99 +38,25 @@ export default function Feedback({
       comment: text.trim(),
       updatedAt: new Date().toISOString(),
     };
-    try {
-      await onChange({
-        ...data,
-        feedback: [
-          ...(data.feedback || []).filter(
-            (f) => !(f.userId === user.id && f.contentId === content.id),
-          ),
-          next,
-        ],
-      });
-      setError("");
-    } catch (e) {
-      setError((e as Error).message);
-    }
+    await onChange({
+      ...data,
+      feedback: [
+        ...(data.feedback || []).filter(
+          (f) => !(f.userId === user.id && f.contentId === content.id),
+        ),
+        next,
+      ],
+    });
   }
   return (
-    <section className="feedback-box" aria-label="Content feedback">
-      <h3>Did you find this useful?</h3>
-      {error && (
-        <Alert variant="destructive" role="alert">
-          {error}
-        </Alert>
-      )}
-      <p>Your feedback helps us make this better.</p>
-      <ActionGroup>
-        {(["up", "down"] as const).map((rating) => (
-          <Button
-            variant={saved?.rating === rating ? "default" : "outline"}
-            key={rating}
-            aria-label={rating === "up" ? "Useful" : "Not useful"}
-            aria-pressed={saved?.rating === rating}
-            onClick={() => {
-              save(rating);
-              setExpanded(true);
-            }}
-          >
-            {rating === "up" ? (
-              <ThumbsUp size={17} />
-            ) : (
-              <ThumbsDown size={17} />
-            )}
-          </Button>
-        ))}
-      </ActionGroup>
-      {saved && (
-        <StatusActions
-          actions={
-            !expanded && (
-              <Button variant="link" onClick={() => setExpanded(true)}>
-                Edit comment
-              </Button>
-            )
-          }
-        >
-          Thanks—your rating is saved.
-        </StatusActions>
-      )}
-      {expanded && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (saved) save(saved.rating);
-            setExpanded(false);
-          }}
-        >
-          <Field>
-            Tell us more <span className="muted">(optional)</span>
-            <Textarea
-              rows={3}
-              maxLength={2000}
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="What worked? What could be more useful?"
-            />
-          </Field>
-          <ActionGroup>
-            <Button variant="default">Save comment</Button>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => {
-                setComment(saved?.comment || "");
-                setExpanded(false);
-              }}
-            >
-              Done
-            </Button>
-          </ActionGroup>
-        </form>
-      )}
-    </section>
+    <ContentFeedback
+      key={`${content.id}:${user.id}`}
+      saved={saved}
+      onSave={save}
+    />
   );
 }
+
 export function FeedbackAdmin({ data }: { data: Workspace }) {
   const [kind, setKind] = useState("all"),
     [item, setItem] = useState("all"),

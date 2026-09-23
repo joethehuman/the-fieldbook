@@ -24,6 +24,8 @@
   --border: #e6e6e6;
   --input: #d4d4d4;
   --ring: #175cd3;
+  --selected: #e0efff;
+  --selected-foreground: #175cd3;
   --control-border: #8a8a8a;
   --control-hover: #666666;
   --primary-hover: #383838;
@@ -85,6 +87,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
   --color-control-border: var(--control-border);
   --color-control-hover: var(--control-hover);
   --color-primary-hover: var(--primary-hover);

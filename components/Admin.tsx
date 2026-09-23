@@ -69,6 +69,7 @@ import {
 import CourseCoverEditor from "./CourseCoverEditor";
 import MarkdownEditor, { type UploadMedia } from "./MarkdownEditor";
 import SiteSettingsPanel from "./SiteSettingsPanel";
+import { SettingsSection } from "./patterns/settings-section";
 import { FeedbackAdmin } from "./Feedback";
 import { TeamsAdmin, TeamProgress } from "./Teams";
 import { videoSource } from "@/lib/video";
@@ -681,10 +682,14 @@ export default function Admin({
             </>
           ) : tab === "people" ? (
             <>
-              <Card className="grid gap-4">
-                <h2>New users</h2>
+              <SettingsSection
+                id="new-users"
+                title={<h2>New users</h2>}
+                guidance="Applies to newly added users and new self-registrations. You can override the stage and start date for each person. Group membership still determines assigned courses."
+              >
                 <FormField label="Default onboarding stage for new users">
                   <SelectField
+                    aria-describedby="new-users-guidance"
                     value={data.settings?.newUserStage || "existing"}
                     onValueChange={async (value) => {
                       try {
@@ -711,12 +716,7 @@ export default function Admin({
                     </option>
                   </SelectField>
                 </FormField>
-                <p className="muted">
-                  Applies to newly added users and new self-registrations. You
-                  can override the stage and start date for each person. Group
-                  membership still determines assigned courses.
-                </p>
-              </Card>
+              </SettingsSection>
               {production && <PendingPeople data={data} onChange={onChange} />}
               <Toolbar>
                 <p className="muted">

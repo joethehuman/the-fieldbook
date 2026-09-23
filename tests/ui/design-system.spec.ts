@@ -341,9 +341,9 @@ test("manager reporting uses shared filters and scoped people", async ({
   const emailBox = await personCell.locator("small").boundingBox();
   expect(emailBox!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height);
 
-  await expect(
-    page.getByRole("cell", { name: /Oliver Anderson/ }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("cell", { name: /Oliver Anderson/ })).toHaveCount(
+    0,
+  );
   await noOverflow(page);
   await testInfo.attach("manager-report", {
     body: await page.screenshot({
@@ -523,15 +523,133 @@ test("update footers and saved feedback keep text and actions separated", async 
   await page.locator(".brief-card").first().click();
   const feedback = page.getByRole("region", { name: "Content feedback" });
   await feedback.getByRole("button", { name: "Useful", exact: true }).click();
-  await feedback.getByRole("button", { name: "Done", exact: true }).click();
-  const status = await feedback.getByRole("status").boundingBox();
-  const edit = await feedback
-    .getByRole("button", { name: "Edit comment", exact: true })
-    .boundingBox();
-  expect(
-    edit!.y >= status!.y + status!.height ||
-      edit!.x >= status!.x + status!.width + 8,
-  ).toBe(true);
+  const form = page.getByRole("form", { name: "Give feedback", exact: true });
+  await expect(form.getByRole("textbox")).toBeFocused();
+  await form.getByRole("textbox").fill("The example was clear.");
+  await form.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(
+    feedback.getByRole("button", { name: "Useful", exact: true }),
+  ).toBeFocused();
+  await expect(feedback.getByRole("status")).toHaveText("Feedback saved.");
+  await page.reload();
+  await feedback
+    .getByRole("button", { name: "Give feedback", exact: true })
+    .click();
+  await expect(form.getByRole("textbox")).toHaveValue("The example was clear.");
   await noOverflow(page);
   await snapshotReview(page, testInfo, "feedback-composition");
+});
+
+test("content feedback catalog preserves failed drafts, pending state and keyboard dismissal", async ({
+  page,
+}, info) => {
+  await page.goto("/ui#catalog-content-feedback");
+  const catalog = page.locator("#catalog-content-feedback");
+  await catalog.getByRole("switch").click();
+  await catalog
+    .getByRole("button", { name: "Not useful", exact: true })
+    .first()
+    .click();
+  const form = page.getByRole("form", { name: "Give feedback", exact: true });
+  await expect(form.getByRole("textbox")).toBeFocused();
+  await expect(
+    form.getByRole("button", { name: "Send", exact: true }),
+  ).toBeDisabled();
+  await expect(form.getByRole("alert")).toContainText(
+    "Could not save feedback",
+  );
+  await form.getByRole("textbox").fill("Keep this draft while I retry.");
+  await form.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(form.getByRole("alert")).toContainText(
+    "Could not save feedback",
+  );
+  await expect(form.getByRole("textbox")).toHaveValue(
+    "Keep this draft while I retry.",
+  );
+  await snapshotReview(page, info, "feedback-error");
+  await form.getByRole("textbox").press("Escape");
+  await expect(form).toBeHidden();
+  await expect(
+    catalog.getByRole("button", { name: "Not useful", exact: true }).first(),
+  ).toBeFocused();
+  await catalog.getByRole("switch").click();
+  await catalog
+    .getByRole("button", { name: "Give feedback", exact: true })
+    .first()
+    .click();
+  await expect(form.getByRole("textbox")).toHaveValue(
+    "Keep this draft while I retry.",
+  );
+  await form.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(form).toBeHidden();
+  await expect(catalog.getByRole("status").first()).toHaveText(
+    "Feedback saved.",
+  );
+  await expect(
+    catalog.getByRole("button", { name: "Give feedback", exact: true }).last(),
+  ).toBeDisabled();
+  await noOverflow(page);
+});
+
+test("new user guidance belongs to the grey fieldset footer and labels its select", async ({
+  page,
+}, info) => {
+  await admin(page);
+  await adminSection(page, "Demo profiles");
+  const section = page.getByRole("region", { name: "New users", exact: true });
+  const select = section.getByRole("combobox");
+  await expect(select).toHaveAccessibleDescription(
+    /Applies to newly added users/,
+  );
+  const footer = section.locator('[data-slot="card-footer"]');
+  await expect(footer).toContainText(
+    "Group membership still determines assigned courses.",
+  );
+  await expect(footer).toHaveCSS("background-color", "rgb(250, 250, 250)");
+  await select.click();
+  await page
+    .getByRole("option", { name: "New user — onboarding window", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Default saved" }),
+  ).toBeVisible();
+  await page.reload();
+  await adminSection(page, "Demo profiles");
+  await expect(select).toContainText("New user — onboarding window");
+  await snapshotReview(page, info, "new-users-footer");
+});
+
+test("feedback remains usable with enlarged text and independent of branding and dark preference", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await page.goto("/ui#catalog-content-feedback");
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+    document.documentElement.style.setProperty("--brand", "#b42318");
+  });
+  const catalog = page.locator("#catalog-content-feedback");
+  await catalog
+    .getByRole("button", { name: "Useful", exact: true })
+    .first()
+    .click();
+  const form = page.getByRole("form", { name: "Give feedback", exact: true });
+  await expect(
+    form.getByRole("button", { name: "Send", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    form.getByRole("button", { name: "Useful", exact: true }),
+  ).toHaveCSS("color", "rgb(23, 92, 211)");
+  await form
+    .getByRole("textbox")
+    .fill(
+      "Long feedback text that wraps correctly with enlarged type and retains the existing character limit.",
+    );
+  await noOverflow(page);
+  const box = await form.getByRole("textbox").boundingBox();
+  expect(box!.width).toBeLessThanOrEqual(info.project.use.viewport!.width);
+  await snapshotReview(page, info, "feedback-enlarged");
+  await form.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(form).toBeHidden();
 });

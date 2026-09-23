@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Make People settings guidance consistent in grey fieldset footers, and add shared two-choice feedback with a compact trigger, focused comment panel, pending/error recovery and a catalog example.
+
 - Align the shared library with live Geist references: filled shadcn avatars, checkbox/switch/collapsible primitives, grey settings and dialog footers, underline tabs, quieter surfaces and compact status treatments.
 - Refine Docs reading proportions and centered metadata; replace large disclosure markers with small chevrons while retaining navigation, outlines and saved tree state. Document reference mappings and owned-source component choices.
 
