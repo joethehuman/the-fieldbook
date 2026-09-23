@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 
-async function seed(page: Page, relevantIds: string[]) {
+async function seed(page: Page, relevantIds: string[], count = 27) {
   const data = freshWorkspace();
   const base = data.content.find((item) => item.kind === "brief")!;
   data.content = data.content.filter((item) => item.kind !== "brief");
@@ -10,7 +10,7 @@ async function seed(page: Page, relevantIds: string[]) {
     { id: "all", name: "Everyone" },
     { id: "sales", name: "Sales", parentId: "all" },
   ];
-  for (let i = 0; i < 27; i++) {
+  for (let i = 0; i < count; i++) {
     const id = `update-${String(i).padStart(2, "0")}`;
     data.content.push({
       ...base,
@@ -105,4 +105,15 @@ test("Load more reveals complete ordered slices once and preserves scroll positi
   const titles = await page.locator(".brief-card h3").allTextContents();
   expect(new Set(titles).size).toBe(titles.length);
   expect(titles).toHaveLength(27);
+});
+
+test("Load more hides on the exact final page boundary", async ({ page }) => {
+  await seed(page, ["update-00", "update-04"], 22);
+  const list = page.locator(".updates-section").nth(1).locator(".brief-card");
+  await expect(list).toHaveCount(10);
+  await page.getByRole("button", { name: "Load more", exact: true }).click();
+  await expect(list).toHaveCount(20);
+  await expect(page.getByRole("button", { name: "Load more" })).toHaveCount(0);
+  const titles = await page.locator(".brief-card h3").allTextContents();
+  expect(new Set(titles).size).toBe(22);
 });
