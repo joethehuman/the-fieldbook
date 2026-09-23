@@ -1,4 +1,5 @@
 "use client";
+import { LibraryExamples } from "./library-examples";
 import { ControlExamples } from "./control-examples";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { Article, CourseOverview } from "@/components/patterns/reading";
@@ -17,7 +18,7 @@ import { LearningCard } from "@/components/patterns/learning-card";
 import { BrowseToolbar } from "@/components/patterns/layout";
 import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
-import { ContentAction } from "@/components/patterns/content-action";
+
 import { DataTable } from "@/components/patterns/data-table";
 import { AccountButton } from "@/components/patterns/account-button";
 import { ArrowRight, Layers, LogOut, Settings } from "lucide-react";
@@ -99,6 +100,7 @@ export default function ComponentCatalog() {
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
       <ControlExamples />
+      <LibraryExamples />
       <section className="grid gap-4" aria-label="Save confirmations">
         <SectionHeader
           title={<h2>Save confirmations</h2>}

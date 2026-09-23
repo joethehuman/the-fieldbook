@@ -4,7 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Refine shared typography, button/input states and visible focus; add labeled text-field and settings-section patterns, an Installation branding pilot and live control comparisons in the demo catalog.
+- Refine shared typography and control states across both apps, with connected form labels/help, consistent settings sections, accessible editor hints, progress rings, readable statuses and responsive administration navigation.
+- Distinguish persistent notes, validation, activity and completion; show honest loading/empty states for AI connections and a shared Updates count/load-more footer. Extend the component catalog and contributor guidance.
 
 - Show the two newest group-relevant Updates in For you, then list the remaining published library once with a local Load more control that reveals ten at a time.
 - Keep the demo and production feed on the same group, publication and ordering rules; use published snapshot dates without allowing unpublished draft edits to reorder an Update.

@@ -152,17 +152,67 @@ The `/ui` catalog includes a document tree, repeated headings, an outline and se
 
 A ResizeObserver supplies `--app-bar-height` for wrapped controls and enlarged text. The root scroll padding applies only when the bar exists; heading scroll margins add breathing room, not a second header-height offset. The Docs outline uses `--anchor-offset` for its sticky top and bounded height. Preserve native fragment/history behavior and navigation guards. SearchPanel bounds its height by the remaining viewport, and retains its trigger-relative desktop and bar-relative phone placement. Verify top/scrolled states, long breadcrumbs, enlarged text, search, heading links and dialog focus in both applications.
 
-## Foundation and control pilot
+## Foundations and controls
 
 The control foundation uses [Geist typography](https://vercel.com/geist/typography), [buttons](https://vercel.com/geist/button) and [inputs](https://vercel.com/geist/input) as public visual/interaction references. Fieldbook owns its source; usage snippets are not implementations and no `@vercel/geistcn` package is required. Preserve the light neutral identity and the separate installation branding token.
 
 `styles/tokens.css` owns semantic type roles: page 32/40, label 14/20, copy 14/22 and compact action 13/20. Existing heading weights (600), label weight (500), spacing scale and surface radii remain. `control` and `control-sm` preserve the 36/32 px minimum sizes; `rounded-control` is 6 px. Controls can grow for wrapped text. Text inputs use 16 px below the small breakpoint to avoid mobile focus zoom, then 14 px on wider screens. Prose retains its own scoped typography. Register new semantic text/spacing names in the shared class-merging helper in `lib/utils.ts`; otherwise font-size names can be mistaken for colors and sizing conflicts may survive.
 
-The global focus token is blue with a visible two-pixel ring; Button/Input add a background-colored offset. This also changes focus on existing links, menus and other token consumers. Page heading and base copy tokens affect both apps. Only Button/Input use the stronger control border; card/separator borders and other control families retain their current tokens. Primary/destructive hover colors and disabled surfaces are explicit tokens, not opacity applied to the whole control. Check these shared changes in learner, admin, account and reading views.
+The global focus token is blue with a visible two-pixel ring; Button/Input add a background-colored offset. This also changes focus on existing links, menus and other token consumers. Page heading and base copy tokens affect both apps. Button, Input, Textarea and Select use the stronger control border; card and separator borders remain subtle. Primary/destructive hover colors and disabled surfaces are explicit tokens, not opacity applied to the whole control. Check these shared changes in learner, admin, account and reading views.
 
 - Keep the existing Button variants (`default`, `outline`, `ghost`, `destructive`, `link`) and sizes (`default`, `sm`, `icon`). Use real anchors with `asChild` for navigation. Supply an accessible name for icon-only commands.
 - Native action buttons accept `loading`. This sets native disabled and `aria-busy`, prevents repeat activation, retains the original label and width, and overlays a decorative spinner. Reduced motion stops its rotation. Loading is intentionally not accepted with `asChild`: links remain navigation. Keep save completion/error announcements in the owning feature.
 - `TextField` composes Field/Input/FieldDescription/FieldError. Supply a unique, stable `id`, a label and optional description/error. Help and error text stay outside the label and are connected with `aria-describedby`; caller-provided description IDs are preserved. Errors set `aria-invalid`. Validation, value, submission and focus management remain with the feature. Prefer blur/submit validation; retain native constraints and clear an existing error when corrected.
-- `SettingsSection` composes Card, SectionHeader and FieldGroup. The owning feature supplies a heading of the correct level and owns saving. Installation branding is the first adopter. Its existing upload, privacy, accent, dirty-navigation and save behaviors remain.
+- `SettingsSection` composes Card, SectionHeader and FieldGroup. The owning feature supplies a heading of the correct level and owns saving. Branding, completion windows, access and privacy settings use this pattern. Its existing upload, privacy, accent, dirty-navigation and save behaviors remain.
 
-The first section of `/ui` compares variants, sizes, disabled/loading states, input states and live blur/submit validation. Hover and Tab exercise actual states rather than painted imitations. `tests/ui/control-pilot.spec.ts` covers label/help/error associations, disabled keyboard skipping, validation, loading dimensions, reduced motion and saved branding at desktop/tablet/phone sizes.
+The first section of `/ui` compares button/input variants and live validation; `/ui#shared-library` covers the wider library and usage decisions. Hover and Tab exercise actual states rather than painted imitations. `tests/ui/control-pilot.spec.ts` covers label/help/error associations, disabled keyboard skipping, validation, loading dimensions, reduced motion and saved branding at desktop/tablet/phone sizes.
+
+
+## Form composition and information
+
+Use `TextField` for a text input with a supplied stable ID (including server-rendered presentation). Use `FormField` inside interactive forms to wrap **one** Input, Textarea or SelectField. FormField uses React `useId` unless the control already has an ID, preserves existing descriptions and invalid state, and links its label/help/error without including helper copy in the control's name. It does not validate, transform values or save. Pass the actual control directly, not an arbitrary wrapper or fragment. Keep refs and event handlers on that control.
+
+```tsx
+<FormField label="Parent team" description="Reporting includes its subteams." error={error}>
+  <SelectField value={parentId} onValueChange={setParentId}>
+    <option value="">No parent</option>
+    {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+  </SelectField>
+</FormField>
+```
+
+Use FieldGroup and a legend for related choices, native Field labels for checkbox/radio rows, and SettingsSection for a titled settings group. Supply SettingsSection an ID to name its section and fieldset; disabled applies to the group's native fieldset. Keep save and publish operations distinct. Descriptions for manager scope, parent groups, privacy contacts, completion windows and media constraints belong with the applicable controls. Context that applies to the whole screen remains outside individual labels.
+
+| Information | Use | Avoid |
+| --- | --- | --- |
+| Persistent control guidance | FormField description or FieldDescription connected by `aria-describedby` | A tooltip as the only instruction |
+| Invalid field | FormField/TextField error, or associated FieldError with `aria-invalid` | Color alone; changing validation rules in presentation |
+| Persistent context | Note, optionally warning tone | Live-region announcements for static instructions |
+| New failure or important result | Alert, with appropriate role and recovery action | Auto-dismissing errors |
+| Completed save | Existing Toast | Stacked or persistent success banners |
+| Supplemental icon hint | Tooltip around an already named focusable control | Interactive content, disabled-only help, replacement for `aria-label` |
+
+Tooltip uses the public Radix primitive, including hover/focus, Escape, collision handling and portaling. Providers wrap children in each layout without converting those server layouts or their children into client-rendered pages. Editor formatting hints use it; essential upload limitations remain visible. See [Radix Tooltip](https://www.radix-ui.com/primitives/docs/components/tooltip) and [shadcn Field](https://ui.shadcn.com/docs/components/base/field) for composition and accessibility contracts.
+
+## Choosing controls and navigation
+
+- Keep Checkbox for selections saved together, Radio for one choice in a named group, and Switch for immediate on/off behavior such as Hide completed. Switch retains native checkbox form events and a stable label; do not change its label with state. See the [WAI switch pattern](https://www.w3.org/WAI/ARIA/apg/patterns/switch/).
+- Select values and options wrap long labels. Retain Radix arrow keys, typeahead, disabled options and focus restoration. Menus are commands, not selections; keep one or two common row actions visible rather than hiding them unnecessarily. Dropdown menus remain available for denser action lists.
+- Tabs select panels. ResponsiveTabsNavigation switches between sidebar tabs and a single section picker based on the available `workspace` container width, including enlarged text. There must be only one visible navigation form. Preserve the shared unsaved-change callback.
+- Dialogs retain Radix focus trapping and return focus. Confirmations use AlertDialog with a safe Cancel action. Actions wrap on narrow screens; avoid fixed widths that clip translated or enlarged text.
+- Data tables retain their central column schema. TableContainer is keyboard focusable and scrolls locally; supply a specific `aria-label` when multiple tables need distinguishing. Hover and focus-within share a row surface. Do not turn data rows into ambiguous click targets.
+- Badge communicates short status through text and a semantic tone. It is not an interactive filter or a save announcement. Content and curricula share its draft/published treatment.
+
+## Progress, activity and pagination
+
+Progress and ProgressRing are determinate indicators. Supply meaningful labels and percentages from existing model functions; UI never recomputes assignment or version rules. ProgressRing exposes `progressbar`, current/min/max and a textual completion value, with visible percentage independent of the operator's accent color. Compact ProgressStatus uses the same ring geometry and retains explicit Not started/In progress/Completed text. Rings do not spin. Bar transitions and Spinner/Skeleton respect reduced motion.
+
+Spinner is decorative within a named loading/status owner. Skeleton reserves approximate content geometry and is hidden from assistive technology; pair it with one concise status. Do not show an empty state until the initial read has finished. The AI connections page demonstrates loading, empty, recoverable error and per-command pending states.
+
+LoadMore is the shared progressive-disclosure footer: visible count, polite status and optional pending action. The caller owns slicing, data, scroll retention and totals. Updates uses its existing ten-item slices; Docs retains real previous/next links. Numbered pagination is not appropriate without a product flow that owns actual pages.
+
+## Coverage and verification
+
+The library is used by shared settings, authoring, people, teams, learning groups, curricula, feedback, learner views and reporting, plus production account/connection pages. Specialized native file/color/date controls, existing reading/navigation compositions, table schemas and decorative artwork retain their established roles. The catalog demonstrates supported states; it is not a substitute for checking real screens.
+
+The current theme is light. A dark operating-system preference must not partially recolor the app. Instance branding remains separate from semantic success/error/focus colors. Check long text, 200% text enlargement, keyboard focus, selection, errors, pending actions and empty states at desktop/tablet/phone widths. Existing tests cover server-rendered/private reading, authoring recovery, search, reporting exports, guest recommendations and branding; a passing build alone is not visual or hosted verification.

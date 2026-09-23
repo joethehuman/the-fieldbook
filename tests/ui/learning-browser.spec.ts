@@ -103,7 +103,7 @@ test("For you uses curriculum cards, one channel picker and a simple ordered pag
     .click();
   const library = page.locator(".library");
   await expect(library.locator(".course-card")).toHaveCount(1);
-  await page.getByRole("checkbox", { name: "Hide completed" }).check();
+  await page.getByRole("switch", { name: "Hide completed" }).check();
   await expect(library.locator(".course-card")).toHaveCount(1);
   await page.getByRole("combobox", { name: "Channel", exact: true }).click();
   await page
@@ -146,8 +146,10 @@ test("optional activity is resumable and all completions remain available at 100
 }, info) => {
   await seed(page, true);
   await expect(
-    page.locator(".for-you").getByRole("img", { name: "100% complete" }),
-  ).toBeVisible();
+    page
+      .locator(".for-you")
+      .getByRole("progressbar", { name: "Assigned course progress" }),
+  ).toHaveAttribute("aria-valuenow", "100");
   await expect(page.locator(".for-you .course-card")).toHaveCount(0);
 
   await page
@@ -169,7 +171,7 @@ test("optional activity is resumable and all completions remain available at 100
   ).toBeVisible();
   await views.getByRole("button", { name: "For you", exact: true }).click();
   await expect(library.locator(".course-card")).toContainText("Completed");
-  await page.getByRole("checkbox", { name: "Hide completed" }).check();
+  await page.getByRole("switch", { name: "Hide completed" }).check();
   await expect(
     page.getByRole("heading", { name: "You’re up to date" }),
   ).toBeVisible();
@@ -273,8 +275,8 @@ test("completion removes a course from the home queue and remains visible in bot
   await expect(
     page
       .locator('.for-you [data-slot="card"]')
-      .getByRole("img", { name: "67% complete" }),
-  ).toBeVisible();
+      .getByRole("progressbar", { name: "Assigned course progress" }),
+  ).toHaveAttribute("aria-valuenow", "67");
   await page
     .getByRole("button", { name: "View completed", exact: true })
     .click();
@@ -284,7 +286,7 @@ test("completion removes a course from the home queue and remains visible in bot
     .getByRole("button", { name: "For you", exact: true })
     .click();
   await expect(page.locator(".library .course-card")).toHaveCount(1);
-  await page.getByRole("checkbox", { name: "Hide completed" }).focus();
+  await page.getByRole("switch", { name: "Hide completed" }).focus();
   await page.keyboard.press("Space");
   await expect(page.locator(".library .course-card")).toHaveCount(1);
 });
