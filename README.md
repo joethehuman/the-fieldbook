@@ -57,7 +57,7 @@ Provider accounts, quotas, pricing, and backups are the operator's responsibilit
 The production application includes:
 
 - Public or members-only browsing and optional learner registration with Google.
-- Articles, field notes, and courses; Markdown formatting controls and preview.
+- Docs and Updates with visual Markdown editing, explicit draft saving and publication; Courses with Markdown formatting controls and preview.
 - Drafts, explicit publication, revision checks, and content-write audit records.
 - Images and video-file uploads, with a 50 MB per-file ceiling and no transcoding.
 - Persistent learner progress, server-graded quizzes, and optional browser-progress import.
@@ -81,6 +81,7 @@ The production application includes:
 - [Reports and CSV exports](docs/reporting.md)
 - [Roles and permissions](docs/permissions.md)
 - [Server-rendered reading pages, metadata and caching](docs/reading-pages.md)
+- [Writing Docs and Updates](docs/authoring.md)
 - [Content presentation controls](docs/content-presentation.md)
 - [Interface standards](docs/design-system.md) and [agent contribution instructions](AGENTS.md)
 - [Changelog](CHANGELOG.md)

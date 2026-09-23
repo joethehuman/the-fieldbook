@@ -281,3 +281,7 @@ Use a full-width detail view for a roster or hierarchy, with a small shared Dial
 `HierarchyList` composes shadcn/Radix Collapsible with ordinary buttons and nested lists. It is a disclosure list, not an ARIA tree: use Tab to navigate and Enter/Space to expand or open. Search automatically exposes matching nodes with their ancestors; clearing search restores the expansion choices. Indentation is capped after four levels to preserve usable space on narrow screens. Keep parent IDs, labels and metadata in the feature; the pattern only renders and navigates.
 
 Use a full-width SettingsSection for selecting and reviewing a branch move. Display current/new paths and actual reporting-access differences, then apply once. A metadata dialog must not silently change hierarchy. Reuse grey guidance footers and the navigation guard; failed saves keep the review available. The catalog includes nested long labels and single-selection examples.
+
+## Visual writing
+
+Use `WritingEditor` for Docs/Updates body editing. It combines a lazy MDXEditor engine with Fieldbook buttons, tooltips, source textarea and reader preview. Keep save/publication intent outside the editor; use explicit actions rather than a status dropdown. See [authoring behavior and extension guidance](authoring.md). The catalog includes editable and read-only examples.

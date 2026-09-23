@@ -1,3 +1,4 @@
+import { withPublishedSnapshots } from "./demo-publication";
 import { seedContent } from "./seed";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 export type Workspace = {
@@ -141,7 +142,7 @@ export function freshWorkspace(): Workspace {
 }
 export function loadWorkspace(): Workspace {
   const raw = localStorage.getItem(KEY);
-  if (!raw) return freshWorkspace();
+  if (!raw) return withPublishedSnapshots(freshWorkspace());
   const data = JSON.parse(raw);
   if (
     data.schema !== 1 ||
@@ -154,19 +155,20 @@ export function loadWorkspace(): Workspace {
       "Saved demo data could not be opened. Export or reset this browser’s demo.",
     );
   // Refresh saved default personas without replacing visitors' custom names.
-  const renamedProfiles: Record<string, { previous: string[]; name: string }> = {
-    "demo-learner": { previous: ["Alex Morgan"], name: "Alex Edwards" },
-    "demo-manager": { previous: ["Jordan Lee"], name: "Sara Downy" },
-    "demo-admin": {
-      previous: ["Organization Admin", "Org Admin"],
-      name: "Oliver Anderson",
-    },
-  };
+  const renamedProfiles: Record<string, { previous: string[]; name: string }> =
+    {
+      "demo-learner": { previous: ["Alex Morgan"], name: "Alex Edwards" },
+      "demo-manager": { previous: ["Jordan Lee"], name: "Sara Downy" },
+      "demo-admin": {
+        previous: ["Organization Admin", "Org Admin"],
+        name: "Oliver Anderson",
+      },
+    };
   for (const user of data.users as User[]) {
     const renamed = renamedProfiles[user.id];
     if (renamed?.previous.includes(user.name)) user.name = renamed.name;
   }
-  return data;
+  return withPublishedSnapshots(data);
 }
 export function saveWorkspace(data: Workspace) {
   localStorage.setItem(KEY, JSON.stringify(data));

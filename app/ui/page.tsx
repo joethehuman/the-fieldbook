@@ -1,4 +1,5 @@
 "use client";
+import { WritingExamples } from "./writing-examples";
 import { LibraryExamples } from "./library-examples";
 import { ControlExamples } from "./control-examples";
 import { DocumentTree } from "@/components/patterns/document-tree";
@@ -103,6 +104,7 @@ export default function ComponentCatalog() {
       </PageHeader>
       <ControlExamples />
       <LibraryExamples />
+      <WritingExamples />
       <section className="grid gap-4" aria-label="Save confirmations">
         <SectionHeader
           title={<h2>Save confirmations</h2>}

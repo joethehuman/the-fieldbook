@@ -8,7 +8,9 @@ export function GroupPicker({
   groups,
   value,
   onChange,
+  showDescription = true,
 }: {
+  showDescription?: boolean;
   groups: { id: string; name: string }[];
   value: string[];
   onChange: (value: string[]) => void;
@@ -22,10 +24,12 @@ export function GroupPicker({
       <legend>
         Groups <span>{value.length} selected</span>
       </legend>
-      <FieldDescription>
-        Learning groups personalize courses and updates. Everyone can explore
-        the library.
-      </FieldDescription>
+      {showDescription && (
+        <FieldDescription>
+          Learning groups personalize courses and updates. Everyone can explore
+          the library.
+        </FieldDescription>
+      )}
       {groups.length > 6 && (
         <Input
           aria-label="Find a group"

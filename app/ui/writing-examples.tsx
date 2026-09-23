@@ -1,0 +1,34 @@
+"use client";
+import { useState } from "react";
+import { WritingEditor } from "@/components/patterns/writing-editor";
+import { SectionHeader } from "@/components/patterns/layout";
+import { Checkbox } from "@/components/ui/choice";
+import { Field } from "@/components/ui/field";
+
+export function WritingExamples() {
+  const [body, setBody] = useState(
+    "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.",
+  );
+  const [disabled, setDisabled] = useState(false);
+  return (
+    <section id="writing" className="grid gap-6">
+      <SectionHeader
+        title={<h2>Visual writing</h2>}
+        description="Docs and Updates use visual Markdown editing. Courses retain their existing editor. Unsupported formatting falls back to source without discarding text."
+      />
+      <Field orientation="horizontal">
+        <Checkbox
+          checked={disabled}
+          onCheckedChange={(value) => setDisabled(value === true)}
+        />
+        Read-only example
+      </Field>
+      <WritingEditor value={body} onChange={setBody} disabled={disabled} />
+      <p className="text-copy text-muted-foreground">
+        Saving a draft and publishing are separate actions in the authoring
+        screen. The editor itself owns no persistence. This catalog does not
+        upload files.
+      </p>
+    </section>
+  );
+}
