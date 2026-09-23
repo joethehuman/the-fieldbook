@@ -376,7 +376,7 @@ async function snapshotReview(
 ) {
   await testInfo.attach(name, {
     body: await page.screenshot({
-      fullPage: true,
+      fullPage: !name.startsWith("feedback"),
       path: testInfo.outputPath(`${name}.png`),
     }),
     contentType: "image/png",
