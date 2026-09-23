@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Remove the unnecessary guest option from the demo profile picker; signed-out visitor recommendations remain available in public installations.
+
 - Tighten built-in copy on learner, visitor and manager pages while keeping progress, safety and recovery information. Let the longer feedback prompt wrap beside its rating controls. Set the default footer tagline to "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS".
 
 - Use a shared searchable, creatable dropdown for categories, channels and Doc sections. New Docs and Updates start with an empty section/category prompt.
