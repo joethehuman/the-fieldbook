@@ -193,7 +193,10 @@ const adminSections = [
 type Props = {
   data: Workspace;
   user: User;
-  onChange: (d: Workspace) => void | Promise<void>;
+  onChange: (
+    d: Workspace,
+    options?: { locallyHandled?: boolean },
+  ) => void | Promise<void>;
   production?: boolean;
   onLearning?: LearningHandler;
   onUpload?: UploadMedia;
@@ -1052,7 +1055,10 @@ export function Editor({
   onSave: (c: Content) => Content | void | Promise<Content | void>;
   onCancel: () => void;
   onLearning?: LearningHandler;
-  onWorkspaceChange?: (data: Workspace) => void | Promise<void>;
+  onWorkspaceChange?: (
+    data: Workspace,
+    options?: { locallyHandled?: boolean },
+  ) => void | Promise<void>;
 }) {
   const form = useRef<HTMLFormElement>(null);
   const [savedMessage, setSavedMessage] = useState("");

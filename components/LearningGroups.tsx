@@ -26,6 +26,7 @@ import { expandLearning, groupItems } from "@/lib/learning-groups";
 import { Button } from "./ui/button";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import type { LearningHandler } from "./Assignments";
+import { SaveRecoveryError } from "@/lib/save-recovery";
 
 const key = (i: LearningItem) => `${i.kind}:${i.id}`;
 export default function LearningGroups({
@@ -35,7 +36,10 @@ export default function LearningGroups({
   initialGroup,
 }: {
   data: Workspace;
-  onChange: (d: Workspace) => void | Promise<void>;
+  onChange: (
+    d: Workspace,
+    options?: { locallyHandled?: boolean },
+  ) => void | Promise<void>;
   onLearning: LearningHandler;
   initialGroup?: string;
 }) {
@@ -57,12 +61,19 @@ export default function LearningGroups({
     setBusy(true);
     setNotice("");
     try {
-      await onChange(next);
+      await onChange(next, { locallyHandled: true });
       setNotice("");
       notify(message);
       return true;
     } catch (e) {
-      setNotice((e as Error).message);
+      if (e instanceof SaveRecoveryError) {
+        const reference = e.message.match(/Reference: ([a-f0-9-]{36})\./)?.[1];
+        setNotice(
+          `Couldn't save this group. ${e.snapshot ? "Check the current list before trying again." : "Refresh before trying again."}${reference ? ` Reference: ${reference}.` : ""}`,
+        );
+      } else {
+        setNotice((e as Error).message);
+      }
       return false;
     } finally {
       setBusy(false);
@@ -499,6 +510,7 @@ export default function LearningGroups({
                             </span>
                             <Button
                               variant="outline"
+                              disabled={busy}
                               onClick={() =>
                                 changeGroup({
                                   learningItems: [

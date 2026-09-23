@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Restore administrator learning-group saves on installations that require a WHERE clause for updates. Scope pending-account group cleanup to affected accounts, and show one concise error beside the group if a save fails. Apply `20260923230000_scope_pending_group_cleanup.sql` before using group administration on an upgraded installation.
+
 - Replace the shared opening screen with a minimal, installation-neutral message and an indeterminate loading bar.
 
 - Remove the unnecessary guest option from the demo profile picker; signed-out visitor recommendations remain available in public installations.

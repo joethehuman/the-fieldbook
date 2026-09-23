@@ -233,6 +233,60 @@ test("failed save preserves downloadable text and does not show success", async 
   );
 });
 
+test("failed learning-group save shows one concise inline error", async ({
+  page,
+}, info) => {
+  test.skip(
+    !info.project.name.startsWith("production"),
+    "The hosted save response is production-only",
+  );
+  const { state } = await setup(page, true, "course");
+  state.content[0].status = "published";
+  state.publishedContent = [state.content[0]];
+  state.groups = [{ ...state.groups[0], learningItems: [] }];
+  await page.route("**/api/governance", (route) =>
+    route.fulfill({
+      status: 500,
+      json: {
+        error: "Unable to complete this request. Please try again.",
+        requestId: "00000000-0000-4000-8000-000000000010",
+      },
+    }),
+  );
+  await page.goto("/admin");
+  if (info.project.name.endsWith("phone")) {
+    await page
+      .getByRole("combobox", { name: "Administration section" })
+      .click();
+    await page.getByRole("option", { name: "Learning groups" }).click();
+  } else {
+    await page.getByRole("tab", { name: "Learning groups" }).click();
+  }
+  await page
+    .getByRole("button", { name: `Manage ${state.groups[0].name}` })
+    .click();
+  await page
+    .getByRole("button", { name: `Add ${state.content[0].title}` })
+    .click();
+  const saveAlerts = page.locator('[data-slot="alert"]');
+  await expect(saveAlerts).toHaveCount(1);
+  await expect(saveAlerts).toContainText(
+    "Couldn't save this group. Check the current list before trying again.",
+  );
+  await expect(saveAlerts).toContainText(
+    "Reference: 00000000-0000-4000-8000-000000000010",
+  );
+  await expect(page.getByText("0 of 1 changes confirmed saved")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: `Add ${state.content[0].title}` }),
+  ).toBeEnabled();
+  await page.screenshot({
+    animations: "disabled",
+    path: info.outputPath("group-save-error.png"),
+    fullPage: true,
+  });
+});
+
 for (const failure of [false, true])
   test(`pending inline upload blocks save and navigation; failure=${failure}`, async ({
     page,
