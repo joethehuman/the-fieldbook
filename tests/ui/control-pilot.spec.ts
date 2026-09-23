@@ -123,6 +123,10 @@ test("branding pilot: validation, save, retained identity and responsive layout"
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin"),
   );
   await page.goto("/#admin");
+  // Navigation is rendered with the lazy Administration bundle.
+  await expect(
+    page.getByRole("heading", { name: "Administration", exact: true }),
+  ).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
