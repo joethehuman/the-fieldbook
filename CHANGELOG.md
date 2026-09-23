@@ -4,6 +4,9 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Show the two newest group-relevant Updates in For you, then list the remaining published library once with a local Load more control that reveals ten at a time.
+- Keep the demo and production feed on the same group, publication and ordering rules; use published snapshot dates without allowing unpublished draft edits to reorder an Update.
+
 - Keep the shared application bar visible while scrolling, with responsive search and document-heading offsets.
 
 ### Docs navigation
