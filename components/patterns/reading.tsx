@@ -173,7 +173,7 @@ export function CourseOverview({
           <li key={lesson.id}>
             <ContentAction
               asChild
-              className="flex w-full items-center gap-4 p-4"
+              className="flex w-full flex-wrap items-center gap-4 p-4"
             >
               <a
                 href={`${path}?lesson=${encodeURIComponent(lesson.id)}${curriculum ? `&curriculum=${encodeURIComponent(curriculum)}` : ""}`}

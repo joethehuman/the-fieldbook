@@ -262,7 +262,7 @@
     grid-column: 2;
   }
   .markdown :is(h1, h2, h3, h4, h5, h6)[id] {
-    scroll-margin-top: var(--anchor-offset);
+    scroll-margin-top: var(--space-6);
   }
   .markdown :is(h1, h2, h3, h4, h5, h6)[id]:focus-visible {
     outline: 2px solid var(--ring);
@@ -308,10 +308,10 @@
       grid-row: 1;
       align-self: start;
       position: sticky;
-      top: var(--space-6);
+      top: var(--anchor-offset);
     }
     .reading-outline nav {
-      max-height: calc(100dvh - 8rem);
+      max-height: calc(100dvh - var(--anchor-offset) - 5rem);
     }
   }
   @media (max-width: 30rem) {

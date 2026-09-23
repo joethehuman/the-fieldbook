@@ -38,6 +38,12 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
   const bounds = (await panel.boundingBox())!;
   const viewport = page.viewportSize()!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
+  if (viewport.width >= 768)
+    expect(bounds.x).toBeGreaterThanOrEqual(
+      await page
+        .locator(".sidebar")
+        .evaluate((el) => el.getBoundingClientRect().right),
+    );
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
   expect(bounds.height).toBeLessThanOrEqual(viewport.height * 0.65 + 1);
   if (viewport.width > 1000)

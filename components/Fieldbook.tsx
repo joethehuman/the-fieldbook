@@ -1,4 +1,5 @@
 "use client";
+import { AppBar } from "./patterns/app-bar";
 import { DocumentTree } from "./patterns/document-tree";
 import type { ReadingState } from "@/lib/reading";
 import { Article, CourseOverview } from "./patterns/reading";
@@ -105,6 +106,7 @@ export default function Fieldbook({
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
   const menuTrigger = useRef<HTMLButtonElement>(null);
+  const demoTrigger = useRef<HTMLButtonElement>(null);
   const menuClose = useRef<HTMLButtonElement>(null);
   const checkingNavigation = useRef(false);
   async function canLeave() {
@@ -621,7 +623,7 @@ export default function Fieldbook({
         />
       )}
       <div className="main-shell">
-        <header className="topbar">
+        <AppBar>
           <Button
             variant="ghost"
             size="icon"
@@ -676,7 +678,11 @@ export default function Fieldbook({
             {item && (
               <>
                 <ChevronRight size={14} />
-                <span className="crumb-item" aria-current="page">
+                <span
+                  className="crumb-item"
+                  aria-current="page"
+                  title={item.title}
+                >
                   {item.title}
                 </span>
               </>
@@ -738,7 +744,10 @@ export default function Fieldbook({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setShowDemo(true)}
+                    onClick={(event) => {
+                      demoTrigger.current = event.currentTarget;
+                      setShowDemo(true);
+                    }}
                   >
                     Demo organization
                   </Button>
@@ -768,7 +777,7 @@ export default function Fieldbook({
               }}
             />
           </SearchPanel>
-        </header>
+        </AppBar>
         {error && (
           <Alert variant="destructive" role="alert">
             {error}
@@ -1032,7 +1041,13 @@ export default function Fieldbook({
               <a href={privacyHref(branding)!}>Privacy policy</a>
             )}
             {!runtime && (
-              <Button variant="ghost" onClick={() => setShowDemo(true)}>
+              <Button
+                variant="ghost"
+                onClick={(event) => {
+                  demoTrigger.current = event.currentTarget;
+                  setShowDemo(true);
+                }}
+              >
                 About this demo
               </Button>
             )}
@@ -1040,7 +1055,13 @@ export default function Fieldbook({
         </main>
       </div>
       <Dialog open={showDemo} onOpenChange={setShowDemo}>
-        <DialogContent className="demo-dialog">
+        <DialogContent
+          className="demo-dialog"
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            demoTrigger.current?.focus();
+          }}
+        >
           <Button
             variant="ghost"
             size="icon"
