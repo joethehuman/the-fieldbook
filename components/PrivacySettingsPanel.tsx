@@ -1,7 +1,8 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
-import { Card } from "@/components/ui/card";
+
+import { SettingsSection } from "./patterns/settings-section";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
@@ -37,15 +38,13 @@ export default function PrivacySettingsPanel({
         (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.contactEmail) ||
           /^https:\/\//.test(draft.contactUrl || ""));
   return (
-    <Card className="grid gap-4">
-      <h3>Policy content</h3>
-      <p>
-        Describe this installation’s practices. Save settings to keep a draft;
-        publish separately after review. The current published policy stays
-        visible while you edit.
-      </p>
-      <Field>
-        Policy location
+    <SettingsSection
+      id="privacy-policy-fields"
+      disabled={busy}
+      title={<h3>Policy content</h3>}
+      description="Describe this installation’s practices. Save settings to keep a draft; publish separately after review. The current published policy stays visible while you edit."
+    >
+      <FormField label="Policy location">
         <SelectField
           value={draft.mode}
           onValueChange={(value) => edit({ mode: value as typeof draft.mode })}
@@ -53,26 +52,29 @@ export default function PrivacySettingsPanel({
           <option value="hosted">Write a policy in Fieldbook</option>
           <option value="external">Link to an existing policy</option>
         </SelectField>
-      </Field>
-      <Field>
-        Operator name
+      </FormField>
+      <FormField label="Operator name">
         <Input
           maxLength={160}
           value={draft.operatorName}
           onChange={(e) => edit({ operatorName: e.target.value })}
         />
-      </Field>
-      <Field>
-        Privacy contact email (optional)
+      </FormField>
+      <FormField
+        label="Privacy contact email (optional)"
+        description="Provide an email address, an HTTPS contact page, or both."
+      >
         <Input
           type="email"
           maxLength={254}
           value={draft.contactEmail}
           onChange={(e) => edit({ contactEmail: e.target.value })}
         />
-      </Field>
-      <Field>
-        Contact page URL (optional)
+      </FormField>
+      <FormField
+        label="Contact page URL (optional)"
+        description="An HTTPS contact page can keep your email address private."
+      >
         <Input
           type="url"
           maxLength={2000}
@@ -80,15 +82,12 @@ export default function PrivacySettingsPanel({
           value={draft.contactUrl || ""}
           onChange={(e) => edit({ contactUrl: e.target.value })}
         />
-      </Field>
-      <p>
-        Provide an email address, an HTTPS contact page, or both. A contact page
-        can keep your email address private. Google sign-in has its own
-        support-email requirement.
+      </FormField>
+      <p className="text-copy text-muted-foreground">
+        Google sign-in has its own support-email requirement.
       </p>
       {draft.mode === "external" ? (
-        <Field>
-          Privacy policy URL
+        <FormField label="Privacy policy URL">
           <Input
             type="url"
             placeholder="https://example.com/privacy"
@@ -96,7 +95,7 @@ export default function PrivacySettingsPanel({
             maxLength={2000}
             onChange={(e) => edit({ url: e.target.value })}
           />
-        </Field>
+        </FormField>
       ) : (
         <MarkdownEditor
           label="Privacy policy draft"
@@ -109,10 +108,22 @@ export default function PrivacySettingsPanel({
           ? `Published ${privacy.publishedAt?.slice(0, 10) || "previously"}.`
           : "No policy has been published yet."}
       </p>
+      {!valid && (
+        <p
+          id="privacy-publish-help"
+          className="text-copy text-muted-foreground"
+        >
+          {draft.mode === "external"
+            ? "Enter an HTTPS policy URL before publishing."
+            : "Add an operator name, a valid contact email or HTTPS contact page, and policy text before publishing."}
+        </p>
+      )}
       <Button
         type="button"
         variant="outline"
-        disabled={busy || !valid}
+        disabled={!valid}
+        loading={busy}
+        aria-describedby={!valid ? "privacy-publish-help" : undefined}
         onClick={async () => {
           if (
             await confirm(
@@ -131,6 +142,6 @@ export default function PrivacySettingsPanel({
       >
         Publish privacy policy
       </Button>
-    </Card>
+    </SettingsSection>
   );
 }

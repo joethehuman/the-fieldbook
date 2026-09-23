@@ -1,4 +1,7 @@
 "use client";
+import { Badge } from "./ui/badge";
+import { Note } from "@/components/ui/note";
+import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
 import { SelectField } from "./ui/select";
 import { Card } from "@/components/ui/card";
@@ -6,7 +9,7 @@ import { SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { ActionGroup } from "@/components/ui/action-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { FieldGroup, Field, FieldDescription } from "@/components/ui/field";
+import { FieldGroup } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import type { Workspace } from "@/lib/store";
@@ -125,8 +128,7 @@ export default function Curricula({
                 : "New curriculum"}
             </h2>
             <p>A playlist of courses, in the order you recommend.</p>
-            <Field>
-              Name
+            <FormField label="Name">
               <Input
                 required
                 maxLength={80}
@@ -135,9 +137,8 @@ export default function Curricula({
                   setEditing({ ...editing, name: e.target.value })
                 }
               />
-            </Field>
-            <Field>
-              Description
+            </FormField>
+            <FormField label="Description">
               <Textarea
                 maxLength={1000}
                 rows={2}
@@ -146,7 +147,7 @@ export default function Curricula({
                   setEditing({ ...editing, description: e.target.value })
                 }
               />
-            </Field>
+            </FormField>
             <OrderedLearning
               items={editing.courseIds.map((id) => ({
                 id,
@@ -166,15 +167,14 @@ export default function Curricula({
                 })
               }
             />
-            <Field>
-              Find a course
+            <FormField label="Find a course">
               <Input
                 type="search"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search the course library"
               />
-            </Field>
+            </FormField>
             <div className="learning-search-results">
               {content
                 .filter(
@@ -208,8 +208,10 @@ export default function Curricula({
                   </div>
                 ))}
             </div>
-            <Field>
-              Status
+            <FormField
+              label="Status"
+              description="Published curricula are available in the library and can be added to learning groups."
+            >
               <SelectField
                 disabled={busy}
                 value={editing.status}
@@ -225,21 +227,17 @@ export default function Curricula({
                 </option>
                 <option value="published">Published</option>
               </SelectField>
-            </Field>
-            <FieldDescription>
-              Published curricula are available in the library and can be added
-              to learning groups.
-            </FieldDescription>
+            </FormField>
             {!!linked(editing.id).length && (
-              <Alert>
+              <Note>
                 Saving updates {linked(editing.id).length} learning groups. New
                 courses join their assigned learning lists; existing completions
                 are preserved. Remove group links before returning this
                 curriculum to draft.
-              </Alert>
+              </Note>
             )}
             <ActionGroup>
-              <Button type="submit" disabled={busy}>
+              <Button type="submit" loading={busy}>
                 {busy ? "Saving…" : "Save curriculum"}
               </Button>
               <Button
@@ -284,7 +282,11 @@ export default function Curricula({
           <div className="group-grid">
             {all.map((c) => (
               <Card className="grid gap-4" key={c.id}>
-                <span className="eyebrow">{c.status}</span>
+                <Badge
+                  variant={c.status === "published" ? "success" : "default"}
+                >
+                  {c.status}
+                </Badge>
                 <h3>{c.name}</h3>
                 <p>{c.description}</p>
                 <p>

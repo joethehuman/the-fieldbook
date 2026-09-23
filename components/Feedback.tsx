@@ -1,4 +1,5 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { CsvExport } from "./patterns/csv-export";
 import { feedbackRows, feedbackCsv } from "@/lib/reporting";
 import { Input } from "@/components/ui/input";
@@ -155,16 +156,14 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
         <CsvExport filename="feedback" report={() => feedbackCsv(records)} />
       </SectionHeader>
       <FilterBar>
-        <Field>
-          Search feedback
+        <FormField label="Search feedback">
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Content title or comment"
           />
-        </Field>
-        <Field>
-          Content type
+        </FormField>
+        <FormField label="Content type">
           <SelectField
             value={kind}
             onValueChange={(value) => {
@@ -177,9 +176,8 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             <option value="brief">Updates</option>
             <option value="course">Courses</option>
           </SelectField>
-        </Field>
-        <Field>
-          Content item
+        </FormField>
+        <FormField label="Content item">
           <SelectField value={item} onValueChange={(value) => setItem(value)}>
             <option value="all">All content</option>
             {data.content
@@ -190,9 +188,8 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
                 </option>
               ))}
           </SelectField>
-        </Field>
-        <Field>
-          Rating
+        </FormField>
+        <FormField label="Rating">
           <SelectField
             value={rating}
             onValueChange={(value) => setRating(value)}
@@ -201,14 +198,13 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             <option value="up">Useful</option>
             <option value="down">Not useful</option>
           </SelectField>
-        </Field>
-        <Field>
-          Sort feedback
+        </FormField>
+        <FormField label="Sort feedback">
           <SelectField value={sort} onValueChange={(value) => setSort(value)}>
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
           </SelectField>
-        </Field>
+        </FormField>
       </FilterBar>
       <div className="report-summary">
         <strong>{records.length} ratings</strong>

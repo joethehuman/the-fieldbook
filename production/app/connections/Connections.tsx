@@ -1,4 +1,6 @@
 "use client";
+import { Skeleton } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/patterns/layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
@@ -9,7 +11,10 @@ import { useEffect, useState } from "react";
 export default function Connections({ branding }: { branding: Branding }) {
   const [items, setItems] = useState<any[]>([]),
     [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [revoking, setRevoking] = useState<string | null>(null);
   async function load() {
+    setLoading(true);
     setError("");
     try {
       setItems(await request("/api/connections"));
@@ -21,6 +26,8 @@ export default function Connections({ branding }: { branding: Branding }) {
         return;
       }
       throw e;
+    } finally {
+      setLoading(false);
     }
   }
   useEffect(() => {
@@ -46,6 +53,16 @@ export default function Connections({ branding }: { branding: Branding }) {
           </Button>
         </Alert>
       )}
+      {loading && (
+        <div
+          role="status"
+          aria-label="Loading connections"
+          className="grid gap-3"
+        >
+          <Skeleton className="h-24" />
+          <span className="sr-only">Loading connections…</span>
+        </div>
+      )}
       {items.map((c) => (
         <Card className="grid gap-4" key={c.client_id}>
           <h2>{c.client_name}</h2>
@@ -53,12 +70,17 @@ export default function Connections({ branding }: { branding: Branding }) {
           {c.enabled && (
             <Button
               variant="outline"
+              loading={revoking === c.client_id}
+              disabled={revoking !== null}
               onClick={async () => {
+                setRevoking(c.client_id);
                 try {
                   await request("/api/connections", { clientId: c.client_id });
                   await load();
                 } catch (e) {
                   setError((e as Error).message);
+                } finally {
+                  setRevoking(null);
                 }
               }}
             >
@@ -67,7 +89,12 @@ export default function Connections({ branding }: { branding: Branding }) {
           )}
         </Card>
       ))}
-      {!items.length && !error && <p>No AI connections yet.</p>}
+      {!loading && !items.length && !error && (
+        <EmptyState>
+          <h2>No AI connections yet.</h2>
+          <p>Connect an AI tool from administration when you’re ready.</p>
+        </EmptyState>
+      )}
     </BrandedAccount>
   );
 }

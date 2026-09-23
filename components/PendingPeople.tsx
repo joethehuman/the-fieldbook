@@ -1,6 +1,7 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
+
 import { Card } from "@/components/ui/card";
 import { ActionGroup } from "./ui/action-group";
 import { GroupPicker } from "./patterns/group-picker";
@@ -98,17 +99,15 @@ export function PendingPeople({
             });
           }}
         >
-          <Field>
-            Name
+          <FormField label="Name">
             <Input
               required
               maxLength={80}
               value={editing.name}
               onChange={(e) => setEditing({ ...editing, name: e.target.value })}
             />
-          </Field>
-          <Field>
-            Google email
+          </FormField>
+          <FormField label="Google email">
             <Input
               required
               type="email"
@@ -120,15 +119,14 @@ export function PendingPeople({
                 setEditing({ ...editing, email: e.target.value })
               }
             />
-          </Field>
+          </FormField>
           <OnboardingFields
             value={editing.onboardingStart}
             onChange={(onboardingStart) =>
               setEditing({ ...editing, onboardingStart })
             }
           />
-          <Field>
-            Role
+          <FormField label="Role">
             <SelectField
               value={editing.role}
               onValueChange={(value) =>
@@ -142,9 +140,8 @@ export function PendingPeople({
               <option value="manager">Manager</option>
               <option value="admin">Administrator</option>
             </SelectField>
-          </Field>
-          <Field>
-            Reporting team
+          </FormField>
+          <FormField label="Reporting team">
             <SelectField
               value={editing.teamId || ""}
               onValueChange={(value) =>
@@ -158,14 +155,14 @@ export function PendingPeople({
                 </option>
               ))}
             </SelectField>
-          </Field>
+          </FormField>
           <GroupPicker
             groups={data.groups}
             value={editing.groups}
             onChange={(groups) => setEditing({ ...editing, groups })}
           />
           <ActionGroup>
-            <Button variant="default" disabled={busy}>
+            <Button variant="default" loading={busy}>
               {busy ? "Saving…" : "Save pending account"}
             </Button>
             <Button

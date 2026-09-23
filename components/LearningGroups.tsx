@@ -1,4 +1,6 @@
 "use client";
+import { Note } from "@/components/ui/note";
+import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SelectField } from "./ui/select";
@@ -147,8 +149,7 @@ export default function LearningGroups({
               }
             }}
           >
-            <Field>
-              New learning group
+            <FormField label="New learning group">
               <Input
                 required
                 maxLength={80}
@@ -156,8 +157,8 @@ export default function LearningGroups({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Account executives"
               />
-            </Field>
-            <Button disabled={busy} type="submit">
+            </FormField>
+            <Button loading={busy} type="submit">
               <Plus size={16} />
               Create group
             </Button>
@@ -264,8 +265,10 @@ export default function LearningGroups({
               <FieldGroup disabled={busy}>
                 {tab === "members" ? (
                   <>
-                    <Field>
-                      Parent learning group
+                    <FormField
+                      label="Parent learning group"
+                      description="Members also receive courses and updates from parent groups."
+                    >
                       <SelectField
                         disabled={busy}
                         value={group.parentId || ""}
@@ -282,13 +285,9 @@ export default function LearningGroups({
                             </option>
                           ))}
                       </SelectField>
-                    </Field>
-                    <FieldDescription>
-                      Members also receive courses and updates from parent
-                      groups.
-                    </FieldDescription>
+                    </FormField>
                     <h3>Teams</h3>
-                    <FieldDescription>
+                    <FieldDescription id="group-teams-help">
                       Team membership stays in sync. Each selected team includes
                       its direct members; select child teams separately.
                     </FieldDescription>
@@ -300,6 +299,7 @@ export default function LearningGroups({
                           key={t.id}
                         >
                           <Checkbox
+                            aria-describedby="group-teams-help"
                             checked={group.teamIds?.includes(t.id) || false}
                             onChange={(e) =>
                               changeGroup({
@@ -319,15 +319,14 @@ export default function LearningGroups({
                       <p>Create a team in Teams to link it here.</p>
                     )}
                     <h3>People</h3>
-                    <Field>
-                      Find a person
+                    <FormField label="Find a person">
                       <Input
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search name or email"
                       />
-                    </Field>
+                    </FormField>
                     <div className="membership-list">
                       {data.users
                         .filter((u) => matches(u.name + " " + u.email))
@@ -397,10 +396,10 @@ export default function LearningGroups({
                       what to take next. Every course stays available.
                     </FieldDescription>
                     {group.parentId && (
-                      <Alert>
+                      <Note>
                         Courses from parent groups come first. Manage those
                         courses in the parent group.
-                      </Alert>
+                      </Note>
                     )}
                     <OrderedLearning
                       items={items.map((i) => ({
@@ -436,15 +435,14 @@ export default function LearningGroups({
                         below.
                       </EmptyState>
                     )}
-                    <Field>
-                      Search courses and curricula
+                    <FormField label="Search courses and curricula">
                       <Input
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search the library"
                       />
-                    </Field>
+                    </FormField>
                     <div className="learning-search-results">
                       {[
                         ...published
@@ -505,15 +503,14 @@ export default function LearningGroups({
                       These updates appear in For you, newest first. Updates
                       never affect learning completion.
                     </FieldDescription>
-                    <Field>
-                      Find an update
+                    <FormField label="Find an update">
                       <Input
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search updates"
                       />
-                    </Field>
+                    </FormField>
                     <div className="learning-search-results">
                       {published
                         .filter((c) => c.kind === "brief" && matches(c.title))

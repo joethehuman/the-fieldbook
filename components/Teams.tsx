@@ -1,4 +1,5 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
 import { CsvExport } from "./patterns/csv-export";
@@ -20,7 +21,7 @@ import {
 } from "@/components/ui/table";
 import { ActionGroup } from "@/components/ui/action-group";
 import { Input } from "@/components/ui/input";
-import { Field } from "@/components/ui/field";
+
 import {
   Toolbar,
   FilterBar,
@@ -95,8 +96,7 @@ export function TeamsAdmin({
       {editing && (
         <form className="grid gap-4" onSubmit={save}>
           <FilterBar>
-            <Field>
-              Team name
+            <FormField label="Team name">
               <Input
                 required
                 maxLength={80}
@@ -105,9 +105,8 @@ export function TeamsAdmin({
                   setEditing({ ...editing, name: e.target.value })
                 }
               />
-            </Field>
-            <Field>
-              Parent team
+            </FormField>
+            <FormField label="Parent team">
               <SelectField
                 value={editing.parentId || ""}
                 onValueChange={(value) =>
@@ -126,9 +125,11 @@ export function TeamsAdmin({
                     </option>
                   ))}
               </SelectField>
-            </Field>
-            <Field>
-              Manager
+            </FormField>
+            <FormField
+              label="Manager"
+              description="Assigning a manager grants reporting access for this team and its subteams."
+            >
               <SelectField
                 value={editing.managerId || ""}
                 onValueChange={(value) =>
@@ -150,12 +151,8 @@ export function TeamsAdmin({
                     </option>
                   ))}
               </SelectField>
-            </Field>
+            </FormField>
           </FilterBar>
-          <p className="muted">
-            Assigning a manager grants reporting access for this team and its
-            subteams.
-          </p>
           <ActionGroup>
             <Button variant="default">Save team</Button>
             <Button
@@ -252,8 +249,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
         />
       </SectionHeader>
       <FilterBar>
-        <Field>
-          Reporting team
+        <FormField label="Reporting team">
           <SelectField
             value={teamId}
             onValueChange={(value) => {
@@ -272,9 +268,8 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                 </option>
               ))}
           </SelectField>
-        </Field>
-        <Field>
-          Find a team member
+        </FormField>
+        <FormField label="Find a team member">
           <Input
             value={query}
             onChange={(e) => {
@@ -283,7 +278,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             }}
             placeholder="Name or email"
           />
-        </Field>
+        </FormField>
       </FilterBar>
       <p className="muted">
         Includes subteams. Completion uses the latest published course versions.

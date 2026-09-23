@@ -1,4 +1,6 @@
 "use client";
+import { Tooltip } from "./ui/tooltip";
+import { FieldDescription } from "./ui/field";
 import { Alert } from "@/components/ui/alert";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -129,17 +131,17 @@ export default function MarkdownEditor({
             ],
           ] as const
         ).map(([name, Icon, before, after, placeholder]) => (
-          <Button
-            variant="ghost"
-            key={name}
-            type="button"
-            title={name}
-            aria-label={name}
-            disabled={preview || busy}
-            onClick={() => insert(before, after, placeholder)}
-          >
-            <Icon size={17} />
-          </Button>
+          <Tooltip key={name} content={name}>
+            <Button
+              variant="ghost"
+              type="button"
+              aria-label={name}
+              disabled={preview || busy}
+              onClick={() => insert(before, after, placeholder)}
+            >
+              <Icon size={17} />
+            </Button>
+          </Tooltip>
         ))}
         {(["image", "video"] as const).map((kind) => (
           <Button
@@ -187,6 +189,8 @@ export default function MarkdownEditor({
       ) : (
         <Textarea
           id={id}
+          aria-describedby={`${id}-help${error ? ` ${id}-error` : ""}`}
+          aria-invalid={!!error}
           ref={input}
           className="body-editor"
           rows={rows}
@@ -196,13 +200,13 @@ export default function MarkdownEditor({
           placeholder="Start with what matters…"
         />
       )}
-      <small className="editor-help">
+      <FieldDescription id={`${id}-help`} role={busy ? "status" : undefined}>
         {busy
           ? "Uploading media…"
           : "Markdown with formatting shortcuts. Preview before publishing."}
-      </small>
+      </FieldDescription>
       {error && (
-        <Alert variant="destructive" role="alert">
+        <Alert id={`${id}-error`} variant="destructive" role="alert">
           {error}
         </Alert>
       )}

@@ -1,4 +1,5 @@
 "use client";
+import { FormField } from "@/components/patterns/form-field";
 import { TextField } from "./patterns/text-field";
 import { SettingsSection as SettingsGroup } from "./patterns/settings-section";
 import { Alert } from "./ui/alert";
@@ -379,19 +380,16 @@ export default function SiteSettingsPanel({
         </section>
       )}
       {section === "courses" && (
-        <FieldGroup
-          className="settings-section"
-          tabIndex={-1}
+        <SettingsGroup
           id="settings-courses"
+          tabIndex={-1}
+          disabled={busy}
+          title={<h3>Course completion windows</h3>}
+          description="Publishing adds to the library. Only courses selected for a group join that group’s assigned learning list."
         >
-          <legend>Course completion windows</legend>
-          <p>
-            Publishing adds to the library. Only courses selected for a group
-            join that group’s assigned learning list.
-          </p>
-          <Field>
-            New user onboarding window (days)
+          <FormField label="New user onboarding window (days)">
             <Input
+              aria-describedby="completion-window-help"
               type="number"
               required
               min={1}
@@ -404,10 +402,10 @@ export default function SiteSettingsPanel({
                 })
               }
             />
-          </Field>
-          <Field>
-            Ongoing catch-up window (days)
+          </FormField>
+          <FormField label="Ongoing catch-up window (days)">
             <Input
+              aria-describedby="completion-window-help"
               type="number"
               required
               min={1}
@@ -420,22 +418,21 @@ export default function SiteSettingsPanel({
                 })
               }
             />
-          </Field>
-          <small>
+          </FormField>
+          <FieldDescription id="completion-window-help">
             Newly assigned courses get a full catch-up window, even near the end
             of onboarding. Changes recalculate targets for everyone.
-          </small>
-        </FieldGroup>
+          </FieldDescription>
+        </SettingsGroup>
       )}
       {section === "access" && (
-        <section
-          className="settings-section"
-          tabIndex={-1}
+        <SettingsGroup
           id="settings-access"
+          tabIndex={-1}
+          disabled={busy}
+          title={<h3>Access and accounts</h3>}
         >
-          <h3>Access and accounts</h3>
-          <Field>
-            Who can browse?
+          <FormField label="Who can browse?">
             <SelectField
               disabled={busy}
               value={settings.access}
@@ -449,7 +446,7 @@ export default function SiteSettingsPanel({
               <option value="public">Anyone — accounts are optional</option>
               <option value="private">Signed-in members only</option>
             </SelectField>
-          </Field>
+          </FormField>
           {settings.access === "public" && (
             <FieldGroup disabled={busy}>
               <legend>Guest recommendations</legend>
@@ -457,8 +454,7 @@ export default function SiteSettingsPanel({
                 Choose a group to personalize For you in Updates and Courses for
                 visitors who aren’t signed in.
               </FieldDescription>
-              <Field>
-                Learning group for guests
+              <FormField label="Learning group for guests">
                 <SelectField
                   value={
                     settings.guestGroupId
@@ -490,7 +486,7 @@ export default function SiteSettingsPanel({
                     </option>
                   ))}
                 </SelectField>
-              </Field>
+              </FormField>
               <FieldDescription id="guest-recommendations-status">
                 {!settings.guestGroupId
                   ? "Your library is public. Select a group to recommend content to guests."
@@ -554,8 +550,7 @@ export default function SiteSettingsPanel({
               </ActionGroup>
             </FieldGroup>
           )}
-          <Field>
-            New learner accounts
+          <FormField label="New learner accounts">
             <SelectField
               disabled={busy}
               value={settings.registration}
@@ -569,13 +564,13 @@ export default function SiteSettingsPanel({
               <option value="open">Allow registration with Google</option>
               <option value="closed">Existing members only</option>
             </SelectField>
-          </Field>
+          </FormField>
           <p className="muted">
             {production
               ? "Google is the sign-in provider. Provider credentials and the initial administrator are configured securely in the deployment settings."
               : "Access settings are illustrative in the demo. Profiles remain browser-local simulations."}
           </p>
-        </section>
+        </SettingsGroup>
       )}
       {section === "privacy" && (
         <section
@@ -607,12 +602,7 @@ export default function SiteSettingsPanel({
       {section === "mcp" && <McpSettings production={production} />}
       {section !== "mcp" && (
         <div className="settings-save-bar">
-          <Button
-            type="submit"
-            variant="default"
-            disabled={section !== "identity" && busy}
-            loading={section === "identity" && busy}
-          >
+          <Button type="submit" variant="default" loading={busy}>
             {busy ? "Saving…" : "Save settings"}
           </Button>
           {notice && <Alert role="status">{notice}</Alert>}
@@ -646,10 +636,11 @@ function McpSettings({ production }: { production: boolean }) {
         Add Fieldbook as a custom MCP server in ChatGPT, Claude, or another
         compatible tool.
       </p>
-      <Field>
-        Server address
+      <div className="grid gap-2">
+        <Field htmlFor="mcp-server-address">Server address</Field>
         <div className="mcp-address">
           <Input
+            id="mcp-server-address"
             readOnly
             value={address}
             aria-label="MCP server address"
@@ -670,7 +661,7 @@ function McpSettings({ production }: { production: boolean }) {
             Copy
           </Button>
         </div>
-      </Field>
+      </div>
       <FieldDescription role="status">{copied}</FieldDescription>
       <ol className="mcp-steps">
         <li>Add the server address in your AI tool’s connection settings.</li>

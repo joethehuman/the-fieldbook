@@ -1,4 +1,7 @@
 "use client";
+import { Badge } from "./ui/badge";
+import { FieldDescription } from "./ui/field";
+import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
 import { DataTable } from "./patterns/data-table";
 import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation";
@@ -526,16 +529,14 @@ export default function Admin({
                 </ActionGroup>
               </CollectionToolbar>
               <FilterBar>
-                <Field>
-                  Search content
+                <FormField label="Search content">
                   <Input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Title, summary, or folder"
                   />
-                </Field>
-                <Field>
-                  Channel / category
+                </FormField>
+                <FormField label="Channel / category">
                   <SelectField
                     value={category}
                     onValueChange={(value) => setCategory(value)}
@@ -555,9 +556,8 @@ export default function Admin({
                         </option>
                       ))}
                   </SelectField>
-                </Field>
-                <Field>
-                  Sort content
+                </FormField>
+                <FormField label="Sort content">
                   <SelectField
                     value={sort}
                     onValueChange={(value) => setSort(value)}
@@ -566,7 +566,7 @@ export default function Admin({
                     <option value="updated">Recently updated</option>
                     <option value="oldest">Oldest update first</option>
                   </SelectField>
-                </Field>
+                </FormField>
               </FilterBar>
               <TableContainer>
                 <DataTable layout="content">
@@ -615,13 +615,23 @@ export default function Admin({
                                 : "Course"}
                           </TableCell>
                           <TableCell>
-                            <span className={"status " + c.status}>
+                            <Badge
+                              variant={
+                                (
+                                  production
+                                    ? !!c.publishedRevision
+                                    : c.status === "published"
+                                )
+                                  ? "success"
+                                  : "default"
+                              }
+                            >
                               {production && c.publishedRevision
                                 ? c.publishedRevision === c.revision
                                   ? "published"
                                   : "published · draft changes"
                                 : c.status}
-                            </span>
+                            </Badge>
                           </TableCell>
                           <TableCell>v{c.version}</TableCell>
                           <TableCell>
@@ -672,8 +682,7 @@ export default function Admin({
             <>
               <Card className="grid gap-4">
                 <h2>New users</h2>
-                <Field>
-                  Default onboarding stage for new users
+                <FormField label="Default onboarding stage for new users">
                   <SelectField
                     value={data.settings?.newUserStage || "existing"}
                     onValueChange={async (value) => {
@@ -700,7 +709,7 @@ export default function Admin({
                       New user — onboarding window
                     </option>
                   </SelectField>
-                </Field>
+                </FormField>
                 <p className="muted">
                   Applies to newly added users and new self-registrations. You
                   can override the stage and start date for each person. Group
@@ -738,16 +747,14 @@ export default function Admin({
                 )}
               </Toolbar>
               <FilterBar>
-                <Field>
-                  Search profiles
+                <FormField label="Search profiles">
                   <Input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Name or email"
                   />
-                </Field>
-                <Field>
-                  Role
+                </FormField>
+                <FormField label="Role">
                   <SelectField
                     value={peopleRole}
                     onValueChange={(value) => setPeopleRole(value)}
@@ -757,9 +764,8 @@ export default function Admin({
                     <option value="manager">Manager</option>
                     <option value="admin">Admin</option>
                   </SelectField>
-                </Field>
-                <Field>
-                  Group
+                </FormField>
+                <FormField label="Group">
                   <SelectField
                     value={peopleGroup}
                     onValueChange={(value) => setPeopleGroup(value)}
@@ -771,9 +777,8 @@ export default function Admin({
                       </option>
                     ))}
                   </SelectField>
-                </Field>
-                <Field>
-                  Profile status
+                </FormField>
+                <FormField label="Profile status">
                   <SelectField
                     value={peopleStatus}
                     onValueChange={(value) => setPeopleStatus(value)}
@@ -782,9 +787,8 @@ export default function Admin({
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
                   </SelectField>
-                </Field>
-                <Field>
-                  Sort profiles
+                </FormField>
+                <FormField label="Sort profiles">
                   <SelectField
                     value={sort}
                     onValueChange={(value) => setSort(value)}
@@ -792,7 +796,7 @@ export default function Admin({
                     <option value="title">Name A–Z</option>
                     <option value="reverse">Name Z–A</option>
                   </SelectField>
-                </Field>
+                </FormField>
               </FilterBar>
               <TableContainer>
                 <DataTable layout="people">
@@ -909,8 +913,7 @@ export default function Admin({
                   ? "Changes apply to this verified account. Login email is read-only."
                   : "Use fictional details. This does not create a secure account."}
               </DialogDescription>
-              <Field>
-                Name
+              <FormField label="Name">
                 <Input
                   required
                   maxLength={80}
@@ -919,9 +922,8 @@ export default function Admin({
                     setPerson({ ...person, name: e.target.value })
                   }
                 />
-              </Field>
-              <Field>
-                {production ? "Login email" : "Email label"}
+              </FormField>
+              <FormField label={production ? "Login email" : "Email label"}>
                 <Input
                   type="email"
                   required
@@ -931,15 +933,14 @@ export default function Admin({
                     setPerson({ ...person, email: e.target.value })
                   }
                 />
-              </Field>
+              </FormField>
               <OnboardingFields
                 value={person.onboardingStart}
                 onChange={(onboardingStart) =>
                   setPerson({ ...person, onboardingStart })
                 }
               />
-              <Field>
-                Access
+              <FormField label="Access">
                 <SelectField
                   disabled={person.id === user.id}
                   value={person.role}
@@ -951,9 +952,8 @@ export default function Admin({
                   <option value="admin">Admin</option>
                   <option value="manager">Manager</option>
                 </SelectField>
-              </Field>
-              <Field>
-                Reporting team
+              </FormField>
+              <FormField label="Reporting team">
                 <SelectField
                   value={person.teamId || ""}
                   onValueChange={(value) =>
@@ -967,7 +967,7 @@ export default function Admin({
                     </option>
                   ))}
                 </SelectField>
-              </Field>
+              </FormField>
               <GroupPicker
                 groups={data.groups}
                 value={person.groups}
@@ -1264,7 +1264,7 @@ export function Editor({
           </span>
           <h1>{existing ? c.title : "Something worth sharing."}</h1>
         </div>
-        <Button variant="default" disabled={busy}>
+        <Button variant="default" loading={busy}>
           <Save size={16} />
           Save {c.status === "published" ? "& publish" : "draft"}
         </Button>
@@ -1298,8 +1298,7 @@ export function Editor({
       )}
       <FieldGroup disabled={busy} className="editor-layout">
         <section className="editor-main">
-          <Field>
-            Title
+          <FormField label="Title">
             <Input
               required
               maxLength={160}
@@ -1307,9 +1306,8 @@ export function Editor({
               onChange={(e) => set("title", e.target.value)}
               placeholder="Give it a clear, useful title"
             />
-          </Field>
-          <Field>
-            Short description
+          </FormField>
+          <FormField label="Short description">
             <Textarea
               required
               rows={2}
@@ -1318,7 +1316,7 @@ export function Editor({
               onChange={(e) => set("summary", e.target.value)}
               placeholder="What will people find here?"
             />
-          </Field>
+          </FormField>
           {c.kind !== "course" ? (
             <MarkdownEditor
               label="Doc content"
@@ -1377,8 +1375,7 @@ export function Editor({
                       </Button>
                     </div>
                   </SectionHeader>
-                  <Field>
-                    Lesson title
+                  <FormField label="Lesson title">
                     <Input
                       required
                       value={l.title}
@@ -1391,7 +1388,7 @@ export function Editor({
                         )
                       }
                     />
-                  </Field>
+                  </FormField>
                   <MarkdownEditor
                     label={`Lesson ${i + 1} text`}
                     rows={8}
@@ -1407,9 +1404,10 @@ export function Editor({
                     }
                   />
                   {onUpload && (
-                    <Field>
-                      Upload lesson video{" "}
-                      <small>MP4 or WebM, up to 50 MB.</small>
+                    <FormField
+                      label="Upload lesson video"
+                      description="MP4 or WebM, up to 50 MB."
+                    >
                       <Input
                         type="file"
                         accept="video/mp4,video/webm"
@@ -1431,13 +1429,12 @@ export function Editor({
                           }
                         }}
                       />
-                    </Field>
+                    </FormField>
                   )}
-                  <Field>
-                    Video URL{" "}
-                    <small>
-                      Optional. YouTube, Vimeo, or a direct HTTPS MP4/WebM URL.
-                    </small>
+                  <FormField
+                    label="Video URL"
+                    description="Optional. YouTube, Vimeo, or a direct HTTPS MP4/WebM URL."
+                  >
                     <Input
                       type="text"
                       placeholder="Upload a file or paste a supported video URL"
@@ -1453,7 +1450,7 @@ export function Editor({
                         )
                       }
                     />
-                  </Field>
+                  </FormField>
                 </Card>
               ))}
               <SectionHeader title={<h2>Quiz</h2>}>
@@ -1499,8 +1496,7 @@ export function Editor({
                       <Trash2 size={16} />
                     </Button>
                   </SectionHeader>
-                  <Field>
-                    Question
+                  <FormField label="Question">
                     <Input
                       required
                       value={q.prompt}
@@ -1515,7 +1511,7 @@ export function Editor({
                         )
                       }
                     />
-                  </Field>
+                  </FormField>
                   {q.options.map((o, j) => (
                     <div className="answer-row" key={j}>
                       <Radio
@@ -1570,8 +1566,7 @@ export function Editor({
                 remove public access.
               </p>
             )}
-            <Field>
-              Status
+            <FormField label="Status">
               <SelectField
                 value={c.status}
                 onValueChange={(value) => set("status", value)}
@@ -1579,14 +1574,13 @@ export function Editor({
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
               </SelectField>
-            </Field>
+            </FormField>
           </section>
           <section className="editor-setting-section">
             <h3>Organization</h3>
             {c.kind === "doc" ? (
               <>
-                <Field>
-                  Section
+                <FormField label="Section">
                   <SelectField
                     aria-label="Section"
                     value={`section:${c.category}`}
@@ -1608,7 +1602,7 @@ export function Editor({
                       <option value="create">Create new section…</option>
                     )}
                   </SelectField>
-                </Field>
+                </FormField>
                 {creatingSection && onWorkspaceChange && (
                   <DocSectionCreate
                     sections={docSections}
@@ -1679,8 +1673,7 @@ export function Editor({
                     setC((current) => ({ ...current, coverImageUrl: url }))
                   }
                 />
-                <Field>
-                  Estimated minutes
+                <FormField label="Estimated minutes">
                   <Input
                     type="number"
                     min={1}
@@ -1689,7 +1682,7 @@ export function Editor({
                     value={c.duration}
                     onChange={(e) => set("duration", Number(e.target.value))}
                   />
-                </Field>
+                </FormField>
               </section>
               <section className="editor-setting-section">
                 <h3>Assigned courses</h3>
@@ -1722,15 +1715,16 @@ export function Editor({
                   <h3>Course version</h3>
                   <Field orientation="horizontal">
                     <Checkbox
+                      aria-describedby="course-version-help"
                       checked={refresh}
                       onChange={(e) => setRefresh(e.target.checked)}
                     />
                     Publish a new version and start a new completion window
                   </Field>
-                  <small>
+                  <FieldDescription id="course-version-help">
                     Current version: {content.version}. Keep this unchecked for
                     minor corrections.
-                  </small>
+                  </FieldDescription>
                 </section>
               )}
             </>
