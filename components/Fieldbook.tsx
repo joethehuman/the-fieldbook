@@ -1,4 +1,5 @@
 "use client";
+import { reconcileDemoPublication } from "@/lib/demo-publication";
 import { Note } from "@/components/ui/note";
 import { AppBar } from "./patterns/app-bar";
 import { DocumentTree } from "./patterns/document-tree";
@@ -313,7 +314,10 @@ export default function Fieldbook({
       return;
     }
     try {
-      const reconciled = reconcileLearning(data || next, next);
+      const reconciled = reconcileLearning(
+        data || next,
+        reconcileDemoPublication(data || next, next),
+      );
       saveWorkspace(reconciled);
       setData(reconciled);
       setReportIssue(undefined);

@@ -134,14 +134,22 @@ test("search preserves dirty edits; canceled navigation and reload keep them unt
   await page
     .getByRole("textbox", { name: "Search all content" })
     .fill("search");
-  await expect(page.getByRole("region", { name: "Search results" })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Search results" }),
+  ).toBeVisible();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep these edits",
   );
-  await page.getByRole("textbox", { name: "Search all content" }).press("Escape");
-  await expect(page.getByRole("region", { name: "Search results" })).toHaveCount(0);
-  await expect(page.getByRole("textbox", { name: "Search all content" })).toBeFocused();
+  await page
+    .getByRole("textbox", { name: "Search all content" })
+    .press("Escape");
+  await expect(
+    page.getByRole("region", { name: "Search results" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("textbox", { name: "Search all content" }),
+  ).toBeFocused();
   await openNav(page);
   await page
     .getByRole("navigation")
@@ -238,7 +246,7 @@ for (const failure of [false, true])
     await page
       .getByRole("textbox", { name: "Doc content", exact: true })
       .fill("Keep the original body");
-    await page.locator('.markdown-editor input[type="file"]').setInputFiles({
+    await page.locator('.writing-editor input[type="file"]').setInputFiles({
       name: "example.png",
       mimeType: "image/png",
       buffer: Buffer.from("synthetic"),
@@ -268,7 +276,7 @@ for (const failure of [false, true])
     if (await closeNav.isVisible()) await closeNav.click();
     await expect(
       page.getByRole("textbox", { name: "Doc content", exact: true }),
-    ).toHaveValue("Keep the original body");
+    ).toHaveText("Keep the original body");
     control.releaseUpload();
     await expect(
       page.getByRole("button", { name: "Save draft", exact: true }),
@@ -276,11 +284,16 @@ for (const failure of [false, true])
     if (failure)
       await expect(
         page.getByRole("textbox", { name: "Doc content", exact: true }),
-      ).toHaveValue("Keep the original body");
+      ).toHaveText("Keep the original body");
     else
       await expect(
         page.getByRole("textbox", { name: "Doc content", exact: true }),
-      ).toHaveValue(/\/api\/media\//);
+      ).toContainText("Keep the original body");
+    if (!failure)
+      await expect(page.locator(".writing-content img")).toHaveAttribute(
+        "src",
+        /\/api\/media\//,
+      );
     await page.screenshot({
       animations: "disabled",
       path: info.outputPath("upload-result.png"),
@@ -288,7 +301,10 @@ for (const failure of [false, true])
     });
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect(
-      page.getByRole("heading", { name: "Administration", exact: true }),
+      page
+        .locator("form.editor")
+        .getByRole("status")
+        .filter({ hasText: "Draft saved" }),
     ).toBeVisible();
     expect(state.content[0].body).toContain("Keep the original body");
     expect(state.content[0].body.includes("/api/media/")).toBe(!failure);
@@ -423,12 +439,7 @@ test("draft saves and publication share one transient confirmation", async ({
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   const toast = page.locator('[data-slot="toast"]');
   await expect(toast).toContainText("Doc draft saved");
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
-  await page.getByRole("combobox", { name: "Status", exact: true }).click();
-  await page.getByRole("option", { name: "Published", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Save & publish", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(toast).toHaveCount(1);
   await expect(toast).toContainText("Doc published");
   await page.screenshot({

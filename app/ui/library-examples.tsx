@@ -18,6 +18,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { Note } from "@/components/ui/note";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { PublicationStatus } from "@/components/patterns/publication-status";
 import {
   Progress,
   ProgressRing,
@@ -166,6 +167,15 @@ export function LibraryExamples() {
           <Badge variant="warning">Needs attention</Badge>
           <Badge variant="destructive">Failed</Badge>
         </ActionGroup>
+        <ActionGroup aria-label="Publication status examples">
+          <PublicationStatus published={false} />
+          <PublicationStatus published />
+          <PublicationStatus published hasUnpublishedChanges />
+        </ActionGroup>
+        <p className="text-copy text-muted-foreground">
+          Badges hold a short, single-line status. Keep details such as draft
+          changes outside the pill.
+        </p>
         <ActionGroup>
           <Tooltip content="Open example settings">
             <Button aria-label="Example settings" size="icon" variant="outline">

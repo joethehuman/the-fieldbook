@@ -1,5 +1,20 @@
 "use client";
-import { Badge } from "./ui/badge";
+import { CreatableCombobox } from "./ui/creatable-combobox";
+import { WritingEditor } from "./patterns/writing-editor";
+import { hasUnpublishedEdits } from "@/lib/demo-publication";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "./ui/dropdown-menu";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "./ui/collapsible";
+import { MoreHorizontal, ChevronDown } from "lucide-react";
+import { PublicationStatus } from "./patterns/publication-status";
 import { FieldDescription } from "./ui/field";
 import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
@@ -34,7 +49,6 @@ import LearningGroups from "./LearningGroups";
 import Curricula from "./Curricula";
 import { groupItems } from "@/lib/learning-groups";
 import { Assignments, type LearningHandler } from "./Assignments";
-import DocSectionCreate from "./DocSectionCreate";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
@@ -268,7 +282,7 @@ export default function Admin({
       title: "",
       summary: "",
       body: "",
-      category: kind === "course" ? "New channel" : "General",
+      category: kind === "course" ? "New channel" : "",
       folder: "",
       status: "draft",
       version: 1,
@@ -299,13 +313,14 @@ export default function Admin({
         ? data.content.map((x) => (x.id === c.id ? updated : x))
         : [...data.content, updated],
     });
-    setEditing(null);
+    if (c.kind === "course") setEditing(null);
     const label =
       c.kind === "brief" ? "Update" : c.kind === "doc" ? "Doc" : "Course";
     setNotice("");
     notify(
       `${label} ${c.status === "published" ? "published" : "draft saved"}${production ? "." : " in this browser."}`,
     );
+    return updated;
   }
   async function savePerson(e: React.FormEvent) {
     e.preventDefault();
@@ -644,23 +659,15 @@ export default function Admin({
                                 : "Course"}
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                (
-                                  production
-                                    ? !!c.publishedRevision
-                                    : c.status === "published"
-                                )
-                                  ? "success"
-                                  : "default"
-                              }
-                            >
-                              {production && c.publishedRevision
-                                ? c.publishedRevision === c.revision
-                                  ? "published"
-                                  : "published · draft changes"
-                                : c.status}
-                            </Badge>
+                            <PublicationStatus
+                              published={!!c.publishedRevision}
+                              hasUnpublishedChanges={hasUnpublishedEdits(
+                                c,
+                                data.publishedContent?.find(
+                                  (live) => live.id === c.id,
+                                ),
+                              )}
+                            />
                           </TableCell>
                           <TableCell>v{c.version}</TableCell>
                           <TableCell>
@@ -672,7 +679,7 @@ export default function Admin({
                                 Edit
                               </Button>
 
-                              {production && c.publishedRevision && (
+                              {!!c.publishedRevision && (
                                 <Button
                                   variant="link"
                                   onClick={async () => {
@@ -1042,11 +1049,14 @@ export function Editor({
   production?: boolean;
   content: Content;
   data: Workspace;
-  onSave: (c: Content) => void | Promise<void>;
+  onSave: (c: Content) => Content | void | Promise<Content | void>;
   onCancel: () => void;
   onLearning?: LearningHandler;
   onWorkspaceChange?: (data: Workspace) => void | Promise<void>;
 }) {
+  const form = useRef<HTMLFormElement>(null);
+  const [savedMessage, setSavedMessage] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [c, setC] = useState<Content>(() => ({
       ...content,
       assignments:
@@ -1063,26 +1073,19 @@ export function Editor({
     [error, setError] = useState(""),
     [refresh, setRefresh] = useState(false),
     [saving, setSaving] = useState(false),
-    [uploadCount, setUploadCount] = useState(0),
-    [creatingSection, setCreatingSection] = useState(false),
-    [sectionSaving, setSectionSaving] = useState(false);
+    [uploadCount, setUploadCount] = useState(0);
   const { confirm } = useInteractionDialog();
   const baseline = useRef(c);
   const original = useRef(content);
   const pendingUploads = useRef(0);
   const savingNow = useRef(false);
   const [recovering, setRecovering] = useState(false);
-  const busy = saving || uploadCount > 0 || sectionSaving || recovering;
+  const busy = saving || uploadCount > 0 || recovering;
   const dirty =
     JSON.stringify(c) !== JSON.stringify(baseline.current) || refresh;
   const guard = useRef(async () => true);
   guard.current = async () => {
-    if (
-      pendingUploads.current ||
-      savingNow.current ||
-      sectionSaving ||
-      recovering
-    ) {
+    if (pendingUploads.current || savingNow.current || recovering) {
       return false;
     }
     return (
@@ -1171,19 +1174,17 @@ export function Editor({
     }
   }
   const docSections = availableDocSections(
-    [
-      ...data.content.filter((item) => item.kind === "doc"),
-      ...(c.kind === "doc" ? [c] : []),
-    ],
+    data.content.filter((item) => item.kind === "doc"),
     data.settings?.docCategoryOrder,
   );
   const existing = data.content.some((x) => x.id === c.id);
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent, intent?: "draft" | "published") {
     e.preventDefault();
+    const saveStatus = intent || (c.kind === "course" ? c.status : "draft");
     if (busy || pendingUploads.current || savingNow.current) return;
     if (
       c.kind === "course" &&
-      c.status === "published" &&
+      saveStatus === "published" &&
       (!c.lessons.length ||
         c.lessons.some(
           (l) => !l.title.trim() || (!l.body.trim() && !l.videoUrl),
@@ -1227,8 +1228,9 @@ export function Editor({
         throw new Error(
           "This content changed while you were editing. Download your draft, then review the saved copy before reapplying changes.",
         );
-      await onSave({
+      const saved: Content = {
         ...c,
+        status: saveStatus,
         ...(latest
           ? {
               assignments: latest.assignments,
@@ -1242,7 +1244,13 @@ export function Editor({
           existing && refresh
             ? original.current.version + 1
             : original.current.version,
-      });
+      };
+      const persisted = (await onSave(saved)) || saved;
+      original.current = persisted;
+      baseline.current = persisted;
+      setC(persisted);
+      setRefresh(false);
+      setSavedMessage(saveStatus === "published" ? "Published" : "Draft saved");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -1270,7 +1278,32 @@ export function Editor({
       </>
     );
   return (
-    <form className="editor" onSubmit={submit}>
+    <form
+      ref={form}
+      className="editor"
+      onSubmit={submit}
+      onInvalidCapture={(event) => {
+        const control = event.target as HTMLInputElement;
+        if (c.kind !== "course" && !control.getClientRects().length) {
+          event.preventDefault();
+          setSettingsOpen(true);
+          requestAnimationFrame(() => {
+            control.focus();
+            control.reportValidity();
+          });
+        }
+      }}
+      onKeyDown={(event) => {
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          event.key.toLowerCase() === "s"
+        ) {
+          event.preventDefault();
+          if (c.kind !== "course" && form.current?.reportValidity())
+            void submit(event, "draft");
+        }
+      }}
+    >
       <Button
         variant="link"
         type="button"
@@ -1287,38 +1320,92 @@ export function Editor({
           <span className="eyebrow">
             {existing ? "EDIT" : "CREATE"}{" "}
             {c.kind === "doc"
-              ? "ARTICLE"
+              ? "DOC"
               : c.kind === "brief"
-                ? "BRIEF"
+                ? "UPDATE"
                 : "COURSE"}
           </span>
           <h1>{existing ? c.title : "Something worth sharing."}</h1>
         </div>
-        <Button variant="default" loading={busy}>
-          <Save size={16} />
-          Save {c.status === "published" ? "& publish" : "draft"}
-        </Button>
+        <ActionGroup>
+          {c.kind !== "course" && (
+            <span role="status" className="text-copy text-muted-foreground">
+              {dirty
+                ? "Unsaved changes"
+                : savedMessage ||
+                  (existing ? "All changes saved" : "Not saved yet")}
+            </span>
+          )}
+          <Button
+            type="submit"
+            variant={c.kind === "course" ? "default" : "outline"}
+            loading={saving}
+            disabled={busy}
+          >
+            <Save size={16} />
+            {c.kind === "course"
+              ? `Save ${c.status === "published" ? "& publish" : "draft"}`
+              : "Save draft"}
+          </Button>
+          {c.kind !== "course" && (
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={(event) => {
+                if (form.current?.reportValidity())
+                  void submit(event, "published");
+              }}
+            >
+              {data.content.find((item) => item.id === c.id)?.publishedRevision
+                ? "Publish changes"
+                : "Publish"}
+            </Button>
+          )}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="More writing actions"
+                disabled={busy}
+              >
+                <MoreHorizontal />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={downloadDraft}>
+                Download draft
+              </DropdownMenuItem>
+              {onReload && (
+                <DropdownMenuItem onSelect={() => void reloadSaved()}>
+                  Review saved copy
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </ActionGroup>
       </div>
       {error && (
         <Alert variant="destructive" role="alert">
-          {error}
+          <p>{error}</p>
+          <ActionGroup className="mt-3">
+            <Button type="button" variant="outline" onClick={downloadDraft}>
+              Download draft
+            </Button>
+            {onReload && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={reloadSaved}
+              >
+                Review saved copy
+              </Button>
+            )}
+          </ActionGroup>
         </Alert>
       )}
-      <ActionGroup>
-        <Button type="button" variant="ghost" onClick={downloadDraft}>
-          Download draft
-        </Button>
-        {onReload && (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy}
-            onClick={reloadSaved}
-          >
-            Review saved copy
-          </Button>
-        )}
-      </ActionGroup>
       {busy && (
         <p role="status">
           {uploadCount
@@ -1348,11 +1435,12 @@ export function Editor({
             />
           </FormField>
           {c.kind !== "course" ? (
-            <MarkdownEditor
-              label="Doc content"
+            <WritingEditor
+              label={c.kind === "doc" ? "Doc content" : "Update content"}
               value={c.body}
               onChange={(value) => set("body", value)}
               onUpload={upload}
+              disabled={busy}
             />
           ) : (
             <>
@@ -1587,192 +1675,221 @@ export function Editor({
           )}
         </section>
         <aside className="editor-settings">
-          <section className="editor-setting-section">
-            <h3>Publishing</h3>
-            {production && (
-              <p className="muted">
-                Saving a draft keeps the current public version online. Select
-                Published to replace it. Unpublish from the content list to
-                remove public access.
-              </p>
-            )}
-            <FormField label="Status">
-              <SelectField
-                value={c.status}
-                onValueChange={(value) => set("status", value)}
+          <Collapsible
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            className="grid gap-4"
+          >
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                className={c.kind === "course" ? "hidden" : "lg:hidden"}
               >
-                <option value="draft">Draft</option>
-                <option value="published">Published</option>
-              </SelectField>
-            </FormField>
-          </section>
-          <section className="editor-setting-section">
-            <h3>Organization</h3>
-            {c.kind === "doc" ? (
-              <>
-                <FormField label="Section">
-                  <SelectField
-                    aria-label="Section"
-                    value={`section:${c.category}`}
-                    disabled={saving || sectionSaving}
-                    onValueChange={(value) => {
-                      if (value === "create") setCreatingSection(true);
-                      else {
-                        set("category", value.slice(8));
-                        setCreatingSection(false);
-                      }
-                    }}
-                  >
-                    {docSections.map((name) => (
-                      <option key={name} value={`section:${name}`}>
-                        {name}
-                      </option>
-                    ))}
-                    {onWorkspaceChange && (
-                      <option value="create">Create new section…</option>
+                Content settings <ChevronDown />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent
+              forceMount
+              className={
+                c.kind === "course"
+                  ? "grid gap-6"
+                  : "hidden data-[state=open]:grid lg:grid gap-6"
+              }
+            >
+              {c.kind !== "course" ? (
+                <SettingsSection
+                  id="writing-publication"
+                  title={<h3>Publication</h3>}
+                  guidance="Save draft keeps your work private. Publish changes when they are ready for readers."
+                >
+                  <PublicationStatus
+                    published={
+                      !!data.content.find((item) => item.id === c.id)
+                        ?.publishedRevision
+                    }
+                    hasUnpublishedChanges={hasUnpublishedEdits(
+                      data.content.find((item) => item.id === c.id) || c,
+                      data.publishedContent?.find((live) => live.id === c.id),
                     )}
-                  </SelectField>
-                </FormField>
-                {creatingSection && onWorkspaceChange && (
-                  <DocSectionCreate
-                    sections={docSections}
-                    disabled={saving}
-                    onBusyChange={setSectionSaving}
-                    onCancel={() => setCreatingSection(false)}
-                    onCreate={async (name) => {
-                      await onWorkspaceChange({
-                        ...data,
-                        settings: {
-                          ...defaultSettings,
-                          ...data.settings,
-                          docCategoryOrder: [...docSections, name],
-                        },
-                      });
-                      set("category", name);
-                      setCreatingSection(false);
-                    }}
                   />
-                )}
-              </>
-            ) : (
-              <Field>
-                {c.kind === "course" ? "Channel" : "Category"}
-                <Input
-                  required
-                  list="categories"
-                  value={c.category}
-                  onChange={(e) => set("category", e.target.value)}
-                />
-                <datalist id="categories">
-                  {Array.from(
-                    new Set(
-                      data.content
-                        .filter((x) => x.kind === c.kind)
-                        .map((x) => x.category),
-                    ),
-                  ).map((x) => (
-                    <option key={x}>{x}</option>
-                  ))}
-                </datalist>
-              </Field>
-            )}
-          </section>
-          {c.kind === "brief" && (
-            <section className="editor-setting-section">
-              <h3>For you</h3>
-              <p>
-                Choose the learning groups this update is relevant to. Everyone
-                can still read it.
-              </p>
-              <GroupPicker
-                groups={data.groups}
-                value={c.groups}
-                onChange={(groups) => set("groups", groups)}
-              />
-            </section>
-          )}
-          {c.kind === "course" && (
-            <>
-              <section className="editor-setting-section">
-                <h3>Course details</h3>
-                <CourseCoverEditor
-                  url={c.coverImageUrl}
-                  onUpload={upload}
-                  disabled={busy}
-                  onChange={(url) =>
-                    setC((current) => ({ ...current, coverImageUrl: url }))
-                  }
-                />
-                <FormField label="Estimated minutes">
-                  <Input
-                    type="number"
-                    min={1}
-                    max={600}
-                    required
-                    value={c.duration}
-                    onChange={(e) => set("duration", Number(e.target.value))}
-                  />
-                </FormField>
-              </section>
-              <section className="editor-setting-section">
-                <h3>Assigned courses</h3>
-                <p className="muted">
-                  Manage this course through Learning groups. Course completion
-                  windows are managed in organization settings.
-                </p>
-                {existing &&
-                (data.publishedContent ?? data.content).some(
-                  (x) => x.id === c.id && x.status === "published",
-                ) &&
-                onLearning ? (
-                  <Button
-                    variant="outline"
-                    type="button"
-                    onClick={() => {
-                      setEditorTab("assignments");
-                    }}
-                  >
-                    Manage learning groups
-                  </Button>
-                ) : (
-                  <p>
-                    Publish this course to add it to a group’s assigned courses.
+                  <p className="text-copy text-muted-foreground">
+                    {production
+                      ? "Drafts are visible to administrators."
+                      : "Saved in this browser. Other visitors do not see your edits."}
                   </p>
-                )}
-              </section>
-              {existing && (
+                </SettingsSection>
+              ) : (
                 <section className="editor-setting-section">
-                  <h3>Course version</h3>
-                  <Field orientation="horizontal">
-                    <Checkbox
-                      aria-describedby="course-version-help"
-                      checked={refresh}
-                      onCheckedChange={(checked) =>
-                        setRefresh(checked === true)
-                      }
-                    />
-                    Publish a new version and start a new completion window
-                  </Field>
-                  <FieldDescription id="course-version-help">
-                    Current version: {content.version}. Keep this unchecked for
-                    minor corrections.
-                  </FieldDescription>
+                  <h3>Publishing</h3>
+                  {production && (
+                    <p className="muted">
+                      Saving a draft keeps the current public version online.
+                      Select Published to replace it. Unpublish from the content
+                      list to remove public access.
+                    </p>
+                  )}
+                  <FormField label="Status">
+                    <SelectField
+                      value={c.status}
+                      onValueChange={(value) => set("status", value)}
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                    </SelectField>
+                  </FormField>
                 </section>
               )}
-            </>
-          )}
-          <div className="demo-note">
-            <strong>
-              {production
-                ? "Saved to your organization"
-                : "Saved in your browser"}
-            </strong>
-            <p>
-              {production
-                ? "Drafts are visible to administrators. Publish when you are ready to share with readers."
-                : "Published content is visible to demo profiles on this device. It is not shared with other visitors."}
-            </p>
-          </div>
+              <SettingsSection
+                id="writing-organization"
+                title={<h3>Organization</h3>}
+                guidance={
+                  c.kind === "doc"
+                    ? "Choose where this doc appears in Docs navigation."
+                    : "Use a clear category to help readers find related content."
+                }
+              >
+                <FormField
+                  label={
+                    c.kind === "doc"
+                      ? "Section"
+                      : c.kind === "course"
+                        ? "Channel"
+                        : "Category"
+                  }
+                >
+                  <CreatableCombobox
+                    required
+                    maxLength={c.kind === "doc" ? 80 : undefined}
+                    value={c.category}
+                    onValueChange={(value) => set("category", value)}
+                    options={
+                      c.kind === "doc"
+                        ? docSections
+                        : data.content
+                            .filter((item) => item.kind === c.kind)
+                            .map((item) => item.category)
+                    }
+                    listLabel={
+                      c.kind === "doc"
+                        ? "Sections"
+                        : c.kind === "course"
+                          ? "Channels"
+                          : "Categories"
+                    }
+                    placeholder={
+                      c.kind === "doc"
+                        ? "Choose or add section…"
+                        : c.kind === "course"
+                          ? "Choose or add channel…"
+                          : "Choose or add category…"
+                    }
+                  />
+                </FormField>
+              </SettingsSection>
+              {c.kind === "brief" && (
+                <SettingsSection
+                  id="writing-relevance"
+                  title={<h3>For you</h3>}
+                  guidance="Choose groups this update is relevant to. Everyone allowed into the installation can still read it."
+                >
+                  <GroupPicker
+                    groups={data.groups}
+                    showDescription={false}
+                    value={c.groups}
+                    onChange={(groups) => set("groups", groups)}
+                  />
+                </SettingsSection>
+              )}
+              {c.kind === "course" && (
+                <>
+                  <section className="editor-setting-section">
+                    <h3>Course details</h3>
+                    <CourseCoverEditor
+                      url={c.coverImageUrl}
+                      onUpload={upload}
+                      disabled={busy}
+                      onChange={(url) =>
+                        setC((current) => ({ ...current, coverImageUrl: url }))
+                      }
+                    />
+                    <FormField label="Estimated minutes">
+                      <Input
+                        type="number"
+                        min={1}
+                        max={600}
+                        required
+                        value={c.duration}
+                        onChange={(e) =>
+                          set("duration", Number(e.target.value))
+                        }
+                      />
+                    </FormField>
+                  </section>
+                  <section className="editor-setting-section">
+                    <h3>Assigned courses</h3>
+                    <p className="muted">
+                      Manage this course through Learning groups. Course
+                      completion windows are managed in organization settings.
+                    </p>
+                    {existing &&
+                    (data.publishedContent ?? data.content).some(
+                      (x) => x.id === c.id && x.status === "published",
+                    ) &&
+                    onLearning ? (
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => {
+                          setEditorTab("assignments");
+                        }}
+                      >
+                        Manage learning groups
+                      </Button>
+                    ) : (
+                      <p>
+                        Publish this course to add it to a group’s assigned
+                        courses.
+                      </p>
+                    )}
+                  </section>
+                  {existing && (
+                    <section className="editor-setting-section">
+                      <h3>Course version</h3>
+                      <Field orientation="horizontal">
+                        <Checkbox
+                          aria-describedby="course-version-help"
+                          checked={refresh}
+                          onCheckedChange={(checked) =>
+                            setRefresh(checked === true)
+                          }
+                        />
+                        Publish a new version and start a new completion window
+                      </Field>
+                      <FieldDescription id="course-version-help">
+                        Current version: {content.version}. Keep this unchecked
+                        for minor corrections.
+                      </FieldDescription>
+                    </section>
+                  )}
+                </>
+              )}
+              {c.kind === "course" && (
+                <div className="demo-note">
+                  <strong>
+                    {production
+                      ? "Saved to your organization"
+                      : "Saved in your browser"}
+                  </strong>
+                  <p>
+                    {production
+                      ? "Drafts are visible to administrators. Publish when you are ready to share with readers."
+                      : "Published content is visible to demo profiles on this device. It is not shared with other visitors."}
+                  </p>
+                </div>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
         </aside>
       </FieldGroup>
     </form>

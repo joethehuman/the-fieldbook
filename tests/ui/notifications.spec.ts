@@ -4,6 +4,10 @@ test("confirmations replace one another without shifting layout and fade automat
   page,
 }, info) => {
   await page.goto("/ui");
+  // The catalog loads its writing engine asynchronously above this example.
+  await expect(
+    page.getByRole("textbox", { name: "Content", exact: true }),
+  ).toBeVisible();
   const trigger = page.getByRole("button", {
     name: "Preview confirmation",
     exact: true,

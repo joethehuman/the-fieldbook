@@ -1,0 +1,57 @@
+/* Adapter for MDXEditor's nested table/media UI; main controls use Fieldbook primitives. */
+.writing-editor .mdxeditor,
+.mdxeditor-popup-container {
+  --basePageBg: var(--background);
+  --baseBase: var(--background);
+  --baseBgSubtle: var(--muted);
+  --baseBg: var(--muted);
+  --baseBgHover: var(--accent);
+  --baseBgActive: var(--accent);
+  --baseLine: var(--border);
+  --baseBorder: var(--control-border);
+  --baseBorderHover: var(--control-hover);
+  --baseSolid: var(--primary);
+  --baseSolidHover: var(--primary-hover);
+  --baseText: var(--muted-foreground);
+  --baseTextContrast: var(--foreground);
+  --accentBgActive: var(--accent);
+  --accentText: var(--foreground);
+  --accentSolid: var(--primary);
+  --accentSolidHover: var(--primary-hover);
+  --accentBorder: var(--ring);
+  --font-body: var(--font-geist-sans), sans-serif;
+  --font-mono: monospace;
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+.writing-editor .mdxeditor-toolbar {
+  position: static;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--muted);
+  padding: var(--space-2);
+}
+.writing-editor .writing-content {
+  min-height: 24rem;
+  padding: var(--space-6);
+  outline: none;
+}
+.writing-editor .writing-content:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ring);
+}
+.writing-editor .mdxeditor-root-contenteditable {
+  min-width: 0;
+  overflow-x: auto;
+}
+.writing-editor [data-toolbar-item][role="combobox"] {
+  min-height: 2.25rem;
+}
+.mdxeditor-popup-container {
+  z-index: 60;
+}
+@media (max-width: 600px) {
+  .writing-editor .writing-content {
+    padding: var(--space-4);
+  }
+}
