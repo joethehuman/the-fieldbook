@@ -1,5 +1,5 @@
 "use client";
-import { Badge } from "./ui/badge";
+import { PublicationStatus } from "./patterns/publication-status";
 import { FieldDescription } from "./ui/field";
 import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
@@ -644,23 +644,18 @@ export default function Admin({
                                 : "Course"}
                           </TableCell>
                           <TableCell>
-                            <Badge
-                              variant={
-                                (
-                                  production
-                                    ? !!c.publishedRevision
-                                    : c.status === "published"
-                                )
-                                  ? "success"
-                                  : "default"
+                            <PublicationStatus
+                              published={
+                                production
+                                  ? !!c.publishedRevision
+                                  : c.status === "published"
                               }
-                            >
-                              {production && c.publishedRevision
-                                ? c.publishedRevision === c.revision
-                                  ? "published"
-                                  : "published · draft changes"
-                                : c.status}
-                            </Badge>
+                              hasUnpublishedChanges={
+                                production &&
+                                !!c.publishedRevision &&
+                                c.publishedRevision !== c.revision
+                              }
+                            />
                           </TableCell>
                           <TableCell>v{c.version}</TableCell>
                           <TableCell>

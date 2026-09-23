@@ -2,7 +2,7 @@ import type { ComponentProps } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 const variants = cva(
-  "inline-flex w-fit items-center gap-1 rounded-full border border-transparent px-2 py-0 text-xs leading-6 font-medium [overflow-wrap:anywhere]",
+  "inline-flex w-fit shrink-0 items-center gap-1 rounded-full border border-transparent px-2 py-0 text-xs leading-6 font-medium whitespace-nowrap",
   {
     variants: {
       variant: {

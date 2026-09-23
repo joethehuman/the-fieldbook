@@ -32,6 +32,8 @@ Inputs and textareas retain browser form semantics. `Checkbox` and `Switch` use 
 
 ## Composition contracts
 
+Badges contain short, single-line status labels. Put explanatory text outside the pill. Use `PublicationStatus` for content tables: Published or Draft is the badge, while Unpublished edits appears beneath it when a published item has newer edits. Preserve both facts; do not truncate the combined state into a tooltip.
+
 Shared controls are necessary but do not establish a consistent page by themselves. Use these patterns rather than arranging their children independently:
 
 - `SectionHeader` requires a `title`; `description` always stays below it. Children occupy the trailing action area. Use `CollectionToolbar` to separate collection filters from creation actions.

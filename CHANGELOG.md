@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep publication badges compact and show unpublished draft changes as separate supporting text in the content table.
+
 - Browse a searchable reporting hierarchy, create subteams or move existing branches with an explicit reporting-access review, and detach a branch to the top level. Delete only empty teams with no member, pending-account, child-team or learning-group references. Server deletion requires the guarded-team-deletion migration; memberships and saved progress are preserved.
 
 - Manage teams in a full-width detail view with searchable, paginated rosters, direct/subteam membership and hierarchy navigation. Review multiple member additions and moves, remove direct members without deleting accounts, and edit team details in the shared dialog. Preserve progress, existing assignment rules and revision-checked administrator saves.
