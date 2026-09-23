@@ -171,7 +171,7 @@ export function CourseOverview({
         <div className="course-detail-meta">
           <Clock size={16} />
           {item.duration} min<span>·</span>
-          {item.lessons.length} lessons<span>·</span>At your own pace
+          {item.lessons.length} lessons
         </div>
       </div>
       {item.body && (

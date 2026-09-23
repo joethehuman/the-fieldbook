@@ -264,7 +264,7 @@ test("completion removes a course from the home queue and remains visible in bot
     .getByRole("button", { name: "Check answers", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Nicely done.", exact: true }),
+    page.getByRole("heading", { name: "Course complete", exact: true }),
   ).toBeVisible();
   await page.goto("/#courses");
   await page.reload();

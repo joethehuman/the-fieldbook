@@ -51,10 +51,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
     );
   return (
     <>
-      <SectionHeader
-        title={<h2>People & completion</h2>}
-        description="Understand completion across your reporting scope."
-      >
+      <SectionHeader title={<h2>People & completion</h2>}>
         <CsvExport
           filename="team-progress"
           report={() => teamProgressCsv(rows)}

@@ -210,6 +210,9 @@ test("learner routes and narrow navigation remain usable", async ({
     ).toBeVisible();
     await noOverflow(page);
   }
+  await expect(page.locator(".main-content > footer > span")).toHaveText(
+    "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS",
+  );
   await page.goto("/#courses");
   const firstChannel = page.locator(".library .channel").first();
   const channelHeading = await firstChannel
@@ -316,7 +319,7 @@ test("course completion still works through shared choices and controls", async 
     .getByRole("button", { name: "Check answers", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Nicely done.", exact: true }),
+    page.getByRole("heading", { name: "Course complete", exact: true }),
   ).toBeVisible();
   await page.reload();
   await expect(
@@ -523,7 +526,10 @@ test("update footers and saved feedback keep text and actions separated", async 
   await page.locator(".brief-card").first().click();
   const feedback = page.getByRole("region", { name: "Content feedback" });
   await feedback.getByRole("button", { name: "Useful", exact: true }).click();
-  const form = page.getByRole("form", { name: "Give feedback", exact: true });
+  const form = page.getByRole("form", {
+    name: "Did you find this useful?",
+    exact: true,
+  });
   await expect(form.getByRole("textbox")).toBeFocused();
   await form.getByRole("textbox").fill("The example was clear.");
   await form.getByRole("button", { name: "Send", exact: true }).click();
@@ -534,7 +540,7 @@ test("update footers and saved feedback keep text and actions separated", async 
   await expect(feedback.getByRole("status")).toHaveText("Feedback saved.");
   await page.reload();
   await feedback
-    .getByRole("button", { name: "Give feedback", exact: true })
+    .getByRole("button", { name: "Did you find this useful?", exact: true })
     .click();
   await expect(form.getByRole("textbox")).toHaveValue("The example was clear.");
   await noOverflow(page);
@@ -551,7 +557,10 @@ test("content feedback catalog preserves failed drafts, pending state and keyboa
     .getByRole("button", { name: "Not useful", exact: true })
     .first()
     .click();
-  const form = page.getByRole("form", { name: "Give feedback", exact: true });
+  const form = page.getByRole("form", {
+    name: "Did you find this useful?",
+    exact: true,
+  });
   await expect(form.getByRole("textbox")).toBeFocused();
   await expect(
     form.getByRole("button", { name: "Send", exact: true }),
@@ -575,7 +584,7 @@ test("content feedback catalog preserves failed drafts, pending state and keyboa
   ).toBeFocused();
   await catalog.getByRole("switch").click();
   await catalog
-    .getByRole("button", { name: "Give feedback", exact: true })
+    .getByRole("button", { name: "Did you find this useful?", exact: true })
     .first()
     .click();
   await expect(form.getByRole("textbox")).toHaveValue(
@@ -587,9 +596,52 @@ test("content feedback catalog preserves failed drafts, pending state and keyboa
     "Feedback saved.",
   );
   await expect(
-    catalog.getByRole("button", { name: "Give feedback", exact: true }).last(),
+    catalog
+      .getByRole("button", { name: "Did you find this useful?", exact: true })
+      .last(),
   ).toBeDisabled();
   await noOverflow(page);
+});
+
+test("long feedback prompt wraps without crowding rating controls", async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.goto("/ui#catalog-content-feedback");
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  const feedback = page
+    .locator("#catalog-content-feedback")
+    .getByRole("region", {
+      name: "Content feedback",
+    })
+    .first();
+  const prompt = feedback.getByRole("button", {
+    name: "Did you find this useful?",
+    exact: true,
+  });
+  const rating = feedback
+    .getByRole("group", { name: "Rate this content" })
+    .first();
+  await expect(prompt).toBeVisible();
+  const promptBox = await prompt.boundingBox();
+  const ratingBox = await rating.boundingBox();
+  expect(promptBox!.x + promptBox!.width).toBeLessThanOrEqual(ratingBox!.x + 1);
+  const feedbackBox = await feedback.boundingBox();
+  expect(feedbackBox!.x + feedbackBox!.width).toBeLessThanOrEqual(321);
+  await prompt.click();
+  const form = page.getByRole("form", {
+    name: "Did you find this useful?",
+    exact: true,
+  });
+  await expect(form).toBeVisible();
+  await expect(
+    form.getByRole("button", { name: "Useful", exact: true }),
+  ).toBeVisible();
+  const formBox = await form.boundingBox();
+  expect(formBox!.x + formBox!.width).toBeLessThanOrEqual(321);
+  await snapshotReview(page, info, "feedback-narrow-long-prompt");
 });
 
 test("new user guidance belongs to the grey fieldset footer and labels its select", async ({
@@ -634,7 +686,10 @@ test("feedback remains usable with enlarged text and independent of branding and
     .getByRole("button", { name: "Useful", exact: true })
     .first()
     .click();
-  const form = page.getByRole("form", { name: "Give feedback", exact: true });
+  const form = page.getByRole("form", {
+    name: "Did you find this useful?",
+    exact: true,
+  });
   await expect(
     form.getByRole("button", { name: "Send", exact: true }),
   ).toBeEnabled();

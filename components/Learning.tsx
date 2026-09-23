@@ -57,7 +57,6 @@ export default function Learning({
   assigned,
   progress,
   onOpen,
-  onKnowledge,
   onCurriculum,
   publicLearning = false,
   guest = false,
@@ -74,7 +73,6 @@ export default function Learning({
   assigned: Content[];
   progress: Progress[];
   onOpen: (id: string) => void;
-  onKnowledge: () => void;
   onCurriculum: (id: string) => void;
 }) {
   const [view, setView] = useState<"home" | "curricula" | LearningCollection>(
@@ -233,19 +231,11 @@ export default function Learning({
             ← Back to courses
           </Button>
         )}
-        <span className="eyebrow">YOUR ORGANIZATION</span>
         <h1>{view === "home" ? "Courses" : "Your courses"}</h1>
-        <p>
-          {view === "home"
-            ? "Build your knowledge, sharpen your skills, and stay one step ahead."
-            : "Find your next course or pick up where you left off."}
-        </p>
       </PageHeader>
       {view === "home" && publicLearning && (
         <Callout>
           <div>
-            <span className="eyebrow">YOUR LEARNING</span>
-            <h2>Keep your curiosity moving.</h2>
             <p>
               {courses.filter((c) => isComplete(c, progress)).length} courses
               completed ·{" "}
@@ -258,7 +248,7 @@ export default function Learning({
             <p className="muted">
               {guest
                 ? "Progress is saved in this browser. Sign in to keep learning across devices."
-                : "Your progress is saved to your account. Pick up wherever you left off."}
+                : "Progress is saved to your account."}
             </p>
             {guest && (
               <Button variant="default" onClick={onSignIn}>
@@ -285,11 +275,6 @@ export default function Learning({
                 For you <Badge variant="default">{outstanding.length}</Badge>
               </h2>
             }
-            description={
-              state.onboarding
-                ? "Get up to speed at your pace."
-                : "Build your knowledge and stay current."
-            }
             leading={
               <Card className="flex flex-col items-center justify-center gap-4 text-center">
                 {assigned.length > 0 ? (
@@ -302,31 +287,26 @@ export default function Learning({
                 <div className="grid gap-2">
                   <h3>
                     {!assigned.length
-                      ? "Learn something new"
+                      ? guest
+                        ? "No recommendations yet"
+                        : "No assigned courses"
                       : pct === 100
-                        ? "You’re up to date"
-                        : state.onboarding
-                          ? "Get up to speed"
-                          : "Stay current"}
+                        ? "Assigned courses complete"
+                        : `${outstanding.length} assigned courses remaining`}
                   </h3>
-                  <p>
-                    {assigned.length
-                      ? `${completed.length} of ${assigned.length} assigned courses complete`
-                      : guest
-                        ? "No guest recommendations yet. Explore the library below."
-                        : "No assigned courses yet."}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {guest
-                      ? "Learn at your own pace. There are no deadlines."
-                      : state.overdue.length
+                  {!!assigned.length && pct < 100 && (
+                    <p>
+                      {completed.length} of {assigned.length} assigned courses
+                      complete
+                    </p>
+                  )}
+                  {!guest && (state.overdue.length > 0 || state.onboarding) && (
+                    <p className="text-xs text-muted-foreground">
+                      {state.overdue.length
                         ? `${state.overdue.length} courses past their target`
-                        : state.onboarding
-                          ? `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`
-                          : outstanding.length
-                            ? "You’re on track"
-                            : "Explore the library at your own pace."}
-                  </p>
+                        : `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`}
+                    </p>
+                  )}
                 </div>
                 {nextCourse && (
                   <Button
@@ -374,18 +354,7 @@ export default function Learning({
           />
         )}
         <SectionHeader
-          title={<h2>{view === "home" ? "Explore the library" : viewTitle}</h2>}
-          description={
-            view === "assigned"
-              ? guest
-                ? "Courses and curricula recommended for visitors."
-                : "Courses and curricula assigned to your learning groups."
-              : view === "in-progress"
-                ? "Continue any course you’ve started, assigned or optional."
-                : view === "completed"
-                  ? "Revisit any course you’ve completed, assigned or optional."
-                  : "Browse by channel or find a specific course."
-          }
+          title={<h2>{view === "home" ? "All courses" : viewTitle}</h2>}
         >
           <span className="muted" role="status">
             {view === "assigned" || view === "curricula"
@@ -401,7 +370,9 @@ export default function Learning({
             <Field orientation="horizontal">
               <Switch
                 checked={hideCompleted}
-                onCheckedChange={(checked) => setHideCompleted(checked === true)}
+                onCheckedChange={(checked) =>
+                  setHideCompleted(checked === true)
+                }
               />
               Hide completed
             </Field>
@@ -497,26 +468,19 @@ export default function Learning({
                         ? "No completed courses yet"
                         : "No courses yet"}
             </h3>
-            <p>
-              {query || topic !== "All channels"
-                ? "Try another channel or search term."
-                : view === "assigned" && hideCompleted && assigned.length
-                  ? "All your assigned courses are complete. Turn off Hide completed to review them."
-                  : "Explore the library to find your next course."}
-            </p>
+            {(query || topic !== "All channels") && (
+              <p>Try another channel or search term.</p>
+            )}
+            {view === "assigned" &&
+              hideCompleted &&
+              !!assigned.length &&
+              !query &&
+              topic === "All channels" && (
+                <p>Turn off Hide completed to review assigned courses.</p>
+              )}
           </EmptyState>
         )}
       </section>
-      <Callout>
-        <BookOpen size={22} />
-        <div>
-          <h3>Looking for an answer?</h3>
-          <p>The docs library is your everyday reference.</p>
-        </div>
-        <Button variant="link" onClick={onKnowledge}>
-          Explore docs <ArrowRight size={17} />
-        </Button>
-      </Callout>
     </>
   );
 }

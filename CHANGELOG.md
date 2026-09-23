@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Tighten built-in copy on learner, visitor and manager pages while keeping progress, safety and recovery information. Let the longer feedback prompt wrap beside its rating controls. Set the default footer tagline to "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS".
+
 - Use a shared searchable, creatable dropdown for categories, channels and Doc sections. New Docs and Updates start with an empty section/category prompt.
 
 - Write Docs and Updates visually with formatting controls and a safe Markdown fallback. Separate draft saving from publication, keep saved work open, and organize settings into shared fieldsets. The demo now preserves a published copy while draft edits are saved.
@@ -41,7 +43,6 @@ No versions have been released. Package and MCP version strings do not constitut
 
 - Server-render published Docs, Updates and course overviews with item metadata and real missing-page responses. Private installations authorize content and metadata before rendering, using uncached request-time reads.
 - Make breadcrumbs navigable, preserve lesson destinations and retain interactive learning, guest progress and editor guards.
-
 
 ### Contained search
 
@@ -100,7 +101,6 @@ No versions have been released. Package and MCP version strings do not constitut
 
 - Unify course browsing into For you, In progress, Completed and All courses, with a default-off Hide completed control for assignments and channel grouping throughout.
 - Add compact course/curriculum progress rings and completion checks while keeping overall progress assigned-only. Simplify the learning summary, align its desktop card with the course row, and hide unnecessary scrolling controls.
-
 
 ### Shared design system
 
