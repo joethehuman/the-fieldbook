@@ -40,22 +40,46 @@ export function expandLearning(
     ),
   ];
 }
+export function updateFeedTimestamp(item: Content): number | undefined {
+  const parse = (value?: string) => {
+    if (!value) return undefined;
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? time : undefined;
+  };
+  // The published snapshot's updatedAt is unchanged by draft-only edits. A
+  // first-publication timestamp is not part of the current content model.
+  return parse(item.updatedAt) ?? parse(item.createdAt);
+}
 export function updatesForUser(
   content: Content[],
   user: Workspace["users"][number],
   groups: Group[],
 ) {
   const memberships = effectiveGroups(user, groups);
-  const updates = content
-    .filter((c) => c.kind === "brief" && c.status === "published")
-    .sort(
-      (a, b) =>
-        b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id),
-    );
+  const updatesById = new Map<string, Content>();
+  for (const item of content) {
+    if (
+      item.kind === "brief" &&
+      item.status === "published" &&
+      !updatesById.has(item.id)
+    )
+      updatesById.set(item.id, item);
+  }
+  const updates = [...updatesById.values()].sort((a, b) => {
+    const aTime = updateFeedTimestamp(a);
+    const bTime = updateFeedTimestamp(b);
+    if (aTime !== undefined && bTime !== undefined)
+      return bTime - aTime || a.id.localeCompare(b.id);
+    if (aTime !== undefined) return -1;
+    if (bTime !== undefined) return 1;
+    return a.id.localeCompare(b.id);
+  });
   const matches = (c: Content) => c.groups.some((g) => memberships.has(g));
+  const featured = updates.filter(matches).slice(0, 2);
+  const featuredIds = new Set(featured.map((item) => item.id));
   return {
-    forYou: updates.filter(matches),
-    other: updates.filter((c) => !matches(c)),
+    forYou: featured,
+    other: updates.filter((item) => !featuredIds.has(item.id)),
   };
 }
 // Browser demo mirrors the server's atomic membership and assignment reconciliation.
