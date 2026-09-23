@@ -4,7 +4,7 @@ import * as Primitive from "@radix-ui/react-tooltip";
 
 export function TooltipProvider({ children }: { children: ReactNode }) {
   return (
-    <Primitive.Provider delayDuration={400}>{children}</Primitive.Provider>
+    <Primitive.Provider delayDuration={150}>{children}</Primitive.Provider>
   );
 }
 

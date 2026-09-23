@@ -13,7 +13,7 @@ export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   return (
     <thead
       className={cn(
-        "border-b border-border bg-muted/50 text-xs text-muted-foreground",
+        "border-b border-border bg-surface text-sm text-muted-foreground",
         className,
       )}
       {...props}

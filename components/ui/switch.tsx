@@ -1,27 +1,35 @@
-import type { ComponentProps } from "react";
-import { cn } from "@/lib/utils";
+// Adapted from shadcn/ui Switch (MIT).
+"use client";
 
-/** Native checkbox events/reset with on/off semantics; keep its label stable. */
-export function Switch({
+import * as React from "react";
+import { cn } from "@/lib/utils";
+import * as SwitchPrimitive from "@radix-ui/react-switch";
+
+function Switch({
   className,
+  size = "default",
   ...props
-}: Omit<ComponentProps<"input">, "type" | "role">) {
+}: React.ComponentProps<typeof SwitchPrimitive.Root> & {
+  size?: "sm" | "default";
+}) {
   return (
-    <span className="relative inline-flex h-6 w-10 shrink-0">
-      <input
-        {...props}
-        type="checkbox"
-        role="switch"
-        data-slot="switch"
+    <SwitchPrimitive.Root
+      data-slot="switch"
+      data-size={size}
+      className={cn(
+        "peer group/switch inline-flex shrink-0 items-center rounded-full border border-transparent transition-colors motion-reduce:transition-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-[size=default]:h-[1.15rem] data-[size=default]:w-8 data-[size=sm]:h-3.5 data-[size=sm]:w-6 data-[state=checked]:bg-primary data-[state=unchecked]:bg-input ",
+        className,
+      )}
+      {...props}
+    >
+      <SwitchPrimitive.Thumb
+        data-slot="switch-thumb"
         className={cn(
-          "peer h-6 w-10 cursor-pointer appearance-none rounded-full border border-control-border bg-muted outline-none transition-colors motion-reduce:transition-none checked:border-primary checked:bg-primary hover:enabled:border-control-hover focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 forced-colors:appearance-auto",
-          className,
+          "pointer-events-none block rounded-full bg-background ring-0 transition-transform motion-reduce:transition-none group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0 ",
         )}
       />
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute top-1 left-1 size-4 rounded-full bg-control-hover transition-transform motion-reduce:transition-none peer-checked:translate-x-4 peer-checked:bg-primary-foreground forced-colors:hidden"
-      />
-    </span>
+    </SwitchPrimitive.Root>
   );
 }
+
+export { Switch };

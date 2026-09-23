@@ -4,7 +4,7 @@ import { ContentAction } from "@/components/patterns/content-action";
 import {
   SectionHeader,
   EmptyState,
-  CardFooter,
+  ContentCardFooter,
 } from "@/components/patterns/layout";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { updateFeedTimestamp, updatesForUser } from "@/lib/learning-groups";
@@ -136,7 +136,7 @@ function UpdateCards({
             <span className="eyebrow">{b.category}</span>
             <h3>{b.title}</h3>
             <p>{b.summary}</p>
-            <CardFooter
+            <ContentCardFooter
               action={
                 <>
                   Read the update <ArrowRight size={16} />
@@ -144,7 +144,7 @@ function UpdateCards({
               }
             >
               {formatUpdateDate(b)}
-            </CardFooter>
+            </ContentCardFooter>
           </div>
         </ContentAction>
       ))}

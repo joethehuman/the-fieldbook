@@ -401,7 +401,7 @@ export default function Learning({
             <Field orientation="horizontal">
               <Switch
                 checked={hideCompleted}
-                onChange={(event) => setHideCompleted(event.target.checked)}
+                onCheckedChange={(checked) => setHideCompleted(checked === true)}
               />
               Hide completed
             </Field>

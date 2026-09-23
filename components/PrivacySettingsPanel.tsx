@@ -1,4 +1,5 @@
 "use client";
+import type { ReactNode } from "react";
 import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
 
@@ -10,11 +11,13 @@ import MarkdownEditor from "./MarkdownEditor";
 import { defaultPrivacy, type SiteSettings } from "@/lib/settings";
 export default function PrivacySettingsPanel({
   settings,
+  actions,
   onChange,
   onPublish,
   busy,
 }: {
   settings: SiteSettings;
+  actions?: ReactNode;
   onChange: (s: SiteSettings) => void;
   onPublish: (s: SiteSettings) => Promise<void>;
   busy: boolean;
@@ -42,7 +45,36 @@ export default function PrivacySettingsPanel({
       id="privacy-policy-fields"
       disabled={busy}
       title={<h3>Policy content</h3>}
-      description="Describe this installation’s practices. Save settings to keep a draft; publish separately after review. The current published policy stays visible while you edit."
+      guidance="Save settings to keep a draft; publish separately after review. The current published policy stays visible while you edit."
+      actions={
+        <>
+          {actions}{" "}
+          <Button
+            type="button"
+            variant="outline"
+            disabled={!valid}
+            loading={busy}
+            aria-describedby={!valid ? "privacy-publish-help" : undefined}
+            onClick={async () => {
+              if (
+                await confirm(
+                  "Publish this privacy policy for all visitors? This also saves your current settings.",
+                )
+              )
+                void onPublish({
+                  ...settings,
+                  privacy: {
+                    ...privacy,
+                    published: { ...draft },
+                    publishedAt: new Date().toISOString(),
+                  },
+                });
+            }}
+          >
+            Publish privacy policy
+          </Button>
+        </>
+      }
     >
       <FormField label="Policy location">
         <SelectField
@@ -118,30 +150,6 @@ export default function PrivacySettingsPanel({
             : "Add an operator name, a valid contact email or HTTPS contact page, and policy text before publishing."}
         </p>
       )}
-      <Button
-        type="button"
-        variant="outline"
-        disabled={!valid}
-        loading={busy}
-        aria-describedby={!valid ? "privacy-publish-help" : undefined}
-        onClick={async () => {
-          if (
-            await confirm(
-              "Publish this privacy policy for all visitors? This also saves your current settings.",
-            )
-          )
-            void onPublish({
-              ...settings,
-              privacy: {
-                ...privacy,
-                published: { ...draft },
-                publishedAt: new Date().toISOString(),
-              },
-            });
-        }}
-      >
-        Publish privacy policy
-      </Button>
     </SettingsSection>
   );
 }

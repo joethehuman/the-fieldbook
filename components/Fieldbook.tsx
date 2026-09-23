@@ -34,6 +34,7 @@ import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
@@ -1081,7 +1082,7 @@ export default function Fieldbook({
             Profiles simulate login and roles; they are not secure accounts.
             Don’t enter private information. Nothing is synced to a server.
           </p>
-          <ActionGroup>
+          <DialogFooter>
             <Button variant="outline" onClick={exportData}>
               <Download size={16} />
               Export demo data
@@ -1090,7 +1091,7 @@ export default function Fieldbook({
               <RotateCcw size={16} />
               Reset sample data
             </Button>
-          </ActionGroup>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

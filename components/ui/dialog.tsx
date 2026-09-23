@@ -27,18 +27,52 @@ export function DialogDescription({
 }
 export const dialogOverlayClass = "fixed inset-0 z-40 bg-overlay";
 export const dialogContentClass =
-  "fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-background p-4 sm:p-6 text-foreground shadow-xl outline-none";
+  "fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-xl outline-none";
 export function DialogContent({
   className,
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content>) {
+  const returnFocus = React.useRef<HTMLElement | null>(null);
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className={dialogOverlayClass} />
       <DialogPrimitive.Content
         className={cn(dialogContentClass, className)}
         {...props}
+        onOpenAutoFocus={(event) => {
+          returnFocus.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
+          onOpenAutoFocus?.(event);
+        }}
+        onCloseAutoFocus={(event) => {
+          onCloseAutoFocus?.(event);
+          if (!event.defaultPrevented && returnFocus.current?.isConnected) {
+            event.preventDefault();
+            returnFocus.current.focus();
+          }
+        }}
       />
     </DialogPrimitive.Portal>
+  );
+}
+
+/** Full-width action surface; place last in DialogContent or its form. */
+export function DialogFooter({
+  className,
+  ...props
+}: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="dialog-footer"
+      className={cn(
+        "-mx-5 -mb-5 mt-2 flex flex-wrap items-center justify-between gap-3 rounded-b-lg border-t border-border bg-surface px-5 py-3",
+        className,
+      )}
+      {...props}
+    />
   );
 }

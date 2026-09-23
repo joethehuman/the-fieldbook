@@ -45,7 +45,7 @@ export function LibraryExamples() {
       <SettingsSection
         id="catalog-settings"
         title={<h3>Fields and choices</h3>}
-        description="Keep persistent guidance next to the control. Use a switch for immediate on/off behavior; use checkboxes for form choices saved together."
+        guidance="Keep persistent guidance next to the control. Use a switch for immediate on/off behavior; use checkboxes for form choices saved together."
       >
         <FormField
           label="Long selection"
@@ -92,6 +92,10 @@ export function LibraryExamples() {
             Include this course in the selected group
           </Field>
           <Field orientation="horizontal">
+            <Checkbox checked="indeterminate" />
+            Some choices selected
+          </Field>
+          <Field orientation="horizontal">
             <Checkbox disabled />
             Unavailable choice
           </Field>
@@ -110,19 +114,19 @@ export function LibraryExamples() {
         <Field orientation="horizontal">
           <Switch
             checked={enabled}
-            onChange={(e) => setEnabled(e.target.checked)}
+            onCheckedChange={(checked) => setEnabled(checked === true)}
           />
           Hide completed example
         </Field>
         <Field orientation="horizontal">
-          <Switch disabled checked readOnly />
+          <Switch disabled checked />
           Unavailable switch
         </Field>
       </SettingsSection>
       <SettingsSection
         id="catalog-feedback"
         title={<h3>Information and actions</h3>}
-        description="Notes provide context. Alerts announce new errors or results. Tooltips supplement an already named action; they never hide required instructions."
+        guidance="Notes provide context. Alerts announce new errors or results. Tooltips supplement an already named action; they never hide required instructions."
       >
         <Note>
           Published content is available to everyone allowed into the
@@ -170,7 +174,7 @@ export function LibraryExamples() {
       <SettingsSection
         id="catalog-progress"
         title={<h3>Progress and loading</h3>}
-        description="Progress measures known completion. Spinners and skeletons indicate activity, never an invented percentage."
+        guidance="Progress measures known completion. Spinners and skeletons indicate activity, never an invented percentage."
       >
         <div className="flex flex-wrap gap-6">
           <ProgressRing value={0} label="Not started example" />

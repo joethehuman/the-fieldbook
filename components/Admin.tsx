@@ -46,6 +46,7 @@ import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
@@ -977,16 +978,18 @@ export default function Admin({
                 <Checkbox
                   disabled={person.id === user.id}
                   checked={person.active}
-                  onChange={(e) =>
-                    setPerson({ ...person, active: e.target.checked })
+                  onCheckedChange={(checked) =>
+                    setPerson({ ...person, active: checked === true })
                   }
                 />
                 Active profile
               </Field>
-              <Button variant="default">
-                <Save size={16} />
-                Save profile
-              </Button>
+              <DialogFooter className="justify-end">
+                <Button variant="default">
+                  <Save size={16} />
+                  Save profile
+                </Button>
+              </DialogFooter>
             </form>
           </DialogContent>
         )}
@@ -1717,7 +1720,9 @@ export function Editor({
                     <Checkbox
                       aria-describedby="course-version-help"
                       checked={refresh}
-                      onChange={(e) => setRefresh(e.target.checked)}
+                      onCheckedChange={(checked) =>
+                        setRefresh(checked === true)
+                      }
                     />
                     Publish a new version and start a new completion window
                   </Field>

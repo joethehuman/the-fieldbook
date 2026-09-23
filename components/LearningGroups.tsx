@@ -301,9 +301,9 @@ export default function LearningGroups({
                           <Checkbox
                             aria-describedby="group-teams-help"
                             checked={group.teamIds?.includes(t.id) || false}
-                            onChange={(e) =>
+                            onCheckedChange={(checked) =>
                               changeGroup({
-                                teamIds: e.target.checked
+                                teamIds: checked === true
                                   ? [...(group.teamIds || []), t.id]
                                   : (group.teamIds || []).filter(
                                       (id) => id !== t.id,
@@ -344,14 +344,14 @@ export default function LearningGroups({
                             >
                               <Checkbox
                                 checked={u.groups.includes(group.id)}
-                                onChange={(e) =>
+                                onCheckedChange={(checked) =>
                                   save({
                                     ...data,
                                     users: data.users.map((p) =>
                                       p.id === u.id
                                         ? {
                                             ...p,
-                                            groups: e.target.checked
+                                            groups: checked === true
                                               ? [...p.groups, group.id]
                                               : p.groups.filter(
                                                   (id) => id !== group.id,

@@ -2,7 +2,7 @@
 import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
 
-import { dialogOverlayClass, dialogContentClass } from "./dialog";
+import { DialogFooter, dialogOverlayClass, dialogContentClass } from "./dialog";
 import { cn } from "@/lib/utils";
 import {
   createContext,
@@ -109,7 +109,7 @@ export function InteractionDialogProvider({
             <AlertDialog.Description className="text-sm leading-relaxed text-muted-foreground">
               {request?.message}
             </AlertDialog.Description>
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <DialogFooter>
               <AlertDialog.Cancel asChild>
                 <Button
                   type="button"
@@ -124,7 +124,7 @@ export function InteractionDialogProvider({
                   Confirm
                 </Button>
               </AlertDialog.Action>
-            </div>
+            </DialogFooter>
           </AlertDialog.Content>
         </AlertDialog.Portal>
       </AlertDialog.Root>
@@ -162,7 +162,7 @@ export function InteractionDialogProvider({
                   onChange={(event) => setValue(event.target.value)}
                 />
               </FormField>
-              <div className="mt-6 flex flex-wrap justify-end gap-2">
+              <DialogFooter>
                 <Button
                   type="button"
                   variant="outline"
@@ -173,7 +173,7 @@ export function InteractionDialogProvider({
                 <Button type="submit">
                   {request?.options?.submitLabel || "Save name"}
                 </Button>
-              </div>
+              </DialogFooter>
             </form>
           </Dialog.Content>
         </Dialog.Portal>

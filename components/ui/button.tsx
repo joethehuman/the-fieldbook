@@ -5,7 +5,7 @@ import { Spinner } from "./spinner";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "relative inline-flex w-fit shrink-0 items-center justify-center gap-2 rounded-control text-label font-medium border border-transparent transition-colors motion-reduce:transition-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border disabled:shadow-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "no-underline hover:no-underline relative inline-flex w-fit shrink-0 items-center justify-center gap-2 rounded-control text-label font-medium border border-transparent transition-colors motion-reduce:transition-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border disabled:shadow-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
@@ -20,7 +20,7 @@ export const buttonVariants = cva(
       },
       size: {
         default: "min-h-control px-3 py-1.5",
-        sm: "min-h-control-sm px-2.5 py-1 text-compact",
+        sm: "min-h-control-sm px-2.5 py-1 text-label",
         icon: "size-control p-2",
       },
     },

@@ -97,7 +97,7 @@ export function StatusActions({
     </div>
   );
 }
-export function CardFooter({
+export function ContentCardFooter({
   children,
   action,
 }: {
@@ -142,7 +142,7 @@ export function EmptyState({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="empty"
       className={cn(
-        "grid min-w-0 justify-items-center gap-3 rounded-lg border border-dashed border-border px-4 py-8 sm:px-8 text-center text-copy [overflow-wrap:anywhere] text-muted-foreground [&_h2]:text-lg [&_h2]:font-medium [&_h3]:text-base [&_h3]:font-medium [&_svg]:mx-auto",
+        "grid min-w-0 justify-items-center gap-3 rounded-lg border border-border px-4 py-8 sm:px-8 text-center text-copy [overflow-wrap:anywhere] text-muted-foreground [&_h2]:text-base [&_h2]:font-medium [&_h2]:text-foreground [&_h3]:text-base [&_h3]:font-medium [&_h3]:text-foreground [&_svg]:mx-auto",
         className,
       )}
       {...props}

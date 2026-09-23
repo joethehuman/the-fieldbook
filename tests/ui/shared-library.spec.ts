@@ -28,6 +28,16 @@ test("library: associated help, selections, choice keys, tooltip, menu and progr
     name: "Shared library states",
     exact: true,
   });
+  const settings = region.locator("#catalog-settings");
+  await expect(
+    settings.getByRole("group", { name: "Fields and choices", exact: true }),
+  ).toHaveAccessibleDescription(/Keep persistent guidance/);
+  await expect(settings.locator('[data-slot="card-footer"]')).toContainText(
+    "Use a switch for immediate",
+  );
+  await expect(
+    region.getByRole("checkbox", { name: "Some choices selected" }),
+  ).toHaveAttribute("aria-checked", "mixed");
   const select = region.getByRole("combobox", {
     name: "Long selection",
     exact: true,

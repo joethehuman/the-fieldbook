@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback } from "./avatar";
 
 /** Decorative identity marker; pair with a visible name. */
 export function InitialsAvatar({
@@ -9,15 +9,12 @@ export function InitialsAvatar({
   size?: "default" | "sm";
 }) {
   return (
-    <span
+    <Avatar
       aria-hidden="true"
       data-slot="initials-avatar"
-      className={cn(
-        "inline-grid shrink-0 place-items-center rounded-full border border-border bg-muted font-semibold leading-none text-foreground",
-        size === "sm" ? "size-8 text-xs" : "size-9 text-xs",
-      )}
+      size={size}
     >
-      {initials}
-    </span>
+      <AvatarFallback>{initials.trim().slice(0, 2).toUpperCase()}</AvatarFallback>
+    </Avatar>
   );
 }

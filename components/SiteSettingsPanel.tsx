@@ -71,6 +71,11 @@ export default function SiteSettingsPanel({
   }
   const [nameError, setNameError] = useState("");
   const logoInput = useRef<HTMLInputElement>(null);
+  const saveAction = (
+    <Button type="submit" loading={busy}>
+      {busy ? "Saving…" : "Save settings"}
+    </Button>
+  );
   return (
     <form
       className="settings-panel"
@@ -98,8 +103,9 @@ export default function SiteSettingsPanel({
         <SettingsGroup
           tabIndex={-1}
           id="settings-identity"
+          actions={saveAction}
           title={<h3>Installation branding</h3>}
-          description="The same identity appears in your workspace and on account pages. The saved name, logo, welcome description and published privacy link are visible before sign-in, including on private installations."
+          guidance="The same identity appears in your workspace and on account pages. The saved name, logo, welcome description and published privacy link are visible before sign-in, including on private installations."
         >
           <TextField
             id="installation-name"
@@ -256,12 +262,13 @@ export default function SiteSettingsPanel({
         </SettingsGroup>
       )}
       {section === "docs" && (
-        <section className="settings-section" id="settings-docs">
-          <p>
-            Create sections and drag them into order for the Docs sidebar and
-            overview. You can also use the arrow buttons or focus a drag handle
-            and press the up and down arrow keys.
-          </p>
+        <SettingsGroup
+          id="settings-docs"
+          title={<h3>Document sections</h3>}
+          description="Arrange the sections in your Docs navigation."
+          guidance="Drag sections, use the arrow buttons, or focus a drag handle and press Up or Down. Empty sections remain available in the editor; readers see sections with published documents."
+          actions={saveAction}
+        >
           {docSections.length ? (
             <ol className="doc-order-list">
               {docSections.map((name, index) => (
@@ -373,19 +380,24 @@ export default function SiteSettingsPanel({
               setNotice(`${name} created. Save settings to keep it.`);
             }}
           />
-          <FieldDescription>
-            Empty sections stay available here and in the editor. Only sections
-            with published documents are shown to readers.
-          </FieldDescription>
-        </section>
+        </SettingsGroup>
       )}
       {section === "courses" && (
         <SettingsGroup
           id="settings-courses"
+          actions={saveAction}
           tabIndex={-1}
           disabled={busy}
           title={<h3>Course completion windows</h3>}
-          description="Publishing adds to the library. Only courses selected for a group join that group’s assigned learning list."
+          description="Set how long learners have to complete assigned courses."
+          guidance={
+            <div id="completion-window-help">
+              Publishing adds to the library. Only courses selected for a group
+              join that group’s assigned learning list. Newly assigned courses
+              get a full catch-up window, even near the end of onboarding.
+              Changes recalculate targets for everyone.
+            </div>
+          }
         >
           <FormField label="New user onboarding window (days)">
             <Input
@@ -419,18 +431,20 @@ export default function SiteSettingsPanel({
               }
             />
           </FormField>
-          <FieldDescription id="completion-window-help">
-            Newly assigned courses get a full catch-up window, even near the end
-            of onboarding. Changes recalculate targets for everyone.
-          </FieldDescription>
         </SettingsGroup>
       )}
       {section === "access" && (
         <SettingsGroup
           id="settings-access"
+          actions={saveAction}
           tabIndex={-1}
           disabled={busy}
           title={<h3>Access and accounts</h3>}
+          guidance={
+            production
+              ? "Google is the sign-in provider. Provider credentials and the initial administrator are configured securely in the deployment settings."
+              : "Access settings are illustrative in the demo. Profiles remain browser-local simulations."
+          }
         >
           <FormField label="Who can browse?">
             <SelectField
@@ -565,11 +579,6 @@ export default function SiteSettingsPanel({
               <option value="closed">Existing members only</option>
             </SelectField>
           </FormField>
-          <p className="muted">
-            {production
-              ? "Google is the sign-in provider. Provider credentials and the initial administrator are configured securely in the deployment settings."
-              : "Access settings are illustrative in the demo. Profiles remain browser-local simulations."}
-          </p>
         </SettingsGroup>
       )}
       {section === "privacy" && (
@@ -580,6 +589,7 @@ export default function SiteSettingsPanel({
         >
           {" "}
           <PrivacySettingsPanel
+            actions={saveAction}
             settings={settings}
             onChange={setSettings}
             busy={busy}
@@ -600,12 +610,9 @@ export default function SiteSettingsPanel({
         </section>
       )}
       {section === "mcp" && <McpSettings production={production} />}
-      {section !== "mcp" && (
+      {section !== "mcp" && notice && (
         <div className="settings-save-bar">
-          <Button type="submit" variant="default" loading={busy}>
-            {busy ? "Saving…" : "Save settings"}
-          </Button>
-          {notice && <Alert role="status">{notice}</Alert>}
+          <Alert role="status">{notice}</Alert>
         </div>
       )}
     </form>
@@ -620,22 +627,29 @@ function McpSettings({ production }: { production: boolean }) {
   }, []);
   if (!production)
     return (
-      <section className="settings-section">
-        <h3>Connect an AI tool</h3>
+      <SettingsGroup
+        id="mcp-demo"
+        title={<h3>Connect an AI tool</h3>}
+        guidance="Connections are available in an installed organization; this demo does not provide an MCP server."
+      >
         <p>
           MCP lets administrators connect tools such as ChatGPT and Claude to
-          their Fieldbook installation. Connections are available in an
-          installed organization; this demo does not provide an MCP server.
+          their Fieldbook installation.
         </p>
-      </section>
+      </SettingsGroup>
     );
   return (
-    <section className="settings-section mcp-settings">
-      <h3>Connect an AI tool</h3>
-      <p>
-        Add Fieldbook as a custom MCP server in ChatGPT, Claude, or another
-        compatible tool.
-      </p>
+    <SettingsGroup
+      id="mcp-connection"
+      title={<h3>Connect an AI tool</h3>}
+      description="Add Fieldbook as a custom MCP server in ChatGPT, Claude, or another compatible tool."
+      guidance="Review or revoke access from connected AI tools."
+      actions={
+        <Button asChild variant="outline">
+          <a href="/connections">Manage connections →</a>
+        </Button>
+      }
+    >
       <div className="grid gap-2">
         <Field htmlFor="mcp-server-address">Server address</Field>
         <div className="mcp-address">
@@ -668,15 +682,6 @@ function McpSettings({ production }: { production: boolean }) {
         <li>Sign in to Fieldbook as an administrator.</li>
         <li>Review and approve the requested connection.</li>
       </ol>
-      <div className="mcp-manage">
-        <div>
-          <h3>Connected tools</h3>
-          <p>Review or revoke access from connected AI tools.</p>
-        </div>
-        <Button asChild variant="outline">
-          <a href="/connections">Manage connections →</a>
-        </Button>
-      </div>
-    </section>
+    </SettingsGroup>
   );
 }

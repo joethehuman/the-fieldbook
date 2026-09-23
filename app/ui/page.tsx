@@ -23,7 +23,7 @@ import { DataTable } from "@/components/patterns/data-table";
 import { AccountButton } from "@/components/patterns/account-button";
 import { ArrowRight, Layers, LogOut, Settings } from "lucide-react";
 import {
-  CardFooter,
+  ContentCardFooter,
   StatusActions,
   CollectionToolbar,
 } from "@/components/patterns/layout";
@@ -43,6 +43,7 @@ import { Progress, ProgressStatus } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
@@ -53,6 +54,7 @@ import {
   SectionHeader,
   EmptyState,
   ReadingPage,
+  SplitPanel,
 } from "@/components/patterns/layout";
 import { OrderedLearning } from "@/components/patterns/ordered-learning";
 import {
@@ -89,7 +91,7 @@ export default function ComponentCatalog() {
     "Product foundations",
   ]);
   return (
-    <ReadingPage>
+    <ReadingPage className="max-w-7xl">
       <PageHeader>
         <span className="eyebrow">Fieldbook component library</span>
         <h1>Interface reference</h1>
@@ -473,7 +475,7 @@ export default function ComponentCatalog() {
           >
             Thanks—your rating is saved.
           </StatusActions>
-          <CardFooter
+          <ContentCardFooter
             action={
               <>
                 Read the update <ArrowRight size={16} />
@@ -481,7 +483,7 @@ export default function ComponentCatalog() {
             }
           >
             Sep 18, 2026
-          </CardFooter>
+          </ContentCardFooter>
         </Stack>
       </Card>
       <Card>
@@ -552,31 +554,33 @@ export default function ComponentCatalog() {
               {choices}
             </SelectField>
           </Field>
-          <ActionGroup>
-            <Button onClick={() => setDialog(false)}>Save example</Button>
+          <DialogFooter>
             <Button variant="outline" onClick={() => setDialog(false)}>
               Cancel
             </Button>
-          </ActionGroup>
+            <Button onClick={() => setDialog(false)}>Save example</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
       <section className="grid gap-8" aria-label="Reading presentation">
         <SectionHeader title={<h2>Reading presentation</h2>} />
-        <DocumentTree
-          docs={seedContent}
-          selected={seedContent.find((item) => item.kind === "doc")!.id}
-          href={(id) => `#docs/${id}`}
-          onOpen={() => {}}
-        />
-        <Article
-          documents={seedContent}
-          item={{
-            ...seedContent.find((item) => item.kind === "doc")!,
-            body: "## Start here\n\nA readable article with a shared heading outline.\n\n### A useful detail\n\nSubheadings retain their hierarchy.\n\n## Start here\n\nRepeated headings have unique links.",
-          }}
-          name="Sample Fieldbook"
-          back={<Button variant="link">← Back to docs</Button>}
-        />
+        <SplitPanel>
+          <DocumentTree
+            docs={seedContent}
+            selected={seedContent.find((item) => item.kind === "doc")!.id}
+            href={(id) => `#docs/${id}`}
+            onOpen={() => {}}
+          />
+          <Article
+            documents={seedContent}
+            item={{
+              ...seedContent.find((item) => item.kind === "doc")!,
+              body: "## Start here\n\nA readable article with a shared heading outline.\n\n### A useful detail\n\nSubheadings retain their hierarchy.\n\n## Start here\n\nRepeated headings have unique links.",
+            }}
+            name="Sample Fieldbook"
+            back={<Button variant="link">← Back to docs</Button>}
+          />
+        </SplitPanel>
         <CourseOverview
           item={seedContent.find((item) => item.kind === "course")!}
           back={<Button variant="link">← Back to courses</Button>}

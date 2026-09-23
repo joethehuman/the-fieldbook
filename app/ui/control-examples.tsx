@@ -42,7 +42,7 @@ export function ControlExamples() {
           <p className="text-label font-medium">Label · 14 / 20 · medium</p>
           <p className="text-copy">Supporting copy · 14 / 22 · regular</p>
           <p className="text-compact text-muted-foreground">
-            Compact action · 13 / 20
+            Compact action · 14 / 20
           </p>
           <div className="flex flex-wrap gap-2 text-copy">
             <span className="rounded-control border border-control-border bg-background px-3 py-2">
@@ -116,7 +116,7 @@ export function ControlExamples() {
       <SettingsSection
         id="input-pilot"
         title={<h3>Text input states</h3>}
-        description="Labels, descriptions and errors are connected programmatically. Read-only values remain focusable and selectable."
+        guidance="Labels, descriptions and errors are connected programmatically. Read-only values remain focusable and selectable."
       >
         <TextField
           id="catalog-empty"

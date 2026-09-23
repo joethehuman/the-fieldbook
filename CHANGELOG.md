@@ -4,6 +4,9 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Align the shared library with live Geist references: filled shadcn avatars, checkbox/switch/collapsible primitives, grey settings and dialog footers, underline tabs, quieter surfaces and compact status treatments.
+- Refine Docs reading proportions and centered metadata; replace large disclosure markers with small chevrons while retaining navigation, outlines and saved tree state. Document reference mappings and owned-source component choices.
+
 - Refine shared typography and control states across both apps, with connected form labels/help, consistent settings sections, accessible editor hints, progress rings, readable statuses and responsive administration navigation.
 - Distinguish persistent notes, validation, activity and completion; show honest loading/empty states for AI connections and a shared Updates count/load-more footer. Extend the component catalog and contributor guidance.
 

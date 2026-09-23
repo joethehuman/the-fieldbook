@@ -17,7 +17,7 @@ export function LoadMore({
   return (
     <div
       data-slot="load-more"
-      className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"
+      className="grid gap-3 pt-4"
     >
       <p
         role="status"
@@ -30,6 +30,7 @@ export function LoadMore({
         <Button
           type="button"
           variant="outline"
+          className="w-full"
           loading={loading}
           onClick={onLoadMore}
         >

@@ -44,9 +44,9 @@ export function GroupPicker({
           >
             <Checkbox
               checked={value.includes(group.id)}
-              onChange={(event) =>
+              onCheckedChange={(checked) =>
                 onChange(
-                  event.target.checked
+                  checked === true
                     ? [...value, group.id]
                     : value.filter((id) => id !== group.id),
                 )

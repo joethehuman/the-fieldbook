@@ -95,6 +95,7 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
   await expect(dialog.getByRole("combobox")).toHaveText("Company");
   await page.keyboard.press("Escape");
   await expect(dialog).not.toBeVisible();
+  await expect(trigger).toBeFocused();
   await noOverflow(page);
   await testInfo.attach("component-catalog", {
     body: await page.screenshot({

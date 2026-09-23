@@ -14,7 +14,7 @@ export function Note({
     <div
       data-slot="note"
       className={cn(
-        "flex min-w-0 items-start gap-3 rounded-md border border-border bg-muted/40 p-4 text-copy [overflow-wrap:anywhere]",
+        "flex min-w-0 items-start gap-2 rounded-control border border-border bg-background px-3 py-2 text-copy [overflow-wrap:anywhere]",
         tone === "warning" && "border-warning/25 bg-warning/5 text-warning",
         className,
       )}
