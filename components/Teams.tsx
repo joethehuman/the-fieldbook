@@ -1,4 +1,6 @@
 "use client";
+import { SettingsSection } from "./patterns/settings-section";
+import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
@@ -41,6 +43,7 @@ export function TeamsAdmin({
   data: Workspace;
   onChange: (d: Workspace) => void | Promise<void>;
 }) {
+  const editor = useRevealTarget<HTMLElement>();
   const teams = data.teams || [];
   const notify = useToast();
   const [editing, setEditing] = useState<Team | null>(null),
@@ -86,6 +89,7 @@ export function TeamsAdmin({
           variant="default"
           onClick={() => {
             setEditing({ id: crypto.randomUUID(), name: "" });
+            editor.reveal();
             setNotice("");
           }}
         >
@@ -95,74 +99,88 @@ export function TeamsAdmin({
       {notice && <Alert variant="destructive">{notice}</Alert>}
       {editing && (
         <form className="grid gap-4" onSubmit={save}>
-          <FilterBar>
-            <FormField label="Team name">
-              <Input
-                required
-                maxLength={80}
-                value={editing.name}
-                onChange={(e) =>
-                  setEditing({ ...editing, name: e.target.value })
-                }
-              />
-            </FormField>
-            <FormField label="Parent team">
-              <SelectField
-                value={editing.parentId || ""}
-                onValueChange={(value) =>
-                  setEditing({
-                    ...editing,
-                    parentId: value || undefined,
-                  })
-                }
-              >
-                <option value="">Top-level team</option>
-                {teams
-                  .filter((t) => canParent(editing.id, t.id, teams))
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-              </SelectField>
-            </FormField>
-            <FormField
-              label="Manager"
-              description="Assigning a manager grants reporting access for this team and its subteams."
-            >
-              <SelectField
-                value={editing.managerId || ""}
-                onValueChange={(value) =>
-                  setEditing({
-                    ...editing,
-                    managerId: value || undefined,
-                  })
-                }
-              >
-                <option value="">No manager</option>
-                {data.users
-                  .filter(
-                    (u) =>
-                      u.active && (u.role === "manager" || u.role === "admin"),
-                  )
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-              </SelectField>
-            </FormField>
-          </FilterBar>
-          <ActionGroup>
-            <Button variant="default">Save team</Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setEditing(null)}
-            >
-              Cancel
-            </Button>
-          </ActionGroup>
+          <SettingsSection
+            {...editor.targetProps}
+            id="team-editor"
+            title={
+              <h3>
+                {teams.some((t) => t.id === editing.id)
+                  ? `Edit ${editing.name || "team"}`
+                  : "New team"}
+              </h3>
+            }
+            guidance="Assigning a manager grants reporting access for this team and its subteams."
+            actions={
+              <ActionGroup>
+                <Button type="submit">Save team</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditing(null)}
+                >
+                  Cancel
+                </Button>
+              </ActionGroup>
+            }
+          >
+            <div className="grid items-start gap-4 md:grid-cols-3">
+              <FormField label="Team name">
+                <Input
+                  required
+                  maxLength={80}
+                  value={editing.name}
+                  onChange={(e) =>
+                    setEditing({ ...editing, name: e.target.value })
+                  }
+                />
+              </FormField>
+              <FormField label="Parent team">
+                <SelectField
+                  value={editing.parentId || ""}
+                  onValueChange={(value) =>
+                    setEditing({
+                      ...editing,
+                      parentId: value || undefined,
+                    })
+                  }
+                >
+                  <option value="">Top-level team</option>
+                  {teams
+                    .filter((t) => canParent(editing.id, t.id, teams))
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </SelectField>
+              </FormField>
+              <FormField label="Manager">
+                <SelectField
+                  aria-describedby="team-editor-guidance"
+                  value={editing.managerId || ""}
+                  onValueChange={(value) =>
+                    setEditing({
+                      ...editing,
+                      managerId: value || undefined,
+                    })
+                  }
+                >
+                  <option value="">No manager</option>
+                  {data.users
+                    .filter(
+                      (u) =>
+                        u.active &&
+                        (u.role === "manager" || u.role === "admin"),
+                    )
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name}
+                      </option>
+                    ))}
+                </SelectField>
+              </FormField>
+            </div>
+          </SettingsSection>
         </form>
       )}
       <TableContainer>
@@ -202,6 +220,7 @@ export function TeamsAdmin({
                     variant="link"
                     onClick={() => {
                       setEditing({ ...t });
+                      editor.reveal();
                       setNotice("");
                     }}
                   >
@@ -222,6 +241,7 @@ export function TeamsAdmin({
   );
 }
 export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
+  const assignments = useRevealTarget<HTMLElement>();
   const teams = data.teams || [];
   const allowed = reportTeamIds(user, teams);
   const [teamId, setTeamId] = useState("all"),
@@ -325,7 +345,13 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                   {percent !== null ? percent + "%" : "—"}
                 </TableCell>
                 <TableCell>
-                  <Button variant="link" onClick={() => setPerson(u.id)}>
+                  <Button
+                    variant="link"
+                    onClick={() => {
+                      setPerson(u.id);
+                      assignments.reveal();
+                    }}
+                  >
                     View courses
                   </Button>
                 </TableCell>
@@ -344,7 +370,12 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             courseProgressRow(data, u, c, "team"),
           );
           return (
-            <Card className="grid gap-4" key={u.id}>
+            <Card
+              {...assignments.targetProps}
+              aria-label={`${u.name}’s assignments`}
+              className="grid gap-4"
+              key={u.id}
+            >
               <SectionHeader title={<h2>{u.name}’s assignments</h2>}>
                 <CsvExport
                   filename={`${u.name}-assignments`}

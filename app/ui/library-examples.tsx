@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
 import { Settings } from "lucide-react";
 import { FormField } from "@/components/patterns/form-field";
@@ -32,6 +33,7 @@ import {
 import { ActionGroup } from "@/components/ui/action-group";
 
 export function LibraryExamples() {
+  const progressTarget = useRevealTarget<HTMLElement>();
   const [feedback, setFeedback] = useState<{
     rating: "up" | "down";
     comment: string;
@@ -48,6 +50,15 @@ export function LibraryExamples() {
       className="grid min-w-0 gap-6"
     >
       <h2>Shared library states and usage</h2>
+      <div>
+        <Button variant="outline" onClick={() => progressTarget.reveal()}>
+          View progress examples
+        </Button>
+        <p className="mt-2 text-copy text-muted-foreground">
+          Drill-ins bring their destination into view and move focus; reduced
+          motion skips the animation.
+        </p>
+      </div>
       <SettingsSection
         id="catalog-settings"
         title={<h3>Fields and choices</h3>}
@@ -201,6 +212,7 @@ export function LibraryExamples() {
         <ContentFeedback disabled onSave={() => {}} />
       </SettingsSection>
       <SettingsSection
+        {...progressTarget.targetProps}
         id="catalog-progress"
         title={<h3>Progress and loading</h3>}
         guidance="Progress measures known completion. Spinners and skeletons indicate activity, never an invented percentage."

@@ -300,7 +300,7 @@ test("feedback filters and sorting preserve text, formula protection and timesta
   );
   expect(filtered.rows).toHaveLength(2);
   expect(filtered.rows[1][5]).toBe('Zoë, "hello"\n東京');
-  await expect(page.locator(".feedback-list article")).toHaveCount(1);
+  await expect(page.locator('article[data-slot="card"]')).toHaveCount(1);
   await screenshot(page, info, "feedback");
 });
 

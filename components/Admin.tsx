@@ -8,6 +8,7 @@ import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation"
 import { FilterOptions } from "./patterns/filter-options";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox, Radio } from "@/components/ui/choice";
+import { useRevealTarget } from "./patterns/use-reveal-target";
 import { Card } from "@/components/ui/card";
 import {
   TableContainer,
@@ -195,6 +196,7 @@ export default function Admin({
 }: Props) {
   const notify = useToast();
   const { confirm } = useInteractionDialog();
+  const adminPanel = useRevealTarget();
   const [settingsPending, setSettingsPending] = useState(false);
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
@@ -406,6 +408,7 @@ export default function Admin({
       return;
     setSettingsPending(false);
     setTab(next);
+    adminPanel.reveal(false);
     setNotice("");
     setQuery("");
   }
@@ -456,7 +459,13 @@ export default function Admin({
             </div>
           ))}
         </ResponsiveTabsNavigation>
-        <TabsContent value={tab} className="admin-panel mt-0" key={tab}>
+        <TabsContent
+          {...adminPanel.targetProps}
+          tabIndex={0}
+          value={tab}
+          className="admin-panel mt-0"
+          key={tab}
+        >
           {!["groups", "curricula", "progress", "feedback"].includes(tab) && (
             <SectionHeader
               title={

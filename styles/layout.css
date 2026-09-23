@@ -551,19 +551,8 @@
   .quiz-question {
     padding-top: var(--space-4);
   }
-  .feedback-box {
-    display: grid;
-    gap: var(--space-4);
-    border-top: 1px solid var(--border);
-    padding-top: var(--space-6);
-  }
-  .feedback-list {
-    display: grid;
-    gap: var(--space-4);
-  }
-  .feedback-comment {
-    padding: var(--space-4);
-    border-bottom: 1px solid var(--border);
+  [data-reveal-target] {
+    scroll-margin-block-start: var(--anchor-offset);
   }
   .loading {
     display: grid;

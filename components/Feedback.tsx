@@ -1,4 +1,7 @@
 "use client";
+import { Card, CardContent, CardFooter } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
 import { ContentFeedback } from "./patterns/content-feedback";
 import { CsvExport } from "./patterns/csv-export";
@@ -63,14 +66,32 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
     [rating, setRating] = useState("all"),
     [query, setQuery] = useState(""),
     [sort, setSort] = useState("newest");
+  const scope = useRevealTarget<HTMLHeadingElement>();
+  const selectedItem = data.content.find((c) => c.id === item);
+  function viewItem(id: string) {
+    setKind("all");
+    setRating("all");
+    setQuery("");
+    setItem(id);
+    scope.reveal();
+  }
   const records = feedbackRows(data, kind, item, rating, query, sort);
   const positive = records.filter((f) => f.rating === "up").length;
   return (
     <>
       <SectionHeader
-        title={<h2>Feedback</h2>}
+        title={
+          <h2 {...scope.targetProps}>
+            {selectedItem ? `Feedback for ${selectedItem.title}` : "Feedback"}
+          </h2>
+        }
         description="See what readers and learners are telling you."
       >
+        {item !== "all" && (
+          <Button variant="outline" onClick={() => viewItem("all")}>
+            All feedback
+          </Button>
+        )}
         <CsvExport filename="feedback" report={() => feedbackCsv(records)} />
       </SectionHeader>
       <FilterBar>
@@ -125,7 +146,9 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
         </FormField>
       </FilterBar>
       <div className="report-summary">
-        <strong>{records.length} ratings</strong>
+        <strong>
+          {records.length} {records.length === 1 ? "rating" : "ratings"}
+        </strong>
         <span>{positive} useful</span>
         <span>{records.length - positive} not useful</span>
         <span>
@@ -134,23 +157,37 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             : "No ratings yet"}
         </span>
       </div>
-      <div className="feedback-list">
+      <div className="grid gap-4">
         {records.map((f) => (
-          <article className="feedback-box" key={f.id}>
-            <SectionHeader title={<h3>{f.title}</h3>}>
-              <span>{f.ratingLabel}</span>
-            </SectionHeader>
-            <small>
-              {f.person} · v{f.version} ·{" "}
-              {new Date(f.updatedAt).toLocaleDateString()}
-            </small>
-            <p className="feedback-comment">
-              {f.comment || "No written comment."}
-            </p>
-            <Button variant="link" onClick={() => setItem(f.contentId)}>
-              View all feedback for this item
-            </Button>
-          </article>
+          <Card asChild className="p-0 sm:p-0" key={f.id}>
+            <article>
+              <CardContent className="grid gap-4">
+                <SectionHeader title={<h3>{f.title}</h3>}>
+                  <Badge variant={f.rating === "up" ? "success" : "default"}>
+                    {f.ratingLabel}
+                  </Badge>
+                </SectionHeader>
+                <p className="whitespace-pre-wrap text-copy [overflow-wrap:anywhere]">
+                  {f.comment || "No written comment."}
+                </p>
+              </CardContent>
+              <CardFooter>
+                <p className="text-copy text-muted-foreground">
+                  {f.person} · v{f.version} ·{" "}
+                  {new Date(f.updatedAt).toLocaleDateString()}
+                </p>
+                {item !== f.contentId && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => viewItem(f.contentId)}
+                  >
+                    View all feedback for this item
+                  </Button>
+                )}
+              </CardFooter>
+            </article>
+          </Card>
         ))}
       </div>
       {!records.length && (

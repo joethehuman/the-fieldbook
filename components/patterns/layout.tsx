@@ -130,7 +130,7 @@ export function FilterBar({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="filter-bar"
       className={cn(
-        "flex min-w-0 flex-wrap items-end gap-4 rounded-lg border border-border bg-muted/40 p-4 [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1",
+        "flex min-w-0 flex-wrap items-start gap-4 rounded-lg border border-border bg-muted/40 p-4 [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1",
         className,
       )}
       {...props}

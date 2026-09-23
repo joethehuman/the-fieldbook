@@ -4,7 +4,8 @@ import { Note } from "@/components/ui/note";
 import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
 import { SelectField } from "./ui/select";
-import { Card } from "@/components/ui/card";
+import { useRevealTarget } from "./patterns/use-reveal-target";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { ActionGroup } from "@/components/ui/action-group";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,6 +29,7 @@ export default function Curricula({
   data: Workspace;
   onChange: (data: Workspace) => void | Promise<void>;
 }) {
+  const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
   const [editing, setEditing] = useState<Curriculum | null>(null);
   const [query, setQuery] = useState("");
@@ -76,6 +78,7 @@ export default function Curricula({
         ],
       });
       setEditing(null);
+      destination.reveal();
       setNotice("");
       notify("Curriculum saved.");
     } catch (e) {
@@ -112,7 +115,11 @@ export default function Curricula({
     }
   }
   return (
-    <section className="learning-admin">
+    <section
+      {...destination.targetProps}
+      aria-label={editing ? "Curriculum editor" : "Curricula"}
+      className="learning-admin"
+    >
       {notice && <Alert variant="destructive">{notice}</Alert>}
       {editing ? (
         <form
@@ -246,6 +253,7 @@ export default function Curricula({
                 onClick={async () => {
                   if (await confirm("Discard unsaved curriculum changes?")) {
                     setEditing(null);
+                    destination.reveal();
                     setNotice("");
                   }
                 }}
@@ -272,6 +280,7 @@ export default function Curricula({
                   courseIds: [],
                   status: "draft",
                 });
+                destination.reveal();
                 setQuery("");
                 setNotice("");
               }}
@@ -281,38 +290,43 @@ export default function Curricula({
           </SectionHeader>
           <div className="group-grid">
             {all.map((c) => (
-              <Card className="grid gap-4" key={c.id}>
-                <Badge
-                  variant={c.status === "published" ? "success" : "default"}
-                >
-                  {c.status}
-                </Badge>
-                <h3>{c.name}</h3>
-                <p>{c.description}</p>
-                <p>
-                  {c.courseIds.length} courses · {linked(c.id).length} learning
-                  groups
-                </p>
-                <ActionGroup>
-                  <Button
-                    variant="outline"
-                    disabled={busy}
-                    onClick={() => {
-                      setEditing(structuredClone(c));
-                      setQuery("");
-                      setNotice("");
-                    }}
+              <Card className="flex flex-col p-0 sm:p-0" key={c.id}>
+                <CardContent className="grid gap-4">
+                  <Badge
+                    variant={c.status === "published" ? "success" : "default"}
                   >
-                    Edit {c.name}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => remove(c)}
-                  >
-                    Delete
-                  </Button>
-                </ActionGroup>
+                    {c.status}
+                  </Badge>
+                  <h3>{c.name}</h3>
+                  <p>{c.description}</p>
+                </CardContent>
+                <CardFooter className="mt-auto">
+                  <p className="text-copy text-muted-foreground">
+                    {c.courseIds.length} courses · {linked(c.id).length}{" "}
+                    learning groups
+                  </p>
+                  <ActionGroup>
+                    <Button
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() => {
+                        setEditing(structuredClone(c));
+                        destination.reveal();
+                        setQuery("");
+                        setNotice("");
+                      }}
+                    >
+                      Edit {c.name}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => remove(c)}
+                    >
+                      Delete
+                    </Button>
+                  </ActionGroup>
+                </CardFooter>
               </Card>
             ))}
           </div>

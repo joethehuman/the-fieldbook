@@ -6,7 +6,8 @@ import { OrderedLearning } from "./patterns/ordered-learning";
 import { SelectField } from "./ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { Checkbox } from "@/components/ui/choice";
-import { Card } from "@/components/ui/card";
+import { useRevealTarget } from "./patterns/use-reveal-target";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { SectionHeader, EmptyState } from "@/components/patterns/layout";
@@ -38,6 +39,7 @@ export default function LearningGroups({
   onLearning: LearningHandler;
   initialGroup?: string;
 }) {
+  const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
   const [selected, setSelected] = useState(initialGroup || "");
@@ -99,12 +101,19 @@ export default function LearningGroups({
       },
       "Learning group deleted. Learning history preserved.",
     );
-    if (ok) setSelected("");
+    if (ok) {
+      setSelected("");
+      destination.reveal();
+    }
   }
   const matches = (name: string) =>
     name.toLowerCase().includes(query.trim().toLowerCase());
   return (
-    <section className="learning-admin">
+    <section
+      {...destination.targetProps}
+      aria-label={group ? group.name : "Learning groups"}
+      className="learning-admin"
+    >
       {notice && <Alert variant="destructive">{notice}</Alert>}
       {!group ? (
         <>
@@ -146,6 +155,7 @@ export default function LearningGroups({
               ) {
                 setName("");
                 setSelected(id);
+                destination.reveal();
               }
             }}
           >
@@ -165,33 +175,38 @@ export default function LearningGroups({
           </form>
           <div className="group-grid">
             {data.groups.map((g) => (
-              <Card className="grid gap-4" key={g.id}>
-                <h3>{g.name}</h3>
-                <p>
-                  {
-                    data.users.filter(
-                      (u) =>
-                        u.active && effectiveGroups(u, data.groups).has(g.id),
-                    ).length
-                  }{" "}
-                  people ·{" "}
-                  {
-                    expandLearning(groupItems(g, content), curricula).filter(
-                      (id) => published.some((c) => c.id === id),
-                    ).length
-                  }{" "}
-                  assigned courses
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSelected(g.id);
-                    setQuery("");
-                    setNotice("");
-                  }}
-                >
-                  Manage {g.name}
-                </Button>
+              <Card className="flex flex-col p-0 sm:p-0" key={g.id}>
+                <CardContent>
+                  <h3 className="font-semibold">{g.name}</h3>
+                </CardContent>
+                <CardFooter className="mt-auto">
+                  <p className="text-copy text-muted-foreground">
+                    {
+                      data.users.filter(
+                        (u) =>
+                          u.active && effectiveGroups(u, data.groups).has(g.id),
+                      ).length
+                    }{" "}
+                    people ·{" "}
+                    {
+                      expandLearning(groupItems(g, content), curricula).filter(
+                        (id) => published.some((c) => c.id === id),
+                      ).length
+                    }{" "}
+                    assigned courses
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelected(g.id);
+                      destination.reveal();
+                      setQuery("");
+                      setNotice("");
+                    }}
+                  >
+                    Manage {g.name}
+                  </Button>
+                </CardFooter>
               </Card>
             ))}
           </div>
@@ -202,6 +217,7 @@ export default function LearningGroups({
             variant="link"
             onClick={() => {
               setSelected("");
+              destination.reveal();
               setQuery("");
             }}
           >
@@ -251,6 +267,7 @@ export default function LearningGroups({
             value={tab}
             onValueChange={(value) => {
               setTab(value);
+              destination.reveal(false);
               setQuery("");
             }}
           >
@@ -303,11 +320,12 @@ export default function LearningGroups({
                             checked={group.teamIds?.includes(t.id) || false}
                             onCheckedChange={(checked) =>
                               changeGroup({
-                                teamIds: checked === true
-                                  ? [...(group.teamIds || []), t.id]
-                                  : (group.teamIds || []).filter(
-                                      (id) => id !== t.id,
-                                    ),
+                                teamIds:
+                                  checked === true
+                                    ? [...(group.teamIds || []), t.id]
+                                    : (group.teamIds || []).filter(
+                                        (id) => id !== t.id,
+                                      ),
                               })
                             }
                           />
@@ -351,11 +369,12 @@ export default function LearningGroups({
                                       p.id === u.id
                                         ? {
                                             ...p,
-                                            groups: checked === true
-                                              ? [...p.groups, group.id]
-                                              : p.groups.filter(
-                                                  (id) => id !== group.id,
-                                                ),
+                                            groups:
+                                              checked === true
+                                                ? [...p.groups, group.id]
+                                                : p.groups.filter(
+                                                    (id) => id !== group.id,
+                                                  ),
                                           }
                                         : p,
                                     ),
