@@ -8,7 +8,6 @@ import {
   SectionHeader,
 } from "@/components/patterns/layout";
 import { readerContext, type ReaderItem } from "@production/lib/reader";
-import { ReaderPending } from "@/components/reader/ReaderPending";
 export async function generateMetadata() {
   const { branding } = await readerContext("/updates");
   return {
@@ -43,7 +42,6 @@ function Cards({ items }: { items: ReaderItem[] }) {
                 action={
                   <>
                     Read the update <ArrowRight size={16} />
-                    <ReaderPending />
                   </>
                 }
               >

@@ -2,7 +2,13 @@ import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { actor } from "./auth";
-import { canRead, document, redact } from "./content";
+import {
+  assertCanRead,
+  canRead,
+  document,
+  readConfig,
+  redact,
+} from "./content";
 import { db, check } from "./db";
 import { readAll } from "./read-all";
 import { HttpError } from "./errors";
@@ -42,8 +48,8 @@ const readerAccess = cache(async (destination: string) => {
   let user: User | null;
   let config: Awaited<ReturnType<typeof canRead>>;
   try {
-    user = await readerActor();
-    config = await canRead(user);
+    [user, config] = await Promise.all([readerActor(), readConfig()]);
+    assertCanRead(user, config);
   } catch (error) {
     if (error instanceof HttpError && [401, 403].includes(error.status))
       redirect(
@@ -53,6 +59,16 @@ const readerAccess = cache(async (destination: string) => {
   }
   return { user, config };
 });
+function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
+  const branding = brandingFromSettings(config.settings);
+  if (branding.logoUrl)
+    branding.logoUrl = `/api/branding/logo?v=${encodeURIComponent(branding.logoUrl.split("/").pop()!)}`;
+  return {
+    ...branding,
+    accent: config.settings.accent || "#0069ff",
+    tagline: config.settings.tagline || "",
+  };
+}
 export const readerContext = cache(async (destination: string) => {
   const { user, config } = await readerAccess(destination);
   const rows = await readAll((from, to) =>
@@ -86,9 +102,7 @@ export const readerContext = cache(async (destination: string) => {
       status: "published",
     }));
   const settings = publicSettings(config.settings, docs);
-  const branding = brandingFromSettings(config.settings);
-  if (branding.logoUrl)
-    branding.logoUrl = `/api/branding/logo?v=${encodeURIComponent(branding.logoUrl.split("/").pop()!)}`;
+  const branding = readerBranding(config);
   const groups = config.groups || [];
   const guestGroup =
     !user && config.settings.access === "public"
@@ -129,11 +143,7 @@ export const readerContext = cache(async (destination: string) => {
   });
   return {
     user: user ? { id: user.id, name: user.name, role: user.role } : null,
-    branding: {
-      ...branding,
-      accent: config.settings.accent || "#0069ff",
-      tagline: settings.tagline || "",
-    },
+    branding,
     docs,
     docCategoryOrder: orderedDocCategories(
       docs,
@@ -148,31 +158,43 @@ export const readerContext = cache(async (destination: string) => {
   };
 });
 
-export const readerItem = cache(async (kind: "doc" | "brief", id: string) => {
-  const destination = `/${kind === "doc" ? "docs" : "updates"}`;
-  await readerAccess(destination);
+const publishedBody = cache(async (kind: "doc" | "brief", id: string) => {
   if (!validId.test(id)) notFound();
-  const body = async () => {
-    const { data, error } = await db()
-      .from("fb_documents")
-      .select("id,published,revision,published_revision")
-      .eq("id", id)
-      .maybeSingle();
-    check(error);
-    if (!data?.published) notFound();
-    return redact(document(data));
-  };
+  const { data, error } = await db()
+    .from("fb_documents")
+    .select("id,published,revision,published_revision")
+    .eq("id", id)
+    .maybeSingle();
+  check(error);
+  if (!data?.published) notFound();
+  const item = redact(document(data));
+  if (item.kind !== kind || item.status !== "published") notFound();
+  return item;
+});
+export const readerItem = cache(async (kind: "doc", id: string) => {
+  const destination = "/docs";
+  await readerAccess(destination);
   const [context, item] = await Promise.all([
     readerContext(destination),
-    body(),
+    publishedBody(kind, id),
   ]);
-  if (item.kind !== kind || item.status !== "published") notFound();
   return { context, item };
+});
+export const readerUpdateItem = cache(async (id: string) => {
+  const { user, config } = await readerAccess("/updates");
+  const item = await publishedBody("brief", id);
+  return {
+    item,
+    context: {
+      user: user ? { id: user.id, name: user.name, role: user.role } : null,
+      branding: readerBranding(config),
+    },
+  };
 });
 
 export function readerMetadata(
   item: Content,
-  context: Awaited<ReturnType<typeof readerContext>>,
+  context: Pick<Awaited<ReturnType<typeof readerContext>>, "branding">,
 ): Metadata {
   const title = `${item.title} | ${context.branding.name}`;
   const description =

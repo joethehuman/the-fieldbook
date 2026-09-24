@@ -3,7 +3,6 @@ import { BookOpen, ChevronRight, ArrowRight } from "lucide-react";
 import { docSections } from "@/lib/docs-navigation";
 import { readerContext } from "@production/lib/reader";
 import { NavigationButton } from "@/components/patterns/navigation-button";
-import { ReaderPending } from "@/components/reader/ReaderPending";
 import { PageHeader } from "@/components/patterns/layout";
 export async function generateMetadata() {
   const { branding } = await readerContext("/docs");
@@ -27,7 +26,7 @@ export default async function Page() {
         <h1>Docs</h1>
       </PageHeader>
       {docs.some((doc) => doc.id === "start") && (
-        <Link className="knowledge-feature" href="/docs/start">
+        <Link className="knowledge-feature" href="/docs/start" prefetch={false}>
           <div>
             <h2>Start here</h2>
             <span className="text-link">
@@ -57,7 +56,6 @@ export default async function Page() {
                   prefetch={false}
                 >
                   {doc.title}
-                  <ReaderPending />
                   <ChevronRight size={16} />
                 </Link>
               </NavigationButton>
@@ -72,7 +70,6 @@ export default async function Page() {
                       prefetch={false}
                     >
                       {doc.title}
-                      <ReaderPending />
                       <ChevronRight size={16} />
                     </Link>
                   </NavigationButton>

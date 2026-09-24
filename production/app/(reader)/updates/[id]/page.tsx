@@ -1,15 +1,15 @@
 import { Article, ReadingBack } from "@/components/patterns/reading";
 import { ReaderFeedback } from "@/components/reader/ReaderFeedback";
-import { readerItem, readerMetadata } from "@production/lib/reader";
+import { readerUpdateItem, readerMetadata } from "@production/lib/reader";
 type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props) {
   const { id } = await params;
-  const { item, context } = await readerItem("brief", id);
+  const { item, context } = await readerUpdateItem(id);
   return readerMetadata(item, context);
 }
 export default async function Page({ params }: Props) {
   const { id } = await params;
-  const { item, context } = await readerItem("brief", id);
+  const { item, context } = await readerUpdateItem(id);
   return (
     <Article
       item={item}

@@ -17,7 +17,6 @@ import { Button } from "../ui/button";
 import { InitialsAvatar } from "../ui/initials-avatar";
 import { ContentAction } from "./content-action";
 import Link from "next/link";
-import { ReaderPending } from "@/components/reader/ReaderPending";
 
 /** Shared, server-compatible reading presentation; callers own access and actions. */
 export function Article({
@@ -171,7 +170,6 @@ export function Article({
                             </span>
                             <span className="[overflow-wrap:anywhere]">
                               {doc.title}
-                              <ReaderPending />
                             </span>
                           </span>
                           {direction === 1 && (
@@ -259,9 +257,8 @@ export function ReadingBack({
   return (
     <Button asChild variant="link">
       {clientNavigation ? (
-        <Link href={`/${label}`}>
+        <Link href={`/${label}`} prefetch={false}>
           ← Back to {label}
-          <ReaderPending />
         </Link>
       ) : (
         <a

@@ -30,16 +30,15 @@ import type { ReaderShellContext } from "@/lib/reader-types";
 
 export function ReaderShell({
   context,
-  section,
   children,
 }: {
   context: ReaderShellContext;
-  section: "docs" | "updates";
   children: ReactNode;
 }) {
   const [menu, setMenu] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
+  const section = pathname.startsWith("/docs") ? "docs" : "updates";
   const selected = pathname.split("/")[2] || null;
   const articleTitle = selected
     ? section === "docs"
@@ -104,7 +103,7 @@ export function ReaderShell({
               key={href}
               className={section === href.slice(1) ? "active" : ""}
             >
-              <Link href={href} onClick={close}>
+              <Link href={href} prefetch={false} onClick={close}>
                 <Icon size={19} />
                 {label}
               </Link>
@@ -124,7 +123,7 @@ export function ReaderShell({
         <div className="sidebar-bottom">
           {context.user?.role === "admin" && (
             <NavigationButton asChild className="admin-nav">
-              <Link href="/admin">
+              <Link href="/admin" prefetch={false}>
                 <Settings size={18} />
                 Manage organization
               </Link>
@@ -132,7 +131,7 @@ export function ReaderShell({
           )}
           {context.user?.role === "manager" && (
             <NavigationButton asChild className="admin-nav">
-              <Link href="/team">
+              <Link href="/team" prefetch={false}>
                 <GraduationCap size={18} />
                 My team’s progress
               </Link>
@@ -190,11 +189,15 @@ export function ReaderShell({
           </Button>
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
-              <Link href="/courses">Organization</Link>
+              <Link href="/courses" prefetch={false}>
+                Organization
+              </Link>
             </Button>
             <ChevronRight size={14} />
             <Button asChild variant="link">
-              <Link href={`/${section}`}>{title}</Link>
+              <Link href={`/${section}`} prefetch={false}>
+                {title}
+              </Link>
             </Button>
             {selected && (
               <>

@@ -26,12 +26,22 @@ export function document(row: any, draft = false): Content {
     publishedRevision: row.published_revision,
   };
 }
-export const canRead = cache(async (user: User | null) => {
+export const readConfig = cache(async () => {
   const { data, error } = await db().from("fb_config").select("*").single();
   check(error);
-  if (data.settings.access === "private" && !user)
-    throw new HttpError(401, "Sign in to view this Fieldbook.");
   return data;
+});
+export function assertCanRead(
+  user: User | null,
+  config: Awaited<ReturnType<typeof readConfig>>,
+) {
+  if (config.settings.access === "private" && !user)
+    throw new HttpError(401, "Sign in to view this Fieldbook.");
+}
+export const canRead = cache(async (user: User | null) => {
+  const config = await readConfig();
+  assertCanRead(user, config);
+  return config;
 });
 export async function getContent(id: string, user: User | null, draft = false) {
   await canRead(user);
@@ -72,7 +82,8 @@ export async function saveContent(
       .eq("id", true)
       .single();
     check(settingsError);
-    if (!config) throw new HttpError(503, "Settings are unavailable. Try again.");
+    if (!config)
+      throw new HttpError(503, "Settings are unavailable. Try again.");
     if (c.sectionId) {
       const sections = availableDocSections(
         [],
@@ -89,7 +100,12 @@ export async function saveContent(
           config.settings.docSections || [],
         );
         section = sectionForDoc(c, legacy);
-        if (section) sections.push(...legacy.filter((item) => !sections.some((saved) => saved.id === item.id)));
+        if (section)
+          sections.push(
+            ...legacy.filter(
+              (item) => !sections.some((saved) => saved.id === item.id),
+            ),
+          );
       }
       if (!section)
         throw new HttpError(400, "Choose an existing Docs section.");

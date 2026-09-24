@@ -30,6 +30,7 @@ const initial = () => ({
 });
 let documents = [],
   reads = 0;
+let readQueries = [];
 let settings = initial(),
   configuredGroups = [],
   userGroups = [],
@@ -69,6 +70,7 @@ createServer(async (req, res) => {
     const change = JSON.parse(body || "{}");
     documents = change.documents || [];
     reads = 0;
+    readQueries = [];
     settings = { ...initial(), ...change.settings };
     configuredGroups = change.groups || [];
     userGroups = change.userGroups || [];
@@ -78,7 +80,7 @@ createServer(async (req, res) => {
     revision = 1;
     return send(res, { ok: true });
   }
-  if (url.pathname === "/reads") return send(res, { reads });
+  if (url.pathname === "/reads") return send(res, { reads, readQueries });
   if (url.pathname === "/health") return send(res, { ok: true });
   if (url.pathname === "/logo") {
     if (brokenLogo) return send(res, {}, 404);
@@ -126,6 +128,7 @@ createServer(async (req, res) => {
     return send(res, { signedURL: "/object/sign/synthetic" });
   if (url.pathname === "/rest/v1/fb_documents") {
     reads++;
+    readQueries.push(url.search);
     let rows = documents;
     const id = url.searchParams.get("id");
     if (id) rows = rows.filter((row) => row.id === id.slice(3));

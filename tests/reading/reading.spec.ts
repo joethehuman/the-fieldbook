@@ -138,6 +138,9 @@ for (const signedIn of [false, true]) {
       expect(html).not.toContain('"parent"');
     }
     await page.evaluate(() => ((window as any).__readerMarker = "kept"));
+    const readsBeforeUpdate = (
+      await (await request.get(`${backend}/reads`)).json()
+    ).readQueries.length;
     await page.locator(`a.brief-card[href="/updates/${ids[1]}"]`).click();
     await expect(
       page.getByRole("heading", { name: items[1].title }),
@@ -145,6 +148,15 @@ for (const signedIn of [false, true]) {
     expect(await page.evaluate(() => (window as any).__readerMarker)).toBe(
       "kept",
     );
+    const updateQueries = (
+      await (await request.get(`${backend}/reads`)).json()
+    ).readQueries.slice(readsBeforeUpdate);
+    expect(updateQueries.length).toBeGreaterThan(0);
+    expect(
+      updateQueries.some((query: string) =>
+        new URLSearchParams(query).get("select")?.includes("title:published"),
+      ),
+    ).toBe(false);
     await page.getByRole("link", { name: /Back to updates/ }).click();
     await expect(page).toHaveURL(/\/updates$/);
     if ((page.viewportSize()?.width || 0) < 768)
@@ -202,23 +214,43 @@ for (const signedIn of [false, true]) {
     expect(workspaceReads).toBe(0);
   });
 }
-test("client navigation rechecks publication, item type and installation access", async ({ page, request }) => {
-  for (const change of ["unpublished", "deleted", "wrong-type", "private"] as const) {
+test("client navigation rechecks publication, item type and installation access", async ({
+  page,
+  request,
+}) => {
+  for (const change of [
+    "unpublished",
+    "deleted",
+    "wrong-type",
+    "private",
+  ] as const) {
     await fixture(request);
     await page.goto("/docs");
     const link = page.locator(`.knowledge-section a[href="/docs/${ids[0]}"]`);
     await expect(link).toBeVisible();
     if (change === "private")
       await fixture(request, { settings: { access: "private", logoUrl: "" } });
-    else if (change === "deleted")
-      await fixture(request, { documents: [] });
+    else if (change === "deleted") await fixture(request, { documents: [] });
     else if (change === "unpublished")
-      await fixture(request, { documents: documents().map((row) => row.id === ids[0] ? { ...row, published: null } : row) });
+      await fixture(request, {
+        documents: documents().map((row) =>
+          row.id === ids[0] ? { ...row, published: null } : row,
+        ),
+      });
     else
-      await fixture(request, { documents: documents().map((row) => row.id === ids[0] ? { ...row, published: { ...row.published, kind: "brief" } } : row) });
+      await fixture(request, {
+        documents: documents().map((row) =>
+          row.id === ids[0]
+            ? { ...row, published: { ...row.published, kind: "brief" } }
+            : row,
+        ),
+      });
     await link.click();
     if (change === "private") await expect(page).toHaveURL(/\/sign-in/);
-    else await expect(page.getByRole("heading", { name: "This page isn’t available" })).toBeVisible();
+    else
+      await expect(
+        page.getByRole("heading", { name: "This page isn’t available" }),
+      ).toBeVisible();
   }
 });
 test("server HTML, metadata, redaction and a compact index plus one body read", async ({
@@ -274,16 +306,44 @@ test("missing, wrong-kind, unpublished and service failures have real statuses",
     (await request.get(`/docs/${ids[0]}`)).status(),
   ).toBeGreaterThanOrEqual(500);
 });
-test("feedback lookup checks sign-in and publication without loading workspace", async ({ browser, request, baseURL }) => {
-  expect((await request.get(`/api/feedback?contentId=${ids[0]}`)).status()).toBe(401);
-  const token = await (await request.post(`${backend}/auth/v1/token`, { data: {} })).json();
+test("feedback lookup checks sign-in and publication without loading workspace", async ({
+  browser,
+  request,
+  baseURL,
+}) => {
+  expect(
+    (await request.get(`/api/feedback?contentId=${ids[0]}`)).status(),
+  ).toBe(401);
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
   const context = await browser.newContext({ baseURL });
-  await context.addCookies([{ name: "sb-test-auth-token", value: "base64-" + Buffer.from(JSON.stringify({ ...token, expires_at: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url"), domain: "localhost", path: "/" }]);
-  const published = await context.request.get(`/api/feedback?contentId=${ids[0]}`);
+  await context.addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  const published = await context.request.get(
+    `/api/feedback?contentId=${ids[0]}`,
+  );
   expect(published.status()).toBe(200);
   expect(await published.json()).toEqual({ saved: null });
-  await fixture(request, { documents: documents().map((row) => ({ ...row, published: null })) });
-  expect((await context.request.get(`/api/feedback?contentId=${ids[0]}`)).status()).toBe(404);
+  await fixture(request, {
+    documents: documents().map((row) => ({ ...row, published: null })),
+  });
+  expect(
+    (await context.request.get(`/api/feedback?contentId=${ids[0]}`)).status(),
+  ).toBe(404);
   await context.close();
 });
 test("private HTML and RSC requests redirect without item or draft data", async ({

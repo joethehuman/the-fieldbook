@@ -8,7 +8,6 @@ import {
 } from "../ui/collapsible";
 import { Button } from "../ui/button";
 import Link from "next/link";
-import { ReaderPending } from "@/components/reader/ReaderPending";
 import {
   docSections,
   type DocLink,
@@ -154,7 +153,6 @@ export function DocumentTree({
                   onClick={() => remember()}
                 >
                   {doc.title}
-                  <ReaderPending />
                 </Link>
               )}
             </Button>

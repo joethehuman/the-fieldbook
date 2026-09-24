@@ -4,7 +4,7 @@ import { env } from "./lib/env";
 import { isAbsentSession } from "./lib/errors";
 
 // Refresh cookie sessions before a reading Server Component needs them.
-// Authorization remains in actor/getContent, never in cookie contents.
+// The session data is untrusted; actor() verifies the user on every read.
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-fieldbook-reader-path", request.nextUrl.pathname);
@@ -29,7 +29,7 @@ export async function proxy(request: NextRequest) {
       },
     });
     try {
-      const { error } = await client.auth.getUser();
+      const { error } = await client.auth.getSession();
       if (error && !isAbsentSession(error)) throw error;
     } catch {
       return new NextResponse(

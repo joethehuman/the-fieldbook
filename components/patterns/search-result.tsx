@@ -2,7 +2,6 @@ import { searchLabels, type SearchResult as Result } from "@/lib/search";
 import { ContentAction } from "./content-action";
 import { Skeleton } from "../ui/skeleton";
 import Link from "next/link";
-import { ReaderPending } from "@/components/reader/ReaderPending";
 
 export function SearchResultSkeleton() {
   return (
@@ -60,7 +59,6 @@ export function SearchResultCard({
       {clientNavigation ? (
         <Link href={href || result.href} prefetch={false} onClick={onOpen}>
           <ResultBody result={result} />
-          <ReaderPending />
         </Link>
       ) : (
         <a
