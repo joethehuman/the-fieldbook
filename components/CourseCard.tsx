@@ -10,11 +10,13 @@ export function CourseCard({
   status,
   dueDate,
   onClick,
+  href,
 }: {
   course: Content;
   status: ReturnType<typeof courseProgress>;
   dueDate?: string;
-  onClick: () => void;
+  onClick?: () => void;
+  href?: string;
 }) {
   const { complete, started } = status;
   const [failedCover, setFailedCover] = useState<string | null>(null);
@@ -23,6 +25,7 @@ export function CourseCard({
   return (
     <LearningCard
       onClick={onClick}
+      href={href}
       title={c.title}
       description={c.summary}
       status={status}

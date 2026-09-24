@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
+import type { Content } from "../../lib/types";
 const backend = "http://127.0.0.1:3130";
 const ids = [
   "00000000-0000-4000-8000-000000000021",
@@ -20,7 +21,7 @@ const items = ["doc", "brief", "course"].map((kind, index) => ({
   createdAt: "2026-01-01",
   updatedAt: "2026-01-02",
   groups: ["hidden-group"],
-  assignments: [],
+  assignments: [] as Content["assignments"],
   lessons:
     kind === "course"
       ? [
@@ -232,6 +233,104 @@ for (const signedIn of [false, true]) {
     expect(workspaceReads).toBe(0);
   });
 }
+test("Courses share reader navigation and show the signed-in account immediately", async ({
+  page,
+  request,
+}, info) => {
+  await fixture(request, {
+    settings: { access: "private", logoUrl: "" },
+    groups: [{ id: "learning-group", name: "Learners" }],
+    userGroups: ["learning-group"],
+    documents: documents([
+      items[0],
+      items[1],
+      { ...items[2], groups: ["learning-group"], assignments: undefined },
+    ]),
+    progress: [
+      {
+        user_id: "00000000-0000-4000-8000-000000000010",
+        content_id: ids[2],
+        version: 1,
+        lessons: ["first", "second"],
+        passed: true,
+        attempts: [],
+      },
+    ],
+  });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  let workspaceReads = 0;
+  let documentNavigations = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/api/workspace")) workspaceReads++;
+    if (request.isNavigationRequest()) documentNavigations++;
+  });
+  await page.goto("/courses");
+  await expect(
+    page.getByRole("heading", { name: "Courses", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  await expect(page.getByText("Assigned courses complete")).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("courses.png"),
+    fullPage: true,
+  });
+  expect(await page.content()).toContain("Synthetic Admin");
+  expect(await page.content()).not.toContain("SECRET DRAFT BODY");
+  await page.evaluate(() => ((window as any).__readerMarker = "kept"));
+  await page.locator(`a.course-card[href="/courses/${ids[2]}"]`).click();
+  await expect(
+    page.getByRole("heading", { name: items[2].title }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: /Back to courses/ }).click();
+  await expect(page).toHaveURL(/\/courses$/);
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Updates" })
+    .click();
+  if ((page.viewportSize()?.width || 0) < 768) {
+    await page.getByRole("button", { name: "Open navigation" }).click();
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("link", { name: "Courses" })
+      .click();
+  } else {
+    await page.getByRole("link", { name: "Organization", exact: true }).click();
+  }
+  await expect(page).toHaveURL(/\/courses$/);
+  expect(await page.evaluate(() => (window as any).__readerMarker)).toBe(
+    "kept",
+  );
+  expect(documentNavigations).toBe(1);
+  expect(workspaceReads).toBe(0);
+  await page.goto(`/courses/${ids[2]}`);
+  await page.getByRole("link", { name: /First lesson/ }).click();
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/progress") &&
+      response.request().method() === "POST",
+  );
+  await page.getByRole("button", { name: "Complete & continue" }).click();
+  expect((await saved).status()).toBe(200);
+});
 test("client navigation rechecks publication, item type and installation access", async ({
   page,
   request,
@@ -311,7 +410,7 @@ test("server HTML, metadata, redaction and a compact index plus one body read", 
     expect(html).not.toContain("Synthetic Admin");
     expect(html).not.toMatch(/\\"answer\\":/);
     expect((await (await request.get(`${backend}/reads`)).json()).reads).toBe(
-      section === "courses" ? 1 : 2,
+      2,
     );
   }
 });
@@ -467,7 +566,7 @@ test("reading without JavaScript, responsive layout and native breadcrumbs", asy
   await page.goto(`/courses/${ids[2]}`);
   await expect(
     page.getByRole("link", { name: /Second lesson/ }),
-  ).toHaveAttribute("href", `/courses/${ids[2]}?lesson=second`);
+  ).toHaveAttribute("href", `/learn/${ids[2]}?lesson=second`);
   await page.screenshot({
     path: info.outputPath("course-no-js.png"),
     fullPage: true,
@@ -593,6 +692,8 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
         )[0]?.passed,
     ),
   ).toBe(true);
+  await page.goto("/courses");
+  await expect(page.getByText(/1 course completed/)).toBeVisible();
 });
 
 test("legacy aliases, curriculum destinations and existing logo metadata", async ({

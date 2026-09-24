@@ -1,4 +1,14 @@
 import type { DocLink, DocSection } from "./docs-navigation";
+import type { Content, Curriculum, Group, Progress, User } from "./types";
+import type { SiteSettings } from "./settings";
+export type CourseReaderData = {
+  user: User;
+  courses: Content[];
+  groups: Group[];
+  curricula: Curriculum[];
+  settings: SiteSettings;
+  progress: Progress[];
+};
 export type ReaderShellContext = {
   user: {
     id: string;
@@ -16,4 +26,5 @@ export type ReaderShellContext = {
   docCategoryOrder: string[];
   docSections: DocSection[];
   updateTitles?: { id: string; title: string }[];
+  courseTitles?: { id: string; title: string }[];
 };

@@ -45,6 +45,8 @@ let fixtureGeneration = Date.now();
 let readQueries = [];
 let settings = initial(),
   configuredGroups = [],
+  configuredCurricula = [],
+  configuredProgress = [],
   userGroups = [],
   fail = false,
   brokenLogo = false,
@@ -87,6 +89,8 @@ createServer(async (req, res) => {
     readQueries = [];
     settings = { ...initial(), ...change.settings };
     configuredGroups = change.groups || [];
+    configuredCurricula = change.curricula || [];
+    configuredProgress = change.progress || [];
     userGroups = change.userGroups || [];
     fail = !!change.fail;
     brokenLogo = !!change.brokenLogo;
@@ -136,7 +140,7 @@ createServer(async (req, res) => {
       revision,
       governance_revision: fixtureGeneration,
       groups: configuredGroups,
-      curricula: [],
+      curricula: configuredCurricula,
     });
   }
   if (url.pathname === "/rest/v1/fb_media")
@@ -151,6 +155,8 @@ createServer(async (req, res) => {
     if (id) rows = rows.filter((row) => row.id === id.slice(3));
     if (url.searchParams.has("published"))
       rows = rows.filter((row) => row.published);
+    if (url.searchParams.get("published->>kind") === "eq.course")
+      rows = rows.filter((row) => row.published?.kind === "course");
     if ((url.searchParams.get("select") || "").includes("title:published"))
       rows = rows.map((row) => ({
         id: row.id,
@@ -167,6 +173,12 @@ createServer(async (req, res) => {
             "createdAt",
             "updatedAt",
             "groups",
+            "assignments",
+            "coverImageUrl",
+            "duration",
+            "version",
+            "lessons",
+            "questions",
           ].map((key) => [key, row.published[key]]),
         ),
       }));
@@ -174,6 +186,10 @@ createServer(async (req, res) => {
       "Content-Range": `0-${rows.length - 1}/${rows.length}`,
     });
   }
+  if (url.pathname === "/rest/v1/fb_progress")
+    return send(res, configuredProgress, 200, {
+      "Content-Range": `0-${configuredProgress.length - 1}/${configuredProgress.length}`,
+    });
   if (url.pathname === "/rest/v1/rpc/fb_save_document") {
     const input = JSON.parse(body);
     const index = documents.findIndex((row) => row.id === input.p_id);

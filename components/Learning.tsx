@@ -61,12 +61,14 @@ export default function Learning({
   publicLearning = false,
   guest = false,
   onSignIn,
+  linkedNavigation = false,
 }: {
   curricula?: import("@/lib/types").Curriculum[];
   settings?: SiteSettings;
   publicLearning?: boolean;
   guest?: boolean;
   onSignIn?: () => void;
+  linkedNavigation?: boolean;
   courses: Content[];
   user: User;
   groups: Group[];
@@ -84,6 +86,9 @@ export default function Learning({
   const [sort, setSort] = useState("recommended");
   const state = learningState(courses, user, groups, progress, settings);
   const completed = assigned.filter((c) => isComplete(c, progress));
+  const completedCourseCount = courses.filter((c) =>
+    isComplete(c, progress),
+  ).length;
   const outstanding = assigned.filter((c) => !isComplete(c, progress));
   const pct = completionPercent(completed.length, assigned.length);
   const source = learningCollection(
@@ -120,7 +125,14 @@ export default function Learning({
         curriculum={item.curriculum}
         courses={item.courses}
         progress={progress}
-        onClick={() => onCurriculum(item.curriculum.id)}
+        onClick={
+          linkedNavigation ? undefined : () => onCurriculum(item.curriculum.id)
+        }
+        href={
+          linkedNavigation
+            ? `/curricula/${encodeURIComponent(item.curriculum.id)}`
+            : undefined
+        }
       />
     );
   const browserCards = (
@@ -214,7 +226,10 @@ export default function Learning({
       key={c.id}
       course={c}
       status={courseProgress(c, progress)}
-      onClick={() => onOpen(c.id)}
+      onClick={linkedNavigation ? undefined : () => onOpen(c.id)}
+      href={
+        linkedNavigation ? `/courses/${encodeURIComponent(c.id)}` : undefined
+      }
     />
   );
   function changeView(next: typeof view) {
@@ -237,8 +252,8 @@ export default function Learning({
         <Callout>
           <div>
             <p>
-              {courses.filter((c) => isComplete(c, progress)).length} courses
-              completed ·{" "}
+              {completedCourseCount} course
+              {completedCourseCount === 1 ? "" : "s"} completed ·{" "}
               {
                 courses.filter((c) => courseProgress(c, progress).inProgress)
                   .length
@@ -359,7 +374,7 @@ export default function Learning({
           <span className="muted" role="status">
             {view === "assigned" || view === "curricula"
               ? `${browserCards.length} items`
-              : `${filtered.length} courses`}
+              : `${filtered.length} course${filtered.length === 1 ? "" : "s"}`}
           </span>
           {view === "home" && (
             <Button variant="link" onClick={() => changeView("all")}>

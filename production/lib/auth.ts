@@ -2,7 +2,7 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { db, check } from "./db";
-import { env } from "./env";
+import { env, siteOrigins } from "./env";
 import type { User } from "@/lib/types";
 
 import { HttpError, ServiceError, isAbsentSession } from "./errors";
@@ -134,7 +134,7 @@ export function requireAdmin(user: User | null): asserts user is User {
     throw new HttpError(403, "Administrator access is required.");
 }
 export function sameOrigin(req: Request) {
-  if (req.headers.get("origin") !== env().origin)
+  if (!siteOrigins().includes(req.headers.get("origin") || ""))
     throw new HttpError(
       403,
       "This request must come from your Fieldbook site.",

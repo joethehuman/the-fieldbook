@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { snapshot } from "../lib/snapshot";
-import { env } from "../lib/env";
+import { env, siteOrigins } from "../lib/env";
+import { sameOrigin } from "../lib/auth";
 
 test("workspace serialization preserves public catalog but scopes assignments, drafts, people and progress", async () => {
   const savedFetch = globalThis.fetch,
@@ -159,8 +160,30 @@ test("preview configuration fails closed if backend identity is missing or diffe
     assert.equal(env().url, "https://isolated.supabase.co");
     process.env.VERCEL_BRANCH_URL = "fieldbook-git-feature-two.vercel.app";
     assert.equal(env().origin, "https://fieldbook-git-feature-two.vercel.app");
+    process.env.VERCEL_URL = "fieldbook-unique-deployment.vercel.app";
+    assert.deepEqual(siteOrigins(), [
+      "https://fieldbook-git-feature-two.vercel.app",
+      "https://fieldbook-unique-deployment.vercel.app",
+    ]);
+    const requestFrom = (origin?: string) =>
+      new Request("https://fieldbook-unique-deployment.vercel.app/api/progress", {
+        method: "POST",
+        headers: origin ? { Origin: origin } : {},
+      });
+    assert.doesNotThrow(() =>
+      sameOrigin(requestFrom("https://fieldbook-unique-deployment.vercel.app")),
+    );
+    assert.doesNotThrow(() =>
+      sameOrigin(requestFrom("https://fieldbook-git-feature-two.vercel.app")),
+    );
+    assert.throws(() => sameOrigin(requestFrom("https://other.vercel.app")));
+    assert.throws(() => sameOrigin(requestFrom()));
     process.env.VERCEL_ENV = "production";
     assert.equal(env().origin, "https://preview.example");
+    assert.deepEqual(siteOrigins(), ["https://preview.example"]);
+    assert.throws(() =>
+      sameOrigin(requestFrom("https://fieldbook-unique-deployment.vercel.app")),
+    );
   } finally {
     process.env = saved;
   }
