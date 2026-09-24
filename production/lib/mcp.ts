@@ -22,7 +22,11 @@ const write = {
 const result = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data) }],
 });
-export function createMcp(user: User, clientId: string) {
+export function createMcp(
+  user: User,
+  clientId: string,
+  invalidatePublishedReader: () => void = () => {},
+) {
   const server = new McpServer(
     { name: "fieldbook", version: "0.1.0" },
     {
@@ -146,16 +150,18 @@ export function createMcp(user: User, clientId: string) {
       },
       annotations: { ...write, destructiveHint: true },
     },
-    async ({ id, expected_revision }) =>
-      result(
-        await saveContent(
-          user,
-          await getContent(id, user, true),
-          expected_revision,
-          true,
-          source,
-        ),
-      ),
+    async ({ id, expected_revision }) => {
+      const saved = await saveContent(
+        user,
+        await getContent(id, user, true),
+        expected_revision,
+        true,
+        source,
+      );
+      if (saved.kind === "doc" || saved.kind === "brief")
+        invalidatePublishedReader();
+      return result(saved);
+    },
   );
   server.registerTool(
     "unpublish_content",
@@ -168,17 +174,19 @@ export function createMcp(user: User, clientId: string) {
       },
       annotations: { ...write, destructiveHint: true },
     },
-    async ({ id, expected_revision }) =>
-      result(
-        await saveContent(
-          user,
-          await getContent(id, user, true),
-          expected_revision,
-          false,
-          source,
-          true,
-        ),
-      ),
+    async ({ id, expected_revision }) => {
+      const saved = await saveContent(
+        user,
+        await getContent(id, user, true),
+        expected_revision,
+        false,
+        source,
+        true,
+      );
+      if (saved.kind === "doc" || saved.kind === "brief")
+        invalidatePublishedReader();
+      return result(saved);
+    },
   );
   server.registerTool(
     "content_report",

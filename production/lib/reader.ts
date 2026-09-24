@@ -21,6 +21,8 @@ import type { Metadata } from "next";
 import { env } from "./env";
 import { contentPath } from "@/lib/navigation";
 import { headers } from "next/headers";
+import { unstable_cache } from "next/cache";
+import { publishedReaderTag } from "./reader-cache";
 
 export type ReaderItem = Pick<
   Content,
@@ -39,11 +41,27 @@ type IndexRow = ReaderItem & { groups: string[] };
 const validId =
   /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
-// Request-local reuse for layout, page and metadata. All database fetches are no-store.
+// Request-local access and metadata reuse; only published snapshots persist.
 async function returnPath(fallback: string) {
   return (await headers()).get("x-fieldbook-reader-return") || fallback;
 }
 const readerActor = cache(() => actor(undefined, true));
+const publishedIndex = unstable_cache(
+  async (_installation: string, _governanceRevision: number) =>
+    readAll((from, to) =>
+      db()
+        .from("fb_documents")
+        .select(
+          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,groups:published->groups",
+          { count: "exact" },
+        )
+        .not("published", "is", null)
+        .order("id")
+        .range(from, to),
+    ),
+  ["fieldbook-reader-index-v1"],
+  { tags: [publishedReaderTag], revalidate: 300 },
+);
 const readerAccess = cache(async (destination: string) => {
   let user: User | null;
   let config: Awaited<ReturnType<typeof canRead>>;
@@ -71,17 +89,7 @@ function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
 }
 export const readerContext = cache(async (destination: string) => {
   const { user, config } = await readerAccess(destination);
-  const rows = await readAll((from, to) =>
-    db()
-      .from("fb_documents")
-      .select(
-        "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,groups:published->groups",
-        { count: "exact" },
-      )
-      .not("published", "is", null)
-      .order("id")
-      .range(from, to),
-  );
+  const rows = await publishedIndex(env().url, config.governance_revision);
   const published = rows.filter(
     (row) => row.status === "published" && ["doc", "brief"].includes(row.kind),
   ) as IndexRow[];
@@ -158,16 +166,26 @@ export const readerContext = cache(async (destination: string) => {
   };
 });
 
+const cachedBody = unstable_cache(
+  async (_installation: string, _governanceRevision: number, id: string) => {
+    const { data, error } = await db()
+      .from("fb_documents")
+      .select("id,published,published_revision")
+      .eq("id", id)
+      .maybeSingle();
+    check(error);
+    if (!data?.published) return null;
+    const item = redact(document(data));
+    return item.status === "published" ? item : null;
+  },
+  ["fieldbook-reader-body-v1"],
+  { tags: [publishedReaderTag], revalidate: 300 },
+);
 const publishedBody = cache(async (kind: "doc" | "brief", id: string) => {
   if (!validId.test(id)) notFound();
-  const { data, error } = await db()
-    .from("fb_documents")
-    .select("id,published,revision,published_revision")
-    .eq("id", id)
-    .maybeSingle();
-  check(error);
-  if (!data?.published) notFound();
-  const item = redact(document(data));
+  const config = await readConfig();
+  const item = await cachedBody(env().url, config.governance_revision, id);
+  if (!item) notFound();
   if (item.kind !== kind || item.status !== "published") notFound();
   return item;
 });
