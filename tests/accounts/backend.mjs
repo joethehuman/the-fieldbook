@@ -30,7 +30,10 @@ const initial = () => ({
 });
 let documents = [],
   reads = 0;
+let readQueries = [];
 let settings = initial(),
+  configuredGroups = [],
+  userGroups = [],
   fail = false,
   brokenLogo = false,
   role = "admin",
@@ -47,7 +50,7 @@ const profile = () => ({
   name: "Synthetic Admin",
   role,
   active: role !== "inactive",
-  groups: [],
+  groups: userGroups,
   group_joined_at: {},
   effective_group_joined_at: {},
 });
@@ -67,14 +70,17 @@ createServer(async (req, res) => {
     const change = JSON.parse(body || "{}");
     documents = change.documents || [];
     reads = 0;
+    readQueries = [];
     settings = { ...initial(), ...change.settings };
+    configuredGroups = change.groups || [];
+    userGroups = change.userGroups || [];
     fail = !!change.fail;
     brokenLogo = !!change.brokenLogo;
     role = change.role || "admin";
     revision = 1;
     return send(res, { ok: true });
   }
-  if (url.pathname === "/reads") return send(res, { reads });
+  if (url.pathname === "/reads") return send(res, { reads, readQueries });
   if (url.pathname === "/health") return send(res, { ok: true });
   if (url.pathname === "/logo") {
     if (brokenLogo) return send(res, {}, 404);
@@ -112,7 +118,7 @@ createServer(async (req, res) => {
       settings,
       revision,
       governance_revision: 1,
-      groups: [],
+      groups: configuredGroups,
       curricula: [],
     });
   }
@@ -122,6 +128,7 @@ createServer(async (req, res) => {
     return send(res, { signedURL: "/object/sign/synthetic" });
   if (url.pathname === "/rest/v1/fb_documents") {
     reads++;
+    readQueries.push(url.search);
     let rows = documents;
     const id = url.searchParams.get("id");
     if (id) rows = rows.filter((row) => row.id === id.slice(3));
@@ -132,10 +139,18 @@ createServer(async (req, res) => {
         id: row.id,
         updated_at: row.updated_at,
         ...Object.fromEntries(
-          ["title", "category", "folder", "kind", "status"].map((key) => [
-            key,
-            row.published[key],
-          ]),
+          [
+            "title",
+            "summary",
+            "category",
+            "folder",
+            "sectionId",
+            "kind",
+            "status",
+            "createdAt",
+            "updatedAt",
+            "groups",
+          ].map((key) => [key, row.published[key]]),
         ),
       }));
     return send(res, rows, 200, {

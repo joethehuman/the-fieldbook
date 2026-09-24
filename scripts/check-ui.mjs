@@ -70,8 +70,10 @@ for (const file of [
           // The only application-level runtime style is the operator's validated branding token.
           const text = attr.initializer?.getText(source) || "";
           if (!(
-            file === "components/Fieldbook.tsx" &&
-            /"--brand": branding\.accent/.test(text) &&
+            ((file === "components/Fieldbook.tsx" &&
+              /"--brand": branding\.accent/.test(text)) ||
+              (file === "components/reader/ReaderShell.tsx" &&
+                /"--brand": context\.branding\.accent/.test(text))) &&
             !/(width|height|margin|padding|background|color)\s*:/.test(text)
           ))
             report(

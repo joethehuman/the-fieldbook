@@ -68,7 +68,192 @@ async function fixture(request: any, extra = {}) {
   });
 }
 test.beforeEach(async ({ request }) => fixture(request));
-test("server HTML, metadata, redaction and one item read and a Docs navigation read per request", async ({
+for (const signedIn of [false, true]) {
+  test(`${signedIn ? "signed-in" : "guest"} reader links keep the shell, history and compact content`, async ({
+    page,
+    request,
+  }) => {
+    const secondDoc = {
+      ...items[0],
+      id: "00000000-0000-4000-8000-000000000024",
+      title: "Second reference document",
+    };
+    const secondUpdate = {
+      ...items[1],
+      id: "00000000-0000-4000-8000-000000000025",
+      title: "Another published update",
+      groups: [],
+    };
+    await fixture(request, {
+      settings: {
+        access: signedIn ? "private" : "public",
+        guestGroupId: "child",
+        logoUrl: "",
+      },
+      groups: [
+        { id: "parent", name: "Internal group" },
+        { id: "child", name: "Child group", parentId: "parent" },
+      ],
+      userGroups: signedIn ? ["child"] : [],
+      documents: documents([
+        { ...items[0], groups: [] },
+        { ...items[1], groups: ["parent"] },
+        items[2],
+        secondDoc,
+        secondUpdate,
+      ]),
+    });
+    if (signedIn) {
+      const token = await (
+        await request.post(`${backend}/auth/v1/token`, { data: {} })
+      ).json();
+      await page.context().addCookies([
+        {
+          name: "sb-test-auth-token",
+          value:
+            "base64-" +
+            Buffer.from(
+              JSON.stringify({
+                ...token,
+                expires_at: Math.floor(Date.now() / 1000) + 3600,
+              }),
+            ).toString("base64url"),
+          domain: "localhost",
+          path: "/",
+        },
+      ]);
+    }
+    let workspaceReads = 0;
+    let documentNavigations = 0;
+    page.on("request", (request) => {
+      if (request.url().includes("/api/workspace")) workspaceReads++;
+      if (request.isNavigationRequest()) documentNavigations++;
+    });
+    await page.goto("/updates");
+    expect(documentNavigations).toBe(1);
+    await expect(page.getByRole("heading", { name: "For you" })).toBeVisible();
+    const html = await page.content();
+    if (!signedIn) {
+      expect(html).not.toContain("Internal group");
+      expect(html).not.toContain('"parent"');
+    }
+    await page.evaluate(() => ((window as any).__readerMarker = "kept"));
+    const readsBeforeUpdate = (
+      await (await request.get(`${backend}/reads`)).json()
+    ).readQueries.length;
+    await page.locator(`a.brief-card[href="/updates/${ids[1]}"]`).click();
+    await expect(
+      page.getByRole("heading", { name: items[1].title }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__readerMarker)).toBe(
+      "kept",
+    );
+    const updateQueries = (
+      await (await request.get(`${backend}/reads`)).json()
+    ).readQueries.slice(readsBeforeUpdate);
+    expect(updateQueries.length).toBeGreaterThan(0);
+    expect(
+      updateQueries.some((query: string) =>
+        new URLSearchParams(query).get("select")?.includes("title:published"),
+      ),
+    ).toBe(false);
+    await page.getByRole("link", { name: /Back to updates/ }).click();
+    await expect(page).toHaveURL(/\/updates$/);
+    if ((page.viewportSize()?.width || 0) < 768)
+      await page.getByRole("button", { name: "Open navigation" }).click();
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("link", { name: "Docs" })
+      .click();
+    await page.locator(`.knowledge-section a[href="/docs/${ids[0]}"]`).click();
+    await expect(
+      page.getByRole("heading", { name: items[0].title }),
+    ).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/docs$/);
+    await page.goForward();
+    await expect(
+      page.getByRole("heading", { name: items[0].title }),
+    ).toBeVisible();
+    await page.route("**/api/search?**", (route) =>
+      route.fulfill({
+        json: {
+          results: [
+            {
+              contentId: secondUpdate.id,
+              kind: "brief",
+              title: secondUpdate.title,
+              passageId: "content",
+              lessonId: null,
+              lessonTitle: null,
+              excerpt: secondUpdate.summary,
+              href: `/updates/${secondUpdate.id}`,
+              highlights: [],
+              publishedRevision: 1,
+              contentDate: "2026-01-02T00:00:00.000Z",
+            },
+          ],
+          hasMore: false,
+        },
+      }),
+    );
+    await page
+      .getByRole("textbox", { name: "Search all content" })
+      .fill("another");
+    await page
+      .getByRole("region", { name: "Search results" })
+      .getByRole("link", { name: new RegExp(secondUpdate.title) })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: secondUpdate.title }),
+    ).toBeVisible();
+    expect(await page.evaluate(() => (window as any).__readerMarker)).toBe(
+      "kept",
+    );
+    expect(documentNavigations).toBe(1);
+    expect(workspaceReads).toBe(0);
+  });
+}
+test("client navigation rechecks publication, item type and installation access", async ({
+  page,
+  request,
+}) => {
+  for (const change of [
+    "unpublished",
+    "deleted",
+    "wrong-type",
+    "private",
+  ] as const) {
+    await fixture(request);
+    await page.goto("/docs");
+    const link = page.locator(`.knowledge-section a[href="/docs/${ids[0]}"]`);
+    await expect(link).toBeVisible();
+    if (change === "private")
+      await fixture(request, { settings: { access: "private", logoUrl: "" } });
+    else if (change === "deleted") await fixture(request, { documents: [] });
+    else if (change === "unpublished")
+      await fixture(request, {
+        documents: documents().map((row) =>
+          row.id === ids[0] ? { ...row, published: null } : row,
+        ),
+      });
+    else
+      await fixture(request, {
+        documents: documents().map((row) =>
+          row.id === ids[0]
+            ? { ...row, published: { ...row.published, kind: "brief" } }
+            : row,
+        ),
+      });
+    await link.click();
+    if (change === "private") await expect(page).toHaveURL(/\/sign-in/);
+    else
+      await expect(
+        page.getByRole("heading", { name: "This page isn’t available" }),
+      ).toBeVisible();
+  }
+});
+test("server HTML, metadata, redaction and a compact index plus one body read", async ({
   request,
 }) => {
   for (const [index, section] of ["docs", "updates", "courses"].entries()) {
@@ -97,7 +282,7 @@ test("server HTML, metadata, redaction and one item read and a Docs navigation r
     expect(html).not.toContain("Synthetic Admin");
     expect(html).not.toMatch(/\\"answer\\":/);
     expect((await (await request.get(`${backend}/reads`)).json()).reads).toBe(
-      section === "docs" ? 2 : 1,
+      section === "courses" ? 1 : 2,
     );
   }
 });
@@ -111,7 +296,7 @@ test("missing, wrong-kind, unpublished and service failures have real statuses",
     "/unknown/item",
     "/docs/too/many",
   ])
-    expect((await request.get(path)).status()).toBe(404);
+    expect((await request.get(path)).status(), path).toBe(404);
   await fixture(request, {
     documents: documents().map((row) => ({ ...row, published: null })),
   });
@@ -120,6 +305,46 @@ test("missing, wrong-kind, unpublished and service failures have real statuses",
   expect(
     (await request.get(`/docs/${ids[0]}`)).status(),
   ).toBeGreaterThanOrEqual(500);
+});
+test("feedback lookup checks sign-in and publication without loading workspace", async ({
+  browser,
+  request,
+  baseURL,
+}) => {
+  expect(
+    (await request.get(`/api/feedback?contentId=${ids[0]}`)).status(),
+  ).toBe(401);
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  const context = await browser.newContext({ baseURL });
+  await context.addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  const published = await context.request.get(
+    `/api/feedback?contentId=${ids[0]}`,
+  );
+  expect(published.status()).toBe(200);
+  expect(await published.json()).toEqual({ saved: null });
+  await fixture(request, {
+    documents: documents().map((row) => ({ ...row, published: null })),
+  });
+  expect(
+    (await context.request.get(`/api/feedback?contentId=${ids[0]}`)).status(),
+  ).toBe(404);
+  await context.close();
 });
 test("private HTML and RSC requests redirect without item or draft data", async ({
   request,
@@ -236,7 +461,7 @@ test("hydration keeps one article, breadcrumbs navigate, and lesson links open t
     ),
   ).toBe(true);
   if (info.project.name === "phone")
-    await page.getByRole("button", { name: "← Back to docs" }).click();
+    await page.getByRole("link", { name: /Back to docs/ }).click();
   else {
     const crumb = page
       .getByRole("navigation", { name: "Breadcrumb" })
@@ -293,7 +518,7 @@ test("private verified sessions refresh and do not contaminate anonymous respons
     const html = await response.text();
     expect(html).toContain(items[0].title);
     expect(html).not.toContain("admin@example.test");
-    expect(html).not.toContain("Synthetic Admin");
+    expect(html).toContain("Synthetic Admin");
     expect(html).not.toContain("SECRET DRAFT");
     if (expired)
       expect(response.headers()["set-cookie"]).toContain("sb-test-auth-token");
@@ -362,23 +587,24 @@ test("legacy aliases, curriculum destinations and existing logo metadata", async
   }
 });
 
-test("republishing during hydration keeps article and metadata on one revision", async ({
+test("reader does not load workspace and picks up republished content on reload", async ({
   page,
   request,
 }) => {
-  let changed = false;
+  let workspaceReads = 0;
   await page.route("**/api/workspace", async (route) => {
-    if (!changed) {
-      changed = true;
-      await fixture(request, {
-        documents: documents(
-          items.map((item) => ({ ...item, title: "New published revision" })),
-        ).map((row) => ({ ...row, published_revision: 2, revision: 3 })),
-      });
-    }
+    workspaceReads++;
     await route.continue();
   });
   await page.goto(`/docs/${ids[0]}`);
+  await expect(page).toHaveTitle(`${items[0].title} | Acme Learning`);
+  expect(workspaceReads).toBe(0);
+  await fixture(request, {
+    documents: documents(
+      items.map((item) => ({ ...item, title: "New published revision" })),
+    ).map((row) => ({ ...row, published_revision: 2, revision: 3 })),
+  });
+  await page.reload();
   await expect(page).toHaveTitle("New published revision | Acme Learning");
   await expect(
     page.getByRole("heading", { name: "New published revision" }),
@@ -475,21 +701,31 @@ test("short and long articles fill the shared reading width in both apps", async
 
 test("content feedback saves ratings and comments with retry and focus return", async ({
   page,
+  request,
 }, info) => {
-  const data = freshWorkspace();
-  data.content = items as typeof data.content;
-  data.publishedContent = data.content.map((item) => ({
-    ...item,
-    publishedRevision: 1,
-  }));
-  data.feedback = [];
-  const user = data.users.find((user) => user.id === "demo-admin")!;
-  await page.route("**/api/workspace", (route) =>
-    route.fulfill({ json: { data, user } }),
-  );
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
   let fail = false;
   const writes: Array<{ rating: string; comment: string }> = [];
-  await page.route("**/api/feedback", async (route) => {
+  await page.route("**/api/feedback**", async (route) => {
+    if (route.request().method() === "GET")
+      return route.fulfill({ json: { saved: null } });
     const entry = route.request().postDataJSON();
     writes.push(entry);
     if (fail)
@@ -497,12 +733,6 @@ test("content feedback saves ratings and comments with retry and focus return", 
         status: 503,
         json: { error: "Feedback temporarily unavailable. Try again." },
       });
-    data.feedback = [
-      ...(data.feedback || []).filter(
-        (f) => !(f.userId === entry.userId && f.contentId === entry.contentId),
-      ),
-      entry,
-    ];
     await route.fulfill({ json: { saved: true } });
   });
   await page.goto(`/updates/${ids[1]}`);

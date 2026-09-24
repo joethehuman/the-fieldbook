@@ -7,6 +7,7 @@ import {
   CollapsibleContent,
 } from "../ui/collapsible";
 import { Button } from "../ui/button";
+import Link from "next/link";
 import {
   docSections,
   type DocLink,
@@ -28,7 +29,7 @@ export function DocumentTree({
   sections?: DocSection[];
   selected: string | null;
   href: (id: string) => string;
-  onOpen: (id: string) => void;
+  onOpen?: (id: string) => void;
   storageKey?: string;
 }) {
   const ref = useRef<HTMLElement>(null);
@@ -106,7 +107,7 @@ export function DocumentTree({
       return;
     event.preventDefault();
     remember();
-    onOpen(id);
+    onOpen?.(id);
   };
   const branch = (value: DocBranch, path: string[]): React.ReactNode => {
     const key = JSON.stringify([...path, value.id]);
@@ -136,13 +137,24 @@ export function DocumentTree({
               key={doc.id}
               className="w-full justify-start rounded-control px-2 py-1.5 text-left text-sm font-normal leading-relaxed whitespace-normal break-words [overflow-wrap:anywhere] aria-[current=page]:bg-accent aria-[current=page]:font-medium aria-[current=page]:text-foreground text-muted-foreground focus-visible:ring-inset focus-visible:ring-offset-0"
             >
-              <a
-                href={href(doc.id)}
-                aria-current={selected === doc.id ? "page" : undefined}
-                onClick={(event) => open(event, doc.id)}
-              >
-                {doc.title}
-              </a>
+              {onOpen ? (
+                <a
+                  href={href(doc.id)}
+                  aria-current={selected === doc.id ? "page" : undefined}
+                  onClick={(event) => open(event, doc.id)}
+                >
+                  {doc.title}
+                </a>
+              ) : (
+                <Link
+                  href={href(doc.id)}
+                  prefetch={false}
+                  aria-current={selected === doc.id ? "page" : undefined}
+                  onClick={() => remember()}
+                >
+                  {doc.title}
+                </Link>
+              )}
             </Button>
           ))}
           {value.folders.map((folder) => branch(folder, [...path, value.id]))}
