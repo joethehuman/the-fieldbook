@@ -16,6 +16,8 @@ import { contentPath } from "@/lib/navigation";
 import { Button } from "../ui/button";
 import { InitialsAvatar } from "../ui/initials-avatar";
 import { ContentAction } from "./content-action";
+import Link from "next/link";
+import { ReaderPending } from "@/components/reader/ReaderPending";
 
 /** Shared, server-compatible reading presentation; callers own access and actions. */
 export function Article({
@@ -114,45 +116,69 @@ export function Article({
                       key={doc.id}
                       className="document-pagination-link h-auto min-w-0 justify-start whitespace-normal p-3 text-left"
                     >
-                      <a
-                        data-direction={direction === 0 ? "previous" : "next"}
-                        href={
-                          demo
-                            ? `#docs/${encodeURIComponent(doc.id)}`
-                            : contentPath("doc", doc.id)
-                        }
-                        onClick={
-                          onDocument
-                            ? (event) => {
-                                if (
-                                  event.button ||
-                                  event.metaKey ||
-                                  event.ctrlKey ||
-                                  event.shiftKey ||
-                                  event.altKey
-                                )
-                                  return;
-                                event.preventDefault();
-                                onDocument(doc.id);
-                              }
-                            : undefined
-                        }
-                      >
-                        {direction === 0 && (
-                          <ChevronLeft aria-hidden="true" size={16} />
-                        )}
-                        <span className="grid min-w-0 gap-1">
-                          <span className="text-xs font-normal text-muted-foreground">
-                            {direction === 0 ? "Previous" : "Next"}
+                      {demo || onDocument ? (
+                        <a
+                          data-direction={direction === 0 ? "previous" : "next"}
+                          href={
+                            demo
+                              ? `#docs/${encodeURIComponent(doc.id)}`
+                              : contentPath("doc", doc.id)
+                          }
+                          onClick={
+                            onDocument
+                              ? (event) => {
+                                  if (
+                                    event.button ||
+                                    event.metaKey ||
+                                    event.ctrlKey ||
+                                    event.shiftKey ||
+                                    event.altKey
+                                  )
+                                    return;
+                                  event.preventDefault();
+                                  onDocument(doc.id);
+                                }
+                              : undefined
+                          }
+                        >
+                          {direction === 0 && (
+                            <ChevronLeft aria-hidden="true" size={16} />
+                          )}
+                          <span className="grid min-w-0 gap-1">
+                            <span className="text-xs font-normal text-muted-foreground">
+                              {direction === 0 ? "Previous" : "Next"}
+                            </span>
+                            <span className="[overflow-wrap:anywhere]">
+                              {doc.title}
+                            </span>
                           </span>
-                          <span className="[overflow-wrap:anywhere]">
-                            {doc.title}
+                          {direction === 1 && (
+                            <ChevronRight aria-hidden="true" size={16} />
+                          )}
+                        </a>
+                      ) : (
+                        <Link
+                          data-direction={direction === 0 ? "previous" : "next"}
+                          href={contentPath("doc", doc.id)}
+                          prefetch={false}
+                        >
+                          {direction === 0 && (
+                            <ChevronLeft aria-hidden="true" size={16} />
+                          )}
+                          <span className="grid min-w-0 gap-1">
+                            <span className="text-xs font-normal text-muted-foreground">
+                              {direction === 0 ? "Previous" : "Next"}
+                            </span>
+                            <span className="[overflow-wrap:anywhere]">
+                              {doc.title}
+                              <ReaderPending />
+                            </span>
                           </span>
-                        </span>
-                        {direction === 1 && (
-                          <ChevronRight aria-hidden="true" size={16} />
-                        )}
-                      </a>
+                          {direction === 1 && (
+                            <ChevronRight aria-hidden="true" size={16} />
+                          )}
+                        </Link>
+                      )}
                     </Button>
                   ),
               )}
@@ -222,23 +248,32 @@ export function CourseOverview({
 export function ReadingBack({
   kind,
   curriculum,
+  clientNavigation = false,
 }: {
   kind: Content["kind"];
   curriculum?: string;
+  clientNavigation?: boolean;
 }) {
   const label =
     kind === "course" ? "courses" : kind === "doc" ? "docs" : "updates";
   return (
     <Button asChild variant="link">
-      <a
-        href={
-          curriculum
-            ? `/curricula/${encodeURIComponent(curriculum)}`
-            : `/${label}`
-        }
-      >
-        ← Back to {curriculum ? "curriculum" : label}
-      </a>
+      {clientNavigation ? (
+        <Link href={`/${label}`}>
+          ← Back to {label}
+          <ReaderPending />
+        </Link>
+      ) : (
+        <a
+          href={
+            curriculum
+              ? `/curricula/${encodeURIComponent(curriculum)}`
+              : `/${label}`
+          }
+        >
+          ← Back to {curriculum ? "curriculum" : label}
+        </a>
+      )}
     </Button>
   );
 }

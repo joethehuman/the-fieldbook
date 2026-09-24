@@ -31,6 +31,8 @@ const initial = () => ({
 let documents = [],
   reads = 0;
 let settings = initial(),
+  configuredGroups = [],
+  userGroups = [],
   fail = false,
   brokenLogo = false,
   role = "admin",
@@ -47,7 +49,7 @@ const profile = () => ({
   name: "Synthetic Admin",
   role,
   active: role !== "inactive",
-  groups: [],
+  groups: userGroups,
   group_joined_at: {},
   effective_group_joined_at: {},
 });
@@ -68,6 +70,8 @@ createServer(async (req, res) => {
     documents = change.documents || [];
     reads = 0;
     settings = { ...initial(), ...change.settings };
+    configuredGroups = change.groups || [];
+    userGroups = change.userGroups || [];
     fail = !!change.fail;
     brokenLogo = !!change.brokenLogo;
     role = change.role || "admin";
@@ -112,7 +116,7 @@ createServer(async (req, res) => {
       settings,
       revision,
       governance_revision: 1,
-      groups: [],
+      groups: configuredGroups,
       curricula: [],
     });
   }
@@ -132,10 +136,18 @@ createServer(async (req, res) => {
         id: row.id,
         updated_at: row.updated_at,
         ...Object.fromEntries(
-          ["title", "category", "folder", "kind", "status"].map((key) => [
-            key,
-            row.published[key],
-          ]),
+          [
+            "title",
+            "summary",
+            "category",
+            "folder",
+            "sectionId",
+            "kind",
+            "status",
+            "createdAt",
+            "updatedAt",
+            "groups",
+          ].map((key) => [key, row.published[key]]),
         ),
       }));
     return send(res, rows, 200, {

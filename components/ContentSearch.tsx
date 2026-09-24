@@ -5,6 +5,7 @@ import {
   type SearchFilter,
   type SearchResponse,
   type SearchResult,
+  type SearchProvider,
 } from "@/lib/search";
 import type { Content } from "@/lib/types";
 import type { FieldbookRuntime } from "@/lib/runtime";
@@ -20,12 +21,16 @@ export function ContentSearch({
   query,
   content,
   runtime,
+  searchProvider,
+  clientNavigation = false,
   onOpen,
 }: {
   query: string;
   content: Content[];
   runtime?: FieldbookRuntime;
-  onOpen: (r: SearchResult) => void;
+  searchProvider?: SearchProvider;
+  clientNavigation?: boolean;
+  onOpen?: (r: SearchResult) => void;
 }) {
   const [filter, setFilter] = useState<SearchFilter>("all");
   const [response, setResponse] = useState<SearchResponse>({
@@ -45,9 +50,11 @@ export function ContentSearch({
     setResponse({ results: [], hasMore: false });
     const timer = setTimeout(async () => {
       try {
-        const result = runtime
-          ? await runtime.search(query, filter, controller.signal)
-          : demoSearch(content, query, filter);
+        const result = searchProvider
+          ? await searchProvider(query, filter, controller.signal)
+          : runtime
+            ? await runtime.search(query, filter, controller.signal)
+            : demoSearch(content, query, filter);
         if (current === generation.current && !controller.signal.aborted) {
           setResponse(result);
           setCompleted(key);
@@ -65,7 +72,7 @@ export function ContentSearch({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [query, filter, content, runtime, retry, key]);
+  }, [query, filter, content, runtime, searchProvider, retry, key]);
   const pending = completed !== key || state === "loading";
   return (
     <section
@@ -141,11 +148,12 @@ export function ContentSearch({
               key={r.contentId}
               result={r}
               href={
-                runtime
+                runtime || clientNavigation
                   ? r.href
                   : `/?${r.lessonId ? `lesson=${encodeURIComponent(r.lessonId)}` : ""}#${r.href.split("?")[0].slice(1)}`
               }
-              onOpen={() => onOpen(r)}
+              clientNavigation={clientNavigation}
+              onOpen={onOpen ? () => onOpen(r) : undefined}
             />
           ))}
         </div>
