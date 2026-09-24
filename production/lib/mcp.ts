@@ -158,8 +158,7 @@ export function createMcp(
         true,
         source,
       );
-      if (saved.kind === "doc" || saved.kind === "brief")
-        invalidatePublishedReader();
+      invalidatePublishedReader();
       return result(saved);
     },
   );
@@ -183,8 +182,7 @@ export function createMcp(
         source,
         true,
       );
-      if (saved.kind === "doc" || saved.kind === "brief")
-        invalidatePublishedReader();
+      invalidatePublishedReader();
       return result(saved);
     },
   );

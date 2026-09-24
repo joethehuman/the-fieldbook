@@ -40,11 +40,7 @@ export async function POST(req: Request) {
       "web",
       a.unpublish === true,
     );
-    if (
-      (a.publish === true || a.unpublish === true) &&
-      (saved.kind === "doc" || saved.kind === "brief")
-    )
-      invalidatePublishedReader();
+    if (a.publish === true || a.unpublish === true) invalidatePublishedReader();
     return Response.json(saved);
   } catch (e) {
     return errorResponse(e, "api/content");
