@@ -13,8 +13,13 @@ import { db, check } from "./db";
 import { readAll } from "./read-all";
 import { HttpError } from "./errors";
 import { brandingFromSettings } from "@/lib/branding";
-import { effectiveGroups, type Content, type User } from "@/lib/types";
-import { guest } from "@/lib/guest-recommendations";
+import {
+  effectiveGroups,
+  type Content,
+  type Progress,
+  type User,
+} from "@/lib/types";
+import { guest, guestRecommendations } from "@/lib/guest-recommendations";
 import { orderedDocCategories, type DocLink } from "@/lib/docs-navigation";
 import { publicSettings } from "@/lib/settings";
 import type { Metadata } from "next";
@@ -37,7 +42,17 @@ export type ReaderItem = Pick<
   | "createdAt"
   | "updatedAt"
 >;
-type IndexRow = ReaderItem & { groups: string[] };
+type IndexRow = ReaderItem & {
+  groups: string[];
+};
+type CourseRow = IndexRow & {
+  assignments?: Content["assignments"];
+  coverImageUrl?: string;
+  duration?: number;
+  version?: number;
+  lessons?: Content["lessons"];
+  questions?: Content["questions"];
+};
 const validId =
   /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 
@@ -60,6 +75,23 @@ const publishedIndex = unstable_cache(
         .range(from, to),
     ),
   ["fieldbook-reader-index-v1"],
+  { tags: [publishedReaderTag], revalidate: 300 },
+);
+const publishedCourseIndex = unstable_cache(
+  async (_installation: string, _governanceRevision: number) =>
+    readAll((from, to) =>
+      db()
+        .from("fb_documents")
+        .select(
+          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,groups:published->groups,assignments:published->assignments,coverImageUrl:published->>coverImageUrl,duration:published->>duration,version:published->>version,lessons:published->lessons,questions:published->questions",
+          { count: "exact" },
+        )
+        .not("published", "is", null)
+        .eq("published->>kind", "course")
+        .order("id")
+        .range(from, to),
+    ),
+  ["fieldbook-course-index-v1"],
   { tags: [publishedReaderTag], revalidate: 300 },
 );
 const readerAccess = cache(async (destination: string) => {
@@ -92,7 +124,7 @@ export const readerContext = cache(async (destination: string) => {
   const rows = await publishedIndex(env().url, config.governance_revision);
   const published = rows.filter(
     (row) => row.status === "published" && ["doc", "brief"].includes(row.kind),
-  ) as IndexRow[];
+  ) as unknown as IndexRow[];
   const docs: DocLink[] = published
     .filter((item) => item.kind === "doc")
     .sort(
@@ -163,6 +195,114 @@ export const readerContext = cache(async (destination: string) => {
     otherUpdates: updates
       .filter((item) => !featuredIds.has(item.id))
       .map(expose),
+    courseTitles: rows
+      .filter((item) => item.kind === "course" && item.status === "published")
+      .map(({ id, title }) => ({ id, title })),
+  };
+});
+
+function courseSummary(row: CourseRow): Content {
+  return {
+    id: row.id,
+    kind: "course",
+    title: row.title,
+    summary: row.summary,
+    body: "",
+    category: row.category,
+    folder: row.folder || "",
+    status: "published",
+    version: Number(row.version || 1),
+    updatedAt: row.updatedAt,
+    createdAt: row.createdAt,
+    assignments: row.assignments ?? undefined,
+    coverImageUrl: row.coverImageUrl,
+    duration: Number(row.duration || 0),
+    groups: row.groups || [],
+    lessons: (row.lessons || []).map(({ id }) => ({
+      id,
+      title: "",
+      body: "",
+    })),
+    questions: (row.questions || []).map(({ id }) => ({
+      id,
+      prompt: "",
+      options: [],
+    })),
+  };
+}
+export const readerCourses = cache(async () => {
+  const { user, config } = await readerAccess("/courses");
+  const [rows, progressRows] = await Promise.all([
+    publishedCourseIndex(env().url, config.governance_revision),
+    user
+      ? readAll((from, to) =>
+          db()
+            .from("fb_progress")
+            .select("content_id,version,lessons,passed,attempts", {
+              count: "exact",
+            })
+            .eq("user_id", user.id)
+            .order("content_id")
+            .range(from, to),
+        )
+      : Promise.resolve([]),
+  ]);
+  const courses = rows
+    .filter((row) => row.kind === "course" && row.status === "published")
+    .map((row) => courseSummary(row as unknown as CourseRow));
+  const curricula = (config.curricula || []).filter(
+    (item: { status: string }) => item.status === "published",
+  );
+  if (!user) {
+    const projected = guestRecommendations({
+      settings: config.settings,
+      groups: config.groups || [],
+      curricula,
+      content: courses,
+    });
+    return {
+      user: projected.user,
+      courses: projected.content,
+      groups: projected.groups,
+      curricula: projected.curricula,
+      settings: projected.settings,
+      progress: [] as Progress[],
+    };
+  }
+  const memberships = effectiveGroups(user, config.groups || []);
+  const groups = (config.groups || [])
+    .filter((group: { id: string }) => memberships.has(group.id))
+    .map(
+      ({ teamIds: _teamIds, ...group }: { teamIds?: string[]; id: string }) =>
+        group,
+    );
+  const groupIds = new Set(groups.map((group: { id: string }) => group.id));
+  const visibleCourses = courses.map((course) => ({
+    ...course,
+    groups: course.groups.filter((id) => groupIds.has(id)),
+    assignments: course.assignments?.filter(
+      (assignment) =>
+        (assignment.groupId && groupIds.has(assignment.groupId)) ||
+        assignment.userId === user.id,
+    ),
+  }));
+  const ids = new Set(courses.map(({ id }) => id));
+  return {
+    user,
+    courses: visibleCourses,
+    groups,
+    curricula: curricula.map((item: { courseIds: string[] }) => ({
+      ...item,
+      courseIds: item.courseIds.filter((id) => ids.has(id)),
+    })),
+    settings: publicSettings(config.settings, visibleCourses),
+    progress: progressRows.map((row) => ({
+      content_id: row.content_id,
+      version: row.version,
+      lessons: row.lessons,
+      passed: row.passed,
+      attempts: row.attempts,
+    })) as Progress[],
   };
 });
 
@@ -181,14 +321,16 @@ const cachedBody = unstable_cache(
   ["fieldbook-reader-body-v1"],
   { tags: [publishedReaderTag], revalidate: 300 },
 );
-const publishedBody = cache(async (kind: "doc" | "brief", id: string) => {
-  if (!validId.test(id)) notFound();
-  const config = await readConfig();
-  const item = await cachedBody(env().url, config.governance_revision, id);
-  if (!item) notFound();
-  if (item.kind !== kind || item.status !== "published") notFound();
-  return item;
-});
+const publishedBody = cache(
+  async (kind: "doc" | "brief" | "course", id: string) => {
+    if (!validId.test(id)) notFound();
+    const config = await readConfig();
+    const item = await cachedBody(env().url, config.governance_revision, id);
+    if (!item) notFound();
+    if (item.kind !== kind || item.status !== "published") notFound();
+    return item;
+  },
+);
 export const readerItem = cache(async (kind: "doc", id: string) => {
   const destination = "/docs";
   // Start the body early, but access must determine the response before a 404.
@@ -219,6 +361,17 @@ export const readerUpdateItem = cache(async (id: string) => {
     },
   };
 });
+export const readerCourseItem = cache(async (id: string) => {
+  const { user, config } = await readerAccess("/courses");
+  const item = await publishedBody("course", id);
+  return {
+    item,
+    context: {
+      user: user ? { id: user.id, name: user.name, role: user.role } : null,
+      branding: readerBranding(config),
+    },
+  };
+});
 
 export function readerMetadata(
   item: Content,
@@ -239,7 +392,7 @@ export function readerMetadata(
       title,
       description,
       siteName: context.branding.name,
-      type: "article",
+      type: item.kind === "course" ? "website" : "article",
       url: contentPath(item.kind, item.id),
       images,
     },

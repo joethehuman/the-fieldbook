@@ -194,12 +194,16 @@ export function CourseOverview({
   item,
   back,
   curriculum,
+  lessonBase,
 }: {
   item: Content;
   back: ReactNode;
   curriculum?: string;
+  lessonBase?: string;
 }) {
-  const path = contentPath("course", item.id);
+  const path = lessonBase
+    ? `${lessonBase}/${encodeURIComponent(item.id)}`
+    : contentPath("course", item.id);
   return (
     <div className="course-detail">
       {back}
@@ -257,8 +261,15 @@ export function ReadingBack({
   return (
     <Button asChild variant="link">
       {clientNavigation ? (
-        <IntentLink href={`/${label}`} eager>
-          ← Back to {label}
+        <IntentLink
+          href={
+            curriculum
+              ? `/curricula/${encodeURIComponent(curriculum)}`
+              : `/${label}`
+          }
+          eager
+        >
+          ← Back to {curriculum ? "curriculum" : label}
         </IntentLink>
       ) : (
         <a

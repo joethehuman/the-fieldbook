@@ -38,12 +38,18 @@ export function ReaderShell({
   const [menu, setMenu] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
-  const section = pathname.startsWith("/docs") ? "docs" : "updates";
+  const section = pathname.startsWith("/docs")
+    ? "docs"
+    : pathname.startsWith("/courses")
+      ? "courses"
+      : "updates";
   const selected = pathname.split("/")[2] || null;
   const articleTitle = selected
     ? section === "docs"
       ? context.docs.find((doc) => doc.id === selected)?.title
-      : context.updateTitles?.find((item) => item.id === selected)?.title
+      : section === "courses"
+        ? context.courseTitles?.find((item) => item.id === selected)?.title
+        : context.updateTitles?.find((item) => item.id === selected)?.title
     : undefined;
   useEffect(() => {
     if (!menu) return;
@@ -56,7 +62,8 @@ export function ReaderShell({
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
   }, [menu]);
-  const title = section === "docs" ? "Docs" : "Updates";
+  const title =
+    section === "docs" ? "Docs" : section === "courses" ? "Courses" : "Updates";
   const close = () => setMenu(false);
   const links = [
     { href: "/updates", title: "Updates", icon: Newspaper },
@@ -103,11 +110,7 @@ export function ReaderShell({
               key={href}
               className={section === href.slice(1) ? "active" : ""}
             >
-              <Link
-                href={href}
-                prefetch={href === "/updates" || href === "/docs"}
-                onClick={close}
-              >
+              <Link href={href} prefetch onClick={close}>
                 <Icon size={19} />
                 {label}
               </Link>
@@ -193,16 +196,20 @@ export function ReaderShell({
           </Button>
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
-              <Link href="/courses" prefetch={false}>
+              <Link href="/courses" prefetch>
                 Organization
               </Link>
             </Button>
-            <ChevronRight size={14} />
-            <Button asChild variant="link">
-              <Link href={`/${section}`} prefetch>
-                {title}
-              </Link>
-            </Button>
+            {section !== "courses" && (
+              <>
+                <ChevronRight size={14} />
+                <Button asChild variant="link">
+                  <Link href={`/${section}`} prefetch>
+                    {title}
+                  </Link>
+                </Button>
+              </>
+            )}
             {selected && (
               <>
                 <ChevronRight size={14} />

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { ContentAction } from "./content-action";
+import { IntentLink } from "./intent-link";
 import { ContentCardFooter } from "./layout";
 import { ProgressStatus } from "../ui/progress";
 
@@ -14,6 +15,7 @@ export function LearningCard({
   status,
   action,
   onClick,
+  href,
 }: {
   artwork: ReactNode;
   metadata: ReactNode;
@@ -22,14 +24,11 @@ export function LearningCard({
   detail?: ReactNode;
   status: { percent: number; complete: boolean; started: boolean };
   action: string;
-  onClick: () => void;
+  onClick?: () => void;
+  href?: string;
 }) {
-  return (
-    <ContentAction
-      focusRing="inside"
-      className="course-card flex h-full min-w-0 flex-col"
-      onClick={onClick}
-    >
+  const content = (
+    <>
       {artwork}
       <div className="flex flex-1 flex-col gap-3 p-4">
         <div className="grid gap-2 text-xs text-muted-foreground">
@@ -56,6 +55,16 @@ export function LearningCard({
           }
         />
       </div>
+    </>
+  );
+  return (
+    <ContentAction
+      asChild={!!href}
+      focusRing="inside"
+      className="course-card flex h-full min-w-0 flex-col"
+      onClick={onClick}
+    >
+      {href ? <IntentLink href={href}>{content}</IntentLink> : content}
     </ContentAction>
   );
 }

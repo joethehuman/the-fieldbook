@@ -24,8 +24,9 @@ export const reading = cache(
     if (!id || section === "curricula" || view === "admin" || view === "team")
       return null;
     let item, config;
+    let user;
     try {
-      const user = await actor(undefined, true);
+      user = await actor(undefined, true);
       config = await canRead(user);
       if (
         !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
@@ -113,7 +114,7 @@ export const reading = cache(
       },
       content: [item],
       publishedContent: [item],
-      users: [guest],
+      users: [user || guest],
       groups: [],
       progress: {},
     };

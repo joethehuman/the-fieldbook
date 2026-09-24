@@ -7,11 +7,13 @@ export function CurriculumCard({
   courses,
   progress,
   onClick,
+  href,
 }: {
   curriculum: Curriculum;
   courses: Content[];
   progress: Progress[];
-  onClick: () => void;
+  onClick?: () => void;
+  href?: string;
 }) {
   const status = curriculumProgress(courses, progress);
   return (
@@ -22,6 +24,7 @@ export function CurriculumCard({
       metadata={`${status.completed} of ${courses.length} courses complete`}
       action="View curriculum"
       onClick={onClick}
+      href={href}
       artwork={
         <div className="course-art art-1">
           <div className="art-grid" />

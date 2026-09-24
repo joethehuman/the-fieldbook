@@ -54,6 +54,7 @@ export const config = {
     "/updates/:id+",
     "/briefs/:id+",
     "/notes/:id+",
+    "/courses",
     "/courses/:id+",
     "/learn/:id+",
     "/learning/:id+",

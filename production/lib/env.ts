@@ -33,3 +33,12 @@ export function env() {
   }
   return { url, key, secret, origin: new URL(origin).origin, owner };
 }
+
+export function siteOrigins() {
+  const canonical = env().origin;
+  const deploymentHost =
+    process.env.VERCEL_ENV === "preview" ? process.env.VERCEL_URL : undefined;
+  return deploymentHost
+    ? [canonical, new URL(`https://${deploymentHost}`).origin]
+    : [canonical];
+}

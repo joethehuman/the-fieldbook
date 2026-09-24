@@ -123,7 +123,9 @@ export default function Fieldbook({
   const [data, setData] = useState<Workspace | null>(
       initialReading?.data || null,
     ),
-    [uid, setUid] = useState<string | null>(initialReading ? "guest" : null),
+    [uid, setUid] = useState<string | null>(
+      initialReading ? initialReading.data.users[0]?.id || "guest" : null,
+    ),
     [view, setView] = useState<View>(initialReading?.section || "learn"),
     [courseOrigin, setCourseOrigin] = useState<string | undefined>(
       initialReading?.curriculum,
