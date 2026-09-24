@@ -224,15 +224,14 @@ export default function Admin({
   const notify = useToast();
   const { confirm } = useInteractionDialog();
   const adminPanel = useRevealTarget();
-  const teamGuard = useRef<NavigationGuard | null>(null);
-  const registerTeamGuard = useCallback<RegisterNavigationGuard>(
+  const adminGuard = useRef<NavigationGuard | null>(null);
+  const registerAdminGuard = useCallback<RegisterNavigationGuard>(
     (guard) => {
-      teamGuard.current = guard;
+      adminGuard.current = guard;
       registerNavigationGuard?.(guard);
     },
     [registerNavigationGuard],
   );
-  const [settingsPending, setSettingsPending] = useState(false);
   const [tab, setTab] = useState("content"),
     [editing, setEditing] = useState<Content | null>(null),
     [person, setPerson] = useState<User | null>(null),
@@ -437,13 +436,8 @@ export default function Admin({
   }
 
   async function changeAdminTab(next: string) {
-    if (teamGuard.current && !(await teamGuard.current())) return;
-    if (
-      settingsPending &&
-      !(await confirm("Leave this page? Unsaved changes will be discarded."))
-    )
+    if (next === tab || (adminGuard.current && !(await adminGuard.current())))
       return;
-    setSettingsPending(false);
     setTab(next);
     adminPanel.reveal(false);
     setNotice("");
@@ -530,10 +524,11 @@ export default function Admin({
           {notice && <Alert variant="destructive">{notice}</Alert>}
           {tab.startsWith("settings-") ? (
             <SiteSettingsPanel
+              key={tab}
               section={
                 tab.slice(9) as import("./SiteSettingsPanel").SettingsSection
               }
-              onPendingChange={setSettingsPending}
+              registerNavigationGuard={registerAdminGuard}
               data={data}
               onChange={onChange}
               onUpload={onUpload}
@@ -545,7 +540,7 @@ export default function Admin({
             <TeamsAdmin
               data={data}
               onChange={onChange}
-              registerNavigationGuard={registerTeamGuard}
+              registerNavigationGuard={registerAdminGuard}
             />
           ) : tab === "content" ? (
             <>
@@ -918,7 +913,7 @@ export default function Admin({
             <Curricula
               data={data}
               onChange={onChange}
-              onEditingChange={setSettingsPending}
+              registerNavigationGuard={registerAdminGuard}
             />
           ) : tab === "groups" ? (
             <LearningGroups

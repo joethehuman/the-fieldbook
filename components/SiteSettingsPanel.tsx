@@ -17,6 +17,8 @@ import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { InstallationLogo } from "./patterns/installation-identity";
 import { defaultSettings, privacyHref } from "@/lib/settings";
+import { equalJson } from "@/lib/equal-json";
+import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
 import type { UploadMedia } from "./MarkdownEditor";
 export type SettingsSection =
@@ -27,30 +29,44 @@ export default function SiteSettingsPanel({
   onUpload,
   production,
   section,
-  onPendingChange,
+  registerNavigationGuard,
 }: {
   data: Workspace;
   onChange: (next: Workspace) => void | Promise<void>;
   onUpload?: UploadMedia;
   production: boolean;
   section: SettingsSection;
-  onPendingChange: (pending: boolean) => void;
+  registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const notify = useToast();
-  const { prompt } = useInteractionDialog();
+  const { confirm, prompt } = useInteractionDialog();
   const [settings, setSettings] = useState({
       ...defaultSettings,
       ...data.settings,
     }),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
+  const savedSettings = useRef(settings);
+  const dirty = !equalJson(settings, savedSettings.current);
+  const guard = useRef(async () => true);
+  guard.current = async () =>
+    !busy &&
+    (!dirty ||
+      (await confirm("Leave this page? Unsaved changes will be discarded.")));
   useEffect(() => {
-    onPendingChange(
-      busy ||
-        JSON.stringify(settings) !==
-          JSON.stringify({ ...defaultSettings, ...data.settings }),
-    );
-  }, [busy, settings, data.settings, onPendingChange]);
+    registerNavigationGuard?.(() => guard.current());
+    return () => registerNavigationGuard?.(null);
+  }, [registerNavigationGuard]);
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirty || busy) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [dirty, busy]);
   const docSections = availableDocSections(
     data.content.filter((c) => c.kind === "doc"),
     settings.docCategoryOrder,
@@ -77,6 +93,7 @@ export default function SiteSettingsPanel({
               ? { ...settings, docSections, docCategoryOrder: [] }
               : settings;
           await onChange({ ...data, settings: next });
+          savedSettings.current = next;
           setSettings(next);
           notify("Settings saved.");
         } catch (e) {
@@ -492,6 +509,7 @@ export default function SiteSettingsPanel({
               setNotice("");
               try {
                 await onChange({ ...data, settings: next });
+                savedSettings.current = next;
                 setSettings(next);
                 notify("Privacy policy published.");
               } catch (e) {
