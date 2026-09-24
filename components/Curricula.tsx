@@ -12,9 +12,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { FieldGroup } from "@/components/ui/field";
 import { Alert } from "@/components/ui/alert";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Workspace } from "@/lib/store";
 import type { Curriculum } from "@/lib/types";
+import { equalJson } from "@/lib/equal-json";
+import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import { groupItems } from "@/lib/learning-groups";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { Button } from "./ui/button";
@@ -23,9 +25,9 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 export default function Curricula({
   data,
   onChange,
-  onEditingChange,
+  registerNavigationGuard,
 }: {
-  onEditingChange?: (editing: boolean) => void;
+  registerNavigationGuard?: RegisterNavigationGuard;
   data: Workspace;
   onChange: (data: Workspace) => void | Promise<void>;
 }) {
@@ -36,9 +38,25 @@ export default function Curricula({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const { confirm } = useInteractionDialog();
+  const savedCurriculum = useRef<Curriculum | null>(null);
+  const dirty = !!editing && !equalJson(editing, savedCurriculum.current);
+  const guard = useRef(async () => true);
+  guard.current = async () =>
+    !busy && (!dirty || (await confirm("Discard unsaved curriculum changes?")));
   useEffect(() => {
-    onEditingChange?.(!!editing);
-  }, [!!editing, onEditingChange]);
+    registerNavigationGuard?.(() => guard.current());
+    return () => registerNavigationGuard?.(null);
+  }, [registerNavigationGuard]);
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirty || busy) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [dirty, busy]);
   const all = data.curricula || [];
   const content = data.publishedContent || data.content;
   const linked = (id: string) =>
@@ -251,7 +269,7 @@ export default function Curricula({
                 variant="outline"
                 type="button"
                 onClick={async () => {
-                  if (await confirm("Discard unsaved curriculum changes?")) {
+                  if (await guard.current()) {
                     setEditing(null);
                     destination.reveal();
                     setNotice("");
@@ -273,13 +291,15 @@ export default function Curricula({
           >
             <Button
               onClick={() => {
-                setEditing({
+                const draft: Curriculum = {
                   id: crypto.randomUUID(),
                   name: "",
                   description: "",
                   courseIds: [],
                   status: "draft",
-                });
+                };
+                savedCurriculum.current = draft;
+                setEditing(draft);
                 destination.reveal();
                 setQuery("");
                 setNotice("");
@@ -310,6 +330,7 @@ export default function Curricula({
                       variant="outline"
                       disabled={busy}
                       onClick={() => {
+                        savedCurriculum.current = structuredClone(c);
                         setEditing(structuredClone(c));
                         destination.reveal();
                         setQuery("");
