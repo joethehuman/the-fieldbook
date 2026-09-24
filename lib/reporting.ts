@@ -205,7 +205,9 @@ export function feedbackRows(
                 ? "Doc"
                 : "Removed content",
         person:
-          data.users.find((u) => u.id === f.userId)?.name || "Former user",
+          f.userId === "guest"
+            ? "Guest visitor"
+            : data.users.find((u) => u.id === f.userId)?.name || "Former user",
         ratingLabel: f.rating === "up" ? "Useful" : "Not useful",
       };
     });

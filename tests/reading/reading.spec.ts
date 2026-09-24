@@ -434,14 +434,14 @@ test("missing, wrong-kind, unpublished and service failures have real statuses",
     (await request.get(`/docs/${ids[0]}`)).status(),
   ).toBeGreaterThanOrEqual(500);
 });
-test("feedback lookup checks sign-in and publication without loading workspace", async ({
+test("feedback lookup checks guest access and publication without loading workspace", async ({
   browser,
   request,
   baseURL,
 }) => {
-  expect(
-    (await request.get(`/api/feedback?contentId=${ids[0]}`)).status(),
-  ).toBe(401);
+  const guestLookup = await request.get(`/api/feedback?contentId=${ids[0]}`);
+  expect(guestLookup.status()).toBe(200);
+  expect(await guestLookup.json()).toEqual({ saved: null });
   const token = await (
     await request.post(`${backend}/auth/v1/token`, { data: {} })
   ).json();
@@ -472,7 +472,81 @@ test("feedback lookup checks sign-in and publication without loading workspace",
   expect(
     (await context.request.get(`/api/feedback?contentId=${ids[0]}`)).status(),
   ).toBe(404);
+  await fixture(request, { settings: { access: "private" } });
+  expect(
+    (await request.get(`/api/feedback?contentId=${ids[0]}`)).status(),
+  ).toBe(401);
+  expect(
+    (
+      await request.post("/api/feedback", {
+        headers: { Origin: new URL(baseURL!).origin },
+        data: { contentId: ids[0], rating: "up", comment: "Denied" },
+      })
+    ).status(),
+  ).toBe(401);
   await context.close();
+});
+test("guest feedback persists in its browser and reaches administrator reports", async ({
+  browser,
+  page,
+  request,
+  baseURL,
+}, info) => {
+  await fixture(request, { settings: { access: "public" } });
+  await page.goto(`/updates/${ids[1]}`);
+  const region = page.getByRole("region", { name: "Content feedback" });
+  await expect(
+    region.getByRole("button", { name: "Useful", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("guest-update-feedback.png"),
+    fullPage: true,
+  });
+  const saved = page.waitForResponse(
+    (response) =>
+      response.url().endsWith("/api/feedback") &&
+      response.request().method() === "POST",
+  );
+  await region.getByRole("button", { name: "Useful", exact: true }).click();
+  expect((await saved).status()).toBe(200);
+  await page.reload();
+  await expect(
+    page
+      .getByRole("region", { name: "Content feedback" })
+      .getByRole("button", { name: "Useful", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  const admin = await browser.newContext({ baseURL });
+  await admin.addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  const memberSave = await admin.request.post("/api/feedback", {
+    headers: { Origin: new URL(baseURL!).origin },
+    data: { contentId: ids[1], rating: "down", comment: "Account response" },
+  });
+  expect(memberSave.status()).toBe(200);
+  const workspace = await (await admin.request.get("/api/workspace")).json();
+  expect(workspace.data.feedback).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ userId: "guest", rating: "up" }),
+      expect.objectContaining({ rating: "down", comment: "Account response" }),
+    ]),
+  );
+  await admin.close();
 });
 test("private HTML and RSC requests redirect without item or draft data", async ({
   request,
@@ -679,6 +753,9 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(
     page.getByText("Great work. You’ve completed this course."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Content feedback" }),
   ).toBeVisible();
   await page.reload();
   await expect(

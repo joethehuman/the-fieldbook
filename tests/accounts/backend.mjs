@@ -47,6 +47,7 @@ let settings = initial(),
   configuredGroups = [],
   configuredCurricula = [],
   configuredProgress = [],
+  configuredFeedback = [],
   userGroups = [],
   fail = false,
   brokenLogo = false,
@@ -91,6 +92,7 @@ createServer(async (req, res) => {
     configuredGroups = change.groups || [];
     configuredCurricula = change.curricula || [];
     configuredProgress = change.progress || [];
+    configuredFeedback = change.feedback || [];
     userGroups = change.userGroups || [];
     fail = !!change.fail;
     brokenLogo = !!change.brokenLogo;
@@ -228,10 +230,33 @@ createServer(async (req, res) => {
       pending: [],
       revision: 1,
     });
+  if (url.pathname === "/rest/v1/fb_feedback") {
+    if (req.method === "POST") {
+      const row = JSON.parse(body || "{}");
+      const index = configuredFeedback.findIndex(
+        (entry) =>
+          entry.content_id === row.content_id &&
+          (row.guest_key
+            ? entry.guest_key === row.guest_key
+            : entry.user_id === row.user_id),
+      );
+      if (index < 0) configuredFeedback.push(row);
+      else configuredFeedback[index] = row;
+      return send(res, []);
+    }
+    const rows = configuredFeedback.filter((row) =>
+      ["content_id", "guest_key", "user_id"].every((field) => {
+        const value = url.searchParams.get(field);
+        return !value || row[field] === value.slice(3);
+      }),
+    );
+    return send(res, rows, 200, {
+      "Content-Range": `0-${Math.max(0, rows.length - 1)}/${rows.length}`,
+    });
+  }
   if (
     [
       "/rest/v1/fb_documents",
-      "/rest/v1/fb_feedback",
       "/rest/v1/fb_mcp_grants",
     ].includes(url.pathname)
   )

@@ -16,7 +16,7 @@ export default async function Page({ params }: Props) {
       name={context.branding.name}
       back={<ReadingBack kind="brief" clientNavigation />}
     >
-      {context.user && <ReaderFeedback key={item.id} contentId={item.id} />}
+      <ReaderFeedback key={item.id} contentId={item.id} />
     </Article>
   );
 }
