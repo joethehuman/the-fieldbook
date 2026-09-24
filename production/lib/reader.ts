@@ -41,7 +41,7 @@ const validId =
 
 // Request-local reuse for layout, page and metadata. All database fetches are no-store.
 async function returnPath(fallback: string) {
-  return (await headers()).get("x-fieldbook-reader-path") || fallback;
+  return (await headers()).get("x-fieldbook-reader-return") || fallback;
 }
 const readerActor = cache(() => actor(undefined, true));
 const readerAccess = cache(async (destination: string) => {

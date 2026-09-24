@@ -8,6 +8,10 @@ import { isAbsentSession } from "./lib/errors";
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-fieldbook-reader-path", request.nextUrl.pathname);
+  requestHeaders.set(
+    "x-fieldbook-reader-return",
+    request.nextUrl.pathname + request.nextUrl.search,
+  );
   let response = NextResponse.next({ request: { headers: requestHeaders } });
   if (
     request.cookies.getAll().some((cookie) => cookie.name.startsWith("sb-"))
