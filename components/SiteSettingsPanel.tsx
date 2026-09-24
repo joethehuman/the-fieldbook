@@ -509,6 +509,7 @@ export default function SiteSettingsPanel({
               setNotice("");
               try {
                 await onChange({ ...data, settings: next });
+                savedSettings.current = next;
                 setSettings(next);
                 notify("Privacy policy published.");
               } catch (e) {

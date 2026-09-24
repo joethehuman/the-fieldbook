@@ -131,4 +131,18 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   await expect(page.getByText("Curriculum saved.")).toBeVisible();
   await section(page, "Identity");
   await expect(confirmation).toHaveCount(0);
+
+  await section(page, "Privacy");
+  await page.getByRole("combobox", { name: "Policy location" }).click();
+  await page
+    .getByRole("option", { name: "Link to an existing policy" })
+    .click();
+  await page
+    .getByRole("textbox", { name: "Privacy policy URL" })
+    .fill("https://example.com/privacy");
+  await page.getByRole("button", { name: "Publish privacy policy" }).click();
+  await confirmation.getByRole("button", { name: "Confirm" }).click();
+  await expect(page.getByText("Privacy policy published.")).toBeVisible();
+  await section(page, "Identity");
+  await expect(confirmation).toHaveCount(0);
 });
