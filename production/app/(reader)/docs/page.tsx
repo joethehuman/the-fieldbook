@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/patterns/intent-link";
 import { BookOpen, ChevronRight, ArrowRight } from "lucide-react";
 import { docSections } from "@/lib/docs-navigation";
 import { readerContext } from "@production/lib/reader";
@@ -26,7 +26,7 @@ export default async function Page() {
         <h1>Docs</h1>
       </PageHeader>
       {docs.some((doc) => doc.id === "start") && (
-        <Link className="knowledge-feature" href="/docs/start" prefetch={false}>
+        <IntentLink className="knowledge-feature" href="/docs/start" eager>
           <div>
             <h2>Start here</h2>
             <span className="text-link">
@@ -34,7 +34,7 @@ export default async function Page() {
             </span>
           </div>
           <BookOpen size={76} strokeWidth={1} />
-        </Link>
+        </IntentLink>
       )}
       <div className="knowledge-grid">
         {docSections(docs, docCategoryOrder, configured).map((section) => (
@@ -51,13 +51,13 @@ export default async function Page() {
             </p>
             {section.docs.map((doc) => (
               <NavigationButton asChild key={doc.id}>
-                <Link
+                <IntentLink
                   href={`/docs/${encodeURIComponent(doc.id)}`}
-                  prefetch={false}
+                  eager={doc.id === docs[0]?.id}
                 >
                   {doc.title}
                   <ChevronRight size={16} />
-                </Link>
+                </IntentLink>
               </NavigationButton>
             ))}
             {section.folders.map((child) => (
@@ -65,13 +65,13 @@ export default async function Page() {
                 <h3>{child.name}</h3>
                 {child.docs.map((doc) => (
                   <NavigationButton asChild key={doc.id}>
-                    <Link
+                    <IntentLink
                       href={`/docs/${encodeURIComponent(doc.id)}`}
-                      prefetch={false}
+                      eager={doc.id === docs[0]?.id}
                     >
                       {doc.title}
                       <ChevronRight size={16} />
-                    </Link>
+                    </IntentLink>
                   </NavigationButton>
                 ))}
               </div>

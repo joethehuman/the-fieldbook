@@ -7,7 +7,7 @@ import {
   CollapsibleContent,
 } from "../ui/collapsible";
 import { Button } from "../ui/button";
-import Link from "next/link";
+import { IntentLink } from "./intent-link";
 import {
   docSections,
   type DocLink,
@@ -146,14 +146,13 @@ export function DocumentTree({
                   {doc.title}
                 </a>
               ) : (
-                <Link
+                <IntentLink
                   href={href(doc.id)}
-                  prefetch={false}
                   aria-current={selected === doc.id ? "page" : undefined}
                   onClick={() => remember()}
                 >
                   {doc.title}
-                </Link>
+                </IntentLink>
               )}
             </Button>
           ))}

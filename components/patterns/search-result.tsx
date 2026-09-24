@@ -1,7 +1,7 @@
 import { searchLabels, type SearchResult as Result } from "@/lib/search";
 import { ContentAction } from "./content-action";
 import { Skeleton } from "../ui/skeleton";
-import Link from "next/link";
+import { IntentLink } from "./intent-link";
 
 export function SearchResultSkeleton() {
   return (
@@ -57,9 +57,9 @@ export function SearchResultCard({
       className="grid gap-1 break-words p-4 hover:bg-muted hover:no-underline hover:shadow-none focus-visible:bg-muted"
     >
       {clientNavigation ? (
-        <Link href={href || result.href} prefetch={false} onClick={onOpen}>
+        <IntentLink href={href || result.href} onClick={onOpen}>
           <ResultBody result={result} />
-        </Link>
+        </IntentLink>
       ) : (
         <a
           href={href || result.href}

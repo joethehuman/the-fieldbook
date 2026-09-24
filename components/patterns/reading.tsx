@@ -16,7 +16,7 @@ import { contentPath } from "@/lib/navigation";
 import { Button } from "../ui/button";
 import { InitialsAvatar } from "../ui/initials-avatar";
 import { ContentAction } from "./content-action";
-import Link from "next/link";
+import { IntentLink } from "./intent-link";
 
 /** Shared, server-compatible reading presentation; callers own access and actions. */
 export function Article({
@@ -156,10 +156,10 @@ export function Article({
                           )}
                         </a>
                       ) : (
-                        <Link
+                        <IntentLink
                           data-direction={direction === 0 ? "previous" : "next"}
                           href={contentPath("doc", doc.id)}
-                          prefetch={false}
+                          eager
                         >
                           {direction === 0 && (
                             <ChevronLeft aria-hidden="true" size={16} />
@@ -175,7 +175,7 @@ export function Article({
                           {direction === 1 && (
                             <ChevronRight aria-hidden="true" size={16} />
                           )}
-                        </Link>
+                        </IntentLink>
                       )}
                     </Button>
                   ),
@@ -257,9 +257,9 @@ export function ReadingBack({
   return (
     <Button asChild variant="link">
       {clientNavigation ? (
-        <Link href={`/${label}`} prefetch={false}>
+        <IntentLink href={`/${label}`} eager>
           ← Back to {label}
-        </Link>
+        </IntentLink>
       ) : (
         <a
           href={

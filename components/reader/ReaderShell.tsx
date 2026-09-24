@@ -103,7 +103,11 @@ export function ReaderShell({
               key={href}
               className={section === href.slice(1) ? "active" : ""}
             >
-              <Link href={href} prefetch={false} onClick={close}>
+              <Link
+                href={href}
+                prefetch={href === "/updates" || href === "/docs"}
+                onClick={close}
+              >
                 <Icon size={19} />
                 {label}
               </Link>
@@ -195,7 +199,7 @@ export function ReaderShell({
             </Button>
             <ChevronRight size={14} />
             <Button asChild variant="link">
-              <Link href={`/${section}`} prefetch={false}>
+              <Link href={`/${section}`} prefetch>
                 {title}
               </Link>
             </Button>

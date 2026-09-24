@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
-import { actor } from "./auth";
+import { readerActor as verifiedReaderActor } from "./auth";
 import {
   assertCanRead,
   canRead,
@@ -45,7 +45,7 @@ const validId =
 async function returnPath(fallback: string) {
   return (await headers()).get("x-fieldbook-reader-return") || fallback;
 }
-const readerActor = cache(() => actor(undefined, true));
+const readerActor = cache(verifiedReaderActor);
 const publishedIndex = unstable_cache(
   async (_installation: string, _governanceRevision: number) =>
     readAll((from, to) =>
@@ -191,16 +191,26 @@ const publishedBody = cache(async (kind: "doc" | "brief", id: string) => {
 });
 export const readerItem = cache(async (kind: "doc", id: string) => {
   const destination = "/docs";
-  await readerAccess(destination);
-  const [context, item] = await Promise.all([
-    readerContext(destination),
-    publishedBody(kind, id),
-  ]);
+  // Start the body early, but access must determine the response before a 404.
+  const body = publishedBody(kind, id).then(
+    (item) => ({ item }),
+    (error: unknown) => ({ error }),
+  );
+  const context = await readerContext(destination);
+  const result = await body;
+  if ("error" in result) throw result.error;
+  const item = result.item;
   return { context, item };
 });
 export const readerUpdateItem = cache(async (id: string) => {
+  const body = publishedBody("brief", id).then(
+    (item) => ({ item }),
+    (error: unknown) => ({ error }),
+  );
   const { user, config } = await readerAccess("/updates");
-  const item = await publishedBody("brief", id);
+  const result = await body;
+  if ("error" in result) throw result.error;
+  const item = result.item;
   return {
     item,
     context: {

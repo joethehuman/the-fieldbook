@@ -99,6 +99,35 @@ export async function actor(
   if (!saved.active) throw new HttpError(403, "This account is inactive.");
   return profile(saved);
 }
+/** Reader identity uses a verified JWT and keeps the profile check fresh. */
+export async function readerActor(): Promise<User | null> {
+  const client = await authClient(true);
+  let result;
+  try {
+    result = await client.auth.getClaims();
+  } catch {
+    throw new ServiceError(
+      "Sign-in verification is unavailable. Try again shortly; contact an administrator if it continues.",
+      "auth",
+    );
+  }
+  if (result.error) {
+    if (isAbsentSession(result.error)) return null;
+    // Older signing keys and unusual providers can still be verified by Auth.
+    return actor(undefined, true);
+  }
+  const id = result.data?.claims.sub;
+  if (!id) return null;
+  const { data: found, error } = await db()
+    .from("fb_profiles")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  check(error);
+  if (!found) return actor(undefined, true); // First visit registers a verified account.
+  if (!found.active) throw new HttpError(403, "This account is inactive.");
+  return profile(found);
+}
 export function requireAdmin(user: User | null): asserts user is User {
   if (!user) throw new HttpError(401, "Sign in to continue.");
   if (!user.active || user.role !== "admin")
