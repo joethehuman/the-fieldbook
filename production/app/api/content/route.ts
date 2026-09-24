@@ -6,6 +6,7 @@ import {
   requireAdmin,
 } from "@production/lib/auth";
 import { saveContent, getContent } from "@production/lib/content";
+import { invalidatePublishedReader } from "@production/lib/reader-cache";
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -31,16 +32,16 @@ export async function POST(req: Request) {
     const a = await req.json();
     if (!Number.isInteger(a.expected) || a.expected < 0)
       throw new HttpError(400, "A revision is required.");
-    return Response.json(
-      await saveContent(
-        user,
-        a.content,
-        a.expected,
-        a.publish === true,
-        "web",
-        a.unpublish === true,
-      ),
+    const saved = await saveContent(
+      user,
+      a.content,
+      a.expected,
+      a.publish === true,
+      "web",
+      a.unpublish === true,
     );
+    if (a.publish === true || a.unpublish === true) invalidatePublishedReader();
+    return Response.json(saved);
   } catch (e) {
     return errorResponse(e, "api/content");
   }

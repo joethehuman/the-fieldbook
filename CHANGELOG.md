@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Reuse published Docs and Updates indexes and article bodies across reader requests, and expire them immediately after publishing or unpublishing through the web editor or administrator MCP. Installation access and personalized relevance remain request-time checks.
+
 - Clear admin navigation warnings after confirmed settings and curriculum saves while retaining prompts for genuinely unsaved edits and blocking navigation during saves.
 
 - Restore administrator learning-group saves on installations that require a WHERE clause for updates. Scope pending-account group cleanup to affected accounts, and show one concise error beside the group if a save fails. Apply `20260923230000_scope_pending_group_cleanup.sql` before using group administration on an upgraded installation.

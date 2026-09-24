@@ -9,6 +9,7 @@ import {
   errorResponse,
 } from "@production/lib/auth";
 import { env } from "@production/lib/env";
+import { invalidatePublishedReader } from "@production/lib/reader-cache";
 export const runtime = "nodejs";
 export const maxDuration = 30;
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
@@ -82,7 +83,7 @@ async function handle(req: Request) {
       return new Response(null, { status: 405, headers: { Allow: "POST" } });
     if (Number(req.headers.get("content-length")) > 2000000)
       throw new HttpError(413, "Request is too large.");
-    const server = createMcp(user, claims.client_id),
+    const server = createMcp(user, claims.client_id, invalidatePublishedReader),
       transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
         enableJsonResponse: true,

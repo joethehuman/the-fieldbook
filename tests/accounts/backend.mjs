@@ -30,6 +30,7 @@ const initial = () => ({
 });
 let documents = [],
   reads = 0;
+let fixtureGeneration = Date.now();
 let readQueries = [];
 let settings = initial(),
   configuredGroups = [],
@@ -68,6 +69,7 @@ createServer(async (req, res) => {
   for await (const chunk of req) body += chunk;
   if (url.pathname === "/fixture") {
     const change = JSON.parse(body || "{}");
+    fixtureGeneration++;
     documents = change.documents || [];
     reads = 0;
     readQueries = [];
@@ -117,7 +119,7 @@ createServer(async (req, res) => {
     return send(res, {
       settings,
       revision,
-      governance_revision: 1,
+      governance_revision: fixtureGeneration,
       groups: configuredGroups,
       curricula: [],
     });
@@ -156,6 +158,32 @@ createServer(async (req, res) => {
     return send(res, rows, 200, {
       "Content-Range": `0-${rows.length - 1}/${rows.length}`,
     });
+  }
+  if (url.pathname === "/rest/v1/rpc/fb_save_document") {
+    const input = JSON.parse(body);
+    const index = documents.findIndex((row) => row.id === input.p_id);
+    const previous = documents[index];
+    if (input.p_expected !== (previous?.revision ?? 0))
+      return send(res, { message: "Revision conflict", code: "P0001" }, 400);
+    const saved = {
+      ...previous,
+      id: input.p_id,
+      draft: input.p_draft,
+      published: input.p_unpublish
+        ? null
+        : input.p_publish
+          ? input.p_draft
+          : previous?.published || null,
+      revision: input.p_expected + 1,
+      published_revision: input.p_unpublish
+        ? null
+        : input.p_publish
+          ? input.p_expected + 1
+          : previous?.published_revision || null,
+    };
+    if (index < 0) documents.push(saved);
+    else documents[index] = saved;
+    return send(res, saved);
   }
   if (url.pathname === "/rest/v1/rpc/fb_allow_request") return send(res, true);
   if (url.pathname === "/rest/v1/rpc/fb_record_progress") return send(res, {});
