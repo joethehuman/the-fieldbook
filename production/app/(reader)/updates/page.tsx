@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { IntentLink } from "@/components/patterns/intent-link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { ContentAction } from "@/components/patterns/content-action";
 import {
@@ -27,9 +27,9 @@ function Cards({ items }: { items: ReaderItem[] }) {
           className={`brief-card ${index === 0 ? "featured" : ""}`}
           key={item.id}
         >
-          <Link
+          <IntentLink
             href={`/updates/${encodeURIComponent(item.id)}`}
-            prefetch={false}
+            eager={index === 0}
           >
             <div className={`brief-art art-${index % 6}`}>
               <ArrowUpRight size={36} />
@@ -55,7 +55,7 @@ function Cards({ items }: { items: ReaderItem[] }) {
                 })}
               </ContentCardFooter>
             </div>
-          </Link>
+          </IntentLink>
         </ContentAction>
       ))}
     </div>

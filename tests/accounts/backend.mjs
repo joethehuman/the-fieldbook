@@ -1,4 +1,14 @@
 import { createServer } from "node:http";
+import { createSign, generateKeyPairSync } from "node:crypto";
+const { privateKey, publicKey } = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+});
+const jwk = {
+  ...publicKey.export({ format: "jwk" }),
+  alg: "RS256",
+  use: "sig",
+  kid: "synthetic-reader",
+};
 const file = "00000000-0000-4000-8000-000000000001.png";
 const initial = () => ({
   name: "Acme Learning",
@@ -29,7 +39,8 @@ const initial = () => ({
   },
 });
 let documents = [],
-  reads = 0;
+  reads = 0,
+  authReads = 0;
 let fixtureGeneration = Date.now();
 let readQueries = [];
 let settings = initial(),
@@ -72,6 +83,7 @@ createServer(async (req, res) => {
     fixtureGeneration++;
     documents = change.documents || [];
     reads = 0;
+    authReads = 0;
     readQueries = [];
     settings = { ...initial(), ...change.settings };
     configuredGroups = change.groups || [];
@@ -82,8 +94,11 @@ createServer(async (req, res) => {
     revision = 1;
     return send(res, { ok: true });
   }
-  if (url.pathname === "/reads") return send(res, { reads, readQueries });
+  if (url.pathname === "/reads")
+    return send(res, { reads, readQueries, authReads });
   if (url.pathname === "/health") return send(res, { ok: true });
+  if (url.pathname === "/auth/v1/.well-known/jwks.json")
+    return send(res, { keys: [jwk] });
   if (url.pathname === "/logo") {
     if (brokenLogo) return send(res, {}, 404);
     res.writeHead(200, { "Content-Type": "image/svg+xml" });
@@ -223,7 +238,17 @@ createServer(async (req, res) => {
         400,
       );
     const encode = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
-    const token = `${encode({ alg: "HS256" })}.${encode({ sub: user().id, exp: Math.floor(Date.now() / 1000) + 3600 })}.synthetic`;
+    const claims = {
+      iss: "https://test.supabase.co/auth/v1",
+      aud: "authenticated",
+      role: "authenticated",
+      sub: user().id,
+      email: user().email,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+      iat: Math.floor(Date.now() / 1000),
+    };
+    const value = `${encode({ alg: "RS256", kid: jwk.kid, typ: "JWT" })}.${encode(claims)}`;
+    const token = `${value}.${createSign("RSA-SHA256").update(value).sign(privateKey, "base64url")}`;
     return send(res, {
       access_token: token,
       refresh_token: "synthetic-refresh",
@@ -232,7 +257,10 @@ createServer(async (req, res) => {
       user: user(),
     });
   }
-  if (url.pathname === "/auth/v1/user") return send(res, user());
+  if (url.pathname === "/auth/v1/user") {
+    authReads++;
+    return send(res, user());
+  }
   if (url.pathname === "/auth/v1/logout") return send(res, {});
   return send(
     res,

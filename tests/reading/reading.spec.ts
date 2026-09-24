@@ -132,15 +132,30 @@ for (const signedIn of [false, true]) {
     await page.goto("/updates");
     expect(documentNavigations).toBe(1);
     await expect(page.getByRole("heading", { name: "For you" })).toBeVisible();
+    if (signedIn)
+      expect(
+        (await (await request.get(`${backend}/reads`)).json()).authReads,
+      ).toBe(0);
+    await expect
+      .poll(async () => {
+        const { readQueries } = await (
+          await request.get(`${backend}/reads`)
+        ).json();
+        return readQueries.some((query: string) => {
+          const params = new URLSearchParams(query);
+          return (
+            params.get("id") === `eq.${ids[1]}` &&
+            params.get("select")?.includes("published_revision")
+          );
+        });
+      })
+      .toBe(true);
     const html = await page.content();
     if (!signedIn) {
       expect(html).not.toContain("Internal group");
       expect(html).not.toContain('"parent"');
     }
     await page.evaluate(() => ((window as any).__readerMarker = "kept"));
-    const readsBeforeUpdate = (
-      await (await request.get(`${backend}/reads`)).json()
-    ).readQueries.length;
     await page.locator(`a.brief-card[href="/updates/${ids[1]}"]`).click();
     await expect(
       page.getByRole("heading", { name: items[1].title }),
@@ -148,12 +163,15 @@ for (const signedIn of [false, true]) {
     expect(await page.evaluate(() => (window as any).__readerMarker)).toBe(
       "kept",
     );
-    const updateQueries = (
-      await (await request.get(`${backend}/reads`)).json()
-    ).readQueries.slice(readsBeforeUpdate);
-    expect(updateQueries.length).toBeGreaterThan(0);
+    const updateQueries = (await (await request.get(`${backend}/reads`)).json())
+      .readQueries;
+    // The body may have arrived from an eager prefetch before the click.
+    const bodyQueries = updateQueries.filter((query: string) =>
+      new URLSearchParams(query).get("select")?.includes("published_revision"),
+    );
+    expect(bodyQueries.length).toBeGreaterThan(0);
     expect(
-      updateQueries.some((query: string) =>
+      bodyQueries.some((query: string) =>
         new URLSearchParams(query).get("select")?.includes("title:published"),
       ),
     ).toBe(false);
@@ -218,29 +236,40 @@ test("client navigation rechecks publication, item type and installation access"
   page,
   request,
 }) => {
+  const coldDoc = {
+    ...items[0],
+    id: "00000000-0000-4000-8000-000000000024",
+    title: "Another published document",
+  };
+  const all = documents([...items, coldDoc]);
   for (const change of [
     "unpublished",
     "deleted",
     "wrong-type",
     "private",
   ] as const) {
-    await fixture(request);
+    await fixture(request, { documents: all });
     await page.goto("/docs");
-    const link = page.locator(`.knowledge-section a[href="/docs/${ids[0]}"]`);
+    const link = page.locator(
+      `.knowledge-section a[href="/docs/${coldDoc.id}"]`,
+    );
     await expect(link).toBeVisible();
     if (change === "private")
       await fixture(request, { settings: { access: "private", logoUrl: "" } });
-    else if (change === "deleted") await fixture(request, { documents: [] });
+    else if (change === "deleted")
+      await fixture(request, {
+        documents: all.filter((row) => row.id !== coldDoc.id),
+      });
     else if (change === "unpublished")
       await fixture(request, {
-        documents: documents().map((row) =>
-          row.id === ids[0] ? { ...row, published: null } : row,
+        documents: all.map((row) =>
+          row.id === coldDoc.id ? { ...row, published: null } : row,
         ),
       });
     else
       await fixture(request, {
-        documents: documents().map((row) =>
-          row.id === ids[0]
+        documents: all.map((row) =>
+          row.id === coldDoc.id
             ? { ...row, published: { ...row.published, kind: "brief" } }
             : row,
         ),
