@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Let visitors to public installations rate and comment on published Docs, Updates and Courses. Save guest feedback under a pseudonymous browser token and include it in administrator reports. Apply `20260924150351_anonymous_feedback.sql` before deploying this change to an existing installation.
+
 - Keep Courses, Docs and Updates in one reader shell with a compact Courses catalog and current learner progress. Accept course progress submissions from either trusted Vercel preview address so guest lessons and quizzes work when opened from a deployment link.
 
 - Reuse published Docs and Updates indexes and article bodies across reader requests, and expire them immediately after publishing or unpublishing through the web editor or administrator MCP. Installation access and personalized relevance remain request-time checks.

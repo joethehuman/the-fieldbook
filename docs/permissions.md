@@ -32,6 +32,8 @@ Before using an installation, verify these rules with separate administrator, le
 
 Only administrators configure the optional guest learning group. Anonymous visitors receive a minimal synthetic recommendation projection of published content, never real group membership, team links or governance revisions. Public access is checked before reading the catalog. No people records, membership changes, deadlines or reporting entries are created. Signing in uses account groups; browser-progress import does not enroll an account. See [guest recommendations](guest-recommendations.md).
 
+On public installations, visitors can rate and comment on published content. A random browser cookie lets them revise their own feedback; the server stores only its hash and labels those entries “Guest visitor” in administrator reports. Guest feedback does not create an account or learning record. The feedback API checks the site origin, publication/access and a request limit. Apply the anonymous-feedback migration before enabling this behavior on an upgraded installation.
+
 
 ## Managing the reporting hierarchy
 

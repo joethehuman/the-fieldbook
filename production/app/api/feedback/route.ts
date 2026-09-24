@@ -6,19 +6,32 @@ import {
 } from "@production/lib/auth";
 import { db, check } from "@production/lib/db";
 import { getContent } from "@production/lib/content";
+import { createHash, randomBytes } from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-export async function GET(req: Request) {
+const guestCookie = "fb_guest_feedback";
+const guestToken = (req: NextRequest) => {
+  const value = req.cookies.get(guestCookie)?.value;
+  return value && /^[a-f0-9]{64}$/.test(value) ? value : null;
+};
+const hash = (value: string) =>
+  createHash("sha256").update(value).digest("hex");
+
+export async function GET(req: NextRequest) {
   try {
     const user = await actor();
-    if (!user) throw new HttpError(401, "Sign in to view feedback.");
     const id = z.uuid().parse(new URL(req.url).searchParams.get("contentId"));
     await getContent(id, user);
-    const { data, error } = await db()
+    const token = user ? null : guestToken(req);
+    const query = db()
       .from("fb_feedback")
       .select("rating,comment")
-      .eq("user_id", user.id)
-      .eq("content_id", id)
-      .maybeSingle();
+      .eq("content_id", id);
+    const { data, error } = user
+      ? await query.eq("user_id", user.id).maybeSingle()
+      : token
+        ? await query.eq("guest_key", hash(token)).maybeSingle()
+        : { data: null, error: null };
     check(error);
     return Response.json(
       { saved: data || null },
@@ -28,11 +41,10 @@ export async function GET(req: Request) {
     return errorResponse(e, "api/feedback");
   }
 }
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
     sameOrigin(req);
     const user = await actor();
-    if (!user) throw new HttpError(401, "Sign in to send feedback.");
     const a = z
       .object({
         contentId: z.uuid(),
@@ -40,21 +52,55 @@ export async function POST(req: Request) {
         comment: z.string().max(5000),
       })
       .parse(await req.json());
+    const existingToken = user ? null : guestToken(req);
+    const token = user ? null : existingToken || randomBytes(32).toString("hex");
+    if (token) {
+      const source =
+        req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
+        token;
+      const { data: allowed, error } = await db().rpc("fb_allow_request", {
+        p_key: `guest-feedback:${hash(source)}`,
+        p_limit: 30,
+        p_seconds: 3600,
+      });
+      check(error);
+      if (!allowed)
+        throw new HttpError(429, "Please wait before sending more feedback.");
+    }
     const c = await getContent(a.contentId, user);
-    const { error } = await db().from("fb_feedback").upsert(
-      {
-        id: crypto.randomUUID(),
-        user_id: user.id,
-        content_id: c.id,
-        version: c.version,
-        rating: a.rating,
-        comment: a.comment,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "user_id,content_id" },
-    );
+    const record = {
+      id: crypto.randomUUID(),
+      content_id: c.id,
+      version: c.version,
+      rating: a.rating,
+      comment: a.comment,
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = user
+      ? await db()
+          .from("fb_feedback")
+          .upsert({ ...record, user_id: user.id }, {
+            onConflict: "user_id,content_id",
+          })
+      : await db()
+          .from("fb_feedback")
+          .upsert({ ...record, user_id: null, guest_key: hash(token!) }, {
+            onConflict: "guest_key,content_id",
+          });
     check(error);
-    return Response.json({ saved: true });
+    const response = NextResponse.json(
+      { saved: true },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+    if (token && !existingToken)
+      response.cookies.set(guestCookie, token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 365,
+        path: "/",
+      });
+    return response;
   } catch (e) {
     return errorResponse(e, "api/feedback");
   }

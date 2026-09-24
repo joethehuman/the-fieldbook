@@ -42,7 +42,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
     });
     feedback = ratings.map((r) => ({
       id: r.id,
-      userId: r.user_id,
+      userId: r.user_id || "guest",
       contentId: r.content_id,
       version: r.version,
       rating: r.rating,

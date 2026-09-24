@@ -61,7 +61,7 @@ The production application includes:
 - Drafts, explicit publication, revision checks, and content-write audit records.
 - Images and video-file uploads, with a 50 MB per-file ceiling and no transcoding.
 - Persistent learner progress, server-graded quizzes, and optional browser-progress import.
-- Signed-in feedback, administrator progress/feedback views, branding, and privacy-policy settings.
+- Feedback from signed-in members and public visitors, administrator progress/feedback views, branding, and privacy-policy settings.
 - Administrator-only MCP tools for content, aggregate reports, and existing media references.
 
 **Production governance** includes people administration, pre-registered Google accounts, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [roles and permissions](docs/permissions.md). Navigation labels are currently fixed. Published search uses PostgreSQL indexes across the full published library and returns the best 30 content matches, including lesson destinations. See [search behavior and setup](docs/search.md). Catalog, feedback and aggregate reporting reads paginate past the database API response cap and fail if a page cannot be retrieved. MCP search still scans up to 500 recent items and returns at most 50 matches. Those administrator MCP search bounds can omit matches on larger installations.

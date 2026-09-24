@@ -71,6 +71,7 @@ import { docSections } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
 import Feedback from "./Feedback";
+import { ReaderFeedback } from "./reader/ReaderFeedback";
 import { TeamProgress } from "./Teams";
 import { videoSource } from "@/lib/video";
 import {
@@ -951,7 +952,9 @@ export default function Fieldbook({
                 </Button>
               }
             >
-              {user.id !== "guest" && (
+              {runtime && user.id === "guest" ? (
+                <ReaderFeedback key={item.id} contentId={item.id} />
+              ) : (
                 <Feedback
                   key={item.id + user.id}
                   content={item}
@@ -1397,7 +1400,9 @@ export function Course({
                   <Check size={16} />
                 </Button>
               </ActionGroup>
-              {user.id !== "guest" && (
+              {runtime && user.id === "guest" ? (
+                <ReaderFeedback key={c.id} contentId={c.id} />
+              ) : (
                 <Feedback
                   key={c.id + user.id}
                   content={c}
