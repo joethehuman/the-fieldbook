@@ -140,7 +140,7 @@ async function setup(
   await page.goto(role === "admin" ? (production ? "/team" : "/#admin") : "/");
   if (production && role === "admin") {
     const menu = page.getByRole("button", { name: "Open navigation" });
-    if (await menu.isVisible()) await menu.click();
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   }
   const ready = role === "admin" ? "Administration" : "Courses";

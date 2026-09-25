@@ -51,7 +51,7 @@ test("publication badges stay compact while unpublished edits remain visible", a
   await page.goto(production ? "/team" : "/#admin");
   if (production) {
     const menu = page.getByRole("button", { name: "Open navigation" });
-    if (await menu.isVisible()) await menu.click();
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   }
   const table = page.locator('table[data-layout="content"]');

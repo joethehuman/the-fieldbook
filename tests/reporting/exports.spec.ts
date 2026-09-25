@@ -174,7 +174,7 @@ async function setup(
   );
   if (production && role === "admin") {
     const menu = page.getByRole("button", { name: "Open navigation" });
-    if (await menu.isVisible()) await menu.click();
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   }
   await expect(
@@ -507,7 +507,7 @@ test("failed progress update disables exports until the complete report reloads"
   );
   await page.goto("/team");
   const menu = page.getByRole("button", { name: "Open navigation" });
-  if (await menu.isVisible()) await menu.click();
+  if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
   await page.getByRole("button", { name: "Manage organization" }).click();
   await expect(
     page.getByRole("heading", { name: "Administration", exact: true }),
@@ -614,7 +614,7 @@ test("People fieldset footers preserve default-stage saving in both applications
   if (production) {
     await page.goto("/team");
     const menu = page.getByRole("button", { name: "Open navigation" });
-    if (await menu.isVisible()) await menu.click();
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   } else await page.reload();
   await expect(

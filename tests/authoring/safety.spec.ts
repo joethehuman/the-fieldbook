@@ -115,7 +115,7 @@ async function setup(
   await page.goto(production ? "/team" : "/#admin");
   if (production) {
     const menu = page.getByRole("button", { name: "Open navigation" });
-    if (await menu.isVisible()) await menu.click();
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   }
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
@@ -123,7 +123,7 @@ async function setup(
 }
 async function openNav(page: Page) {
   const menu = page.getByRole("button", { name: "Open navigation" });
-  if (await menu.isVisible()) await menu.click();
+  if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
 }
 
 test("search preserves dirty edits; canceled navigation and reload keep them until explicit discard", async ({
@@ -260,7 +260,7 @@ test("failed learning-group save shows one concise inline error", async ({
   );
   await page.goto("/team");
   const menu = page.getByRole("button", { name: "Open navigation" });
-  if (await menu.isVisible()) await menu.click();
+  if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
   await page.getByRole("button", { name: "Manage organization" }).click();
   if (info.project.name.endsWith("phone")) {
     await page
