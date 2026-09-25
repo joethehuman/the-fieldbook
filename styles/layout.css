@@ -127,7 +127,7 @@
     overflow-y: auto;
     overscroll-behavior: none;
     scroll-padding-block-start: var(--anchor-offset);
-    scrollbar-gutter: stable;
+    scrollbar-gutter: stable both-edges;
     outline: none;
   }
   .app-footer {
