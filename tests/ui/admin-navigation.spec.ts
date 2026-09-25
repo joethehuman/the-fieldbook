@@ -16,13 +16,18 @@ async function revealed(target: Locator) {
     .poll(async () =>
       target.evaluate((el) => {
         const top = el.getBoundingClientRect().top;
+        const panel = el.closest(".admin-panel")?.getBoundingClientRect();
+        const footer = document.querySelector(".app-footer")?.getBoundingClientRect();
         const bar =
           parseFloat(
             getComputedStyle(document.documentElement).getPropertyValue(
               "--app-bar-height",
             ),
           ) || 64;
-        return top >= bar && top < innerHeight / 2;
+        return (
+          top >= Math.max(bar, panel?.top ?? bar) &&
+          top < Math.min(panel?.bottom ?? innerHeight, footer?.top ?? innerHeight)
+        );
       }),
     )
     .toBe(true);

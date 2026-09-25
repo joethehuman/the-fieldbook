@@ -302,7 +302,7 @@ export default function Fieldbook({
         : `${window.location.pathname}${query}#${path}`,
     );
     acceptedUrl.current = window.location.href;
-    window.scrollTo({ top: 0 });
+    document.getElementById("main-content")?.scrollTo({ top: 0 });
   }
   async function persist(
     next: Workspace,
@@ -817,7 +817,14 @@ export default function Fieldbook({
             {error}
           </Alert>
         )}
-        <main id="main-content" className="main-content" tabIndex={-1}>
+        <main
+          id="main-content"
+          className={
+            "main-content" +
+            (view === "admin" && user.role === "admin" ? " admin-content" : "")
+          }
+          tabIndex={-1}
+        >
           {view === "admin" && user.role === "admin" ? (
             <ReportAvailability.Provider value={reportIssue}>
               <Admin
@@ -1133,24 +1140,24 @@ export default function Fieldbook({
               />
             </>
           )}
-          <footer>
-            {branding.name} <span>{branding.tagline}</span>
-            {privacyHref(branding) && (
-              <a href={privacyHref(branding)!}>Privacy policy</a>
-            )}
-            {!runtime && (
-              <Button
-                variant="ghost"
-                onClick={(event) => {
-                  demoTrigger.current = event.currentTarget;
-                  setShowDemo(true);
-                }}
-              >
-                About this demo
-              </Button>
-            )}
-          </footer>
         </main>
+        <footer className="app-footer">
+          {branding.name} <span>{branding.tagline}</span>
+          {privacyHref(branding) && (
+            <a href={privacyHref(branding)!}>Privacy policy</a>
+          )}
+          {!runtime && (
+            <Button
+              variant="ghost"
+              onClick={(event) => {
+                demoTrigger.current = event.currentTarget;
+                setShowDemo(true);
+              }}
+            >
+              About this demo
+            </Button>
+          )}
+        </footer>
       </div>
       <Dialog open={showDemo} onOpenChange={setShowDemo}>
         <DialogContent

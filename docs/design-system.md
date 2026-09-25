@@ -25,7 +25,7 @@ Start with existing primitives and patterns. For example, use `SectionHeader`, `
 - Use **TableContainer** with Table and its row/cell primitives for data. Overflow belongs inside the table container, never on the whole page.
 - Use **Card**, **Alert** and **EmptyState** for surfaces and state feedback. Do not duplicate their backgrounds, borders, radius and padding in a feature stylesheet.
 - Use **ResponsiveTabsNavigation** for dense administration navigation: grouped desktop tabs and a compact section picker on narrow screens. Both drive the same selected section and unsaved-change handler.
-- Keep the desktop Administration tab list independently scrollable beside the page content, without an extra visible page introduction or menu heading. Selecting a tab reveals the new panel from the top without resetting the tab list's scroll position.
+- Keep the desktop Administration tab list and selected panel in separate scroll areas inside the shared viewport shell, without an extra visible page introduction or menu heading. Selecting a tab reveals the new panel from the top without resetting the tab list's scroll position.
 - Use **OrderedLearning** for playlist sequencing. Dragging has keyboard and up/down alternatives. Do not import reusable UI from another feature screen.
 - Keep course assignment, authorization, fetching and mutation logic in features/server code. Presentation refactoring must preserve publishing, completion, autosave, explicit Save, revision checks and navigation behavior.
 
@@ -151,9 +151,9 @@ The `/ui` catalog includes a document tree, repeated headings, an outline and se
 
 ## Persistent application bar
 
-`AppBar` owns the shared sticky header in `Fieldbook`. The document remains the page scroll container; do not add overflow containers to `.app` or `.main-shell`. Sticky positioning reserves the header's natural height and follows the sidebar's existing responsive margin. Keep the opaque background and border. Its layer (15) is below navigation/backdrop (20/30), dialogs (40) and portaled menus (50). Search stays inside the bar's stacking context. Standalone account and full-screen routes do not acquire this shell.
+`AppBar` owns the shared header in `Fieldbook`. The application shell fills the viewport: the header and footer stay in place, while `.main-content` owns page scrolling and the sidebar owns its own scroll. Administration divides the available content area into independently scrolling section navigation and panel. Keep the opaque header background and border. Its layer (15) is below navigation/backdrop (20/30), dialogs (40) and portaled menus (50). Search stays inside the bar's stacking context. Standalone account and full-screen routes do not acquire this shell.
 
-A ResizeObserver supplies `--app-bar-height` for wrapped controls and enlarged text. The root scroll padding applies only when the bar exists; heading scroll margins add breathing room, not a second header-height offset. The Docs outline uses `--anchor-offset` for its sticky top and bounded height. Preserve native fragment/history behavior and navigation guards. SearchPanel bounds its height by the remaining viewport, and retains its trigger-relative desktop and bar-relative phone placement. Verify top/scrolled states, long breadcrumbs, enlarged text, search, heading links and dialog focus in both applications.
+A ResizeObserver supplies `--app-bar-height` for wrapped controls and enlarged text. The main scroll area and nested Admin panel use local scroll padding and heading margins; the bar's height is not added to those offsets. The Docs outline tracks the main scroll area and uses `--anchor-offset` for its sticky top and bounded height. Preserve native fragment/history behavior and navigation guards. SearchPanel bounds its height by the remaining viewport, and retains its trigger-relative desktop and bar-relative phone placement. Verify short and long content, scroll limits, long breadcrumbs, enlarged text, search, heading links and dialog focus in both applications.
 
 ## Foundations and controls
 

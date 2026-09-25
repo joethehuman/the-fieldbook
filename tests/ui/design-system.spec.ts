@@ -154,7 +154,7 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop");
-  await page.setViewportSize({ width: 1280, height: 560 });
+  await page.setViewportSize({ width: 1280, height: 400 });
   await admin(page);
   const nav = page.locator('[data-slot="admin-navigation"] [role="tablist"]');
   await expect(nav).toBeVisible();
@@ -163,26 +163,75 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   await expect(page.locator("main")).not.toContainText(
     "Content, people, and the settings that keep your organization running.",
   );
-  const initialPageY = await page.evaluate(() => window.scrollY);
+  const panel = page.getByRole("tabpanel", { name: "Content" });
+  const shellPositions = await page.evaluate(() => ({
+    header: document.querySelector(".topbar")!.getBoundingClientRect().top,
+    footer: document.querySelector(".app-footer")!.getBoundingClientRect()
+      .bottom,
+    sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+  }));
   await nav.hover();
   await page.mouse.wheel(0, 500);
   await expect
     .poll(() => nav.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
-  expect(await page.evaluate(() => window.scrollY)).toBe(initialPageY);
+  expect(await panel.evaluate((element) => element.scrollTop)).toBe(0);
   const before = await nav.evaluate((element) => element.scrollTop);
-  await page.getByRole("tabpanel", { name: "Content" }).hover();
+  await panel.hover();
   await page.mouse.wheel(0, 500);
   await expect
-    .poll(() => page.evaluate(() => window.scrollY))
-    .toBeGreaterThan(initialPageY);
+    .poll(() => panel.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
   expect(await nav.evaluate((element) => element.scrollTop)).toBe(before);
+  await panel.evaluate((element) => (element.scrollTop = element.scrollHeight));
+  await page.mouse.wheel(0, 500);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(
+    await page.evaluate(() => ({
+      header: document.querySelector(".topbar")!.getBoundingClientRect().top,
+      footer: document.querySelector(".app-footer")!.getBoundingClientRect()
+        .bottom,
+      sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+    })),
+  ).toEqual(shellPositions);
   await nav.getByRole("tab", { name: "Privacy", exact: true }).click();
   await expect(page.getByRole("tabpanel", { name: "Privacy" })).toBeVisible();
   expect(await nav.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await expect(
     page.getByRole("tabpanel", { name: "Privacy" }),
   ).toBeInViewport();
+});
+
+test("short pages keep the shared shell fixed at both scroll limits", async ({
+  page,
+}) => {
+  const data = freshWorkspace();
+  data.content = [];
+  await page.addInitScript((workspace) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+  }, data);
+  await page.goto("/#updates");
+  const main = page.locator("#main-content");
+  await expect(page.getByText("No updates published yet.")).toBeVisible();
+  const before = await page.evaluate(() => ({
+    header: document.querySelector(".topbar")!.getBoundingClientRect().top,
+    footer: document.querySelector(".app-footer")!.getBoundingClientRect()
+      .bottom,
+    sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+  }));
+  await main.hover();
+  await page.mouse.wheel(0, -600);
+  await page.mouse.wheel(0, 600);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(await main.evaluate((element) => element.scrollTop)).toBe(0);
+  expect(
+    await page.evaluate(() => ({
+      header: document.querySelector(".topbar")!.getBoundingClientRect().top,
+      footer: document.querySelector(".app-footer")!.getBoundingClientRect()
+        .bottom,
+      sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+    })),
+  ).toEqual(before);
 });
 
 test("admin destinations and editor render without overflow or errors", async ({
@@ -244,7 +293,7 @@ test("learner routes and narrow navigation remain usable", async ({
     ).toBeVisible();
     await noOverflow(page);
   }
-  await expect(page.locator(".main-content > footer > span")).toHaveText(
+  await expect(page.locator(".app-footer > span")).toHaveText(
     "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS",
   );
   await page.goto("/#courses");

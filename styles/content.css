@@ -412,7 +412,9 @@
       top: var(--anchor-offset);
     }
     .reading-outline nav {
-      max-height: calc(100dvh - var(--anchor-offset) - 5rem);
+      max-height: calc(
+        100dvh - var(--app-bar-height, 4rem) - var(--anchor-offset) - 5rem
+      );
     }
   }
   @media (max-width: 30rem) {

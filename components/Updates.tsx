@@ -54,14 +54,17 @@ export default function Updates({
     const pending = pendingScroll.current;
     pendingScroll.current = null;
     if (pending?.key === paginationKey)
-      window.scrollTo(pending.left, pending.top);
+      document
+        .getElementById("main-content")
+        ?.scrollTo(pending.left, pending.top);
   }, [paginationKey, visibleCount]);
 
   function loadMore() {
+    const contentScroll = document.getElementById("main-content");
     pendingScroll.current = {
       key: paginationKey,
-      left: window.scrollX,
-      top: window.scrollY,
+      left: contentScroll?.scrollLeft || 0,
+      top: contentScroll?.scrollTop || 0,
     };
     setPagination((current) => ({
       key: paginationKey,

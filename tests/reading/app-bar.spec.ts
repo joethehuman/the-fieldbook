@@ -63,11 +63,20 @@ for (const app of ["demo", "production"]) {
       await page.screenshot({
         path: info.outputPath(`${app}-${kind}-top.png`),
       });
-      await page.evaluate(() => scrollTo(0, 1200));
-      expect(await page.evaluate(() => scrollY)).toBeGreaterThan(200);
+      const main = page.locator("#main-content");
+      const footer = page.locator(".app-footer");
+      const footerBottom = await footer.evaluate(
+        (el) => el.getBoundingClientRect().bottom,
+      );
+      await main.evaluate((el) => el.scrollTo(0, 1200));
+      expect(await main.evaluate((el) => el.scrollTop)).toBeGreaterThan(200);
+      expect(await page.evaluate(() => scrollY)).toBe(0);
       expect(await bar.evaluate((el) => el.getBoundingClientRect().top)).toBe(
         0,
       );
+      expect(
+        await footer.evaluate((el) => el.getBoundingClientRect().bottom),
+      ).toBe(footerBottom);
       await page.screenshot({
         path: info.outputPath(`${app}-${kind}-scrolled.png`),
       });

@@ -464,7 +464,7 @@ export default function Admin({
     setQuery("");
   }
   return (
-    <>
+    <div className="admin-workspace">
       <h1 className="sr-only">Administration</h1>
       {openingTab && <p role="status">Opening section…</p>}
       <Tabs
@@ -1067,7 +1067,7 @@ export default function Admin({
           </DialogContent>
         )}
       </Dialog>
-    </>
+    </div>
   );
 }
 export function Editor({

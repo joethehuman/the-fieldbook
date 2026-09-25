@@ -48,28 +48,32 @@ test("For you has zero, one and two results without hiding the published library
     const workspace = JSON.parse(
       localStorage.getItem("fieldbook.workspace.v1")!,
     );
-    workspace.content.find((item: { id: string }) => item.id === "update-03")
-      .groups = ["sales"];
+    workspace.content.find(
+      (item: { id: string }) => item.id === "update-03",
+    ).groups = ["sales"];
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   });
   await page.reload();
   await expect(page.locator(".updates-section").first()).toContainText(
     "For you",
   );
-  await expect(page.locator(".updates-section").first().locator(".brief-card"))
-    .toHaveCount(1);
+  await expect(
+    page.locator(".updates-section").first().locator(".brief-card"),
+  ).toHaveCount(1);
 
   await page.evaluate(() => {
     const workspace = JSON.parse(
       localStorage.getItem("fieldbook.workspace.v1")!,
     );
-    workspace.content.find((item: { id: string }) => item.id === "update-00")
-      .groups = ["sales"];
+    workspace.content.find(
+      (item: { id: string }) => item.id === "update-00",
+    ).groups = ["sales"];
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   });
   await page.reload();
-  await expect(page.locator(".updates-section").first().locator(".brief-card"))
-    .toHaveCount(2);
+  await expect(
+    page.locator(".updates-section").first().locator(".brief-card"),
+  ).toHaveCount(2);
 });
 
 test("Load more reveals complete ordered slices once and preserves scroll position", async ({
@@ -93,10 +97,14 @@ test("Load more reveals complete ordered slices once and preserves scroll positi
   });
 
   await more.focus();
-  const scrollBefore = await page.evaluate(() => window.scrollY);
+  const scrollBefore = await page
+    .locator("#main-content")
+    .evaluate((el) => el.scrollTop);
   await page.keyboard.press("Enter");
   await expect(list).toHaveCount(20);
-  expect(await page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+  expect(
+    await page.locator("#main-content").evaluate((el) => el.scrollTop),
+  ).toBe(scrollBefore);
   await expect(list.nth(19)).toContainText("Update 21");
 
   await page.getByRole("button", { name: "Load more", exact: true }).click();

@@ -232,13 +232,13 @@ export function ReaderShell({
         <main id="main-content" className="main-content" tabIndex={-1}>
           {context.user && <ReaderGuestImport />}
           {children}
-          <footer>
-            {context.branding.name} <span>{context.branding.tagline}</span>
-            {context.branding.privacyUrl && (
-              <Link href={context.branding.privacyUrl}>Privacy policy</Link>
-            )}
-          </footer>
         </main>
+        <footer className="app-footer">
+          {context.branding.name} <span>{context.branding.tagline}</span>
+          {context.branding.privacyUrl && (
+            <Link href={context.branding.privacyUrl}>Privacy policy</Link>
+          )}
+        </footer>
       </div>
     </div>
   );
