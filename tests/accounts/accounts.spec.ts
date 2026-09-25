@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { organizationHomePath } from "../../lib/navigation";
 const backend = "http://127.0.0.1:3130/fixture";
 const file = "00000000-0000-4000-8000-000000000001.png";
 async function bounds(page: Page) {
@@ -202,7 +203,7 @@ test("provider failure stays recoverable, cancellation preserves return, unsafe 
     (await page.context().cookies()).find(
       (c) => c.name === "fieldbook-sign-in-return",
     )?.value,
-  ).toBe("%2F");
+  ).toBe(encodeURIComponent(organizationHomePath));
 });
 test("settings authorization, saved identity and private content protection", async ({
   page,
@@ -452,7 +453,7 @@ test("only the account action signs out; identity is inert", async ({
   await signOut.focus();
   await page.keyboard.press("Enter");
   await expect.poll(() => signOuts).toBe(1);
-  await page.waitForURL("/");
+  await page.waitForURL(organizationHomePath);
 });
 
 test("shared settings library and connection states work in the server app", async ({
