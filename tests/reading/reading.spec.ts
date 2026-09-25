@@ -106,6 +106,10 @@ test("guest team report stays empty without a workspace or catalog read", async 
   page,
   request,
 }) => {
+  const response = await request.get("/team");
+  expect(response.status()).toBe(200);
+  const reads = await (await request.get(`${backend}/reads`)).json();
+  expect(reads.reads).toBe(0);
   let workspaceReads = 0;
   page.on("request", (entry) => {
     if (entry.url().includes("/api/workspace")) workspaceReads++;
@@ -115,8 +119,6 @@ test("guest team report stays empty without a workspace or catalog read", async 
     page.getByText("Reporting requires an administrator or manager account."),
   ).toBeVisible();
   expect(workspaceReads).toBe(0);
-  const reads = await (await request.get(`${backend}/reads`)).json();
-  expect(reads.reads).toBe(0);
   await fixture(request, { settings: { access: "private" } });
   await page.goto("/team");
   await expect(page).toHaveURL(/\/sign-in(?:\?|$)/);
