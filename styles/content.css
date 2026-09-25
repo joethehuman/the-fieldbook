@@ -360,7 +360,7 @@
     gap: var(--space-4);
   }
   .document-pagination-link {
-    width: 100%;
+    max-width: 100%;
     min-width: 0;
     height: auto;
     align-items: center;
@@ -369,8 +369,12 @@
     text-align: left;
     white-space: normal;
   }
+  .document-pagination [data-direction="previous"] {
+    justify-self: start;
+  }
   .document-pagination [data-direction="next"] {
     grid-column: 2;
+    justify-self: end;
     justify-content: flex-end;
     text-align: right;
   }

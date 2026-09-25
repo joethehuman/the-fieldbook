@@ -445,7 +445,7 @@ test("no selection and publication changes preserve a usable library with honest
   await expect(
     page.getByRole("button", { name: "View all for you" }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Browse all courses" }).click();
+  await page.getByRole("button", { name: "All courses", exact: true }).click();
   await expect(page.locator("#all-courses")).toBeInViewport();
   await nav(page, "Updates");
   await expect(

@@ -47,7 +47,7 @@ Shared controls are necessary but do not establish a consistent page by themselv
 
 Acceptance checks must exercise state changes, not just initial screenshots: long and short labels, populated and empty results, reporting-team changes, desktop/tablet/phone widths and enlarged text. Compare column positions before/after filtering and action alignment across differently sized rows. Inspect screenshots after the interaction checks; passing overflow checks alone is insufficient.
 
-`ProgressStatus` is the compact course/curriculum indicator: an empty or partial ring with text, or a completion check. Its caller owns the completion calculation. `CourseRow` owns overflow observation, keyboard scrolling and endpoint controls. Use `ContentAction` with `focusRing="inside"` inside clipping containers so keyboard focus remains visible. `SplitPanel` has an explicit stretch option for equal-height summary/card compositions.
+`ProgressStatus` is the compact course/curriculum indicator: an empty or partial ring with text, or a completion check. Its caller owns the completion calculation. `CourseRow` observes overflow and makes the native horizontal strip keyboard-focusable only when scrolling is available. Use `ContentAction` with `focusRing="inside"` inside clipping containers so keyboard focus remains visible. `SplitPanel` has an explicit stretch option for equal-height summary/card compositions.
 
 ## Theme and layout rules
 
@@ -100,7 +100,7 @@ Reference conventions: [shadcn composition](https://ui.shadcn.com/docs), [themin
 
 `LearningCard` is the shared anatomy for courses and curricula. Supply artwork, metadata, status, title, description and action; do not lay these out again in a feature. Artwork has a fixed 10rem height and never shrinks. Metadata and status occupy separate, consistently spaced rows, titles reserve two lines but may grow, descriptions wrap without truncation, and ContentCardFooter anchors the action. CardGrid uses a common 18rem minimum card width, 16px gaps and equal-height rows. CourseRow uses the same 18rem card width, capped to its container on narrow screens. ContentAction owns borders, focus, hover and clipping.
 
-`CourseRow` owns its SectionHeader as well as scrolling. Pass a heading and optional description; overflow arrows occupy the header's trailing action slot. Optional `leading` content shares a stretch-aligned SplitPanel with the cards. Never position arrows with negative offsets or compensate with feature-specific header padding. Hide arrows when content fits; disable only the unavailable direction at a scroll endpoint.
+`CourseRow` owns its SectionHeader and native horizontal scrolling. Pass a heading and optional description; do not add carousel arrow controls. Optional `leading` content shares a stretch-aligned SplitPanel with the cards. When that panel becomes one column, its summary card fills the row, while its actions retain their natural width. Keep the strip reachable by touch, horizontal mouse/trackpad scrolling and keyboard focus when it overflows.
 
 `BrowseToolbar` aligns labeled fields to their control baseline and wraps whole fields on narrow screens. Use Search, a single Channel SelectField, and Sort for a full collection browser. A short fixed set of primary views may use FilterOptions; growing taxonomies belong in a dropdown. When a home page already groups cards under channel headings, do not repeat channel filter buttons. Result counts and Hide completed belong in the SectionHeader action area, separate from search/sort controls.
 

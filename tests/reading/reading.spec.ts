@@ -115,19 +115,33 @@ test("reader feedback, next navigation and long Docs menu align visibly", async 
   }));
   await fixture(request, { documents: documents([...items, ...extraDocs]) });
   await page.setViewportSize({ width: 1280, height: 480 });
-  await page.goto(`/docs/${ids[0]}`);
+  await page.goto(`/docs/${extraDocs[1].id}`);
   const tree = page.locator(".document-tree");
   await expect(tree).toHaveAttribute("data-scroll-fade-after", "true");
+  const previous = page.locator('.document-pagination [data-direction="previous"]');
   const next = page.locator('.document-pagination [data-direction="next"]');
   await expect(next).toHaveCSS("text-align", "right");
   await expect(next).toHaveCSS("justify-content", "flex-end");
   const article = await page.locator("article").boundingBox();
+  const previousBox = await previous.boundingBox();
+  const nextBox = await next.boundingBox();
+  expect(Math.abs(previousBox!.x - article!.x)).toBeLessThan(2);
+  expect(Math.abs(nextBox!.x + nextBox!.width - article!.x - article!.width)).toBeLessThan(2);
   const feedback = await page.getByRole("region", { name: "Content feedback" }).locator(":scope > div").boundingBox();
   expect(Math.abs((feedback!.x + feedback!.width / 2) - (article!.x + article!.width / 2))).toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("reader-footer-and-docs-fade.png") });
+  await next.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("reader-pagination-desktop.png") });
   await tree.evaluate((element) => (element.scrollTop = element.scrollHeight));
   await expect(tree).toHaveAttribute("data-scroll-fade-before", "true");
   await expect(tree).toHaveAttribute("data-scroll-fade-after", "false");
+  await page.setViewportSize({ width: 390, height: 844 });
+  const narrowArticle = await page.locator("article").boundingBox();
+  const narrowPrevious = await previous.boundingBox();
+  const narrowNext = await next.boundingBox();
+  expect(Math.abs(narrowPrevious!.x - narrowArticle!.x)).toBeLessThan(2);
+  expect(Math.abs(narrowNext!.x + narrowNext!.width - narrowArticle!.x - narrowArticle!.width)).toBeLessThan(2);
+  await page.screenshot({ path: info.outputPath("reader-footer-phone.png") });
 });
 
 test("empty For you card keeps its wording and uses the quieter border", async ({ page }, info) => {
