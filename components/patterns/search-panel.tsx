@@ -51,7 +51,7 @@ export function SearchPanel({
         <Card
           id={id}
           data-slot="search-panel"
-          className="absolute right-0 top-full z-40 mt-2 max-h-[min(36rem,65dvh,calc(100dvh-var(--app-bar-height,4rem)-1rem))] w-[var(--search-panel-width,min(48rem,calc(100vw-2rem)))] overflow-y-auto overscroll-contain p-0 sm:p-0 shadow-xl max-[767px]:inset-x-4 max-[767px]:w-auto"
+          className="absolute right-0 top-full z-40 mt-2 max-h-[min(36rem,65dvh,calc(100dvh-var(--app-bar-height,4rem)-1rem))] w-[var(--search-panel-width,min(48rem,calc(100vw-2rem)))] overflow-y-auto overscroll-contain p-0 pe-4 sm:p-0 sm:pe-4 [scrollbar-gutter:stable] shadow-xl max-[767px]:inset-x-4 max-[767px]:w-auto"
         >
           {children}
         </Card>

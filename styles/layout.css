@@ -16,6 +16,7 @@
     gap: var(--space-6);
     overflow-y: auto;
     overscroll-behavior: none;
+    scrollbar-gutter: stable;
     border-right: 1px solid var(--border);
     background: var(--muted);
     padding: var(--space-6) var(--space-4);
@@ -161,6 +162,7 @@
     padding-inline: var(--space-6);
     overflow-y: auto;
     overscroll-behavior: none;
+    scrollbar-gutter: stable;
     color: var(--muted-foreground);
     font-size: 0.75rem;
   }
@@ -217,6 +219,7 @@
     display: flow-root;
     min-height: 0;
     padding-bottom: var(--space-6);
+    padding-inline-end: var(--space-4);
     overflow-y: auto;
     overscroll-behavior: none;
     scroll-padding-block-start: var(--anchor-offset);
@@ -312,6 +315,8 @@
     gap: var(--space-2);
     max-height: 18rem;
     overflow-y: auto;
+    padding-inline-end: var(--space-3);
+    scrollbar-gutter: stable;
   }
   .group-picker-option {
     display: flex;
@@ -349,6 +354,8 @@
   .membership-list {
     max-height: 24rem;
     overflow-y: auto;
+    padding-inline-end: var(--space-3);
+    scrollbar-gutter: stable;
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }

@@ -36,7 +36,7 @@ export function ResponsiveTabsNavigation({
       >
         <TabsList
           variant="sidebar"
-          className="min-h-0 content-start overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
+          className="min-h-0 content-start overflow-y-auto overscroll-contain pe-3 [scrollbar-gutter:stable]"
           aria-label={label}
         >
           {children}

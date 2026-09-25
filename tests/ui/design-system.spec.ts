@@ -234,6 +234,54 @@ test("short pages keep the shared shell fixed at both scroll limits", async ({
   ).toEqual(before);
 });
 
+test("scrollbars leave room beside Admin feedback controls and cards", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop");
+  await page.setViewportSize({ width: 1280, height: 560 });
+  const data = freshWorkspace();
+  const item = data.content[0];
+  data.feedback = data.users.slice(0, 3).map((user, index) => ({
+    id: `scrollbar-feedback-${index}`,
+    userId: user.id,
+    contentId: item.id,
+    version: item.version,
+    rating: index === 0 ? "down" : "up",
+    comment: "Feedback alongside the scrollbar",
+    updatedAt: "2026-09-25T12:00:00Z",
+  }));
+  await page.addInitScript((workspace) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+  }, data);
+  await admin(page);
+  await adminSection(page, "Feedback");
+  const panel = page.getByRole("tabpanel", { name: "Feedback" });
+  await expect(panel.getByText("Feedback alongside the scrollbar")).toHaveCount(
+    3,
+  );
+  expect(await panel.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
+    true,
+  );
+  const distanceFromPanelEdge = (locator: ReturnType<Page["locator"]>) =>
+    locator.evaluate((el) => {
+      const panel = el.closest(".admin-panel")!;
+      return (
+        panel.getBoundingClientRect().right - el.getBoundingClientRect().right
+      );
+    });
+  await expect
+    .poll(() =>
+      distanceFromPanelEdge(panel.getByRole("button", { name: "Export CSV" })),
+    )
+    .toBeGreaterThanOrEqual(16);
+  expect(
+    await distanceFromPanelEdge(panel.locator('[data-slot="card"]').first()),
+  ).toBeGreaterThanOrEqual(16);
+  await page.screenshot({
+    path: testInfo.outputPath("feedback-scrollbar-clearance.png"),
+  });
+});
+
 test("admin destinations and editor render without overflow or errors", async ({
   page,
 }, testInfo) => {

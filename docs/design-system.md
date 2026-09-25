@@ -155,6 +155,8 @@ The `/ui` catalog includes a document tree, repeated headings, an outline and se
 
 A ResizeObserver supplies `--app-bar-height` for wrapped controls and enlarged text. The main scroll area and nested Admin panel use local scroll padding and heading margins; the bar's height is not added to those offsets. The Docs outline tracks the main scroll area and uses `--anchor-offset` for its sticky top and bounded height. Preserve native fragment/history behavior and navigation guards. SearchPanel bounds its height by the remaining viewport, and retains its trigger-relative desktop and bar-relative phone placement. Verify short and long content, scroll limits, long breadcrumbs, enlarged text, search, heading links and dialog focus in both applications.
 
+Vertically scrolling surfaces keep an inline-end inset between content and the scrollbar. Retain it in Administration panels, section navigation, the Docs tree and outline, and scrollable menus and pickers. `scrollbar-gutter` stabilizes classic scrollbars, while the inset keeps macOS overlay scrollbars off text and controls.
+
 ## Foundations and controls
 
 The control foundation uses [Geist typography](https://vercel.com/geist/typography), [buttons](https://vercel.com/geist/button) and [inputs](https://vercel.com/geist/input) as public visual/interaction references. Fieldbook owns its source; usage snippets are not implementations and no `@vercel/geistcn` package is required. Preserve the light neutral identity and the separate installation branding token.
