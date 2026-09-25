@@ -112,10 +112,12 @@ test("public browse, alternate brand, defaults and failed image fallback", async
   if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(
-    page.getByRole("button", { name: "Sign in", exact: true }).first(),
+    page
+      .getByRole("button", { name: "Sign in with Google", exact: true })
+      .first(),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Sign in", exact: true })
+    .getByRole("button", { name: "Sign in with Google", exact: true })
     .first()
     .click();
   await expect(
