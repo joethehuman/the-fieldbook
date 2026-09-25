@@ -34,12 +34,9 @@ export function ResponsiveTabsNavigation({
         className="hidden min-h-0 @min-[48rem]/workspace:grid"
         data-slot="admin-navigation-desktop"
       >
-        <span className="border-b border-border px-3 pb-3 text-sm font-semibold">
-          Administration
-        </span>
         <TabsList
           variant="sidebar"
-          className="min-h-0 overflow-y-auto overscroll-contain pt-3 [scrollbar-gutter:stable]"
+          className="min-h-0 content-start overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
           aria-label={label}
         >
           {children}

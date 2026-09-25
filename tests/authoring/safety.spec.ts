@@ -181,9 +181,7 @@ test("search preserves dirty edits; canceled navigation and reload keep them unt
   });
   await page.getByRole("button", { name: "Back to content" }).click();
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
 });
 
 test("browser back can be canceled without unmounting the editor", async ({
@@ -453,9 +451,7 @@ for (const media of ["inline-video", "lesson-video", "cover"] as const)
       page.getByRole("button", { name: "Save draft", exact: true }),
     ).toBeEnabled();
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
-    await expect(
-      page.getByRole("heading", { name: "Administration", exact: true }),
-    ).toBeVisible();
+    await expect(page.locator(".admin-layout")).toBeVisible();
     const saved = state.content[0];
     expect(
       media === "cover"

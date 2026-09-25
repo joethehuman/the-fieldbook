@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Keep the Administration menu heading visible while its section list scrolls independently, simplify guest sign-in and Courses home, move Docs/Updates category into article metadata, and add date and title sorting to learning-group content pickers.
+- Remove redundant Administration headings and keep its section list independently scrollable, simplify the guest account label and Courses home, move Docs/Updates category into article metadata, and add date and title sorting to learning-group content pickers.
 - Keep course lessons and quizzes inside the shared reader route. Open a lesson with Next navigation, fetch only that course's signed-in progress, and save completion and quiz attempts through the existing server endpoint. Guest progress and explicit import after sign-in remain available without loading the full workspace.
 
 - Open administration from a server-rendered route with a compact content index. Fetch people, reporting data and feedback only when their sections open, and load one full draft when editing. Administrator saves no longer reload the full workspace.

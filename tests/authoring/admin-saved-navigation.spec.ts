@@ -69,9 +69,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
     if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   }
-  await expect(
-    page.getByRole("heading", { name: "Administration" }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Docs navigation");
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();

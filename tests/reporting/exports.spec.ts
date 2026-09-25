@@ -166,11 +166,7 @@ async function setup(
       { data, id: user.id },
     );
   await page.goto(
-    production
-      ? "/team"
-      : role === "manager"
-        ? "/#team"
-        : "/#admin",
+    production ? "/team" : role === "manager" ? "/#team" : "/#admin",
   );
   if (production && role === "admin") {
     const menu = page.getByRole("button", { name: "Open navigation" });
@@ -509,9 +505,7 @@ test("failed progress update disables exports until the complete report reloads"
   const menu = page.getByRole("button", { name: "Open navigation" });
   if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
   await page.getByRole("button", { name: "Manage organization" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Progress");
   await expect(
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -617,9 +611,7 @@ test("People fieldset footers preserve default-stage saving in both applications
     if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   } else await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, production ? "People" : "Demo profiles");
   await expect(group.getByRole("combobox")).toContainText(
     "New user — onboarding window",

@@ -143,10 +143,12 @@ async function setup(
     if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   }
-  const ready = role === "admin" ? "Administration" : "Courses";
-  await expect(
-    page.getByRole("heading", { name: ready, exact: true }).first(),
-  ).toBeVisible();
+  if (role === "admin")
+    await expect(page.locator(".admin-layout")).toBeVisible();
+  else
+    await expect(
+      page.getByRole("heading", { name: "Courses", exact: true }).first(),
+    ).toBeVisible();
   return {
     production,
     fail: (value: string) => {
@@ -318,7 +320,8 @@ test("guest Updates and curriculum learning, browser progress and account transi
     const open = page.getByRole("button", { name: "Open navigation" });
     if (await open.isVisible()) await open.click();
     const account = page.locator(".sidebar-bottom");
-    await expect(account.getByText("Viewing as guest")).toBeVisible();
+    await expect(account.getByText("Guest", { exact: true })).toBeVisible();
+    await expect(account).not.toContainText("Progress stays in this browser");
     await expect(
       account.getByRole("button", { name: "Sign in with Google" }),
     ).toBeVisible();

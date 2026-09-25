@@ -10,9 +10,7 @@ async function noOverflow(page: Page) {
 }
 async function adminSection(page: Page, name: string) {
   // Reloads remount the lazy Administration bundle before its navigation.
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
@@ -27,9 +25,7 @@ async function admin(page: Page) {
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin"),
   );
   await page.goto("/#admin");
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
 }
 
 test("catalog: keyboard select, tab spacing, dialog stacking and ordering", async ({
@@ -162,11 +158,25 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   await admin(page);
   const nav = page.locator('[data-slot="admin-navigation"] [role="tablist"]');
   await expect(nav).toBeVisible();
-  await nav.evaluate((element) => {
-    element.scrollTop = element.scrollHeight;
-  });
+  await expect(page.locator("main h1")).toHaveClass(/sr-only/);
+  await expect(nav.getByText("Administration", { exact: true })).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText(
+    "Content, people, and the settings that keep your organization running.",
+  );
+  const initialPageY = await page.evaluate(() => window.scrollY);
+  await nav.hover();
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => nav.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(initialPageY);
   const before = await nav.evaluate((element) => element.scrollTop);
-  expect(before).toBeGreaterThan(0);
+  await page.getByRole("tabpanel", { name: "Content" }).hover();
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => page.evaluate(() => window.scrollY))
+    .toBeGreaterThan(initialPageY);
+  expect(await nav.evaluate((element) => element.scrollTop)).toBe(before);
   await nav.getByRole("tab", { name: "Privacy", exact: true }).click();
   await expect(page.getByRole("tabpanel", { name: "Privacy" })).toBeVisible();
   expect(await nav.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);

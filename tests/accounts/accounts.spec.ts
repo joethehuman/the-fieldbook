@@ -462,9 +462,7 @@ test("shared settings library and connection states work in the server app", asy
 }, info) => {
   await login(page);
   async function section(name: string) {
-    await expect(
-      page.getByRole("heading", { name: "Administration", exact: true }),
-    ).toBeVisible();
+    await expect(page.locator(".admin-layout")).toBeVisible();
     const picker = page.getByRole("combobox", {
       name: "Administration section",
     });

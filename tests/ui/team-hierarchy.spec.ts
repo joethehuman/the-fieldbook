@@ -50,9 +50,7 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   }, data);
   await page.goto("/#admin");
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page);
   const expand = page.getByRole("button", {
     name: "Expand Customer success",

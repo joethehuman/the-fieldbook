@@ -124,9 +124,7 @@ test("branding pilot: validation, save, retained identity and responsive layout"
   );
   await page.goto("/#admin");
   // Navigation is rendered with the lazy Administration bundle.
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
@@ -167,9 +165,7 @@ test("branding pilot: validation, save, retained identity and responsive layout"
   await expect(page.getByRole("status")).toContainText("Settings saved.");
   await page.reload();
   // Administration intentionally returns to Content after a full reload.
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   if (await picker.isVisible()) {
     await picker.click();
     await page.getByRole("option", { name: "Identity", exact: true }).click();

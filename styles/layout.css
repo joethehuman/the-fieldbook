@@ -150,8 +150,8 @@
     top: var(--anchor-offset);
   }
   [data-slot="admin-navigation-desktop"] {
-    grid-template-rows: auto minmax(0, 1fr);
-    max-height: calc(100dvh - var(--anchor-offset) - var(--space-6));
+    grid-template-rows: minmax(0, 1fr);
+    height: calc(100dvh - var(--anchor-offset) - var(--space-6));
   }
   @container workspace (width < 48rem) {
     .admin-layout {

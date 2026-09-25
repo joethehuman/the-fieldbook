@@ -616,17 +616,17 @@ export default function Fieldbook({
             }
             visibleAction={!!runtime && uid === "guest"}
             initials={initials(user.name)}
-            name={runtime && uid === "guest" ? "Viewing as guest" : user.name}
+            name={runtime && uid === "guest" ? "Guest" : user.name}
             description={
-              user.role === "admin"
-                ? "Administrator"
-                : user.role === "manager"
-                  ? "Sales Director"
-                  : runtime
-                    ? uid === "guest"
-                      ? "Progress stays in this browser"
-                      : "Learner"
-                    : "Account Executive"
+              runtime && uid === "guest"
+                ? undefined
+                : user.role === "admin"
+                  ? "Administrator"
+                  : user.role === "manager"
+                    ? "Sales Director"
+                    : runtime
+                      ? "Learner"
+                      : "Account Executive"
             }
             icon={
               runtime && uid === "guest" ? (

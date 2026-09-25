@@ -147,7 +147,7 @@ export function ReaderShell({
             </NavigationButton>
           )}
           <AccountButton
-            name={context.user?.name || "Viewing as guest"}
+            name={context.user?.name || "Guest"}
             initials={
               context.user
                 ? context.user.name
@@ -162,7 +162,7 @@ export function ReaderShell({
                 ? "Administrator"
                 : context.user
                   ? "Learner"
-                  : "Progress stays in this browser"
+                  : undefined
             }
             icon={context.user ? <LogOut size={16} /> : <LogIn size={16} />}
             actionLabel={context.user ? "Sign out" : "Sign in with Google"}

@@ -25,7 +25,7 @@ Start with existing primitives and patterns. For example, use `SectionHeader`, `
 - Use **TableContainer** with Table and its row/cell primitives for data. Overflow belongs inside the table container, never on the whole page.
 - Use **Card**, **Alert** and **EmptyState** for surfaces and state feedback. Do not duplicate their backgrounds, borders, radius and padding in a feature stylesheet.
 - Use **ResponsiveTabsNavigation** for dense administration navigation: grouped desktop tabs and a compact section picker on narrow screens. Both drive the same selected section and unsaved-change handler.
-- Keep the desktop Administration heading visible above its independently scrolling tab list. Selecting a tab reveals the new panel from the top without resetting the tab list's scroll position.
+- Keep the desktop Administration tab list independently scrollable beside the page content, without an extra visible page introduction or menu heading. Selecting a tab reveals the new panel from the top without resetting the tab list's scroll position.
 - Use **OrderedLearning** for playlist sequencing. Dragging has keyboard and up/down alternatives. Do not import reusable UI from another feature screen.
 - Keep course assignment, authorization, fetching and mutation logic in features/server code. Presentation refactoring must preserve publishing, completion, autosave, explicit Save, revision checks and navigation behavior.
 

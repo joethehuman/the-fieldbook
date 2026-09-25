@@ -53,9 +53,7 @@ test("admin destinations reveal details and keep filters and fieldset footers co
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   }, data);
   await page.goto("/#admin");
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Progress");
   await page
     .getByRole("button", { name: "View courses", exact: true })

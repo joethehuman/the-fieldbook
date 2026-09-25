@@ -51,9 +51,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   }, data);
   await page.goto("/#admin");
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Teams");
   await page
     .getByRole("button", { name: "Manage Sales team", exact: true })

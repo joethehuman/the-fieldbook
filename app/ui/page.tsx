@@ -475,8 +475,7 @@ export default function ComponentCatalog() {
               <AccountButton
                 actionLabel="Sign in with Google"
                 initials="G"
-                name="Viewing as guest"
-                description="Progress stays in this browser"
+                name="Guest"
                 helpText="Sign in to save course progress across devices and browsers."
                 visibleAction
                 icon={<LogIn />}

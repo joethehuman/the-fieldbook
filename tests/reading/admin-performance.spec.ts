@@ -64,9 +64,7 @@ test("admin entry and section changes avoid the full workspace", async ({
   const response = await page.goto("/admin");
   expect(response?.status()).toBe(200);
   expect(await response!.text()).not.toContain(draft.body);
-  await expect(
-    page.getByRole("heading", { name: "Administration" }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await expect(page.getByText(draft.title)).toBeVisible();
   expect(workspaceReads).toBe(0);
   await page.screenshot({ path: info.outputPath("admin-entry.png") });
@@ -110,7 +108,7 @@ test("admin entry and section changes avoid the full workspace", async ({
   if (await menu.isVisible()) await menu.click();
   await page.getByRole("link", { name: "Manage organization" }).click();
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.getByRole("heading", { name: "Administration" })).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   expect(documentNavigations).toBe(1);
   expect(workspaceReads).toBe(0);
 });
