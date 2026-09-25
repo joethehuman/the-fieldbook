@@ -7,7 +7,7 @@ import { canRead } from "./content";
 export async function signedMediaUrl(file: string, user: User | null) {
   if (!/^[a-f0-9-]{36}\.(png|jpg|webp|gif|mp4|webm)$/.test(file))
     throw new HttpError(404, "Media not found.");
-  const config = await canRead(user);
+  await canRead(user);
   const { data: media, error } = await db()
     .from("fb_media")
     .select("path")
@@ -18,7 +18,7 @@ export async function signedMediaUrl(file: string, user: User | null) {
   if (!media || media.path.split("/").pop() !== file)
     throw new HttpError(404, "Media not found.");
   const reference = `/api/media/${file}`;
-  if (user?.role !== "admin" && config.settings.logoUrl !== reference) {
+  if (user?.role !== "admin") {
     // Filter in the database before limiting. JSON ->> extracts lesson arrays as
     // text too, covering inline lesson media and lesson videoUrl references.
     // The validated filename cannot introduce PostgREST operators or wildcards.

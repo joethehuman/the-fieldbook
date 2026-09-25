@@ -35,7 +35,6 @@ export type SiteSettings = {
   welcomeDescription?: string;
   name: string;
   tagline: string;
-  logoUrl: string;
   accent: string;
   access: "public" | "private";
   registration: "open" | "closed";
@@ -48,7 +47,6 @@ export const defaultSettings: SiteSettings = {
   welcomeDescription: "",
   name: "Fieldbook",
   tagline: "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS",
-  logoUrl: "",
   accent: "#0069ff",
   access: "public",
   registration: "open",
@@ -59,7 +57,11 @@ export function publicSettings(
   settings: SiteSettings,
   content: DocLink[] = [],
 ): SiteSettings {
-  const { guestGroupId: _guestGroupId, ...visible } = settings;
+  const {
+    guestGroupId: _guestGroupId,
+    logoUrl: _legacyLogoUrl,
+    ...visible
+  } = settings as SiteSettings & { logoUrl?: string };
   const docs = content.filter(
     (item) => item.kind === "doc" && item.status === "published",
   );

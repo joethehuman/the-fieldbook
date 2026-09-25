@@ -11,7 +11,7 @@ export function BrandedAccount({
 }) {
   return (
     <AccountPage className="[overflow-wrap:anywhere]">
-      <InstallationIdentity name={branding.name} logoUrl={branding.logoUrl} />
+      <InstallationIdentity name={branding.name} />
       {children}
       {branding.privacyUrl && (
         <nav aria-label="Privacy">

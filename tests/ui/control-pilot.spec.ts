@@ -135,6 +135,15 @@ test("branding pilot: validation, save, retained identity and responsive layout"
     await picker.click();
     await page.getByRole("option", { name: "Identity", exact: true }).click();
   } else await page.getByRole("tab", { name: "Identity", exact: true }).click();
+  await expect(page.getByText("Organization logo")).toHaveCount(0);
+  await expect(
+    page.getByText("YOUR ORGANIZATION", { exact: true }),
+  ).toHaveCount(0);
+  const identity = page.locator(".sidebar .logo");
+  await expect(identity.locator("img, svg")).toHaveCount(0);
+  expect(
+    Number(await identity.evaluate((el) => getComputedStyle(el).fontWeight)),
+  ).toBeLessThan(600);
   const name = page.getByRole("textbox", {
     name: "Installation name",
     exact: true,

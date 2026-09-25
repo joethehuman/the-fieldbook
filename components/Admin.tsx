@@ -159,8 +159,7 @@ const adminSections = [
       {
         id: "settings-identity",
         name: "Identity",
-        description:
-          "Installation name, logo, welcome description and privacy link.",
+        description: "Installation name, welcome description and privacy link.",
         icon: Settings,
       },
       {
@@ -552,7 +551,6 @@ export default function Admin({
               registerNavigationGuard={registerAdminGuard}
               data={data}
               onChange={onChange}
-              onUpload={onUpload}
               production={production}
             />
           ) : tab === "feedback" ? (

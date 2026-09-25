@@ -17,28 +17,11 @@
     padding: var(--space-6) var(--space-4);
   }
   .logo {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
     color: var(--foreground);
     font-size: 1.375rem;
-    font-weight: 650;
-    letter-spacing: -0.04em;
-  }
-  .logo > span:first-child {
-    display: grid;
-    width: 2rem;
-    height: 2rem;
-    flex-shrink: 0;
-    place-items: center;
-    border-radius: var(--radius);
-    background: var(--brand);
-    color: var(--primary-foreground);
-  }
-  .logo img {
-    max-width: 2rem;
-    max-height: 2rem;
-    object-fit: contain;
+    font-weight: 550;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
   }
   .nav-label,
   .admin-nav-label,
@@ -340,8 +323,7 @@
     display: grid;
     gap: var(--space-3);
   }
-  .color-control,
-  .logo-control {
+  .color-control {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -350,11 +332,6 @@
   .color-control [type="text"] {
     max-width: 12rem;
   }
-  .logo-controls {
-    display: grid;
-    gap: var(--space-3);
-  }
-  .logo-preview,
   .cover-preview {
     display: grid;
     min-height: 5rem;
@@ -364,11 +341,6 @@
     border-radius: var(--radius);
     background: var(--muted);
     padding: var(--space-3);
-  }
-  .logo-preview img {
-    max-width: 10rem;
-    max-height: 4rem;
-    object-fit: contain;
   }
   .cover-preview {
     aspect-ratio: 16/9;

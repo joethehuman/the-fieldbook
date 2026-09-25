@@ -10,39 +10,37 @@ import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { DocSectionsSettings } from "./DocSectionsSettings";
-import { Upload } from "lucide-react";
 import { ActionGroup } from "./ui/action-group";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { availableDocSections } from "@/lib/docs-navigation";
-import { InstallationLogo } from "./patterns/installation-identity";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import { equalJson } from "@/lib/equal-json";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
-import type { UploadMedia } from "./MarkdownEditor";
 export type SettingsSection =
   "identity" | "docs" | "courses" | "access" | "privacy" | "mcp";
 export default function SiteSettingsPanel({
   data,
   onChange,
-  onUpload,
   production,
   section,
   registerNavigationGuard,
 }: {
   data: Workspace;
   onChange: (next: Workspace) => void | Promise<void>;
-  onUpload?: UploadMedia;
   production: boolean;
   section: SettingsSection;
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
-  const [settings, setSettings] = useState({
-      ...defaultSettings,
-      ...data.settings,
+  const [settings, setSettings] = useState(() => {
+      const saved = (data.settings || {}) as Partial<typeof defaultSettings> & {
+        logoUrl?: string;
+      };
+      const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
+      return { ...defaultSettings, ...withoutLogo };
     }),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
@@ -73,7 +71,6 @@ export default function SiteSettingsPanel({
     settings.docSections,
   );
   const [nameError, setNameError] = useState("");
-  const logoInput = useRef<HTMLInputElement>(null);
   const saveAction = (
     <Button type="submit" loading={busy}>
       {busy ? "Saving…" : "Save settings"}
@@ -109,7 +106,7 @@ export default function SiteSettingsPanel({
           id="settings-identity"
           actions={saveAction}
           title={<h3>Installation branding</h3>}
-          guidance="The same identity appears in your workspace and on account pages. The saved name, logo, welcome description and published privacy link are visible before sign-in, including on private installations."
+          guidance="The same identity appears in your workspace and on account pages. The saved name, welcome description and published privacy link are visible before sign-in, including on private installations."
         >
           <TextField
             id="installation-name"
@@ -195,74 +192,6 @@ export default function SiteSettingsPanel({
               />
             </div>
           </FieldGroup>
-          {(onUpload || settings.logoUrl) && (
-            <FieldGroup className="brand-control">
-              <legend>Organization logo</legend>
-              <div className="logo-control">
-                <div className="logo-preview">
-                  <InstallationLogo logoUrl={settings.logoUrl} />
-                </div>
-                <div className="logo-controls">
-                  <ActionGroup>
-                    {onUpload && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() => logoInput.current?.click()}
-                      >
-                        <Upload size={14} />
-                        {settings.logoUrl ? "Replace logo" : "Upload logo"}
-                      </Button>
-                    )}
-                    {settings.logoUrl && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        disabled={busy}
-                        onClick={() =>
-                          setSettings({ ...settings, logoUrl: "" })
-                        }
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </ActionGroup>
-                  <FieldDescription>
-                    PNG, JPG, or WebP. Your logo is scaled to fit.
-                  </FieldDescription>
-                </div>
-              </div>
-              {onUpload && (
-                <Input
-                  ref={logoInput}
-                  hidden
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  disabled={busy}
-                  aria-label="Upload organization logo"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    e.target.value = "";
-                    if (!file) return;
-                    setBusy(true);
-                    setNotice("");
-                    try {
-                      const url = await onUpload(file);
-                      setSettings((current) => ({ ...current, logoUrl: url }));
-                      setNotice("Logo uploaded. Save settings to apply it.");
-                    } catch (error) {
-                      setNotice((error as Error).message);
-                    } finally {
-                      setBusy(false);
-                    }
-                  }}
-                />
-              )}
-            </FieldGroup>
-          )}
         </SettingsGroup>
       )}
       {section === "docs" && (

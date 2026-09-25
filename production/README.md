@@ -45,7 +45,7 @@ The AI can edit Markdown, lessons, and quizzes through the same service as the a
 
 Uploads go directly from an authorized administrator's browser to the private `fieldbook-media` bucket. The app issues a token for one random path, then verifies the uploaded object's metadata before accepting it. Supported formats: JPG, PNG, WebP, GIF, MP4, WebM. The initial per-file ceiling is 50 MB. There is no transcoding, automatic captioning, or adaptive streaming; use browser-compatible H.264/AAC MP4 or WebM files.
 
-Published content may reference uploaded media. Guests receive short-lived signed URLs only for files referenced by published content or the site logo; drafts require admin access. Unpublishing stops new signed URLs, but an already-issued link can work for up to five minutes. Treat media published to a public site as public.
+Published content may reference uploaded media. Guests receive short-lived signed URLs only for files referenced by published content; drafts require admin access. Unpublishing stops new signed URLs, but an already-issued link can work for up to five minutes. Treat media published to a public site as public.
 
 Check [current Supabase plan limits](https://supabase.com/pricing) and your host's limits before launch; free tiers are provider policies, not application guarantees. Free plans may pause inactive projects and do not supply the same backup/recovery guarantees as paid plans. Choose your own budget and alert settings. Arrange database exports and separate media backups before relying on the instance for important content; verify recovery rather than assuming a database export includes stored files.
 
@@ -88,7 +88,7 @@ For a public installation, set the app name, public homepage and privacy link in
 
 Google supports a non-Gmail support address registered as a Google account. Email can remain hosted by another provider. Sign in with that account and grant only the Google project permissions it needs (OAuth Config Editor worked for the initial deployment), then select the address in Branding. Account creation and Google Cloud may have separate terms. A custom mailbox is optional infrastructure for the operator; Fieldbook does not provision email or require Google Workspace.
 
-Fieldbook’s own sign-in, consent and connection pages use the installation identity configured in **Organization Settings → Identity**. Name, logo, optional welcome description and the published privacy link are shared with the application. Private visitors go directly to branded sign-in with their destination preserved; public visitors can keep browsing. No migration is required. See [installation branding](../docs/branding.md) for logo visibility, validation and configuration.
+Fieldbook’s own sign-in, consent and connection pages use the installation identity configured in **Organization Settings → Identity**. Name, optional welcome description and the published privacy link are shared with the application. Private visitors go directly to branded sign-in with their destination preserved; public visitors can keep browsing. No migration is required. See [installation branding](../docs/branding.md) for configuration.
 
 Keep private developer notification contacts separate from the public support contact. An installation-specific policy is configured in Admin → Settings; see [privacy setup](../docs/privacy-setup.md). The maintainer's policy must not become your default.
 

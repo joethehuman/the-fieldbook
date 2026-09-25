@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { publicBranding } from "../lib/branding";
-import { readyLogo, signedBrandingLogoUrl } from "../lib/branding-logo";
 import { brandingFromSettings } from "../../lib/branding";
 import { settingsSchema } from "../lib/schemas";
 import { defaultSettings, defaultPrivacy } from "../../lib/settings";
@@ -10,8 +9,6 @@ import { HttpError, ServiceError } from "../lib/errors";
 import { safeNext } from "../lib/redirect";
 import { SIGN_IN_RETURN_COOKIE } from "../lib/sign-in";
 
-const file = "00000000-0000-4000-8000-000000000001.png";
-const reference = `/api/media/${file}`;
 test("branding projection contains only public identity with existing-installation defaults", async () => {
   const previous = globalThis.fetch;
   const oldEnv = { ...process.env };
@@ -24,11 +21,6 @@ test("branding projection contains only public identity with existing-installati
   });
   delete process.env.VERCEL_ENV;
   delete process.env.FIELDBOOK_ENVIRONMENT;
-  let ready = true,
-    mime = "image/png",
-    path = `uploads/${file}`,
-    signs = 0;
-  let logo = reference;
   const requests: URL[] = [];
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
@@ -39,7 +31,6 @@ test("branding projection contains only public identity with existing-installati
       assert.ok(!url.searchParams.get("select")!.includes("draft"));
       data = {
         name: "Acme",
-        logoUrl: logo,
         welcomeDescription: "Welcome aboard",
         access: "private",
         policyMode: "external",
@@ -47,12 +38,6 @@ test("branding projection contains only public identity with existing-installati
         registration: "SECRET",
         draft: "SECRET",
       };
-    } else if (url.pathname.endsWith("fb_media")) {
-      assert.equal(url.searchParams.get("ready"), "eq.true");
-      data = ready ? { path, mime } : null;
-    } else if (url.pathname.includes("/object/sign/")) {
-      signs++;
-      data = { signedURL: "/object/sign/synthetic" };
     } else throw new Error(`Unexpected ${url.pathname}`);
     return new Response(JSON.stringify(data), {
       headers: { "Content-Type": "application/json" },
@@ -61,31 +46,13 @@ test("branding projection contains only public identity with existing-installati
   try {
     assert.deepEqual(await publicBranding(), {
       name: "Acme",
-      logoUrl: `/api/branding/logo?v=${file}`,
       welcomeDescription: "Welcome aboard",
       access: "private",
       privacyUrl: "https://example.test/privacy",
     });
-    await signedBrandingLogoUrl();
-    assert.equal(signs, 1);
-    for (const invalid of [
-      "https://example.test/x.png",
-      "/api/media/private.mp4",
-      "//evil.test/x",
-      "data:image/png,x",
-    ])
-      await assert.rejects(readyLogo(invalid));
-    ready = false;
-    await assert.rejects(signedBrandingLogoUrl(), /Logo not found/);
-    ready = true;
-    mime = "video/mp4";
-    await assert.rejects(signedBrandingLogoUrl(), /Logo not found/);
-    mime = "image/png";
-    path = "uploads/different.png";
-    await assert.rejects(signedBrandingLogoUrl(), /Logo not found/);
-    logo = "";
-    await assert.rejects(signedBrandingLogoUrl(), /Logo not found/);
-    assert.equal(signs, 1);
+    assert.ok(
+      requests.every((u) => !u.searchParams.get("select")?.includes("logoUrl")),
+    );
     assert.ok(requests.every((u) => !u.pathname.includes("fb_documents")));
   } finally {
     globalThis.fetch = previous;
@@ -93,15 +60,11 @@ test("branding projection contains only public identity with existing-installati
   }
   assert.deepEqual(brandingFromSettings({}), {
     name: "Fieldbook",
-    logoUrl: "",
     welcomeDescription: "",
     access: "public",
     privacyUrl: null,
   });
-  assert.equal(
-    brandingFromSettings({ name: " ", logoUrl: "javascript:alert(1)" }).logoUrl,
-    "",
-  );
+  assert.equal(brandingFromSettings({ name: " " }).name, "Fieldbook");
 });
 
 test("settings accepts old configurations and validates branding without separate login settings", () => {
@@ -117,8 +80,6 @@ test("settings accepts old configurations and validates branding without separat
     { name: " " },
     { name: "x".repeat(61) },
     { welcomeDescription: "x".repeat(181) },
-    { logoUrl: "/api/media/00000000-0000-4000-8000-000000000001.mp4" },
-    { logoUrl: "https://example.test/logo.png" },
     {
       privacy: {
         ...defaultPrivacy,
@@ -134,6 +95,11 @@ test("settings accepts old configurations and validates branding without separat
       settingsSchema.safeParse({ ...defaultSettings, ...patch }).success,
       false,
     );
+  assert.equal(
+    "logoUrl" in
+      settingsSchema.parse({ ...defaultSettings, logoUrl: "legacy" }),
+    false,
+  );
 });
 
 test("cancelled, denied and unavailable authentication preserve safe destinations", () => {

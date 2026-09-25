@@ -110,7 +110,7 @@ The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browse
 
 `InitialsAvatar` is the shared circular initials marker for profile pickers, account buttons and compact attribution. Its neutral surface and border remain visible on white and muted backgrounds. Use the default 36px size for accounts or the compact 32px size for metadata. Always pair it with a visible name; initials are decorative and hidden from assistive technology to avoid duplicate announcements. Do not recreate avatar styling in feature CSS. The `/ui` catalog demonstrates both sizes.
 
-`InstallationIdentity` and `InstallationLogo` provide the workspace/account wordmark and failed-image fallback. `BrandedAccount` composes them with `AccountPage` and the published privacy link. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.
+`InstallationIdentity` displays the installation name in the workspace and on account pages. `BrandedAccount` composes it with `AccountPage` and the published privacy link. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.
 
 ## Search results
 
@@ -248,7 +248,7 @@ The following mapping covers the current shared library. Several Fieldbook patte
 | LearningCard, ContentAction, ContentCardFooter, CourseRow, LaunchList | Geist Entity and card composition | Quiet border/hover, aligned metadata/actions; retain horizontal browsing, curriculum sequencing and course-specific cover art. ContentCardFooter is tile metadata; CardFooter is a surface footer. |
 | OrderedLearning, ReorderRow | Geist Entity composition | Preserve drag, keyboard and explicit up/down movement; use aligned identity/action columns. Reordering has no single Geist replacement. |
 | SearchField, SearchPanel, SearchResult | Geist Search Input/Entity | Keep bounded nonmodal search so unsaved authoring stays mounted, with Escape/focus return and clear empty/loading results. A command menu would change product behavior. |
-| AppBar, InstallationIdentity, BrandedAccount, AccountPage, SkipLink | Vercel Docs shell; shadcn composition | Retain installation logos/colors, sticky app bar, breadcrumb links, skip target and server authentication boundaries. |
+| AppBar, InstallationIdentity, BrandedAccount, AccountPage, SkipLink | Vercel Docs shell; shadcn composition | Retain installation name/colors, sticky app bar, breadcrumb links, skip target and server authentication boundaries. |
 | Stack, SplitPanel, PageHeader, CollectionToolbar, Toolbar, FilterBar, BrowseToolbar, StatusActions, Callout | Geist composition principles; shadcn Card/Field | Shared spacing, associated descriptions and wrapping actions. Keep feature data/handlers outside layout helpers. |
 
 There is one supported light interface theme. Do not claim dark-mode support because the reference has it. The neutral color and type changes affect every shared consumer, including standalone sign-in/consent pages; installation branding remains a separate token. Decorative book-cover experiments, new calendars, charts, command palettes and other unused reference families are outside this component library's current product needs.

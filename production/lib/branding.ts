@@ -8,7 +8,7 @@ export async function publicBranding() {
   const { data, error } = await db()
     .from("fb_config")
     .select(
-      "name:settings->>name,logoUrl:settings->>logoUrl,welcomeDescription:settings->>welcomeDescription,access:settings->>access,policyMode:settings->privacy->published->>mode,policyUrl:settings->privacy->published->>url",
+      "name:settings->>name,welcomeDescription:settings->>welcomeDescription,access:settings->>access,policyMode:settings->privacy->published->>mode,policyUrl:settings->privacy->published->>url",
     )
     .eq("id", true)
     .single();
@@ -20,7 +20,6 @@ export async function publicBranding() {
     );
   const branding = brandingFromSettings({
     name: data.name || undefined,
-    logoUrl: data.logoUrl || undefined,
     welcomeDescription: data.welcomeDescription || undefined,
     access: data.access === "private" ? "private" : "public",
     privacy: {
@@ -35,10 +34,5 @@ export async function publicBranding() {
           : null,
     },
   });
-  return {
-    ...branding,
-    logoUrl: branding.logoUrl
-      ? `/api/branding/logo?v=${encodeURIComponent(branding.logoUrl.split("/").pop()!)}`
-      : "",
-  };
+  return branding;
 }
