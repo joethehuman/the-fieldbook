@@ -304,6 +304,10 @@ test("consent and connection identity preserve purpose and demo stays simulated"
     page.getByRole("heading", { name: "AI connections", exact: true }),
   ).toBeVisible();
   await page.goto("http://127.0.0.1:3132");
+  await expect(
+    page.getByRole("heading", { name: "Choose a demo profile" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Alex Edwards/ }).click();
   if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
   const account = page.locator('[data-slot="account-button"]');
