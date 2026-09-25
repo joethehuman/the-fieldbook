@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { ReaderSearch } from "./ReaderSearch";
 import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
+import { organizationHomePath } from "@/lib/navigation";
 
 export function ReaderShell({
   context,
@@ -42,13 +43,15 @@ export function ReaderShell({
   const pathname = usePathname();
   const section = pathname.startsWith("/docs")
     ? "docs"
-    : pathname.startsWith("/curricula")
-      ? "curricula"
-      : pathname.startsWith("/privacy")
-        ? "privacy"
-        : pathname.startsWith("/courses")
-          ? "courses"
-          : "updates";
+    : pathname.startsWith("/team")
+      ? "team"
+      : pathname.startsWith("/curricula")
+        ? "curricula"
+        : pathname.startsWith("/privacy")
+          ? "privacy"
+          : pathname.startsWith("/courses")
+            ? "courses"
+            : "updates";
   const selected = pathname.split("/")[2] || null;
   const articleTitle = selected
     ? section === "docs"
@@ -75,9 +78,11 @@ export function ReaderShell({
       ? "Docs"
       : section === "courses" || section === "curricula"
         ? "Courses"
-        : section === "privacy"
-          ? "Privacy policy"
-          : "Updates";
+        : section === "team"
+          ? "Team progress"
+          : section === "privacy"
+            ? "Privacy policy"
+            : "Updates";
   const close = () => setMenu(false);
   const links = [
     { href: "/updates", title: "Updates", icon: Newspaper },
@@ -140,7 +145,7 @@ export function ReaderShell({
         <div className="sidebar-bottom">
           {context.user?.role === "admin" && (
             <NavigationButton asChild className="admin-nav">
-              <Link href="/admin" prefetch={false}>
+              <Link href="/admin" prefetch={false} onClick={close}>
                 <Settings size={18} />
                 Manage organization
               </Link>
@@ -148,7 +153,7 @@ export function ReaderShell({
           )}
           {context.user?.role === "manager" && (
             <NavigationButton asChild className="admin-nav">
-              <Link href="/team" prefetch={false}>
+              <Link href="/team" prefetch={false} onClick={close}>
                 <GraduationCap size={18} />
                 My team’s progress
               </Link>
@@ -168,9 +173,11 @@ export function ReaderShell({
             description={
               context.user?.role === "admin"
                 ? "Administrator"
-                : context.user
-                  ? "Learner"
-                  : undefined
+                : context.user?.role === "manager"
+                  ? "Manager"
+                  : context.user
+                    ? "Learner"
+                    : undefined
             }
             icon={context.user ? <LogOut size={16} /> : <LogIn size={16} />}
             actionLabel={context.user ? "Sign out" : "Sign in with Google"}
@@ -212,7 +219,7 @@ export function ReaderShell({
           </Button>
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
-              <Link href="/courses" prefetch>
+              <Link href={organizationHomePath} prefetch>
                 Organization
               </Link>
             </Button>

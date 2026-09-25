@@ -21,6 +21,25 @@ async function setup(
       item.publishedRevision = 1;
   }
   const savedUsers = JSON.stringify(data.users);
+  async function syncProvider(nextRole = "admin", userGroups: string[] = []) {
+    await page.request.post("http://127.0.0.1:3130/fixture", {
+      data: {
+        settings: data.settings,
+        groups: data.groups,
+        curricula: data.curricula,
+        role: nextRole,
+        userGroups,
+        documents: data.content.map((item) => ({
+          id: item.id,
+          published: item.status === "published" ? item : null,
+          draft: item,
+          revision: 1,
+          published_revision: 1,
+          updated_at: item.updatedAt,
+        })),
+      },
+    });
+  }
   const workspace = () => {
     if (current === "guest") {
       const p = guestRecommendations(data);
@@ -48,21 +67,28 @@ async function setup(
     return { data, user };
   };
   if (production) {
-    await page.request.post("http://127.0.0.1:3130/fixture", {
-      data: {
-        settings: data.settings,
-        groups: data.groups,
-        curricula: data.curricula,
-        documents: data.content.map((item) => ({
-          id: item.id,
-          published: item.status === "published" ? item : null,
-          draft: item,
-          revision: 1,
-          published_revision: 1,
-          updated_at: item.updatedAt,
-        })),
-      },
-    });
+    await syncProvider();
+    if (role === "admin") {
+      const token = await (
+        await page.request.post("http://127.0.0.1:3130/auth/v1/token", {
+          data: {},
+        })
+      ).json();
+      await page.context().addCookies([
+        {
+          name: "sb-test-auth-token",
+          value:
+            "base64-" +
+            Buffer.from(
+              JSON.stringify({
+                ...token,
+                expires_at: Math.floor(Date.now() / 1000) + 3600,
+              }),
+            ).toString("base64url"),
+          url: new URL(String(info.project.use.baseURL)).origin,
+        },
+      ]);
+    }
     await page.route("**/api/workspace", async (route) => {
       if (fail === "load")
         return route.fulfill({
@@ -96,11 +122,12 @@ async function setup(
           data = reconcileLearning(data, {
             ...data,
             groups: b.groups,
-            users: b.users,
+            users: data.users,
             curricula: b.curricula,
             teams: b.teams,
             governanceRevision: (data.governanceRevision || 0) + 1,
           });
+        await syncProvider();
         await route.fulfill({
           json: {
             revision:
@@ -137,12 +164,15 @@ async function setup(
       },
       { data, role },
     );
-  await page.goto(role === "admin" ? (production ? "/team" : "/#admin") : "/");
-  if (production && role === "admin") {
-    const menu = page.getByRole("button", { name: "Open navigation" });
-    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-    await page.getByRole("button", { name: "Manage organization" }).click();
-  }
+  await page.goto(
+    role === "admin"
+      ? production
+        ? "/admin"
+        : "/#admin"
+      : production
+        ? "/courses"
+        : "/",
+  );
   if (role === "admin")
     await expect(page.locator(".admin-layout")).toBeVisible();
   else
@@ -165,7 +195,8 @@ async function setup(
           ),
     change: async (fn: (d: typeof data) => void) => {
       fn(data);
-      if (!production)
+      if (production) await syncProvider();
+      else
         await page.evaluate(
           (d) =>
             localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(d)),
@@ -174,11 +205,32 @@ async function setup(
     },
     signIn: async () => {
       current = "learner";
-      if (!production)
+      if (production) {
+        await syncProvider("learner", ["account"]);
+        const token = await (
+          await page.request.post("http://127.0.0.1:3130/auth/v1/token", {
+            data: {},
+          })
+        ).json();
+        await page.context().addCookies([
+          {
+            name: "sb-test-auth-token",
+            value:
+              "base64-" +
+              Buffer.from(
+                JSON.stringify({
+                  ...token,
+                  expires_at: Math.floor(Date.now() / 1000) + 3600,
+                }),
+              ).toString("base64url"),
+            url: new URL(page.url()).origin,
+          },
+        ]);
+      } else
         await page.evaluate(() =>
           sessionStorage.setItem("fieldbook.profile.v1", "demo-learner"),
         );
-      await page.goto("/");
+      await page.goto(production ? "/courses" : "/");
     },
     unchangedPeople: async () =>
       expect(
@@ -333,7 +385,7 @@ test("guest Updates and curriculum learning, browser progress and account transi
   }
   await page
     .locator(".for-you")
-    .getByRole("button", { name: /Guest introduction/ })
+    .getByRole(f.production ? "link" : "button", { name: /Guest introduction/ })
     .click();
   await expect(
     page.getByRole("heading", { name: "Guest introduction", exact: true }),
@@ -385,7 +437,9 @@ test("no selection and publication changes preserve a usable library with honest
     "No recommendations yet",
   );
   await expect(
-    page.getByRole("button", { name: /Foundation course/ }),
+    page.getByRole(f.production ? "link" : "button", {
+      name: /Foundation course/,
+    }),
   ).toBeVisible();
   await shot(page, info, "guest-empty");
   await expect(
@@ -410,7 +464,7 @@ test("no selection and publication changes preserve a usable library with honest
     d.settings!.guestGroupId = "visitors";
     d.content[1].status = "draft";
   });
-  await page.goto("/");
+  await page.goto(f.production ? "/courses" : "/");
   await expect(page.locator(".for-you")).toContainText(
     "0 of 1 assigned courses complete",
   );
@@ -491,7 +545,7 @@ test("public to private removes anonymous learning and keeps the saved group", a
     d.settings!.access = "private";
   });
   await page.reload();
-  if (f.production) await expect(page).toHaveURL(/\/auth\/sign-in\?/);
+  if (f.production) await expect(page).toHaveURL(/\/sign-in(?:\?|$)/);
   else
     await expect(
       page.getByRole("heading", { name: "Choose a demo profile" }),
@@ -504,39 +558,26 @@ test("public to private removes anonymous learning and keeps the saved group", a
   await f.unchangedPeople();
 });
 
-test("guest workspace loading, failure and retry remain recoverable", async ({
+test("guest reader failure and retry remain recoverable", async ({
   page,
 }, info) => {
   test.skip(
     !info.project.name.startsWith("production"),
-    "HTTP load states are specific to the installed application",
+    "HTTP failures are specific to the installed application",
   );
   const f = await setup(page, info);
-  f.delay(900);
-  await page.reload();
+  await page.request.post("http://127.0.0.1:3130/fixture", {
+    data: { settings: { access: "public" }, fail: true },
+  });
+  await page.goto("/courses");
   await expect(
-    page.getByRole("heading", { name: "Just a sec…" }),
+    page.getByRole("heading", { name: "Unable to load this page" }),
   ).toBeVisible();
-  const box = await page.locator(".loading-content").boundingBox();
-  const viewport = page.viewportSize();
-  expect(box).not.toBeNull();
-  expect(viewport).not.toBeNull();
-  expect(Math.abs(box!.x + box!.width / 2 - viewport!.width / 2)).toBeLessThan(
-    2,
-  );
-  expect(
-    Math.abs(box!.y + box!.height / 2 - viewport!.height / 2),
-  ).toBeLessThan(2);
-  await shot(page, info, "guest-loading");
-  await expect(page.locator(".for-you")).toContainText("Guest introduction");
-  f.delay(0);
-  f.fail("load");
-  await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Workspace temporarily unavailable." }),
-  ).toBeVisible();
-  await shot(page, info, "guest-load-error");
-  f.fail("");
+  await expect(page.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
+  await shot(page, info, "guest-reader-error");
+  await f.change(() => {});
   await page.getByRole("button", { name: "Try again", exact: true }).click();
-  await expect(page.locator(".for-you")).toContainText("Guest introduction");
+  await expect(
+    page.getByRole("heading", { name: "Courses", exact: true }),
+  ).toBeVisible();
 });

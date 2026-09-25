@@ -70,6 +70,60 @@ async function fixture(request: any, extra = {}) {
 }
 test.beforeEach(async ({ request }) => fixture(request));
 
+test("installation root opens the current home without a workspace snapshot", async ({
+  page,
+  request,
+}) => {
+  const response = await request.get("/", { maxRedirects: 0 });
+  expect(response.status()).toBe(307);
+  expect(response.headers().location).toBe("/courses");
+  let workspaceReads = 0;
+  page.on("request", (entry) => {
+    if (entry.url().includes("/api/workspace")) workspaceReads++;
+  });
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/courses$/);
+  await expect(
+    page.getByRole("heading", { name: "Courses", exact: true }),
+  ).toBeVisible();
+  expect(workspaceReads).toBe(0);
+});
+
+test("current section URLs are canonical and retired names do not open the app", async ({
+  request,
+}) => {
+  for (const path of ["/knowledge", "/notes", "/learn", "/briefs"]) {
+    const response = await request.get(path, { maxRedirects: 0 });
+    expect(response.status(), path).toBe(404);
+  }
+  for (const path of ["/docs", "/updates", "/courses"]) {
+    const response = await request.get(path);
+    expect(response.status(), path).toBe(200);
+  }
+});
+
+test("guest team report stays empty without a workspace or catalog read", async ({
+  page,
+  request,
+}) => {
+  const response = await request.get("/team");
+  expect(response.status()).toBe(200);
+  const reads = await (await request.get(`${backend}/reads`)).json();
+  expect(reads.reads).toBe(0);
+  let workspaceReads = 0;
+  page.on("request", (entry) => {
+    if (entry.url().includes("/api/workspace")) workspaceReads++;
+  });
+  await page.goto("/team");
+  await expect(
+    page.getByText("Reporting requires an administrator or manager account."),
+  ).toBeVisible();
+  expect(workspaceReads).toBe(0);
+  await fixture(request, { settings: { access: "private" } });
+  await page.goto("/team");
+  await expect(page).toHaveURL(/\/sign-in(?:\?|$)/);
+});
+
 test("hosted privacy stays in the app shell and returns to Courses without a workspace load", async ({
   page,
   request,
@@ -153,9 +207,13 @@ test("published curriculum opens in the reader shell with guest progress and no 
     if (entry.url().includes("/api/workspace")) workspaceReads++;
   });
   await page.goto("/curricula/intro");
-  await expect(page.getByRole("heading", { name: "Introduction" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Introduction" }),
+  ).toBeVisible();
   await expect(page.locator(".sidebar")).toHaveCount(1);
-  await expect(page.getByText("In progress", { exact: true }).first()).toBeVisible();
+  await expect(
+    page.getByText("In progress", { exact: true }).first(),
+  ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("curriculum-shell.png") });
   await page.getByRole("button", { name: "Back to courses" }).click();
   await expect(page).toHaveURL(/\/courses$/);
@@ -978,11 +1036,11 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
   ).toBeVisible();
 });
 
-test("legacy aliases, curriculum destinations and name-only metadata", async ({
+test("canonical detail routes, curriculum destinations and name-only metadata", async ({
   request,
 }) => {
   await fixture(request, { settings: { access: "public" } });
-  for (const [index, section] of ["knowledge", "notes", "learning"].entries()) {
+  for (const [index, section] of ["docs", "updates", "courses"].entries()) {
     const response = await request.get(
       `/${section}/${ids[index]}?curriculum=intro`,
     );

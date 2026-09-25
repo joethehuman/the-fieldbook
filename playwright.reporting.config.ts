@@ -4,8 +4,8 @@ const serverPort = Number(process.env.FIELDBOOK_SERVER_TEST_PORT || 3148);
 export default defineConfig({
   testDir: "./tests/reporting",
   outputDir: "test-results/reporting",
-  fullyParallel: true,
-  workers: 2,
+  fullyParallel: false,
+  workers: 1,
   reporter: [
     ["list"],
     ["html", { outputFolder: "playwright-report/reporting", open: "never" }],
@@ -47,12 +47,26 @@ export default defineConfig({
   ],
   webServer: [
     {
+      command: "node tests/accounts/backend.mjs",
+      url: "http://127.0.0.1:3130/health",
+      reuseExistingServer: false,
+    },
+    {
       command: `node node_modules/serve/build/main.js out -l ${demoPort} --no-clipboard`,
       url: `http://127.0.0.1:${demoPort}`,
       reuseExistingServer: false,
     },
     {
-      command: `node node_modules/next/dist/bin/next start production -H 127.0.0.1 -p ${serverPort}`,
+      command: `node --require ./tests/accounts/provider.cjs node_modules/next/dist/bin/next start production -H 127.0.0.1 -p ${serverPort}`,
+      env: {
+        NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "synthetic-test-key",
+        SUPABASE_SECRET_KEY: "synthetic-secret",
+        FIELDBOOK_URL: `http://127.0.0.1:${serverPort}`,
+        FIELDBOOK_OWNER_EMAIL: "admin@example.test",
+        VERCEL_ENV: "",
+        FIELDBOOK_ENVIRONMENT: "",
+      },
       url: `http://127.0.0.1:${serverPort}`,
       reuseExistingServer: false,
     },

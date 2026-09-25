@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
+import { setupAuthoringProvider } from "./provider-fixture";
 
 test("publication badges stay compact while unpublished edits remain visible", async ({
   page,
@@ -34,26 +35,14 @@ test("publication badges stay compact while unpublished edits remain visible", a
     },
   ];
   if (production) {
-    await page.route("**/api/workspace", (route) =>
-      route.fulfill({
-        json: {
-          data,
-          user: data.users.find((user) => user.id === "demo-admin"),
-        },
-      }),
-    );
+    await setupAuthoringProvider(page, data);
   } else {
     await page.addInitScript((workspace) => {
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
       sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     }, data);
   }
-  await page.goto(production ? "/team" : "/#admin");
-  if (production) {
-    const menu = page.getByRole("button", { name: "Open navigation" });
-    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-    await page.getByRole("button", { name: "Manage organization" }).click();
-  }
+  await page.goto(production ? "/admin" : "/#admin");
   const table = page.locator('table[data-layout="content"]');
   const edited = table
     .getByRole("row")

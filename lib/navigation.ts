@@ -1,3 +1,6 @@
+// Change this one destination if the installation home moves to Updates.
+export const organizationHomePath = "/courses";
+
 export const sectionPaths = {
   learn: "courses",
   docs: "docs",
@@ -6,19 +9,13 @@ export const sectionPaths = {
   team: "team",
 } as const;
 
-// Keep bookmarks and previously shared links working after the terminology update.
 export function resolveSection(
   path: string,
 ): keyof typeof sectionPaths | undefined {
   const aliases: Record<string, keyof typeof sectionPaths> = {
-    learn: "learn",
-    learning: "learn",
     courses: "learn",
     curricula: "learn",
-    knowledge: "docs",
     docs: "docs",
-    briefs: "briefs",
-    notes: "briefs",
     updates: "briefs",
     admin: "admin",
     team: "team",

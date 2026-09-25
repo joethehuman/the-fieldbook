@@ -1,6 +1,5 @@
 "use client";
-import ReadingError from "./[section]/[[...id]]/error";
+import ReadingError from "./ReaderError";
 
-// Also catch failures in the reader layout, which its own segment boundary
-// cannot wrap.
+// Catch failures from reader and other server-rendered routes.
 export default ReadingError;

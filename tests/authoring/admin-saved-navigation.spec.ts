@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
+import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
 async function section(page: Page, name: string) {
   const picker = page.getByRole("combobox", {
@@ -27,11 +28,12 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
     docSections: [],
   } as typeof data.settings;
   if (production) {
-    await page.route("**/api/workspace", (route) =>
+    await setupAuthoringProvider(page, data);
+    await page.route("**/api/admin/snapshot?**", (route) =>
       route.fulfill({
         json: {
           data,
-          user: data.users.find((user) => user.id === "demo-admin"),
+          user: authoringUser,
         },
       }),
     );
@@ -63,12 +65,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
     }, data);
   }
 
-  await page.goto(production ? "/team" : "/#admin");
-  if (production) {
-    const menu = page.getByRole("button", { name: "Open navigation" });
-    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-    await page.getByRole("button", { name: "Manage organization" }).click();
-  }
+  await page.goto(production ? "/admin" : "/#admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Docs navigation");
   await page.getByRole("button", { name: "Save settings" }).click();

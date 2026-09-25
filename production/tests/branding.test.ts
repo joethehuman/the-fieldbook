@@ -140,7 +140,7 @@ test("cancelled, denied and unavailable authentication preserve safe destination
     "https://evil.test",
     "/\n/evil.test",
   ])
-    assert.equal(safeNext(unsafe), "/");
+    assert.equal(safeNext(unsafe), "/courses");
   assert.equal(
     safeNext("/docs/guide?view=all#google"),
     "/docs/guide?view=all#google",

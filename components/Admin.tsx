@@ -336,7 +336,10 @@ export default function Admin({
     notify(
       `${label} ${c.status === "published" ? "published" : "draft saved"}${production ? "." : " in this browser."}`,
     );
-    return updated;
+    // The server may normalize the draft while saving. Keep the editor's
+    // baseline on the persisted revision so a second publish is not treated
+    // as a concurrent edit.
+    return production && onEdit ? await onEdit(c.id) : updated;
   }
   async function savePerson(e: React.FormEvent) {
     e.preventDefault();
@@ -463,9 +466,13 @@ export default function Admin({
     setQuery("");
   }
   return (
-    <div className="admin-workspace">
+    <div className="admin-workspace" aria-busy={!!openingTab}>
       <h1 className="sr-only">Administration</h1>
-      {openingTab && <p role="status">Opening section…</p>}
+      {openingTab && (
+        <span className="sr-only" role="status">
+          Loading administration data
+        </span>
+      )}
       <Tabs
         className="admin-layout"
         orientation="vertical"
@@ -1119,6 +1126,7 @@ export function Editor({
   const original = useRef(content);
   const pendingUploads = useRef(0);
   const savingNow = useRef(false);
+  const historyGuardArmed = useRef(false);
   const [recovering, setRecovering] = useState(false);
   const busy = saving || uploadCount > 0 || recovering;
   const dirty =
@@ -1149,6 +1157,31 @@ export function Editor({
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy]);
+  useEffect(() => {
+    if (!production) return;
+    if (!dirty && !busy) {
+      historyGuardArmed.current = false;
+      return;
+    }
+    if (!historyGuardArmed.current) {
+      historyGuardArmed.current = true;
+      window.history.pushState(window.history.state, "", window.location.href);
+    }
+    const onBack = () => {
+      if (!historyGuardArmed.current) return;
+      // Back first reaches the identical Admin URL, keeping the editor mounted
+      // while the async discard dialog runs. Restore the guard entry at once.
+      window.history.pushState(window.history.state, "", window.location.href);
+      void guard.current().then((approved) => {
+        if (approved) {
+          historyGuardArmed.current = false;
+          window.history.go(-2);
+        }
+      });
+    };
+    window.addEventListener("popstate", onBack);
+    return () => window.removeEventListener("popstate", onBack);
+  }, [production, dirty, busy]);
   const upload: UploadMedia | undefined = onUpload
     ? async (file) => {
         pendingUploads.current++;

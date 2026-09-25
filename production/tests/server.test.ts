@@ -95,12 +95,12 @@ test("login return destinations cannot redirect to another origin", () => {
     "/\n/evil.example",
     "/\t/evil.example",
   ])
-    assert.equal(safeNext(raw), "/");
+    assert.equal(safeNext(raw), "/courses");
   assert.equal(
     safeNext("/oauth/consent?authorization_id=123"),
     "/oauth/consent?authorization_id=123",
   );
-  assert.equal(safeNext("/#learn/course"), "/#learn/course");
+  assert.equal(safeNext("/#learn/course"), "/courses");
 });
 
 test("MCP's stateless HTTP transport handles initialization and tool discovery", async () => {

@@ -49,16 +49,12 @@ export const config = {
   matcher: [
     "/docs",
     "/docs/:id+",
-    "/knowledge/:id+",
     "/updates",
     "/updates/:id+",
-    "/briefs/:id+",
-    "/notes/:id+",
     "/courses",
     "/courses/:id+",
+    "/team",
     "/curricula",
     "/curricula/:id+",
-    "/learn/:id+",
-    "/learning/:id+",
   ],
 };

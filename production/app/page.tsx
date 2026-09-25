@@ -1,4 +1,6 @@
-import ProductionApp from "./ProductionApp";
+import { organizationHomePath } from "@/lib/navigation";
+import { redirect } from "next/navigation";
+
 export default function Page() {
-  return <ProductionApp />;
+  redirect(organizationHomePath);
 }

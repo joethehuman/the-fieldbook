@@ -5,6 +5,7 @@ import { privacySettings } from "@production/lib/privacy";
 import { actor } from "@production/lib/auth";
 import { brandingFromSettings } from "@/lib/branding";
 import { ReaderShell } from "@/components/reader/ReaderShell";
+import { organizationHomePath } from "@/lib/navigation";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Privacy policy" };
 export default async function PrivacyPage() {
@@ -31,7 +32,7 @@ export default async function PrivacyPage() {
       }}
     >
       <div className="mx-auto grid w-full max-w-3xl gap-6">
-        <Link href="/courses">← {settings.name}</Link>
+        <Link href={organizationHomePath}>← {settings.name}</Link>
         <h1>Privacy policy</h1>
         {policy ? (
           <>

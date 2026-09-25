@@ -10,6 +10,7 @@ import { publicBranding } from "@production/lib/branding";
 import { errorResponse } from "@production/lib/errors";
 import { AccountUnavailable } from "../AccountUnavailable";
 import Link from "next/link";
+import { organizationHomePath } from "@/lib/navigation";
 export const dynamic = "force-dynamic";
 export default async function SignIn({
   searchParams,
@@ -62,7 +63,7 @@ export default async function SignIn({
       </Button>
       {branding.access === "public" && (
         <nav className="sign-in-footer" aria-label="Sign-in links">
-          <Link href="/courses">Back to browsing</Link>
+          <Link href={organizationHomePath}>Back to browsing</Link>
         </nav>
       )}
     </BrandedAccount>
