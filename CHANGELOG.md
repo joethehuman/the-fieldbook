@@ -4,6 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Open a new demo session on the profile chooser, remove the redundant top-bar demo button, and keep “About this demo” in the footer at the surrounding text size.
 - Keep the shared header, footer and sidebar stable at scroll limits across the demo and production app. Page content scrolls within the viewport, with separate scroll areas for Administration sections and their selected panel. Scrollable surfaces leave room for overlay scrollbars beside their content and controls.
 - Remove redundant Administration headings and keep its section list independently scrollable, simplify the guest account label and Courses home, move Docs/Updates category into article metadata, and add date and title sorting to learning-group content pickers.
 - Display the installation name without a logo or icon in the demo and installed application. Remove logo upload from Identity settings and the redundant “Your Organization” sidebar label; give the name more room and lighter, clearer type.
