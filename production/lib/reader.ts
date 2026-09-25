@@ -373,6 +373,21 @@ export const readerCourseItem = cache(async (id: string) => {
   };
 });
 
+export const readerCourseProgress = cache(async (id: string) => {
+  const { user } = await readerAccess("/courses");
+  if (!user) return [] as Progress[];
+  const { data, error } = await db()
+    .from("fb_progress")
+    .select("content_id,version,lessons,passed,attempts")
+    .eq("user_id", user.id)
+    .eq("content_id", id)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  check(error);
+  return data ? [data as Progress] : [];
+});
+
 export function readerMetadata(
   item: Content,
   context: Pick<Awaited<ReturnType<typeof readerContext>>, "branding">,

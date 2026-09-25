@@ -26,6 +26,7 @@ import { SkipLink } from "@/components/patterns/skip-link";
 import { NavigationButton } from "@/components/patterns/navigation-button";
 import { Button } from "@/components/ui/button";
 import { ReaderSearch } from "./ReaderSearch";
+import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
 
 export function ReaderShell({
@@ -222,6 +223,7 @@ export function ReaderShell({
           <ReaderSearch />
         </AppBar>
         <main id="main-content" className="main-content" tabIndex={-1}>
+          {context.user && <ReaderGuestImport />}
           {children}
           <footer>
             {context.branding.name} <span>{context.branding.tagline}</span>

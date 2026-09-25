@@ -17,6 +17,7 @@ import { Button } from "../ui/button";
 import { InitialsAvatar } from "../ui/initials-avatar";
 import { ContentAction } from "./content-action";
 import { IntentLink } from "./intent-link";
+import Link from "next/link";
 
 /** Shared, server-compatible reading presentation; callers own access and actions. */
 export function Article({
@@ -230,13 +231,14 @@ export function CourseOverview({
               asChild
               className="flex w-full flex-wrap items-center gap-4 p-4"
             >
-              <a
+              <Link
+                prefetch
                 href={`${path}?lesson=${encodeURIComponent(lesson.id)}${curriculum ? `&curriculum=${encodeURIComponent(curriculum)}` : ""}`}
               >
                 <span>{index + 1}</span>
                 <span>{lesson.title}</span>
                 <span className="ml-auto">Start lesson →</span>
-              </a>
+              </Link>
             </ContentAction>
           </li>
         ))}
