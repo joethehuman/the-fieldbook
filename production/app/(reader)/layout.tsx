@@ -4,6 +4,7 @@ import {
   readerCourseItem,
   readerCurriculum,
   readerItem,
+  readerTeamContext,
   readerUpdateItem,
 } from "@production/lib/reader";
 import { headers } from "next/headers";
@@ -23,7 +24,7 @@ export default async function Layout({
   if (
     parts.length < 1 ||
     parts.length > 2 ||
-    !["docs", "updates", "courses", "curricula"].includes(section)
+    !["docs", "updates", "courses", "curricula", "team"].includes(section)
   )
     notFound();
 
@@ -37,6 +38,10 @@ export default async function Layout({
     else if (section === "curricula") await readerCurriculum(id);
     else notFound();
   }
+  if (section === "team")
+    return (
+      <ReaderShell context={await readerTeamContext()}>{children}</ReaderShell>
+    );
   const {
     user,
     branding,

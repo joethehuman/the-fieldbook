@@ -13,6 +13,7 @@ import {
   guestAnswersForImport,
   type GuestProgress,
 } from "@/lib/guest-progress";
+import { organizationHomePath } from "@/lib/navigation";
 
 import {
   request,
@@ -133,7 +134,7 @@ const runtime: FieldbookRuntime = {
   },
   async signOut() {
     await request("/auth/logout", {});
-    window.location.replace("/");
+    window.location.replace(organizationHomePath);
   },
 };
 

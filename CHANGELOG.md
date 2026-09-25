@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Send the installation root directly to Courses and open Team progress in the shared reader shell with scoped reporting data. Use canonical `/docs` and `/updates` routes in place of the pre-release Knowledge/Notes aliases, and preserve the unsaved Admin editor prompt on browser Back.
+
 - Open a new demo session on the profile chooser, remove the redundant top-bar demo button, and keep “About this demo” in the footer at the surrounding text size.
 - Center the shared opening message and loading bar. Show the hosted privacy policy in the app shell and return to Courses without booting the legacy workspace. Open curricula in the reader shell, and prefetch likely course destinations while preserving private access checks.
 

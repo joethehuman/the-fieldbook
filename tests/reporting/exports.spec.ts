@@ -144,15 +144,76 @@ async function setup(
   const production = info.project.name.startsWith("production");
   const user = data.users.find((u) => u.id === `demo-${role}`)!;
   if (production) {
-    // UI parity only: real server authorization/pagination is tested separately.
-    if (role === "manager") {
-      data.users = data.users.filter(
-        (u) =>
-          u.id === user.id || ["sales-team", "child"].includes(u.teamId || ""),
-      );
-      data.teams = data.teams!.filter((t) => t.id !== "other");
-      data.feedback = [];
+    const actorId = "00000000-0000-4000-8000-000000000010";
+    const oldId = user.id;
+    user.id = actorId;
+    for (const team of data.teams || [])
+      if (team.managerId === oldId) team.managerId = actorId;
+    if (data.progress[oldId]) {
+      data.progress[actorId] = data.progress[oldId];
+      delete data.progress[oldId];
     }
+    await page.request.post("http://127.0.0.1:3130/fixture", {
+      data: {
+        settings: data.settings,
+        groups: data.groups,
+        curricula: data.curricula,
+        role,
+        userGroups: user.groups,
+        teams: data.teams,
+        users: data.users.map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          email: entry.email,
+          role: entry.role,
+          active: entry.active,
+          groups: entry.groups,
+          team_id: entry.teamId || null,
+          onboarding_start: entry.onboardingStart || null,
+          group_joined_at: entry.groupJoinedAt || {},
+          effective_group_joined_at: entry.effectiveGroupJoinedAt || {},
+        })),
+        progress: Object.entries(data.progress).flatMap(([id, rows]) =>
+          rows.map((entry) => ({ ...entry, user_id: id })),
+        ),
+        feedback: (data.feedback || []).map((entry) => ({
+          id: entry.id,
+          user_id: entry.userId,
+          content_id: entry.contentId,
+          version: entry.version,
+          rating: entry.rating,
+          comment: entry.comment,
+          updated_at: entry.updatedAt,
+        })),
+        documents: data.content.map((item) => ({
+          id: item.id,
+          published: item.status === "published" ? item : null,
+          draft: item,
+          revision: item.revision || 1,
+          published_revision: item.status === "published" ? 1 : null,
+          updated_at: item.updatedAt,
+        })),
+      },
+    });
+    const token = await (
+      await page.request.post("http://127.0.0.1:3130/auth/v1/token", {
+        data: {},
+      })
+    ).json();
+    await page.context().addCookies([
+      {
+        name: "sb-test-auth-token",
+        value:
+          "base64-" +
+          Buffer.from(
+            JSON.stringify({
+              ...token,
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+            }),
+          ).toString("base64url"),
+        url: new URL(String(info.project.use.baseURL)).origin,
+      },
+    ]);
     await page.route("**/api/workspace", (route) =>
       route.fulfill({ json: { data, user } }),
     );
@@ -166,13 +227,14 @@ async function setup(
       { data, id: user.id },
     );
   await page.goto(
-    production ? "/team" : role === "manager" ? "/#team" : "/#admin",
+    production
+      ? role === "manager"
+        ? "/team"
+        : "/admin"
+      : role === "manager"
+        ? "/#team"
+        : "/#admin",
   );
-  if (production && role === "admin") {
-    const menu = page.getByRole("button", { name: "Open navigation" });
-    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-    await page.getByRole("button", { name: "Manage organization" }).click();
-  }
   await expect(
     page.getByRole("heading", {
       name: role === "manager" ? "Team progress" : "Administration",
@@ -252,7 +314,24 @@ test("progress filters, keyboard download, member details and empty report", asy
 test("manager exports include subteams and exclude sibling teams", async ({
   page,
 }, info) => {
-  await setup(page, info, "manager");
+  let workspaceReads = 0;
+  let documentNavigations = 0;
+  page.on("request", (request) => {
+    if (request.url().includes("/api/workspace")) workspaceReads++;
+    if (request.isNavigationRequest()) documentNavigations++;
+  });
+  const { production } = await setup(page, info, "manager");
+  if (production) {
+    const menu = page.getByRole("button", { name: "Open navigation" });
+    if (await menu.isVisible()) await menu.click();
+    await page.getByRole("link", { name: "Courses", exact: true }).click();
+    if (await menu.isVisible()) await menu.click();
+    await page.getByRole("link", { name: "My team’s progress" }).click();
+    await expect(page).toHaveURL(/\/team$/);
+    expect(workspaceReads).toBe(0);
+    expect(documentNavigations).toBe(1);
+    expect(await page.content()).not.toContain("SECRET OUTSIDER");
+  }
   const result = await download(
     page,
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -409,15 +488,16 @@ test("download preparation failure is visible, retryable and creates no file", a
   ).toHaveCount(0);
 });
 
-test("unavailable or pending workspace never offers export", async ({
+test("unavailable or pending admin report never offers export", async ({
   page,
 }, info) => {
   test.skip(
     !info.project.name.startsWith("production"),
     "Workspace HTTP loading belongs to production",
   );
+  await setup(page, info);
   let release!: () => void;
-  await page.route("**/api/workspace", async (route) => {
+  await page.route("**/api/admin/snapshot?**", async (route) => {
     await new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -428,10 +508,8 @@ test("unavailable or pending workspace never offers export", async ({
       },
     });
   });
-  await page.goto("/team");
-  await expect(
-    page.getByRole("heading", { name: "Just a sec…" }),
-  ).toBeVisible();
+  await section(page, "Progress");
+  await expect(page.getByText("Opening section…")).toBeVisible();
   await expect(page.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
   await screenshot(page, info, "loading");
   release();
@@ -468,7 +546,7 @@ test("failed progress update disables exports until the complete report reloads"
       release = resolve;
     });
     // The mutation succeeded but its required complete reload fails.
-    await page.route("**/api/workspace", (r) =>
+    await page.route("**/api/admin/snapshot?**", (r) =>
       r.fulfill({ status: 503, json: { error: "Report reload unavailable" } }),
     );
     await route.fulfill({ json: { ok: true } });
@@ -494,17 +572,8 @@ test("failed progress update disables exports until the complete report reloads"
   for (const button of await exports.all()) await expect(button).toBeDisabled();
   await screenshot(page, info, "mutation-error");
   // A full successful load is the recovery; no retry of the uncertain mutation.
-  await page.unroute("**/api/workspace");
-  const data = fixture();
-  await page.route("**/api/workspace", (r) =>
-    r.fulfill({
-      json: { data, user: data.users.find((u) => u.role === "admin") },
-    }),
-  );
-  await page.goto("/team");
-  const menu = page.getByRole("button", { name: "Open navigation" });
-  if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-  await page.getByRole("button", { name: "Manage organization" }).click();
+  await page.unroute("**/api/admin/snapshot?**");
+  await page.goto("/admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Progress");
   await expect(
@@ -608,10 +677,11 @@ test("People fieldset footers preserve default-stage saving in both applications
   }
   await screenshot(page, info, "people-fieldset-footers");
   if (production) {
-    await page.goto("/team");
-    const menu = page.getByRole("button", { name: "Open navigation" });
-    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-    await page.getByRole("button", { name: "Manage organization" }).click();
+    await page.request.patch(
+      "http://127.0.0.1:3130/rest/v1/fb_config?revision=eq.1",
+      { data: { settings: data.settings, revision: 2 } },
+    );
+    await page.goto("/admin");
   } else await page.reload();
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, production ? "People" : "Demo profiles");

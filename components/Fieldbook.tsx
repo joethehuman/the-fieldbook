@@ -59,7 +59,12 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { FieldbookRuntime } from "@/lib/runtime";
-import { sectionPaths, resolveSection, contentPath } from "@/lib/navigation";
+import {
+  sectionPaths,
+  resolveSection,
+  contentPath,
+  organizationHomePath,
+} from "@/lib/navigation";
 import { docSections } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
@@ -672,7 +677,7 @@ export default function Fieldbook({
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
               <a
-                href={runtime ? "/courses" : "#courses"}
+                href={runtime ? organizationHomePath : "#courses"}
                 onClick={(event) => {
                   if (
                     event.metaKey ||

@@ -47,6 +47,8 @@ let settings = initial(),
   configuredCurricula = [],
   configuredProgress = [],
   configuredFeedback = [],
+  configuredUsers = [],
+  configuredTeams = [],
   userGroups = [],
   fail = false,
   role = "admin",
@@ -58,15 +60,16 @@ const user = () => ({
   app_metadata: {},
   user_metadata: {},
 });
-const profile = () => ({
-  ...user(),
-  name: "Synthetic Admin",
-  role,
-  active: role !== "inactive",
-  groups: userGroups,
-  group_joined_at: {},
-  effective_group_joined_at: {},
-});
+const profile = () =>
+  configuredUsers.find((entry) => entry.id === user().id) || {
+    ...user(),
+    name: "Synthetic Admin",
+    role,
+    active: role !== "inactive",
+    groups: userGroups,
+    group_joined_at: {},
+    effective_group_joined_at: {},
+  };
 const send = (res, data, status = 200, headers = {}) => {
   res.writeHead(status, {
     "Content-Type": "application/json",
@@ -91,6 +94,8 @@ createServer(async (req, res) => {
     configuredCurricula = change.curricula || [];
     configuredProgress = change.progress || [];
     configuredFeedback = change.feedback || [];
+    configuredUsers = change.users || [];
+    configuredTeams = change.teams || [];
     userGroups = change.userGroups || [];
     fail = !!change.fail;
     role = change.role || "admin";
@@ -274,13 +279,15 @@ createServer(async (req, res) => {
   if (url.pathname === "/rest/v1/fb_profiles")
     return url.searchParams.has("id")
       ? send(res, profile())
-      : send(res, [profile()], 200, { "Content-Range": "0-0/1" });
+      : send(res, configuredUsers.length ? configuredUsers : [profile()], 200, {
+          "Content-Range": `0-${Math.max(0, configuredUsers.length - 1)}/${configuredUsers.length || 1}`,
+        });
   if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot")
     return send(res, {
-      users: [profile()],
+      users: configuredUsers.length ? configuredUsers : [profile()],
       progress: configuredProgress,
       groups: configuredGroups,
-      teams: [],
+      teams: configuredTeams,
       pending: [],
       revision: fixtureGeneration,
     });

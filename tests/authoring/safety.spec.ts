@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
+import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
 async function setup(
   page: Page,
@@ -25,6 +26,7 @@ async function setup(
     releaseUpload: () => {},
   };
   if (production) {
+    await setupAuthoringProvider(page, state);
     await page.route("**/api/search?**", (route) =>
       route.fulfill({ json: { results: [], hasMore: false } }),
     );
@@ -37,20 +39,20 @@ async function setup(
         ),
       }),
     );
-    await page.route("**/api/workspace", (route) =>
+    await page.route("**/api/admin/snapshot?**", (route) =>
       route.fulfill({
         status: control.failRefresh ? 503 : 200,
         json: control.failRefresh
           ? { error: "Workspace unavailable" }
           : {
               data: state,
-              user: control.sessionLost
-                ? null
-                : state.users.find((u) => u.id === "demo-admin"),
+              user: control.sessionLost ? null : authoringUser,
             },
       }),
     );
-    await page.route("**/api/content", async (route) => {
+    await page.route("**/api/content*", async (route) => {
+      if (route.request().method() === "GET")
+        return route.fulfill({ json: state.content[0] });
       control.saves++;
       if (control.failSave)
         return route.fulfill({
@@ -112,12 +114,7 @@ async function setup(
       sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     }, state);
   }
-  await page.goto(production ? "/team" : "/#admin");
-  if (production) {
-    const menu = page.getByRole("button", { name: "Open navigation" });
-    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-    await page.getByRole("button", { name: "Manage organization" }).click();
-  }
+  await page.goto(production ? "/admin" : "/#admin");
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   return { state, control };
 }
@@ -196,7 +193,9 @@ test("browser back can be canceled without unmounting the editor", async ({
     .getByRole("button", { name: "Docs", exact: true })
     .click();
   await openNav(page);
-  await page.getByRole("button", { name: "Manage organization" }).click();
+  await page
+    .getByRole(production ? "link" : "button", { name: "Manage organization" })
+    .click();
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   await page.getByLabel("Title", { exact: true }).fill("History protected");
   await page.evaluate(() => history.back());
@@ -205,6 +204,11 @@ test("browser back can be canceled without unmounting the editor", async ({
     "History protected",
   );
   await expect(page).toHaveURL(production ? /\/admin$/ : /#admin$/);
+  if (production) {
+    await page.evaluate(() => history.back());
+    await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    await expect(page).toHaveURL(/\/docs$/);
+  }
 });
 
 test("failed save preserves downloadable text and does not show success", async ({
@@ -256,10 +260,7 @@ test("failed learning-group save shows one concise inline error", async ({
       },
     }),
   );
-  await page.goto("/team");
-  const menu = page.getByRole("button", { name: "Open navigation" });
-  if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-  await page.getByRole("button", { name: "Manage organization" }).click();
+  await page.goto("/admin");
   if (info.project.name.endsWith("phone")) {
     await page
       .getByRole("combobox", { name: "Administration section" })
@@ -481,7 +482,7 @@ test("session expiration during recovery cannot replace the editor with a guest 
   );
   await page.getByRole("button", { name: "Review saved copy" }).click();
   await expect(page.locator("form.editor").getByRole("alert")).toContainText(
-    "sign-in or account access changed",
+    "Administrator access changed",
   );
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep this after expiry",

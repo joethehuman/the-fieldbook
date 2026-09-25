@@ -2,6 +2,11 @@ import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { equivalentMarkdown } from "../../lib/markdown-compatibility";
+import {
+  authoringUser,
+  setupAuthoringProvider,
+  syncAuthoringProvider,
+} from "./provider-fixture";
 
 const original = `## Working with customers
 
@@ -45,11 +50,12 @@ async function setup(
   state.publishedContent = [structuredClone(item)];
   let writes = 0;
   if (production) {
-    await page.route("**/api/workspace", (route) =>
+    await setupAuthoringProvider(page, state);
+    await page.route("**/api/admin/snapshot?**", (route) =>
       route.fulfill({
         json: {
           data: state,
-          user: state.users.find((user) => user.id === "demo-admin"),
+          user: authoringUser,
         },
       }),
     );
@@ -59,7 +65,9 @@ async function setup(
       state.revision = (state.revision || 1) + 1;
       return route.fulfill({ json: { revision: state.revision } });
     });
-    await page.route("**/api/content", (route) => {
+    await page.route("**/api/content", async (route) => {
+      if (route.request().method() === "GET")
+        return route.fulfill({ json: state.content[0] });
       writes++;
       const request = route.request().postDataJSON();
       const current = state.content.find(
@@ -83,6 +91,7 @@ async function setup(
         ...state.content.filter((item) => item.id !== saved.id),
         saved,
       ];
+      await syncAuthoringProvider(page, state);
       return route.fulfill({ json: saved });
     });
   } else {
@@ -104,12 +113,7 @@ async function setup(
   await page.route("**/api/media/example.mp4", (route) =>
     route.fulfill({ status: 204 }),
   );
-  await page.goto(production ? "/team" : "/#admin");
-  if (production) {
-    const menu = page.getByRole("button", { name: "Open navigation" });
-    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
-    await page.getByRole("button", { name: "Manage organization" }).click();
-  }
+  await page.goto(production ? "/admin" : "/#admin");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const read = async (): Promise<Workspace> =>
     production
@@ -219,7 +223,7 @@ test("formatting controls, keyboard save, source fallback and responsive setting
   await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
   expect((await read()).publishedContent![0].body).toBe("A short update");
   const settings = page.getByRole("button", { name: "Content settings" });
-  if (await settings.isVisible()) await settings.click();
+  if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
   await expect(
     page.getByRole("heading", { name: "For you", exact: true }),
   ).toBeVisible();
@@ -316,7 +320,7 @@ test("Update category filters, creates, normalizes and survives draft saves", as
     "brief",
   );
   const settings = page.getByRole("button", { name: "Content settings" });
-  if (await settings.isVisible()) await settings.click();
+  if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
   const input = page.getByRole("combobox", { name: "Category", exact: true });
   const existing = await input.inputValue();
   await input.fill(existing.toLowerCase());
@@ -372,7 +376,7 @@ for (const kind of ["Doc", "Update"]) {
       kind === "Doc" ? "doc" : "brief",
     );
     const settings = page.getByRole("button", { name: "Content settings" });
-    if (await settings.isVisible()) await settings.click();
+    if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
     if (kind === "Doc") {
       await expect(
         page.getByRole("button", {
@@ -467,7 +471,7 @@ for (const kind of ["Doc", "Update"]) {
       .filter({ hasText: `New ${kind}` })
       .getByRole("button", { name: "Edit", exact: true })
       .click();
-    if (await settings.isVisible()) await settings.click();
+    if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
     if (kind === "Doc") {
       await expect(
         page.getByRole("button", {

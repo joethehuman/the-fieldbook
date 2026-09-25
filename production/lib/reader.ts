@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
-import { readerActor as verifiedReaderActor } from "./auth";
+import { profile, readerActor as verifiedReaderActor } from "./auth";
 import {
   assertCanRead,
   canRead,
@@ -29,6 +29,8 @@ import { contentPath } from "@/lib/navigation";
 import { headers } from "next/headers";
 import { unstable_cache } from "next/cache";
 import { publishedReaderTag } from "./reader-cache";
+import type { Workspace } from "@/lib/store";
+import { reportTeamIds } from "@/lib/types";
 
 export type ReaderItem = Pick<
   Content,
@@ -203,6 +205,108 @@ export const readerContext = cache(async (destination: string) => {
         id: item.id,
         title: item.name,
       })),
+  };
+});
+
+export const readerTeamContext = cache(async () => {
+  const { user, config } = await readerAccess("/team");
+  return {
+    user: user ? { id: user.id, name: user.name, role: user.role } : null,
+    branding: readerBranding(config),
+    docs: [],
+    docCategoryOrder: [],
+    docSections: [],
+  };
+});
+
+export const readerTeam = cache(async () => {
+  const { user, config } = await readerAccess("/team");
+  const empty: Workspace = {
+    schema: 1,
+    settings: publicSettings(config.settings, []),
+    content: [],
+    publishedContent: [],
+    users: user ? [user] : [],
+    groups: [],
+    teams: [],
+    progress: {},
+  };
+  if (!user || !user.active || !["admin", "manager"].includes(user.role))
+    return { data: empty, user };
+
+  const [result, rows] = await Promise.all([
+    db().rpc("fb_governance_snapshot", { p_actor: user.id }),
+    publishedCourseIndex(env().url, config.governance_revision),
+  ]);
+  check(result.error);
+  const governance = result.data;
+  const current = (governance?.users || []).find(
+    (entry: { id: string }) => entry.id === user.id,
+  );
+  if (!current || !current.active || current.role !== user.role)
+    throw new Error("Account access changed. Reload and sign in again.");
+  const teams = governance.teams || [];
+  const allowed = reportTeamIds(user, teams);
+  const visibleTeams =
+    user.role === "admin"
+      ? teams
+      : teams.filter((team: { id: string }) => allowed.has(team.id));
+  const people: User[] = (governance.users || [])
+    .map(profile)
+    .filter(
+      (person: User) =>
+        user.role === "admin" ||
+        person.id === user.id ||
+        (!!person.teamId && allowed.has(person.teamId)),
+    );
+  const peopleIds = new Set(people.map((person) => person.id));
+  const allGroups = governance.groups || [];
+  const visibleGroupIds = new Set(
+    people.flatMap((person) => [...effectiveGroups(person, allGroups)]),
+  );
+  const groups =
+    user.role === "admin"
+      ? allGroups
+      : allGroups.filter((group: { id: string }) =>
+          visibleGroupIds.has(group.id),
+        );
+  const groupIds = new Set(groups.map((group: { id: string }) => group.id));
+  const courses = rows
+    .filter((row) => row.kind === "course" && row.status === "published")
+    .map((row) => courseSummary(row as unknown as CourseRow))
+    .map((course) => ({
+      ...course,
+      groups: course.groups.filter((id) => groupIds.has(id)),
+      assignments: course.assignments?.filter(
+        (assignment) =>
+          (assignment.groupId && groupIds.has(assignment.groupId)) ||
+          (assignment.userId && peopleIds.has(assignment.userId)),
+      ),
+    }));
+  const progress: Workspace["progress"] = {};
+  for (const row of governance.progress || []) {
+    if (!peopleIds.has(row.user_id)) continue;
+    (progress[row.user_id] ??= []).push({
+      content_id: row.content_id,
+      version: row.version,
+      lessons: row.lessons,
+      passed: row.passed,
+      attempts: row.attempts,
+      revision: row.revision,
+    });
+  }
+  return {
+    user,
+    data: {
+      ...empty,
+      settings: publicSettings(config.settings, courses),
+      content: courses,
+      publishedContent: courses,
+      users: people,
+      groups,
+      teams: visibleTeams,
+      progress,
+    },
   };
 });
 
