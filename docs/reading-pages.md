@@ -12,6 +12,8 @@ Docs, Updates and Courses use Next links for list cards, lesson links, the docum
 
 The installation root redirects to `/courses`. The destination is defined in `lib/navigation.ts` so it can move to `/updates` later. Team progress shares the reader shell but gets only the authorized people, teams, groups, progress and compact published course records needed for reporting. It does not fetch the full workspace or feedback and does not cache personal report data. Administration remains on its scoped editing route with its unsaved-work guard. Current section URLs are `/courses`, `/updates` and `/docs`; pre-public legacy aliases are not maintained.
 
+Authored hyperlinks follow the reading context without extra link settings in saved Markdown. Hyperlinked lesson and course overview text opens in a new tab so the current course step remains available. In Docs and Updates, relative links and absolute links to the current installation stay in the same tab; outside HTTP(S) links open in a new tab. Links opening separately include a screen-reader announcement and do not expose the opener. Course progression buttons, breadcrumbs, document navigation and media controls retain their own navigation behavior.
+
 ## Metadata and caching
 
 Each readable item supplies a title, description, canonical URL, Open Graph and Twitter summary metadata. URLs use the configured trusted application origin. Previews use text metadata without item media, expiring Storage URLs or generated images. Private authorized pages are marked noindex; anonymous private requests receive only generic metadata and the approved public sign-in identity.

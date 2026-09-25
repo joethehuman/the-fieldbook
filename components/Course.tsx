@@ -206,7 +206,7 @@ export function Course({
                 </Note>
               ) : null}
               <div className="markdown">
-                <ReactMarkdown>{lesson.body}</ReactMarkdown>
+                <ReactMarkdown linkContext="course">{lesson.body}</ReactMarkdown>
               </div>
               <ActionGroup>
                 {p?.lessons.includes(lesson.id) && (

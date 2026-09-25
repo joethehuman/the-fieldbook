@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Field } from "../ui/field";
 import { SelectField } from "../ui/select";
 import { TabsList } from "../ui/tabs";
+import { useScrollFade } from "./use-scroll-fade";
 
 /** Full navigation on desktop, one compact section picker on narrow screens. */
 export function ResponsiveTabsNavigation({
@@ -18,6 +19,7 @@ export function ResponsiveTabsNavigation({
   options: { id: string; name: string }[];
   children: ReactNode;
 }) {
+  const fade = useScrollFade<HTMLDivElement>();
   return (
     <div data-slot="admin-navigation" className="min-w-0">
       <Field className="@min-[48rem]/workspace:hidden">
@@ -35,9 +37,13 @@ export function ResponsiveTabsNavigation({
         data-slot="admin-navigation-desktop"
       >
         <TabsList
+          ref={fade.ref}
           variant="sidebar"
-          className="min-h-0 content-start overflow-y-auto overscroll-contain pe-3 [scrollbar-gutter:stable]"
+          className="scroll-fade min-h-0 content-start overflow-y-auto overscroll-contain pe-3 [scrollbar-gutter:stable]"
           aria-label={label}
+          data-scroll-fade-before={fade.edges.before}
+          data-scroll-fade-after={fade.edges.after}
+          onScroll={fade.measure}
         >
           {children}
         </TabsList>

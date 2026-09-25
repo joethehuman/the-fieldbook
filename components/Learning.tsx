@@ -248,14 +248,10 @@ export default function Learning({
     </h2>
   );
   const progressCard = (
-    <Card className="flex w-full max-w-xs flex-col items-center justify-center gap-4 text-center">
+    <Card className={`flex w-full max-w-xs flex-col items-center justify-center gap-4 text-center ${assigned.length ? "" : "border-dotted border-muted-foreground/50"}`}>
       {assigned.length > 0 ? (
         <ProgressRing value={pct} />
-      ) : (
-        <div className="learning-status-icon">
-          <BookOpen size={24} />
-        </div>
-      )}
+      ) : null}
       <div className="grid gap-2">
         <h3>
           {!assigned.length
@@ -305,7 +301,7 @@ export default function Learning({
         </Button>
       ) : (
         <Button variant="link" onClick={browseLibrary}>
-          Browse all courses <ArrowRight size={16} />
+          All courses <ArrowRight size={16} />
         </Button>
       )}
     </Card>

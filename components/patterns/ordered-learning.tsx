@@ -1,6 +1,7 @@
 "use client";
 import { ReorderRow } from "./reorder-row";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useRowReorder } from "./use-row-reorder";
 import { ArrowDown, ArrowUp, GripVertical, Trash2 } from "lucide-react";
 import { Button } from "../ui/button";
 export function OrderedLearning({
@@ -14,7 +15,7 @@ export function OrderedLearning({
   onRemove: (id: string) => void;
   disabled?: boolean;
 }) {
-  const [dragged, setDragged] = useState<string | null>(null);
+  const drag = useRowReorder(items, (id, target) => move(id, target), disabled);
   function move(id: string, position: number) {
     const ids = items.map((i) => i.id),
       from = ids.indexOf(id);
@@ -32,17 +33,15 @@ export function OrderedLearning({
   }
   return (
     <ol className="learning-order">
-      {items.map((item, index) => (
+      {drag.ordered.map((item, index) => (
         <ReorderRow
           key={item.id}
+          data-sortable-preview
+          data-dragging={drag.active === item.id}
           onDragOver={(e) => {
-            if (dragged) e.preventDefault();
+            drag.over(e, item.id);
           }}
-          onDrop={(e) => {
-            e.preventDefault();
-            if (dragged) move(dragged, index);
-            setDragged(null);
-          }}
+          onDrop={drag.drop}
           handle={
             <Button
               variant="ghost"
@@ -51,11 +50,8 @@ export function OrderedLearning({
               draggable={!disabled}
               disabled={disabled}
               aria-label={`Reorder ${item.label}; use up or down arrow`}
-              onDragStart={(e) => {
-                e.dataTransfer.setData("text/plain", item.id);
-                setDragged(item.id);
-              }}
-              onDragEnd={() => setDragged(null)}
+              onDragStart={(e) => drag.start(e, item.id)}
+              onDragEnd={drag.cancel}
               onKeyDown={(e) => {
                 if (e.key === "ArrowUp" || e.key === "ArrowDown") {
                   e.preventDefault();

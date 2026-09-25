@@ -14,6 +14,7 @@ import {
   type DocBranch,
   type DocSection,
 } from "@/lib/docs-navigation";
+import { useScrollFade } from "./use-scroll-fade";
 
 export function DocumentTree({
   docs,
@@ -32,7 +33,8 @@ export function DocumentTree({
   onOpen?: (id: string) => void;
   storageKey?: string;
 }) {
-  const ref = useRef<HTMLElement>(null);
+  const fade = useScrollFade<HTMLElement>();
+  const ref = fade.ref;
   const restored = useRef(false);
   const [closed, setClosed] = useState<string[]>([]);
   const catalogKey = docs
@@ -79,9 +81,9 @@ export function DocumentTree({
       if (!root || !active) return;
       const bounds = root.getBoundingClientRect(),
         link = active.getBoundingClientRect();
-      if (link.top < bounds.top) root.scrollTop += link.top - bounds.top - 4;
+      if (link.top < bounds.top) root.scrollTop += link.top - bounds.top - 16;
       else if (link.bottom > bounds.bottom)
-        root.scrollTop += link.bottom - bounds.bottom + 4;
+        root.scrollTop += link.bottom - bounds.bottom + 16;
     });
     return () => cancelAnimationFrame(frame);
   }, [selected, catalogKey]);
@@ -164,9 +166,14 @@ export function DocumentTree({
   return (
     <nav
       ref={ref}
-      className="document-tree"
+      className="document-tree scroll-fade"
       aria-label="Documents"
-      onScroll={() => remember()}
+      data-scroll-fade-before={fade.edges.before}
+      data-scroll-fade-after={fade.edges.after}
+      onScroll={() => {
+        remember();
+        fade.measure();
+      }}
     >
       {sections.map((section) => branch(section, []))}
     </nav>

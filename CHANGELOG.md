@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine the empty Courses summary, center reader feedback, align Docs navigation, unify card and sign-out hover states, and show scroll cues in long Docs/Admin menus. Course and Docs section ordering now moves full rows during drag while retaining arrow controls. Authored course hyperlinks open in a new tab; Docs and Updates keep same-installation hyperlinks in place and open outside sites separately.
+
 - Send the installation root directly to Courses and open Team progress in the shared reader shell with scoped reporting data. Use canonical `/docs` and `/updates` routes in place of the pre-release Knowledge/Notes aliases, and preserve the unsaved Admin editor prompt on browser Back. Warm Admin report sections after the Content view paints, without a visible status line shifting its navigation.
 
 - Open a new demo session on the profile chooser, remove the redundant top-bar demo button, and keep “About this demo” in the footer at the surrounding text size.

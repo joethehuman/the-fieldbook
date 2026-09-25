@@ -1594,6 +1594,7 @@ export function Editor({
                   </FormField>
                   <MarkdownEditor
                     label={`Lesson ${i + 1} text`}
+                    linkContext="course"
                     rows={8}
                     value={l.body}
                     onUpload={upload}

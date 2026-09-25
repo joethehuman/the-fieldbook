@@ -70,6 +70,76 @@ async function fixture(request: any, extra = {}) {
 }
 test.beforeEach(async ({ request }) => fixture(request));
 
+test("authored hyperlinks follow article and course tab rules", async ({ page, request }) => {
+  const linked = items.map((item) => ({
+    ...item,
+    body: item.kind === "course"
+      ? "See [reference](/docs/00000000-0000-4000-8000-000000000021)."
+      : "See [reference](/docs/00000000-0000-4000-8000-000000000021) and [outside](https://example.com/guide).",
+    lessons: item.kind === "course"
+      ? item.lessons.map((lesson, index) => ({
+          ...lesson,
+          body: index === 0
+            ? "See [reference](/docs/00000000-0000-4000-8000-000000000021)."
+            : lesson.body,
+        }))
+      : item.lessons,
+  }));
+  await fixture(request, { documents: documents(linked) });
+
+  for (const section of ["docs", "updates"]) {
+    await page.goto(`/${section}/${ids[section === "docs" ? 0 : 1]}`);
+    const article = page.locator("article");
+    await expect(article.getByRole("link", { name: "reference" })).not.toHaveAttribute("target", "_blank");
+    await expect(article.getByRole("link", { name: /outside/ })).toHaveAttribute("target", "_blank");
+  }
+
+  await page.goto(`/courses/${ids[2]}?lesson=first`);
+  const reference = page.getByRole("link", { name: /reference.*opens in a new tab/ });
+  await expect(reference).toHaveAttribute("target", "_blank");
+  const original = page.url();
+  const popup = page.waitForEvent("popup");
+  await reference.click();
+  const opened = await popup;
+  await expect(opened).toHaveURL(new RegExp(`/docs/${ids[0]}$`));
+  await expect(page).toHaveURL(original);
+  await opened.close();
+});
+
+test("reader feedback, next navigation and long Docs menu align visibly", async ({ page, request }, info) => {
+  test.skip(info.project.name !== "desktop");
+  const extraDocs = Array.from({ length: 18 }, (_, index) => ({
+    ...items[0],
+    id: `00000000-0000-4000-8000-${String(index + 100).padStart(12, "0")}`,
+    title: `Reference ${index + 1}`,
+  }));
+  await fixture(request, { documents: documents([...items, ...extraDocs]) });
+  await page.setViewportSize({ width: 1280, height: 480 });
+  await page.goto(`/docs/${ids[0]}`);
+  const tree = page.locator(".document-tree");
+  await expect(tree).toHaveAttribute("data-scroll-fade-after", "true");
+  const next = page.locator('.document-pagination [data-direction="next"]');
+  await expect(next).toHaveCSS("text-align", "right");
+  await expect(next).toHaveCSS("justify-content", "flex-end");
+  const article = await page.locator("article").boundingBox();
+  const feedback = await page.getByRole("region", { name: "Content feedback" }).locator(":scope > div").boundingBox();
+  expect(Math.abs((feedback!.x + feedback!.width / 2) - (article!.x + article!.width / 2))).toBeLessThan(2);
+  await page.screenshot({ path: info.outputPath("reader-footer-and-docs-fade.png") });
+  await tree.evaluate((element) => (element.scrollTop = element.scrollHeight));
+  await expect(tree).toHaveAttribute("data-scroll-fade-before", "true");
+  await expect(tree).toHaveAttribute("data-scroll-fade-after", "false");
+});
+
+test("empty For you card keeps its wording and uses the quieter border", async ({ page }, info) => {
+  await page.goto("/courses");
+  const card = page.locator(".for-you [data-slot=card]").first();
+  await expect(card).toHaveCSS("border-top-style", "dotted");
+  await expect(card).toContainText("No recommendations yet");
+  await expect(card).toContainText("All courses");
+  await expect(card.locator(".learning-status-icon")).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("empty-for-you-card.png") });
+});
+
 test("installation root opens the current home without a workspace snapshot", async ({
   page,
   request,
