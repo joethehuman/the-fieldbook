@@ -495,9 +495,10 @@ test("unavailable or pending admin report never offers export", async ({
     !info.project.name.startsWith("production"),
     "Workspace HTTP loading belongs to production",
   );
-  await setup(page, info);
   let release!: () => void;
   await page.route("**/api/admin/snapshot?**", async (route) => {
+    if (!route.request().url().includes("scope=governance"))
+      return route.continue();
     await new Promise<void>((resolve) => {
       release = resolve;
     });
@@ -508,8 +509,16 @@ test("unavailable or pending admin report never offers export", async ({
       },
     });
   });
+  await setup(page, info);
+  await expect.poll(() => !!release).toBe(true);
+  const navigation = page.locator('[data-slot="admin-navigation"]');
+  const top = (await navigation.boundingBox())?.y;
   await section(page, "Progress");
-  await expect(page.getByText("Opening section…")).toBeVisible();
+  await expect(page.locator(".admin-workspace")).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  expect((await navigation.boundingBox())?.y).toBe(top);
   await expect(page.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
   await screenshot(page, info, "loading");
   release();
@@ -520,6 +529,30 @@ test("unavailable or pending admin report never offers export", async ({
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
   await screenshot(page, info, "unavailable");
+});
+
+test("admin warms first-visit report sections without duplicate reads", async ({
+  page,
+}, info) => {
+  test.skip(
+    !info.project.name.startsWith("production"),
+    "Server-only data path",
+  );
+  const reads = { governance: 0, feedback: 0 };
+  await page.route("**/api/admin/snapshot?**", async (route) => {
+    const scope = new URL(route.request().url()).searchParams.get("scope");
+    if (scope === "governance" || scope === "feedback") reads[scope]++;
+    await route.continue();
+  });
+  await setup(page, info);
+  await expect.poll(() => reads.governance).toBe(1);
+  await expect.poll(() => reads.feedback).toBe(1);
+  await section(page, "Progress");
+  await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
+  await section(page, "Feedback");
+  await expect(page.getByRole("heading", { name: "Feedback" })).toBeVisible();
+  expect(reads).toEqual({ governance: 1, feedback: 1 });
+  await expect(page.getByText("Opening section…")).toHaveCount(0);
 });
 
 test("failed progress update disables exports until the complete report reloads", async ({

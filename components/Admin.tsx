@@ -466,9 +466,13 @@ export default function Admin({
     setQuery("");
   }
   return (
-    <div className="admin-workspace">
+    <div className="admin-workspace" aria-busy={!!openingTab}>
       <h1 className="sr-only">Administration</h1>
-      {openingTab && <p role="status">Opening section…</p>}
+      {openingTab && (
+        <span className="sr-only" role="status">
+          Loading administration data
+        </span>
+      )}
       <Tabs
         className="admin-layout"
         orientation="vertical"

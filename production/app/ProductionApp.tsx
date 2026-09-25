@@ -147,8 +147,19 @@ function createAdminRuntime(initial: {
   const cached = new Map<"content" | "governance" | "feedback", Workspace>([
     ["content", initial.data],
   ]);
-  async function fresh(): Promise<Workspace> {
-    const state = await request(`/api/admin/snapshot?scope=${scope}`);
+  const pending = new Map<
+    "content" | "governance" | "feedback",
+    Promise<Workspace>
+  >();
+  let cacheVersion = 0;
+  function clearCached() {
+    cacheVersion++;
+    cached.clear();
+    pending.clear();
+  }
+  async function fresh(target = scope): Promise<Workspace> {
+    const version = cacheVersion;
+    const state = await request(`/api/admin/snapshot?scope=${target}`);
     if (
       !state.user ||
       state.user.id !== initial.user.id ||
@@ -159,7 +170,7 @@ function createAdminRuntime(initial: {
         401,
       );
     let data = state.data as Workspace;
-    if (openItem && scope === "content") {
+    if (openItem && target === "content") {
       const item = await request(
         `/api/content?id=${encodeURIComponent(openItem)}&draft=true`,
       );
@@ -170,8 +181,20 @@ function createAdminRuntime(initial: {
         ),
       };
     }
-    cached.set(scope, data);
+    if (version !== cacheVersion) return fresh(target);
+    cached.set(target, data);
     return data;
+  }
+  function prepared(target: "content" | "governance" | "feedback") {
+    const available = cached.get(target);
+    if (available) return Promise.resolve(available);
+    const running = pending.get(target);
+    if (running) return running;
+    const load = fresh(target).finally(() => {
+      if (pending.get(target) === load) pending.delete(target);
+    });
+    pending.set(target, load);
+    return load;
   }
   const saver = createWorkspaceSaver(request, fresh);
   return {
@@ -183,26 +206,31 @@ function createAdminRuntime(initial: {
       );
       if (created) openItem = created.id;
       const saved = await saver(before, after);
-      cached.clear();
+      clearCached();
       cached.set(scope, saved);
       return saved;
     },
     refresh: async () => {
       const latest = await saver.refresh();
-      cached.clear();
+      clearCached();
       cached.set(scope, latest);
       return latest;
     },
     manageLearning: async (action) => {
       await request("/api/assignments", action);
-      cached.clear();
+      clearCached();
       return fresh();
     },
     admin: {
+      prefetch: () => {
+        // Warm the two first-visit sections after Content has painted. A tab
+        // click shares the same in-flight read instead of starting another.
+        void Promise.allSettled([prepared("governance"), prepared("feedback")]);
+      },
       prepare: async (next) => {
         scope = next;
         openItem = null;
-        return cached.get(next) || fresh();
+        return prepared(next);
       },
       edit: async (id) => {
         const item = await request(
@@ -228,7 +256,7 @@ function createAdminRuntime(initial: {
           unpublish: true,
         });
         openItem = null;
-        cached.clear();
+        clearCached();
         return fresh();
       },
     },
@@ -250,6 +278,9 @@ export default function ProductionApp({
   const [importable, setImportable] = useState(false),
     [importing, setImporting] = useState(false),
     [error, setError] = useState("");
+  useEffect(() => {
+    if (initialAdmin) activeRuntime.admin?.prefetch();
+  }, [activeRuntime, initialAdmin]);
   useEffect(() => {
     const restore = (event: PageTransitionEvent) => {
       if (event.persisted) window.location.reload();

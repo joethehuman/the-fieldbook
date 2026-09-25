@@ -120,7 +120,12 @@ async function setup(
 }
 async function openNav(page: Page) {
   const menu = page.getByRole("button", { name: "Open navigation" });
-  if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
+  if ((page.viewportSize()?.width ?? 1000) < 768) {
+    await menu.click();
+    await expect(
+      page.getByRole("button", { name: "Close navigation" }),
+    ).toBeVisible();
+  }
 }
 
 test("search preserves dirty edits; canceled navigation and reload keep them until explicit discard", async ({
@@ -192,6 +197,10 @@ test("browser back can be canceled without unmounting the editor", async ({
     .getByRole("navigation")
     .getByRole("button", { name: "Docs", exact: true })
     .click();
+  await expect(page).toHaveURL(production ? /\/docs$/ : /#docs$/);
+  await expect(
+    page.getByRole("heading", { name: "Docs", exact: true }),
+  ).toBeVisible();
   await openNav(page);
   await page
     .getByRole(production ? "link" : "button", { name: "Manage organization" })

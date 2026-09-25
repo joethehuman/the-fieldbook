@@ -19,6 +19,7 @@ export type FieldbookRuntime = {
   signIn: () => void;
   signOut: () => Promise<void>;
   admin?: {
+    prefetch: () => void;
     prepare: (
       scope: "content" | "governance" | "feedback",
     ) => Promise<Workspace>;
