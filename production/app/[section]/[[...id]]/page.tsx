@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { reading, readingMetadata } from "@production/lib/reading";
 import {
@@ -27,6 +27,10 @@ async function resolve({ params, searchParams }: Props) {
       search.append(key, entry);
   }
   const destination = `/${section}${id ? `/${encodeURIComponent(id[0])}` : ""}${search.size ? `?${search}` : ""}`;
+  if (section === "learn" || section === "learning")
+    redirect(
+      `/courses${id ? `/${encodeURIComponent(id[0])}` : ""}${search.size ? `?${search}` : ""}`,
+    );
   const result = await reading(section, id?.[0], destination);
   const lesson = typeof query.lesson === "string" ? query.lesson : undefined;
   if (

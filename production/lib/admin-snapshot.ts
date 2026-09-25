@@ -1,0 +1,154 @@
+import "server-only";
+import { db, check } from "./db";
+import { readAll } from "./read-all";
+import { document, readConfig } from "./content";
+import { profile, requireAdmin } from "./auth";
+import type { Workspace } from "@/lib/store";
+import type { Content, User } from "@/lib/types";
+
+export type AdminScope = "content" | "governance" | "feedback";
+
+const contentIndex = async (): Promise<Content[]> => {
+  const rows = await readAll((from, to) =>
+    db()
+      .from("fb_documents")
+      .select(
+        "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,groups:draft->groups,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
+        { count: "exact" },
+      )
+      .order("id")
+      .range(from, to),
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    title: row.title || "",
+    summary: row.summary || "",
+    category: row.category || "",
+    folder: row.folder || "",
+    sectionId: row.sectionId || undefined,
+    kind: row.kind,
+    status: row.status,
+    version: Number(row.version) || 1,
+    createdAt: row.createdAt || row.updated_at,
+    updatedAt: row.updated_at,
+    revision: row.revision,
+    publishedRevision: row.published_revision || undefined,
+    groups: row.groups || [],
+    assignments: row.assignments || [],
+    duration: Number(row.duration) || 5,
+    coverImageUrl: row.coverImageUrl || undefined,
+    body: "",
+    lessons: [],
+    questions: [],
+  })) as unknown as Content[];
+};
+
+/** Only administrator data crosses this boundary. Never cache it. */
+export async function adminSnapshot(
+  user: User,
+  scope: AdminScope,
+): Promise<Workspace> {
+  requireAdmin(user);
+  const [config, content] = await Promise.all([readConfig(), contentIndex()]);
+  const data: Workspace = {
+    schema: 1,
+    settings: config.settings,
+    revision: config.revision,
+    governanceRevision: config.governance_revision,
+    content,
+    publishedContent: content
+      .filter((item) => item.publishedRevision)
+      .map((item) => ({
+        ...item,
+        status: "published" as const,
+        revision: item.publishedRevision ?? undefined,
+      })),
+    users: [user],
+    groups: config.groups || [],
+    curricula: config.curricula || [],
+    teams: [],
+    pendingUsers: [],
+    progress: {},
+    feedback: [],
+  };
+  if (scope === "content") return data;
+
+  if (scope === "feedback") {
+    const [ratings, people] = await Promise.all([
+      readAll((from, to) =>
+        db()
+          .from("fb_feedback")
+          .select("*", { count: "exact" })
+          .order("id")
+          .range(from, to),
+      ),
+      readAll((from, to) =>
+        db()
+          .from("fb_profiles")
+          .select("*", { count: "exact" })
+          .order("id")
+          .range(from, to),
+      ),
+    ]);
+    data.users = people.map(profile);
+    data.feedback = ratings.map((row) => ({
+      id: row.id,
+      userId: row.user_id || "guest",
+      contentId: row.content_id,
+      version: row.version,
+      rating: row.rating,
+      comment: row.comment,
+      updatedAt: row.updated_at,
+    }));
+    return data;
+  }
+
+  const [governanceResult, courseRows] = await Promise.all([
+    db().rpc("fb_governance_snapshot", { p_actor: user.id }),
+    readAll((from, to) =>
+      db()
+        .from("fb_documents")
+        .select("id,draft,published,revision,published_revision,updated_at", {
+          count: "exact",
+        })
+        .eq("draft->>kind", "course")
+        .order("id")
+        .range(from, to),
+    ),
+  ]);
+  check(governanceResult.error);
+  const governance = governanceResult.data;
+  const current = governance.users.find((entry: any) => entry.id === user.id);
+  if (!current || !current.active || current.role !== "admin")
+    throw new Error("Account access changed. Reload and sign in again.");
+  data.users = governance.users.map(profile);
+  data.groups = governance.groups;
+  data.teams = governance.teams;
+  data.governanceRevision = governance.revision;
+  data.pendingUsers = governance.pending.map((entry: any) => ({
+    email: entry.email,
+    name: entry.name,
+    role: entry.role,
+    groups: entry.groups,
+    teamId: entry.team_id || undefined,
+    onboardingStart: entry.onboarding_start || undefined,
+  }));
+  for (const progress of governance.progress)
+    (data.progress[progress.user_id] ??= []).push({
+      content_id: progress.content_id,
+      version: progress.version,
+      lessons: progress.lessons,
+      passed: progress.passed,
+      attempts: progress.attempts,
+      revision: progress.revision,
+    });
+  const courses = new Map(courseRows.map((row) => [row.id, row]));
+  data.content = content.map((item) => {
+    const row = courses.get(item.id);
+    return row ? document(row, true) : item;
+  });
+  data.publishedContent = courseRows
+    .filter((row) => row.published)
+    .map((row) => document(row));
+  return data;
+}

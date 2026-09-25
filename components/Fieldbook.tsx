@@ -1,10 +1,10 @@
 "use client";
 import { reconcileDemoPublication } from "@/lib/demo-publication";
-import { Note } from "@/components/ui/note";
 import { AppBar } from "./patterns/app-bar";
 import { DocumentTree } from "./patterns/document-tree";
 import type { ReadingState } from "@/lib/reading";
 import { Article, CourseOverview } from "./patterns/reading";
+import { Course } from "./Course";
 import { guestRecommendations } from "@/lib/guest-recommendations";
 import { ReportAvailability } from "./patterns/csv-export";
 import { SearchPanel } from "./patterns/search-panel";
@@ -20,13 +20,8 @@ import { SkipLink } from "./patterns/skip-link";
 import { AccountButton } from "./patterns/account-button";
 import { SearchField } from "./patterns/search-field";
 import { NavigationButton } from "./patterns/navigation-button";
-import { Card } from "./ui/card";
-import { Progress } from "./ui/progress";
-import { Radio } from "@/components/ui/choice";
-import { ActionGroup } from "@/components/ui/action-group";
 import { Alert } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
-import { Field, FieldGroup } from "@/components/ui/field";
 import { Toolbar, EmptyState, PageHeader } from "@/components/patterns/layout";
 import Updates from "./Updates";
 import { reconcileLearning } from "@/lib/learning-groups";
@@ -52,20 +47,16 @@ import {
   Newspaper,
   ArrowRight,
   ChevronRight,
-  Check,
-  Clock,
   Settings,
   LogOut,
   LogIn,
   ArrowLeftRight,
   X,
   Menu,
-  CheckCircle2,
   Compass,
   Download,
   RotateCcw,
 } from "lucide-react";
-import ReactMarkdown from "./Markdown";
 import type { FieldbookRuntime } from "@/lib/runtime";
 import { sectionPaths, resolveSection, contentPath } from "@/lib/navigation";
 import { docSections } from "@/lib/docs-navigation";
@@ -74,7 +65,6 @@ import Learning from "./Learning";
 import Feedback from "./Feedback";
 import { ReaderFeedback } from "./reader/ReaderFeedback";
 import { TeamProgress } from "./Teams";
-import { videoSource } from "@/lib/video";
 import {
   assignedCourses,
   isComplete,
@@ -91,6 +81,7 @@ import {
   type Workspace,
 } from "@/lib/store";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { SaveRecoveryError } from "@/lib/save-recovery";
 import type { NavigationGuard } from "@/lib/navigation-guard";
 const Admin = dynamic(() => import("./Admin"));
@@ -98,14 +89,17 @@ type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook({
   runtime,
   initialReading,
+  initialAdmin,
   children,
   onLoaded,
 }: {
   runtime?: FieldbookRuntime;
   initialReading?: ReadingState;
+  initialAdmin?: { data: Workspace; user: User };
   children?: ReactNode;
   onLoaded?: (user: User | null) => void;
 } = {}) {
+  const router = useRouter();
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
@@ -123,12 +117,15 @@ export default function Fieldbook({
     }
   }
   const [data, setData] = useState<Workspace | null>(
-      initialReading?.data || null,
+      initialAdmin?.data || initialReading?.data || null,
     ),
     [uid, setUid] = useState<string | null>(
-      initialReading ? initialReading.data.users[0]?.id || "guest" : null,
+      initialAdmin?.user.id ||
+        (initialReading ? initialReading.data.users[0]?.id || "guest" : null),
     ),
-    [view, setView] = useState<View>(initialReading?.section || "learn"),
+    [view, setView] = useState<View>(
+      initialAdmin ? "admin" : initialReading?.section || "learn",
+    ),
     [courseOrigin, setCourseOrigin] = useState<string | undefined>(
       initialReading?.curriculum,
     ),
@@ -145,6 +142,10 @@ export default function Fieldbook({
     [menu, setMenu] = useState(false),
     [showDemo, setShowDemo] = useState(false);
   useEffect(() => {
+    if (initialAdmin) {
+      onLoaded?.(initialAdmin.user);
+      return;
+    }
     if (runtime) {
       runtime
         .load()
@@ -262,6 +263,7 @@ export default function Fieldbook({
     if (
       runtime &&
       (initialReading ||
+        initialAdmin ||
         (id &&
           !id.startsWith("curriculum:") &&
           ["learn", "docs", "briefs"].includes(v)))
@@ -272,7 +274,9 @@ export default function Fieldbook({
       const query = new URLSearchParams();
       if (lesson) query.set("lesson", lesson);
       if (origin) query.set("curriculum", origin);
-      window.location.assign(`/${path}${query.size ? `?${query}` : ""}`);
+      const destination = `/${path}${query.size ? `?${query}` : ""}`;
+      if (v === "admin" || initialAdmin) router.push(destination);
+      else window.location.assign(destination);
       return;
     }
     setView(v);
@@ -820,6 +824,35 @@ export default function Fieldbook({
                 data={data}
                 user={user}
                 onChange={persist}
+                onOpenTab={
+                  runtime?.admin
+                    ? async (next) => {
+                        const scope =
+                          next === "feedback"
+                            ? "feedback"
+                            : next === "content" || next.startsWith("settings-")
+                              ? "content"
+                              : "governance";
+                        setData(await runtime.admin!.prepare(scope));
+                      }
+                    : undefined
+                }
+                onEdit={
+                  runtime?.admin
+                    ? async (id) => {
+                        const result = await runtime.admin!.edit(id);
+                        setData(result.data);
+                        return result.item;
+                      }
+                    : undefined
+                }
+                onUnpublish={
+                  runtime?.admin
+                    ? async (id) => {
+                        setData(await runtime.admin!.unpublish(id));
+                      }
+                    : undefined
+                }
                 onLearning={
                   runtime
                     ? async (action) => {
@@ -909,9 +942,8 @@ export default function Fieldbook({
             <Course
               key={item.id + item.version + (targetLesson || "")}
               course={item}
-              data={data}
-              user={user}
-              onChange={persist}
+              initialLessonId={targetLesson || undefined}
+              progress={data.progress[user.id] || []}
               onBack={() =>
                 navigate(
                   "learn",
@@ -921,25 +953,59 @@ export default function Fieldbook({
               backLabel={
                 courseOrigin ? "Back to curriculum" : "Back to courses"
               }
-              runtime={runtime}
-              onProgress={async (lessonId, answers) => {
-                if (!runtime) return undefined;
-                const r = await runtime.progress(
-                  item,
-                  data.progress[user.id] || [],
-                  lessonId,
-                  answers,
-                );
-                setData((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        progress: { ...prev.progress, [user.id]: r.progress },
-                      }
-                    : prev,
-                );
-                return r.attemptPassed;
-              }}
+              guest={!!runtime && user.id === "guest"}
+              onSignIn={runtime?.signIn}
+              feedback={
+                runtime && user.id === "guest" ? (
+                  <ReaderFeedback key={item.id} contentId={item.id} />
+                ) : (
+                  <Feedback
+                    key={item.id + user.id}
+                    content={item}
+                    user={user}
+                    data={data}
+                    onChange={persist}
+                  />
+                )
+              }
+              onDemoProgress={
+                runtime
+                  ? undefined
+                  : (lessonId, answers) => {
+                      persist(
+                        updateProgress(data, user.id, item, lessonId, answers),
+                      );
+                      return answers
+                        ? item.questions.every(
+                            (q, i) => answers[i] === q.answer,
+                          )
+                        : undefined;
+                    }
+              }
+              onProgress={
+                runtime
+                  ? async (lessonId, answers) => {
+                      const r = await runtime.progress(
+                        item,
+                        data.progress[user.id] || [],
+                        lessonId,
+                        answers,
+                      );
+                      setData((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              progress: {
+                                ...prev.progress,
+                                [user.id]: r.progress,
+                              },
+                            }
+                          : prev,
+                      );
+                      return r.attemptPassed;
+                    }
+                  : undefined
+              }
             />
           ) : item ? (
             <Article
@@ -1144,290 +1210,5 @@ function Empty({ title, description }: { title: string; description: string }) {
       <h3>{title}</h3>
       <p>{description}</p>
     </EmptyState>
-  );
-}
-export function Course({
-  course: c,
-  data,
-  user,
-  onChange,
-  onBack,
-  backLabel,
-  runtime,
-  onProgress,
-}: {
-  runtime?: FieldbookRuntime;
-  onProgress?: (
-    lessonId?: string,
-    answers?: number[],
-  ) => Promise<boolean | undefined>;
-  course: Content;
-  data: Workspace;
-  user: User;
-  onChange: (d: Workspace) => void;
-  onBack: () => void;
-  backLabel: string;
-}) {
-  const [step, setStep] = useState(() => {
-      const id =
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search).get("lesson")
-          : null;
-      return Math.max(
-        0,
-        c.lessons.findIndex((l) => l.id === id),
-      );
-    }),
-    [answers, setAnswers] = useState<number[]>([]),
-    [result, setResult] = useState<string | null>(null),
-    [resultPassed, setResultPassed] = useState(false),
-    [busy, setBusy] = useState(false),
-    [saveError, setSaveError] = useState("");
-  const p = (data.progress[user.id] || []).find(
-    (p) => p.content_id === c.id && p.version === c.version,
-  );
-  const lesson = c.lessons[step];
-  const video = lesson?.videoUrl ? videoSource(lesson.videoUrl) : null;
-  const allDone = c.lessons.every((l) => p?.lessons.includes(l.id));
-  const complete = isComplete(c, data.progress[user.id] || []);
-  async function mark() {
-    setBusy(true);
-    setSaveError("");
-    try {
-      if (lesson) {
-        if (runtime) await onProgress?.(lesson.id);
-        else onChange(updateProgress(data, user.id, c, lesson.id));
-      }
-      setStep(Math.min(step + 1, c.lessons.length));
-    } catch (e) {
-      setSaveError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  async function submit() {
-    setBusy(true);
-    setSaveError("");
-    try {
-      const passed = runtime
-        ? !!(await onProgress?.(undefined, answers))
-        : c.questions.every((q, i) => answers[i] === q.answer);
-      if (!runtime)
-        onChange(updateProgress(data, user.id, c, undefined, answers));
-      setResultPassed(passed);
-      setResult(
-        passed
-          ? "Great work. You’ve completed this course."
-          : complete
-            ? "This attempt did not pass. Your previous completion is preserved."
-            : "Not quite yet. Revisit the lessons and try again.",
-      );
-    } catch (e) {
-      setSaveError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  }
-  return (
-    <div className="course-detail">
-      <Button variant="link" onClick={onBack}>
-        ← {backLabel}
-      </Button>
-      <div className="course-detail-heading">
-        <span className="eyebrow">{c.category}</span>
-        <h1>{c.title}</h1>
-        <p>{c.summary}</p>
-        <div className="course-detail-meta">
-          <Clock size={16} />
-          {c.duration} min <span>·</span>
-          {c.lessons.length} lessons<span>·</span>
-          {complete && <Badge variant="success">Completed</Badge>}
-        </div>
-      </div>
-      {runtime && user.id === "guest" && (
-        <div className="guest-progress-note">
-          Your progress is saved in this browser.{" "}
-          <Button variant="link" onClick={runtime.signIn}>
-            Sign in to keep it across devices →
-          </Button>
-        </div>
-      )}
-      {saveError && (
-        <Alert variant="destructive" role="alert">
-          {saveError}
-        </Alert>
-      )}
-      <div className="lesson-layout">
-        <aside className="lesson-nav">
-          <h3>In this course</h3>
-          {c.lessons.map((l, i) => (
-            <NavigationButton
-              variant="ghost"
-              className={step === i ? "selected" : ""}
-              onClick={() => setStep(i)}
-              key={l.id}
-            >
-              <span
-                className={
-                  "step-number " + (p?.lessons.includes(l.id) ? "done" : "")
-                }
-              >
-                {p?.lessons.includes(l.id) ? <Check size={13} /> : i + 1}
-              </span>
-              {l.title}
-            </NavigationButton>
-          ))}
-          <NavigationButton
-            variant="ghost"
-            className={step === c.lessons.length ? "selected" : ""}
-            onClick={() => setStep(c.lessons.length)}
-          >
-            <CheckCircle2 size={18} />
-            {c.questions.length ? "Quiz" : "Finish course"}
-          </NavigationButton>
-          <div className="lesson-progress">
-            <Progress
-              aria-label="Lessons completed"
-              value={
-                c.lessons.length
-                  ? ((p?.lessons.length || 0) / c.lessons.length) * 100
-                  : 0
-              }
-            />
-            <small>
-              {p?.lessons.length || 0} of {c.lessons.length} lessons complete
-            </small>
-          </div>
-        </aside>
-        <Card className="grid gap-6">
-          {lesson ? (
-            <>
-              <span className="eyebrow">
-                LESSON {step + 1} OF {c.lessons.length}
-              </span>
-              <h2>{lesson.title}</h2>
-              {video?.type === "embed" ? (
-                <iframe
-                  className="lesson-video"
-                  key={video.url}
-                  src={video.url}
-                  title={lesson.title + " video"}
-                  allow="fullscreen; picture-in-picture"
-                  allowFullScreen
-                  loading="lazy"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                />
-              ) : video?.type === "file" ? (
-                <video
-                  key={video.url}
-                  controls
-                  preload="metadata"
-                  src={video.url}
-                >
-                  Your browser does not support video playback.
-                </video>
-              ) : lesson.videoUrl ? (
-                <Note>
-                  This video URL is not supported. Ask an editor to update it.
-                </Note>
-              ) : null}
-              <div className="markdown">
-                <ReactMarkdown>{lesson.body}</ReactMarkdown>
-              </div>
-              <ActionGroup>
-                {p?.lessons.includes(lesson.id) && (
-                  <Badge variant="success">
-                    <CheckCircle2 size={16} />
-                    Lesson completed
-                  </Badge>
-                )}
-                <Button variant="default" onClick={mark} loading={busy}>
-                  {step === c.lessons.length - 1
-                    ? "Continue to quiz"
-                    : "Complete & continue"}
-                  <ArrowRight size={16} />
-                </Button>
-              </ActionGroup>
-            </>
-          ) : (
-            <>
-              <h2>{complete ? "Course complete" : "Knowledge check"}</h2>
-              <p>
-                Answer every question correctly to complete the course. You can
-                try again as often as you need.
-              </p>
-              {!allDone && (
-                <Note>
-                  Complete all lessons before submitting your answers.
-                </Note>
-              )}
-              {c.questions.map((q, i) => (
-                <FieldGroup className="quiz-question" key={q.id}>
-                  <legend>
-                    {i + 1}. {q.prompt}
-                  </legend>
-                  {q.options.map((o, j) => (
-                    <Field orientation="horizontal" variant="choice" key={j}>
-                      <Radio
-                        name={q.id}
-                        checked={answers[i] === j}
-                        onChange={() => {
-                          const next = [...answers];
-                          next[i] = j;
-                          setAnswers(next);
-                          setResult(null);
-                        }}
-                      />
-                      {o}
-                    </Field>
-                  ))}
-                </FieldGroup>
-              ))}
-              {result && (
-                <Alert
-                  role="status"
-                  variant={resultPassed ? "success" : "default"}
-                >
-                  {result}
-                </Alert>
-              )}
-              <ActionGroup>
-                <Button variant="outline" onClick={() => setStep(0)}>
-                  Review lessons
-                </Button>
-                <Button
-                  variant="default"
-                  disabled={
-                    busy ||
-                    !allDone ||
-                    c.questions.some((_, i) => answers[i] === undefined)
-                  }
-                  onClick={submit}
-                >
-                  {c.questions.length ? "Check answers" : "Complete course"}
-                  <Check size={16} />
-                </Button>
-              </ActionGroup>
-              {runtime && user.id === "guest" ? (
-                <ReaderFeedback key={c.id} contentId={c.id} />
-              ) : (
-                <Feedback
-                  key={c.id + user.id}
-                  content={c}
-                  user={user}
-                  data={data}
-                  onChange={onChange}
-                />
-              )}
-              {complete && (
-                <Button variant="link" onClick={onBack}>
-                  {backLabel} <ArrowRight size={16} />
-                </Button>
-              )}
-            </>
-          )}
-        </Card>
-      </div>
-    </div>
   );
 }

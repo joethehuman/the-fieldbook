@@ -6,7 +6,8 @@ import Fieldbook from "@/components/Fieldbook";
 import { createBrowserClient } from "@supabase/ssr";
 import type { FieldbookRuntime } from "@/lib/runtime";
 import type { Progress, User } from "@/lib/types";
-import { useEffect, useState, type ReactNode } from "react";
+import type { Workspace } from "@/lib/store";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ReadingState } from "@/lib/reading";
 import {
   guestAnswersForImport,
@@ -135,13 +136,116 @@ const runtime: FieldbookRuntime = {
     window.location.replace("/");
   },
 };
+
+function createAdminRuntime(initial: {
+  data: Workspace;
+  user: User;
+}): FieldbookRuntime {
+  let scope: "content" | "governance" | "feedback" = "content";
+  let openItem: string | null = null;
+  const cached = new Map<"content" | "governance" | "feedback", Workspace>([
+    ["content", initial.data],
+  ]);
+  async function fresh(): Promise<Workspace> {
+    const state = await request(`/api/admin/snapshot?scope=${scope}`);
+    if (
+      !state.user ||
+      state.user.id !== initial.user.id ||
+      state.user.role !== "admin"
+    )
+      throw new RequestError(
+        "Administrator access changed. Sign in again.",
+        401,
+      );
+    let data = state.data as Workspace;
+    if (openItem && scope === "content") {
+      const item = await request(
+        `/api/content?id=${encodeURIComponent(openItem)}&draft=true`,
+      );
+      data = {
+        ...data,
+        content: data.content.map((entry) =>
+          entry.id === openItem ? item : entry,
+        ),
+      };
+    }
+    cached.set(scope, data);
+    return data;
+  }
+  const saver = createWorkspaceSaver(request, fresh);
+  return {
+    ...runtime,
+    load: async () => ({ data: await fresh(), user: initial.user }),
+    save: async (before, after) => {
+      const created = after.content.find(
+        (item) => !before.content.some((previous) => previous.id === item.id),
+      );
+      if (created) openItem = created.id;
+      const saved = await saver(before, after);
+      cached.clear();
+      cached.set(scope, saved);
+      return saved;
+    },
+    refresh: async () => {
+      const latest = await saver.refresh();
+      cached.clear();
+      cached.set(scope, latest);
+      return latest;
+    },
+    manageLearning: async (action) => {
+      await request("/api/assignments", action);
+      cached.clear();
+      return fresh();
+    },
+    admin: {
+      prepare: async (next) => {
+        scope = next;
+        openItem = null;
+        return cached.get(next) || fresh();
+      },
+      edit: async (id) => {
+        const item = await request(
+          `/api/content?id=${encodeURIComponent(id)}&draft=true`,
+        );
+        openItem = id;
+        const data = {
+          ...(cached.get(scope) || initial.data),
+          content: (cached.get(scope) || initial.data).content.map((entry) =>
+            entry.id === id ? item : entry,
+          ),
+        };
+        cached.set(scope, data);
+        return { data, item };
+      },
+      unpublish: async (id) => {
+        const item = await request(
+          `/api/content?id=${encodeURIComponent(id)}&draft=true`,
+        );
+        await request("/api/content", {
+          content: item,
+          expected: item.revision,
+          unpublish: true,
+        });
+        openItem = null;
+        cached.clear();
+        return fresh();
+      },
+    },
+  };
+}
 export default function ProductionApp({
   initialReading,
+  initialAdmin,
   children,
 }: {
   initialReading?: ReadingState;
+  initialAdmin?: { data: Workspace; user: User };
   children?: ReactNode;
 }) {
+  const activeRuntime = useMemo(
+    () => (initialAdmin ? createAdminRuntime(initialAdmin) : runtime),
+    [initialAdmin],
+  );
   const [importable, setImportable] = useState(false),
     [importing, setImporting] = useState(false),
     [error, setError] = useState("");
@@ -211,8 +315,9 @@ export default function ProductionApp({
         </Callout>
       )}
       <Fieldbook
-        runtime={runtime}
+        runtime={activeRuntime}
         initialReading={initialReading}
+        initialAdmin={initialAdmin}
         onLoaded={(user) => setImportable(!!user && readGuest().length > 0)}
       >
         {children}

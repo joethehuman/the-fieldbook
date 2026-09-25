@@ -46,6 +46,7 @@ import {
 } from "@/lib/learning";
 import type { SiteSettings } from "@/lib/settings";
 import { CourseCard } from "./CourseCard";
+import { IntentLink } from "./patterns/intent-link";
 
 export default function Learning({
   curricula = [],

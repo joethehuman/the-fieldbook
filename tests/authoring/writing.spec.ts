@@ -104,7 +104,12 @@ async function setup(
   await page.route("**/api/media/example.mp4", (route) =>
     route.fulfill({ status: 204 }),
   );
-  await page.goto(production ? "/admin" : "/#admin");
+  await page.goto(production ? "/team" : "/#admin");
+  if (production) {
+    const menu = page.getByRole("button", { name: "Open navigation" });
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
+    await page.getByRole("button", { name: "Manage organization" }).click();
+  }
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const read = async (): Promise<Workspace> =>
     production
@@ -357,7 +362,9 @@ test("Update category filters, creates, normalizes and survives draft saves", as
 });
 
 for (const kind of ["Doc", "Update"]) {
-  test(`new ${kind} starts without a placement and saves an explicit choice`, async ({ page }, info) => {
+  test(`new ${kind} starts without a placement and saves an explicit choice`, async ({
+    page,
+  }, info) => {
     const { read } = await setup(
       page,
       info.project.name.startsWith("production"),
@@ -367,51 +374,112 @@ for (const kind of ["Doc", "Update"]) {
     const settings = page.getByRole("button", { name: "Content settings" });
     if (await settings.isVisible()) await settings.click();
     if (kind === "Doc") {
-      await expect(page.getByRole("button", { name: "Start here → Getting started", exact: true, pressed: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", {
+          name: "Start here → Getting started",
+          exact: true,
+          pressed: true,
+        }),
+      ).toBeVisible();
     } else {
-      await expect(page.getByRole("combobox", { name: "Category", exact: true })).not.toHaveValue("");
+      await expect(
+        page.getByRole("combobox", { name: "Category", exact: true }),
+      ).not.toHaveValue("");
     }
-    await page.getByRole("button", { name: "Back to content", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Back to content", exact: true })
+      .click();
     await page.getByRole("button", { name: kind, exact: true }).click();
     await page.getByLabel("Title", { exact: true }).fill(`New ${kind}`);
-    await page.getByLabel("Short description", { exact: true }).fill("A useful introduction.");
+    await page
+      .getByLabel("Short description", { exact: true })
+      .fill("A useful introduction.");
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     if (kind === "Doc") {
-      await expect(page.getByText("Choose a Docs section before saving.")).toBeVisible();
+      await expect(
+        page.getByText("Choose a Docs section before saving."),
+      ).toBeVisible();
       const search = page.getByRole("searchbox", { name: "Search sections" });
       await expect(search).toBeVisible();
       await search.fill("Start here");
-      await expect(page.getByRole("button", { name: "Start here → Getting started", exact: true, pressed: false })).toBeVisible();
+      await expect(
+        page.getByRole("button", {
+          name: "Start here → Getting started",
+          exact: true,
+          pressed: false,
+        }),
+      ).toBeVisible();
       await search.fill("");
-      await page.getByRole("button", { name: "Create section", exact: true }).first().click();
-      await page.getByRole("textbox", { name: "New section name" }).fill("New organization name");
+      await page
+        .getByRole("button", { name: "Create section", exact: true })
+        .first()
+        .click();
+      await page
+        .getByRole("textbox", { name: "New section name" })
+        .fill("New organization name");
       await page.getByRole("combobox", { name: "Top-level parent" }).click();
-      await page.getByRole("option", { name: "Start here", exact: true }).click();
-      await page.locator(".doc-section-create").getByRole("button", { name: "Create section" }).click();
-      await expect(page.getByRole("button", { name: "Start here → New organization name", exact: true, pressed: true })).toBeVisible();
+      await page
+        .getByRole("option", { name: "Start here", exact: true })
+        .click();
+      await page
+        .locator(".doc-section-create")
+        .getByRole("button", { name: "Create section" })
+        .click();
+      await expect(
+        page.getByRole("button", {
+          name: "Start here → New organization name",
+          exact: true,
+          pressed: true,
+        }),
+      ).toBeVisible();
     } else {
-      const control = page.getByRole("combobox", { name: "Category", exact: true });
+      const control = page.getByRole("combobox", {
+        name: "Category",
+        exact: true,
+      });
       await expect(control).toBeVisible();
       await expect(control).toHaveValue("");
       await control.fill("New organization name");
-      await page.getByRole("option", { name: "Add “New organization name”", exact: true }).click();
+      await page
+        .getByRole("option", {
+          name: "Add “New organization name”",
+          exact: true,
+        })
+        .click();
     }
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
-    const saved = (await read()).content.find((item) => item.title === `New ${kind}`);
-    expect(saved?.category).toBe(kind === "Doc" ? "Start here" : "New organization name");
+    const saved = (await read()).content.find(
+      (item) => item.title === `New ${kind}`,
+    );
+    expect(saved?.category).toBe(
+      kind === "Doc" ? "Start here" : "New organization name",
+    );
     if (kind === "Doc") {
       expect(saved?.sectionId).toBeTruthy();
       expect(saved?.folder).toBe("New organization name");
     }
-    await page.getByRole("button", { name: "Back to content", exact: true }).click();
-    await page.getByRole("row").filter({ hasText: `New ${kind}` })
-      .getByRole("button", { name: "Edit", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Back to content", exact: true })
+      .click();
+    await page
+      .getByRole("row")
+      .filter({ hasText: `New ${kind}` })
+      .getByRole("button", { name: "Edit", exact: true })
+      .click();
     if (await settings.isVisible()) await settings.click();
     if (kind === "Doc") {
-      await expect(page.getByRole("button", { name: "Start here → New organization name", exact: true, pressed: true })).toBeVisible();
+      await expect(
+        page.getByRole("button", {
+          name: "Start here → New organization name",
+          exact: true,
+          pressed: true,
+        }),
+      ).toBeVisible();
     } else {
-      await expect(page.getByRole("combobox", { name: "Category", exact: true })).toHaveValue("New organization name");
+      await expect(
+        page.getByRole("combobox", { name: "Category", exact: true }),
+      ).toHaveValue("New organization name");
     }
     await page.screenshot({
       path: info.outputPath(`new-${kind.toLowerCase()}-section.png`),

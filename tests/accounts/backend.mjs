@@ -159,6 +159,32 @@ createServer(async (req, res) => {
       rows = rows.filter((row) => row.published);
     if (url.searchParams.get("published->>kind") === "eq.course")
       rows = rows.filter((row) => row.published?.kind === "course");
+    if (url.searchParams.get("draft->>kind") === "eq.course")
+      rows = rows.filter((row) => row.draft?.kind === "course");
+    if ((url.searchParams.get("select") || "").includes("title:draft"))
+      rows = rows.map((row) => ({
+        id: row.id,
+        revision: row.revision,
+        published_revision: row.published_revision,
+        updated_at: row.updated_at,
+        ...Object.fromEntries(
+          [
+            "title",
+            "summary",
+            "category",
+            "folder",
+            "sectionId",
+            "kind",
+            "status",
+            "version",
+            "createdAt",
+            "groups",
+            "assignments",
+            "duration",
+            "coverImageUrl",
+          ].map((key) => [key, row.draft?.[key]]),
+        ),
+      }));
     if ((url.searchParams.get("select") || "").includes("title:published"))
       rows = rows.map((row) => ({
         id: row.id,
@@ -188,10 +214,17 @@ createServer(async (req, res) => {
       "Content-Range": `0-${rows.length - 1}/${rows.length}`,
     });
   }
-  if (url.pathname === "/rest/v1/fb_progress")
-    return send(res, configuredProgress, 200, {
-      "Content-Range": `0-${configuredProgress.length - 1}/${configuredProgress.length}`,
+  if (url.pathname === "/rest/v1/fb_progress") {
+    const rows = configuredProgress.filter((row) =>
+      ["user_id", "content_id", "version"].every((field) => {
+        const value = url.searchParams.get(field);
+        return !value || String(row[field]) === value.slice(3);
+      }),
+    );
+    return send(res, rows, 200, {
+      "Content-Range": `0-${Math.max(0, rows.length - 1)}/${rows.length}`,
     });
+  }
   if (url.pathname === "/rest/v1/rpc/fb_save_document") {
     const input = JSON.parse(body);
     const index = documents.findIndex((row) => row.id === input.p_id);
@@ -219,16 +252,42 @@ createServer(async (req, res) => {
     return send(res, saved);
   }
   if (url.pathname === "/rest/v1/rpc/fb_allow_request") return send(res, true);
-  if (url.pathname === "/rest/v1/rpc/fb_record_progress") return send(res, {});
-  if (url.pathname === "/rest/v1/fb_profiles") return send(res, profile());
+  if (url.pathname === "/rest/v1/rpc/fb_record_progress") {
+    const input = JSON.parse(body || "{}");
+    const index = configuredProgress.findIndex(
+      (row) =>
+        row.user_id === input.p_user &&
+        row.content_id === input.p_content &&
+        row.version === input.p_version,
+    );
+    const previous = configuredProgress[index];
+    const saved = {
+      user_id: input.p_user,
+      content_id: input.p_content,
+      version: input.p_version,
+      lessons: [...new Set([...(previous?.lessons || []), ...input.p_lessons])],
+      passed: !!(previous?.passed || input.p_passed),
+      attempts: [
+        ...(previous?.attempts || []),
+        ...(input.p_attempt ? [input.p_attempt] : []),
+      ],
+    };
+    if (index < 0) configuredProgress.push(saved);
+    else configuredProgress[index] = saved;
+    return send(res, saved);
+  }
+  if (url.pathname === "/rest/v1/fb_profiles")
+    return url.searchParams.has("id")
+      ? send(res, profile())
+      : send(res, [profile()], 200, { "Content-Range": "0-0/1" });
   if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot")
     return send(res, {
       users: [profile()],
-      progress: [],
-      groups: [],
+      progress: configuredProgress,
+      groups: configuredGroups,
       teams: [],
       pending: [],
-      revision: 1,
+      revision: fixtureGeneration,
     });
   if (url.pathname === "/rest/v1/fb_feedback") {
     if (req.method === "POST") {
@@ -255,10 +314,7 @@ createServer(async (req, res) => {
     });
   }
   if (
-    [
-      "/rest/v1/fb_documents",
-      "/rest/v1/fb_mcp_grants",
-    ].includes(url.pathname)
+    ["/rest/v1/fb_documents", "/rest/v1/fb_mcp_grants"].includes(url.pathname)
   )
     return send(res, [], 200, { "Content-Range": "*/0" });
   if (url.pathname === "/auth/v1/token") {

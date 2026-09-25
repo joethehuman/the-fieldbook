@@ -167,13 +167,16 @@ async function setup(
     );
   await page.goto(
     production
-      ? role === "manager"
-        ? "/team"
-        : "/admin"
+      ? "/team"
       : role === "manager"
         ? "/#team"
         : "/#admin",
   );
+  if (production && role === "admin") {
+    const menu = page.getByRole("button", { name: "Open navigation" });
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
+    await page.getByRole("button", { name: "Manage organization" }).click();
+  }
   await expect(
     page.getByRole("heading", {
       name: role === "manager" ? "Team progress" : "Administration",
@@ -429,7 +432,7 @@ test("unavailable or pending workspace never offers export", async ({
       },
     });
   });
-  await page.goto("/admin");
+  await page.goto("/team");
   await expect(
     page.getByRole("heading", { name: "Just a sec…" }),
   ).toBeVisible();
@@ -502,7 +505,10 @@ test("failed progress update disables exports until the complete report reloads"
       json: { data, user: data.users.find((u) => u.role === "admin") },
     }),
   );
-  await page.reload();
+  await page.goto("/team");
+  const menu = page.getByRole("button", { name: "Open navigation" });
+  if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
+  await page.getByRole("button", { name: "Manage organization" }).click();
   await expect(
     page.getByRole("heading", { name: "Administration", exact: true }),
   ).toBeVisible();
@@ -605,7 +611,12 @@ test("People fieldset footers preserve default-stage saving in both applications
     );
   }
   await screenshot(page, info, "people-fieldset-footers");
-  await page.reload();
+  if (production) {
+    await page.goto("/team");
+    const menu = page.getByRole("button", { name: "Open navigation" });
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
+    await page.getByRole("button", { name: "Manage organization" }).click();
+  } else await page.reload();
   await expect(
     page.getByRole("heading", { name: "Administration", exact: true }),
   ).toBeVisible();
