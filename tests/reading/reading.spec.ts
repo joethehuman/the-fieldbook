@@ -640,7 +640,7 @@ test("reading without JavaScript, responsive layout and native breadcrumbs", asy
   await page.goto(`/courses/${ids[2]}`);
   await expect(
     page.getByRole("link", { name: /Second lesson/ }),
-  ).toHaveAttribute("href", `/learn/${ids[2]}?lesson=second`);
+  ).toHaveAttribute("href", `/courses/${ids[2]}?lesson=second`);
   await page.screenshot({
     path: info.outputPath("course-no-js.png"),
     fullPage: true,
@@ -745,6 +745,7 @@ test("private verified sessions refresh and do not contaminate anonymous respons
 });
 test("guest lessons and server-graded quiz retain browser progress", async ({
   page,
+  request,
 }) => {
   await page.goto(`/courses/${ids[2]}?lesson=first`);
   await page.getByRole("button", { name: "Complete & continue" }).click();
@@ -771,6 +772,106 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
   ).toBe(true);
   await page.goto("/courses");
   await expect(page.getByText(/1 course completed/)).toBeVisible();
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  await page.reload();
+  await page
+    .getByRole("region", { name: "Import browser progress" })
+    .getByRole("button", { name: "Save browser progress to my account" })
+    .click();
+  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem("fieldbook.guest-progress.v1"),
+    ),
+  ).toBeNull();
+});
+
+test("signed-in lessons keep the reader shell and persist server-graded progress", async ({
+  page,
+  request,
+}) => {
+  await fixture(request, {
+    settings: { access: "private", logoUrl: "" },
+    role: "learner",
+  });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  let documentNavigations = 0;
+  let workspaceReads = 0;
+  page.on("request", (entry) => {
+    if (entry.isNavigationRequest()) documentNavigations++;
+    if (entry.url().includes("/api/workspace")) workspaceReads++;
+  });
+  await page.goto(`/courses/${ids[2]}`);
+  await page.getByRole("link", { name: /First lesson/ }).click();
+  await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}\\?lesson=first`));
+  await page.getByRole("button", { name: "Complete & continue" }).click();
+  await page.getByRole("button", { name: "Continue to quiz" }).click();
+  await page.getByRole("radio", { name: "First", exact: true }).check();
+  await page.getByRole("button", { name: "Check answers" }).click();
+  await expect(
+    page.getByText("Not quite yet. Revisit the lessons and try again."),
+  ).toBeVisible();
+  await page.getByRole("radio", { name: "Second", exact: true }).check();
+  await page.getByRole("button", { name: "Check answers" }).click();
+  await expect(
+    page.getByText("Great work. You’ve completed this course."),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Content feedback" }),
+  ).toBeVisible();
+  expect(documentNavigations).toBe(1);
+  expect(workspaceReads).toBe(0);
+  const saved = await (
+    await request.get(`${backend}/rest/v1/fb_progress?content_id=eq.${ids[2]}`)
+  ).json();
+  expect(saved[0]).toMatchObject({
+    lessons: ["first", "second"],
+    passed: true,
+  });
+  expect(saved[0].attempts).toHaveLength(2);
+  await page.getByRole("button", { name: /Back to course/ }).first().click();
+  await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}$`));
+  await page.getByRole("link", { name: /Back to courses/ }).click();
+  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  expect(documentNavigations).toBe(1);
+  await page.reload();
+  await expect(
+    page.getByText("Completed", { exact: true }).first(),
+  ).toBeVisible();
 });
 
 test("legacy aliases, curriculum destinations and existing logo metadata", async ({

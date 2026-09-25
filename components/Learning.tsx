@@ -47,6 +47,7 @@ import {
 } from "@/lib/learning";
 import type { SiteSettings } from "@/lib/settings";
 import { CourseCard } from "./CourseCard";
+import { IntentLink } from "./patterns/intent-link";
 
 export default function Learning({
   curricula = [],
@@ -327,11 +328,25 @@ export default function Learning({
                   <Button
                     variant="default"
                     className="mt-auto w-full"
-                    onClick={() => onOpen(nextCourse.id)}
+                    asChild={linkedNavigation}
+                    onClick={
+                      linkedNavigation ? undefined : () => onOpen(nextCourse.id)
+                    }
                   >
-                    {courseProgress(nextCourse, progress).started
-                      ? "Continue course"
-                      : "Start course"}
+                    {linkedNavigation ? (
+                      <IntentLink
+                        href={`/courses/${encodeURIComponent(nextCourse.id)}`}
+                        eager
+                      >
+                        {courseProgress(nextCourse, progress).started
+                          ? "Continue course"
+                          : "Start course"}
+                      </IntentLink>
+                    ) : courseProgress(nextCourse, progress).started ? (
+                      "Continue course"
+                    ) : (
+                      "Start course"
+                    )}
                   </Button>
                 )}
               </Card>

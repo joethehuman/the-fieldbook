@@ -214,10 +214,17 @@ createServer(async (req, res) => {
       "Content-Range": `0-${rows.length - 1}/${rows.length}`,
     });
   }
-  if (url.pathname === "/rest/v1/fb_progress")
-    return send(res, configuredProgress, 200, {
-      "Content-Range": `0-${configuredProgress.length - 1}/${configuredProgress.length}`,
+  if (url.pathname === "/rest/v1/fb_progress") {
+    const rows = configuredProgress.filter((row) =>
+      ["user_id", "content_id", "version"].every((field) => {
+        const value = url.searchParams.get(field);
+        return !value || String(row[field]) === value.slice(3);
+      }),
+    );
+    return send(res, rows, 200, {
+      "Content-Range": `0-${Math.max(0, rows.length - 1)}/${rows.length}`,
     });
+  }
   if (url.pathname === "/rest/v1/rpc/fb_save_document") {
     const input = JSON.parse(body);
     const index = documents.findIndex((row) => row.id === input.p_id);
@@ -245,7 +252,30 @@ createServer(async (req, res) => {
     return send(res, saved);
   }
   if (url.pathname === "/rest/v1/rpc/fb_allow_request") return send(res, true);
-  if (url.pathname === "/rest/v1/rpc/fb_record_progress") return send(res, {});
+  if (url.pathname === "/rest/v1/rpc/fb_record_progress") {
+    const input = JSON.parse(body || "{}");
+    const index = configuredProgress.findIndex(
+      (row) =>
+        row.user_id === input.p_user &&
+        row.content_id === input.p_content &&
+        row.version === input.p_version,
+    );
+    const previous = configuredProgress[index];
+    const saved = {
+      user_id: input.p_user,
+      content_id: input.p_content,
+      version: input.p_version,
+      lessons: [...new Set([...(previous?.lessons || []), ...input.p_lessons])],
+      passed: !!(previous?.passed || input.p_passed),
+      attempts: [
+        ...(previous?.attempts || []),
+        ...(input.p_attempt ? [input.p_attempt] : []),
+      ],
+    };
+    if (index < 0) configuredProgress.push(saved);
+    else configuredProgress[index] = saved;
+    return send(res, saved);
+  }
   if (url.pathname === "/rest/v1/fb_profiles")
     return url.searchParams.has("id")
       ? send(res, profile())
