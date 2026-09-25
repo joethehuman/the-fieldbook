@@ -63,7 +63,12 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
     }, data);
   }
 
-  await page.goto(production ? "/admin" : "/#admin");
+  await page.goto(production ? "/team" : "/#admin");
+  if (production) {
+    const menu = page.getByRole("button", { name: "Open navigation" });
+    if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
+    await page.getByRole("button", { name: "Manage organization" }).click();
+  }
   await expect(
     page.getByRole("heading", { name: "Administration" }),
   ).toBeVisible();
@@ -78,7 +83,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   const name = page.getByRole("textbox", { name: "Installation name" });
   await name.fill("Unsaved installation name");
   const menu = page.getByRole("button", { name: "Open navigation" });
-  if (await menu.isVisible()) await menu.click();
+  if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
   await page
     .getByRole("navigation")
     .getByRole("button", { name: "Docs", exact: true })

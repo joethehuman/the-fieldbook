@@ -90,6 +90,7 @@ import {
   type Workspace,
 } from "@/lib/store";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { SaveRecoveryError } from "@/lib/save-recovery";
 import type { NavigationGuard } from "@/lib/navigation-guard";
 const Admin = dynamic(() => import("./Admin"));
@@ -97,14 +98,17 @@ type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook({
   runtime,
   initialReading,
+  initialAdmin,
   children,
   onLoaded,
 }: {
   runtime?: FieldbookRuntime;
   initialReading?: ReadingState;
+  initialAdmin?: { data: Workspace; user: User };
   children?: ReactNode;
   onLoaded?: (user: User | null) => void;
 } = {}) {
+  const router = useRouter();
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
@@ -122,12 +126,15 @@ export default function Fieldbook({
     }
   }
   const [data, setData] = useState<Workspace | null>(
-      initialReading?.data || null,
+      initialAdmin?.data || initialReading?.data || null,
     ),
     [uid, setUid] = useState<string | null>(
-      initialReading ? initialReading.data.users[0]?.id || "guest" : null,
+      initialAdmin?.user.id ||
+        (initialReading ? initialReading.data.users[0]?.id || "guest" : null),
     ),
-    [view, setView] = useState<View>(initialReading?.section || "learn"),
+    [view, setView] = useState<View>(
+      initialAdmin ? "admin" : initialReading?.section || "learn",
+    ),
     [courseOrigin, setCourseOrigin] = useState<string | undefined>(
       initialReading?.curriculum,
     ),
@@ -144,6 +151,10 @@ export default function Fieldbook({
     [menu, setMenu] = useState(false),
     [showDemo, setShowDemo] = useState(false);
   useEffect(() => {
+    if (initialAdmin) {
+      onLoaded?.(initialAdmin.user);
+      return;
+    }
     if (runtime) {
       runtime
         .load()
@@ -261,6 +272,7 @@ export default function Fieldbook({
     if (
       runtime &&
       (initialReading ||
+        initialAdmin ||
         (id &&
           !id.startsWith("curriculum:") &&
           ["learn", "docs", "briefs"].includes(v)))
@@ -271,7 +283,9 @@ export default function Fieldbook({
       const query = new URLSearchParams();
       if (lesson) query.set("lesson", lesson);
       if (origin) query.set("curriculum", origin);
-      window.location.assign(`/${path}${query.size ? `?${query}` : ""}`);
+      const destination = `/${path}${query.size ? `?${query}` : ""}`;
+      if (v === "admin" || initialAdmin) router.push(destination);
+      else window.location.assign(destination);
       return;
     }
     setView(v);
@@ -810,6 +824,35 @@ export default function Fieldbook({
                 data={data}
                 user={user}
                 onChange={persist}
+                onOpenTab={
+                  runtime?.admin
+                    ? async (next) => {
+                        const scope =
+                          next === "feedback"
+                            ? "feedback"
+                            : next === "content" || next.startsWith("settings-")
+                              ? "content"
+                              : "governance";
+                        setData(await runtime.admin!.prepare(scope));
+                      }
+                    : undefined
+                }
+                onEdit={
+                  runtime?.admin
+                    ? async (id) => {
+                        const result = await runtime.admin!.edit(id);
+                        setData(result.data);
+                        return result.item;
+                      }
+                    : undefined
+                }
+                onUnpublish={
+                  runtime?.admin
+                    ? async (id) => {
+                        setData(await runtime.admin!.unpublish(id));
+                      }
+                    : undefined
+                }
                 onLearning={
                   runtime
                     ? async (action) => {
