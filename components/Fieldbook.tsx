@@ -264,8 +264,8 @@ export default function Fieldbook({
     origin?: string,
     lesson?: string,
   ) {
-    setMenu(false);
     if (!(await canLeave())) return;
+    if (v !== "docs" || id) setMenu(false);
     if (
       runtime &&
       (initialReading ||
@@ -289,7 +289,6 @@ export default function Fieldbook({
     setCourseOrigin(origin);
     setTargetLesson(lesson);
     setSearch("");
-    setMenu(false);
     const curriculum = v === "learn" && id?.startsWith("curriculum:");
     const path = curriculum
       ? `curricula/${encodeURIComponent(id!.slice(11))}`

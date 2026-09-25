@@ -76,8 +76,11 @@ test("Docs settings move and rename a subsection without losing published placem
   const tree = page.getByRole("navigation", { name: "Documents", includeHidden: true });
   if (!(await tree.isVisible()))
     await page.getByRole("button", { name: "Open navigation" }).click();
-  await expect(tree.getByRole("button", { name: "Reference" })).toBeVisible();
-  await expect(tree.getByRole("button", { name: "Installation" })).toBeVisible();
+  await expect(tree.getByRole("heading", { name: "Reference" })).toBeVisible();
+  await expect(tree.getByRole("button", { name: "Reference" })).toHaveCount(0);
+  const installation = tree.getByRole("button", { name: "Installation" });
+  await expect(installation).toHaveAttribute("aria-expanded", "false");
+  await installation.click();
   await expect(tree.getByRole("link", { name: "Install guide" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
   await page.screenshot({ path: info.outputPath("docs-hierarchy.png"), fullPage: true });

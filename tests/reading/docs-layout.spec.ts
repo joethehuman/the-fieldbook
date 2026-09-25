@@ -130,15 +130,8 @@ for (const app of ["demo", "production"] as const) {
       "text-align",
       "left",
     );
-    await tree.locator(".document-branch-trigger").last().click();
-    await expect(
-      tree.locator(".document-branch-trigger").last(),
-    ).toHaveAttribute("aria-expanded", "false");
-    await tree.locator(".document-branch-trigger").last().focus();
-    await page.keyboard.press("Enter");
-    await expect(
-      tree.locator(".document-branch-trigger").last(),
-    ).toHaveAttribute("aria-expanded", "true");
+    await expect(tree.locator(".document-section-heading")).toHaveCount(2);
+    await expect(tree.locator(".document-subsection-trigger")).toHaveCount(0);
     await page.screenshot({
       animations: "disabled",
       path: info.outputPath(`${app}-tree-scrolled.png`),
@@ -284,6 +277,108 @@ for (const app of ["demo", "production"] as const) {
     ).toBeFocused();
     await expect(tree).not.toBeVisible();
     expect(errors).toEqual([]);
+  });
+}
+for (const app of ["demo", "production"] as const) {
+  test(`${app}: Docs headings stay fixed, subsections disclose, and mobile Docs stays open`, async ({
+    page,
+    request,
+    browser,
+  }, info) => {
+    const hierarchy = [
+      { ...docs[0], title: "Start here", folder: "" },
+      { ...docs[1], title: "Reference guide", folder: "Guides" },
+    ];
+    await fixture(request, hierarchy);
+    if (app === "demo") {
+      const data = freshWorkspace();
+      data.content = hierarchy;
+      data.settings = {
+        ...defaultSettings,
+        docCategoryOrder: ["Getting started"],
+      };
+      await page.addInitScript((workspace) => {
+        localStorage.setItem(
+          "fieldbook.workspace.v1",
+          JSON.stringify(workspace),
+        );
+        sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+      }, data);
+    }
+    await page.goto(
+      app === "demo" ? "http://localhost:3132/#learn" : "/courses",
+    );
+    const narrow = info.project.name === "phone";
+    if (narrow)
+      await page.getByRole("button", { name: "Open navigation" }).click();
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole(app === "demo" ? "button" : "link", { name: "Docs" })
+      .click();
+    const sidebar = page.locator(".sidebar");
+    const tree = page.getByRole("navigation", { name: "Documents" });
+    if (narrow) await expect(sidebar).toHaveClass(/open/);
+    await expect(
+      tree.getByRole("heading", { name: "Getting started" }),
+    ).toBeVisible();
+    await expect(
+      tree.getByRole("button", { name: "Getting started" }),
+    ).toHaveCount(0);
+    await expect(tree.getByRole("link", { name: "Start here" })).toBeVisible();
+    const guides = tree.getByRole("button", { name: "Guides" });
+    await expect(guides).toHaveAttribute("aria-expanded", "false");
+    await expect(
+      tree.getByRole("link", { name: "Reference guide" }),
+    ).toBeHidden();
+    await guides.click();
+    await expect(guides).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      tree.getByRole("link", { name: "Reference guide" }),
+    ).toBeVisible();
+    await guides.focus();
+    await page.keyboard.press("Enter");
+    await expect(guides).toHaveAttribute("aria-expanded", "false");
+    await page.keyboard.press("Enter");
+    await expect(guides).toHaveAttribute("aria-expanded", "true");
+    await guides.evaluate((element) => (element as HTMLElement).blur());
+    await page.screenshot({
+      animations: "disabled",
+      path: info.outputPath(`${app}-docs-navigation-${info.project.name}.png`),
+    });
+    await page.reload();
+    if (narrow) {
+      await page.getByRole("button", { name: "Open navigation" }).click();
+      await expect(sidebar).toHaveClass(/open/);
+    }
+    await expect(tree.getByRole("button", { name: "Guides" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+    await tree.getByRole("link", { name: "Reference guide" }).click();
+    await expect(page.locator("article h1")).toHaveText("Reference guide");
+    if (narrow) await expect(sidebar).not.toHaveClass(/open/);
+    if (narrow) {
+      await page.getByRole("button", { name: "Open navigation" }).click();
+      await expect(
+        tree.getByRole("button", { name: "Guides" }),
+      ).toHaveAttribute("aria-expanded", "true");
+      await page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole(app === "demo" ? "button" : "link", { name: "Courses" })
+        .click();
+      await expect(sidebar).not.toHaveClass(/open/);
+    }
+    if (app === "production" && !narrow) {
+      const noScript = await browser.newContext({ javaScriptEnabled: false });
+      const noScriptPage = await noScript.newPage();
+      await noScriptPage.goto(`http://localhost:3131/docs/${hierarchy[0].id}`);
+      await expect(
+        noScriptPage
+          .getByRole("navigation", { name: "Documents", exact: true })
+          .getByRole("link", { name: "Reference guide", exact: true }),
+      ).toBeVisible();
+      await noScript.close();
+    }
   });
 }
 test("server navigation is published-only, updates across publication and works without JavaScript", async ({
