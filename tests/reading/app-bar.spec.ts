@@ -97,9 +97,8 @@ for (const app of ["demo", "production"]) {
         path: info.outputPath(`${app}-${kind}-enlarged.png`),
       });
       if (app === "demo") {
-        await page
-          .getByRole("button", { name: "Demo organization", exact: true })
-          .click();
+        const about = footer.getByRole("button", { name: "About this demo" });
+        await about.click();
         const dialog = page.getByRole("dialog");
         await expect(dialog).toBeVisible();
         await expect
@@ -111,10 +110,32 @@ for (const app of ["demo", "production"]) {
           path: info.outputPath(`${app}-${kind}-dialog.png`),
         });
         await page.keyboard.press("Escape");
-        await expect(
-          page.getByRole("button", { name: "Demo organization", exact: true }),
-        ).toBeFocused();
+        await expect(about).toBeFocused();
       }
     });
   }
 }
+
+test("demo opens on profile choice before the first selection", async ({
+  page,
+}) => {
+  await page.goto("http://localhost:3132/");
+  await expect(
+    page.getByRole("heading", { name: "Choose a demo profile" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /Alex Edwards/ }).click();
+  const footer = page.locator(".app-footer");
+  const about = footer.getByRole("button", { name: "About this demo" });
+  await expect(about).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Demo organization" }),
+  ).toHaveCount(0);
+  expect(await about.evaluate((el) => getComputedStyle(el).fontSize)).toBe(
+    await footer
+      .locator("span")
+      .first()
+      .evaluate((el) => getComputedStyle(el).fontSize),
+  );
+  await page.reload();
+  await expect(about).toBeVisible();
+});
