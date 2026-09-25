@@ -8,6 +8,11 @@ async function noOverflow(page: Page) {
     ),
   ).toBe(true);
 }
+async function learner(page: Page) {
+  await page.addInitScript(() =>
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-learner"),
+  );
+}
 async function adminSection(page: Page, name: string) {
   // Reloads remount the lazy Administration bundle before its navigation.
   await expect(page.locator(".admin-layout")).toBeVisible();
@@ -205,6 +210,7 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
 test("short pages keep the shared shell fixed at both scroll limits", async ({
   page,
 }) => {
+  await learner(page);
   const data = freshWorkspace();
   data.content = [];
   await page.addInitScript((workspace) => {
@@ -328,6 +334,7 @@ test("admin destinations and editor render without overflow or errors", async ({
 test("learner routes and narrow navigation remain usable", async ({
   page,
 }, testInfo) => {
+  await learner(page);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   for (const [route, heading] of [
@@ -426,6 +433,7 @@ test("curriculum builder uses shared fields and preserves saved sequence", async
 test("course completion still works through shared choices and controls", async ({
   page,
 }) => {
+  await learner(page);
   await page.goto("/#courses/course-2");
   await expect(
     page.getByRole("heading", {
@@ -652,6 +660,7 @@ test("report columns stay fixed across teams, long values and empty results", as
 test("update footers and saved feedback keep text and actions separated", async ({
   page,
 }, testInfo) => {
+  await learner(page);
   await page.goto("/#updates");
   const action = page.locator('[data-slot="card-action"]').first();
   const box = await action.boundingBox(),

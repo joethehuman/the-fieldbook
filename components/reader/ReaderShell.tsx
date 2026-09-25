@@ -42,16 +42,22 @@ export function ReaderShell({
   const pathname = usePathname();
   const section = pathname.startsWith("/docs")
     ? "docs"
-    : pathname.startsWith("/courses")
-      ? "courses"
-      : "updates";
+    : pathname.startsWith("/curricula")
+      ? "curricula"
+      : pathname.startsWith("/privacy")
+        ? "privacy"
+        : pathname.startsWith("/courses")
+          ? "courses"
+          : "updates";
   const selected = pathname.split("/")[2] || null;
   const articleTitle = selected
     ? section === "docs"
       ? context.docs.find((doc) => doc.id === selected)?.title
-      : section === "courses"
-        ? context.courseTitles?.find((item) => item.id === selected)?.title
-        : context.updateTitles?.find((item) => item.id === selected)?.title
+      : section === "curricula"
+        ? context.curriculumTitles?.find((item) => item.id === selected)?.title
+        : section === "courses"
+          ? context.courseTitles?.find((item) => item.id === selected)?.title
+          : context.updateTitles?.find((item) => item.id === selected)?.title
     : undefined;
   useEffect(() => {
     if (!menu) return;
@@ -65,7 +71,13 @@ export function ReaderShell({
     return () => document.removeEventListener("keydown", escape);
   }, [menu]);
   const title =
-    section === "docs" ? "Docs" : section === "courses" ? "Courses" : "Updates";
+    section === "docs"
+      ? "Docs"
+      : section === "courses" || section === "curricula"
+        ? "Courses"
+        : section === "privacy"
+          ? "Privacy policy"
+          : "Updates";
   const close = () => setMenu(false);
   const links = [
     { href: "/updates", title: "Updates", icon: Newspaper },
@@ -208,7 +220,10 @@ export function ReaderShell({
               <>
                 <ChevronRight size={14} />
                 <Button asChild variant="link">
-                  <Link href={`/${section}`} prefetch>
+                  <Link
+                    href={section === "curricula" ? "/courses" : `/${section}`}
+                    prefetch
+                  >
                     {title}
                   </Link>
                 </Button>
@@ -231,7 +246,7 @@ export function ReaderShell({
         </main>
         <footer className="app-footer">
           {context.branding.name} <span>{context.branding.tagline}</span>
-          {context.branding.privacyUrl && (
+          {context.branding.privacyUrl && section !== "privacy" && (
             <Link href={context.branding.privacyUrl}>Privacy policy</Link>
           )}
         </footer>

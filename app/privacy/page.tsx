@@ -1,5 +1,6 @@
 "use client";
 import { ReadingPage } from "@/components/patterns/layout";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { loadWorkspace } from "@/lib/store";
 import { defaultSettings, type SiteSettings } from "@/lib/settings";
@@ -17,7 +18,7 @@ export default function DemoPrivacyPage() {
   const policy = settings?.privacy?.published;
   return (
     <ReadingPage>
-      <a href="/">← Back to demo</a>
+      <Link href="/">← Back to demo</Link>
       <h1>Privacy policy preview</h1>
       <p>
         This is a browser-local demonstration of the policy editor, not a policy

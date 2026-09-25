@@ -21,6 +21,13 @@ export function ReaderCourses({ data }: { data: CourseReaderData }) {
       setGuestProgress([]);
     }
   }, [data.user.id]);
+  useEffect(() => {
+    // Warm only the most likely course destinations, keeping the catalog cheap.
+    const suggested = assignedCourses(data.courses, data.user, data.groups)[0];
+    const ids = new Set([suggested?.id, data.courses[0]?.id]);
+    for (const id of ids)
+      if (id) router.prefetch(`/courses/${encodeURIComponent(id)}`);
+  }, [data.courses, data.groups, data.user, router]);
   return (
     <Learning
       courses={data.courses}

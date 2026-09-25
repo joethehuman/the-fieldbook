@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { reconcileDemoPublication } from "@/lib/demo-publication";
 import { AppBar } from "./patterns/app-bar";
 import { DocumentTree } from "./patterns/document-tree";
@@ -275,8 +276,7 @@ export default function Fieldbook({
       if (lesson) query.set("lesson", lesson);
       if (origin) query.set("curriculum", origin);
       const destination = `/${path}${query.size ? `?${query}` : ""}`;
-      if (v === "admin" || initialAdmin) router.push(destination);
-      else window.location.assign(destination);
+      router.push(destination);
       return;
     }
     setView(v);
@@ -433,6 +433,7 @@ export default function Fieldbook({
     demoGuest?.user || data.users.find((u) => u.id === uid && u.active);
   const learningGroups = demoGuest?.groups || data.groups;
   const branding = { ...defaultSettings, ...data.settings };
+  const policyHref = privacyHref(branding);
   if (!user)
     return (
       <BrandedAccount branding={brandingFromSettings(branding)}>
@@ -782,7 +783,7 @@ export default function Fieldbook({
               runtime={runtime}
               onOpen={async (r) => {
                 if (runtime) {
-                  if (await canLeave()) window.location.assign(r.href);
+                  if (await canLeave()) router.push(r.href);
                   return;
                 }
                 await navigate(
@@ -1130,9 +1131,12 @@ export default function Fieldbook({
         </main>
         <footer className="app-footer">
           {branding.name} <span>{branding.tagline}</span>
-          {privacyHref(branding) && (
-            <a href={privacyHref(branding)!}>Privacy policy</a>
-          )}
+          {policyHref &&
+            (policyHref === "/privacy" ? (
+              <Link href="/privacy">Privacy policy</Link>
+            ) : (
+              <a href={policyHref}>Privacy policy</a>
+            ))}
           {!runtime && (
             <Button
               variant="link"

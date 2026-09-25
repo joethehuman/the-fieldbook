@@ -589,8 +589,10 @@
   .loading {
     display: flex;
     min-height: 100dvh;
-    align-items: flex-end;
+    align-items: center;
+    justify-content: center;
     padding: var(--space-12);
+    text-align: center;
   }
   .loading-content {
     display: grid;
@@ -613,11 +615,6 @@
     border-radius: inherit;
     background: var(--foreground);
     animation: loading-sweep 1.8s ease-in-out infinite alternate;
-  }
-  .loading-error {
-    align-items: center;
-    justify-content: center;
-    text-align: center;
   }
   .loading-error .loading-content {
     justify-items: center;

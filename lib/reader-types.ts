@@ -26,4 +26,5 @@ export type ReaderShellContext = {
   docSections: DocSection[];
   updateTitles?: { id: string; title: string }[];
   courseTitles?: { id: string; title: string }[];
+  curriculumTitles?: { id: string; title: string }[];
 };
