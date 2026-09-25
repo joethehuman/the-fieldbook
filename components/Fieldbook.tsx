@@ -12,7 +12,7 @@ import { ContentSearch } from "./ContentSearch";
 import { InitialsAvatar } from "./ui/initials-avatar";
 import { RequestError } from "@/lib/workspace-save";
 import { BrandedAccount } from "./patterns/branded-account";
-import { InstallationIdentity as Logo } from "./patterns/installation-identity";
+import { InstallationIdentity } from "./patterns/installation-identity";
 import { brandingFromSettings } from "@/lib/branding";
 import { CurriculumPage } from "./CurriculumPage";
 import { Badge } from "@/components/ui/badge";
@@ -522,7 +522,7 @@ export default function Fieldbook({
       </SkipLink>
       <aside className={"sidebar " + (menu ? "open" : "")}>
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-          <Logo name={data.settings?.name} logoUrl={data.settings?.logoUrl} />
+          <InstallationIdentity name={data.settings?.name} />
           <Button
             ref={menuClose}
             variant="ghost"
@@ -537,7 +537,6 @@ export default function Fieldbook({
             <X />
           </Button>
         </div>
-        <span className="nav-label">YOUR ORGANIZATION</span>
         <nav className="primary-navigation" aria-label="Primary">
           {(
             [

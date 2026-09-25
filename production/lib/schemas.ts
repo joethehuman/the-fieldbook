@@ -131,10 +131,6 @@ export const settingsSchema = z
     name: text(60).trim().min(1),
     tagline: text(180),
     welcomeDescription: text(180).trim().default(""),
-    logoUrl: text(2000).refine(
-      (s) => !s || /^\/api\/media\/[a-f0-9-]{36}\.(png|jpg|webp|gif)$/.test(s),
-      "Upload a logo using Fieldbook.",
-    ),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     access: z.enum(["public", "private"]),
     registration: z.enum(["open", "closed"]),

@@ -81,8 +81,6 @@ export const reading = cache(
     }
     const branding = brandingFromSettings(config.settings);
     const visibleSettings = publicSettings(config.settings, documents);
-    if (branding.logoUrl)
-      branding.logoUrl = `/api/branding/logo?v=${encodeURIComponent(branding.logoUrl.split("/").pop()!)}`;
     const data: ReadingState["data"] = {
       schema: 1,
       settings: {
@@ -109,7 +107,6 @@ export const reading = cache(
               },
             }
           : undefined,
-        logoUrl: branding.logoUrl,
         access: branding.access,
       },
       content: [item],
@@ -127,11 +124,6 @@ export function readingMetadata(
   const { item, branding } = value;
   const title = `${item.title} | ${branding.name}`;
   const description = item.summary.trim() || `${item.title} — ${branding.name}`;
-  // The public logo endpoint checks current branding on every request. Do not
-  // advertise private media through share images or signed Storage URLs.
-  const images = branding.logoUrl
-    ? [{ url: branding.logoUrl, alt: branding.name }]
-    : [];
   return {
     metadataBase: new URL(env().origin),
     title,
@@ -143,13 +135,11 @@ export function readingMetadata(
       siteName: branding.name,
       type: item.kind === "course" ? "website" : "article",
       url: contentPath(item.kind, item.id),
-      images,
     },
     twitter: {
       card: "summary",
       title,
       description,
-      images: images.map((image) => image.url),
     },
     ...(branding.access === "private"
       ? { robots: { index: false, follow: false } }

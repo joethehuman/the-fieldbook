@@ -44,7 +44,6 @@ test("production content rejects duplicate lesson ids and unsafe branding", () =
     settingsSchema.safeParse({
       name: "Site",
       tagline: "",
-      logoUrl: "javascript:alert(1)",
       accent: "red;display:none",
       access: "public",
       registration: "open",

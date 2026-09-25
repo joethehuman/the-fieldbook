@@ -207,8 +207,8 @@ export default function ComponentCatalog() {
         <Card>
           <InstallationIdentity name="Example Academy" />
           <p>
-            Shared by the workspace, sign-in, consent and connection pages.
-            Missing or failed logos use the book mark.
+            Shared by the workspace, sign-in, consent and connection pages. The
+            installation name appears without an icon.
           </p>
         </Card>
       </section>

@@ -360,7 +360,7 @@ test("MCP tool returns complete totals and learner activity semantics beyond the
     }
   }));
 
-test("published media lookup covers old articles, lessons, videos, covers and logos without scanning the catalog", async () =>
+test("published media lookup covers old articles, lessons, videos and covers without scanning the catalog", async () =>
   fixture(async (f) => {
     const old = f.documents[1204];
     for (const fragment of [
@@ -380,18 +380,17 @@ test("published media lookup covers old articles, lessons, videos, covers and lo
     await assert.rejects(signedMediaUrl(file, learner), /Media not found/);
     assert.equal(f.signs, 4);
     await signedMediaUrl(file, admin);
-    f.settings.logoUrl = reference;
-    await signedMediaUrl(file, null);
+    await assert.rejects(signedMediaUrl(file, null), /Media not found/);
     f.settings.access = "private";
     await assert.rejects(signedMediaUrl(file, null), /Sign in/);
-    await signedMediaUrl(file, learner);
+    await assert.rejects(signedMediaUrl(file, learner), /Media not found/);
     f.ready = false;
     await assert.rejects(signedMediaUrl(file, admin), /Media not found/);
     await assert.rejects(
       signedMediaUrl("invalid.png", admin),
       /Media not found/,
     );
-    assert.equal(f.signs, 7);
+    assert.equal(f.signs, 5);
     assert.ok(
       f.requests
         .filter((u) => u.pathname.endsWith("fb_documents"))

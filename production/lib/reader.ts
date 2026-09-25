@@ -111,8 +111,6 @@ const readerAccess = cache(async (destination: string) => {
 });
 function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
   const branding = brandingFromSettings(config.settings);
-  if (branding.logoUrl)
-    branding.logoUrl = `/api/branding/logo?v=${encodeURIComponent(branding.logoUrl.split("/").pop()!)}`;
   return {
     ...branding,
     accent: config.settings.accent || "#0069ff",
@@ -395,9 +393,6 @@ export function readerMetadata(
   const title = `${item.title} | ${context.branding.name}`;
   const description =
     item.summary.trim() || `${item.title} — ${context.branding.name}`;
-  const images = context.branding.logoUrl
-    ? [{ url: context.branding.logoUrl, alt: context.branding.name }]
-    : [];
   return {
     metadataBase: new URL(env().origin),
     title,
@@ -409,13 +404,11 @@ export function readerMetadata(
       siteName: context.branding.name,
       type: item.kind === "course" ? "website" : "article",
       url: contentPath(item.kind, item.id),
-      images,
     },
     twitter: {
       card: "summary",
       title,
       description,
-      images: images.map((image) => image.url),
     },
     ...(context.branding.access === "private"
       ? { robots: { index: false, follow: false } }

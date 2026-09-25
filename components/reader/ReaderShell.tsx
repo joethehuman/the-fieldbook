@@ -87,10 +87,7 @@ export function ReaderShell({
       <SkipLink href="#main-content">Skip to content</SkipLink>
       <aside className={`sidebar ${menu ? "open" : ""}`}>
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-          <InstallationIdentity
-            name={context.branding.name}
-            logoUrl={context.branding.logoUrl}
-          />
+          <InstallationIdentity name={context.branding.name} />
           <Button
             variant="ghost"
             size="icon"
@@ -104,7 +101,6 @@ export function ReaderShell({
             <X />
           </Button>
         </div>
-        <span className="nav-label">YOUR ORGANIZATION</span>
         <nav className="primary-navigation" aria-label="Primary">
           {links.map(({ href, title: label, icon: Icon }) => (
             <NavigationButton

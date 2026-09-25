@@ -12,7 +12,6 @@ const jwk = {
 const file = "00000000-0000-4000-8000-000000000001.png";
 const initial = () => ({
   name: "Acme Learning",
-  logoUrl: `/api/media/${file}`,
   welcomeDescription: "Welcome to your learning workspace.",
   tagline: "Learn together",
   accent: "#0069ff",
@@ -50,7 +49,6 @@ let settings = initial(),
   configuredFeedback = [],
   userGroups = [],
   fail = false,
-  brokenLogo = false,
   role = "admin",
   revision = 1;
 const user = () => ({
@@ -95,7 +93,6 @@ createServer(async (req, res) => {
     configuredFeedback = change.feedback || [];
     userGroups = change.userGroups || [];
     fail = !!change.fail;
-    brokenLogo = !!change.brokenLogo;
     role = change.role || "admin";
     revision = 1;
     return send(res, { ok: true });
@@ -106,7 +103,6 @@ createServer(async (req, res) => {
   if (url.pathname === "/auth/v1/.well-known/jwks.json")
     return send(res, { keys: [jwk] });
   if (url.pathname === "/logo") {
-    if (brokenLogo) return send(res, {}, 404);
     res.writeHead(200, { "Content-Type": "image/svg+xml" });
     return res.end(
       '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><rect width="32" height="32" rx="6" fill="#222"/><path d="M8 24L16 8l8 16M11 19h10" fill="none" stroke="white" stroke-width="3"/></svg>',
@@ -128,10 +124,9 @@ createServer(async (req, res) => {
       return send(res, { revision });
     }
     const select = url.searchParams.get("select") || "*";
-    if (select.includes("logoUrl:"))
+    if (select.includes("name:settings->>name"))
       return send(res, {
         name: settings.name ?? null,
-        logoUrl: settings.logoUrl ?? null,
         welcomeDescription: settings.welcomeDescription ?? null,
         access: settings.access ?? null,
         policyMode: settings.privacy?.published?.mode ?? null,

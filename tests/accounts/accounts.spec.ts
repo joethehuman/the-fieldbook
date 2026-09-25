@@ -35,7 +35,7 @@ async function login(page: Page, next = "/admin") {
   await expect(page).toHaveURL(new RegExp(next.split("?")[0]));
 }
 test.beforeEach(async ({ request, page }) => {
-  for (const pattern of ["**/api/branding/logo*", "**/api/media/*"])
+  for (const pattern of ["**/api/media/*"])
     await page.route(pattern, async (route) => {
       const response = await route.fetch({ maxRedirects: 0 });
       if (response.status() !== 307) return route.fulfill({ response });
@@ -74,14 +74,8 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
   expect(workspace.status()).toBe(401);
   expect(await workspace.json()).not.toHaveProperty("requestId");
   expect((await request.get(`/api/media/${file}`)).status()).toBe(401);
-  await expect(page.locator(".logo img")).toBeVisible();
-  await expect
-    .poll(() =>
-      page
-        .locator(".logo img")
-        .evaluate((img: HTMLImageElement) => img.naturalWidth),
-    )
-    .toBe(32);
+  await expect(page.locator(".logo")).toHaveText("Acme Learning");
+  await expect(page.locator(".logo img, .logo svg")).toHaveCount(0);
   const html = await page.content();
   expect(html).not.toContain("SECRET POLICY DRAFT");
   expect(html).not.toContain('"registration"');
@@ -95,7 +89,7 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
   await page.getByRole("link", { name: "Continue with Google" }).click();
   await expect(page).toHaveURL(next);
 });
-test("public browse, alternate brand, defaults and failed image fallback", async ({
+test("public browse, alternate brand and long-name fallback", async ({
   page,
   request,
 }, info) => {
@@ -142,7 +136,6 @@ test("public browse, alternate brand, defaults and failed image fallback", async
   });
   await request.post(backend, {
     data: {
-      brokenLogo: true,
       settings: {
         name: "A very long installation name for accessible account layouts",
         access: "public",
@@ -150,8 +143,10 @@ test("public browse, alternate brand, defaults and failed image fallback", async
     },
   });
   await page.reload();
-  await expect(page.locator(".logo svg")).toBeVisible();
-  await expect(page.locator(".logo img")).toHaveCount(0);
+  await expect(page.locator(".logo")).toHaveText(
+    "A very long installation name for accessible account layouts",
+  );
+  await expect(page.locator(".logo img, .logo svg")).toHaveCount(0);
   await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
   await bounds(page);
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -163,7 +158,6 @@ test("public browse, alternate brand, defaults and failed image fallback", async
     data: {
       settings: {
         name: null,
-        logoUrl: null,
         welcomeDescription: null,
         privacy: null,
       },
@@ -173,7 +167,7 @@ test("public browse, alternate brand, defaults and failed image fallback", async
   await expect(
     page.getByRole("heading", { name: "Sign in to Fieldbook" }),
   ).toBeVisible();
-  await expect(page.locator(".logo svg")).toBeVisible();
+  await expect(page.locator(".logo")).toHaveText("Fieldbook");
 });
 test("provider failure stays recoverable, cancellation preserves return, unsafe redirects rejected", async ({
   page,
