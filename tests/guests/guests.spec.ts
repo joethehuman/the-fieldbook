@@ -320,8 +320,8 @@ test("guest Updates and curriculum learning, browser progress and account transi
     await expect(account).toContainText(
       "Sign in to save course progress across devices and browsers.",
     );
-    if (await open.isVisible())
-      await page.getByRole("button", { name: "Dismiss navigation" }).click();
+    const close = page.getByRole("button", { name: "Close navigation" });
+    if (await close.isVisible()) await close.click();
   }
   await page
     .locator(".for-you")
