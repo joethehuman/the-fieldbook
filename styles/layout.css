@@ -1,7 +1,10 @@
 /* Application geometry only. Controls, fields, actions and surfaces live in components. */
 @layer components {
   .app {
-    min-height: 100dvh;
+    position: fixed;
+    inset: 0;
+    height: 100dvh;
+    overflow: clip;
   }
   .sidebar {
     position: fixed;
@@ -12,6 +15,8 @@
     flex-direction: column;
     gap: var(--space-6);
     overflow-y: auto;
+    overscroll-behavior: none;
+    scrollbar-gutter: stable;
     border-right: 1px solid var(--border);
     background: var(--muted);
     padding: var(--space-6) var(--space-4);
@@ -49,15 +54,20 @@
     padding-top: var(--space-3);
   }
   .main-shell {
+    display: flex;
+    height: 100%;
+    min-height: 0;
+    flex-direction: column;
     margin-left: var(--sidebar-width);
+    overflow: clip;
   }
   .topbar {
     --search-panel-width: min(48rem, calc(100vw - var(--sidebar-width) - 3rem));
-    position: sticky;
-    top: 0;
+    position: relative;
     z-index: 15;
     background: var(--background);
     display: flex;
+    flex: none;
     flex-wrap: wrap;
     min-height: 4rem;
     align-items: center;
@@ -104,40 +114,74 @@
   .main-content {
     container: workspace / inline-size;
     display: grid;
+    flex: 1 1 auto;
+    align-content: start;
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
+    min-height: 0;
+    width: 100%;
     max-width: var(--page-width);
     gap: var(--space-8);
     margin-inline: auto;
     padding: var(--space-8) var(--space-6);
+    overflow-y: auto;
+    overscroll-behavior: none;
+    scroll-padding-block-start: var(--anchor-offset);
+    scrollbar-gutter: stable both-edges;
     outline: none;
   }
-  .main-content > footer {
+  .app-footer {
     display: flex;
+    flex: none;
     flex-wrap: wrap;
     justify-content: space-between;
     gap: var(--space-4);
+    width: 100%;
+    max-width: var(--page-width);
+    max-height: 30dvh;
+    margin-inline: auto;
     border-top: 1px solid var(--border);
     padding-block: var(--space-6);
+    padding-inline: var(--space-6);
+    overflow-y: auto;
+    overscroll-behavior: none;
+    scrollbar-gutter: stable;
     color: var(--muted-foreground);
     font-size: 0.75rem;
   }
   .admin-layout {
     display: grid;
+    flex: 1 1 auto;
     grid-template-columns: 11rem minmax(0, 1fr);
     gap: var(--space-8);
-    align-items: start;
+    min-height: 0;
+    align-items: stretch;
+  }
+  .admin-content {
+    display: flex;
+    flex-direction: column;
+  }
+  .admin-workspace {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    flex-direction: column;
   }
   [data-slot="admin-navigation"] {
-    position: sticky;
-    top: var(--anchor-offset);
+    min-height: 0;
+    overflow: hidden;
+  }
+  [data-slot="admin-navigation-desktop"] {
+    grid-template-rows: minmax(0, 1fr);
+    height: 100%;
   }
   @container workspace (width < 48rem) {
     .admin-layout {
       grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto minmax(0, 1fr);
     }
     [data-slot="admin-navigation"] {
-      position: static;
+      overflow: visible;
     }
     .editor-layout {
       grid-template-columns: minmax(0, 1fr);
@@ -155,8 +199,17 @@
     margin: 0 var(--space-3) var(--space-2);
   }
   .admin-panel {
-    display: grid;
-    gap: var(--space-6);
+    display: flow-root;
+    min-height: 0;
+    padding-bottom: var(--space-6);
+    padding-inline-end: var(--space-4);
+    overflow-y: auto;
+    overscroll-behavior: none;
+    scroll-padding-block-start: var(--anchor-offset);
+    scrollbar-gutter: stable;
+  }
+  .admin-panel > * + * {
+    margin-block-start: var(--space-6);
   }
   .editor {
     display: grid;
@@ -245,6 +298,8 @@
     gap: var(--space-2);
     max-height: 18rem;
     overflow-y: auto;
+    padding-inline-end: var(--space-3);
+    scrollbar-gutter: stable;
   }
   .group-picker-option {
     display: flex;
@@ -282,6 +337,8 @@
   .membership-list {
     max-height: 24rem;
     overflow-y: auto;
+    padding-inline-end: var(--space-3);
+    scrollbar-gutter: stable;
     border: 1px solid var(--border);
     border-radius: var(--radius);
   }
@@ -403,6 +460,9 @@
     display: flex;
     flex-wrap: wrap;
     gap: var(--space-3);
+  }
+  .library {
+    scroll-margin-block-start: var(--anchor-offset);
   }
   .learning-status-icon {
     color: var(--muted-foreground);
@@ -657,6 +717,9 @@
     }
     .main-content {
       padding: var(--space-6) var(--space-4);
+    }
+    .app-footer {
+      padding: var(--space-4);
     }
     .topbar {
       padding-inline: var(--space-4);

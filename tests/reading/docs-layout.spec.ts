@@ -147,11 +147,11 @@ for (const app of ["demo", "production"] as const) {
       await page
         .getByRole("button", { name: "Close navigation", exact: true })
         .click();
-    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.locator("#main-content").evaluate((el) => el.scrollTo(0, 0));
     const bar = page.locator(".topbar");
-    await expect(bar).toHaveCSS("position", "sticky");
+    await expect(bar).toHaveCSS("position", "relative");
     await page.screenshot({ path: info.outputPath(`${app}-bar-top.png`) });
-    await page.evaluate(() => window.scrollTo(0, 1400));
+    await page.locator("#main-content").evaluate((el) => el.scrollTo(0, 1400));
     await expect
       .poll(() => bar.evaluate((el) => el.getBoundingClientRect().top))
       .toBe(0);

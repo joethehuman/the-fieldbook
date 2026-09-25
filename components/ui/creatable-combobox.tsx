@@ -153,7 +153,7 @@ export function CreatableCombobox({
           id={listId}
           role="listbox"
           aria-label={listLabel}
-          className="max-h-60 overflow-y-auto"
+          className="max-h-60 overflow-y-auto pe-3 [scrollbar-gutter:stable]"
         >
           {items.map((item, index) => (
             <div

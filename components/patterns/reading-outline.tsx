@@ -30,28 +30,30 @@ export function ReadingOutline({
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
+    const scrollport = ref.current?.closest<HTMLElement>(".main-content");
+    if (!scrollport) return;
     let frame = 0;
     const targets = headings
       .map((h) => document.getElementById(h.id))
       .filter((el): el is HTMLElement => !!el);
     const update = () => {
       frame = 0;
+      const viewport = scrollport.getBoundingClientRect();
       const offset = Math.max(
-        window.innerHeight * 0.25,
+        viewport.height * 0.25,
         (targets[0]
           ? parseFloat(getComputedStyle(targets[0]).scrollMarginTop)
           : 0) +
-          (parseFloat(
-            getComputedStyle(document.documentElement).scrollPaddingTop,
-          ) || 0) +
+          (parseFloat(getComputedStyle(scrollport).scrollPaddingTop) || 0) +
           2,
       );
       let current: HTMLElement | undefined = targets[0];
       for (const target of targets)
-        if (target.getBoundingClientRect().top <= offset) current = target;
+        if (target.getBoundingClientRect().top <= viewport.top + offset)
+          current = target;
       if (
-        window.scrollY + window.innerHeight >=
-        document.documentElement.scrollHeight - 2
+        scrollport.scrollTop + scrollport.clientHeight >=
+        scrollport.scrollHeight - 2
       )
         current = targets.at(-1);
       setActive(current?.id || "");
@@ -77,12 +79,12 @@ export function ReadingOutline({
       schedule();
     };
     fragment();
-    window.addEventListener("scroll", schedule, { passive: true });
+    scrollport.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     window.addEventListener("hashchange", fragment);
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", schedule);
+      scrollport.removeEventListener("scroll", schedule);
       window.removeEventListener("resize", schedule);
       window.removeEventListener("hashchange", fragment);
     };

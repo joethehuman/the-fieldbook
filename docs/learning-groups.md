@@ -6,6 +6,8 @@ Learning groups replaces the separate Groups and Required courses tabs. Create a
 
 Search the course library to add individual courses or published curricula. Reorder group items with drag handles, keyboard up/down on a handle, or the move buttons. The same controls order courses inside a curriculum. The curriculum builder is separate from the course builder. Course editors link to Learning groups; Update editors select audience groups directly. These are shared saved relationships, not independent copies.
 
+The Learning and Updates pickers can sort search results by title, creation date or last update to the published copy. The Updates picker can also keep items for this group first. Undated legacy items and curricula without saved dates follow dated results in date sorts. These controls do not change a group's recommended sequence or the order of learners' Updates. Course assignment timestamps already drive completion windows; the unassigned search results have no assignment date to sort by. Group-targeted Updates are relevance tags, not timed learning assignments.
+
 A curriculum is published when it is ready for the library and group use. Saving edits to a published playlist affects its linked groups; the editor shows how many. Unlink it before returning it to draft. Curriculum and group deletion dialogs describe their impact. Completion history is retained.
 
 ## Reporting teams

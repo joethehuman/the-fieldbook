@@ -10,9 +10,7 @@ async function noOverflow(page: Page) {
 }
 async function adminSection(page: Page, name: string) {
   // Reloads remount the lazy Administration bundle before its navigation.
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
@@ -27,9 +25,7 @@ async function admin(page: Page) {
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin"),
   );
   await page.goto("/#admin");
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
 }
 
 test("catalog: keyboard select, tab spacing, dialog stacking and ordering", async ({
@@ -131,6 +127,9 @@ test("learning groups: shared controls, save and reload", async ({
   await expect(
     page.getByRole("heading", { name: "Updates for this group" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Sort updates for this group" }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "Members", exact: true }).click();
   await noOverflow(page);
   await testInfo.attach("learning-group", {
@@ -149,6 +148,138 @@ test("learning groups: shared controls, save and reload", async ({
   await expect(
     page.getByRole("combobox", { name: "Parent learning group" }),
   ).toHaveText("Account executives");
+});
+
+test("admin menu scroll stays put while the new panel starts at the top", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop");
+  await page.setViewportSize({ width: 1280, height: 400 });
+  await admin(page);
+  const nav = page.locator('[data-slot="admin-navigation"] [role="tablist"]');
+  await expect(nav).toBeVisible();
+  await expect(page.locator("main h1")).toHaveClass(/sr-only/);
+  await expect(nav.getByText("Administration", { exact: true })).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText(
+    "Content, people, and the settings that keep your organization running.",
+  );
+  const panel = page.getByRole("tabpanel", { name: "Content" });
+  const shellPositions = await page.evaluate(() => ({
+    header: document.querySelector(".topbar")!.getBoundingClientRect().top,
+    footer: document.querySelector(".app-footer")!.getBoundingClientRect()
+      .bottom,
+    sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+  }));
+  await nav.hover();
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => nav.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  expect(await panel.evaluate((element) => element.scrollTop)).toBe(0);
+  const before = await nav.evaluate((element) => element.scrollTop);
+  await panel.hover();
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => panel.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  expect(await nav.evaluate((element) => element.scrollTop)).toBe(before);
+  await panel.evaluate((element) => (element.scrollTop = element.scrollHeight));
+  await page.mouse.wheel(0, 500);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(
+    await page.evaluate(() => ({
+      header: document.querySelector(".topbar")!.getBoundingClientRect().top,
+      footer: document.querySelector(".app-footer")!.getBoundingClientRect()
+        .bottom,
+      sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+    })),
+  ).toEqual(shellPositions);
+  await nav.getByRole("tab", { name: "Privacy", exact: true }).click();
+  await expect(page.getByRole("tabpanel", { name: "Privacy" })).toBeVisible();
+  expect(await nav.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect(
+    page.getByRole("tabpanel", { name: "Privacy" }),
+  ).toBeInViewport();
+});
+
+test("short pages keep the shared shell fixed at both scroll limits", async ({
+  page,
+}) => {
+  const data = freshWorkspace();
+  data.content = [];
+  await page.addInitScript((workspace) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+  }, data);
+  await page.goto("/#updates");
+  const main = page.locator("#main-content");
+  await expect(page.getByText("No updates published yet.")).toBeVisible();
+  const before = await page.evaluate(() => ({
+    header: document.querySelector(".topbar")!.getBoundingClientRect().top,
+    footer: document.querySelector(".app-footer")!.getBoundingClientRect()
+      .bottom,
+    sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+  }));
+  await main.hover();
+  await page.mouse.wheel(0, -600);
+  await page.mouse.wheel(0, 600);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(await main.evaluate((element) => element.scrollTop)).toBe(0);
+  expect(
+    await page.evaluate(() => ({
+      header: document.querySelector(".topbar")!.getBoundingClientRect().top,
+      footer: document.querySelector(".app-footer")!.getBoundingClientRect()
+        .bottom,
+      sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
+    })),
+  ).toEqual(before);
+});
+
+test("scrollbars leave room beside Admin feedback controls and cards", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop");
+  await page.setViewportSize({ width: 1280, height: 560 });
+  const data = freshWorkspace();
+  const item = data.content[0];
+  data.feedback = data.users.slice(0, 3).map((user, index) => ({
+    id: `scrollbar-feedback-${index}`,
+    userId: user.id,
+    contentId: item.id,
+    version: item.version,
+    rating: index === 0 ? "down" : "up",
+    comment: "Feedback alongside the scrollbar",
+    updatedAt: "2026-09-25T12:00:00Z",
+  }));
+  await page.addInitScript((workspace) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+  }, data);
+  await admin(page);
+  await adminSection(page, "Feedback");
+  const panel = page.getByRole("tabpanel", { name: "Feedback" });
+  await expect(panel.getByText("Feedback alongside the scrollbar")).toHaveCount(
+    3,
+  );
+  expect(await panel.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
+    true,
+  );
+  const distanceFromPanelEdge = (locator: ReturnType<Page["locator"]>) =>
+    locator.evaluate((el) => {
+      const panel = el.closest(".admin-panel")!;
+      return (
+        panel.getBoundingClientRect().right - el.getBoundingClientRect().right
+      );
+    });
+  await expect
+    .poll(() =>
+      distanceFromPanelEdge(panel.getByRole("button", { name: "Export CSV" })),
+    )
+    .toBeGreaterThanOrEqual(16);
+  expect(
+    await distanceFromPanelEdge(panel.locator('[data-slot="card"]').first()),
+  ).toBeGreaterThanOrEqual(16);
+  await page.screenshot({
+    path: testInfo.outputPath("feedback-scrollbar-clearance.png"),
+  });
 });
 
 test("admin destinations and editor render without overflow or errors", async ({
@@ -210,7 +341,7 @@ test("learner routes and narrow navigation remain usable", async ({
     ).toBeVisible();
     await noOverflow(page);
   }
-  await expect(page.locator(".main-content > footer > span")).toHaveText(
+  await expect(page.locator(".app-footer > span")).toHaveText(
     "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS",
   );
   await page.goto("/#courses");
@@ -449,9 +580,12 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
   await page.reload();
   await adminSection(page, "Docs navigation");
   await expect(
-    page.locator(
-      ".doc-order-list > li > .doc-order-list > [data-slot=reorder-row]:first-child",
-    ).nth(2).locator("strong"),
+    page
+      .locator(
+        ".doc-order-list > li > .doc-order-list > [data-slot=reorder-row]:first-child",
+      )
+      .nth(2)
+      .locator("strong"),
   ).toHaveText(firstText);
 });
 

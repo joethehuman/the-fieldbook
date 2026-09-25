@@ -30,13 +30,18 @@ export function ResponsiveTabsNavigation({
           ))}
         </SelectField>
       </Field>
-      <TabsList
-        variant="sidebar"
-        className="hidden @min-[48rem]/workspace:grid"
-        aria-label={label}
+      <div
+        className="hidden min-h-0 @min-[48rem]/workspace:grid"
+        data-slot="admin-navigation-desktop"
       >
-        {children}
-      </TabsList>
+        <TabsList
+          variant="sidebar"
+          className="min-h-0 content-start overflow-y-auto overscroll-contain pe-3 [scrollbar-gutter:stable]"
+          aria-label={label}
+        >
+          {children}
+        </TabsList>
+      </div>
     </div>
   );
 }

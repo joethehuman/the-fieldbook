@@ -13,6 +13,7 @@ import {
   ChevronRight,
   GraduationCap,
   LogOut,
+  LogIn,
   Menu,
   Newspaper,
   Settings,
@@ -142,7 +143,7 @@ export function ReaderShell({
             </NavigationButton>
           )}
           <AccountButton
-            name={context.user?.name || "Sign in with Google"}
+            name={context.user?.name || "Guest"}
             initials={
               context.user
                 ? context.user.name
@@ -157,10 +158,16 @@ export function ReaderShell({
                 ? "Administrator"
                 : context.user
                   ? "Learner"
-                  : "Save progress across devices"
+                  : undefined
             }
-            icon={<LogOut size={16} />}
-            actionLabel={context.user ? "Sign out" : "Sign in"}
+            icon={context.user ? <LogOut size={16} /> : <LogIn size={16} />}
+            actionLabel={context.user ? "Sign out" : "Sign in with Google"}
+            visibleAction={!context.user}
+            helpText={
+              context.user
+                ? undefined
+                : "Sign in to save course progress across devices and browsers."
+            }
             onClick={
               context.user
                 ? signOut
@@ -221,13 +228,13 @@ export function ReaderShell({
         <main id="main-content" className="main-content" tabIndex={-1}>
           {context.user && <ReaderGuestImport />}
           {children}
-          <footer>
-            {context.branding.name} <span>{context.branding.tagline}</span>
-            {context.branding.privacyUrl && (
-              <Link href={context.branding.privacyUrl}>Privacy policy</Link>
-            )}
-          </footer>
         </main>
+        <footer className="app-footer">
+          {context.branding.name} <span>{context.branding.tagline}</span>
+          {context.branding.privacyUrl && (
+            <Link href={context.branding.privacyUrl}>Privacy policy</Link>
+          )}
+        </footer>
       </div>
     </div>
   );

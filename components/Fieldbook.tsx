@@ -49,6 +49,7 @@ import {
   ChevronRight,
   Settings,
   LogOut,
+  LogIn,
   ArrowLeftRight,
   X,
   Menu,
@@ -301,7 +302,7 @@ export default function Fieldbook({
         : `${window.location.pathname}${query}#${path}`,
     );
     acceptedUrl.current = window.location.href;
-    window.scrollTo({ top: 0 });
+    document.getElementById("main-content")?.scrollTo({ top: 0 });
   }
   async function persist(
     next: Workspace,
@@ -608,29 +609,38 @@ export default function Fieldbook({
             actionLabel={
               runtime
                 ? uid === "guest"
-                  ? "Sign in"
+                  ? "Sign in with Google"
                   : "Sign out"
                 : "Switch demo profile"
             }
+            visibleAction={!!runtime && uid === "guest"}
             initials={initials(user.name)}
-            name={
-              runtime && uid === "guest" ? "Sign in with Google" : user.name
-            }
+            name={runtime && uid === "guest" ? "Guest" : user.name}
             description={
-              user.role === "admin"
-                ? "Administrator"
-                : user.role === "manager"
-                  ? "Sales Director"
-                  : runtime
-                    ? uid === "guest"
-                      ? "Save progress across devices"
-                      : "Learner"
-                    : "Account Executive"
+              runtime && uid === "guest"
+                ? undefined
+                : user.role === "admin"
+                  ? "Administrator"
+                  : user.role === "manager"
+                    ? "Sales Director"
+                    : runtime
+                      ? "Learner"
+                      : "Account Executive"
             }
-            icon={runtime ? <LogOut size={16} /> : <ArrowLeftRight size={16} />}
+            icon={
+              runtime && uid === "guest" ? (
+                <LogIn size={16} />
+              ) : runtime ? (
+                <LogOut size={16} />
+              ) : (
+                <ArrowLeftRight size={16} />
+              )
+            }
             helpText={
               runtime
-                ? undefined
+                ? uid === "guest"
+                  ? "Sign in to save course progress across devices and browsers."
+                  : undefined
                 : "Demo workspace. Use the switch button to try learner, manager and admin views."
             }
           />
@@ -806,7 +816,14 @@ export default function Fieldbook({
             {error}
           </Alert>
         )}
-        <main id="main-content" className="main-content" tabIndex={-1}>
+        <main
+          id="main-content"
+          className={
+            "main-content" +
+            (view === "admin" && user.role === "admin" ? " admin-content" : "")
+          }
+          tabIndex={-1}
+        >
           {view === "admin" && user.role === "admin" ? (
             <ReportAvailability.Provider value={reportIssue}>
               <Admin
@@ -1041,9 +1058,7 @@ export default function Fieldbook({
               progress={progress}
               onOpen={(id) => navigate("learn", id)}
               onCurriculum={(id) => navigate("learn", `curriculum:${id}`)}
-              publicLearning={uid === "guest"}
               guest={uid === "guest"}
-              onSignIn={runtime?.signIn || logout}
             />
           ) : view === "docs" ? (
             <>
@@ -1124,24 +1139,24 @@ export default function Fieldbook({
               />
             </>
           )}
-          <footer>
-            {branding.name} <span>{branding.tagline}</span>
-            {privacyHref(branding) && (
-              <a href={privacyHref(branding)!}>Privacy policy</a>
-            )}
-            {!runtime && (
-              <Button
-                variant="ghost"
-                onClick={(event) => {
-                  demoTrigger.current = event.currentTarget;
-                  setShowDemo(true);
-                }}
-              >
-                About this demo
-              </Button>
-            )}
-          </footer>
         </main>
+        <footer className="app-footer">
+          {branding.name} <span>{branding.tagline}</span>
+          {privacyHref(branding) && (
+            <a href={privacyHref(branding)!}>Privacy policy</a>
+          )}
+          {!runtime && (
+            <Button
+              variant="ghost"
+              onClick={(event) => {
+                demoTrigger.current = event.currentTarget;
+                setShowDemo(true);
+              }}
+            >
+              About this demo
+            </Button>
+          )}
+        </footer>
       </div>
       <Dialog open={showDemo} onOpenChange={setShowDemo}>
         <DialogContent

@@ -166,11 +166,7 @@ async function setup(
       { data, id: user.id },
     );
   await page.goto(
-    production
-      ? "/team"
-      : role === "manager"
-        ? "/#team"
-        : "/#admin",
+    production ? "/team" : role === "manager" ? "/#team" : "/#admin",
   );
   if (production && role === "admin") {
     const menu = page.getByRole("button", { name: "Open navigation" });
@@ -509,9 +505,7 @@ test("failed progress update disables exports until the complete report reloads"
   const menu = page.getByRole("button", { name: "Open navigation" });
   if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
   await page.getByRole("button", { name: "Manage organization" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Progress");
   await expect(
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -562,8 +556,10 @@ test("app bar stays visible over long administration reports", async ({
   await setup(page, info, "admin", data);
   await section(page, "Progress");
   await page.screenshot({ path: info.outputPath("bar-report-top.png") });
-  await page.evaluate(() => scrollTo(0, 1000));
-  expect(await page.evaluate(() => scrollY)).toBeGreaterThan(100);
+  const panel = page.getByRole("tabpanel", { name: "Progress" });
+  await panel.evaluate((el) => el.scrollTo(0, 1000));
+  expect(await panel.evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
   expect(
     await page
       .locator(".topbar")
@@ -617,9 +613,7 @@ test("People fieldset footers preserve default-stage saving in both applications
     if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   } else await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, production ? "People" : "Demo profiles");
   await expect(group.getByRole("combobox")).toContainText(
     "New user — onboarding window",

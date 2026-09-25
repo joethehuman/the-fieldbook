@@ -22,7 +22,7 @@ import { CourseRow } from "@/components/patterns/course-row";
 
 import { DataTable } from "@/components/patterns/data-table";
 import { AccountButton } from "@/components/patterns/account-button";
-import { ArrowRight, Layers, LogOut, Settings } from "lucide-react";
+import { ArrowRight, Layers, LogIn, LogOut, Settings } from "lucide-react";
 import {
   ContentCardFooter,
   StatusActions,
@@ -464,13 +464,23 @@ export default function ComponentCatalog() {
                 </TabsTrigger>
               </TabsList>
             </Tabs>
-            <AccountButton
-              actionLabel="Sign out"
-              initials="OA"
-              name="Organization Administrator with a long name"
-              description="Administrator"
-              icon={<LogOut />}
-            />
+            <div className="grid gap-4">
+              <AccountButton
+                actionLabel="Sign out"
+                initials="OA"
+                name="Organization Administrator with a long name"
+                description="Administrator"
+                icon={<LogOut />}
+              />
+              <AccountButton
+                actionLabel="Sign in with Google"
+                initials="G"
+                name="Guest"
+                helpText="Sign in to save course progress across devices and browsers."
+                visibleAction
+                icon={<LogIn />}
+              />
+            </div>
           </div>
           <StatusActions
             actions={<Button variant="link">Review saved changes</Button>}

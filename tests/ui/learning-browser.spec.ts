@@ -88,6 +88,10 @@ test("For you uses curriculum cards, one channel picker and a simple ordered pag
   await expect(
     page.getByRole("group", { name: "Course channels" }),
   ).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Channel" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "View in progress" }),
+  ).toHaveCount(0);
   if (info.project.name === "desktop") {
     const summary = await home.locator('[data-slot="card"]').boundingBox();
     const card = await home.locator(".course-card").boundingBox();
@@ -152,8 +156,10 @@ test("optional activity is resumable and all completions remain available at 100
   ).toHaveAttribute("aria-valuenow", "100");
   await expect(page.locator(".for-you .course-card")).toHaveCount(0);
 
+  await page.getByRole("button", { name: "View all for you" }).click();
   await page
-    .getByRole("button", { name: "View in progress", exact: true })
+    .getByRole("group", { name: "Course views", exact: true })
+    .getByRole("button", { name: "In progress", exact: true })
     .click();
   const library = page.locator(".library");
   await expect(library.locator(".course-card")).toHaveCount(1);
@@ -277,8 +283,10 @@ test("completion removes a course from the home queue and remains visible in bot
       .locator('.for-you [data-slot="card"]')
       .getByRole("progressbar", { name: "Assigned course progress" }),
   ).toHaveAttribute("aria-valuenow", "67");
+  await page.getByRole("button", { name: "View all for you" }).click();
   await page
-    .getByRole("button", { name: "View completed", exact: true })
+    .getByRole("group", { name: "Course views", exact: true })
+    .getByRole("button", { name: "Completed", exact: true })
     .click();
   await expect(page.locator(".library .course-card")).toHaveCount(3);
   await page

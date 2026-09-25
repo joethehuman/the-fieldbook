@@ -3,7 +3,7 @@ import { freshWorkspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
 
 async function openSettings(page: Page) {
-  await expect(page.getByRole("heading", { name: "Administration", exact: true })).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   const picker = page.getByRole("combobox", { name: "Administration section" });
   if (await picker.isVisible()) {
     await picker.click();

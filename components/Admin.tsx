@@ -463,14 +463,8 @@ export default function Admin({
     setQuery("");
   }
   return (
-    <>
-      <PageHeader>
-        <span className="eyebrow">ORGANIZATION</span>
-        <h1>Administration</h1>
-        <p>
-          Content, people, and the settings that keep your organization running.
-        </p>
-      </PageHeader>
+    <div className="admin-workspace">
+      <h1 className="sr-only">Administration</h1>
       {openingTab && <p role="status">Opening section…</p>}
       <Tabs
         className="admin-layout"
@@ -1071,7 +1065,7 @@ export default function Admin({
           </DialogContent>
         )}
       </Dialog>
-    </>
+    </div>
   );
 }
 export function Editor({

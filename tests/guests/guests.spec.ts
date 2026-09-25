@@ -143,10 +143,12 @@ async function setup(
     if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
     await page.getByRole("button", { name: "Manage organization" }).click();
   }
-  const ready = role === "admin" ? "Administration" : "Courses";
-  await expect(
-    page.getByRole("heading", { name: ready, exact: true }).first(),
-  ).toBeVisible();
+  if (role === "admin")
+    await expect(page.locator(".admin-layout")).toBeVisible();
+  else
+    await expect(
+      page.getByRole("heading", { name: "Courses", exact: true }).first(),
+    ).toBeVisible();
   return {
     production,
     fail: (value: string) => {
@@ -314,6 +316,21 @@ test("guest Updates and curriculum learning, browser progress and account transi
     /past their target|days left in onboarding/,
   );
   await shot(page, info, "guest-courses");
+  if (f.production) {
+    const open = page.getByRole("button", { name: "Open navigation" });
+    if (await open.isVisible()) await open.click();
+    const account = page.locator(".sidebar-bottom");
+    await expect(account.getByText("Guest", { exact: true })).toBeVisible();
+    await expect(account).not.toContainText("Progress stays in this browser");
+    await expect(
+      account.getByRole("button", { name: "Sign in with Google" }),
+    ).toBeVisible();
+    await expect(account).toContainText(
+      "Sign in to save course progress across devices and browsers.",
+    );
+    const close = page.getByRole("button", { name: "Close navigation" });
+    if (await close.isVisible()) await close.click();
+  }
   await page
     .locator(".for-you")
     .getByRole("button", { name: /Guest introduction/ })
@@ -371,6 +388,11 @@ test("no selection and publication changes preserve a usable library with honest
     page.getByRole("button", { name: /Foundation course/ }),
   ).toBeVisible();
   await shot(page, info, "guest-empty");
+  await expect(
+    page.getByRole("button", { name: "View all for you" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Browse all courses" }).click();
+  await expect(page.locator("#all-courses")).toBeInViewport();
   await nav(page, "Updates");
   await expect(
     page.getByRole("heading", { name: "For you", exact: true }),

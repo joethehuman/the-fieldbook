@@ -16,13 +16,21 @@ async function revealed(target: Locator) {
     .poll(async () =>
       target.evaluate((el) => {
         const top = el.getBoundingClientRect().top;
+        const panel = el.closest(".admin-panel")?.getBoundingClientRect();
+        const footer = document
+          .querySelector(".app-footer")
+          ?.getBoundingClientRect();
         const bar =
           parseFloat(
             getComputedStyle(document.documentElement).getPropertyValue(
               "--app-bar-height",
             ),
           ) || 64;
-        return top >= bar && top < innerHeight / 2;
+        return (
+          top >= Math.max(bar, panel?.top ?? bar) &&
+          top <
+            Math.min(panel?.bottom ?? innerHeight, footer?.top ?? innerHeight)
+        );
       }),
     )
     .toBe(true);
@@ -53,9 +61,7 @@ test("admin destinations reveal details and keep filters and fieldset footers co
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   }, data);
   await page.goto("/#admin");
-  await expect(
-    page.getByRole("heading", { name: "Administration", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Progress");
   await page
     .getByRole("button", { name: "View courses", exact: true })
@@ -101,6 +107,9 @@ test("admin destinations reveal details and keep filters and fieldset footers co
   ).toHaveAttribute("aria-describedby", /team-manager-guidance/);
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
 
+  if (info.project.name === "desktop") {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+  }
   await section(page, "Feedback");
   const rating = page.getByRole("combobox", { name: "Rating", exact: true });
   await rating.click();
@@ -124,10 +133,35 @@ test("admin destinations reveal details and keep filters and fieldset footers co
     const controls = page.locator(
       '[data-slot="filter-bar"] [role="combobox"], [data-slot="filter-bar"] input',
     );
-    const tops = await controls.evaluateAll((nodes) =>
-      nodes.map((n) => n.getBoundingClientRect().top),
+    const bounds = await controls.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const { top, left, right } = node.getBoundingClientRect();
+        const bar = node
+          .closest('[data-slot="filter-bar"]')!
+          .getBoundingClientRect();
+        return { top, left, right, barLeft: bar.left, barRight: bar.right };
+      }),
     );
-    expect(Math.max(...tops) - Math.min(...tops)).toBeLessThan(2);
+    const rowTops: number[] = [];
+    for (const { top } of bounds) {
+      if (!rowTops.some((rowTop) => Math.abs(rowTop - top) < 2)) {
+        rowTops.push(top);
+      }
+    }
+    expect(rowTops.length).toBeGreaterThan(1);
+    expect(rowTops.length).toBeLessThan(bounds.length);
+    for (const bound of bounds) {
+      expect(bound.left).toBeGreaterThanOrEqual(bound.barLeft);
+      expect(bound.right).toBeLessThanOrEqual(bound.barRight);
+    }
+    for (const rowTop of rowTops) {
+      const row = bounds
+        .filter(({ top }) => Math.abs(top - rowTop) < 2)
+        .sort((a, b) => a.left - b.left);
+      for (let index = 1; index < row.length; index += 1) {
+        expect(row[index - 1].right).toBeLessThanOrEqual(row[index].left);
+      }
+    }
   }
   expect(
     await page.evaluate(

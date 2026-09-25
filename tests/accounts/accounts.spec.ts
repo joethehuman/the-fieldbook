@@ -106,10 +106,12 @@ test("public browse, alternate brand and long-name fallback", async ({
   if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
   await expect(
-    page.getByRole("button", { name: "Sign in", exact: true }).first(),
+    page
+      .getByRole("button", { name: "Sign in with Google", exact: true })
+      .first(),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Sign in", exact: true })
+    .getByRole("button", { name: "Sign in with Google", exact: true })
     .first()
     .click();
   await expect(
@@ -454,9 +456,7 @@ test("shared settings library and connection states work in the server app", asy
 }, info) => {
   await login(page);
   async function section(name: string) {
-    await expect(
-      page.getByRole("heading", { name: "Administration", exact: true }),
-    ).toBeVisible();
+    await expect(page.locator(".admin-layout")).toBeVisible();
     const picker = page.getByRole("combobox", {
       name: "Administration section",
     });

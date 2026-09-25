@@ -60,14 +60,7 @@ export function Article({
       <div className="reading-columns">
         <article className="article">
           <header className="article-header">
-            <div className="article-navigation">
-              {back}
-              <span>
-                {placement
-                  ? sectionPath(placement, allSections)
-                  : item.category}
-              </span>
-            </div>
+            <div className="article-navigation">{back}</div>
             <h1>{item.title}</h1>
             <p className="article-lede">{item.summary}</p>
             <div className="article-meta">
@@ -81,6 +74,12 @@ export function Article({
                   size="sm"
                 />
                 <span>{name}</span>
+              </span>
+              <span aria-hidden="true">·</span>
+              <span>
+                {placement
+                  ? sectionPath(placement, allSections)
+                  : item.category}
               </span>
               <span aria-hidden="true">·</span>
               <span>
