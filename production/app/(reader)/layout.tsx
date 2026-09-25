@@ -2,6 +2,7 @@ import { ReaderShell } from "@/components/reader/ReaderShell";
 import {
   readerContext,
   readerCourseItem,
+  readerCurriculum,
   readerItem,
   readerUpdateItem,
 } from "@production/lib/reader";
@@ -22,7 +23,7 @@ export default async function Layout({
   if (
     parts.length < 1 ||
     parts.length > 2 ||
-    (section !== "docs" && section !== "updates" && section !== "courses")
+    !["docs", "updates", "courses", "curricula"].includes(section)
   )
     notFound();
 
@@ -32,7 +33,9 @@ export default async function Layout({
     const id = decodeURIComponent(parts[1]);
     if (section === "docs") await readerItem("doc", id);
     else if (section === "updates") await readerUpdateItem(id);
-    else await readerCourseItem(id);
+    else if (section === "courses") await readerCourseItem(id);
+    else if (section === "curricula") await readerCurriculum(id);
+    else notFound();
   }
   const {
     user,
@@ -43,6 +46,7 @@ export default async function Layout({
     forYou,
     otherUpdates,
     courseTitles,
+    curriculumTitles,
   } = await readerContext(`/${section}`);
   return (
     <ReaderShell
@@ -57,6 +61,7 @@ export default async function Layout({
           title,
         })),
         courseTitles,
+        curriculumTitles,
       }}
     >
       {children}

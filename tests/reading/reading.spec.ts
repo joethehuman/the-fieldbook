@@ -69,6 +69,100 @@ async function fixture(request: any, extra = {}) {
   });
 }
 test.beforeEach(async ({ request }) => fixture(request));
+
+test("hosted privacy stays in the app shell and returns to Courses without a workspace load", async ({
+  page,
+  request,
+}, testInfo) => {
+  await fixture(request, {
+    settings: {
+      access: "public",
+      name: "Acme Learning",
+      privacy: {
+        draft: {
+          mode: "hosted",
+          operatorName: "",
+          contactEmail: "",
+          body: "",
+          url: "",
+        },
+        published: {
+          mode: "hosted",
+          operatorName: "Acme",
+          contactEmail: "help@example.test",
+          body: "Our published policy.",
+          url: "",
+        },
+        publishedAt: "2026-09-25T00:00:00Z",
+      },
+    },
+  });
+  let documentNavigations = 0;
+  let workspaceReads = 0;
+  page.on("request", (entry) => {
+    if (entry.isNavigationRequest()) documentNavigations++;
+    if (entry.url().includes("/api/workspace")) workspaceReads++;
+  });
+  await page.goto("/courses");
+  await page.getByRole("link", { name: "Privacy policy" }).click();
+  await expect(page).toHaveURL(/\/privacy$/);
+  await expect(page.getByText("Our published policy.")).toBeVisible();
+  await expect(page.locator(".sidebar")).toHaveCount(1);
+  await page.screenshot({ path: testInfo.outputPath("privacy-shell.png") });
+  await page.getByRole("link", { name: "← Acme Learning" }).click();
+  await expect(page).toHaveURL(/\/courses$/);
+  await expect(
+    page.getByRole("heading", { name: "Courses", exact: true }),
+  ).toBeVisible();
+  expect(documentNavigations).toBe(1);
+  expect(workspaceReads).toBe(0);
+});
+
+test("published curriculum opens in the reader shell with guest progress and no workspace load", async ({
+  page,
+  request,
+}, testInfo) => {
+  await fixture(request, {
+    settings: { access: "public" },
+    curricula: [
+      {
+        id: "intro",
+        name: "Introduction",
+        description: "Start here.",
+        status: "published",
+        courseIds: [ids[2]],
+      },
+    ],
+  });
+  await page.addInitScript((id) => {
+    localStorage.setItem(
+      "fieldbook.guest-progress.v1",
+      JSON.stringify([
+        {
+          content_id: id,
+          version: 1,
+          lessons: ["first"],
+          passed: false,
+          attempts: [],
+        },
+      ]),
+    );
+  }, ids[2]);
+  let workspaceReads = 0;
+  page.on("request", (entry) => {
+    if (entry.url().includes("/api/workspace")) workspaceReads++;
+  });
+  await page.goto("/curricula/intro");
+  await expect(page.getByRole("heading", { name: "Introduction" })).toBeVisible();
+  await expect(page.locator(".sidebar")).toHaveCount(1);
+  await expect(page.getByText("In progress", { exact: true }).first()).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("curriculum-shell.png") });
+  await page.getByRole("button", { name: "Back to courses" }).click();
+  await expect(page).toHaveURL(/\/courses$/);
+  expect(workspaceReads).toBe(0);
+  expect((await request.get("/curricula/missing")).status()).toBe(404);
+});
+
 for (const signedIn of [false, true]) {
   test(`${signedIn ? "signed-in" : "guest"} reader links keep the shell, history and compact content`, async ({
     page,

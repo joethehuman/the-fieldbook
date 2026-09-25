@@ -16,6 +16,7 @@ import { brandingFromSettings } from "@/lib/branding";
 import {
   effectiveGroups,
   type Content,
+  type Curriculum,
   type Progress,
   type User,
 } from "@/lib/types";
@@ -196,6 +197,12 @@ export const readerContext = cache(async (destination: string) => {
     courseTitles: rows
       .filter((item) => item.kind === "course" && item.status === "published")
       .map(({ id, title }) => ({ id, title })),
+    curriculumTitles: (config.curricula || [])
+      .filter((item: { status: string }) => item.status === "published")
+      .map((item: { id: string; name: string }) => ({
+        id: item.id,
+        title: item.name,
+      })),
   };
 });
 
@@ -302,6 +309,15 @@ export const readerCourses = cache(async () => {
       attempts: row.attempts,
     })) as Progress[],
   };
+});
+
+export const readerCurriculum = cache(async (id: string) => {
+  const data = await readerCourses();
+  const curriculum = data.curricula.find(
+    (item: Curriculum) => item.id === id && item.status === "published",
+  );
+  if (!curriculum) notFound();
+  return { data, curriculum };
 });
 
 const cachedBody = unstable_cache(

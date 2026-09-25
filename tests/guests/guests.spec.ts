@@ -517,6 +517,16 @@ test("guest workspace loading, failure and retry remain recoverable", async ({
   await expect(
     page.getByRole("heading", { name: "Just a sec…" }),
   ).toBeVisible();
+  const box = await page.locator(".loading-content").boundingBox();
+  const viewport = page.viewportSize();
+  expect(box).not.toBeNull();
+  expect(viewport).not.toBeNull();
+  expect(Math.abs(box!.x + box!.width / 2 - viewport!.width / 2)).toBeLessThan(
+    2,
+  );
+  expect(
+    Math.abs(box!.y + box!.height / 2 - viewport!.height / 2),
+  ).toBeLessThan(2);
   await shot(page, info, "guest-loading");
   await expect(page.locator(".for-you")).toContainText("Guest introduction");
   f.delay(0);
