@@ -287,6 +287,13 @@ test("Courses share reader navigation and show the signed-in account immediately
   ).toBeVisible();
   await expect(page.getByText(/1 course completed/)).toBeVisible();
   await expect(page.getByText("Assigned courses complete")).toBeVisible();
+  await expect(page.locator(".sidebar .logo")).toHaveText("Acme Learning");
+  await expect(
+    page.locator(".sidebar .logo img, .sidebar .logo svg"),
+  ).toHaveCount(0);
+  await expect(
+    page.getByText("YOUR ORGANIZATION", { exact: true }),
+  ).toHaveCount(0);
   await page.screenshot({
     path: info.outputPath("courses.png"),
     fullPage: true,
@@ -863,7 +870,10 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
     passed: true,
   });
   expect(saved[0].attempts).toHaveLength(2);
-  await page.getByRole("button", { name: /Back to course/ }).first().click();
+  await page
+    .getByRole("button", { name: /Back to course/ })
+    .first()
+    .click();
   await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}$`));
   await page.getByRole("link", { name: /Back to courses/ }).click();
   await expect(page.getByText(/1 course completed/)).toBeVisible();
@@ -874,7 +884,7 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
   ).toBeVisible();
 });
 
-test("legacy aliases, curriculum destinations and existing logo metadata", async ({
+test("legacy aliases, curriculum destinations and name-only metadata", async ({
   request,
 }) => {
   await fixture(request, { settings: { access: "public" } });
@@ -884,9 +894,7 @@ test("legacy aliases, curriculum destinations and existing logo metadata", async
     );
     expect(response.status()).toBe(200);
     const html = await response.text();
-    expect(html).toContain(
-      'property="og:image" content="http://localhost:3131/api/branding/logo?v=',
-    );
+    expect(html).not.toContain("/api/branding/logo");
     expect(html).not.toContain("SECRET POLICY DRAFT");
     if (index === 2) {
       expect(html).toContain(`?lesson=first&amp;curriculum=intro`);

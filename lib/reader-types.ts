@@ -17,7 +17,6 @@ export type ReaderShellContext = {
   } | null;
   branding: {
     name: string;
-    logoUrl: string;
     accent: string;
     tagline: string;
     privacyUrl: string | null;

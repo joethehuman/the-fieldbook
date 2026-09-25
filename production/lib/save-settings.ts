@@ -2,7 +2,6 @@ import "server-only";
 import type { User } from "@/lib/types";
 import { requireAdmin, HttpError } from "./auth";
 import { db, check } from "./db";
-import { readyLogo } from "./branding-logo";
 import { settingsSchema } from "./schemas";
 import {
   availableDocSections,
@@ -24,7 +23,6 @@ export async function saveSettings(
     );
   if (!Number.isInteger(a.expected) || a.expected < 1)
     throw new HttpError(400, "A settings revision is required.");
-  if (parsed.data.logoUrl) await readyLogo(parsed.data.logoUrl);
   const { data: config, error: configError } = await db()
     .from("fb_config")
     .select("settings,groups,governance_revision")
