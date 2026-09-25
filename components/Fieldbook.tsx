@@ -271,8 +271,7 @@ export default function Fieldbook({
     if (!(await canLeave())) return;
     if (
       runtime &&
-      (v === "admin" ||
-        initialReading ||
+      (initialReading ||
         initialAdmin ||
         (id &&
           !id.startsWith("curriculum:") &&
