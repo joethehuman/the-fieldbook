@@ -34,8 +34,18 @@ test("Docs sections drag by their handle and save the resulting row order", asyn
   }
   const rows = page.locator(".doc-order-list > li > .doc-order-list > [data-slot=reorder-row]:first-child");
   expect(await rows.count()).toBeGreaterThan(1);
+  await rows.nth(1).scrollIntoViewIfNeeded();
+  await rows.first().getByRole("button", { name: /^Reorder / }).scrollIntoViewIfNeeded();
+  await page.locator(".admin-panel").evaluate((element) => { element.scrollTop += 120; });
   const first = await rows.first().locator("strong").innerText();
-  await rows.first().getByRole("button", { name: /^Reorder / }).dragTo(rows.nth(1));
+  const source = await rows.first().getByRole("button", { name: /^Reorder / }).boundingBox();
+  const target = await rows.nth(1).boundingBox();
+  expect(source && target).toBeTruthy();
+  await page.mouse.move(source!.x + source!.width / 2, source!.y + source!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(source!.x + source!.width / 2 + 12, source!.y + source!.height / 2 + 12, { steps: 5 });
+  await page.mouse.move(target!.x + 20, target!.y + 20, { steps: 12 });
+  await page.mouse.up();
   await expect(rows.nth(1).locator("strong")).toHaveText(first);
   await page.getByRole("button", { name: "Save settings", exact: true }).click();
   await page.reload();
