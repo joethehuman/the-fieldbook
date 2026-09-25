@@ -186,7 +186,7 @@ export default function Fieldbook({
         savedProfile &&
           (DEMO_PROFILE_IDS.includes(savedProfile) || savedProfile === "guest")
           ? savedProfile
-          : "demo-learner",
+          : null,
       );
     } catch (e) {
       setError((e as Error).message);
@@ -774,18 +774,6 @@ export default function Fieldbook({
                     </Button>
                   )}
                 </SearchField>
-                {!runtime && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(event) => {
-                      demoTrigger.current = event.currentTarget;
-                      setShowDemo(true);
-                    }}
-                  >
-                    Demo organization
-                  </Button>
-                )}
               </Toolbar>
             }
           >
@@ -1151,7 +1139,10 @@ export default function Fieldbook({
             ))}
           {!runtime && (
             <Button
-              variant="ghost"
+              variant="link"
+              size="sm"
+              className="text-xs font-normal text-muted-foreground"
+              type="button"
               onClick={(event) => {
                 demoTrigger.current = event.currentTarget;
                 setShowDemo(true);

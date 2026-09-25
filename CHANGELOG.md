@@ -4,6 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Open a new demo session on the profile chooser, remove the redundant top-bar demo button, and keep “About this demo” in the footer at the surrounding text size.
 - Center the shared opening message and loading bar. Show the hosted privacy policy in the app shell and return to Courses without booting the legacy workspace. Open curricula in the reader shell, and prefetch likely course destinations while preserving private access checks.
 
 - Keep the shared header, footer and sidebar stable at scroll limits across the demo and production app. Page content scrolls within the viewport, with separate scroll areas for Administration sections and their selected panel. Scrollable surfaces leave room for overlay scrollbars beside their content and controls.

@@ -21,6 +21,9 @@
     overscroll-behavior: none;
     scrollbar-gutter: auto;
   }
+  html:has(.loading) {
+    scrollbar-gutter: auto;
+  }
   body {
     margin: 0;
     background: var(--background);
