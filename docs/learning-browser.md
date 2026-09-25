@@ -1,8 +1,8 @@
 # Learning browser and curriculum navigation
 
-The Courses home keeps an assigned-only completion summary and an unfinished queue. An assigned curriculum appears as one card in place of its constituent courses. Standalone assignments remain cards. The summary counts distinct courses, even when curricula overlap. Completed curricula disappear from the home queue and remain available in the full For you view.
+The Courses home keeps an assigned-only completion card beneath For you and an unfinished queue. With no assigned courses, that card points to the full library below. An assigned curriculum appears as one card in place of its constituent courses. Standalone assignments remain cards. The summary counts distinct courses, even when curricula overlap. Completed curricula disappear from the home queue and remain available through the card's View all for you link.
 
-The full browser has For you, In progress, Completed and All courses views. For you includes all assigned cards by default, with Hide completed beside the result count. In progress and Completed include optional courses. Search, one Channel dropdown and Sort share a labeled toolbar. Home uses channel headings without repeating channel filter buttons. Browse curricula opens the published curriculum collection.
+The full browser has For you, In progress, Completed and All courses views. For you includes all assigned cards by default, with Hide completed beside the result count. In progress and Completed include optional courses. Search, one Channel dropdown and Sort share a labeled toolbar on the home library and full browser. Home keeps its channel headings and shows the total published-course count beside All courses. Browse curricula opens the published curriculum collection.
 
 Curriculum cards open a simple page with description, completion, next-course action and an ordered launch list. All available published courses remain accessible, including completed ones. The next action chooses the first incomplete course. Course pages return to the curriculum, including after reload. Direct curriculum URLs work in demo and server routing.
 

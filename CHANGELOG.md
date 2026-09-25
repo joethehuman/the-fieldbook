@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep the Administration menu heading visible while its section list scrolls independently, simplify guest sign-in and Courses home, move Docs/Updates category into article metadata, and add date and title sorting to learning-group content pickers.
+
 - Let visitors to public installations rate and comment on published Docs, Updates and Courses. Save guest feedback under a pseudonymous browser token and include it in administrator reports. Apply `20260924150351_anonymous_feedback.sql` before deploying this change to an existing installation.
 
 - Keep Courses, Docs and Updates in one reader shell with a compact Courses catalog and current learner progress. Accept course progress submissions from either trusted Vercel preview address so guest lessons and quizzes work when opened from a deployment link.

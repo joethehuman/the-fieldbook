@@ -1,6 +1,7 @@
 "use client";
 import { Note } from "@/components/ui/note";
 import { FormField } from "@/components/patterns/form-field";
+import { BrowseToolbar } from "@/components/patterns/layout";
 import { useToast } from "./ui/toast";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SelectField } from "./ui/select";
@@ -23,6 +24,10 @@ import {
   type LearningItem,
 } from "@/lib/types";
 import { expandLearning, groupItems } from "@/lib/learning-groups";
+import {
+  sortGroupBrowseItems,
+  type GroupBrowseSort,
+} from "@/lib/group-browse-sort";
 import { Button } from "./ui/button";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import type { LearningHandler } from "./Assignments";
@@ -49,6 +54,9 @@ export default function LearningGroups({
   const [selected, setSelected] = useState(initialGroup || "");
   const [tab, setTab] = useState("learning");
   const [query, setQuery] = useState("");
+  const [learningSort, setLearningSort] = useState<GroupBrowseSort>("title");
+  const [updateSort, setUpdateSort] =
+    useState<GroupBrowseSort>("assigned-first");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -465,33 +473,63 @@ export default function LearningGroups({
                         below.
                       </EmptyState>
                     )}
-                    <FormField label="Search courses and curricula">
-                      <Input
-                        type="search"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search the library"
-                      />
-                    </FormField>
+                    <BrowseToolbar>
+                      <FormField label="Search courses and curricula">
+                        <Input
+                          type="search"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="Search the library"
+                        />
+                      </FormField>
+                      <FormField label="Sort results">
+                        <SelectField
+                          aria-label="Sort courses and curricula"
+                          value={learningSort}
+                          onValueChange={(value) =>
+                            setLearningSort(value as GroupBrowseSort)
+                          }
+                        >
+                          <option value="title">Title A–Z</option>
+                          <option value="updated-newest">
+                            Recently updated
+                          </option>
+                          <option value="updated-oldest">
+                            Oldest update first
+                          </option>
+                          <option value="created-newest">
+                            Recently created
+                          </option>
+                          <option value="created-oldest">
+                            Oldest creation first
+                          </option>
+                        </SelectField>
+                      </FormField>
+                    </BrowseToolbar>
                     <div className="learning-search-results">
-                      {[
-                        ...published
-                          .filter((c) => c.kind === "course")
-                          .map((c) => ({
-                            kind: "course" as const,
-                            id: c.id,
-                            name: c.title,
-                            detail: c.category,
-                          })),
-                        ...curricula
-                          .filter((c) => c.status === "published")
-                          .map((c) => ({
-                            kind: "curriculum" as const,
-                            id: c.id,
-                            name: c.name,
-                            detail: `${c.courseIds.length} courses`,
-                          })),
-                      ]
+                      {sortGroupBrowseItems(
+                        [
+                          ...published
+                            .filter((c) => c.kind === "course")
+                            .map((c) => ({
+                              kind: "course" as const,
+                              id: c.id,
+                              name: c.title,
+                              detail: c.category,
+                              createdAt: c.createdAt,
+                              updatedAt: c.updatedAt,
+                            })),
+                          ...curricula
+                            .filter((c) => c.status === "published")
+                            .map((c) => ({
+                              kind: "curriculum" as const,
+                              id: c.id,
+                              name: c.name,
+                              detail: `${c.courseIds.length} courses`,
+                            })),
+                        ],
+                        learningSort,
+                      )
                         .filter(
                           (i) =>
                             matches(i.name + " " + i.detail) &&
@@ -534,64 +572,93 @@ export default function LearningGroups({
                       These updates appear in For you, newest first. Updates
                       never affect learning completion.
                     </FieldDescription>
-                    <FormField label="Find an update">
-                      <Input
-                        type="search"
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search updates"
-                      />
-                    </FormField>
+                    <BrowseToolbar>
+                      <FormField label="Find an update">
+                        <Input
+                          type="search"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="Search updates"
+                        />
+                      </FormField>
+                      <FormField label="Sort results">
+                        <SelectField
+                          aria-label="Sort updates for this group"
+                          value={updateSort}
+                          onValueChange={(value) =>
+                            setUpdateSort(value as GroupBrowseSort)
+                          }
+                        >
+                          <option value="assigned-first">
+                            For this group first
+                          </option>
+                          <option value="updated-newest">
+                            Recently updated
+                          </option>
+                          <option value="updated-oldest">
+                            Oldest update first
+                          </option>
+                          <option value="created-newest">
+                            Recently created
+                          </option>
+                          <option value="created-oldest">
+                            Oldest creation first
+                          </option>
+                          <option value="title">Title A–Z</option>
+                        </SelectField>
+                      </FormField>
+                    </BrowseToolbar>
                     <div className="learning-search-results">
-                      {published
-                        .filter((c) => c.kind === "brief" && matches(c.title))
-                        .sort(
-                          (a, b) =>
-                            Number(b.groups.includes(group.id)) -
-                              Number(a.groups.includes(group.id)) ||
-                            b.updatedAt.localeCompare(a.updatedAt),
-                        )
-                        .map((c) => (
-                          <div className="learning-search-result" key={c.id}>
-                            <span>
-                              <strong>{c.title}</strong>
-                              <small>
-                                {c.groups.includes(group.id)
-                                  ? "For this group"
-                                  : "Available to everyone"}
-                              </small>
-                            </span>
-                            <Button
-                              variant="outline"
-                              onClick={async () => {
-                                setBusy(true);
+                      {sortGroupBrowseItems(
+                        published
+                          .filter((c) => c.kind === "brief" && matches(c.title))
+                          .map((c) => ({
+                            ...c,
+                            name: c.title,
+                            assigned: c.groups.includes(group.id),
+                          })),
+                        updateSort,
+                      ).map((c) => (
+                        <div className="learning-search-result" key={c.id}>
+                          <span>
+                            <strong>{c.title}</strong>
+                            <small>
+                              {c.groups.includes(group.id)
+                                ? "For this group"
+                                : "Available to everyone"}
+                            </small>
+                          </span>
+                          <Button
+                            variant="outline"
+                            onClick={async () => {
+                              setBusy(true);
+                              setNotice("");
+                              try {
+                                await onLearning({
+                                  operation: c.groups.includes(group.id)
+                                    ? "untarget"
+                                    : "target",
+                                  contentId: c.id,
+                                  groupId: group.id,
+                                  expected:
+                                    data.content.find((x) => x.id === c.id)
+                                      ?.revision ||
+                                    c.revision ||
+                                    1,
+                                });
                                 setNotice("");
-                                try {
-                                  await onLearning({
-                                    operation: c.groups.includes(group.id)
-                                      ? "untarget"
-                                      : "target",
-                                    contentId: c.id,
-                                    groupId: group.id,
-                                    expected:
-                                      data.content.find((x) => x.id === c.id)
-                                        ?.revision ||
-                                      c.revision ||
-                                      1,
-                                  });
-                                  setNotice("");
-                                  notify("Update audience saved.");
-                                } catch (e) {
-                                  setNotice((e as Error).message);
-                                } finally {
-                                  setBusy(false);
-                                }
-                              }}
-                            >
-                              {c.groups.includes(group.id) ? "Remove" : "Add"}
-                            </Button>
-                          </div>
-                        ))}
+                                notify("Update audience saved.");
+                              } catch (e) {
+                                setNotice((e as Error).message);
+                              } finally {
+                                setBusy(false);
+                              }
+                            }}
+                          >
+                            {c.groups.includes(group.id) ? "Remove" : "Add"}
+                          </Button>
+                        </div>
+                      ))}
                     </div>
                   </>
                 )}

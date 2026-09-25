@@ -17,7 +17,6 @@ import { FilterOptions } from "./patterns/filter-options";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/ui/field";
 import {
-  Callout,
   PageHeader,
   SectionHeader,
   EmptyState,
@@ -58,16 +57,12 @@ export default function Learning({
   progress,
   onOpen,
   onCurriculum,
-  publicLearning = false,
   guest = false,
-  onSignIn,
   linkedNavigation = false,
 }: {
   curricula?: import("@/lib/types").Curriculum[];
   settings?: SiteSettings;
-  publicLearning?: boolean;
   guest?: boolean;
-  onSignIn?: () => void;
   linkedNavigation?: boolean;
   courses: Content[];
   user: User;
@@ -238,6 +233,83 @@ export default function Learning({
     setQuery("");
     setTopic("All channels");
   }
+  function browseLibrary() {
+    document.getElementById("all-courses")?.scrollIntoView({
+      block: "start",
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "instant"
+        : "smooth",
+    });
+  }
+  const forYouHeading = (
+    <h2>
+      For you <Badge variant="default">{outstanding.length}</Badge>
+    </h2>
+  );
+  const progressCard = (
+    <Card className="flex w-full max-w-xs flex-col items-center justify-center gap-4 text-center">
+      {assigned.length > 0 ? (
+        <ProgressRing value={pct} />
+      ) : (
+        <div className="learning-status-icon">
+          <BookOpen size={24} />
+        </div>
+      )}
+      <div className="grid gap-2">
+        <h3>
+          {!assigned.length
+            ? guest
+              ? "No recommendations yet"
+              : "No courses assigned to you"
+            : pct === 100
+              ? "Assigned courses complete"
+              : `${outstanding.length} assigned courses remaining`}
+        </h3>
+        {!!assigned.length && pct < 100 ? (
+          <p>
+            {completed.length} of {assigned.length} assigned courses complete
+          </p>
+        ) : completedCourseCount > 0 ? (
+          <p>
+            {completedCourseCount} course
+            {completedCourseCount === 1 ? "" : "s"} completed
+          </p>
+        ) : !assigned.length ? (
+          <p className="text-sm text-muted-foreground">
+            Browse the full library below.
+          </p>
+        ) : null}
+        {!guest && (state.overdue.length > 0 || state.onboarding) && (
+          <p className="text-xs text-muted-foreground">
+            {state.overdue.length
+              ? `${state.overdue.length} courses past their target`
+              : `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`}
+          </p>
+        )}
+      </div>
+      {nextCourse && (
+        <Button
+          variant="default"
+          className="mt-auto w-full"
+          onClick={() => onOpen(nextCourse.id)}
+        >
+          {courseProgress(nextCourse, progress).started
+            ? "Continue course"
+            : "Start course"}
+        </Button>
+      )}
+      {assigned.length ? (
+        <Button variant="link" onClick={() => changeView("assigned")}>
+          View all for you <ArrowRight size={16} />
+        </Button>
+      ) : (
+        <Button variant="link" onClick={browseLibrary}>
+          Browse all courses <ArrowRight size={16} />
+        </Button>
+      )}
+    </Card>
+  );
+  const outstandingCards = assignedCards.filter((item) => !completeCard(item));
   return (
     <>
       <PageHeader>
@@ -248,113 +320,25 @@ export default function Learning({
         )}
         <h1>{view === "home" ? "Courses" : "Your courses"}</h1>
       </PageHeader>
-      {view === "home" && publicLearning && (
-        <Callout>
-          <div>
-            <p>
-              {completedCourseCount} course
-              {completedCourseCount === 1 ? "" : "s"} completed ·{" "}
-              {
-                courses.filter((c) => courseProgress(c, progress).inProgress)
-                  .length
-              }{" "}
-              in progress
-            </p>
-            <p className="muted">
-              {guest
-                ? "Progress is saved in this browser. Sign in to keep learning across devices."
-                : "Progress is saved to your account."}
-            </p>
-            {guest && (
-              <Button variant="default" onClick={onSignIn}>
-                {onSignIn ? "Sign in" : "Sign in with Google"}
-              </Button>
-            )}
-          </div>
-          <div className="learning-links">
-            <Button variant="link" onClick={() => changeView("in-progress")}>
-              View in progress <ArrowRight size={16} />
-            </Button>
-            <Button variant="link" onClick={() => changeView("completed")}>
-              View completed <ArrowRight size={16} />
-            </Button>
-          </div>
-        </Callout>
-      )}
       {view === "home" && (
         <section className="for-you">
-          <CourseRow
-            title="For you"
-            heading={
-              <h2>
-                For you <Badge variant="default">{outstanding.length}</Badge>
-              </h2>
-            }
-            leading={
-              <Card className="flex flex-col items-center justify-center gap-4 text-center">
-                {assigned.length > 0 ? (
-                  <ProgressRing value={pct} />
-                ) : (
-                  <div className="learning-status-icon">
-                    <BookOpen size={24} />
-                  </div>
-                )}
-                <div className="grid gap-2">
-                  <h3>
-                    {!assigned.length
-                      ? guest
-                        ? "No recommendations yet"
-                        : "No assigned courses"
-                      : pct === 100
-                        ? "Assigned courses complete"
-                        : `${outstanding.length} assigned courses remaining`}
-                  </h3>
-                  {!!assigned.length && pct < 100 && (
-                    <p>
-                      {completed.length} of {assigned.length} assigned courses
-                      complete
-                    </p>
-                  )}
-                  {!guest && (state.overdue.length > 0 || state.onboarding) && (
-                    <p className="text-xs text-muted-foreground">
-                      {state.overdue.length
-                        ? `${state.overdue.length} courses past their target`
-                        : `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`}
-                    </p>
-                  )}
-                </div>
-                {nextCourse && (
-                  <Button
-                    variant="default"
-                    className="mt-auto w-full"
-                    onClick={() => onOpen(nextCourse.id)}
-                  >
-                    {courseProgress(nextCourse, progress).started
-                      ? "Continue course"
-                      : "Start course"}
-                  </Button>
-                )}
-              </Card>
-            }
-          >
-            {assignedCards
-              .filter((item) => !completeCard(item))
-              .map(displayCard)}
-          </CourseRow>
-          <div className="learning-links">
-            <Button variant="link" onClick={() => changeView("assigned")}>
-              View all for you <ArrowRight size={16} />
-            </Button>
-            <Button variant="link" onClick={() => changeView("in-progress")}>
-              View in progress <ArrowRight size={16} />
-            </Button>
-            <Button variant="link" onClick={() => changeView("completed")}>
-              View completed <ArrowRight size={16} />
-            </Button>
-          </div>
+          {outstandingCards.length ? (
+            <CourseRow
+              title="For you"
+              heading={forYouHeading}
+              leading={progressCard}
+            >
+              {outstandingCards.map(displayCard)}
+            </CourseRow>
+          ) : (
+            <>
+              <SectionHeader title={forYouHeading} />
+              {progressCard}
+            </>
+          )}
         </section>
       )}
-      <section className="library">
+      <section className="library" id="all-courses">
         {view !== "home" && view !== "curricula" && (
           <FilterOptions
             label="Course views"
@@ -369,17 +353,21 @@ export default function Learning({
           />
         )}
         <SectionHeader
-          title={<h2>{view === "home" ? "All courses" : viewTitle}</h2>}
+          title={
+            <h2 className="flex items-center gap-2">
+              {view === "home" ? "All courses" : viewTitle}
+              {view === "home" && (
+                <Badge variant="default">{courses.length}</Badge>
+              )}
+            </h2>
+          }
         >
-          <span className="muted" role="status">
-            {view === "assigned" || view === "curricula"
-              ? `${browserCards.length} items`
-              : `${filtered.length} course${filtered.length === 1 ? "" : "s"}`}
-          </span>
-          {view === "home" && (
-            <Button variant="link" onClick={() => changeView("all")}>
-              View all courses <ArrowRight size={16} />
-            </Button>
+          {view !== "home" && (
+            <span className="muted" role="status">
+              {view === "assigned" || view === "curricula"
+                ? `${browserCards.length} items`
+                : `${filtered.length} course${filtered.length === 1 ? "" : "s"}`}
+            </span>
           )}
           {view === "assigned" && (
             <Field orientation="horizontal">
@@ -411,21 +399,19 @@ export default function Learning({
               />
             </SearchField>
           </Field>
-          {view !== "home" && (
-            <FormField label="Channel">
-              <SelectField
-                aria-label="Channel"
-                value={topic}
-                onValueChange={setTopic}
-              >
-                {["All channels", ...topics].map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </SelectField>
-            </FormField>
-          )}
+          <FormField label="Channel">
+            <SelectField
+              aria-label="Channel"
+              value={topic}
+              onValueChange={setTopic}
+            >
+              {["All channels", ...topics].map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </SelectField>
+          </FormField>
           <FormField label="Sort courses">
             <SelectField value={sort} onValueChange={setSort}>
               <option value="recommended">Recommended order</option>

@@ -309,6 +309,20 @@ test("guest Updates and curriculum learning, browser progress and account transi
     /past their target|days left in onboarding/,
   );
   await shot(page, info, "guest-courses");
+  if (f.production) {
+    const open = page.getByRole("button", { name: "Open navigation" });
+    if (await open.isVisible()) await open.click();
+    const account = page.locator(".sidebar-bottom");
+    await expect(account.getByText("Viewing as guest")).toBeVisible();
+    await expect(
+      account.getByRole("button", { name: "Sign in with Google" }),
+    ).toBeVisible();
+    await expect(account).toContainText(
+      "Sign in to save course progress across devices and browsers.",
+    );
+    if (await open.isVisible())
+      await page.getByRole("button", { name: "Dismiss navigation" }).click();
+  }
   await page
     .locator(".for-you")
     .getByRole("button", { name: /Guest introduction/ })
@@ -366,6 +380,11 @@ test("no selection and publication changes preserve a usable library with honest
     page.getByRole("button", { name: /Foundation course/ }),
   ).toBeVisible();
   await shot(page, info, "guest-empty");
+  await expect(
+    page.getByRole("button", { name: "View all for you" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Browse all courses" }).click();
+  await expect(page.locator("#all-courses")).toBeInViewport();
   await nav(page, "Updates");
   await expect(
     page.getByRole("heading", { name: "For you", exact: true }),

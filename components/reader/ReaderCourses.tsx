@@ -30,10 +30,8 @@ export function ReaderCourses({ data }: { data: CourseReaderData }) {
       groups={data.groups}
       assigned={assignedCourses(data.courses, data.user, data.groups)}
       progress={data.user.id === "guest" ? guestProgress : data.progress}
-      publicLearning
       guest={data.user.id === "guest"}
       linkedNavigation
-      onSignIn={() => window.location.assign("/auth/sign-in")}
       onOpen={(id) => router.push(`/courses/${encodeURIComponent(id)}`)}
       onCurriculum={(id) => router.push(`/curricula/${encodeURIComponent(id)}`)}
     />

@@ -131,6 +131,9 @@ test("learning groups: shared controls, save and reload", async ({
   await expect(
     page.getByRole("heading", { name: "Updates for this group" }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Sort updates for this group" }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "Members", exact: true }).click();
   await noOverflow(page);
   await testInfo.attach("learning-group", {
@@ -149,6 +152,27 @@ test("learning groups: shared controls, save and reload", async ({
   await expect(
     page.getByRole("combobox", { name: "Parent learning group" }),
   ).toHaveText("Account executives");
+});
+
+test("admin menu scroll stays put while the new panel starts at the top", async ({
+  page,
+}, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop");
+  await page.setViewportSize({ width: 1280, height: 560 });
+  await admin(page);
+  const nav = page.locator('[data-slot="admin-navigation"] [role="tablist"]');
+  await expect(nav).toBeVisible();
+  await nav.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+  });
+  const before = await nav.evaluate((element) => element.scrollTop);
+  expect(before).toBeGreaterThan(0);
+  await nav.getByRole("tab", { name: "Privacy", exact: true }).click();
+  await expect(page.getByRole("tabpanel", { name: "Privacy" })).toBeVisible();
+  expect(await nav.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect(
+    page.getByRole("tabpanel", { name: "Privacy" }),
+  ).toBeInViewport();
 });
 
 test("admin destinations and editor render without overflow or errors", async ({
@@ -449,9 +473,12 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
   await page.reload();
   await adminSection(page, "Docs navigation");
   await expect(
-    page.locator(
-      ".doc-order-list > li > .doc-order-list > [data-slot=reorder-row]:first-child",
-    ).nth(2).locator("strong"),
+    page
+      .locator(
+        ".doc-order-list > li > .doc-order-list > [data-slot=reorder-row]:first-child",
+      )
+      .nth(2)
+      .locator("strong"),
   ).toHaveText(firstText);
 });
 

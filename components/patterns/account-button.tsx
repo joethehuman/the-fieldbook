@@ -10,6 +10,7 @@ export function AccountButton({
   className,
   actionLabel,
   helpText,
+  visibleAction = false,
   ...props
 }: ComponentProps<typeof Button> & {
   initials: string;
@@ -18,6 +19,7 @@ export function AccountButton({
   icon: ReactNode;
   actionLabel: string;
   helpText?: string;
+  visibleAction?: boolean;
 }) {
   return (
     <div className="@container">
@@ -40,13 +42,16 @@ export function AccountButton({
         <Button
           {...props}
           type="button"
-          variant="ghost"
-          size="icon"
-          className="col-start-2 @[12rem]:col-auto"
+          variant={visibleAction ? "default" : "ghost"}
+          size={visibleAction ? "default" : "icon"}
+          className={
+            visibleAction ? "col-span-full" : "col-start-2 @[12rem]:col-auto"
+          }
           aria-label={actionLabel}
           title={actionLabel}
         >
           {icon}
+          {visibleAction && <span>{actionLabel}</span>}
         </Button>
         {helpText && (
           <p className="col-span-full text-xs leading-relaxed text-muted-foreground">
