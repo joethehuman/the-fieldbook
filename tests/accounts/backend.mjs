@@ -159,6 +159,32 @@ createServer(async (req, res) => {
       rows = rows.filter((row) => row.published);
     if (url.searchParams.get("published->>kind") === "eq.course")
       rows = rows.filter((row) => row.published?.kind === "course");
+    if (url.searchParams.get("draft->>kind") === "eq.course")
+      rows = rows.filter((row) => row.draft?.kind === "course");
+    if ((url.searchParams.get("select") || "").includes("title:draft"))
+      rows = rows.map((row) => ({
+        id: row.id,
+        revision: row.revision,
+        published_revision: row.published_revision,
+        updated_at: row.updated_at,
+        ...Object.fromEntries(
+          [
+            "title",
+            "summary",
+            "category",
+            "folder",
+            "sectionId",
+            "kind",
+            "status",
+            "version",
+            "createdAt",
+            "groups",
+            "assignments",
+            "duration",
+            "coverImageUrl",
+          ].map((key) => [key, row.draft?.[key]]),
+        ),
+      }));
     if ((url.searchParams.get("select") || "").includes("title:published"))
       rows = rows.map((row) => ({
         id: row.id,
@@ -220,15 +246,18 @@ createServer(async (req, res) => {
   }
   if (url.pathname === "/rest/v1/rpc/fb_allow_request") return send(res, true);
   if (url.pathname === "/rest/v1/rpc/fb_record_progress") return send(res, {});
-  if (url.pathname === "/rest/v1/fb_profiles") return send(res, profile());
+  if (url.pathname === "/rest/v1/fb_profiles")
+    return url.searchParams.has("id")
+      ? send(res, profile())
+      : send(res, [profile()], 200, { "Content-Range": "0-0/1" });
   if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot")
     return send(res, {
       users: [profile()],
-      progress: [],
-      groups: [],
+      progress: configuredProgress,
+      groups: configuredGroups,
       teams: [],
       pending: [],
-      revision: 1,
+      revision: fixtureGeneration,
     });
   if (url.pathname === "/rest/v1/fb_feedback") {
     if (req.method === "POST") {
@@ -255,10 +284,7 @@ createServer(async (req, res) => {
     });
   }
   if (
-    [
-      "/rest/v1/fb_documents",
-      "/rest/v1/fb_mcp_grants",
-    ].includes(url.pathname)
+    ["/rest/v1/fb_documents", "/rest/v1/fb_mcp_grants"].includes(url.pathname)
   )
     return send(res, [], 200, { "Content-Range": "*/0" });
   if (url.pathname === "/auth/v1/token") {

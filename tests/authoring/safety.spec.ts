@@ -112,7 +112,12 @@ async function setup(
       sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     }, state);
   }
-  await page.goto(production ? "/admin" : "/#admin");
+  await page.goto(production ? "/team" : "/#admin");
+  if (production) {
+    const menu = page.getByRole("button", { name: "Open navigation" });
+    if (await menu.isVisible()) await menu.click();
+    await page.getByRole("button", { name: "Manage organization" }).click();
+  }
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   return { state, control };
 }
@@ -253,7 +258,10 @@ test("failed learning-group save shows one concise inline error", async ({
       },
     }),
   );
-  await page.goto("/admin");
+  await page.goto("/team");
+  const menu = page.getByRole("button", { name: "Open navigation" });
+  if (await menu.isVisible()) await menu.click();
+  await page.getByRole("button", { name: "Manage organization" }).click();
   if (info.project.name.endsWith("phone")) {
     await page
       .getByRole("combobox", { name: "Administration section" })

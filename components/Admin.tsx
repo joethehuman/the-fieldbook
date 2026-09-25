@@ -200,6 +200,9 @@ const adminSections = [
 type Props = {
   data: Workspace;
   user: User;
+  onOpenTab?: (tab: string) => Promise<void>;
+  onEdit?: (id: string) => Promise<Content>;
+  onUnpublish?: (id: string) => Promise<void>;
   onChange: (
     d: Workspace,
     options?: { locallyHandled?: boolean },
@@ -214,6 +217,9 @@ const id = () => crypto.randomUUID();
 export default function Admin({
   data,
   user,
+  onOpenTab,
+  onEdit,
+  onUnpublish,
   onChange,
   production = false,
   onUpload,
@@ -233,6 +239,8 @@ export default function Admin({
     [registerNavigationGuard],
   );
   const [tab, setTab] = useState("content"),
+    [openingTab, setOpeningTab] = useState<string | null>(null),
+    [openingItem, setOpeningItem] = useState<string | null>(null),
     [editing, setEditing] = useState<Content | null>(null),
     [person, setPerson] = useState<User | null>(null),
     [notice, setNotice] = useState(""),
@@ -438,6 +446,18 @@ export default function Admin({
   async function changeAdminTab(next: string) {
     if (next === tab || (adminGuard.current && !(await adminGuard.current())))
       return;
+    if (openingTab) return;
+    if (onOpenTab) {
+      setOpeningTab(next);
+      try {
+        await onOpenTab(next);
+      } catch (error) {
+        setNotice((error as Error).message);
+        setOpeningTab(null);
+        return;
+      }
+      setOpeningTab(null);
+    }
     setTab(next);
     adminPanel.reveal(false);
     setNotice("");
@@ -452,6 +472,7 @@ export default function Admin({
           Content, people, and the settings that keep your organization running.
         </p>
       </PageHeader>
+      {openingTab && <p role="status">Opening section…</p>}
       <Tabs
         className="admin-layout"
         orientation="vertical"
@@ -668,9 +689,11 @@ export default function Admin({
                               published={!!c.publishedRevision}
                               hasUnpublishedChanges={hasUnpublishedEdits(
                                 c,
-                                data.publishedContent?.find(
-                                  (live) => live.id === c.id,
-                                ),
+                                production
+                                  ? undefined
+                                  : data.publishedContent?.find(
+                                      (live) => live.id === c.id,
+                                    ),
                               )}
                             />
                           </TableCell>
@@ -679,9 +702,24 @@ export default function Admin({
                             <ActionGroup>
                               <Button
                                 variant="link"
-                                onClick={() => setEditing(structuredClone(c))}
+                                disabled={openingItem === c.id}
+                                onClick={async () => {
+                                  if (!onEdit) {
+                                    setEditing(structuredClone(c));
+                                    return;
+                                  }
+                                  setOpeningItem(c.id);
+                                  try {
+                                    setEditing(await onEdit(c.id));
+                                    setNotice("");
+                                  } catch (error) {
+                                    setNotice((error as Error).message);
+                                  } finally {
+                                    setOpeningItem(null);
+                                  }
+                                }}
                               >
-                                Edit
+                                {openingItem === c.id ? "Opening…" : "Edit"}
                               </Button>
 
                               {!!c.publishedRevision && (
@@ -695,12 +733,14 @@ export default function Admin({
                                     )
                                       return;
                                     try {
-                                      await onChange({
-                                        ...data,
-                                        content: data.content.filter(
-                                          (x) => x.id !== c.id,
-                                        ),
-                                      });
+                                      if (onUnpublish) await onUnpublish(c.id);
+                                      else
+                                        await onChange({
+                                          ...data,
+                                          content: data.content.filter(
+                                            (x) => x.id !== c.id,
+                                          ),
+                                        });
                                       setNotice("");
                                       notify("Content unpublished.");
                                     } catch (e) {
@@ -1730,7 +1770,11 @@ export function Editor({
                     }
                     hasUnpublishedChanges={hasUnpublishedEdits(
                       data.content.find((item) => item.id === c.id) || c,
-                      data.publishedContent?.find((live) => live.id === c.id),
+                      production
+                        ? undefined
+                        : data.publishedContent?.find(
+                            (live) => live.id === c.id,
+                          ),
                     )}
                   />
                   <p className="text-copy text-muted-foreground">

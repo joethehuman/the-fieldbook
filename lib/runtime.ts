@@ -18,4 +18,11 @@ export type FieldbookRuntime = {
   upload: UploadMedia;
   signIn: () => void;
   signOut: () => Promise<void>;
+  admin?: {
+    prepare: (
+      scope: "content" | "governance" | "feedback",
+    ) => Promise<Workspace>;
+    edit: (id: string) => Promise<{ data: Workspace; item: Content }>;
+    unpublish: (id: string) => Promise<Workspace>;
+  };
 };

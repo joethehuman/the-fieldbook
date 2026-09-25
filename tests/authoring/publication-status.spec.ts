@@ -48,7 +48,12 @@ test("publication badges stay compact while unpublished edits remain visible", a
       sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     }, data);
   }
-  await page.goto(production ? "/admin" : "/#admin");
+  await page.goto(production ? "/team" : "/#admin");
+  if (production) {
+    const menu = page.getByRole("button", { name: "Open navigation" });
+    if (await menu.isVisible()) await menu.click();
+    await page.getByRole("button", { name: "Manage organization" }).click();
+  }
   const table = page.locator('table[data-layout="content"]');
   const edited = table
     .getByRole("row")
