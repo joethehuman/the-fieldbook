@@ -14,6 +14,7 @@
   --secondary: #f2f2f2;
   --secondary-foreground: #171717;
   --muted: #f2f2f2;
+  --muted-hover: #e2e2e2;
   --muted-foreground: #666666;
   --accent: #f2f2f2;
   --accent-foreground: #171717;
@@ -77,6 +78,7 @@
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
+  --color-muted-hover: var(--muted-hover);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
