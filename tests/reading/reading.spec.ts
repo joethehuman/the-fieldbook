@@ -420,7 +420,16 @@ for (const signedIn of [false, true]) {
       .getByRole("navigation", { name: "Primary" })
       .getByRole("link", { name: "Docs" })
       .click();
-    await page.locator(`.knowledge-section a[href="/docs/${ids[0]}"]`).click();
+    if ((page.viewportSize()?.width || 0) < 768) {
+      await expect(page.locator(".sidebar")).toHaveClass(/open/);
+      await page
+        .getByRole("navigation", { name: "Documents", exact: true })
+        .locator(`a[href="/docs/${ids[0]}"]`)
+        .click();
+      await expect(page.locator(".sidebar")).not.toHaveClass(/open/);
+    } else {
+      await page.locator(`.knowledge-section a[href="/docs/${ids[0]}"]`).click();
+    }
     await expect(
       page.getByRole("heading", { name: items[0].title }),
     ).toBeVisible();
