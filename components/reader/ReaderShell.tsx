@@ -7,22 +7,19 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
   ChevronRight,
   GraduationCap,
-  LogOut,
-  LogIn,
   Menu,
   Newspaper,
-  Settings,
   X,
 } from "lucide-react";
 import { AppBar } from "@/components/patterns/app-bar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
 import { DocumentTree } from "@/components/patterns/document-tree";
-import { AccountButton } from "@/components/patterns/account-button";
+import { AccountMenu } from "@/components/patterns/account-menu";
 import { SkipLink } from "@/components/patterns/skip-link";
 import { NavigationButton } from "@/components/patterns/navigation-button";
 import { Button } from "@/components/ui/button";
@@ -41,6 +38,7 @@ export function ReaderShell({
   const [menu, setMenu] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
+  const router = useRouter();
   const section = pathname.startsWith("/docs")
     ? "docs"
     : pathname.startsWith("/team")
@@ -148,24 +146,10 @@ export function ReaderShell({
           />
         )}
         <div className="sidebar-bottom">
-          {context.user?.role === "admin" && (
-            <NavigationButton asChild className="admin-nav">
-              <Link href="/admin" prefetch={false} onClick={close}>
-                <Settings size={18} />
-                Manage organization
-              </Link>
-            </NavigationButton>
-          )}
-          {context.user?.role === "manager" && (
-            <NavigationButton asChild className="admin-nav">
-              <Link href="/team" prefetch={false} onClick={close}>
-                <GraduationCap size={18} />
-                My team’s progress
-              </Link>
-            </NavigationButton>
-          )}
-          <AccountButton
+          <AccountMenu
             name={context.user?.name || "Guest"}
+            email={context.user?.email}
+            guest={!context.user}
             initials={
               context.user
                 ? context.user.name
@@ -184,19 +168,47 @@ export function ReaderShell({
                     ? "Learner"
                     : undefined
             }
-            icon={context.user ? <LogOut size={16} /> : <LogIn size={16} />}
-            actionLabel={context.user ? "Sign out" : "Sign in with Google"}
-            visibleAction={!context.user}
-            helpText={
-              context.user
-                ? undefined
-                : "Sign in to save course progress across devices and browsers."
+            onManageOrganization={
+              context.user?.role === "admin"
+                ? () => {
+                    close();
+                    router.push("/admin");
+                  }
+                : undefined
             }
-            onClick={
-              context.user
-                ? signOut
-                : () => window.location.assign("/auth/sign-in")
+            onTeamProgress={
+              context.user &&
+              (context.user.role === "manager" || context.user.managesTeam)
+                ? () => {
+                    close();
+                    router.push("/team");
+                  }
+                : undefined
             }
+            onSignOut={context.user ? signOut : undefined}
+            onSignIn={
+              !context.user
+                ? () => window.location.assign("/auth/sign-in")
+                : undefined
+            }
+            onFeedbackOpen={close}
+            onFeedbackClose={() => {
+              if (window.matchMedia("(max-width: 767px)").matches)
+                trigger.current?.focus();
+            }}
+            onFeedback={async (rating, comment) => {
+              const response = await fetch("/api/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rating, comment }),
+              });
+              if (!response.ok) {
+                const result = await response.json().catch(() => ({}));
+                throw new Error(
+                  result.error || "Could not save feedback. Try again.",
+                );
+              }
+            }}
           />
         </div>
       </aside>

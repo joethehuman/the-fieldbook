@@ -22,8 +22,8 @@ import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
 
 import { DataTable } from "@/components/patterns/data-table";
-import { AccountButton } from "@/components/patterns/account-button";
-import { ArrowRight, Layers, LogIn, LogOut, Settings } from "lucide-react";
+import { AccountMenu } from "@/components/patterns/account-menu";
+import { ArrowRight, Layers, Settings } from "lucide-react";
 import {
   ContentCardFooter,
   StatusActions,
@@ -466,20 +466,22 @@ export default function ComponentCatalog() {
               </TabsList>
             </Tabs>
             <div className="grid gap-4">
-              <AccountButton
-                actionLabel="Sign out"
+              <AccountMenu
                 initials="OA"
                 name="Organization Administrator with a long name"
+                email="admin@example.com"
                 description="Administrator"
-                icon={<LogOut />}
+                onManageOrganization={() => {}}
+                onTeamProgress={() => {}}
+                onSignOut={() => {}}
+                onFeedback={async () => {}}
               />
-              <AccountButton
-                actionLabel="Sign in with Google"
+              <AccountMenu
                 initials="G"
                 name="Guest"
-                helpText="Sign in to save course progress across devices and browsers."
-                visibleAction
-                icon={<LogIn />}
+                guest
+                onSignIn={() => {}}
+                onFeedback={async () => {}}
               />
             </div>
           </div>

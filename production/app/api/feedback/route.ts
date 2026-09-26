@@ -5,7 +5,7 @@ import {
   HttpError,
 } from "@production/lib/auth";
 import { db, check } from "@production/lib/db";
-import { getContent } from "@production/lib/content";
+import { canRead, getContent } from "@production/lib/content";
 import { createHash, randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -47,13 +47,15 @@ export async function POST(req: NextRequest) {
     const user = await actor();
     const a = z
       .object({
-        contentId: z.uuid(),
+        contentId: z.uuid().optional(),
         rating: z.enum(["up", "down"]),
         comment: z.string().max(5000),
       })
       .parse(await req.json());
     const existingToken = user ? null : guestToken(req);
-    const token = user ? null : existingToken || randomBytes(32).toString("hex");
+    const token = user
+      ? null
+      : existingToken || randomBytes(32).toString("hex");
     if (token) {
       const source =
         req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
@@ -67,26 +69,41 @@ export async function POST(req: NextRequest) {
       if (!allowed)
         throw new HttpError(429, "Please wait before sending more feedback.");
     }
-    const c = await getContent(a.contentId, user);
+    const c = a.contentId ? await getContent(a.contentId, user) : null;
+    if (!c) await canRead(user);
     const record = {
       id: crypto.randomUUID(),
-      content_id: c.id,
-      version: c.version,
+      content_id: c?.id ?? null,
+      version: c?.version ?? null,
       rating: a.rating,
       comment: a.comment,
       updated_at: new Date().toISOString(),
     };
-    const { error } = user
+    const { error } = !c
       ? await db()
           .from("fb_feedback")
-          .upsert({ ...record, user_id: user.id }, {
-            onConflict: "user_id,content_id",
+          .insert({
+            ...record,
+            user_id: user?.id ?? null,
+            guest_key: token ? hash(token) : null,
           })
-      : await db()
-          .from("fb_feedback")
-          .upsert({ ...record, user_id: null, guest_key: hash(token!) }, {
-            onConflict: "guest_key,content_id",
-          });
+      : user
+        ? await db()
+            .from("fb_feedback")
+            .upsert(
+              { ...record, user_id: user.id },
+              {
+                onConflict: "user_id,content_id",
+              },
+            )
+        : await db()
+            .from("fb_feedback")
+            .upsert(
+              { ...record, user_id: null, guest_key: hash(token!) },
+              {
+                onConflict: "guest_key,content_id",
+              },
+            );
     check(error);
     const response = NextResponse.json(
       { saved: true },

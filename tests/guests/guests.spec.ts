@@ -390,12 +390,14 @@ test("guest Updates and curriculum learning, browser progress and account transi
     const account = page.locator(".sidebar-bottom");
     await expect(account.getByText("Guest", { exact: true })).toBeVisible();
     await expect(account).not.toContainText("Progress stays in this browser");
+    await account.getByRole("button", { name: "Account menu" }).click();
     await expect(
-      account.getByRole("button", { name: "Sign in with Google" }),
+      page.getByRole("menuitem", { name: "Sign in with Google" }),
     ).toBeVisible();
-    await expect(account).toContainText(
-      "Sign in to save course progress across devices and browsers.",
+    await expect(page.getByRole("menu")).toContainText(
+      "Sign in with Google to save course progress across devices and browsers.",
     );
+    await page.keyboard.press("Escape");
     const close = page.getByRole("button", { name: "Close navigation" });
     if (await close.isVisible()) await close.click();
   }

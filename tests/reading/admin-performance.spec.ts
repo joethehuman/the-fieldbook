@@ -106,7 +106,8 @@ test("admin entry and section changes avoid the full workspace", async ({
   if (info.project.name === "phone" || info.project.name === "desktop")
     await page.screenshot({ path: info.outputPath("admin-to-courses.png") });
   if (await menu.isVisible()) await menu.click();
-  await page.getByRole("link", { name: "Manage organization" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Manage organization" }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.locator(".admin-layout")).toBeVisible();
   expect(documentNavigations).toBe(1);

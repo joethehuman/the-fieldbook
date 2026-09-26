@@ -20,7 +20,7 @@ import { brandingFromSettings } from "@/lib/branding";
 import { CurriculumPage } from "./CurriculumPage";
 import { Badge } from "@/components/ui/badge";
 import { SkipLink } from "./patterns/skip-link";
-import { AccountButton } from "./patterns/account-button";
+import { AccountMenu } from "./patterns/account-menu";
 import { SearchField } from "./patterns/search-field";
 import { NavigationButton } from "./patterns/navigation-button";
 import { Alert } from "@/components/ui/alert";
@@ -50,10 +50,6 @@ import {
   Newspaper,
   ArrowRight,
   ChevronRight,
-  Settings,
-  LogOut,
-  LogIn,
-  ArrowLeftRight,
   X,
   Menu,
   Compass,
@@ -600,39 +596,11 @@ export default function Fieldbook({
           />
         )}
         <div className="sidebar-bottom">
-          {user.role === "admin" && (
-            <NavigationButton
-              variant="ghost"
-              className={"admin-nav " + (view === "admin" ? "active" : "")}
-              onClick={() => navigate("admin")}
-            >
-              <Settings size={18} />
-              Manage organization
-            </NavigationButton>
-          )}
-          {(user.role === "manager" ||
-            (data.teams || []).some((t) => t.managerId === user.id)) && (
-            <NavigationButton
-              variant="ghost"
-              className={"admin-nav " + (view === "team" ? "active" : "")}
-              onClick={() => navigate("team")}
-            >
-              <GraduationCap size={18} />
-              My team’s progress
-            </NavigationButton>
-          )}
-          <AccountButton
-            onClick={logout}
-            actionLabel={
-              runtime
-                ? uid === "guest"
-                  ? "Sign in with Google"
-                  : "Sign out"
-                : "Switch demo profile"
-            }
-            visibleAction={!!runtime && uid === "guest"}
+          <AccountMenu
             initials={initials(user.name)}
             name={runtime && uid === "guest" ? "Guest" : user.name}
+            email={uid === "guest" ? undefined : user.email}
+            guest={uid === "guest"}
             description={
               runtime && uid === "guest"
                 ? undefined
@@ -644,22 +612,55 @@ export default function Fieldbook({
                       ? "Learner"
                       : "Account Executive"
             }
-            icon={
-              runtime && uid === "guest" ? (
-                <LogIn size={16} />
-              ) : runtime ? (
-                <LogOut size={16} />
-              ) : (
-                <ArrowLeftRight size={16} />
-              )
+            onManageOrganization={
+              user.role === "admin" ? () => navigate("admin") : undefined
             }
-            helpText={
-              runtime
-                ? uid === "guest"
-                  ? "Sign in to save course progress across devices and browsers."
-                  : undefined
-                : "Demo workspace. Use the switch button to try learner, manager and admin views."
+            onTeamProgress={
+              user.role === "manager" ||
+              (data.teams || []).some((t) => t.managerId === user.id)
+                ? () => navigate("team")
+                : undefined
             }
+            onSignOut={runtime && uid !== "guest" ? logout : undefined}
+            onSignIn={runtime && uid === "guest" ? logout : undefined}
+            onSwitchDemoProfile={!runtime ? logout : undefined}
+            onFeedbackOpen={() => setMenu(false)}
+            onFeedbackClose={() => {
+              if (window.matchMedia("(max-width: 767px)").matches)
+                menuTrigger.current?.focus();
+            }}
+            onFeedback={async (rating, comment) => {
+              if (runtime) {
+                const response = await fetch("/api/feedback", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ rating, comment }),
+                });
+                if (!response.ok) {
+                  const result = await response.json().catch(() => ({}));
+                  throw new Error(
+                    result.error || "Could not save feedback. Try again.",
+                  );
+                }
+              } else {
+                await persist(
+                  {
+                    ...data,
+                    feedback: [
+                      ...(data.feedback || []),
+                      {
+                        id: crypto.randomUUID(),
+                        userId: user.id,
+                        rating,
+                        comment,
+                        updatedAt: new Date().toISOString(),
+                      },
+                    ],
+                  },
+                  { locallyHandled: true },
+                );
+              }
+            }}
           />
         </div>
       </aside>
@@ -936,7 +937,9 @@ export default function Fieldbook({
               key={item.id + item.version + (targetLesson || "")}
               course={item}
               initialLessonId={targetLesson || undefined}
-              curriculumTitle={data.curricula?.find((entry) => entry.id === courseOrigin)?.name}
+              curriculumTitle={
+                data.curricula?.find((entry) => entry.id === courseOrigin)?.name
+              }
               progress={data.progress[user.id] || []}
               onBack={() =>
                 navigate(
@@ -967,7 +970,14 @@ export default function Fieldbook({
                   ? undefined
                   : (lessonId, answers, complete) => {
                       persist(
-                        updateProgress(data, user.id, item, lessonId, answers, complete),
+                        updateProgress(
+                          data,
+                          user.id,
+                          item,
+                          lessonId,
+                          answers,
+                          complete,
+                        ),
                       );
                       return answers
                         ? gradeQuiz(item, answers).passed

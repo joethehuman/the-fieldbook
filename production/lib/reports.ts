@@ -51,6 +51,7 @@ export async function contentReport(user: User | null) {
   }
   const ratings = new Map<string, { positive: number; negative: number }>();
   for (const row of feedback) {
+    if (!row.content_id) continue;
     const count = ratings.get(row.content_id) || { positive: 0, negative: 0 };
     if (row.rating === "up") count.positive++;
     if (row.rating === "down") count.negative++;

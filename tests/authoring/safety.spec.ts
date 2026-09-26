@@ -208,8 +208,9 @@ test("browser back can be canceled without unmounting the editor", async ({
     page.getByRole("heading", { name: "Docs", exact: true }),
   ).toBeVisible();
   await openNav(page);
+  await page.getByRole("button", { name: "Account menu" }).click();
   await page
-    .getByRole(production ? "link" : "button", { name: "Manage organization" })
+    .getByRole("menuitem", { name: "Manage organization" })
     .click();
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   await page.getByLabel("Title", { exact: true }).fill("History protected");

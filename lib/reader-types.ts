@@ -13,7 +13,9 @@ export type ReaderShellContext = {
   user: {
     id: string;
     name: string;
+    email: string;
     role: "admin" | "manager" | "learner";
+    managesTeam: boolean;
   } | null;
   branding: {
     name: string;

@@ -43,8 +43,8 @@ export async function snapshot(user: User | null): Promise<Workspace> {
     feedback = ratings.map((r) => ({
       id: r.id,
       userId: r.user_id || "guest",
-      contentId: r.content_id,
-      version: r.version,
+      contentId: r.content_id || undefined,
+      version: r.version ?? undefined,
       rating: r.rating,
       comment: r.comment,
       updatedAt: r.updated_at,
@@ -111,7 +111,9 @@ export async function snapshot(user: User | null): Promise<Workspace> {
     });
   return {
     schema: 1,
-    settings: admin ? config.settings : publicSettings(config.settings, learningContent),
+    settings: admin
+      ? config.settings
+      : publicSettings(config.settings, learningContent),
     revision: config.revision,
     content: admin ? documents.map((r) => document(r, true)) : learningContent,
     publishedContent: learningContent,

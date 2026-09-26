@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import Markdown from "@/components/Markdown";
 import { privacySettings } from "@production/lib/privacy";
 import { actor } from "@production/lib/auth";
+import { readConfig } from "@production/lib/content";
 import { brandingFromSettings } from "@/lib/branding";
 import { ReaderShell } from "@/components/reader/ReaderShell";
 import { organizationHomePath } from "@/lib/navigation";
@@ -14,12 +15,23 @@ export default async function PrivacyPage() {
     actor(undefined, true),
   ]);
   const policy = settings.privacy?.published;
+  const config = user ? await readConfig() : null;
   if (policy?.mode === "external") redirect(policy.url);
   const branding = brandingFromSettings(settings);
   return (
     <ReaderShell
       context={{
-        user: user ? { id: user.id, name: user.name, role: user.role } : null,
+        user: user
+          ? {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              managesTeam: (config?.teams || []).some(
+                (team: { managerId?: string }) => team.managerId === user.id,
+              ),
+            }
+          : null,
         branding: {
           name: branding.name,
           accent: settings.accent,
