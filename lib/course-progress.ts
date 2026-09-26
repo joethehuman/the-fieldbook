@@ -24,7 +24,7 @@ export function courseProgress(course: Content, records: Progress[]) {
 }
 
 export type LearningCollection =
-  "assigned" | "in-progress" | "completed" | "all";
+  "yours" | "assigned" | "in-progress" | "completed" | "all";
 
 export function learningCollection(
   courses: Content[],
@@ -39,6 +39,8 @@ export function learningCollection(
     const status = courseProgress(course, progress);
     if (collection === "assigned")
       return assignedIds.has(course.id) && (!hideCompleted || !status.complete);
+    if (collection === "yours")
+      return assignedIds.has(course.id) || status.started || status.complete;
     if (collection === "in-progress") return status.inProgress;
     if (collection === "completed") return status.complete;
     return true;

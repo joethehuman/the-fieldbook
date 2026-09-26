@@ -85,6 +85,16 @@ export default function Learning({
   const completedCourseCount = courses.filter((c) =>
     isComplete(c, progress),
   ).length;
+  const inProgressCourseCount = courses.filter(
+    (c) => courseProgress(c, progress).inProgress,
+  ).length;
+  const personalCourseCount = learningCollection(
+    courses,
+    assigned,
+    progress,
+    "yours",
+  ).length;
+  const assignedIds = new Set(assigned.map((c) => c.id));
   const outstanding = assigned.filter((c) => !isComplete(c, progress));
   const pct = completionPercent(completed.length, assigned.length);
   const source = learningCollection(
@@ -183,13 +193,15 @@ export default function Learning({
   const viewTitle =
     view === "curricula"
       ? "Curricula"
-      : view === "assigned"
-        ? "For you"
-        : view === "in-progress"
-          ? "In progress"
-          : view === "completed"
-            ? "Completed"
-            : "All courses";
+      : view === "yours"
+        ? "Your courses"
+        : view === "assigned"
+          ? "Assigned"
+          : view === "in-progress"
+            ? "In progress"
+            : view === "completed"
+              ? "Completed"
+              : "All courses";
   const ordered = (items: Content[]) =>
     [...items].sort((a, b) => {
       if (sort === "recommended") {
@@ -222,6 +234,7 @@ export default function Learning({
       key={c.id}
       course={c}
       status={courseProgress(c, progress)}
+      assigned={view !== "home" && assignedIds.has(c.id)}
       onClick={linkedNavigation ? undefined : () => onOpen(c.id)}
       href={
         linkedNavigation ? `/courses/${encodeURIComponent(c.id)}` : undefined
@@ -249,10 +262,10 @@ export default function Learning({
   );
   const outstandingCards = assignedCards.filter((item) => !completeCard(item));
   const progressCard = (
-    <Card className={`flex w-full flex-col items-center justify-center gap-4 text-center ${outstandingCards.length ? "" : "max-w-xs"} ${assigned.length ? "" : "border-dotted border-muted-foreground/50"}`}>
-      {assigned.length > 0 ? (
-        <ProgressRing value={pct} />
-      ) : null}
+    <Card
+      className={`flex w-full flex-col items-center justify-center gap-4 text-center ${outstandingCards.length ? "" : "max-w-xs"} ${assigned.length ? "pt-8 sm:pt-10" : "border-dotted border-muted-foreground/50"}`}
+    >
+      {assigned.length > 0 ? <ProgressRing value={pct} /> : null}
       <div className="grid gap-2">
         <h3>
           {!assigned.length
@@ -263,27 +276,37 @@ export default function Learning({
               ? "Assigned courses complete"
               : `${outstanding.length} assigned courses remaining`}
         </h3>
-        {!!assigned.length && pct < 100 ? (
+        {!!assigned.length ? (
           <p>
             {completed.length} of {assigned.length} assigned courses complete
           </p>
-        ) : completedCourseCount > 0 ? (
+        ) : !assigned.length && personalCourseCount > 0 ? (
           <p>
-            {completedCourseCount} course
-            {completedCourseCount === 1 ? "" : "s"} completed
+            {[
+              inProgressCourseCount > 0
+                ? `${inProgressCourseCount} in progress`
+                : null,
+              completedCourseCount > 0
+                ? `${completedCourseCount} completed`
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
         ) : !assigned.length ? (
           <p className="text-sm text-muted-foreground">
-            Browse the full library below.
+            Explore the course library at your own pace.
           </p>
         ) : null}
-        {!guest && (state.overdue.length > 0 || state.onboarding) && (
-          <p className="text-xs text-muted-foreground">
-            {state.overdue.length
-              ? `${state.overdue.length} courses past their target`
-              : `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`}
-          </p>
-        )}
+        {!guest &&
+          assigned.length > 0 &&
+          (state.overdue.length > 0 || state.onboarding) && (
+            <p className="text-xs text-muted-foreground">
+              {state.overdue.length
+                ? `${state.overdue.length} courses past their target`
+                : `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`}
+            </p>
+          )}
       </div>
       {nextCourse && (
         <Button
@@ -294,6 +317,15 @@ export default function Learning({
           {courseProgress(nextCourse, progress).started
             ? "Continue course"
             : "Start course"}
+        </Button>
+      )}
+      {!assigned.length && personalCourseCount > 0 && (
+        <Button
+          variant="link"
+          className="text-sm text-foreground underline hover:text-foreground"
+          onClick={() => changeView("yours")}
+        >
+          View your courses
         </Button>
       )}
       {assigned.length ? (
@@ -342,7 +374,8 @@ export default function Learning({
             value={view}
             onValueChange={(value) => changeView(value as LearningCollection)}
             options={[
-              { value: "assigned", label: "For you" },
+              { value: "yours", label: "Your courses" },
+              { value: "assigned", label: "Assigned" },
               { value: "in-progress", label: "In progress" },
               { value: "completed", label: "Completed" },
               { value: "all", label: "All courses" },

@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Make the Courses summary useful without assignments: show current course activity and link to a combined Your courses view, with an Assigned filter and a quiet marker on assigned cards. Keep the progress ring assigned-only and improve its spacing.
+
 - Open Docs on the first published document in sidebar order, with a simple empty page when no Docs are published. Remove the back-to-Docs link from articles, keep the wide page outline visible, and place the mobile outline chevron beside its label.
 
 - Refine the empty Courses summary, center reader feedback, align Docs navigation, unify card and account hover states, and show scroll cues in long Docs/Admin menus. The account icon gains a subtle filled hover and the guest sign-in button keeps its dark, readable hover. The course completion card fills the row when cards wrap below it, and course strips scroll directly without carousel arrows. Previous and Next Docs links sit at opposite reading-content edges. Docs top-level sections are fixed headings with tighter link spacing; subsections begin closed, reveal the selected page, and remember their open state. The narrow-screen menu stays open when Docs is selected and closes when a document is chosen. Course and Docs section ordering now moves full rows during drag while retaining reorder arrow controls. Authored course hyperlinks open in a new tab; Docs and Updates keep same-installation hyperlinks in place and open outside sites separately.

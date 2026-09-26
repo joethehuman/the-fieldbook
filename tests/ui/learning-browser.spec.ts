@@ -175,7 +175,18 @@ test("optional activity is resumable and all completions remain available at 100
   await expect(
     library.locator(".course-card").filter({ hasText: "Optional achievement" }),
   ).toBeVisible();
-  await views.getByRole("button", { name: "For you", exact: true }).click();
+  await views
+    .getByRole("button", { name: "Your courses", exact: true })
+    .click();
+  await expect(library.locator(".course-card")).toHaveCount(5);
+  await library.screenshot({ path: info.outputPath("your-courses.png") });
+  await expect(
+    library.locator(".course-card").filter({ hasText: "Optional exploration" }),
+  ).not.toContainText("Assigned");
+  await expect(
+    library.locator(".course-card").filter({ hasText: "Know the platform" }),
+  ).toContainText("Assigned");
+  await views.getByRole("button", { name: "Assigned", exact: true }).click();
   await expect(library.locator(".course-card")).toContainText("Completed");
   await page.getByRole("switch", { name: "Hide completed" }).check();
   await expect(
@@ -197,25 +208,118 @@ test("optional activity is resumable and all completions remain available at 100
   ).toBeVisible();
 });
 
+test("no assignments show personal activity without labeling other courses", async ({
+  page,
+}, info) => {
+  const data = freshWorkspace();
+  const learner = data.users.find((user) => user.id === "demo-learner")!;
+  learner.groups = [];
+  learner.teamId = undefined;
+  const started = data.content.find((course) => course.id === "course-2")!;
+  data.progress[learner.id].push({
+    content_id: started.id,
+    version: started.version,
+    lessons: [started.lessons[0].id],
+    passed: false,
+  });
+  await page.addInitScript((workspace) => {
+    if (!localStorage.getItem("learning-test-seeded")) {
+      localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+      localStorage.setItem("learning-test-seeded", "yes");
+    }
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-learner");
+  }, data);
+  await page.goto("/#courses");
+  const summary = page.locator('.for-you [data-slot="card"]');
+  await expect(summary).toContainText("No courses assigned to you");
+  await expect(summary).toContainText("1 in progress · 1 completed");
+  await expect(summary).not.toContainText("days left in onboarding");
+  await expect(summary.getByRole("progressbar")).toHaveCount(0);
+  await summary.screenshot({
+    path: info.outputPath("no-assignments-with-activity.png"),
+  });
+  await summary.getByRole("button", { name: "View your courses" }).click();
+  const views = page.getByRole("group", { name: "Course views" });
+  await expect(
+    views.getByRole("button", { name: "Your courses" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".library .course-card")).toHaveCount(2);
+  await expect(
+    page.locator(".library .course-card").filter({ hasText: "Assigned" }),
+  ).toHaveCount(0);
+  await views.getByRole("button", { name: "Assigned" }).click();
+  await expect(
+    page.getByRole("heading", { name: "No assigned courses yet" }),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!);
+    data.progress["demo-learner"] = data.progress["demo-learner"].filter(
+      (record: { content_id: string }) => record.content_id !== "course-1",
+    );
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
+  });
+  await page.reload();
+  await expect(summary).toContainText("1 in progress");
+  await expect(summary).not.toContainText("completed");
+  await expect(
+    summary.getByRole("button", { name: "View your courses" }),
+  ).toBeVisible();
+
+  await page.evaluate(() => {
+    const data = JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!);
+    data.progress["demo-learner"] = [];
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
+  });
+  await page.reload();
+  await expect(summary).toContainText(
+    "Explore the course library at your own pace.",
+  );
+  await expect(
+    summary.getByRole("button", { name: "View your courses" }),
+  ).toHaveCount(0);
+  await expect(
+    summary.getByRole("button", { name: "All courses" }),
+  ).toBeVisible();
+  await summary.screenshot({
+    path: info.outputPath("no-assignments-no-activity.png"),
+  });
+});
+
 test("course rows scroll directly and the completion card fills narrow layouts", async ({
   page,
 }, info) => {
   await seed(page, false, true);
   const home = page.locator(".for-you");
   const row = home.getByRole("region", { name: "For you", exact: true });
-  await expect(page.getByRole("button", { name: /^(Previous|Next) .* courses$/ })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /^(Previous|Next) .* courses$/ }),
+  ).toHaveCount(0);
   await expect(row).toHaveAttribute("tabindex", "0");
-  expect(await row.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  expect(
+    await row.evaluate((element) => element.scrollWidth > element.clientWidth),
+  ).toBe(true);
   await row.scrollIntoViewIfNeeded();
   const rowBox = await row.boundingBox();
-  await page.mouse.move(rowBox!.x + rowBox!.width / 2, rowBox!.y + rowBox!.height / 2);
+  await page.mouse.move(
+    rowBox!.x + rowBox!.width / 2,
+    rowBox!.y + rowBox!.height / 2,
+  );
   await page.mouse.wheel(400, 0);
-  await expect.poll(() => row.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-  await row.evaluate((element) => { element.scrollLeft = 0; });
-  await expect.poll(() => row.evaluate((element) => element.scrollLeft)).toBe(0);
+  await expect
+    .poll(() => row.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0);
+  await row.evaluate((element) => {
+    element.scrollLeft = 0;
+  });
+  await expect
+    .poll(() => row.evaluate((element) => element.scrollLeft))
+    .toBe(0);
   await row.focus();
   await page.keyboard.press("ArrowRight");
-  await expect.poll(() => row.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await expect
+    .poll(() => row.evaluate((element) => element.scrollLeft))
+    .toBeGreaterThan(0);
   // A one-card library channel remains a normal, non-focusable strip.
   const product = page.locator(".channel").filter({
     has: page.getByRole("heading", {
@@ -225,19 +329,34 @@ test("course rows scroll directly and the completion card fills narrow layouts",
   });
   await expect(product).toHaveCount(1);
   await expect(product.locator(".course-card")).toHaveCount(1);
-  await expect(product.getByRole("region", { name: "Completed optional learning" })).not.toHaveAttribute("tabindex", "0");
+  await expect(
+    product.getByRole("region", { name: "Completed optional learning" }),
+  ).not.toHaveAttribute("tabindex", "0");
   for (const width of [1024, 390]) {
     await page.setViewportSize({ width, height: 844 });
-    const summary = await home.locator('[data-slot="card"]').first().boundingBox();
+    const summary = await home
+      .locator('[data-slot="card"]')
+      .first()
+      .boundingBox();
     const strip = await row.boundingBox();
-    const action = await home.locator('[data-slot="card"]').first().getByRole("button", { name: "Start course" }).boundingBox();
+    const action = await home
+      .locator('[data-slot="card"]')
+      .first()
+      .getByRole("button", { name: "Start course" })
+      .boundingBox();
     expect(Math.abs(summary!.x - strip!.x)).toBeLessThan(2);
     expect(Math.abs(summary!.width - strip!.width)).toBeLessThan(2);
     expect(action!.width).toBeLessThan(summary!.width * 0.7);
-    expect(Math.abs(action!.x + action!.width / 2 - (summary!.x + summary!.width / 2))).toBeLessThan(2);
+    expect(
+      Math.abs(
+        action!.x + action!.width / 2 - (summary!.x + summary!.width / 2),
+      ),
+    ).toBeLessThan(2);
     await page.setViewportSize({ width, height: 1400 });
     await row.evaluate((element) => element.blur());
-    await home.screenshot({ path: info.outputPath(`course-summary-${width}.png`) });
+    await home.screenshot({
+      path: info.outputPath(`course-summary-${width}.png`),
+    });
   }
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
@@ -297,7 +416,7 @@ test("completion removes a course from the home queue and remains visible in bot
   await expect(page.locator(".library .course-card")).toHaveCount(3);
   await page
     .getByRole("group", { name: "Course views", exact: true })
-    .getByRole("button", { name: "For you", exact: true })
+    .getByRole("button", { name: "Assigned", exact: true })
     .click();
   await expect(page.locator(".library .course-card")).toHaveCount(1);
   await page.getByRole("switch", { name: "Hide completed" }).focus();

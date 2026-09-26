@@ -9,12 +9,14 @@ export function CourseCard({
   course: c,
   status,
   dueDate,
+  assigned = false,
   onClick,
   href,
 }: {
   course: Content;
   status: ReturnType<typeof courseProgress>;
   dueDate?: string;
+  assigned?: boolean;
   onClick?: () => void;
   href?: string;
 }) {
@@ -29,7 +31,7 @@ export function CourseCard({
       title={c.title}
       description={c.summary}
       status={status}
-      metadata={`${c.lessons.length} lessons · Quiz`}
+      metadata={`${c.lessons.length} lessons · Quiz${assigned ? " · Assigned" : ""}`}
       action={
         complete
           ? "Review course"
