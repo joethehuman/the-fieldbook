@@ -138,6 +138,25 @@
   .markdown-table {
     overflow-x: auto;
   }
+  .markdown-table-wrap { position: relative; min-width: 0; }
+  .markdown-table-wrap[data-more-right="true"]::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 2.5rem;
+    pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--background));
+  }
+  .markdown-table [data-slot="table"] {
+    width: max-content;
+    min-width: 100%;
+    table-layout: auto;
+  }
+  .markdown-table :is(th, td) {
+    min-width: 11rem;
+  }
   .markdown th,
   .markdown td {
     overflow-wrap: normal;

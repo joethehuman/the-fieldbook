@@ -1,6 +1,6 @@
 import { Link2 } from "lucide-react";
 import { remarkHeadingAnchors } from "@/lib/markdown-headings";
-import { Table } from "@/components/ui/table";
+import { ScrollableMarkdownTable } from "./patterns/scrollable-markdown-table";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { contentLinkTarget, type ContentLinkContext } from "@/lib/content-links";
@@ -84,16 +84,7 @@ export default function Markdown({
               <img src={src} alt={alt || ""} loading="lazy" />
             </Button>
           ) : <img src={src} alt={alt || ""} loading="lazy" /> : null,
-        table: ({ children }) => (
-          <div
-            className="markdown-table"
-            role="region"
-            aria-label="Table"
-            tabIndex={0}
-          >
-            <Table>{children}</Table>
-          </div>
-        ),
+        table: ({ children }) => <ScrollableMarkdownTable>{children}</ScrollableMarkdownTable>,
       }}
     >
       {children}

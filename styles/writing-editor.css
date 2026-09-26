@@ -24,11 +24,26 @@
   color: var(--foreground);
   font-family: var(--font-body);
 }
+.writing-editor,
+.writing-editor .mdxeditor,
+.writing-editor .mdxeditor-root-contenteditable,
+.writing-editor .mdxeditor-contenteditable-wrapper,
+.writing-editor .writing-content {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+.writing-editor { overflow: hidden; }
+.writing-editor,
+.writing-editor .mdxeditor,
+.writing-editor .mdxeditor-root-contenteditable,
+.writing-editor .mdxeditor-contenteditable-wrapper,
+.writing-editor .writing-content { width: 100%; }
 .writing-slash-menu {
   position: fixed;
   z-index: 60;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   width: min(20rem, calc(100vw - 2rem));
   padding: var(--space-2);
   border: 1px solid var(--border);
@@ -37,9 +52,6 @@
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
   overflow: hidden;
 }
-.writing-slash-search { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2) var(--space-2); border-bottom: 1px solid var(--border); }
-.writing-slash-search > span { color: var(--muted-foreground); }
-.writing-slash-search > span:last-child:not(.muted) { color: var(--foreground); }
 .writing-slash-options { display: grid; min-height: 0; overflow-y: auto; padding-top: var(--space-1); }
 .writing-slash-options [role="menuitem"] { justify-content: flex-start; }
 .writing-slash-options [aria-current="true"] { background: var(--accent); }
@@ -57,19 +69,84 @@
   padding: var(--space-6);
   outline: none;
 }
-.writing-editor .writing-content:focus-within p:empty::before,
-.writing-editor .writing-content:focus-within p:has(> br:only-child)::before {
+.writing-editor:focus-within .writing-content:not([contenteditable]),
+.writing-editor:has(.writing-media-line) .writing-content:not([contenteditable]) {
+  display: none;
+}
+.writing-editor .writing-content:focus-within > p:last-child:empty:not(.writing-command-line, .writing-pending-list, .writing-media-line)::before,
+.writing-editor .writing-content:focus-within > p:last-child:has(> br:only-child):not(.writing-command-line, .writing-pending-list, .writing-media-line)::before {
   content: "Type / for commands…";
   color: var(--muted-foreground);
   opacity: .65;
   pointer-events: none;
 }
+.writing-editor .writing-content:focus-within > p.writing-command-line::before {
+  content: attr(data-slash-query);
+  color: var(--muted-foreground);
+  opacity: .8;
+  pointer-events: none;
+}
+.writing-editor .writing-content:focus-within > p.writing-pending-list::before {
+  content: attr(data-list-marker);
+  display: inline-block;
+  min-width: 1.5rem;
+  color: var(--muted-foreground);
+  opacity: 1;
+  pointer-events: none;
+}
+.writing-editor .writing-content .writing-media-line {
+  display: flex;
+  align-items: center;
+  min-height: 3.5rem;
+  padding: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--muted);
+}
+.writing-editor .writing-content > p.writing-media-line::before {
+  content: attr(data-media-placeholder);
+  color: var(--muted-foreground);
+  opacity: 1;
+}
+.writing-media-chooser {
+  position: fixed;
+  z-index: 61;
+  display: grid;
+  gap: var(--space-2);
+  width: min(21rem, calc(100vw - 1rem));
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  box-shadow: 0 12px 32px rgb(0 0 0 / .12);
+}
+.writing-media-tabs { display: flex; gap: var(--space-1); border-bottom: 1px solid var(--border); }
+.writing-media-tabs [aria-pressed="true"] { border-bottom: 2px solid var(--foreground); border-radius: 0; }
+.writing-media-fields { display: grid; gap: var(--space-2); }
 .writing-editor .writing-content:focus-visible {
   box-shadow: inset 0 0 0 2px var(--ring);
 }
 .writing-editor .mdxeditor-root-contenteditable {
   min-width: 0;
+  overflow-x: hidden;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"]:has(table) {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   overflow-x: auto;
+  border-radius: var(--radius);
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table {
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+  height: auto;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table :is(td, th):not([data-tool-cell="true"]):not(:first-child) {
+  min-width: 11rem;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table [data-tool-cell="true"] {
+  min-width: 2rem;
 }
 .writing-editor [data-toolbar-item][role="combobox"] {
   min-height: 2.25rem;

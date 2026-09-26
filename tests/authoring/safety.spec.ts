@@ -554,6 +554,9 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   const scrollBefore = await page.locator(".main-content").evaluate((node) => node.scrollTop);
   await writing.press("/");
   await expect(page.getByRole("menu", { name: "Insert content" })).toBeVisible();
+  await expect(writing.locator(".writing-command-line")).toHaveAttribute("data-slash-query", "/Type to search");
+  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::before").content)).toBe('"/Type to search"');
+  await expect(page.locator(".writing-editor .writing-content:not([contenteditable])")).toBeHidden();
   await expect(writing).toBeFocused();
   const menu = (await page.getByRole("menu", { name: "Insert content" }).boundingBox())!;
   expect(Math.min(Math.abs(menu.y - caret.bottom), Math.abs(menu.y + menu.height - caret.top))).toBeLessThan(24);
@@ -562,10 +565,14 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   expect(await page.locator(".main-content").evaluate((node) => node.scrollTop)).toBe(scrollBefore);
   await page.screenshot({ path: info.outputPath("course-builder-slash.png"), fullPage: true });
   await page.keyboard.type("hea");
+  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::before").content)).toBe('"/hea"');
   await expect(page.getByRole("menuitem")).toHaveCount(1);
   await page.keyboard.press("Enter");
+  await expect(writing).toBeFocused();
+  await expect.poll(() => page.evaluate(() => { const anchor = window.getSelection()?.anchorNode; return (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("h2")?.tagName; })).toBe("H2");
+  await page.keyboard.type("A heading here");
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/##/);
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/## A heading here/);
   await page.getByRole("button", { name: "Add quiz" }).click();
   await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Add quiz" })).toHaveCount(0);
@@ -584,6 +591,114 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toHaveCount(0);
 });
+
+test("inline media chooser inserts a video where the slash command was opened", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click();
+  await page.keyboard.type("Before the video");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("After the video");
+  await writing.locator("p").nth(1).click();
+  await page.keyboard.press("/");
+  await page.keyboard.type("embed video");
+  await page.getByRole("menuitem", { name: "Embed video link" }).click();
+  await expect(writing.locator(".writing-media-line")).toBeVisible();
+  const chooser = page.getByRole("dialog", { name: "Insert video" });
+  await expect(chooser).toBeVisible();
+  await chooser.getByRole("textbox", { name: "Video URL" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await chooser.getByRole("button", { name: "Insert video" }).click();
+  await expect(chooser).toHaveCount(0);
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/Before the video[\s\S]*\[Video\]\(https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ\)[\s\S]*After the video/);
+});
+
+test("wide course tables scroll inside the editor and show a reading edge", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true);
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await page.getByRole("textbox", { name: "Lesson content Markdown" }).fill("Text above the table.\n\n| One | Two | Three | Four | Five | Six |\n| --- | --- | --- | --- | --- | --- |\n| A | B | C | D | E | F |\n\nText below the table.");
+  await page.getByRole("button", { name: "Write", exact: true }).click();
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  const table = writing.locator("table").first();
+  await expect(table).toBeVisible();
+  const widths = await table.evaluate((node) => {
+    const wrapper = node.closest('[data-lexical-decorator="true"]');
+    const editor = node.closest(".writing-content");
+    return { table: node.scrollWidth, wrapper: wrapper?.clientWidth || 0, wrapperScroll: wrapper?.scrollWidth || 0, editor: editor?.scrollWidth || 0, editorWidth: editor?.clientWidth || 0 };
+  });
+  expect(widths.table).toBeGreaterThan(widths.wrapper);
+  expect(widths.wrapperScroll).toBeGreaterThan(widths.wrapper);
+  expect(widths.editor).toBeLessThanOrEqual(widths.editorWidth + 2);
+  await page.getByRole("button", { name: "Preview draft" }).click();
+  const reader = page.locator(".markdown-table-wrap");
+  await expect(reader).toHaveAttribute("data-more-right", "true");
+  await page.screenshot({ path: info.outputPath("course-table-more-columns.png") });
+  await reader.locator(".markdown-table").evaluate((node) => { node.scrollLeft = node.scrollWidth; });
+  await expect(reader).toHaveAttribute("data-more-right", "false");
+  await page.screenshot({ path: info.outputPath("course-table-scroll.png") });
+});
+
+test("pasted image uploads at the editor caret", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "The browser-local demo has no media storage.");
+  const { control } = await setup(page, true, "course", true);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click();
+  await page.keyboard.type("Before the image");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("After the image");
+  await writing.locator("p").nth(1).click();
+  await writing.evaluate((node) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["synthetic"], "pasted.png", { type: "image/png" }));
+    node.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect.poll(() => control.uploaded).toBe(true);
+  control.releaseUpload();
+  await expect(writing.locator("img")).toHaveAttribute("src", /\/api\/media\//);
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/Before the image[\s\S]*!\[pasted\]\(\/api\/media\/[\s\S]*After the image/);
+});
+
+test("image chooser uploads into the selected lesson line", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "The browser-local demo has no media storage.");
+  const { control } = await setup(page, true, "course", true);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click();
+  await page.keyboard.press("/");
+  await page.getByRole("menuitem", { name: "Image", exact: true }).click();
+  const chooser = page.getByRole("dialog", { name: "Insert image" });
+  await expect(writing.locator(".writing-media-line")).toBeVisible();
+  await chooser.getByRole("textbox", { name: "Image alternative text" }).fill("Course diagram");
+  const fileChooser = page.waitForEvent("filechooser");
+  await chooser.getByRole("button", { name: "Choose image" }).click();
+  await (await fileChooser).setFiles({ name: "diagram.png", mimeType: "image/png", buffer: Buffer.from("synthetic") });
+  await expect.poll(() => control.uploaded).toBe(true);
+  control.releaseUpload();
+  await expect(writing.locator("img")).toHaveAttribute("alt", "Course diagram");
+  await expect(chooser).toHaveCount(0);
+});
+
+for (const { command, query, marker } of [
+  { command: "Bulleted list", query: "bullet", marker: /[*-] A list item/ },
+  { command: "Numbered list", query: "number", marker: /1\. A list item/ },
+]) {
+  test(`${command} keeps the caret in the new list`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "course", true);
+    const writing = page.getByRole("textbox", { name: "Lesson content" });
+    await writing.click();
+    await page.keyboard.press("/");
+    await page.keyboard.type(query);
+    await page.keyboard.press("Enter");
+    await expect(writing.locator(".writing-pending-list")).toBeVisible();
+    await expect.poll(() => writing.locator(".writing-pending-list").evaluate((node) => getComputedStyle(node, "::before").content)).toBe(command === "Bulleted list" ? '"•"' : '"1."');
+    await page.keyboard.type("A list item");
+    await expect.poll(() => page.evaluate(() => { const anchor = window.getSelection()?.anchorNode; return (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("li")?.tagName; })).toBe("LI");
+    await page.getByRole("button", { name: "Markdown", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(marker);
+  });
+}
 
 test("slash insertion stays beside a blank line after lesson prose", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
@@ -609,6 +724,9 @@ test("slash insertion stays beside a blank line after lesson prose", async ({ pa
   await page.screenshot({ path: info.outputPath("blank-line-commands.png") });
   await page.keyboard.type("call");
   await page.keyboard.press("Enter");
+  await expect(writing).toBeFocused();
+  await expect.poll(() => page.evaluate(() => { const anchor = window.getSelection()?.anchorNode; return (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("blockquote")?.tagName; })).toBe("BLOCKQUOTE");
+  await page.keyboard.type("A callout here");
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/First line[\s\S]*>/);
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/First line[\s\S]*> A callout here/);
 });

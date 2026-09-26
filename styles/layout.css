@@ -753,7 +753,7 @@
   .course-image-open:focus-visible { outline: 2px solid var(--ring); }
   .course-image-dialog { max-width: min(92vw, 90rem); }
   .course-image-dialog img { max-width: 100%; max-height: 80dvh; object-fit: contain; justify-self: center; }
-  .course-builder { display: grid; grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr); gap: var(--space-5); min-width: 0; }
+  .course-builder { display: grid; grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr); gap: var(--space-8); min-width: 0; }
   .course-builder-outline { display: grid; align-content: start; gap: var(--space-4); }
   .course-builder-steps { display: grid; gap: var(--space-2); }
   .course-builder-panel { min-width: 0; }
@@ -762,8 +762,6 @@
   .course-editor-layout .editor-main { grid-area: main; }
   .course-editor-metadata { grid-area: metadata; display: grid; align-content: start; gap: var(--space-5); min-width: 0; }
   .course-editor-layout .editor-settings { grid-area: settings; position: static; align-self: start; }
-  .writing-video-link { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3); }
-  .writing-video-link [data-slot="input"] { flex: 1 1 14rem; }
   @media (width < 70rem) {
     .course-player .lesson-layout, .course-builder { grid-template-columns: minmax(0, 1fr); }
     .course-sidebar { position: static; max-height: none; }

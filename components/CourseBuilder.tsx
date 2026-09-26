@@ -46,7 +46,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, onError }:
   }
   return <section className="course-builder" aria-label="Course lessons and quiz">
     <div className="course-builder-outline">
-      <SectionHeader title={<h2>Course steps</h2>} />
+      <SectionHeader title={<h2>Course Outline</h2>} />
       <div className="course-builder-picker">
         <SelectField aria-label="Edit course step" value={selected} onValueChange={setSelected}>
           {course.lessons.map((lesson, index) => <option key={lesson.id} value={lesson.id}>{index + 1}. {lesson.title || `Lesson ${index + 1}`}</option>)}

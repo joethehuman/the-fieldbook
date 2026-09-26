@@ -19,6 +19,9 @@
     "test:reading": "playwright test -c playwright.reading.config.ts"
   },
   "dependencies": {
+    "@lexical/list": "0.48.0",
+    "@lexical/rich-text": "0.48.0",
+    "@lexical/selection": "0.48.0",
     "@mdxeditor/editor": "4.2.5",
     "@mdxeditor/gurx": "1.2.4",
     "@modelcontextprotocol/sdk": "^1.30.0",
