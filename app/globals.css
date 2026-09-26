@@ -16,7 +16,8 @@
   html {
     scrollbar-gutter: stable;
   }
-  html:has(.topbar) {
+  html:has(.topbar),
+  html:has([data-slot="account-viewport"]) {
     overflow: clip;
     overscroll-behavior: none;
     scrollbar-gutter: auto;

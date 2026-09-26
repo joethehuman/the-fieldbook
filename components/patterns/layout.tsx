@@ -162,13 +162,18 @@ export function ReadingPage({ className, ...props }: ComponentProps<"main">) {
 }
 export function AccountPage({ className, ...props }: ComponentProps<"main">) {
   return (
-    <main
-      className={cn(
-        "mx-auto my-12 grid w-[calc(100%-2rem)] max-w-lg gap-6 rounded-xl border border-border bg-card p-4 shadow-sm sm:my-20 sm:p-8 [&_h1]:text-2xl [&_h1]:font-semibold [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-muted-foreground",
-        className,
-      )}
-      {...props}
-    />
+    <div
+      data-slot="account-viewport"
+      className="h-dvh overflow-y-auto overscroll-contain"
+    >
+      <main
+        className={cn(
+          "mx-auto my-12 grid w-[calc(100%-2rem)] max-w-lg gap-6 rounded-xl border border-border bg-card p-4 shadow-sm sm:my-20 sm:p-8 [&_h1]:text-2xl [&_h1]:font-semibold [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-muted-foreground",
+          className,
+        )}
+        {...props}
+      />
+    </div>
   );
 }
 

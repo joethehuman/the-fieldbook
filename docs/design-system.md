@@ -116,7 +116,7 @@ The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browse
 
 `AccountMenu` is the shared sidebar identity and action surface in the demo and installed app. The calling shell supplies role-authorized destinations and the feedback persistence callback. The menu never grants access by itself; installed-app routes still enforce server permissions. Guest guidance and sign-in live in the menu. No theme control is currently offered.
 
-`InstallationIdentity` displays the installation name in the workspace and on account pages. `BrandedAccount` composes it with `AccountPage` and the published privacy link. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.
+`InstallationIdentity` displays the installation name in the workspace and on account pages. `BrandedAccount` composes it with `AccountPage` and the published privacy link. `AccountPage` owns a viewport-height scroll area: a short card stays in place on mobile, while a taller card scrolls within that area. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.
 
 ## Search results
 

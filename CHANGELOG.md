@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Place the footer after page content instead of fixing it in the viewport. Keep the mobile footer compact with the configured tagline and privacy link, without a custom pull animation.
+- Place the footer after page content instead of fixing it in the viewport. Keep the mobile footer compact with the configured tagline and privacy link, without a custom pull animation. Keep short account pages, including the demo profile chooser, from scrolling out of view on mobile while allowing taller pages to scroll.
 
 - Move account, team and organization actions into a shared profile menu for learners, managers, administrators and guests. Add general Fieldbook feedback through a dismissible dialog and include it in administrator feedback reports. Keep demo profile switching separate. Existing installations need `20260926182840_general_feedback.sql` before this feedback action can save.
 
