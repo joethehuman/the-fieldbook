@@ -117,7 +117,6 @@ function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
   return {
     ...branding,
     accent: config.settings.accent || "#0069ff",
-    tagline: config.settings.tagline || "",
   };
 }
 function readerAccount(

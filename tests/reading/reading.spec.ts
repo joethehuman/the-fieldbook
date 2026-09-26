@@ -281,7 +281,11 @@ test("hosted privacy stays in the app shell and returns to Courses without a wor
     if (entry.url().includes("/api/workspace")) workspaceReads++;
   });
   await page.goto("/courses");
-  await page.getByRole("link", { name: "Privacy policy" }).click();
+  const account = page.getByRole("button", { name: "Account menu" });
+  if (!(await account.isVisible()))
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await account.click();
+  await page.getByRole("menuitem", { name: "Privacy policy" }).click();
   await expect(page).toHaveURL(/\/privacy$/);
   await expect(page.getByText("Our published policy.")).toBeVisible();
   await expect(page.locator(".sidebar")).toHaveCount(1);

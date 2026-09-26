@@ -20,7 +20,6 @@ export type ReaderShellContext = {
   branding: {
     name: string;
     accent: string;
-    tagline: string;
     privacyUrl: string | null;
   };
   docs: DocLink[];

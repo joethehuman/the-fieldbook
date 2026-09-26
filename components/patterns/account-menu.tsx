@@ -1,9 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type RefObject } from "react";
+import Link from "next/link";
 import {
   ArrowLeftRight,
+  BookOpen,
   GraduationCap,
+  Info,
   LogIn,
   LogOut,
   MessageSquare,
@@ -32,6 +35,9 @@ export function AccountMenu({
   onSignOut,
   onSignIn,
   onSwitchDemoProfile,
+  privacyHref,
+  onPrivacyOpen,
+  onAboutDemo,
   onFeedback,
   onFeedbackOpen,
   onFeedbackClose,
@@ -46,6 +52,9 @@ export function AccountMenu({
   onSignOut?: () => void;
   onSignIn?: () => void;
   onSwitchDemoProfile?: () => void;
+  privacyHref?: string | null;
+  onPrivacyOpen?: () => void;
+  onAboutDemo?: (trigger: RefObject<HTMLButtonElement | null>) => void;
   onFeedback: (rating: "up" | "down", comment: string) => Promise<void>;
   onFeedbackOpen?: () => void;
   onFeedbackClose?: () => void;
@@ -123,6 +132,27 @@ export function AccountMenu({
               <DropdownMenuItem onSelect={onManageOrganization}>
                 Manage organization{" "}
                 <Settings className="ml-auto size-4" aria-hidden="true" />
+              </DropdownMenuItem>
+            )}
+            {privacyHref && (
+              <DropdownMenuItem asChild>
+                {privacyHref.startsWith("/") ? (
+                  <Link href={privacyHref} onClick={onPrivacyOpen}>
+                    Privacy policy{" "}
+                    <BookOpen className="ml-auto size-4" aria-hidden="true" />
+                  </Link>
+                ) : (
+                  <a href={privacyHref} onClick={onPrivacyOpen}>
+                    Privacy policy{" "}
+                    <BookOpen className="ml-auto size-4" aria-hidden="true" />
+                  </a>
+                )}
+              </DropdownMenuItem>
+            )}
+            {onAboutDemo && (
+              <DropdownMenuItem onSelect={() => onAboutDemo(trigger)}>
+                About this demo{" "}
+                <Info className="ml-auto size-4" aria-hidden="true" />
               </DropdownMenuItem>
             )}
             {(onSignOut || onSignIn) && <DropdownMenuSeparator />}

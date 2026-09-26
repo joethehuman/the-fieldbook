@@ -35,7 +35,6 @@ export default async function PrivacyPage() {
         branding: {
           name: branding.name,
           accent: settings.accent,
-          tagline: settings.tagline,
           privacyUrl: branding.privacyUrl,
         },
         docs: [],
