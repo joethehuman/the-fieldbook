@@ -98,8 +98,8 @@ export type Assignment = {
 export type Feedback = {
   id: string;
   userId: string;
-  contentId: string;
-  version: number;
+  contentId?: string;
+  version?: number;
   rating: "up" | "down";
   comment: string;
   updatedAt: string;

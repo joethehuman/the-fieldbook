@@ -120,6 +120,21 @@ function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
     tagline: config.settings.tagline || "",
   };
 }
+function readerAccount(
+  user: User | null,
+  config: Awaited<ReturnType<typeof canRead>>,
+) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    managesTeam: (config.teams || []).some(
+      (team: { managerId?: string }) => team.managerId === user.id,
+    ),
+  };
+}
 export const readerContext = cache(async (destination: string) => {
   const { user, config } = await readerAccess(destination);
   const rows = await publishedIndex(env().url, config.governance_revision);
@@ -183,7 +198,7 @@ export const readerContext = cache(async (destination: string) => {
     updatedAt: item.updatedAt,
   });
   return {
-    user: user ? { id: user.id, name: user.name, role: user.role } : null,
+    user: readerAccount(user, config),
     branding,
     docs,
     docCategoryOrder: orderedDocCategories(
@@ -211,7 +226,7 @@ export const readerContext = cache(async (destination: string) => {
 export const readerTeamContext = cache(async () => {
   const { user, config } = await readerAccess("/team");
   return {
-    user: user ? { id: user.id, name: user.name, role: user.role } : null,
+    user: readerAccount(user, config),
     branding: readerBranding(config),
     docs: [],
     docCategoryOrder: [],
@@ -474,7 +489,7 @@ export const readerUpdateItem = cache(async (id: string) => {
   return {
     item,
     context: {
-      user: user ? { id: user.id, name: user.name, role: user.role } : null,
+      user: readerAccount(user, config),
       branding: readerBranding(config),
     },
   };
@@ -485,7 +500,7 @@ export const readerCourseItem = cache(async (id: string) => {
   return {
     item,
     context: {
-      user: user ? { id: user.id, name: user.name, role: user.role } : null,
+      user: readerAccount(user, config),
       branding: readerBranding(config),
     },
   };

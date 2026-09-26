@@ -357,7 +357,8 @@ for (const app of ["demo", "production"] as const) {
     await page
       .getByRole("button", { name: "Open navigation", exact: true })
       .click();
-    const account = page.locator('[data-slot="account-button"] button');
+    await expect(page.locator(".sidebar")).toHaveClass(/open/);
+    const account = page.getByRole("button", { name: "Account menu" });
     expect(
       await page
         .locator('[data-slot="account-button"] > .min-w-0')

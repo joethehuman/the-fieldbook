@@ -178,10 +178,11 @@ export function feedbackRows(
     .filter((f) => {
       const c = data.content.find((c) => c.id === f.contentId);
       return (
-        (kind === "all" || c?.kind === kind) &&
+        (kind === "all" ||
+          (kind === "general" ? !f.contentId : c?.kind === kind)) &&
         (item === "all" || f.contentId === item) &&
         (rating === "all" || f.rating === rating) &&
-        `${c?.title || ""} ${f.comment}`
+        `${f.contentId ? c?.title || "" : "Fieldbook feedback"} ${f.comment}`
           .toLowerCase()
           .includes(query.toLowerCase())
       );
@@ -195,9 +196,12 @@ export function feedbackRows(
       const c = data.content.find((c) => c.id === f.contentId);
       return {
         ...f,
-        title: c?.title || "Removed content",
-        kind:
-          c?.kind === "course"
+        title: f.contentId
+          ? c?.title || "Removed content"
+          : "Fieldbook feedback",
+        kind: !f.contentId
+          ? "General"
+          : c?.kind === "course"
             ? "Course"
             : c?.kind === "brief"
               ? "Update"
@@ -226,7 +230,7 @@ export function feedbackCsv(rows: ReturnType<typeof feedbackRows>): CsvReport {
     rows: rows.map((r) => [
       r.title,
       r.kind,
-      r.version,
+      r.version ?? "",
       r.person,
       r.ratingLabel,
       r.comment,

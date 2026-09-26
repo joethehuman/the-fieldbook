@@ -326,7 +326,8 @@ test("manager exports include subteams and exclude sibling teams", async ({
     if (await menu.isVisible()) await menu.click();
     await page.getByRole("link", { name: "Courses", exact: true }).click();
     if (await menu.isVisible()) await menu.click();
-    await page.getByRole("link", { name: "My team’s progress" }).click();
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("menuitem", { name: "My team’s progress" }).click();
     await expect(page).toHaveURL(/\/team$/);
     expect(workspaceReads).toBe(0);
     expect(documentNavigations).toBe(1);

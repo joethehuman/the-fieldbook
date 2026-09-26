@@ -106,15 +106,11 @@ test("public browse, alternate brand and long-name fallback", async ({
   await page.goto("/docs");
   if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
   await expect(
-    page
-      .getByRole("button", { name: "Sign in with Google", exact: true })
-      .first(),
+    page.getByRole("menuitem", { name: "Sign in with Google" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Sign in with Google", exact: true })
-    .first()
-    .click();
+  await page.getByRole("menuitem", { name: "Sign in with Google" }).click();
   await expect(
     page.getByRole("heading", { name: "Sign in to Northstar Academy" }),
   ).toBeVisible();
@@ -317,7 +313,9 @@ test("consent and connection identity preserve purpose and demo stays simulated"
   await expect(
     page.getByRole("heading", { name: "Explore Fieldbook" }),
   ).toHaveCount(0);
-  await expect(account.getByText(/Demo workspace/)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Switch demo profile" }),
+  ).toBeVisible();
   await account.screenshot({
     path: info.outputPath("demo-account-action.png"),
   });
@@ -442,18 +440,186 @@ test("only the account action signs out; identity is inert", async ({
   await account.locator('[data-slot="initials-avatar"]').click();
   await account.getByText("Administrator", { exact: true }).click();
   await account.locator(".font-semibold").last().click();
-  await expect(
-    page.getByRole("button", { name: "Sign out", exact: true }),
-  ).toBeVisible();
+  await account.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "Sign out" })).toBeVisible();
   expect(signOuts).toBe(0);
-  await expect(account.getByText(/Demo workspace/)).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: info.outputPath("account-action.png") });
-  const signOut = page.getByRole("button", { name: "Sign out", exact: true });
+  const signOut = page.getByRole("menuitem", { name: "Sign out" });
   await signOut.focus();
   await page.keyboard.press("Enter");
   await expect.poll(() => signOuts).toBe(1);
   await page.waitForURL(organizationHomePath);
+});
+
+test("demo account menu follows the selected role and dismisses unsent feedback", async ({
+  page,
+}, info) => {
+  await page.goto("http://127.0.0.1:3132");
+  await page.getByRole("button", { name: /Alex Edwards/ }).click();
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(page.getByRole("menuitem", { name: "Feedback" })).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Manage organization" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("menuitem", { name: "My team’s progress" }),
+  ).toHaveCount(0);
+  await expect(page.getByRole("menuitem", { name: "Theme" })).toHaveCount(0);
+  await page.getByRole("menuitem", { name: "Feedback" }).click();
+  const dialog = page.getByRole("dialog", { name: "Share feedback" });
+  await expect(dialog).toBeVisible();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await page.screenshot({
+    path: info.outputPath("general-feedback-dialog.png"),
+  });
+  await dialog
+    .getByRole("textbox", { name: "Your feedback (optional)" })
+    .fill("Unsent draft");
+  await page.mouse.click(5, 5);
+  await expect(dialog).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("fieldbook.workspace.v1") || "{}")
+          .feedback || [],
+    ),
+  ).toHaveLength(0);
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await page.getByRole("menuitem", { name: "Feedback" }).click();
+  await dialog.getByRole("button", { name: "Useful", exact: true }).click();
+  await dialog
+    .getByRole("textbox", { name: "Your feedback (optional)" })
+    .fill("Helpful workspace");
+  await dialog.getByRole("button", { name: "Send" }).click();
+  await expect(dialog).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("fieldbook.workspace.v1") || "{}")
+          .feedback,
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        userId: "demo-learner",
+        comment: "Helpful workspace",
+      }),
+    ]),
+  );
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Switch demo profile" }).click();
+  await page.getByRole("button", { name: /manager/i }).click();
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "My team’s progress" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Manage organization" }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  if (
+    (page.viewportSize()?.width || 0) < 768 &&
+    !(await page
+      .getByRole("button", { name: "Switch demo profile" })
+      .isVisible())
+  )
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Switch demo profile" }).click();
+  await page.getByRole("button", { name: /Oliver Anderson/ }).click();
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Manage organization" }),
+  ).toBeVisible();
+});
+
+test("public guest can send general feedback through the account menu", async ({
+  page,
+  request,
+}) => {
+  await request.post(backend, { data: { settings: { access: "public" } } });
+  await page.goto("/docs");
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Sign in with Google" }),
+  ).toBeVisible();
+  await expect(page.getByRole("menu")).toContainText(
+    "save course progress across devices",
+  );
+  await page.getByRole("menuitem", { name: "Feedback" }).click();
+  const dialog = page.getByRole("dialog", { name: "Share feedback" });
+  await dialog.getByRole("button", { name: "Not useful" }).click();
+  await dialog
+    .getByRole("textbox", { name: "Your feedback (optional)" })
+    .fill("Guest feedback");
+  let attempted = 0;
+  await page.route("**/api/feedback", async (route) => {
+    attempted++;
+    await route.fulfill({ status: 503, json: { error: "Try again shortly." } });
+  });
+  expect(attempted).toBe(0);
+  await dialog.getByRole("button", { name: "Send" }).click();
+  await expect(dialog.getByRole("alert")).toHaveText("Try again shortly.");
+  await expect(
+    dialog.getByRole("textbox", { name: "Your feedback (optional)" }),
+  ).toHaveValue("Guest feedback");
+  await page.unroute("**/api/feedback");
+  await dialog.getByRole("button", { name: "Send" }).click();
+  await expect(dialog).toHaveCount(0);
+  await login(page);
+  const workspace = await (await page.request.get("/api/workspace")).json();
+  expect(workspace.data.feedback).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ userId: "guest", comment: "Guest feedback" }),
+    ]),
+  );
+  const picker = page.getByRole("combobox", { name: "Administration section" });
+  if (await picker.isVisible()) {
+    await picker.click();
+    await page.getByRole("option", { name: "Feedback", exact: true }).click();
+  } else {
+    await page.getByRole("tab", { name: "Feedback", exact: true }).click();
+  }
+  await expect(page.getByText("Fieldbook feedback", { exact: true })).toBeVisible();
+  await expect(page.getByText("Guest feedback", { exact: true })).toBeVisible();
+});
+
+test("an administrator who manages a team sees both account destinations", async ({
+  page,
+  request,
+}) => {
+  await request.post(backend, {
+    data: {
+      teams: [
+        {
+          id: "sales",
+          name: "Sales",
+          managerId: "00000000-0000-4000-8000-000000000010",
+        },
+      ],
+    },
+  });
+  await login(page, "/courses");
+  if ((page.viewportSize()?.width || 0) < 768)
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Manage organization" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "My team’s progress" }),
+  ).toBeVisible();
 });
 
 test("shared settings library and connection states work in the server app", async ({

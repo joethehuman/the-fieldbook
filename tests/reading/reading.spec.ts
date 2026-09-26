@@ -1100,7 +1100,7 @@ test("private verified sessions refresh and do not contaminate anonymous respons
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html).toContain(items[0].title);
-    expect(html).not.toContain("admin@example.test");
+    expect(html).toContain("admin@example.test");
     expect(html).toContain("Synthetic Admin");
     expect(html).not.toContain("SECRET DRAFT");
     if (expired)
@@ -1123,6 +1123,7 @@ test("private verified sessions refresh and do not contaminate anonymous respons
   const anonymous = await request.get(`/docs/${ids[0]}`, { maxRedirects: 0 });
   expect(anonymous.status()).toBe(307);
   expect(await anonymous.text()).not.toContain(items[0].title);
+  expect(await anonymous.text()).not.toContain("admin@example.test");
 });
 test("guest lessons and server-graded quiz retain browser progress", async ({
   page,

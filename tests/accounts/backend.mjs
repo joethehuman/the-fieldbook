@@ -142,6 +142,7 @@ createServer(async (req, res) => {
       revision,
       governance_revision: fixtureGeneration,
       groups: configuredGroups,
+      teams: configuredTeams,
       curricula: configuredCurricula,
     });
   }
@@ -294,6 +295,10 @@ createServer(async (req, res) => {
   if (url.pathname === "/rest/v1/fb_feedback") {
     if (req.method === "POST") {
       const row = JSON.parse(body || "{}");
+      if (row.content_id === null) {
+        configuredFeedback.push(row);
+        return send(res, []);
+      }
       const index = configuredFeedback.findIndex(
         (entry) =>
           entry.content_id === row.content_id &&

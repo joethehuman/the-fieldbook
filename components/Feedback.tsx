@@ -111,6 +111,7 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             }}
           >
             <option value="all">All types</option>
+            <option value="general">General</option>
             <option value="doc">Docs</option>
             <option value="brief">Updates</option>
             <option value="course">Courses</option>
@@ -118,7 +119,7 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
         </FormField>
         <FormField label="Content item">
           <SelectField value={item} onValueChange={(value) => setItem(value)}>
-            <option value="all">All content</option>
+            <option value="all">All feedback</option>
             {data.content
               .filter((c) => kind === "all" || c.kind === kind)
               .map((c) => (
@@ -173,14 +174,14 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
               </CardContent>
               <CardFooter>
                 <p className="text-copy text-muted-foreground">
-                  {f.person} · v{f.version} ·{" "}
+                  {f.person} {f.version ? `· v${f.version} ` : ""}·{" "}
                   {new Date(f.updatedAt).toLocaleDateString()}
                 </p>
-                {item !== f.contentId && (
+                {f.contentId && item !== f.contentId && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => viewItem(f.contentId)}
+                    onClick={() => viewItem(f.contentId!)}
                   >
                     View all feedback for this item
                   </Button>

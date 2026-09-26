@@ -94,8 +94,8 @@ export async function adminSnapshot(
     data.feedback = ratings.map((row) => ({
       id: row.id,
       userId: row.user_id || "guest",
-      contentId: row.content_id,
-      version: row.version,
+      contentId: row.content_id || undefined,
+      version: row.version ?? undefined,
       rating: row.rating,
       comment: row.comment,
       updatedAt: row.updated_at,
