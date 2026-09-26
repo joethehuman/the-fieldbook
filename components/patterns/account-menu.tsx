@@ -56,7 +56,7 @@ export function AccountMenu({
     <div className="@container">
       <div
         data-slot="account-button"
-        className="grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-3 border-t border-border px-2 py-4 text-left"
+        className="grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-3 border-t border-border px-2 py-4 text-left @max-[13rem]:grid-cols-[2.25rem_minmax(0,1fr)]"
       >
         <InitialsAvatar initials={initials} />
         <span className="min-w-0">
@@ -76,7 +76,7 @@ export function AccountMenu({
               type="button"
               variant="ghost"
               size="icon"
-              className="rounded-full hover:bg-muted-hover focus-visible:bg-muted-hover"
+              className="rounded-full hover:bg-muted-hover focus-visible:bg-muted-hover @max-[13rem]:col-start-2 @max-[13rem]:justify-self-end"
               aria-label="Account menu"
               title="Account menu"
             >
