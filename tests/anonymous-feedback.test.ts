@@ -50,7 +50,7 @@ test("general feedback migration preserves content rows and requires matched con
     for (const file of [
       "202609190001_fieldbook.sql",
       "20260924150351_anonymous_feedback.sql",
-      "20260926120000_general_feedback.sql",
+      "20260926182840_general_feedback.sql",
     ]) {
       await pg.exec(
         await readFile(
