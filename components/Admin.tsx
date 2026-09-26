@@ -1507,9 +1507,17 @@ export function Editor({
             : "Saving or refreshing. Keep this page open."}
         </p>
       )}
-      <FieldGroup disabled={busy} className="editor-layout">
-        <section className="editor-main">
+      <FieldGroup disabled={busy} className={`editor-layout${c.kind === "course" ? " course-editor-layout" : ""}`}>
+        {c.kind === "course" && <section className="course-editor-metadata" aria-label="Course introduction">
           <FormField label="Title">
+            <Input required maxLength={160} value={c.title} onChange={(e) => set("title", e.target.value)} placeholder="Give it a clear, useful title" />
+          </FormField>
+          <FormField label="Short description">
+            <Textarea required rows={3} maxLength={300} value={c.summary} onChange={(e) => set("summary", e.target.value)} placeholder="What will people learn?" />
+          </FormField>
+        </section>}
+        <section className="editor-main">
+          {c.kind !== "course" && <><FormField label="Title">
             <Input
               required
               maxLength={160}
@@ -1527,7 +1535,7 @@ export function Editor({
               onChange={(e) => set("summary", e.target.value)}
               placeholder="What will people find here?"
             />
-          </FormField>
+          </FormField></>}
           {c.kind !== "course" ? (
             <WritingEditor
               label={c.kind === "doc" ? "Doc content" : "Update content"}

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Check, CheckCircle2, Clock } from "lucide-react";
+import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Alert } from "./ui/alert";
@@ -46,6 +46,8 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const [saveError, setSaveError] = useState("");
   const [image, setImage] = useState<{ src: string; alt: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const activeCard = useRef<HTMLElement>(null);
+  const mounted = useRef(false);
   const didResume = useRef(false);
   const lesson = course.lessons[step];
   const allDone = course.lessons.every((item) => p?.lessons.includes(item.id));
@@ -62,10 +64,10 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
     else if (next < 0 && !p.passed) setStep(course.lessons.length);
   }, [guest, initialLessonId, p, step, course.lessons]);
   useEffect(() => {
-    if (step === 0) return;
+    if (!mounted.current) { mounted.current = true; return; }
     requestAnimationFrame(() => {
       heading.current?.focus({ preventScroll: true });
-      heading.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+      activeCard.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
     });
   }, [step]);
   async function record(lessonId?: string, selections?: QuizAnswers, finish?: boolean) {
@@ -130,20 +132,20 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
       <div className="course-reader">
         {saveError && <Alert variant="destructive" role="alert">{saveError}</Alert>}
         {lesson ? <>
-          <Card className="course-lesson grid gap-6">
+          <Card ref={activeCard} className="course-lesson grid gap-6">
             <span className="eyebrow">Lesson {step + 1} of {course.lessons.length}</span>
             <h2 ref={heading} tabIndex={-1}>{lesson.title}</h2>
             {lesson.videoUrl && <CourseVideo key={lesson.videoUrl} url={lesson.videoUrl} title={`${lesson.title} video`} posterUrl={course.coverImageUrl} />}
             <div className="markdown"><Markdown linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown></div>
             {p?.lessons.includes(lesson.id) && <Badge variant="success"><CheckCircle2 size={16} /> Lesson completed</Badge>}
           </Card>
-          <div className="course-continue"><Button variant="default" onClick={next} loading={busy}>
-            {step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Continue to quiz" : "Finish lessons"} <ArrowRight size={16} />
-          </Button></div>
+          <nav className="course-continue" aria-label="Continue course"><Button variant="ghost" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={next} loading={busy}>
+            <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish lessons"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Share feedback"}</span></span><ChevronRight aria-hidden="true" size={16} />
+          </Button></nav>
         </> : <>
-          {!!course.questions.length && <Card className="course-quiz grid gap-6">
+          {!!course.questions.length && <Card ref={activeCard} className="course-quiz grid gap-6">
             <span className="eyebrow">Quiz</span>
-            <h2 ref={heading} tabIndex={-1}>Check your understanding</h2>
+            <h2 ref={heading} tabIndex={-1}>Check your knowledge</h2>
             <p>{requiresPassing(course) ? "Answer every question correctly to complete this course. You can retry." : "Complete the quiz to finish this course. You can review your answers afterward."}</p>
             {!allDone && <Note>Complete all lessons before submitting your answers.</Note>}
             {course.questions.map((question, index) => <FieldGroup className="quiz-question" key={question.id}>

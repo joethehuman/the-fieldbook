@@ -378,10 +378,10 @@ test("completion removes a course from the home queue and remains visible in bot
     page.getByRole("heading", { name: "Know the platform", level: 1 }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Next lesson", exact: true })
+    .getByRole("button", { name: /^Next lesson/ })
     .click();
   await page
-    .getByRole("button", { name: "Continue to quiz", exact: true })
+    .getByRole("button", { name: "Quiz Check your knowledge" })
     .click();
   await page
     .getByRole("radio", { name: "The customer’s goal", exact: true })

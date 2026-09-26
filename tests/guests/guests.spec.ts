@@ -411,7 +411,7 @@ test("guest Updates and curriculum learning, browser progress and account transi
     .getByRole(f.production ? "link" : "button", { name: /Foundation course/ })
     .first()
     .click();
-  await page.getByRole("button", { name: "Continue to quiz" }).click();
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await page.getByRole("radio", { name: "Correct", exact: true }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(

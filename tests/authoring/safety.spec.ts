@@ -529,13 +529,41 @@ test("draft saves and publication share one transient confirmation", async ({
 test("course builder edits one lesson at a time and keeps one final quiz", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   await expect(page.getByRole("heading", { name: "Lesson 1" })).toBeVisible();
+  const metadata = page.getByRole("region", { name: "Course introduction" });
+  await expect(metadata.getByRole("textbox", { name: "Title", exact: true })).toBeVisible();
+  if ((page.viewportSize()?.width || 0) >= 1024) {
+    const details = await metadata.boundingBox();
+    const outline = await page.getByRole("navigation", { name: "Edit course step" }).boundingBox();
+    expect(details!.x).toBeGreaterThan(outline!.x);
+  }
+  await page.screenshot({ path: info.outputPath("course-builder-layout.png"), fullPage: true });
   await page.getByRole("button", { name: "Add lesson" }).click();
   await page.getByLabel("Lesson title").fill("Second lesson");
   await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Lesson 1" })).toHaveCount(0);
-  await page.getByRole("textbox", { name: "Lesson content" }).press("/");
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click({ position: { x: 32, y: 48 } });
+  const caret = await page.evaluate(() => {
+    const selection = window.getSelection()!;
+    const range = selection.getRangeAt(0).getBoundingClientRect();
+    const anchor = selection.anchorNode instanceof Element ? selection.anchorNode : selection.anchorNode?.parentElement;
+    const rect = range.height ? range : anchor?.closest("p, h1, h2, h3, li, blockquote")?.getBoundingClientRect();
+    if (!rect) throw new Error("Expected a visible insertion line");
+    return { top: rect.top, bottom: rect.bottom };
+  });
+  const scrollBefore = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  await writing.press("/");
   await expect(page.getByRole("menu", { name: "Insert content" })).toBeVisible();
-  await page.getByRole("menuitem", { name: "Heading" }).click();
+  await expect(writing).toBeFocused();
+  const menu = (await page.getByRole("menu", { name: "Insert content" }).boundingBox())!;
+  expect(Math.min(Math.abs(menu.y - caret.bottom), Math.abs(menu.y + menu.height - caret.top))).toBeLessThan(24);
+  expect(menu.y).toBeGreaterThanOrEqual(0);
+  expect(menu.y + menu.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  expect(await page.locator(".main-content").evaluate((node) => node.scrollTop)).toBe(scrollBefore);
+  await page.screenshot({ path: info.outputPath("course-builder-slash.png"), fullPage: true });
+  await page.keyboard.type("hea");
+  await expect(page.getByRole("menuitem")).toHaveCount(1);
+  await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
   await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/##/);
   await page.getByRole("button", { name: "Add quiz" }).click();
@@ -555,4 +583,32 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   }
   await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toHaveCount(0);
+});
+
+test("slash insertion stays beside a blank line after lesson prose", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click();
+  await page.keyboard.press("ControlOrMeta+A");
+  await page.keyboard.type("First line");
+  await page.keyboard.press("Enter");
+  await page.screenshot({ path: info.outputPath("blank-lesson-line.png") });
+  const oldScroll = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  const line = (await writing.locator("p").last().boundingBox())!;
+  await page.keyboard.press("/");
+  const menu = page.getByRole("menu", { name: "Insert content" });
+  await expect(menu).toBeVisible();
+  await expect(writing).toBeFocused();
+  const box = (await menu.boundingBox())!;
+  const newScroll = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  expect(Math.abs(newScroll - oldScroll)).toBeLessThan(8);
+  expect(box.y).toBeGreaterThanOrEqual(0);
+  expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  expect(Math.abs(box.x - line.x)).toBeLessThan(24);
+  expect(box.y >= line.y + line.height - 12 || box.y + box.height <= line.y + 12).toBe(true);
+  await page.screenshot({ path: info.outputPath("blank-line-commands.png") });
+  await page.keyboard.type("call");
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/First line[\s\S]*>/);
 });

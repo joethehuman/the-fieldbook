@@ -106,6 +106,8 @@ Reference conventions: [shadcn composition](https://ui.shadcn.com/docs), [themin
 
 `LaunchList` remains a general ordered sequence pattern. Curriculum detail pages use shared `LearningCard` and `CardGrid` in saved order, with the Curriculum eyebrow, title and description. Do not add sorting, channel filters or course editing controls to a learner playlist.
 
+The course builder places its step outline, selected lesson editor and settings in three desktop columns. Course title and short description lead the settings column; on narrow screens they precede the step picker and editor. `WritingEditor` keeps the slash command menu at the editing line in a portal so opening it does not reflow the lesson. Keep keyboard search, arrow selection and Escape dismissal within the editor. The shared `reading-pagination-link` gives lesson continuation the same quiet label, destination title and chevron treatment as Docs pagination. Scroll the active lesson or quiz card into view at its top edge, accounting for the app bar.
+
 The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browser toolbar, the ordered launch list and the responsive course player. `CourseVideo` owns file/embed presentation, theater view, loading and native speed controls; `WritingEditor` owns the shared visual/source/preview modes and insertion UI. Verify mixed title lengths, metadata wrapping, equal card/footer alignment, header controls, keyboard focus, narrow screens and enlarged text whenever these patterns change.
 
 ## Account identity

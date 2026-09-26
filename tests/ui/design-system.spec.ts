@@ -448,10 +448,10 @@ test("course completion still works through shared choices and controls", async 
     }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Next lesson", exact: true })
+    .getByRole("button", { name: /^Next lesson/ })
     .click();
   await page
-    .getByRole("button", { name: "Continue to quiz", exact: true })
+    .getByRole("button", { name: "Quiz Check your knowledge" })
     .click();
   await page
     .getByRole("radio", { name: "The customer’s goal", exact: true })

@@ -384,7 +384,8 @@
     padding-top: var(--space-6);
     gap: var(--space-4);
   }
-  .document-pagination-link {
+  .document-pagination-link,
+  .reading-pagination-link {
     max-width: 100%;
     min-width: 0;
     height: auto;

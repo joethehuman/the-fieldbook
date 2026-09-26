@@ -24,6 +24,26 @@
   color: var(--foreground);
   font-family: var(--font-body);
 }
+.writing-slash-menu {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(20rem, calc(100vw - 2rem));
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--background);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
+  overflow: hidden;
+}
+.writing-slash-search { display: flex; align-items: center; gap: var(--space-1); padding: var(--space-1) var(--space-2) var(--space-2); border-bottom: 1px solid var(--border); }
+.writing-slash-search > span { color: var(--muted-foreground); }
+.writing-slash-search > span:last-child:not(.muted) { color: var(--foreground); }
+.writing-slash-options { display: grid; min-height: 0; overflow-y: auto; padding-top: var(--space-1); }
+.writing-slash-options [role="menuitem"] { justify-content: flex-start; }
+.writing-slash-options [aria-current="true"] { background: var(--accent); }
+.writing-slash-options .muted { padding: var(--space-3); }
 .writing-editor .mdxeditor-toolbar {
   position: static;
   flex-wrap: wrap;
@@ -36,6 +56,13 @@
   min-height: 24rem;
   padding: var(--space-6);
   outline: none;
+}
+.writing-editor .writing-content:focus-within p:empty::before,
+.writing-editor .writing-content:focus-within p:has(> br:only-child)::before {
+  content: "Type / for commands…";
+  color: var(--muted-foreground);
+  opacity: .65;
+  pointer-events: none;
 }
 .writing-editor .writing-content:focus-visible {
   box-shadow: inset 0 0 0 2px var(--ring);

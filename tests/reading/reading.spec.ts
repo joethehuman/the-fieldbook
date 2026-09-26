@@ -1127,10 +1127,21 @@ test("private verified sessions refresh and do not contaminate anonymous respons
 test("guest lessons and server-graded quiz retain browser progress", async ({
   page,
   request,
-}) => {
+}, info) => {
   await page.goto(`/courses/${ids[2]}?lesson=first`);
   await page.getByRole("button", { name: "Next lesson" }).click();
-  await page.getByRole("button", { name: "Continue to quiz" }).click();
+  await expect.poll(async () => {
+    const card = await page.locator(".course-lesson").boundingBox();
+    const viewport = await page.locator(".main-content").boundingBox();
+    return card!.y - viewport!.y;
+  }).toBeGreaterThanOrEqual(0);
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await expect.poll(async () => {
+    const card = await page.locator(".course-quiz").boundingBox();
+    const viewport = await page.locator(".main-content").boundingBox();
+    return card!.y - viewport!.y;
+  }).toBeGreaterThanOrEqual(0);
+  await page.screenshot({ path: info.outputPath("course-quiz-entry.png") });
   await page.getByRole("radio", { name: "Second", exact: true }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(
@@ -1185,6 +1196,34 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
   ).toBeNull();
 });
 
+test("long lesson transitions reveal the entire next card from its top edge", async ({ page, request }, info) => {
+  const longBody = Array.from({ length: 24 }, (_, index) => `Paragraph ${index + 1}. A useful point for this lesson.`).join("\n\n");
+  const course = {
+    ...items[2],
+    lessons: items[2].lessons.map((lesson) => ({ ...lesson, body: longBody })),
+    questions: Array.from({ length: 8 }, (_, index) => ({ ...items[2].questions[0], id: `check-${index}`, prompt: `Choose a principle ${index + 1}` })),
+  };
+  await fixture(request, { documents: documents([items[0], items[1], course]) });
+  await page.setViewportSize({ width: info.project.name === "phone" ? 375 : 1280, height: 640 });
+  await page.goto(`/courses/${ids[2]}?lesson=first`);
+  const distanceFromScrollTop = async (selector: string) => {
+    const card = await page.locator(selector).boundingBox();
+    const viewport = await page.locator(".main-content").boundingBox();
+    return card!.y - viewport!.y;
+  };
+  await page.getByRole("button", { name: /^Next lesson/ }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("course-next-navigation.png") });
+  await page.getByRole("button", { name: /^Next lesson/ }).click();
+  await expect.poll(() => distanceFromScrollTop(".course-lesson")).toBeLessThan(70);
+  await expect.poll(() => distanceFromScrollTop(".course-lesson")).toBeGreaterThanOrEqual(0);
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("course-quiz-navigation.png") });
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await expect.poll(() => distanceFromScrollTop(".course-quiz")).toBeLessThan(70);
+  await expect.poll(() => distanceFromScrollTop(".course-quiz")).toBeGreaterThanOrEqual(0);
+  await page.screenshot({ path: info.outputPath("long-course-quiz-start.png") });
+});
+
 test("signed-in lessons keep the reader shell and persist server-graded progress", async ({
   page,
   request,
@@ -1221,7 +1260,7 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
   await page.getByRole("link", { name: /First lesson/ }).click();
   await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}\\?lesson=first`));
   await page.getByRole("button", { name: "Next lesson" }).click();
-  await page.getByRole("button", { name: "Continue to quiz" }).click();
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await page.getByRole("radio", { name: "First", exact: true }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(
