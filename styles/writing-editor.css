@@ -142,20 +142,43 @@
   min-width: 100%;
   height: auto;
 }
-.writing-editor .writing-content [data-lexical-decorator="true"] table :is(td, th):not([data-tool-cell="true"]):not(:first-child) {
+.writing-editor .writing-content [data-lexical-decorator="true"] table tbody > tr > :is(td, th):not([data-tool-cell="true"]):not(:first-child) {
   min-width: 11rem;
 }
 .writing-editor .writing-content [data-lexical-decorator="true"] table [data-tool-cell="true"] {
-  min-width: 2rem;
-  height: 2rem;
+  min-width: 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table :is(thead, tfoot) th:not([data-tool-cell="true"]) {
+  min-width: 1.5rem;
+  width: 1.5rem;
   padding: 0;
   border: 0;
 }
 .writing-editor .writing-content [data-lexical-decorator="true"] table :is(tr:first-child, tr:last-child):has([data-tool-cell="true"]) {
-  height: 2rem;
+  height: 1.5rem;
 }
 .writing-editor .writing-content [data-lexical-decorator="true"] table :is(tr:first-child, tr:last-child):has([data-tool-cell="true"]) > [data-tool-cell="true"] button {
-  min-height: 2rem;
+  min-height: 1.5rem;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table :is(thead, tfoot) button,
+.writing-editor .writing-content [data-lexical-decorator="true"] table tbody [data-tool-cell="true"] button {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table:hover :is(thead, tfoot) button,
+.writing-editor .writing-content [data-lexical-decorator="true"] table:hover tbody [data-tool-cell="true"] button,
+.writing-editor .writing-content [data-lexical-decorator="true"] table:focus-within :is(thead, tfoot) button,
+.writing-editor .writing-content [data-lexical-decorator="true"] table:focus-within tbody [data-tool-cell="true"] button,
+.writing-editor .writing-content [data-lexical-decorator="true"] table button[data-state="open"] {
+  opacity: 1;
+}
+@media (hover: none) {
+  .writing-editor .writing-content [data-lexical-decorator="true"] table :is(thead, tfoot) button,
+  .writing-editor .writing-content [data-lexical-decorator="true"] table tbody [data-tool-cell="true"] button { opacity: .7; }
 }
 .writing-editor [data-toolbar-item][role="combobox"] {
   min-height: 2.25rem;

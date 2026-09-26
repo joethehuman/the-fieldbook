@@ -630,6 +630,12 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   expect(widths.table).toBeGreaterThan(widths.wrapper);
   expect(widths.wrapperScroll).toBeGreaterThan(widths.wrapper);
   expect(widths.editor).toBeLessThanOrEqual(widths.editorWidth + 2);
+  const trailingControlWidth = await table.locator("tfoot th").last().evaluate((cell) => cell.getBoundingClientRect().width);
+  expect(trailingControlWidth).toBeLessThan(50);
+  await table.getByRole("button", { name: "Column menu" }).first().click();
+  await expect(page.getByTitle("Insert a column to the right of this one")).toBeVisible();
+  await table.evaluate((node) => { const scroller = node.closest('[data-lexical-decorator="true"]'); if (scroller) scroller.scrollLeft = 180; });
+  await expect(page.getByTitle("Insert a column to the right of this one")).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("course-editor-wide-table.png") });
   await page.getByRole("button", { name: "Preview draft" }).click();
   const reader = page.locator(".markdown-table-wrap");
@@ -638,6 +644,102 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   await reader.locator(".markdown-table").evaluate((node) => { node.scrollLeft = node.scrollWidth; });
   await expect(reader).toHaveAttribute("data-more-right", "false");
   await page.screenshot({ path: info.outputPath("course-table-scroll.png") });
+});
+
+test("slash Table inserts at the selected line and unmatched searches can return to writing", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true);
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await page.getByRole("textbox", { name: "Lesson content Markdown" }).fill("Before\n\nAfter");
+  await page.getByRole("button", { name: "Write", exact: true }).click();
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.locator("p").first().click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("/");
+  await page.keyboard.type("table");
+  await expect(page.getByRole("menuitem", { name: "Table" })).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(writing.locator("table")).toBeVisible();
+  await expect(writing.locator("table tbody tr")).toHaveCount(3);
+  await expect(writing.locator("table tbody tr").first().locator(":is(td, th):not([data-tool-cell])")).toHaveCount(3);
+  const beforeTable = await writing.locator("table").evaluate((node) => node.closest('[data-lexical-decorator="true"]')?.previousElementSibling?.textContent);
+  expect(beforeTable).toBe("Before");
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/Before[\s\S]*\|[\s\S]*After/);
+  await page.getByRole("button", { name: "Write", exact: true }).click();
+  await writing.locator("p").last().click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("/");
+  await page.keyboard.type("unlikely-block-name");
+  await expect(page.getByText("No matching blocks")).toBeVisible();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(0);
+  await expect(writing).toBeFocused();
+  await page.keyboard.type(" continues");
+  await writing.locator("p", { hasText: "After" }).click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("/");
+  await page.keyboard.type("another-unknown-block");
+  await writing.locator("p", { hasText: "Before" }).click();
+  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/\/unlikely-block-name continues/);
+});
+
+test("slash Table can be chosen with the pointer", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.locator("p").first().click();
+  await page.keyboard.type("Before");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("/");
+  await page.getByRole("menuitem", { name: "Table" }).click();
+  const table = writing.locator("table");
+  await expect(table).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(0);
+  await table.getByRole("button", { name: "Column menu" }).first().click();
+  await page.getByTitle("Insert a column to the right of this one").click();
+  await expect(table.locator("tbody tr").first().locator(":is(td, th):not([data-tool-cell])")).toHaveCount(4);
+  await table.getByRole("button", { name: "Row menu" }).first().click();
+  await page.getByTitle("Insert a row below this one").click();
+  await expect(table.locator("tbody tr")).toHaveCount(4);
+  await table.getByRole("button", { name: "Delete table" }).click();
+  await expect(table).toHaveCount(0);
+});
+
+test("slash list begins on the chosen line without an extra blank block", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true);
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await page.getByRole("textbox", { name: "Lesson content Markdown" }).fill("Before\n\nAfter");
+  await page.getByRole("button", { name: "Write", exact: true }).click();
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.locator("p").first().click();
+  await page.keyboard.press("End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("/");
+  await page.keyboard.type("bullet");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("On this line");
+  const listItem = writing.locator("li", { hasText: "On this line" });
+  await expect(listItem).toBeVisible();
+  const structure = await writing.evaluate((node) => {
+    const list = node.querySelector("ul")!;
+    const before = list.previousElementSibling;
+    const after = list.nextElementSibling;
+    return {
+      previousText: before?.textContent,
+      previousTag: before?.tagName,
+      nextText: after?.textContent,
+      gap: list.getBoundingClientRect().top - (before?.getBoundingClientRect().bottom || 0),
+    };
+  });
+  expect(structure.previousTag).toBe("P");
+  expect(structure.previousText).toBe("Before");
+  expect(structure.nextText).toBe("After");
+  expect(structure.gap).toBeLessThan(64);
+  await writing.screenshot({ path: info.outputPath("slash-list-between-paragraphs.png") });
 });
 
 test("pasted image uploads at the editor caret", async ({ page }, info) => {
