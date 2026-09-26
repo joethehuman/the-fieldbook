@@ -147,6 +147,15 @@
 }
 .writing-editor .writing-content [data-lexical-decorator="true"] table [data-tool-cell="true"] {
   min-width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 0;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table :is(tr:first-child, tr:last-child):has([data-tool-cell="true"]) {
+  height: 2rem;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table :is(tr:first-child, tr:last-child):has([data-tool-cell="true"]) > [data-tool-cell="true"] button {
+  min-height: 2rem;
 }
 .writing-editor [data-toolbar-item][role="combobox"] {
   min-height: 2.25rem;

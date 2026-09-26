@@ -630,6 +630,7 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   expect(widths.table).toBeGreaterThan(widths.wrapper);
   expect(widths.wrapperScroll).toBeGreaterThan(widths.wrapper);
   expect(widths.editor).toBeLessThanOrEqual(widths.editorWidth + 2);
+  await page.screenshot({ path: info.outputPath("course-editor-wide-table.png") });
   await page.getByRole("button", { name: "Preview draft" }).click();
   const reader = page.locator(".markdown-table-wrap");
   await expect(reader).toHaveAttribute("data-more-right", "true");
