@@ -1150,7 +1150,7 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
     ),
   ).toBe(true);
   await page.goto("/courses");
-  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  await expect(page.getByText(/1 completed/)).toBeVisible();
   const token = await (
     await request.post(`${backend}/auth/v1/token`, { data: {} })
   ).json();
@@ -1174,7 +1174,7 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
     .getByRole("region", { name: "Import browser progress" })
     .getByRole("button", { name: "Save browser progress to my account" })
     .click();
-  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  await expect(page.getByText(/1 completed/)).toBeVisible();
   expect(
     await page.evaluate(() =>
       localStorage.getItem("fieldbook.guest-progress.v1"),
@@ -1248,7 +1248,7 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
     .click();
   await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}$`));
   await page.getByRole("link", { name: /Back to courses/ }).click();
-  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  await expect(page.getByText(/1 completed/)).toBeVisible();
   expect(documentNavigations).toBe(1);
   await page.reload();
   await expect(
