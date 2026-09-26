@@ -70,13 +70,14 @@ export function ContentScroll({ children }: { children: ReactNode }) {
       event: WheelEvent | TouchEvent,
     ) => {
       if (reducedMotion.matches || movement === 0 || !event.cancelable) return;
+      const atTop = area.scrollTop <= 1;
+      const atBottom =
+        area.scrollTop + area.clientHeight >= area.scrollHeight - 1;
+      if ((pull > 0 && !atTop) || (pull < 0 && !atBottom)) setPull(0);
       const direction = -Math.sign(movement);
       if (pull === 0) {
-        if (childCanScroll(target, area, direction)) return;
-        const atTop = area.scrollTop <= 1;
-        const atBottom =
-          area.scrollTop + area.clientHeight >= area.scrollHeight - 1;
         if ((movement > 0 && !atTop) || (movement < 0 && !atBottom)) return;
+        if (childCanScroll(target, area, direction)) return;
       }
 
       event.preventDefault();
