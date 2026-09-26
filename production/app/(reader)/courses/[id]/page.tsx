@@ -2,14 +2,15 @@ import { notFound } from "next/navigation";
 import {
   readerCourseItem,
   readerCourseProgress,
+  readerCourses,
   readerMetadata,
 } from "@production/lib/reader";
-import { CourseOverview, ReadingBack } from "@/components/patterns/reading";
 import { ReaderCoursePlayer } from "@/components/reader/ReaderCoursePlayer";
+import type { Curriculum } from "@/lib/types";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ lesson?: string; curriculum?: string }>;
+  searchParams: Promise<{ lesson?: string; curriculum?: string; from?: string }>;
 };
 
 export async function generateMetadata({ params }: Props) {
@@ -20,33 +21,24 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function Page({ params, searchParams }: Props) {
   const { id } = await params;
-  const { lesson, curriculum } = await searchParams;
-  const [{ item, context }, progress] = await Promise.all([
-    readerCourseItem(id),
-    lesson ? readerCourseProgress(id) : Promise.resolve([]),
-  ]);
-  if (lesson) {
-    if (!item.lessons.some((entry) => entry.id === lesson)) notFound();
-    return (
+  const { lesson, curriculum, from } = await searchParams;
+  const { item, context } = await readerCourseItem(id);
+  const progress = context.user ? await readerCourseProgress(id) : [];
+  if (lesson && !item.lessons.some((entry) => entry.id === lesson)) notFound();
+  const origin = curriculum ? (await readerCourses()).curricula.find((entry: Curriculum) =>
+    entry.id === curriculum && entry.status === "published" && entry.courseIds.includes(item.id),
+  ) : undefined;
+  return (
       <ReaderCoursePlayer
         course={item}
         lessonId={lesson}
-        curriculum={curriculum}
+        curriculum={origin?.id}
+        curriculumTitle={origin?.name}
+        from={from}
         signedIn={!!context.user}
         initialProgress={progress.filter(
           (entry) => entry.version === item.version,
         )}
       />
     );
-  }
-  return (
-    <CourseOverview
-      item={item}
-      curriculum={curriculum}
-      lessonBase="/courses"
-      back={
-        <ReadingBack kind="course" curriculum={curriculum} clientNavigation />
-      }
-    />
-  );
 }

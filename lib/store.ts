@@ -1,6 +1,7 @@
 import { withPublishedSnapshots } from "./demo-publication";
 import { seedContent } from "./seed";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
+import { gradeQuiz, quizUnlocked } from "./course-quiz";
 export type Workspace = {
   settings?: import("./settings").SiteSettings;
   revision?: number;
@@ -178,7 +179,8 @@ export function updateProgress(
   userId: string,
   course: Content,
   lessonId?: string,
-  answers?: number[],
+  answers?: number[] | import("./course-quiz").QuizAnswers,
+  complete = false,
 ): Workspace {
   const next = structuredClone(data);
   const list = (next.progress[userId] ??= []);
@@ -190,7 +192,7 @@ export function updateProgress(
       content_id: course.id,
       version: course.version,
       lessons: [],
-      passed: course.questions.length === 0,
+      passed: false,
     };
     list.push(p);
   }
@@ -201,9 +203,14 @@ export function updateProgress(
   )
     p.lessons.push(lessonId);
   if (answers && course.lessons.every((l) => p!.lessons.includes(l.id))) {
-    const passed = course.questions.every((q, i) => q.answer === answers[i]);
-    (p.attempts ??= []).push({ at: new Date().toISOString(), passed });
-    p.passed = p.passed || passed;
+    const selections = answers.map((answer) => Array.isArray(answer) ? answer : [answer]);
+    const graded = gradeQuiz(course, selections);
+    (p.attempts ??= []).push({ at: new Date().toISOString(), version: course.version, passed: graded.passed, answers: graded.answers });
+  }
+  if (complete) {
+    if (!course.lessons.every((lesson) => p!.lessons.includes(lesson.id)) || !quizUnlocked(course, p.attempts))
+      throw new Error("Finish the lessons and quiz before completing this course.");
+    p.passed = true;
   }
   return next;
 }

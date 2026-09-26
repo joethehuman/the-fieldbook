@@ -4,6 +4,11 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Open course cards directly in a responsive lesson player, with curriculum-aware return navigation, a sticky course outline, image expansion, a larger video view, and a final feedback and Complete course action. Curriculum cards open an ordered course-card page.
+- Build courses one lesson at a time in the shared visual editor. Add a slash insert menu, inline uploaded or linked video, accessible image descriptions, and one optional final quiz. Quiz questions support two to five answers and one to four correct choices; an optional all-correct rule controls when completion unlocks. Save detailed attempts separately from course completion.
+- Place course title and description above its settings, anchor the visual editor's searchable slash menu to the active line, and give lesson continuation the same quiet destination navigation as Docs. Reveal the complete lesson or quiz card when advancing.
+- Add a 3×3 Table to the course editor's slash menu, let unmatched searches return to normal writing, and remove the extra blank line left by list insertion. Keep table controls compact and close an open row or column menu when its table scrolls.
+
 - Make the Courses summary useful without assignments: show current course activity and link to a combined Your courses view, with an Assigned filter and a quiet marker on assigned cards. Keep the progress ring assigned-only and improve its spacing.
 
 - Open Docs on the first published document in sidebar order, with a simple empty page when no Docs are published. Remove the back-to-Docs link from articles, keep the wide page outline visible, and place the mobile outline chevron beside its label.

@@ -35,6 +35,8 @@ export function ReaderGuestImport() {
           version: entry.version,
           lessons: entry.lessons,
           answers: entry.guestAnswers,
+          selections: entry.guestSelections,
+          complete: entry.passed,
         });
         saved++;
         localStorage.setItem(

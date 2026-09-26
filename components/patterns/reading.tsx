@@ -118,7 +118,7 @@ export function Article({
                       asChild
                       variant="ghost"
                       key={doc.id}
-                      className={`document-pagination-link h-auto min-w-0 whitespace-normal p-3 ${direction === 0 ? "justify-start text-left" : "justify-end text-right"}`}
+                      className={`document-pagination-link reading-pagination-link h-auto min-w-0 whitespace-normal p-3 ${direction === 0 ? "justify-start text-left" : "justify-end text-right"}`}
                     >
                       {demo || onDocument ? (
                         <a

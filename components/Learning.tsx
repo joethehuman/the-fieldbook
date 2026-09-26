@@ -136,7 +136,7 @@ export default function Learning({
         }
         href={
           linkedNavigation
-            ? `/curricula/${encodeURIComponent(item.curriculum.id)}`
+            ? `/curricula/${encodeURIComponent(item.curriculum.id)}?from=${encodeURIComponent("/courses")}`
             : undefined
         }
       />

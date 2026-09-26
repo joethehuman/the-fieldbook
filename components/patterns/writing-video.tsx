@@ -12,6 +12,7 @@ import {
   addImportVisitor$,
   addExportVisitor$,
 } from "@mdxeditor/editor";
+import { videoSource } from "@/lib/video";
 
 type VideoData = SerializedLexicalNode & {
   url: string;
@@ -66,8 +67,9 @@ class WritingVideoNode extends DecoratorNode<ReactNode> {
     return this.__label;
   }
   decorate() {
+    const source = videoSource(this.__url);
     return (
-      <video
+      source?.type === "embed" ? <iframe src={source.url} title={this.__label} allowFullScreen loading="lazy" /> : <video
         controls
         preload="metadata"
         src={this.__url}
@@ -84,7 +86,8 @@ export const writingVideoPlugin = realmPlugin({
       priority: 100,
       testNode: (node) =>
         node.type === "link" &&
-        /^\/api\/media\/.+\.(mp4|webm)(?:\?|$)/i.test(node.url) &&
+        (/^\/api\/media\/.+\.(mp4|webm)(?:\?|$)/i.test(node.url) ||
+          !!videoSource(node.url) && node.children.some((child) => child.type === "text" && child.value === "Video")) &&
         node.children.every((child) => child.type === "text"),
       visitNode({ mdastNode, lexicalParent }) {
         if (mdastNode.type !== "link" || !$isElementNode(lexicalParent)) return;
