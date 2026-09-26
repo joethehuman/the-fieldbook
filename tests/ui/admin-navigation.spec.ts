@@ -53,6 +53,10 @@ test("long admin content and footer use one scroll path", async ({ page }) => {
   await expect(panel).toBeVisible();
   expect(await area.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
   expect(await panel.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+  const nav = page.locator('[data-slot="admin-navigation"]');
+  const navTop = await nav.evaluate((el) => el.getBoundingClientRect().top);
+  await area.evaluate((el) => (el.scrollTop = 200));
+  expect(await nav.evaluate((el) => el.getBoundingClientRect().top)).toBeCloseTo(navTop, 0);
   await area.evaluate((el) => (el.scrollTop = el.scrollHeight));
   await expect(footer).toBeInViewport();
   const before = await page.evaluate(() => {

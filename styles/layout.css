@@ -192,9 +192,11 @@
       grid-template-columns: minmax(0, 1fr);
     }
     [data-slot="admin-navigation"] {
-      position: static;
+      top: var(--space-6);
+      z-index: 1;
       height: auto;
       overflow: visible;
+      background: var(--background);
     }
     .editor-layout {
       grid-template-columns: minmax(0, 1fr);
