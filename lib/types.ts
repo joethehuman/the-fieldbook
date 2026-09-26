@@ -8,6 +8,10 @@ export type Question = {
   id: string;
   prompt: string;
   options: string[];
+  optionIds?: string[];
+  correctOptionIds?: string[];
+  explanation?: string;
+  multiple?: boolean;
   answer?: number;
 };
 export type Content = {
@@ -31,6 +35,8 @@ export type Content = {
   groups: string[];
   lessons: Lesson[];
   questions: Question[];
+  /** Missing on older published courses, which retain the original passing rule. */
+  requirePassing?: boolean;
 };
 export type User = {
   id: string;
@@ -49,8 +55,14 @@ export type Progress = {
   content_id: string;
   version: number;
   lessons: string[];
+  /** Legacy database column: course completion, separate from attempt correctness. */
   passed: boolean;
-  attempts?: { at: string; passed: boolean }[];
+  attempts?: {
+    at: string;
+    passed: boolean;
+    version?: number;
+    answers?: { questionId: string; optionIds: string[]; correct: boolean }[];
+  }[];
 };
 export type LearningItem = { kind: "course" | "curriculum"; id: string };
 export type Curriculum = {

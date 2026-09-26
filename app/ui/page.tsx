@@ -3,7 +3,8 @@ import { WritingExamples } from "./writing-examples";
 import { LibraryExamples } from "./library-examples";
 import { ControlExamples } from "./control-examples";
 import { DocumentTree } from "@/components/patterns/document-tree";
-import { Article, CourseOverview } from "@/components/patterns/reading";
+import { Article } from "@/components/patterns/reading";
+import { Course } from "@/components/Course";
 import { seedContent } from "@/lib/seed";
 import { useToast } from "@/components/ui/toast";
 import { useInteractionDialog } from "@/components/ui/interaction-dialog";
@@ -592,10 +593,9 @@ export default function ComponentCatalog() {
             name="Sample Fieldbook"
           />
         </SplitPanel>
-        <CourseOverview
-          item={seedContent.find((item) => item.kind === "course")!}
-          back={<Button variant="link">← Back to courses</Button>}
-        />
+        <Course course={seedContent.find((item) => item.kind === "course")!}
+          progress={[]} initialLessonId={seedContent.find((item) => item.kind === "course")!.lessons[0]?.id}
+          backLabel="Back to courses" onBack={() => {}} onDemoProgress={() => true} />
       </section>
     </ReadingPage>
   );

@@ -105,7 +105,7 @@ test("authored hyperlinks follow article and course tab rules", async ({
   }
 
   await page.goto(`/courses/${ids[2]}?lesson=first`);
-  const reference = page.getByRole("link", {
+  const reference = page.locator(".course-reader").getByRole("link", {
     name: /reference.*opens in a new tab/,
   });
   await expect(reference).toHaveAttribute("target", "_blank");
@@ -337,8 +337,9 @@ test("published curriculum opens in the reader shell with guest progress and no 
   await expect(
     page.getByText("In progress", { exact: true }).first(),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: /Published course title/ })).toHaveAttribute("href", new RegExp(`/courses/${ids[2]}\\?curriculum=intro`));
   await page.screenshot({ path: testInfo.outputPath("curriculum-shell.png") });
-  await page.getByRole("button", { name: "Back to courses" }).click();
+  await page.getByRole("link", { name: "Back to courses" }).click();
   await expect(page).toHaveURL(/\/courses$/);
   expect(workspaceReads).toBe(0);
   expect((await request.get("/curricula/missing")).status()).toBe(404);
@@ -622,7 +623,7 @@ test("Courses share reader navigation and show the signed-in account immediately
       response.url().includes("/api/progress") &&
       response.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Complete & continue" }).click();
+  await page.getByRole("button", { name: "Next lesson" }).click();
   expect((await saved).status()).toBe(200);
 });
 test("signed-in learners can find started and completed courses without assignments", async ({
@@ -1056,6 +1057,7 @@ test("hydration keeps one article, breadcrumbs navigate, and lesson links open t
   await expect(
     page.getByText("Learn the second principle.", { exact: true }),
   ).toBeVisible();
+  await expect(page.getByRole("link", { name: /Second lesson/ })).toHaveClass(/selected/);
   await expect(page).toHaveTitle(`${items[2].title} | Acme Learning`);
   await page.screenshot({
     path: info.outputPath("lesson-player.png"),
@@ -1127,20 +1129,21 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
   request,
 }) => {
   await page.goto(`/courses/${ids[2]}?lesson=first`);
-  await page.getByRole("button", { name: "Complete & continue" }).click();
+  await page.getByRole("button", { name: "Next lesson" }).click();
   await page.getByRole("button", { name: "Continue to quiz" }).click();
   await page.getByRole("radio", { name: "Second", exact: true }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(
-    page.getByText("Great work. You’ve completed this course."),
+    page.getByText("All answers are correct."),
   ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Content feedback" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Complete course" }).click();
   await page.reload();
-  await expect(
-    page.getByText("Completed", { exact: true }).first(),
-  ).toBeVisible();
+  await expect.poll(async () => page.evaluate(() =>
+    JSON.parse(localStorage.getItem("fieldbook.guest-progress.v1") || "[]")[0]?.passed,
+  )).toBe(true);
   expect(
     await page.evaluate(
       () =>
@@ -1217,37 +1220,36 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
   await page.goto(`/courses/${ids[2]}`);
   await page.getByRole("link", { name: /First lesson/ }).click();
   await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}\\?lesson=first`));
-  await page.getByRole("button", { name: "Complete & continue" }).click();
+  await page.getByRole("button", { name: "Next lesson" }).click();
   await page.getByRole("button", { name: "Continue to quiz" }).click();
   await page.getByRole("radio", { name: "First", exact: true }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(
-    page.getByText("Not quite yet. Revisit the lessons and try again."),
+    page.getByText("Some answers need another try. Review and retry when ready."),
   ).toBeVisible();
   await page.getByRole("radio", { name: "Second", exact: true }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(
-    page.getByText("Great work. You’ve completed this course."),
+    page.getByText("All answers are correct."),
   ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Content feedback" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Complete course" }).click();
+  await expect(page).toHaveURL(/\/courses$/);
+  await expect.poll(async () => {
+    const rows = await (await request.get(`${backend}/rest/v1/fb_progress?content_id=eq.${ids[2]}`)).json();
+    return rows[0]?.passed;
+  }).toBe(true);
+  const saved = await (await request.get(`${backend}/rest/v1/fb_progress?content_id=eq.${ids[2]}`)).json();
   expect(documentNavigations).toBe(1);
   expect(workspaceReads).toBe(0);
-  const saved = await (
-    await request.get(`${backend}/rest/v1/fb_progress?content_id=eq.${ids[2]}`)
-  ).json();
   expect(saved[0]).toMatchObject({
     lessons: ["first", "second"],
     passed: true,
   });
   expect(saved[0].attempts).toHaveLength(2);
-  await page
-    .getByRole("button", { name: /Back to course/ })
-    .first()
-    .click();
-  await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}$`));
-  await page.getByRole("link", { name: /Back to courses/ }).click();
+  await expect(page).toHaveURL(/\/courses$/);
   await expect(page.getByText(/1 completed/)).toBeVisible();
   expect(documentNavigations).toBe(1);
   await page.reload();
@@ -1269,8 +1271,8 @@ test("canonical detail routes, curriculum destinations and name-only metadata", 
     expect(html).not.toContain("/api/branding/logo");
     expect(html).not.toContain("SECRET POLICY DRAFT");
     if (index === 2) {
-      expect(html).toContain(`?lesson=first&amp;curriculum=intro`);
-      expect(html).toContain('href="/curricula/intro"');
+      expect(html).toContain(`?lesson=first`);
+      expect(html).toContain('href="/courses"');
     }
   }
 });

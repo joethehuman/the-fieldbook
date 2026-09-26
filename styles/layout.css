@@ -725,3 +725,50 @@
     }
   }
 }
+
+@layer components {
+  .course-player .lesson-layout { grid-template-columns: minmax(15rem, 1fr) minmax(0, 2fr); gap: var(--space-8); }
+  .course-sidebar { display: grid; align-content: start; gap: var(--space-6); position: sticky; top: var(--anchor-offset); max-height: calc(100dvh - var(--anchor-offset) - var(--space-6)); min-width: 0; }
+  .course-sidebar .lesson-nav { position: static; min-height: 0; overflow-y: auto; align-content: start; padding-right: var(--space-2); }
+  .course-sidebar .lesson-nav h2 { font-size: 1rem; font-weight: 600; margin-block: var(--space-2); }
+  .course-sidebar .lesson-nav [data-slot="navigation-button"] { text-align: left; align-items: center; }
+  .course-sidebar .quiz-step { border-top: 1px solid var(--border); margin-top: var(--space-2); padding-top: var(--space-3); }
+  .course-sidebar .quiz-number { background: var(--surface); border: 1px solid var(--border); }
+  .course-about details { display: none; }
+  .course-reader { display: grid; min-width: 0; gap: var(--space-5); }
+  .course-lesson, .course-quiz { min-width: 0; }
+  .course-lesson h2, .course-quiz h2 { scroll-margin-top: var(--anchor-offset); }
+  .course-continue { display: flex; justify-content: flex-end; }
+  .course-finish { display: grid; justify-items: center; gap: var(--space-6); padding-block: var(--space-6); }
+  .course-video { display: grid; gap: var(--space-3); min-width: 0; position: relative; }
+  .course-video-loading { position: absolute; z-index: 1; top: var(--space-4); left: var(--space-4); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--background); color: var(--foreground); font-size: .875rem; pointer-events: none; }
+  .course-video video, .course-video iframe { display: block; width: 100%; max-height: 70dvh; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius); background: var(--foreground); }
+  .course-video.theater { width: min(85vw, 90rem); max-width: none; margin-inline: calc((100% - min(85vw, 90rem)) / 2); }
+  .course-video.theater video, .course-video.theater iframe { max-height: 82dvh; }
+  .course-video-actions { justify-content: flex-end; }
+  .course-video-speed { display: flex; align-items: center; gap: var(--space-2); font-size: .875rem; }
+  .course-video-speed [data-slot="select-trigger"] { min-width: 5rem; }
+  .course-image-open { display: inline-block; max-width: 100%; cursor: zoom-in; border-radius: var(--radius-control); outline-offset: 3px; }
+  .course-image-open:focus-visible { outline: 2px solid var(--ring); }
+  .course-image-dialog { max-width: min(92vw, 90rem); }
+  .course-image-dialog img { max-width: 100%; max-height: 80dvh; object-fit: contain; justify-self: center; }
+  .course-builder { display: grid; grid-template-columns: minmax(10rem, 13rem) minmax(0, 1fr); gap: var(--space-5); min-width: 0; }
+  .course-builder-outline { display: grid; align-content: start; gap: var(--space-4); }
+  .course-builder-steps { display: grid; gap: var(--space-2); }
+  .course-builder-panel { min-width: 0; }
+  .course-builder-picker { display: none; }
+  .writing-slash-menu { display: grid; position: relative; z-index: 10; width: min(100%, 18rem); padding: var(--space-2); border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--background); }
+  .writing-slash-menu [role="menuitem"] { justify-content: flex-start; }
+  .writing-video-link { display: flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-3); }
+  .writing-video-link [data-slot="input"] { flex: 1 1 14rem; }
+  @media (width < 70rem) {
+    .course-player .lesson-layout, .course-builder { grid-template-columns: minmax(0, 1fr); }
+    .course-sidebar { position: static; max-height: none; }
+    .course-sidebar .lesson-nav { grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; }
+    .course-about details { display: block; }
+    .course-desktop-summary { display: none; }
+    .course-builder-steps { display: none; }
+    .course-builder-picker { display: block; }
+    .course-video.theater { width: 100%; margin-inline: 0; }
+  }
+}

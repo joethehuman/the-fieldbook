@@ -448,7 +448,7 @@ test("course completion still works through shared choices and controls", async 
     }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Complete & continue", exact: true })
+    .getByRole("button", { name: "Next lesson", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Continue to quiz", exact: true })
@@ -463,8 +463,9 @@ test("course completion still works through shared choices and controls", async 
     .getByRole("button", { name: "Check answers", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Course complete", exact: true }),
+    page.getByRole("button", { name: "Complete course", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Complete course", exact: true }).click();
   await page.reload();
   await expect(
     page.getByText("Completed", { exact: true }).first(),

@@ -80,7 +80,8 @@ test("real snapshot/progress/settings boundaries with synthetic PostgREST: no an
       lessons: ["lesson"],
       answers: [0],
     });
-    assert.equal(result.passed, true);
+    assert.equal(result.passed, false);
+    assert.equal(result.attemptPassed, true);
     assert.ok(requests.every((r) => r.method === "GET"));
     assert.equal(JSON.stringify(data.users), before);
     const admin = { ...data.users[0], role: "admin" as const };

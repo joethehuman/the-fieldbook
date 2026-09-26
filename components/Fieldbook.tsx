@@ -5,7 +5,8 @@ import { AppBar } from "./patterns/app-bar";
 import { DocumentTree } from "./patterns/document-tree";
 import { DocsEmpty } from "./patterns/docs-empty";
 import type { ReadingState } from "@/lib/reading";
-import { Article, CourseOverview } from "./patterns/reading";
+import { Article } from "./patterns/reading";
+import { gradeQuiz } from "@/lib/course-quiz";
 import { Course } from "./Course";
 import { guestRecommendations } from "@/lib/guest-recommendations";
 import { ReportAvailability } from "./patterns/csv-export";
@@ -930,29 +931,12 @@ export default function Fieldbook({
             />
           ) : initialReading && data === initialReading.data ? (
             children
-          ) : item?.kind === "course" && initialReading && !targetLesson ? (
-            <CourseOverview
-              curriculum={courseOrigin}
-              item={item}
-              back={
-                <Button
-                  variant="link"
-                  onClick={() =>
-                    navigate(
-                      "learn",
-                      courseOrigin ? `curriculum:${courseOrigin}` : undefined,
-                    )
-                  }
-                >
-                  ← Back to {courseOrigin ? "curriculum" : "courses"}
-                </Button>
-              }
-            />
           ) : item?.kind === "course" ? (
             <Course
               key={item.id + item.version + (targetLesson || "")}
               course={item}
               initialLessonId={targetLesson || undefined}
+              curriculumTitle={data.curricula?.find((entry) => entry.id === courseOrigin)?.name}
               progress={data.progress[user.id] || []}
               onBack={() =>
                 navigate(
@@ -981,25 +965,24 @@ export default function Fieldbook({
               onDemoProgress={
                 runtime
                   ? undefined
-                  : (lessonId, answers) => {
+                  : (lessonId, answers, complete) => {
                       persist(
-                        updateProgress(data, user.id, item, lessonId, answers),
+                        updateProgress(data, user.id, item, lessonId, answers, complete),
                       );
                       return answers
-                        ? item.questions.every(
-                            (q, i) => answers[i] === q.answer,
-                          )
+                        ? gradeQuiz(item, answers).passed
                         : undefined;
                     }
               }
               onProgress={
                 runtime
-                  ? async (lessonId, answers) => {
+                  ? async (lessonId, answers, complete) => {
                       const r = await runtime.progress(
                         item,
                         data.progress[user.id] || [],
                         lessonId,
                         answers,
+                        complete,
                       );
                       setData((prev) =>
                         prev

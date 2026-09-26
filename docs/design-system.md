@@ -104,9 +104,9 @@ Reference conventions: [shadcn composition](https://ui.shadcn.com/docs), [themin
 
 `BrowseToolbar` aligns labeled fields to their control baseline and wraps whole fields on narrow screens. Use Search, a single Channel SelectField, and Sort for a full collection browser. A short fixed set of primary views may use FilterOptions; growing taxonomies belong in a dropdown. When a home page already groups cards under channel headings, do not repeat channel filter buttons. Result counts and Hide completed belong in the SectionHeader action area, separate from search/sort controls.
 
-`LaunchList` presents a learner's ordered sequence: number, flexible title/description/status, and an aligned launch action. It is distinct from the editor's OrderedLearning. Curriculum detail pages use this simple list with a PageHeader and progress/next-course action. Do not add sorting, channel filters, nested accordions or course editing controls to a learner playlist.
+`LaunchList` remains a general ordered sequence pattern. Curriculum detail pages use shared `LearningCard` and `CardGrid` in saved order, with the Curriculum eyebrow, title and description. Do not add sorting, channel filters or course editing controls to a learner playlist.
 
-The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browser toolbar, and the ordered launch list. Verify mixed title lengths, metadata wrapping, equal card/footer alignment, header controls, keyboard focus, narrow screens and enlarged text whenever these patterns change.
+The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browser toolbar, the ordered launch list and the responsive course player. `CourseVideo` owns file/embed presentation, theater view, loading and native speed controls; `WritingEditor` owns the shared visual/source/preview modes and insertion UI. Verify mixed title lengths, metadata wrapping, equal card/footer alignment, header controls, keyboard focus, narrow screens and enlarged text whenever these patterns change.
 
 ## Account identity
 
@@ -136,7 +136,7 @@ Do not use transient confirmations for errors, validation, pending work, quiz re
 
 ## Reading presentation
 
-`Article` and `CourseOverview` are shared, server-compatible compositions. Reuse their existing article/course geometry and the shared Markdown renderer for server pages and client transitions. Supply back-navigation and interactive feedback from the caller; authorization stays outside presentation. Course lesson links use ContentAction anchors. Breadcrumb ancestors use real links with visible focus; their in-app click handler respects the unsaved-editor guard. Keep the existing narrow-layout breadcrumb behavior and visible article back link.
+`Article` stays a shared, server-compatible composition. `Course` is the shared interactive player, receiving a server-authorized, answer-redacted published course and current progress. Its initial lesson and links render as HTML; quiz submission and progress updates stay client-side. Reuse the shared Markdown renderer, and supply back navigation and feedback from the caller. Breadcrumb ancestors use real links with visible focus; their in-app click handler respects the unsaved-editor guard. Keep the existing narrow-layout breadcrumb behavior and visible article back link.
 
 ### Document navigation and outlines
 
@@ -248,7 +248,7 @@ The following mapping covers the current shared library. Several Fieldbook patte
 | Spinner, Skeleton, EmptyState | Geist Spinner/Skeleton/Empty State; shadcn Spinner/Skeleton/Empty | Activity differs from progress. Reduced-motion support, known-layout placeholders, quiet solid empty-state surface with useful next action. Never show an invented progress percentage. |
 | LoadMore | Geist Load More Button | Full-width reveal control with count. Retain local-slice behavior; do not label it network pagination. |
 | Collapsible, DocumentTree, ReadingOutline | Geist Collapse and Vercel Docs navigation; shadcn Collapsible | Fixed top-level headings, compact indented links and chevrons only on focusable subsection triggers. Selected ancestors are revealed and open state is retained. Closed subsection content remains mounted and hidden. Outline follows available article width. |
-| Article, CourseOverview, ReadingPage | Vercel Docs article composition | Compact title/summary, centered avatar metadata, 16/28 prose and restrained sibling links. Article content remains server-rendered; only the outline and navigation need client interaction. |
+| Article, Course, ReadingPage | Vercel Docs article composition | Compact article reading and a responsive course summary/lesson split. Article content remains server-rendered; the course player receives authorized server content and owns learner interaction. |
 | LearningCard, ContentAction, ContentCardFooter, CourseRow, LaunchList | Geist Entity and card composition | Quiet border/hover, aligned metadata/actions; retain horizontal browsing, curriculum sequencing and course-specific cover art. ContentCardFooter is tile metadata; CardFooter is a surface footer. |
 | OrderedLearning, ReorderRow | Geist Entity composition | Preserve drag, keyboard and explicit up/down movement; use aligned identity/action columns. Reordering has no single Geist replacement. |
 | SearchField, SearchPanel, SearchResult | Geist Search Input/Entity | Keep bounded nonmodal search so unsaved authoring stays mounted, with Escape/focus return and clear empty/loading results. A command menu would change product behavior. |

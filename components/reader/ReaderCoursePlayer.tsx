@@ -6,9 +6,12 @@ import { Course } from "@/components/Course";
 import { ReaderFeedback } from "./ReaderFeedback";
 import {
   guestAnswersForImport,
+  guestSelectionsForImport,
   type GuestProgress,
 } from "@/lib/guest-progress";
 import type { Content, Progress } from "@/lib/types";
+import type { QuizAnswers } from "@/lib/course-quiz";
+import { safeReturnPath } from "@/lib/return-path";
 
 const guestKey = "fieldbook.guest-progress.v1";
 
@@ -16,12 +19,16 @@ export function ReaderCoursePlayer({
   course,
   lessonId,
   curriculum,
+  curriculumTitle,
+  from,
   signedIn,
   initialProgress,
 }: {
   course: Content;
-  lessonId: string;
+  lessonId?: string;
   curriculum?: string;
+  curriculumTitle?: string;
+  from?: string;
   signedIn: boolean;
   initialProgress: Progress[];
 }) {
@@ -38,11 +45,20 @@ export function ReaderCoursePlayer({
     }
   }, [signedIn]);
 
-  async function record(lessonId?: string, answers?: number[]) {
+  async function record(lessonId?: string, answers?: QuizAnswers, complete?: boolean) {
     const prior = progress.find(
       (entry) =>
         entry.content_id === course.id && entry.version === course.version,
     );
+    if (!signedIn && complete) {
+      const saved: GuestProgress = { ...(prior || {
+        content_id: course.id, version: course.version, lessons: [], attempts: [],
+      }), passed: true };
+      const next = [...progress.filter((entry) => entry.content_id !== course.id || entry.version !== course.version), saved];
+      setProgress(next);
+      localStorage.setItem(guestKey, JSON.stringify(next));
+      return undefined;
+    }
     const response = await fetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -50,7 +66,8 @@ export function ReaderCoursePlayer({
         contentId: course.id,
         version: course.version,
         lessonId,
-        answers,
+        selections: answers,
+        complete,
         lessons: signedIn ? undefined : prior?.lessons || [],
       }),
       cache: "no-store",
@@ -63,14 +80,18 @@ export function ReaderCoursePlayer({
       version: course.version,
       lessons: result.lessons,
       passed: result.passed || prior?.passed || false,
-      attempts: result.attempts || prior?.attempts || [],
+      attempts: signedIn ? result.attempts || prior?.attempts || [] : [
+        ...(prior?.attempts || []), ...(result.attempt ? [result.attempt] : []),
+      ],
     };
-    if (!signedIn)
+    if (!signedIn) {
       (saved as GuestProgress).guestAnswers = guestAnswersForImport(
         prior,
-        answers,
+        answers?.map((selection) => selection[0]),
         result.attemptPassed,
       );
+      (saved as GuestProgress).guestSelections = guestSelectionsForImport(prior as GuestProgress | undefined, answers, result.attemptPassed);
+    }
     const next = [
       ...progress.filter(
         (entry) =>
@@ -86,17 +107,20 @@ export function ReaderCoursePlayer({
   }
 
   const back = curriculum
-    ? `/curricula/${encodeURIComponent(curriculum)}`
-    : `/courses/${encodeURIComponent(course.id)}`;
+    ? `/curricula/${encodeURIComponent(curriculum)}?from=${encodeURIComponent(safeReturnPath(from))}`
+    : "/courses";
   return (
     <Course
       key={`${course.id}:${lessonId}`}
       course={course}
+      curriculumTitle={curriculumTitle}
       initialLessonId={lessonId}
       progress={progress}
       onProgress={record}
       onBack={() => router.push(back)}
-      backLabel={curriculum ? "Back to curriculum" : "Back to course"}
+      backHref={back}
+      lessonBaseHref={`/courses/${encodeURIComponent(course.id)}${curriculum ? `?curriculum=${encodeURIComponent(curriculum)}&from=${encodeURIComponent(safeReturnPath(from))}` : ""}`}
+      backLabel={curriculum ? "Back to curriculum" : "Back to courses"}
       guest={!signedIn}
       onSignIn={() =>
         router.push(

@@ -5,7 +5,7 @@ import {
   withPublishedSnapshots,
   reconcileDemoPublication,
 } from "../lib/demo-publication";
-import { equivalentMarkdown } from "../lib/markdown-compatibility";
+import { equivalentMarkdown, hasMissingImageAlt } from "../lib/markdown-compatibility";
 
 test("demo retains live publication through draft edits, reverts, publishing and unpublishing", () => {
   const initial = withPublishedSnapshots(freshWorkspace());
@@ -74,4 +74,10 @@ test("visual editor compatibility rejects lost links/media/formatting but accept
     equivalentMarkdown("<custom>Keep me</custom>", "Keep me"),
     false,
   );
+});
+
+test("course image validation finds missing descriptions in inline and referenced images", () => {
+  assert.equal(hasMissingImageAlt("![Step diagram](/api/media/image.png)"), false);
+  assert.equal(hasMissingImageAlt("![](/api/media/image.png)"), true);
+  assert.equal(hasMissingImageAlt("![ ][diagram]\n\n[diagram]: /api/media/image.png"), true);
 });

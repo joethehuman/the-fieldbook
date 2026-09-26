@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { ReadingState } from "@/lib/reading";
 import {
   guestAnswersForImport,
+  guestSelectionsForImport,
   type GuestProgress,
 } from "@/lib/guest-progress";
 import { organizationHomePath } from "@/lib/navigation";
@@ -73,15 +74,22 @@ const runtime: FieldbookRuntime = {
   },
   save: saveWorkspace,
   refresh: saveWorkspace.refresh,
-  async progress(course, current, lessonId, answers) {
+  async progress(course, current, lessonId, answers, complete) {
     const prior = current.find(
       (p) => p.content_id === course.id && p.version === course.version,
     );
+    if (!currentUser && complete) {
+      const p: GuestProgress = { ...(prior || { content_id: course.id, version: course.version, lessons: [], attempts: [] }), passed: true };
+      const progress = [...current.filter((x) => x.content_id !== course.id || x.version !== course.version), p];
+      localStorage.setItem(GUEST_KEY, JSON.stringify(progress));
+      return { progress };
+    }
     const r = await request("/api/progress", {
       contentId: course.id,
       version: course.version,
       lessonId,
-      answers,
+      selections: answers,
+      complete,
       lessons: currentUser ? undefined : prior?.lessons || [],
     });
     const p: Progress = {
@@ -89,15 +97,16 @@ const runtime: FieldbookRuntime = {
       version: course.version,
       lessons: r.lessons,
       passed: r.passed || prior?.passed || false,
-      attempts: r.attempts || prior?.attempts || [],
+      attempts: currentUser ? r.attempts || prior?.attempts || [] : [...(prior?.attempts || []), ...(r.attempt ? [r.attempt] : [])],
     };
     // Retain answers only for guest import; the server re-grades them after sign-in.
     if (!currentUser)
       (p as GuestProgress).guestAnswers = guestAnswersForImport(
         prior,
-        answers,
+        answers?.map((selection) => selection[0]),
         r.attemptPassed,
       );
+    if (!currentUser) (p as GuestProgress).guestSelections = guestSelectionsForImport(prior as GuestProgress | undefined, answers, r.attemptPassed);
     const progress = [
       ...current.filter(
         (x) => !(x.content_id === p.content_id && x.version === p.version),
@@ -299,6 +308,8 @@ export default function ProductionApp({
           version: p.version,
           lessons: p.lessons,
           answers: (p as GuestProgress).guestAnswers,
+          selections: (p as GuestProgress).guestSelections,
+          complete: p.passed,
         });
         saved++;
         localStorage.setItem(

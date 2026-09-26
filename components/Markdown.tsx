@@ -4,17 +4,22 @@ import { Table } from "@/components/ui/table";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { contentLinkTarget, type ContentLinkContext } from "@/lib/content-links";
+import { videoSource } from "@/lib/video";
+import { CourseVideo } from "./patterns/course-video";
+import { Button } from "./ui/button";
 
 export default function Markdown({
   children,
   headingPrefix,
   linkContext = "article",
   sameSiteOrigins,
+  onImageOpen,
 }: {
   children: string;
   headingPrefix?: string;
   linkContext?: ContentLinkContext;
   sameSiteOrigins?: readonly string[];
+  onImageOpen?: (src: string, alt: string) => void;
 }) {
   return (
     <ReactMarkdown
@@ -53,6 +58,8 @@ export default function Markdown({
             )
           : {}),
         a: ({ href, children }) => {
+          if (href && videoSource(href) && linkContext === "course" && (href.startsWith("/api/media/") || String(children) === "Video"))
+            return <CourseVideo url={href} title={String(children)} />;
           if (href?.startsWith("/api/media/") && /\.(mp4|webm)(?:\?|$)/i.test(href))
             return (
               <video
@@ -71,9 +78,12 @@ export default function Markdown({
           );
         },
         img: ({ src, alt }) =>
-          typeof src === "string" ? (
-            <img src={src} alt={alt || ""} loading="lazy" />
-          ) : null,
+          typeof src === "string" ? onImageOpen ? (
+            <Button type="button" variant="ghost" className="course-image-open" onClick={() => onImageOpen(src, alt || "")}
+              aria-label={`Expand image: ${alt || "course image"}`}>
+              <img src={src} alt={alt || ""} loading="lazy" />
+            </Button>
+          ) : <img src={src} alt={alt || ""} loading="lazy" /> : null,
         table: ({ children }) => (
           <div
             className="markdown-table"

@@ -105,7 +105,7 @@ test("retakes record attempts without revoking completion", () => {
   let d = freshWorkspace();
   const c = d.content.find((c) => c.id === "course-1")!;
   const u = d.users[0];
-  d = updateProgress(d, u.id, c, undefined, [99, 99]);
+  d = updateProgress(d, u.id, c, undefined, [1, 0]);
   assert.equal(isComplete(c, d.progress[u.id]), true);
   assert.equal(d.progress[u.id][0].attempts?.[0].passed, false);
   assert.equal(d.progress[u.id][0].attempts?.length, 1);

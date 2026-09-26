@@ -5,6 +5,8 @@ import { db, check } from "./db";
 import { requireAdmin, HttpError } from "./auth";
 import { contentSchema } from "./schemas";
 import { videoSource } from "@/lib/video";
+import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
+import { correctOptionIds, requiresPassing, validQuestion } from "@/lib/course-quiz";
 import {
   availableDocSections,
   sectionForDoc,
@@ -16,7 +18,10 @@ export function redact(c: Content): Content {
     ...c,
     groups: [],
     assignments: [],
-    questions: c.questions.map(({ answer, ...q }) => q),
+    questions: c.questions.map((question) => {
+      const { answer, correctOptionIds: correct, ...safe } = question;
+      return { ...safe, multiple: correctOptionIds(question).length > 1 };
+    }),
   };
 }
 export function document(row: any, draft = false): Content {
@@ -127,6 +132,12 @@ export async function saveContent(
     .eq("id", c.id)
     .maybeSingle();
   check(error);
+  if (c.kind === "course" && c.requirePassing === undefined && !old?.published)
+    c.requirePassing = false;
+  if (publish && c.kind === "course" && old?.published?.kind === "course" &&
+    requiresPassing(c) !== requiresPassing(old.published as Content) &&
+    c.version === old.published.version)
+    throw new HttpError(400, "Changing the quiz completion rule requires publishing a new course version.");
   if (expected !== (old?.revision ?? 0))
     throw new HttpError(
       409,
@@ -160,13 +171,7 @@ export async function saveContent(
       c.lessons.some(
         (l) => !l.title.trim() || (!l.body.trim() && !l.videoUrl),
       ) ||
-      c.questions.some(
-        (q) =>
-          !q.prompt.trim() ||
-          q.options.some((o) => !o.trim()) ||
-          q.answer === undefined ||
-          q.answer >= q.options.length,
-      ))
+      c.questions.some((q) => !validQuestion(q)))
   )
     throw new HttpError(
       400,
@@ -174,6 +179,8 @@ export async function saveContent(
     );
   if (c.lessons.some((l) => l.videoUrl && !videoSource(l.videoUrl)))
     throw new HttpError(400, "Unsupported video URL.");
+  if (publish && c.kind === "course" && c.lessons.some((l) => hasMissingImageAlt(l.body)))
+    throw new HttpError(400, "Add alternative text to every lesson image before publishing.");
   const serialized = JSON.stringify(c);
   const mediaIds = [
     ...serialized.matchAll(

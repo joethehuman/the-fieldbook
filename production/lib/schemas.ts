@@ -19,6 +19,7 @@ export const contentBaseSchema = z.object({
     )
     .optional(),
   duration: z.number().int().min(0).max(10000),
+  requirePassing: z.boolean().optional(),
   groups: z.array(text(80)).max(100),
   lessons: z
     .array(
@@ -36,6 +37,9 @@ export const contentBaseSchema = z.object({
         id: text(100).min(1),
         prompt: text(2000),
         options: z.array(text(1000)).min(2).max(10),
+        optionIds: z.array(text(100)).min(2).max(5).optional(),
+        correctOptionIds: z.array(text(100)).min(1).max(4).optional(),
+        explanation: text(2000).optional(),
         answer: z.number().int().min(0).optional(),
       }),
     )
@@ -148,4 +152,6 @@ export const progressSchema = z.object({
   lessonId: text(100).optional(),
   lessons: z.array(text(100)).max(100).optional(),
   answers: z.array(z.number().int().min(0).max(9)).max(100).optional(),
+  selections: z.array(z.array(z.number().int().min(0).max(4)).min(1).max(4)).max(100).optional(),
+  complete: z.boolean().optional(),
 });

@@ -3,6 +3,7 @@ import { CreatableCombobox } from "./ui/creatable-combobox";
 import { DocSectionPicker } from "./DocSectionPicker";
 import DocSectionCreate from "./DocSectionCreate";
 import { WritingEditor } from "./patterns/writing-editor";
+import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { hasUnpublishedEdits } from "@/lib/demo-publication";
 import {
   DropdownMenu,
@@ -92,7 +93,9 @@ import {
   MessageSquare,
 } from "lucide-react";
 import CourseCoverEditor from "./CourseCoverEditor";
-import MarkdownEditor, { type UploadMedia } from "./MarkdownEditor";
+import { type UploadMedia } from "./MarkdownEditor";
+import { CourseBuilder } from "./CourseBuilder";
+import { requiresPassing, validQuestion } from "@/lib/course-quiz";
 import SiteSettingsPanel from "./SiteSettingsPanel";
 import { SettingsSection } from "./patterns/settings-section";
 import { FeedbackAdmin } from "./Feedback";
@@ -310,6 +313,7 @@ export default function Admin({
       lessons:
         kind === "course" ? [{ id: id(), title: "Lesson 1", body: "" }] : [],
       questions: [],
+      ...(kind === "course" ? { requirePassing: false } : {}),
     });
   }
   async function save(c: Content) {
@@ -1274,12 +1278,7 @@ export function Editor({
         c.lessons.some(
           (l) => !l.title.trim() || (!l.body.trim() && !l.videoUrl),
         ) ||
-        c.questions.some(
-          (q) =>
-            !q.prompt.trim() ||
-            q.options.some((o) => !o.trim()) ||
-            q.answer === undefined,
-        ))
+        c.questions.some((q) => !validQuestion(q)))
     ) {
       setError(
         "Published courses need at least one complete lesson and valid quiz questions with correct answers.",
@@ -1287,7 +1286,17 @@ export function Editor({
       return;
     }
     if (c.lessons.some((l) => l.videoUrl && !videoSource(l.videoUrl))) {
-      setError("Use a supported HTTPS YouTube, Vimeo, MP4, or WebM URL.");
+      setError("Use a supported HTTPS YouTube, Vimeo, Loom, MP4, or WebM URL.");
+      return;
+    }
+    if (c.kind === "course" && saveStatus === "published" && c.lessons.some((l) => hasMissingImageAlt(l.body))) {
+      setError("Add alternative text to every lesson image before publishing.");
+      return;
+    }
+    const liveCourse = data.publishedContent?.find((item) => item.id === c.id);
+    if (c.kind === "course" && saveStatus === "published" && !refresh && liveCourse &&
+      requiresPassing(c) !== requiresPassing(liveCourse)) {
+      setError("Changing the quiz completion rule requires publishing a new version. Choose Publish a new version in the course settings.");
       return;
     }
     savingNow.current = true;
@@ -1528,236 +1537,13 @@ export function Editor({
               disabled={busy}
             />
           ) : (
-            <>
-              <SectionHeader title={<h2>Lessons</h2>}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    set("lessons", [
-                      ...c.lessons,
-                      { id: id(), title: "", body: "" },
-                    ])
-                  }
-                >
-                  <Plus size={16} />
-                  Add lesson
-                </Button>
-              </SectionHeader>
-              {c.lessons.map((l, i) => (
-                <Card className="grid gap-4" key={l.id}>
-                  <SectionHeader title={<strong>Lesson {i + 1}</strong>}>
-                    <div>
-                      <Button
-                        variant="link"
-                        type="button"
-
-                        disabled={i === 0}
-                        onClick={() => {
-                          const next = [...c.lessons];
-                          [next[i - 1], next[i]] = [next[i], next[i - 1]];
-                          set("lessons", next);
-                        }}
-                      >
-                        Move up
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        type="button"
-
-                        aria-label={`Remove lesson ${i + 1}`}
-                        onClick={() =>
-                          set(
-                            "lessons",
-                            c.lessons.filter((x) => x.id !== l.id),
-                          )
-                        }
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </div>
-                  </SectionHeader>
-                  <FormField label="Lesson title">
-                    <Input
-                      required
-                      value={l.title}
-                      onChange={(e) =>
-                        set(
-                          "lessons",
-                          c.lessons.map((x) =>
-                            x.id === l.id ? { ...x, title: e.target.value } : x,
-                          ),
-                        )
-                      }
-                    />
-                  </FormField>
-                  <MarkdownEditor
-                    label={`Lesson ${i + 1} text`}
-                    linkContext="course"
-                    rows={8}
-                    value={l.body}
-                    onUpload={upload}
-                    onChange={(value) =>
-                      setC((current) => ({
-                        ...current,
-                        lessons: current.lessons.map((x) =>
-                          x.id === l.id ? { ...x, body: value } : x,
-                        ),
-                      }))
-                    }
-                  />
-                  {onUpload && (
-                    <FormField
-                      label="Upload lesson video"
-                      description="MP4 or WebM, up to 50 MB."
-                    >
-                      <Input
-                        type="file"
-                        accept="video/mp4,video/webm"
-                        onChange={async (e) => {
-                          const f = e.target.files?.[0];
-                          if (!f) return;
-                          e.target.value = "";
-                          setError("");
-                          try {
-                            const url = await upload!(f);
-                            setC((prev) => ({
-                              ...prev,
-                              lessons: prev.lessons.map((x) =>
-                                x.id === l.id ? { ...x, videoUrl: url } : x,
-                              ),
-                            }));
-                          } catch (error) {
-                            setError((error as Error).message);
-                          }
-                        }}
-                      />
-                    </FormField>
-                  )}
-                  <FormField
-                    label="Video URL"
-                    description="Optional. YouTube, Vimeo, or a direct HTTPS MP4/WebM URL."
-                  >
-                    <Input
-                      type="text"
-                      placeholder="Upload a file or paste a supported video URL"
-                      value={l.videoUrl || ""}
-                      onChange={(e) =>
-                        set(
-                          "lessons",
-                          c.lessons.map((x) =>
-                            x.id === l.id
-                              ? { ...x, videoUrl: e.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
-                  </FormField>
-                </Card>
-              ))}
-              <SectionHeader title={<h2>Quiz</h2>}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    set("questions", [
-                      ...c.questions,
-                      {
-                        id: id(),
-                        prompt: "",
-                        options: ["", "", ""],
-                        answer: 0,
-                      },
-                    ])
-                  }
-                >
-                  <Plus size={16} />
-                  Add question
-                </Button>
-              </SectionHeader>
-              <p className="muted">
-                Learners must answer every question correctly. Unlimited
-                retries.
-              </p>
-              {c.questions.map((q, i) => (
-                <Card className="grid gap-4" key={q.id}>
-                  <SectionHeader title={<strong>Question {i + 1}</strong>}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      type="button"
-
-                      aria-label={`Remove question ${i + 1}`}
-                      onClick={() =>
-                        set(
-                          "questions",
-                          c.questions.filter((x) => x.id !== q.id),
-                        )
-                      }
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </SectionHeader>
-                  <FormField label="Question">
-                    <Input
-                      required
-                      value={q.prompt}
-                      onChange={(e) =>
-                        set(
-                          "questions",
-                          c.questions.map((x) =>
-                            x.id === q.id
-                              ? { ...x, prompt: e.target.value }
-                              : x,
-                          ),
-                        )
-                      }
-                    />
-                  </FormField>
-                  {q.options.map((o, j) => (
-                    <div className="answer-row" key={j}>
-                      <Radio
-                        aria-label={`Correct answer ${j + 1} for question ${i + 1}`}
-                        name={"correct-" + q.id}
-                        checked={q.answer === j}
-                        onChange={() =>
-                          set(
-                            "questions",
-                            c.questions.map((x) =>
-                              x.id === q.id ? { ...x, answer: j } : x,
-                            ),
-                          )
-                        }
-                      />
-                      <Input
-                        aria-label={`Answer ${j + 1} for question ${i + 1}`}
-                        required
-                        value={o}
-                        onChange={(e) =>
-                          set(
-                            "questions",
-                            c.questions.map((x) =>
-                              x.id === q.id
-                                ? {
-                                    ...x,
-                                    options: x.options.map((a, k) =>
-                                      k === j ? e.target.value : a,
-                                    ),
-                                  }
-                                : x,
-                            ),
-                          )
-                        }
-                      />
-                      {q.answer === j && <Check size={16} />}
-                    </div>
-                  ))}
-                  <small>Select the circle next to the correct answer.</small>
-                </Card>
-              ))}
-            </>
+            <CourseBuilder
+              course={c}
+              onChange={(updater) => setC(updater)}
+              onUpload={upload}
+              disabled={busy}
+              onError={setError}
+            />
           )}
         </section>
         <aside className="editor-settings">

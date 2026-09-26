@@ -1,7 +1,7 @@
 import { ReaderCurriculum } from "@/components/reader/ReaderCurriculum";
 import { readerCurriculum } from "@production/lib/reader";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams: Promise<{ from?: string }> };
 
 export async function generateMetadata({ params }: Props) {
   const { id } = await params;
@@ -12,8 +12,9 @@ export async function generateMetadata({ params }: Props) {
   };
 }
 
-export default async function Page({ params }: Props) {
+export default async function Page({ params, searchParams }: Props) {
   const { id } = await params;
+  const { from } = await searchParams;
   const { data, curriculum } = await readerCurriculum(id);
-  return <ReaderCurriculum curriculum={curriculum} data={data} />;
+  return <ReaderCurriculum curriculum={curriculum} data={data} from={from} />;
 }

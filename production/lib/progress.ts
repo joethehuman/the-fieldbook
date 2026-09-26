@@ -4,6 +4,8 @@ import { db, check } from "./db";
 import { canRead } from "./content";
 import { HttpError } from "./auth";
 import { progressSchema } from "./schemas";
+import { gradeQuiz, quizUnlocked } from "@/lib/course-quiz";
+import type { Progress } from "@/lib/types";
 
 export async function recordProgress(user: User | null, input: unknown) {
   await canRead(user);
@@ -27,41 +29,56 @@ export async function recordProgress(user: User | null, input: unknown) {
     ...new Set([...(a.lessons || []), ...(a.lessonId ? [a.lessonId] : [])]),
   ].filter((id) => c.lessons.some((l) => l.id === id));
   let prior: string[] = [];
+  let priorCompleted = false;
+  let priorAttempts: NonNullable<Progress["attempts"]> = [];
   if (user) {
     const { data: p, error: e } = await db()
       .from("fb_progress")
-      .select("lessons")
+      .select("lessons,passed,attempts")
       .eq("user_id", user.id)
       .eq("content_id", c.id)
       .eq("version", c.version)
       .maybeSingle();
     check(e);
     prior = p?.lessons || [];
+    priorCompleted = !!p?.passed;
+    priorAttempts = p?.attempts || [];
   }
   const allDone = c.lessons.every(
     (l) => lessons.includes(l.id) || prior.includes(l.id),
   );
-  const attempted = !!a.answers;
+  const selections = a.selections || a.answers?.map((answer) => [answer]);
+  const attempted = !!selections;
   if (attempted && !allDone)
     throw new HttpError(
       400,
       "Complete the lessons before submitting the quiz.",
     );
-  const passed =
-    c.questions.length === 0 ||
-    (attempted &&
-      a.answers!.length === c.questions.length &&
-      c.questions.every((q, i) => q.answer === a.answers![i]));
+  let attempt: NonNullable<Progress["attempts"]>[number] | undefined;
+  if (attempted) {
+    if (!c.questions.length) throw new HttpError(400, "This course has no quiz.");
+    let graded: ReturnType<typeof gradeQuiz>;
+    try { graded = gradeQuiz(c, selections!); }
+    catch (error) { throw new HttpError(400, (error as Error).message); }
+    attempt = {
+      at: new Date().toISOString(), version: c.version,
+      passed: graded.passed, answers: graded.answers,
+    };
+  }
+  if (a.complete && (!allDone || !quizUnlocked(c, [...priorAttempts, ...(attempt ? [attempt] : [])])))
+    throw new HttpError(400, "Finish the lessons and quiz before completing this course.");
+  const completed = priorCompleted || !!a.complete;
   if (!user)
-    return { lessons, passed, attemptPassed: attempted ? passed : undefined };
+    return { lessons, passed: completed, attemptPassed: attempt?.passed,
+      attempt, attempts: attempt ? [attempt] : [] };
   const { data: p, error: e } = await db().rpc("fb_record_progress", {
     p_user: user.id,
     p_content: c.id,
     p_version: c.version,
     p_lessons: lessons,
-    p_passed: passed,
-    p_attempt: attempted ? { at: new Date().toISOString(), passed } : null,
+    p_passed: completed,
+    p_attempt: attempt || null,
   });
   check(e);
-  return { ...p, attemptPassed: attempted ? passed : undefined };
+  return { ...p, attemptPassed: attempt?.passed, attempt };
 }

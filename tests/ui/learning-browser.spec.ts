@@ -122,16 +122,14 @@ test("For you uses curriculum cards, one channel picker and a simple ordered pag
       level: 1,
     }),
   ).toBeVisible();
-  const rows = page.locator('[data-slot="launch-list"] li');
+  const rows = page.locator("[data-slot=card-grid] .course-card");
   await expect(rows).toHaveCount(3);
   await expect(rows.nth(0)).toContainText("Start with the customer");
   await expect(rows.nth(1)).toContainText("Know the platform");
   await expect(rows.nth(2)).toContainText("From discovery to next steps");
   await expect(page.getByRole("combobox")).toHaveCount(0);
   await page.reload();
-  await page
-    .getByRole("button", { name: "Continue curriculum", exact: true })
-    .click();
+  await rows.nth(1).click();
   await expect(
     page.getByRole("heading", { name: "Know the platform", level: 1 }),
   ).toBeVisible();
@@ -380,7 +378,7 @@ test("completion removes a course from the home queue and remains visible in bot
     page.getByRole("heading", { name: "Know the platform", level: 1 }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Complete & continue", exact: true })
+    .getByRole("button", { name: "Next lesson", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Continue to quiz", exact: true })
@@ -395,8 +393,9 @@ test("completion removes a course from the home queue and remains visible in bot
     .getByRole("button", { name: "Check answers", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Course complete", exact: true }),
+    page.getByRole("button", { name: "Complete course", exact: true }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Complete course", exact: true }).click();
   await page.goto("/#courses");
   await page.reload();
   await expect(page.locator(".for-you .course-card")).toHaveCount(1);

@@ -31,7 +31,7 @@ export function CourseCard({
       title={c.title}
       description={c.summary}
       status={status}
-      metadata={`${c.lessons.length} lessons · Quiz${assigned ? " · Assigned" : ""}`}
+      metadata={`${c.lessons.length} lessons${c.questions.length ? " · Quiz" : ""}${assigned ? " · Assigned" : ""}`}
       action={
         complete
           ? "Review course"

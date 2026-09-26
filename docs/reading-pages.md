@@ -1,6 +1,6 @@
 # Reading pages and link metadata
 
-The server application renders published Docs (`/docs/:id`), Updates (`/updates/:id`) and Courses (`/courses/:id`) on the server. A course lesson uses `/courses/:id?lesson=:lessonId` inside the same reader shell. Curriculum context is preserved. Search keeps its published item and lesson destinations. The browser-local demo continues to use its own local data.
+The server application renders published Docs (`/docs/:id`), Updates (`/updates/:id`) and Courses (`/courses/:id`) on the server. A course URL now opens the player at its first unfinished lesson, or lesson one when new or already completed. A specific lesson uses `/courses/:id?lesson=:lessonId` inside the same reader shell and remains readable without JavaScript. Validated curriculum context and return paths are preserved. Search keeps its published item and lesson destinations. The browser-local demo continues to use its own local data.
 
 ## Access and response behavior
 

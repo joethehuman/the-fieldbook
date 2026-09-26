@@ -6,12 +6,18 @@ async function setup(
   page: Page,
   production: boolean,
   kind: "doc" | "course" = "doc",
+  blankCourse = false,
 ) {
   const state = freshWorkspace();
   state.content = state.content.filter((c) => c.kind === kind).slice(0, 1);
   state.content[0].revision = 1;
   state.content[0].status = "draft";
   state.content[0].title = "Safety fixture";
+  if (kind === "course" && blankCourse) {
+    state.content[0].lessons = [{ id: "first", title: "Lesson 1", body: "" }];
+    state.content[0].questions = [];
+    state.content[0].requirePassing = false;
+  }
   state.publishedContent = [];
   const control = {
     failSave: false,
@@ -438,12 +444,12 @@ for (const media of ["inline-video", "lesson-video", "cover"] as const)
       media === "cover"
         ? page.getByLabel("Upload course cover", { exact: true })
         : media === "lesson-video"
-          ? page.getByLabel(/Upload lesson video/).first()
-          : page.locator('.markdown-editor input[type="file"]').first();
+          ? page.getByLabel(/Upload opening video/).first()
+          : page.locator('.writing-editor input[type="file"]').first();
     await input.setInputFiles(file);
     await expect.poll(() => control.uploaded).toBe(true);
     await expect(
-      page.getByRole("button", { name: "Remove lesson 1", exact: true }),
+      page.getByRole("button", { name: "Remove lesson", exact: true }),
     ).toBeDisabled();
     await expect(
       page.getByRole("button", { name: "Save draft", exact: true }),
@@ -518,4 +524,35 @@ test("draft saves and publication share one transient confirmation", async ({
     page.getByRole("button", { name: "Dismiss message" }),
   ).toHaveCount(0);
   await expect(toast).toHaveCount(0, { timeout: 6000 });
+});
+
+test("course builder edits one lesson at a time and keeps one final quiz", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true);
+  await expect(page.getByRole("heading", { name: "Lesson 1" })).toBeVisible();
+  await page.getByRole("button", { name: "Add lesson" }).click();
+  await page.getByLabel("Lesson title").fill("Second lesson");
+  await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Lesson 1" })).toHaveCount(0);
+  await page.getByRole("textbox", { name: "Lesson content" }).press("/");
+  await expect(page.getByRole("menu", { name: "Insert content" })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Heading" }).click();
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/##/);
+  await page.getByRole("button", { name: "Add quiz" }).click();
+  await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Add quiz" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add answer" }).click();
+  await expect(page.getByRole("textbox", { name: "Answer 3 for question 1" })).toBeVisible();
+  await page.getByRole("textbox", { name: "Answer 3 for question 1" }).fill("Third choice");
+  await page.getByRole("checkbox", { name: "Correct answer 3 for question 1" }).check();
+  await page.getByRole("button", { name: "Add question" }).click();
+  await expect(page.getByRole("heading", { name: "Question 2" })).toBeVisible();
+  if ((page.viewportSize()?.width || 0) < 1120) {
+    await page.getByRole("combobox", { name: "Edit course step" }).click();
+    await page.getByRole("option", { name: /Second lesson/ }).click();
+  } else {
+    await page.getByRole("navigation", { name: "Edit course step" }).getByRole("button", { name: /Second lesson/ }).click();
+  }
+  await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toHaveCount(0);
 });

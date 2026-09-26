@@ -9,7 +9,7 @@ test("assignments follow role groups and exclude drafts", () => {
   d.content.find((c) => c.id === "course-2")!.status = "draft";
   assert.equal(assignedCourses(d.content, d.users[0]).length, 2);
 });
-test("completion requires all lessons and a passing quiz", () => {
+test("completion requires all lessons, a passing quiz, and the final action", () => {
   let d = freshWorkspace();
   const c = d.content.find((c) => c.id === "course-2")!;
   const u = d.users[0].id;
@@ -19,6 +19,8 @@ test("completion requires all lessons and a passing quiz", () => {
   d = updateProgress(d, u, c, undefined, [2, 2]);
   assert.equal(isComplete(c, d.progress[u]), false);
   d = updateProgress(d, u, c, undefined, [0, 1]);
+  assert.equal(isComplete(c, d.progress[u]), false);
+  d = updateProgress(d, u, c, undefined, undefined, true);
   assert.equal(isComplete(c, d.progress[u]), true);
   d = updateProgress(d, u, c, undefined, [2, 2]);
   assert.equal(isComplete(c, d.progress[u]), true);

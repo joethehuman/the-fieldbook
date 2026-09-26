@@ -3,6 +3,7 @@ import { guestFixture } from "../guest-fixture";
 import { guestRecommendations } from "../../lib/guest-recommendations";
 import { reconcileLearning } from "../../lib/learning-groups";
 import { updateProgress } from "../../lib/store";
+import { gradeQuiz } from "../../lib/course-quiz";
 
 async function setup(
   page: Page,
@@ -141,13 +142,13 @@ async function setup(
       const lessons = [
         ...new Set([...(b.lessons || []), ...(b.lessonId ? [b.lessonId] : [])]),
       ];
-      const passed =
-        !!b.answers && c.questions.every((q, i) => q.answer === b.answers[i]);
+      const graded = b.selections ? gradeQuiz(c, b.selections) : undefined;
       await route.fulfill({
         json: {
           lessons,
-          passed,
-          attemptPassed: b.answers ? passed : undefined,
+          passed: !!b.complete,
+          attemptPassed: graded?.passed,
+          attempt: graded && { at: new Date().toISOString(), version: c.version, passed: graded.passed, answers: graded.answers },
         },
       });
     });
@@ -407,17 +408,16 @@ test("guest Updates and curriculum learning, browser progress and account transi
   ).toBeVisible();
   await shot(page, info, "guest-curriculum");
   await page
-    .getByRole("button", { name: "Start curriculum", exact: true })
+    .getByRole(f.production ? "link" : "button", { name: /Foundation course/ })
     .first()
     .click();
-  if (f.production)
-    await page.getByRole("link", { name: /One lesson/ }).click();
   await page.getByRole("button", { name: "Continue to quiz" }).click();
   await page.getByRole("radio", { name: "Correct", exact: true }).check();
   await page.getByRole("button", { name: "Check answers" }).click();
   await expect(
-    page.getByText("Great work. You’ve completed this course."),
+    page.getByText("All answers are correct."),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Complete course" }).click();
   await page.reload();
   await nav(page, "Courses");
   await expect(page.locator(".for-you")).toContainText(

@@ -58,6 +58,7 @@ import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Alert } from "../ui/alert";
 import type { WritingEditorProps } from "./writing-editor";
+import { videoSource } from "@/lib/video";
 import "@mdxeditor/editor/style.css";
 import "../../styles/writing-editor.css";
 
@@ -88,11 +89,13 @@ function PlainCodeEditor({
 
 function WritingToolbar({
   upload,
+  embedVideo,
   disabled,
   canUpload,
 }: {
   canUpload: boolean;
   upload: (type: "image" | "video") => void;
+  embedVideo: () => void;
   disabled: boolean;
 }) {
   const editor = useCellValue(activeEditor$);
@@ -190,6 +193,7 @@ function WritingToolbar({
       run: () => upload("video"),
       unavailable: !canUpload,
     },
+    { label: "Embed video", icon: Video, run: embedVideo },
   ];
   return (
     <div
@@ -232,9 +236,18 @@ export default function WritingEditorEngine({
   const current = useRef(value);
   const failed = useRef(false);
   const file = useRef<HTMLInputElement>(null);
+  const slashMenu = useRef<HTMLDivElement>(null);
   const [media, setMedia] = useState<"image" | "video">("image");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [slashOpen, setSlashOpen] = useState(false);
+  const [videoUrl, setVideoUrl] = useState("");
+  const [videoLinkOpen, setVideoLinkOpen] = useState(false);
+  const [imageAltOpen, setImageAltOpen] = useState(false);
+  const [imageAlt, setImageAlt] = useState("");
+  useEffect(() => {
+    if (slashOpen) requestAnimationFrame(() => slashMenu.current?.querySelector<HTMLButtonElement>("button")?.focus());
+  }, [slashOpen]);
   useEffect(() => {
     if (current.current !== value) {
       current.current = value;
@@ -254,13 +267,50 @@ export default function WritingEditorEngine({
       setBusy(false);
     }
   }
+  function insert(markdown: string) {
+    editor.current?.insertMarkdown(markdown);
+    setSlashOpen(false);
+  }
+  function insertVideo() {
+    if (!videoSource(videoUrl)) {
+      setError("Use a supported HTTPS YouTube, Vimeo, Loom, MP4, or WebM URL.");
+      return;
+    }
+    insert(`\n\n[Video](${videoUrl})\n\n`);
+    setVideoUrl("");
+    setVideoLinkOpen(false);
+  }
   return (
-    <div className="writing-editor rounded-lg border border-border bg-background">
+    <div className="writing-editor rounded-lg border border-border bg-background" onKeyDownCapture={(event) => {
+      if (event.key === "/" && !disabled && !busy && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
+        const selection = window.getSelection();
+        const before = selection?.anchorNode?.textContent?.slice(0, selection.anchorOffset) || "";
+        if (!before.trim()) { event.preventDefault(); setSlashOpen(true); }
+      }
+      if (event.key === "Escape") { setSlashOpen(false); setVideoLinkOpen(false); setImageAltOpen(false); }
+    }}>
       {error && (
         <Alert variant="destructive" role="alert">
           {error}
         </Alert>
       )}
+      {slashOpen && <div ref={slashMenu} role="menu" aria-label="Insert content" className="writing-slash-menu" onKeyDown={(event) => {
+        if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+        event.preventDefault();
+        const items = Array.from(slashMenu.current?.querySelectorAll<HTMLButtonElement>("button") || []);
+        const next = (items.indexOf(document.activeElement as HTMLButtonElement) + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
+        items[next]?.focus();
+      }}>
+        {[
+          ["Heading", "\n\n## "], ["Bulleted list", "\n\n- "],
+          ["Numbered list", "\n\n1. "], ["Callout", "\n\n> "],
+        ].map(([name, markdown]) => <Button key={name} type="button" variant="ghost" role="menuitem" onClick={() => insert(markdown)}>{name}</Button>)}
+        <Button type="button" variant="ghost" role="menuitem" onClick={() => { setMedia("image"); setSlashOpen(false); setImageAltOpen(true); }}>Image</Button>
+        <Button type="button" variant="ghost" role="menuitem" onClick={() => { setMedia("video"); setSlashOpen(false); requestAnimationFrame(() => file.current?.click()); }}>Upload video</Button>
+        <Button type="button" variant="ghost" role="menuitem" onClick={() => { setSlashOpen(false); setVideoLinkOpen(true); }}>Embed video link</Button>
+      </div>}
+      {videoLinkOpen && <div className="writing-video-link"><Input aria-label="Video URL" type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder="YouTube, Vimeo or Loom URL" /><Button type="button" onClick={insertVideo}>Insert video</Button><Button type="button" variant="ghost" onClick={() => setVideoLinkOpen(false)}>Cancel</Button></div>}
+      {imageAltOpen && <div className="writing-video-link"><Input aria-label="Image alternative text" value={imageAlt} onChange={(event) => setImageAlt(event.target.value)} placeholder="Describe the image" /><Button type="button" disabled={!imageAlt.trim()} onClick={() => { setImageAltOpen(false); requestAnimationFrame(() => file.current?.click()); }}>Choose image</Button><Button type="button" variant="ghost" onClick={() => setImageAltOpen(false)}>Cancel</Button></div>}
       <Input
         ref={file}
         type="file"
@@ -272,10 +322,12 @@ export default function WritingEditorEngine({
           if (!selected) return;
           try {
             const url = await upload(selected);
-            const alt = selected.name.replace(/[\[\]\\\n]/g, " ");
-            editor.current?.insertMarkdown(
-              `\n\n${selected.type.startsWith("video/") ? "" : "!"}[${alt}](${url})\n\n`,
-            );
+            const alt = (imageAlt.trim() || selected.name).replace(/[\[\]\\\n]/g, " ");
+            const next = `${current.current}\n\n${selected.type.startsWith("video/") ? "" : "!"}[${alt}](${url})\n\n`;
+            current.current = next;
+            editor.current?.setMarkdown(next);
+            onChange(next);
+            setImageAlt("");
           } catch {
             /* upload() retains the error and the document. */
           } finally {
@@ -340,13 +392,15 @@ export default function WritingEditorEngine({
               <WritingToolbar
                 canUpload={!!onUpload}
                 disabled={disabled || busy}
+                embedVideo={() => setVideoLinkOpen(true)}
                 upload={(type) => {
                   if (!onUpload) {
                     setError("Uploads are unavailable in this view.");
                     return;
                   }
                   setMedia(type);
-                  requestAnimationFrame(() => file.current?.click());
+                  if (type === "image") setImageAltOpen(true);
+                  else requestAnimationFrame(() => file.current?.click());
                 }}
               />
             ),

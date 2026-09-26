@@ -13,7 +13,8 @@ export type FieldbookRuntime = {
     course: Content,
     current: Progress[],
     lessonId?: string,
-    answers?: number[],
+    answers?: import("./course-quiz").QuizAnswers,
+    complete?: boolean,
   ) => Promise<{ progress: Progress[]; attemptPassed?: boolean }>;
   upload: UploadMedia;
   signIn: () => void;

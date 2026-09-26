@@ -28,6 +28,10 @@ export function videoSource(
           }
         : null;
     }
+    if (["loom.com", "www.loom.com"].includes(u.hostname)) {
+      const id = u.pathname.match(/^\/(?:share|embed)\/([a-f\d]{32})(?:\/|$)/i)?.[1];
+      return id ? { type: "embed", url: `https://www.loom.com/embed/${id}` } : null;
+    }
     return /\.(mp4|webm)$/i.test(u.pathname)
       ? { type: "file", url: u.href }
       : null;
