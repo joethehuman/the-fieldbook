@@ -568,8 +568,12 @@ test("Courses share reader navigation and show the signed-in account immediately
   await expect(
     page.getByRole("heading", { name: "Courses", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText(/1 course completed/)).toBeVisible();
-  await expect(page.getByText("Assigned courses complete")).toBeVisible();
+  await expect(
+    page.getByText("1 of 1 assigned courses complete"),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Assigned courses complete" }),
+  ).toBeVisible();
   await expect(page.locator(".sidebar .logo")).toHaveText("Acme Learning");
   await expect(
     page.locator(".sidebar .logo img, .sidebar .logo svg"),
@@ -621,6 +625,77 @@ test("Courses share reader navigation and show the signed-in account immediately
   await page.getByRole("button", { name: "Complete & continue" }).click();
   expect((await saved).status()).toBe(200);
 });
+test("signed-in learners can find started and completed courses without assignments", async ({
+  page,
+  request,
+}) => {
+  const anotherCourse = {
+    ...items[2],
+    id: "00000000-0000-4000-8000-000000000024",
+    title: "Another published course",
+    groups: [],
+    assignments: [],
+  };
+  await fixture(request, {
+    settings: { access: "private" },
+    documents: documents([...items, anotherCourse]),
+    userGroups: [],
+    progress: [
+      {
+        user_id: "00000000-0000-4000-8000-000000000010",
+        content_id: ids[2],
+        version: 1,
+        lessons: ["first", "second"],
+        passed: true,
+        attempts: [],
+      },
+      {
+        user_id: "00000000-0000-4000-8000-000000000010",
+        content_id: anotherCourse.id,
+        version: 1,
+        lessons: ["first"],
+        passed: false,
+        attempts: [],
+      },
+    ],
+  });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  await page.goto("/courses");
+  const summary = page.locator('.for-you [data-slot="card"]');
+  await expect(summary).toContainText("No courses assigned to you");
+  await expect(summary).toContainText("1 in progress · 1 completed");
+  await expect(summary.getByRole("progressbar")).toHaveCount(0);
+  await summary.getByRole("button", { name: "View your courses" }).click();
+  await expect(page.locator(".library .course-card")).toHaveCount(2);
+  await expect(
+    page.locator(".library .course-card").filter({ hasText: "Assigned" }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("group", { name: "Course views" })
+    .getByRole("button", { name: "Assigned" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "No assigned courses yet" }),
+  ).toBeVisible();
+});
+
 test("client navigation rechecks publication, item type and installation access", async ({
   page,
   request,
@@ -1075,7 +1150,7 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
     ),
   ).toBe(true);
   await page.goto("/courses");
-  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  await expect(page.getByText(/1 completed/)).toBeVisible();
   const token = await (
     await request.post(`${backend}/auth/v1/token`, { data: {} })
   ).json();
@@ -1099,7 +1174,7 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
     .getByRole("region", { name: "Import browser progress" })
     .getByRole("button", { name: "Save browser progress to my account" })
     .click();
-  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  await expect(page.getByText(/1 completed/)).toBeVisible();
   expect(
     await page.evaluate(() =>
       localStorage.getItem("fieldbook.guest-progress.v1"),
@@ -1173,7 +1248,7 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
     .click();
   await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}$`));
   await page.getByRole("link", { name: /Back to courses/ }).click();
-  await expect(page.getByText(/1 course completed/)).toBeVisible();
+  await expect(page.getByText(/1 completed/)).toBeVisible();
   expect(documentNavigations).toBe(1);
   await page.reload();
   await expect(

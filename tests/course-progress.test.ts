@@ -73,6 +73,10 @@ test("optional learning belongs in progress and completed without lowering assig
     learningCollection(all, assigned, progress, "in-progress").map((c) => c.id),
     [optional.id],
   );
+  assert.deepEqual(
+    learningCollection(all, assigned, progress, "yours").map((c) => c.id),
+    [...assigned.map((c) => c.id), optional.id],
+  );
   assert.equal(
     learningCollection(all, assigned, progress, "assigned").length,
     assigned.length,
@@ -82,6 +86,11 @@ test("optional learning belongs in progress and completed without lowering assig
     0,
   );
   progress[progress.length - 1] = passed(optional);
+  assert.ok(
+    learningCollection(all, assigned, progress, "yours").some(
+      (c) => c.id === optional.id,
+    ),
+  );
   assert.ok(
     learningCollection(all, assigned, progress, "completed").some(
       (c) => c.id === optional.id,
@@ -118,4 +127,8 @@ test("collections exclude drafts and preserve assigned sequence after completed 
     0,
   );
   assert.equal(learningCollection(courses, [], progress, "assigned").length, 0);
+  assert.deepEqual(
+    learningCollection(courses, [], progress, "yours").map((c) => c.id),
+    [sequence[0].id],
+  );
 });
