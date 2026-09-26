@@ -65,9 +65,13 @@ for (const app of ["demo", "production"]) {
       });
       const main = page.locator("#main-content");
       const footer = page.locator(".app-footer");
-      const footerBottom = await footer.evaluate(
+      const scrollAreaBottom = await main.evaluate(
         (el) => el.getBoundingClientRect().bottom,
       );
+      const initialFooterTop = await footer.evaluate(
+        (el) => el.getBoundingClientRect().top,
+      );
+      expect(initialFooterTop).toBeGreaterThanOrEqual(scrollAreaBottom - 1);
       await main.evaluate((el) => el.scrollTo(0, 1200));
       expect(await main.evaluate((el) => el.scrollTop)).toBeGreaterThan(200);
       expect(await page.evaluate(() => scrollY)).toBe(0);
@@ -75,8 +79,26 @@ for (const app of ["demo", "production"]) {
         0,
       );
       expect(
-        await footer.evaluate((el) => el.getBoundingClientRect().bottom),
-      ).toBe(footerBottom);
+        await footer.evaluate((el) => el.getBoundingClientRect().top),
+      ).toBeLessThan(initialFooterTop);
+      await main.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+      await footer.scrollIntoViewIfNeeded();
+      await expect(footer).toBeInViewport();
+      expect(await bar.evaluate((el) => el.getBoundingClientRect().top)).toBe(
+        0,
+      );
+      expect(await page.evaluate(() => scrollY)).toBe(0);
+      if (info.project.name === "phone") {
+        await expect(footer.locator(".footer-name")).toBeHidden();
+        await expect(footer.locator(".footer-tagline")).toBeVisible();
+        if (app === "production")
+          await expect(
+            footer.getByRole("link", { name: "Privacy policy" }),
+          ).toBeVisible();
+        expect(
+          await footer.evaluate((el) => el.getBoundingClientRect().height),
+        ).toBeLessThan(120);
+      }
       await page.screenshot({
         path: info.outputPath(`${app}-${kind}-scrolled.png`),
       });

@@ -30,7 +30,7 @@ export function ReadingOutline({
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
-    const scrollport = ref.current?.closest<HTMLElement>(".main-content");
+    const scrollport = ref.current?.closest<HTMLElement>(".app-scroll");
     if (!scrollport) return;
     let frame = 0;
     const targets = headings

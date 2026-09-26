@@ -1133,13 +1133,13 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
   await page.getByRole("button", { name: "Next lesson" }).click();
   await expect.poll(async () => {
     const card = await page.locator(".course-lesson").boundingBox();
-    const viewport = await page.locator(".main-content").boundingBox();
+    const viewport = await page.locator(".app-scroll").boundingBox();
     return card!.y - viewport!.y;
   }).toBeGreaterThanOrEqual(0);
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await expect.poll(async () => {
     const card = await page.locator(".course-quiz").boundingBox();
-    const viewport = await page.locator(".main-content").boundingBox();
+    const viewport = await page.locator(".app-scroll").boundingBox();
     return card!.y - viewport!.y;
   }).toBeGreaterThanOrEqual(0);
   await page.screenshot({ path: info.outputPath("course-quiz-entry.png") });
@@ -1209,7 +1209,7 @@ test("long lesson transitions reveal the entire next card from its top edge", as
   await page.goto(`/courses/${ids[2]}?lesson=first`);
   const distanceFromScrollTop = async (selector: string) => {
     const card = await page.locator(selector).boundingBox();
-    const viewport = await page.locator(".main-content").boundingBox();
+    const viewport = await page.locator(".app-scroll").boundingBox();
     return card!.y - viewport!.y;
   };
   await page.getByRole("button", { name: /^Next lesson/ }).scrollIntoViewIfNeeded();

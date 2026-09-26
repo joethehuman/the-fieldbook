@@ -822,13 +822,12 @@ export default function Fieldbook({
             {error}
           </Alert>
         )}
+        <div id="main-content" className="app-scroll" tabIndex={-1}>
         <main
-          id="main-content"
           className={
             "main-content" +
             (view === "admin" && user.role === "admin" ? " admin-content" : "")
           }
-          tabIndex={-1}
         >
           {view === "admin" && user.role === "admin" ? (
             <ReportAvailability.Provider value={reportIssue}>
@@ -1069,7 +1068,8 @@ export default function Fieldbook({
           )}
         </main>
         <footer className="app-footer">
-          {branding.name} <span>{branding.tagline}</span>
+          <span className="footer-name">{branding.name}</span>
+          <span className="footer-tagline">{branding.tagline}</span>
           {policyHref &&
             (policyHref === "/privacy" ? (
               <Link href="/privacy">Privacy policy</Link>
@@ -1091,6 +1091,7 @@ export default function Fieldbook({
             </Button>
           )}
         </footer>
+        </div>
       </div>
       <Dialog open={showDemo} onOpenChange={setShowDemo}>
         <DialogContent

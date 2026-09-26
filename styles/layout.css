@@ -111,41 +111,42 @@
     width: min(24rem, 40vw);
     max-width: 100%;
   }
+  .app-scroll {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    width: 100%;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    scroll-padding-block-start: var(--anchor-offset);
+    scrollbar-gutter: stable both-edges;
+    outline: none;
+  }
   .main-content {
     container: workspace / inline-size;
     display: grid;
-    flex: 1 1 auto;
     align-content: start;
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
-    min-height: 0;
+    min-height: 100%;
     width: 100%;
     max-width: var(--page-width);
     gap: var(--space-8);
     margin-inline: auto;
     padding: var(--space-8) var(--space-6);
-    overflow-y: auto;
-    overscroll-behavior: none;
-    scroll-padding-block-start: var(--anchor-offset);
-    scrollbar-gutter: stable both-edges;
-    outline: none;
   }
   .app-footer {
     display: flex;
-    flex: none;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
     width: 100%;
     max-width: var(--page-width);
-    max-height: 30dvh;
     margin-inline: auto;
     border-top: 1px solid var(--border);
     padding-block: var(--space-6);
     padding-inline: var(--space-6);
-    overflow-y: auto;
-    overscroll-behavior: none;
-    scrollbar-gutter: stable;
     color: var(--muted-foreground);
     font-size: 0.75rem;
   }
@@ -160,6 +161,7 @@
   .admin-content {
     display: flex;
     flex-direction: column;
+    height: 100%;
   }
   .admin-workspace {
     display: flex;
@@ -204,7 +206,7 @@
     padding-bottom: var(--space-6);
     padding-inline-end: var(--space-4);
     overflow-y: auto;
-    overscroll-behavior: none;
+    overscroll-behavior-y: auto;
     scroll-padding-block-start: var(--anchor-offset);
     scrollbar-gutter: stable;
   }
@@ -711,7 +713,15 @@
       padding: var(--space-6) var(--space-4);
     }
     .app-footer {
-      padding: var(--space-4);
+      justify-content: flex-start;
+      gap: var(--space-1) var(--space-4);
+      padding: var(--space-2) var(--space-4);
+    }
+    .app-footer .footer-name {
+      display: none;
+    }
+    .app-footer .footer-tagline {
+      flex-basis: 100%;
     }
     .topbar {
       padding-inline: var(--space-4);

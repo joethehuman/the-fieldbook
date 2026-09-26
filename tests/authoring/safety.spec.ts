@@ -552,7 +552,7 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
     if (!rect) throw new Error("Expected a visible insertion line");
     return { top: rect.top, bottom: rect.bottom };
   });
-  const scrollBefore = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  const scrollBefore = await page.locator("#main-content").evaluate((node) => node.scrollTop);
   await writing.press("/");
   await expect(page.getByRole("menu", { name: "Insert content" })).toBeVisible();
   await expect(writing.locator(".writing-command-line")).toHaveAttribute("data-slash-query", "/Type to search");
@@ -563,7 +563,7 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   expect(Math.min(Math.abs(menu.y - caret.bottom), Math.abs(menu.y + menu.height - caret.top))).toBeLessThan(24);
   expect(menu.y).toBeGreaterThanOrEqual(0);
   expect(menu.y + menu.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-  expect(await page.locator(".main-content").evaluate((node) => node.scrollTop)).toBe(scrollBefore);
+  expect(await page.locator("#main-content").evaluate((node) => node.scrollTop)).toBe(scrollBefore);
   await page.screenshot({ path: info.outputPath("course-builder-slash.png"), fullPage: true });
   await page.keyboard.type("hea");
   await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::before").content)).toBe('"/hea"');
@@ -812,14 +812,14 @@ test("slash insertion stays beside a blank line after lesson prose", async ({ pa
   await page.keyboard.type("First line");
   await page.keyboard.press("Enter");
   await page.screenshot({ path: info.outputPath("blank-lesson-line.png") });
-  const oldScroll = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  const oldScroll = await page.locator("#main-content").evaluate((node) => node.scrollTop);
   const line = (await writing.locator("p").last().boundingBox())!;
   await page.keyboard.press("/");
   const menu = page.getByRole("menu", { name: "Insert content" });
   await expect(menu).toBeVisible();
   await expect(writing).toBeFocused();
   const box = (await menu.boundingBox())!;
-  const newScroll = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  const newScroll = await page.locator("#main-content").evaluate((node) => node.scrollTop);
   expect(Math.abs(newScroll - oldScroll)).toBeLessThan(8);
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);

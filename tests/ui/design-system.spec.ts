@@ -172,8 +172,6 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   const panel = page.getByRole("tabpanel", { name: "Content" });
   const shellPositions = await page.evaluate(() => ({
     header: document.querySelector(".topbar")!.getBoundingClientRect().top,
-    footer: document.querySelector(".app-footer")!.getBoundingClientRect()
-      .bottom,
     sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
   }));
   await nav.hover();
@@ -192,12 +190,16 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   expect(await nav.evaluate((element) => element.scrollTop)).toBe(before);
   await panel.evaluate((element) => (element.scrollTop = element.scrollHeight));
   await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() =>
+      page.locator("#main-content").evaluate((element) => element.scrollTop),
+    )
+    .toBeGreaterThan(0);
+  await expect(page.locator(".app-footer")).toBeInViewport();
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   expect(
     await page.evaluate(() => ({
       header: document.querySelector(".topbar")!.getBoundingClientRect().top,
-      footer: document.querySelector(".app-footer")!.getBoundingClientRect()
-        .bottom,
       sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
     })),
   ).toEqual(shellPositions);
@@ -209,7 +211,7 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   ).toBeInViewport();
 });
 
-test("short pages keep the shared shell fixed at both scroll limits", async ({
+test("short pages keep the bar and sidebar fixed when the footer is reached", async ({
   page,
 }) => {
   await learner(page);
@@ -223,20 +225,18 @@ test("short pages keep the shared shell fixed at both scroll limits", async ({
   await expect(page.getByText("No updates published yet.")).toBeVisible();
   const before = await page.evaluate(() => ({
     header: document.querySelector(".topbar")!.getBoundingClientRect().top,
-    footer: document.querySelector(".app-footer")!.getBoundingClientRect()
-      .bottom,
     sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
   }));
+  const footer = page.locator(".app-footer");
   await main.hover();
   await page.mouse.wheel(0, -600);
   await page.mouse.wheel(0, 600);
+  await footer.scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
-  expect(await main.evaluate((element) => element.scrollTop)).toBe(0);
+  await expect(footer).toBeInViewport();
   expect(
     await page.evaluate(() => ({
       header: document.querySelector(".topbar")!.getBoundingClientRect().top,
-      footer: document.querySelector(".app-footer")!.getBoundingClientRect()
-        .bottom,
       sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
     })),
   ).toEqual(before);
@@ -353,7 +353,7 @@ test("learner routes and narrow navigation remain usable", async ({
       ).toBeVisible();
     await noOverflow(page);
   }
-  await expect(page.locator(".app-footer > span")).toHaveText(
+  await expect(page.locator(".app-footer .footer-tagline")).toHaveText(
     "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS",
   );
   await page.goto("/#courses");
