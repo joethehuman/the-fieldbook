@@ -117,10 +117,20 @@
     min-height: 0;
     width: 100%;
     overflow-y: auto;
-    overscroll-behavior-y: contain;
+    overscroll-behavior-y: none;
     scroll-padding-block-start: var(--anchor-offset);
     scrollbar-gutter: stable both-edges;
     outline: none;
+  }
+  .app-scroll:is(.is-overscrolling, .is-overscroll-releasing) > .main-content:not(.admin-content),
+  .app-scroll:is(.is-overscrolling, .is-overscroll-releasing) > .app-footer,
+  .app-scroll:is(.is-overscrolling, .is-overscroll-releasing) .admin-panel > * {
+    transform: translate3d(0, var(--content-overscroll), 0);
+  }
+  .app-scroll.is-overscroll-releasing > .main-content:not(.admin-content),
+  .app-scroll.is-overscroll-releasing > .app-footer,
+  .app-scroll.is-overscroll-releasing .admin-panel > * {
+    transition: transform 360ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .main-content {
     container: workspace / inline-size;
@@ -161,6 +171,8 @@
   .admin-content {
     display: flex;
     flex-direction: column;
+  }
+  .admin-content:has(> .admin-workspace) {
     height: 100%;
   }
   .admin-workspace {

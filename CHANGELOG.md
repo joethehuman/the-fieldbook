@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Keep the shared header steady while page content and its footer scroll together. Allow native bounce inside that area where supported, and make the phone footer a compact tagline and links.
+- Keep the shared header steady while page content and its footer scroll together. Add a bounded pull at the top and bottom of the content on wheel and touch input, keep long editor pages above the footer, and make the phone footer a compact tagline and links.
 
 - Move account, team and organization actions into a shared profile menu for learners, managers, administrators and guests. Add general Fieldbook feedback through a dismissible dialog and include it in administrator feedback reports. Keep demo profile switching separate. Existing installations need `20260926182840_general_feedback.sql` before this feedback action can save.
 

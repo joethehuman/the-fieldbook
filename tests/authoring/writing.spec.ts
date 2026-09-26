@@ -124,6 +124,43 @@ async function setup(
   return { read, writes: () => writes };
 }
 
+test("editor footer stays after its content", async ({ page }, info) => {
+  const production = info.project.name.startsWith("production");
+  await setup(page, production, original.repeat(8));
+  await expect(page.getByRole("textbox", { name: "Doc content" })).toBeVisible();
+  const positions = await page.evaluate(() => {
+    const area = document.querySelector("#main-content")!;
+    const main = document.querySelector(".main-content")!;
+    const editor = document.querySelector("form.editor")!;
+    const footer = document.querySelector(".app-footer")!;
+    return {
+      editorBottom: editor.getBoundingClientRect().bottom,
+      mainBottom: main.getBoundingClientRect().bottom,
+      footerTop: footer.getBoundingClientRect().top,
+      areaBottom: area.getBoundingClientRect().bottom,
+    };
+  });
+  expect(positions.editorBottom).toBeGreaterThan(positions.areaBottom);
+  expect(positions.mainBottom).toBeGreaterThanOrEqual(positions.editorBottom - 1);
+  expect(positions.footerTop).toBeGreaterThanOrEqual(positions.editorBottom - 1);
+
+  const area = page.locator("#main-content");
+  const footer = page.locator(".app-footer");
+  const editor = page.locator("form.editor");
+  await area.evaluate((el) => el.scrollTo(0, 1200));
+  expect(
+    await footer.evaluate((el) => el.getBoundingClientRect().top),
+  ).toBeGreaterThan(positions.areaBottom);
+  await area.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+  await expect(footer).toBeInViewport();
+  const footerTop = await footer.evaluate((el) => el.getBoundingClientRect().top);
+  const editorBottom = await editor.evaluate(
+    (el) => el.getBoundingClientRect().bottom,
+  );
+  expect(footerTop).toBeGreaterThanOrEqual(editorBottom - 1);
+  await page.screenshot({ path: info.outputPath("editor-footer.png") });
+});
+
 test("visual Markdown round trip, explicit draft saves, republish and unpublish", async ({
   page,
 }, info) => {

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { reconcileDemoPublication } from "@/lib/demo-publication";
 import { AppBar } from "./patterns/app-bar";
+import { ContentScroll } from "./patterns/content-scroll";
 import { DocumentTree } from "./patterns/document-tree";
 import { DocsEmpty } from "./patterns/docs-empty";
 import type { ReadingState } from "@/lib/reading";
@@ -822,7 +823,7 @@ export default function Fieldbook({
             {error}
           </Alert>
         )}
-        <div id="main-content" className="app-scroll" tabIndex={-1}>
+        <ContentScroll>
         <main
           className={
             "main-content" +
@@ -1091,7 +1092,7 @@ export default function Fieldbook({
             </Button>
           )}
         </footer>
-        </div>
+        </ContentScroll>
       </div>
       <Dialog open={showDemo} onOpenChange={setShowDemo}>
         <DialogContent

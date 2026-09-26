@@ -1,6 +1,38 @@
 import { test, expect, type Page, type Locator } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 
+test("admin content pulls without moving either navigation area", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+  });
+  await page.goto("/#admin");
+  const panel = page.locator(".admin-panel");
+  await expect(panel).toBeVisible();
+  const movement = await panel.evaluate((el) => {
+    const content = el.firstElementChild!;
+    const adminNav = document.querySelector('[data-slot="admin-navigation"]')!;
+    const mainNav = document.querySelector(".sidebar")!;
+    const bar = document.querySelector(".topbar")!;
+    const before = [content, adminNav, mainNav, bar].map(
+      (item) => item.getBoundingClientRect().top,
+    );
+    el.dispatchEvent(
+      new WheelEvent("wheel", {
+        deltaY: -160,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    return [content, adminNav, mainNav, bar].map(
+      (item, index) => item.getBoundingClientRect().top - before[index],
+    );
+  });
+  expect(movement[0]).toBeGreaterThan(0);
+  expect(movement.slice(1)).toEqual([0, 0, 0]);
+});
+
 async function section(page: Page, name: string) {
   const picker = page.getByRole("combobox", {
     name: "Administration section",

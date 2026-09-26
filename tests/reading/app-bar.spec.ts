@@ -134,6 +134,84 @@ for (const app of ["demo", "production"]) {
         await page.keyboard.press("Escape");
         await expect(about).toBeFocused();
       }
+
+      await main.evaluate((el) => el.scrollTo(0, 0));
+      await expect
+        .poll(() =>
+          main.evaluate((el) => {
+            const content = el.querySelector(".main-content")!;
+            const before = content.getBoundingClientRect().top;
+            el.dispatchEvent(
+              new WheelEvent("wheel", {
+                deltaY: -160,
+                bubbles: true,
+                cancelable: true,
+              }),
+            );
+            return content.getBoundingClientRect().top - before;
+          }),
+        )
+        .toBeGreaterThan(0);
+      expect(await bar.evaluate((el) => el.getBoundingClientRect().top)).toBe(
+        0,
+      );
+      expect(
+        await page
+          .locator(".sidebar")
+          .evaluate((el) => el.getBoundingClientRect().top),
+      ).toBe(0);
+
+      await main.evaluate((el) => el.scrollTo(0, el.scrollHeight));
+      const bottomPull = await main.evaluate((el) => {
+        const footer = el.querySelector(".app-footer")!;
+        const before = footer.getBoundingClientRect().top;
+        el.dispatchEvent(
+          new WheelEvent("wheel", {
+            deltaY: 160,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        return footer.getBoundingClientRect().top - before;
+      });
+      expect(bottomPull).toBeLessThan(0);
+      expect(await bar.evaluate((el) => el.getBoundingClientRect().top)).toBe(
+        0,
+      );
+
+      if (info.project.name === "phone") {
+        await main.evaluate((el) => el.scrollTo(0, 0));
+        const touchPull = await main.evaluate((el) => {
+          const content = el.querySelector(".main-content")!;
+          const before = content.getBoundingClientRect().top;
+          const start = new Touch({ identifier: 1, target: el, clientY: 100 });
+          const moved = new Touch({ identifier: 1, target: el, clientY: 160 });
+          el.dispatchEvent(
+            new TouchEvent("touchstart", {
+              touches: [start],
+              changedTouches: [start],
+              bubbles: true,
+            }),
+          );
+          el.dispatchEvent(
+            new TouchEvent("touchmove", {
+              touches: [moved],
+              changedTouches: [moved],
+              bubbles: true,
+              cancelable: true,
+            }),
+          );
+          const distance = content.getBoundingClientRect().top - before;
+          el.dispatchEvent(
+            new TouchEvent("touchend", {
+              changedTouches: [moved],
+              bubbles: true,
+            }),
+          );
+          return distance;
+        });
+        expect(touchPull).toBeGreaterThan(0);
+      }
     });
   }
 }

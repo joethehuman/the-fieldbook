@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { AppBar } from "@/components/patterns/app-bar";
+import { ContentScroll } from "@/components/patterns/content-scroll";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { AccountMenu } from "@/components/patterns/account-menu";
@@ -264,7 +265,7 @@ export function ReaderShell({
           </nav>
           <ReaderSearch />
         </AppBar>
-        <div id="main-content" className="app-scroll" tabIndex={-1}>
+        <ContentScroll>
           <main className="main-content">
             {context.user && <ReaderGuestImport />}
             {children}
@@ -276,7 +277,7 @@ export function ReaderShell({
               <Link href={context.branding.privacyUrl}>Privacy policy</Link>
             )}
           </footer>
-        </div>
+        </ContentScroll>
       </div>
     </div>
   );
