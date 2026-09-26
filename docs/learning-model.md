@@ -15,7 +15,7 @@ The Courses page starts with For you for signed-in users, then offers published 
 
 ### Browsing courses and personal activity
 
-“View all for you” opens the shared course browser with **Assigned** selected. It contains assigned published courses and curriculum cards, including completed cards; the curriculum presentation rules below describe how these are combined. **Hide completed** defaults off and filters only this view. The home For you row shows unfinished assigned cards in recommended order; a curriculum card opens its ordered course list.
+“View all for you” opens the shared course browser with **Assigned** selected for signed-in learners, or **For you** for guests. It contains assigned published courses and curriculum cards, including completed cards; the curriculum presentation rules below describe how these are combined. Guest-group items remain recommendations and do not gain an Assigned card label. **Hide completed** defaults off and filters only this view. The home For you row shows unfinished assigned cards in recommended order; a curriculum card opens its ordered course list.
 
 The browser also provides **Your courses** (assigned courses plus any other course started or completed on its current version), **In progress** (any started, unfinished course), **Completed** (all current-version completions), and **All courses** (the published course library). An Assigned marker appears quietly on assigned course cards in browser views; other cards have no assignment label. Switching views clears search/channel filters and resets Hide completed. Search and sorting apply within the selected collection. These views use the same saved progress; they do not enroll learners or change assignments.
 

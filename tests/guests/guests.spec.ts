@@ -368,6 +368,16 @@ test("guest Updates and curriculum learning, browser progress and account transi
     /past their target|days left in onboarding/,
   );
   await shot(page, info, "guest-courses");
+  await page.getByRole("button", { name: "View all for you" }).click();
+  await expect(
+    page
+      .getByRole("group", { name: "Course views" })
+      .getByRole("button", { name: "For you" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.locator(".library .course-card").filter({ hasText: "Assigned" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Back to courses" }).click();
   if (f.production) {
     const open = page.getByRole("button", { name: "Open navigation" });
     if (await open.isVisible()) await open.click();
