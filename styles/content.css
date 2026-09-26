@@ -1,5 +1,24 @@
 /* Rich text and media are deliberately scoped away from application controls. */
 @layer components {
+  .scroll-fade[data-scroll-fade-before="true"][data-scroll-fade-after="true"] {
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      black var(--space-4),
+      black calc(100% - var(--space-4)),
+      transparent
+    );
+  }
+  .scroll-fade[data-scroll-fade-before="true"][data-scroll-fade-after="false"] {
+    mask-image: linear-gradient(to bottom, transparent, black var(--space-4));
+  }
+  .scroll-fade[data-scroll-fade-before="false"][data-scroll-fade-after="true"] {
+    mask-image: linear-gradient(
+      to bottom,
+      black calc(100% - var(--space-4)),
+      transparent
+    );
+  }
   .article {
     display: grid;
     width: 100%;
@@ -219,56 +238,64 @@
     padding-inline-end: var(--space-3);
     flex: 1 1 auto;
   }
-  .document-branch-trigger {
+  .document-section + .document-section {
+    margin-top: var(--space-6);
+  }
+  .document-section-heading {
+    margin: 0;
+    padding: 0 var(--space-2) var(--space-1);
+    color: var(--foreground);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.375;
+    overflow-wrap: anywhere;
+  }
+  .document-section-children,
+  .document-subsection-children {
+    display: grid;
+    min-width: 0;
+    margin-left: var(--space-2);
+    padding-left: var(--space-2);
+    border-left: 1px solid var(--border);
+  }
+  .document-subsection-trigger {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: var(--space-2);
     width: 100%;
-    min-height: var(--control-height);
+    min-height: var(--control-height-sm);
     border-radius: var(--control-radius);
     text-align: left;
     cursor: pointer;
-    padding: var(--space-2);
+    padding: var(--space-1) var(--space-2);
     color: var(--foreground);
-    font-size: 0.8125rem;
-    font-weight: 600;
-    line-height: 1.5;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.375;
     overflow-wrap: anywhere;
   }
-  .document-branch-trigger:hover {
-    background: var(--accent);
+  .document-subsection-trigger:hover {
+    background: var(--muted-hover);
   }
-  .document-branch-trigger:focus-visible {
+  .document-subsection-trigger:focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: -2px;
   }
-  .document-branch-trigger svg {
+  .document-subsection-trigger svg {
     flex-shrink: 0;
     color: var(--muted-foreground);
     transition: transform 150ms;
   }
-  .document-branch-trigger[data-state="open"] svg {
+  .document-subsection-trigger[data-state="open"] svg {
     transform: rotate(90deg);
   }
-  .document-children[data-state="closed"] {
+  .document-subsection-children[data-state="closed"] {
     display: none;
   }
   @media (prefers-reduced-motion: reduce) {
-    .document-branch-trigger svg {
+    .document-subsection-trigger svg {
       transition: none;
     }
-  }
-  .document-tree > .document-branch + .document-branch {
-    margin-top: var(--space-4);
-  }
-  .document-children {
-    display: grid;
-    min-width: 0;
-    padding-left: var(--space-3);
-  }
-  .document-children .document-children {
-    border-left: 1px solid var(--border);
   }
   .reading-layout {
     container: reading / inline-size;
@@ -291,10 +318,17 @@
     min-width: 0;
     grid-row: 1;
   }
+  .reading-outline-title {
+    display: none;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    padding-block: var(--space-2);
+  }
   .reading-outline summary {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
+    gap: var(--space-2);
     list-style: none;
     cursor: pointer;
     font-size: 0.8125rem;
@@ -351,7 +385,7 @@
     gap: var(--space-4);
   }
   .document-pagination-link {
-    width: 100%;
+    max-width: 100%;
     min-width: 0;
     height: auto;
     align-items: center;
@@ -360,8 +394,12 @@
     text-align: left;
     white-space: normal;
   }
+  .document-pagination [data-direction="previous"] {
+    justify-self: start;
+  }
   .document-pagination [data-direction="next"] {
     grid-column: 2;
+    justify-self: end;
     justify-content: flex-end;
     text-align: right;
   }
@@ -413,6 +451,12 @@
       align-self: start;
       position: sticky;
       top: var(--anchor-offset);
+    }
+    .reading-outline summary {
+      display: none;
+    }
+    .reading-outline-title {
+      display: block;
     }
     .reading-outline nav {
       max-height: calc(

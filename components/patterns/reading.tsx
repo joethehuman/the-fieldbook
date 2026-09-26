@@ -30,16 +30,18 @@ export function Article({
   sections = [],
   demo = false,
   onDocument,
+  sameSiteOrigins,
 }: {
   item: Content;
   name: string;
-  back: ReactNode;
+  back?: ReactNode;
   children?: ReactNode;
   documents?: DocLink[];
   sectionOrder?: string[];
   sections?: DocSection[];
   demo?: boolean;
   onDocument?: (id: string) => void;
+  sameSiteOrigins?: readonly string[];
 }) {
   const isDoc = item.kind === "doc";
   const headings = isDoc ? markdownHeadings(item.body) : [];
@@ -60,7 +62,7 @@ export function Article({
       <div className="reading-columns">
         <article className="article">
           <header className="article-header">
-            <div className="article-navigation">{back}</div>
+            {back && <div className="article-navigation">{back}</div>}
             <h1>{item.title}</h1>
             <p className="article-lede">{item.summary}</p>
             <div className="article-meta">
@@ -96,7 +98,10 @@ export function Article({
             </div>
           </header>
           <div className="markdown">
-            <ReactMarkdown headingPrefix={isDoc ? prefix : undefined}>
+            <ReactMarkdown
+              headingPrefix={isDoc ? prefix : undefined}
+              sameSiteOrigins={sameSiteOrigins}
+            >
               {item.body}
             </ReactMarkdown>
           </div>
@@ -113,7 +118,7 @@ export function Article({
                       asChild
                       variant="ghost"
                       key={doc.id}
-                      className="document-pagination-link h-auto min-w-0 justify-start whitespace-normal p-3 text-left"
+                      className={`document-pagination-link h-auto min-w-0 whitespace-normal p-3 ${direction === 0 ? "justify-start text-left" : "justify-end text-right"}`}
                     >
                       {demo || onDocument ? (
                         <a
@@ -219,7 +224,7 @@ export function CourseOverview({
       </div>
       {item.body && (
         <div className="markdown">
-          <ReactMarkdown>{item.body}</ReactMarkdown>
+          <ReactMarkdown linkContext="course">{item.body}</ReactMarkdown>
         </div>
       )}
       <h2>In this course</h2>

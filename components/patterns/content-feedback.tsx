@@ -196,7 +196,7 @@ export function ContentFeedback({
     </form>
   );
   return (
-    <section aria-label="Content feedback" className="min-w-0">
+    <section aria-label="Content feedback" className="flex min-w-0 flex-col items-center">
       <Popover open={desktop && open} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
           <div

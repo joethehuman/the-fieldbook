@@ -46,9 +46,11 @@ export function AccountButton({
           type="button"
           variant={visibleAction ? "default" : "ghost"}
           size={visibleAction ? "default" : "icon"}
-          className={
-            visibleAction ? "col-span-full" : "col-start-2 @[12rem]:col-auto"
-          }
+          className={cn(
+            visibleAction
+              ? "col-span-full"
+              : "col-start-2 @[12rem]:col-auto hover:bg-muted-hover focus-visible:bg-muted-hover",
+          )}
           aria-label={actionLabel}
           title={actionLabel}
         >

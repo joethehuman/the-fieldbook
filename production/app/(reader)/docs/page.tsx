@@ -1,9 +1,7 @@
-import { IntentLink } from "@/components/patterns/intent-link";
-import { BookOpen, ChevronRight, ArrowRight } from "lucide-react";
-import { docSections } from "@/lib/docs-navigation";
+import { DocsEmpty } from "@/components/patterns/docs-empty";
+import { orderedDocs } from "@/lib/docs-navigation";
 import { readerContext } from "@production/lib/reader";
-import { NavigationButton } from "@/components/patterns/navigation-button";
-import { PageHeader } from "@/components/patterns/layout";
+import { redirect } from "next/navigation";
 export async function generateMetadata() {
   const { branding } = await readerContext("/docs");
   return {
@@ -15,70 +13,8 @@ export async function generateMetadata() {
   };
 }
 export default async function Page() {
-  const {
-    docs,
-    docCategoryOrder,
-    docSections: configured,
-  } = await readerContext("/docs");
-  return (
-    <>
-      <PageHeader>
-        <h1>Docs</h1>
-      </PageHeader>
-      {docs.some((doc) => doc.id === "start") && (
-        <IntentLink className="knowledge-feature" href="/docs/start" eager>
-          <div>
-            <h2>Start here</h2>
-            <span className="text-link">
-              Open guide <ArrowRight size={17} />
-            </span>
-          </div>
-          <BookOpen size={76} strokeWidth={1} />
-        </IntentLink>
-      )}
-      <div className="knowledge-grid">
-        {docSections(docs, docCategoryOrder, configured).map((section) => (
-          <section className="knowledge-section" key={section.id}>
-            <BookOpen size={22} />
-            <h2>{section.name}</h2>
-            <p>
-              {section.docs.length +
-                section.folders.reduce(
-                  (count, child) => count + child.docs.length,
-                  0,
-                )}{" "}
-              articles
-            </p>
-            {section.docs.map((doc) => (
-              <NavigationButton asChild key={doc.id}>
-                <IntentLink
-                  href={`/docs/${encodeURIComponent(doc.id)}`}
-                  eager={doc.id === docs[0]?.id}
-                >
-                  {doc.title}
-                  <ChevronRight size={16} />
-                </IntentLink>
-              </NavigationButton>
-            ))}
-            {section.folders.map((child) => (
-              <div key={child.id}>
-                <h3>{child.name}</h3>
-                {child.docs.map((doc) => (
-                  <NavigationButton asChild key={doc.id}>
-                    <IntentLink
-                      href={`/docs/${encodeURIComponent(doc.id)}`}
-                      eager={doc.id === docs[0]?.id}
-                    >
-                      {doc.title}
-                      <ChevronRight size={16} />
-                    </IntentLink>
-                  </NavigationButton>
-                ))}
-              </div>
-            ))}
-          </section>
-        ))}
-      </div>
-    </>
-  );
+  const { docs, docCategoryOrder, docSections } = await readerContext("/docs");
+  const first = orderedDocs(docs, docCategoryOrder, docSections)[0];
+  if (first) redirect(`/docs/${encodeURIComponent(first.id)}`);
+  return <DocsEmpty />;
 }

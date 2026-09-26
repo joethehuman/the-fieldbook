@@ -8,14 +8,25 @@ test("confirmations replace one another without shifting layout and fade automat
     name: "Preview confirmation",
     exact: true,
   });
+  await expect(page.getByRole("group", { name: "Formatting" })).toBeVisible();
   await expect(trigger).toBeVisible();
   await trigger.scrollIntoViewIfNeeded();
-  const before = await trigger.boundingBox();
+  const documentPosition = () =>
+    trigger.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      return {
+        x: box.x + window.scrollX,
+        y: box.y + window.scrollY,
+        width: box.width,
+        height: box.height,
+      };
+    });
+  const before = await documentPosition();
   await trigger.click();
   const toast = page.locator('[data-slot="toast"]');
   await expect(toast).toHaveText("Doc published.");
   await expect(trigger).toBeFocused();
-  expect(await trigger.boundingBox()).toEqual(before);
+  expect(await documentPosition()).toEqual(before);
   await page.clock.install();
   await page.clock.fastForward(3000);
   for (let i = 0; i < 10; i++) await trigger.click();
@@ -38,7 +49,7 @@ test("confirmations replace one another without shifting layout and fade automat
   await trigger.hover();
   await page.clock.fastForward(4300);
   await expect(toast).toHaveCount(0);
-  expect(await trigger.boundingBox()).toEqual(before);
+  expect(await documentPosition()).toEqual(before);
 });
 
 test("reduced motion preserves confirmation and timeout without animation", async ({

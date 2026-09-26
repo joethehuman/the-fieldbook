@@ -1,6 +1,6 @@
 "use client";
-import { useState } from "react";
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react";
+import { useState, type DragEvent, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, GripVertical, Trash2 } from "lucide-react";
 import {
   availableDocSections,
   deleteDocSection,
@@ -16,8 +16,52 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { ReorderRow } from "./patterns/reorder-row";
+import { useRowReorder } from "./patterns/use-row-reorder";
 import { FormField } from "./patterns/form-field";
 import DocSectionCreate from "./DocSectionCreate";
+
+type DragControls = {
+  handle: ReactNode;
+  dragging: boolean;
+  onDragOver: (event: DragEvent<HTMLLIElement>) => void;
+  onDrop: (event: DragEvent<HTMLLIElement>) => void;
+};
+
+function SectionOrderRows({
+  items,
+  disabled,
+  onMove,
+  renderRow,
+}: {
+  items: DocSection[];
+  disabled: boolean;
+  onMove: (id: string, index: number) => void;
+  renderRow: (section: DocSection, siblings: DocSection[], drag: DragControls) => ReactNode;
+}) {
+  const drag = useRowReorder(items, onMove, disabled);
+  return drag.ordered.map((section) =>
+    renderRow(section, items, {
+      handle: (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="order-handle"
+          draggable={!disabled}
+          disabled={disabled}
+          aria-label={`Reorder ${section.name}; use up or down buttons`}
+          onDragStart={(event) => drag.start(event, section.id)}
+          onDragEnd={drag.cancel}
+        >
+          <GripVertical aria-hidden="true" size={17} />
+        </Button>
+      ),
+      dragging: drag.active === section.id,
+      onDragOver: (event) => drag.over(event, section.id),
+      onDrop: drag.drop,
+    }),
+  );
+}
 
 export function DocSectionsSettings({
   sections,
@@ -43,17 +87,17 @@ export function DocSectionsSettings({
       setError((error as Error).message);
     }
   };
-  const row = (section: DocSection, siblings: DocSection[]) => {
+  const row = (section: DocSection, siblings: DocSection[], drag: DragControls) => {
     const index = siblings.findIndex((item) => item.id === section.id);
     return (
       <ReorderRow
         key={section.id}
+        data-sortable-preview
+        data-dragging={drag.dragging}
+        onDragOver={drag.onDragOver}
+        onDrop={drag.onDrop}
         title={<strong>{section.name}</strong>}
-        handle={
-          <span aria-hidden="true" className="text-muted-foreground">
-            {section.parentId ? "↳" : "§"}
-          </span>
-        }
+        handle={drag.handle}
         detail={
           <FormField label={"Placement for " + sectionPath(section, sections)}>
             <SelectField
@@ -150,23 +194,29 @@ export function DocSectionsSettings({
       {error && <p role="alert">{error}</p>}
       {sections.length ? (
         <ol className="doc-order-list">
-          {roots.map((root) => (
+          <SectionOrderRows
+            items={roots}
+            disabled={disabled || !!conflict}
+            onMove={(id, target) =>
+              act(() => reorderDocSection(sections, id, target - roots.findIndex((item) => item.id === id)))
+            }
+            renderRow={(root, siblings, drag) => (
             <li key={root.id} className="list-none">
               <ol className="doc-order-list">
-                {row(root, roots)}
-                {sections
-                  .filter((section) => section.parentId === root.id)
-                  .map((child) =>
-                    row(
-                      child,
-                      sections.filter(
-                        (section) => section.parentId === root.id,
-                      ),
-                    ),
-                  )}
+                {row(root, siblings, drag)}
+                <SectionOrderRows
+                  items={sections.filter((section) => section.parentId === root.id)}
+                  disabled={disabled || !!conflict}
+                  onMove={(id, target) => {
+                    const children = sections.filter((section) => section.parentId === root.id);
+                    act(() => reorderDocSection(sections, id, target - children.findIndex((item) => item.id === id)));
+                  }}
+                  renderRow={row}
+                />
               </ol>
             </li>
-          ))}
+            )}
+          />
         </ol>
       ) : (
         <p>No sections yet. Create one below.</p>

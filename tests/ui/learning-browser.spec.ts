@@ -197,30 +197,26 @@ test("optional activity is resumable and all completions remain available at 100
   ).toBeVisible();
 });
 
-test("course row arrows track overflow, endpoints, resize and enlarged text", async ({
+test("course rows scroll directly and the completion card fills narrow layouts", async ({
   page,
 }, info) => {
   await seed(page, false, true);
   const home = page.locator(".for-you");
-  const next = home.getByRole("button", {
-    name: "Next For you courses",
-    exact: true,
-  });
-  const previous = home.getByRole("button", {
-    name: "Previous For you courses",
-    exact: true,
-  });
-  await expect(next).toBeEnabled();
-  await expect(previous).toBeDisabled();
-  await next.click();
-  await expect(previous).toBeEnabled();
-  await home
-    .getByRole("region", { name: "For you", exact: true })
-    .evaluate((element) => {
-      element.scrollLeft = element.scrollWidth;
-    });
-  await expect(next).toBeDisabled();
-  // A one-card library channel never needs arrows at these widths.
+  const row = home.getByRole("region", { name: "For you", exact: true });
+  await expect(page.getByRole("button", { name: /^(Previous|Next) .* courses$/ })).toHaveCount(0);
+  await expect(row).toHaveAttribute("tabindex", "0");
+  expect(await row.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+  await row.scrollIntoViewIfNeeded();
+  const rowBox = await row.boundingBox();
+  await page.mouse.move(rowBox!.x + rowBox!.width / 2, rowBox!.y + rowBox!.height / 2);
+  await page.mouse.wheel(400, 0);
+  await expect.poll(() => row.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  await row.evaluate((element) => { element.scrollLeft = 0; });
+  await expect.poll(() => row.evaluate((element) => element.scrollLeft)).toBe(0);
+  await row.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => row.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  // A one-card library channel remains a normal, non-focusable strip.
   const product = page.locator(".channel").filter({
     has: page.getByRole("heading", {
       name: "Completed optional learning",
@@ -229,13 +225,23 @@ test("course row arrows track overflow, endpoints, resize and enlarged text", as
   });
   await expect(product).toHaveCount(1);
   await expect(product.locator(".course-card")).toHaveCount(1);
-  await expect(product.getByRole("button", { name: /^Next / })).toHaveCount(0);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(next).toBeVisible();
+  await expect(product.getByRole("region", { name: "Completed optional learning" })).not.toHaveAttribute("tabindex", "0");
+  for (const width of [1024, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const summary = await home.locator('[data-slot="card"]').first().boundingBox();
+    const strip = await row.boundingBox();
+    const action = await home.locator('[data-slot="card"]').first().getByRole("button", { name: "Start course" }).boundingBox();
+    expect(Math.abs(summary!.x - strip!.x)).toBeLessThan(2);
+    expect(Math.abs(summary!.width - strip!.width)).toBeLessThan(2);
+    expect(action!.width).toBeLessThan(summary!.width * 0.7);
+    expect(Math.abs(action!.x + action!.width / 2 - (summary!.x + summary!.width / 2))).toBeLessThan(2);
+    await page.setViewportSize({ width, height: 1400 });
+    await row.evaluate((element) => element.blur());
+    await home.screenshot({ path: info.outputPath(`course-summary-${width}.png`) });
+  }
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });
-  await expect(product.getByRole("button", { name: /^Next / })).toHaveCount(0);
   await noOverflow(page);
   await page.screenshot({
     path: info.outputPath("learning-enlarged.png"),

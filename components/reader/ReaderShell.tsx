@@ -125,7 +125,11 @@ export function ReaderShell({
               key={href}
               className={section === href.slice(1) ? "active" : ""}
             >
-              <Link href={href} prefetch onClick={close}>
+              <Link
+                href={href}
+                prefetch
+                onClick={href === "/docs" ? undefined : close}
+              >
                 <Icon size={19} />
                 {label}
               </Link>
@@ -139,6 +143,7 @@ export function ReaderShell({
             sections={context.docSections}
             selected={selected}
             href={(id) => `/docs/${encodeURIComponent(id)}`}
+            onNavigate={close}
             storageKey="fieldbook.documents.production"
           />
         )}

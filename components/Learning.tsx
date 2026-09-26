@@ -247,15 +247,12 @@ export default function Learning({
       For you <Badge variant="default">{outstanding.length}</Badge>
     </h2>
   );
+  const outstandingCards = assignedCards.filter((item) => !completeCard(item));
   const progressCard = (
-    <Card className="flex w-full max-w-xs flex-col items-center justify-center gap-4 text-center">
+    <Card className={`flex w-full flex-col items-center justify-center gap-4 text-center ${outstandingCards.length ? "" : "max-w-xs"} ${assigned.length ? "" : "border-dotted border-muted-foreground/50"}`}>
       {assigned.length > 0 ? (
         <ProgressRing value={pct} />
-      ) : (
-        <div className="learning-status-icon">
-          <BookOpen size={24} />
-        </div>
-      )}
+      ) : null}
       <div className="grid gap-2">
         <h3>
           {!assigned.length
@@ -291,7 +288,7 @@ export default function Learning({
       {nextCourse && (
         <Button
           variant="default"
-          className="mt-auto w-full"
+          className="mt-auto"
           onClick={() => onOpen(nextCourse.id)}
         >
           {courseProgress(nextCourse, progress).started
@@ -305,12 +302,11 @@ export default function Learning({
         </Button>
       ) : (
         <Button variant="link" onClick={browseLibrary}>
-          Browse all courses <ArrowRight size={16} />
+          All courses <ArrowRight size={16} />
         </Button>
       )}
     </Card>
   );
-  const outstandingCards = assignedCards.filter((item) => !completeCard(item));
   return (
     <>
       <PageHeader>

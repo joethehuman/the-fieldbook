@@ -1,6 +1,7 @@
-import { Article, ReadingBack } from "@/components/patterns/reading";
+import { Article } from "@/components/patterns/reading";
 import { ReaderFeedback } from "@/components/reader/ReaderFeedback";
 import { readerItem, readerMetadata } from "@production/lib/reader";
+import { siteOrigins } from "@production/lib/env";
 type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props) {
   const { id } = await params;
@@ -17,7 +18,7 @@ export default async function Page({ params }: Props) {
       documents={context.docs}
       sectionOrder={context.docCategoryOrder}
       sections={context.docSections}
-      back={<ReadingBack kind="doc" clientNavigation />}
+      sameSiteOrigins={siteOrigins()}
     >
       <ReaderFeedback key={item.id} contentId={item.id} />
     </Article>

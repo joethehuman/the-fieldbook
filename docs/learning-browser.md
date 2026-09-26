@@ -10,4 +10,4 @@ Current-version progress drives every indicator. Opening a course alone does not
 
 ## Shared patterns
 
-LearningCard and CardGrid own card anatomy, spacing and sizing. CourseRow owns its section heading, optional leading summary, overflow measurement and header-slot controls. BrowseToolbar aligns labeled collection controls. LaunchList owns the simple ordered learner list. These compose existing ContentAction, CardFooter, ProgressStatus, Field, SelectField and semantic tokens. The `/ui` catalog and design-system standards document their contracts. Superseded offsets and feature-local layout rules were removed.
+LearningCard and CardGrid own card anatomy, spacing and sizing. CourseRow owns its section heading, optional leading summary, overflow measurement and native horizontal scrolling. BrowseToolbar aligns labeled collection controls. LaunchList owns the simple ordered learner list. These compose existing ContentAction, CardFooter, ProgressStatus, Field, SelectField and semantic tokens. The `/ui` catalog and design-system standards document their contracts. Superseded offsets and feature-local layout rules were removed.

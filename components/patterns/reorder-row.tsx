@@ -19,7 +19,7 @@ export function ReorderRow({
     <li
       data-slot="reorder-row"
       className={cn(
-        "@container min-w-0 rounded-lg border border-border bg-card p-3",
+        "@container min-w-0 rounded-lg border border-border bg-card p-3 transition-colors motion-reduce:transition-none data-[dragging=true]:border-input data-[dragging=true]:bg-surface data-[dragging=true]:opacity-50",
         className,
       )}
       {...props}

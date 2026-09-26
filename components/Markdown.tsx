@@ -3,13 +3,18 @@ import { remarkHeadingAnchors } from "@/lib/markdown-headings";
 import { Table } from "@/components/ui/table";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { contentLinkTarget, type ContentLinkContext } from "@/lib/content-links";
 
 export default function Markdown({
   children,
   headingPrefix,
+  linkContext = "article",
+  sameSiteOrigins,
 }: {
   children: string;
   headingPrefix?: string;
+  linkContext?: ContentLinkContext;
+  sameSiteOrigins?: readonly string[];
 }) {
   return (
     <ReactMarkdown
@@ -47,20 +52,24 @@ export default function Markdown({
               ]),
             )
           : {}),
-        a: ({ href, children }) =>
-          href?.startsWith("/api/media/") &&
-          /\.(mp4|webm)(?:\?|$)/i.test(href) ? (
-            <video
-              controls
-              preload="metadata"
-              src={href}
-              aria-label={String(children)}
-            />
-          ) : (
-            <a href={href} rel="noopener noreferrer">
+        a: ({ href, children }) => {
+          if (href?.startsWith("/api/media/") && /\.(mp4|webm)(?:\?|$)/i.test(href))
+            return (
+              <video
+                controls
+                preload="metadata"
+                src={href}
+                aria-label={String(children)}
+              />
+            );
+          const target = contentLinkTarget(href, linkContext, sameSiteOrigins);
+          return (
+            <a href={href} target={target} rel={target ? "noopener noreferrer" : undefined}>
               {children}
+              {target && <span className="sr-only"> (opens in a new tab)</span>}
             </a>
-          ),
+          );
+        },
         img: ({ src, alt }) =>
           typeof src === "string" ? (
             <img src={src} alt={alt || ""} loading="lazy" />

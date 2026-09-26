@@ -31,12 +31,14 @@ export default function MarkdownEditor({
   onChange,
   onUpload,
   rows = 14,
+  linkContext = "article",
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   onUpload?: UploadMedia;
   rows?: number;
+  linkContext?: "article" | "course";
 }) {
   const id = useId(),
     input = useRef<HTMLTextAreaElement>(null),
@@ -184,7 +186,7 @@ export default function MarkdownEditor({
       </Toolbar>
       {preview ? (
         <div className="markdown markdown-preview">
-          <Markdown>{value || "Nothing to preview yet."}</Markdown>
+          <Markdown linkContext={linkContext}>{value || "Nothing to preview yet."}</Markdown>
         </div>
       ) : (
         <Textarea

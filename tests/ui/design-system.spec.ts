@@ -163,6 +163,7 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   await admin(page);
   const nav = page.locator('[data-slot="admin-navigation"] [role="tablist"]');
   await expect(nav).toBeVisible();
+  await expect(nav).toHaveAttribute("data-scroll-fade-after", "true");
   await expect(page.locator("main h1")).toHaveClass(/sr-only/);
   await expect(nav.getByText("Administration", { exact: true })).toHaveCount(0);
   await expect(page.locator("main")).not.toContainText(
@@ -180,6 +181,7 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   await expect
     .poll(() => nav.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
+  await expect(nav).toHaveAttribute("data-scroll-fade-before", "true");
   expect(await panel.evaluate((element) => element.scrollTop)).toBe(0);
   const before = await nav.evaluate((element) => element.scrollTop);
   await panel.hover();
@@ -343,9 +345,12 @@ test("learner routes and narrow navigation remain usable", async ({
     ["docs", "Docs"],
   ]) {
     await page.goto(`/#${route}`);
-    await expect(
-      page.getByRole("heading", { name: heading, exact: true }).first(),
-    ).toBeVisible();
+    if (route === "docs")
+      await expect(page.locator("article h1")).toBeVisible();
+    else
+      await expect(
+        page.getByRole("heading", { name: heading, exact: true }).first(),
+      ).toBeVisible();
     await noOverflow(page);
   }
   await expect(page.locator(".app-footer > span")).toHaveText(
