@@ -376,7 +376,7 @@ export default function Learning({
             value={view}
             onValueChange={(value) => changeView(value as LearningCollection)}
             options={[
-              { value: "yours", label: "Your courses" },
+              ...(!guest ? [{ value: "yours", label: "Your courses" }] : []),
               { value: "assigned", label: guest ? "For you" : "Assigned" },
               { value: "in-progress", label: "In progress" },
               { value: "completed", label: "Completed" },

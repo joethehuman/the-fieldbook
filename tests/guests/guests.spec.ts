@@ -375,6 +375,11 @@ test("guest Updates and curriculum learning, browser progress and account transi
       .getByRole("button", { name: "For you" }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
+    page
+      .getByRole("group", { name: "Course views" })
+      .getByRole("button", { name: "Your courses" }),
+  ).toHaveCount(0);
+  await expect(
     page.locator(".library .course-card").filter({ hasText: "Assigned" }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Back to courses" }).click();
