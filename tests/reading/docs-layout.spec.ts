@@ -54,6 +54,92 @@ async function fixture(request: any, items = docs) {
   });
 }
 for (const app of ["demo", "production"] as const) {
+  test(`${app}: Docs opens the first document in sidebar order`, async ({
+    page,
+    request,
+  }, info) => {
+    const arranged = [
+      { ...docs[0], category: "Getting started" },
+      { ...docs[40], category: "Reference", folder: "Guides" },
+      { ...docs[41], category: "Reference", folder: "Guides" },
+    ];
+    await fixture(request, arranged);
+    if (app === "demo") {
+      const data = freshWorkspace();
+      data.content = arranged;
+      data.settings = {
+        ...defaultSettings,
+        docCategoryOrder: ["Reference", "Getting started"],
+      };
+      await page.addInitScript((workspace) => {
+        localStorage.setItem(
+          "fieldbook.workspace.v1",
+          JSON.stringify(workspace),
+        );
+        sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+      }, data);
+      await page.goto("http://localhost:3132/#docs");
+    } else {
+      await request.post(`${backend}/fixture`, {
+        data: {
+          settings: {
+            access: "public",
+            docCategoryOrder: ["Reference", "Getting started"],
+          },
+          documents: rows(arranged),
+        },
+      });
+      await page.goto("/docs");
+      await expect(page).toHaveURL(new RegExp(`/docs/${arranged[1].id}$`));
+    }
+    await expect(page.locator("article h1")).toHaveText(arranged[1].title);
+    await expect(page.getByRole("link", { name: /Back to docs/ })).toHaveCount(
+      0,
+    );
+    if (info.project.name === "phone")
+      await page.getByRole("button", { name: "Open navigation" }).click();
+    await expect(
+      page
+        .getByRole("navigation", { name: "Documents", exact: true })
+        .getByRole("link", { name: arranged[1].title }),
+    ).toHaveAttribute("aria-current", "page");
+    if (info.project.name === "phone")
+      await page.getByRole("button", { name: "Close navigation" }).click();
+    await page.screenshot({
+      animations: "disabled",
+      path: info.outputPath(`${app}-docs-landing-${info.project.name}.png`),
+    });
+  });
+
+  test(`${app}: Docs has a useful empty page`, async ({
+    page,
+    request,
+  }, info) => {
+    await fixture(request, []);
+    if (app === "demo") {
+      const data = freshWorkspace();
+      data.content = [];
+      data.publishedContent = [];
+      await page.addInitScript((workspace) => {
+        localStorage.setItem(
+          "fieldbook.workspace.v1",
+          JSON.stringify(workspace),
+        );
+        sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+      }, data);
+      await page.goto("http://localhost:3132/#docs");
+    } else await page.goto("/docs");
+    await expect(
+      page.getByRole("heading", { name: "No docs yet" }),
+    ).toBeVisible();
+    await expect(page.locator("article")).toHaveCount(0);
+    await page.screenshot({
+      animations: "disabled",
+      path: info.outputPath(`${app}-docs-empty-${info.project.name}.png`),
+    });
+  });
+}
+for (const app of ["demo", "production"] as const) {
   test(`${app}: heading links, history, tree scrolling, neighbors and reflow`, async ({
     page,
     request,
@@ -200,7 +286,19 @@ for (const app of ["demo", "production"] as const) {
     });
     await marker.press("Tab");
     const outline = page.getByRole("complementary", { name: "On this page" });
-    if (info.project.name === "phone") await outline.locator("summary").click();
+    if (info.project.name === "phone") {
+      await expect(outline.locator("summary")).toHaveCSS(
+        "justify-content",
+        "flex-start",
+      );
+      await outline.locator("summary").click();
+    } else {
+      await expect(outline.locator("summary")).toBeHidden();
+      await expect(outline.locator(".reading-outline-title")).toBeVisible();
+      await expect(
+        outline.getByRole("navigation", { name: "Article sections" }),
+      ).toBeVisible();
+    }
     const lastHeading = outline.getByRole("link", {
       name: "Finish",
       exact: true,
@@ -316,7 +414,10 @@ for (const app of ["demo", "production"] as const) {
       .getByRole(app === "demo" ? "button" : "link", { name: "Docs" })
       .click();
     const sidebar = page.locator(".sidebar");
-    const tree = page.getByRole("navigation", { name: "Documents" });
+    const tree = page.getByRole("navigation", {
+      name: "Documents",
+      exact: true,
+    });
     if (narrow) await expect(sidebar).toHaveClass(/open/);
     await expect(
       tree.getByRole("heading", { name: "Getting started" }),

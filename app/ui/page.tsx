@@ -590,7 +590,6 @@ export default function ComponentCatalog() {
               body: "## Start here\n\nA readable article with a shared heading outline.\n\n### A useful detail\n\nSubheadings retain their hierarchy.\n\n## Start here\n\nRepeated headings have unique links.",
             }}
             name="Sample Fieldbook"
-            back={<Button variant="link">← Back to docs</Button>}
           />
         </SplitPanel>
         <CourseOverview

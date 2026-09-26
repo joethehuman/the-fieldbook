@@ -36,7 +36,9 @@ These checks do not establish hosted Google OAuth, production provider behavior,
 
 Docs use left-aligned section/folder navigation with the current document highlighted. On desktop the document tree scrolls independently of application navigation and account controls. Tab-local scroll/disclosure preferences are optional and do not change document order or access. Short screens and larger text retain an outer-sidebar scrolling fallback.
 
-Articles with H2/H3 headings have an **On this page** outline. It stays beside the article on wide screens and becomes a compact disclosure on smaller screens. Headings have shareable links; repeated headings receive unique suffixes. These links derive from the rendered Markdown rules, so code examples are never mistaken for headings. Editing a heading can change its anchor; unchanged headings retain their anchors unless an earlier duplicate changes their suffix.
+`/docs` opens the first published document in sidebar order, including a subsection document when the first section has no direct documents. The route shows a simple empty state when no documents are published. Individual Docs pages use the sidebar and previous/next links for navigation, without a back-to-index link.
+
+Articles with H2/H3 headings have an **On this page** outline. It stays visible beside the article on wide screens and becomes a compact disclosure on smaller screens. Headings have shareable links; repeated headings receive unique suffixes. These links derive from the rendered Markdown rules, so code examples are never mistaken for headings. Editing a heading can change its anchor; unchanged headings retain their anchors unless an earlier duplicate changes their suffix.
 
 Previous and next links follow the same published document sequence as the sidebar, crossing section and folder boundaries. Search and collapsed sections do not change the sequence. The first and last document omit their unavailable direction. Publication changes made through Fieldbook appear on the next server request without a workspace load.
 

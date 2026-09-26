@@ -34,7 +34,7 @@ export function Article({
 }: {
   item: Content;
   name: string;
-  back: ReactNode;
+  back?: ReactNode;
   children?: ReactNode;
   documents?: DocLink[];
   sectionOrder?: string[];
@@ -62,7 +62,7 @@ export function Article({
       <div className="reading-columns">
         <article className="article">
           <header className="article-header">
-            <div className="article-navigation">{back}</div>
+            {back && <div className="article-navigation">{back}</div>}
             <h1>{item.title}</h1>
             <p className="article-lede">{item.summary}</p>
             <div className="article-meta">
@@ -98,7 +98,10 @@ export function Article({
             </div>
           </header>
           <div className="markdown">
-            <ReactMarkdown headingPrefix={isDoc ? prefix : undefined} sameSiteOrigins={sameSiteOrigins}>
+            <ReactMarkdown
+              headingPrefix={isDoc ? prefix : undefined}
+              sameSiteOrigins={sameSiteOrigins}
+            >
               {item.body}
             </ReactMarkdown>
           </div>

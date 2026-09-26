@@ -70,32 +70,44 @@ async function fixture(request: any, extra = {}) {
 }
 test.beforeEach(async ({ request }) => fixture(request));
 
-test("authored hyperlinks follow article and course tab rules", async ({ page, request }) => {
+test("authored hyperlinks follow article and course tab rules", async ({
+  page,
+  request,
+}) => {
   const linked = items.map((item) => ({
     ...item,
-    body: item.kind === "course"
-      ? "See [reference](/docs/00000000-0000-4000-8000-000000000021)."
-      : "See [reference](/docs/00000000-0000-4000-8000-000000000021) and [outside](https://example.com/guide).",
-    lessons: item.kind === "course"
-      ? item.lessons.map((lesson, index) => ({
-          ...lesson,
-          body: index === 0
-            ? "See [reference](/docs/00000000-0000-4000-8000-000000000021)."
-            : lesson.body,
-        }))
-      : item.lessons,
+    body:
+      item.kind === "course"
+        ? "See [reference](/docs/00000000-0000-4000-8000-000000000021)."
+        : "See [reference](/docs/00000000-0000-4000-8000-000000000021) and [outside](https://example.com/guide).",
+    lessons:
+      item.kind === "course"
+        ? item.lessons.map((lesson, index) => ({
+            ...lesson,
+            body:
+              index === 0
+                ? "See [reference](/docs/00000000-0000-4000-8000-000000000021)."
+                : lesson.body,
+          }))
+        : item.lessons,
   }));
   await fixture(request, { documents: documents(linked) });
 
   for (const section of ["docs", "updates"]) {
     await page.goto(`/${section}/${ids[section === "docs" ? 0 : 1]}`);
     const article = page.locator("article");
-    await expect(article.getByRole("link", { name: "reference" })).not.toHaveAttribute("target", "_blank");
-    await expect(article.getByRole("link", { name: /outside/ })).toHaveAttribute("target", "_blank");
+    await expect(
+      article.getByRole("link", { name: "reference" }),
+    ).not.toHaveAttribute("target", "_blank");
+    await expect(
+      article.getByRole("link", { name: /outside/ }),
+    ).toHaveAttribute("target", "_blank");
   }
 
   await page.goto(`/courses/${ids[2]}?lesson=first`);
-  const reference = page.getByRole("link", { name: /reference.*opens in a new tab/ });
+  const reference = page.getByRole("link", {
+    name: /reference.*opens in a new tab/,
+  });
   await expect(reference).toHaveAttribute("target", "_blank");
   const original = page.url();
   const popup = page.waitForEvent("popup");
@@ -106,7 +118,10 @@ test("authored hyperlinks follow article and course tab rules", async ({ page, r
   await opened.close();
 });
 
-test("reader feedback, next navigation and long Docs menu align visibly", async ({ page, request }, info) => {
+test("reader feedback, next navigation and long Docs menu align visibly", async ({
+  page,
+  request,
+}, info) => {
   test.skip(info.project.name !== "desktop");
   const extraDocs = Array.from({ length: 18 }, (_, index) => ({
     ...items[0],
@@ -118,7 +133,9 @@ test("reader feedback, next navigation and long Docs menu align visibly", async 
   await page.goto(`/docs/${extraDocs[1].id}`);
   const tree = page.locator(".document-tree");
   await expect(tree).toHaveAttribute("data-scroll-fade-after", "true");
-  const previous = page.locator('.document-pagination [data-direction="previous"]');
+  const previous = page.locator(
+    '.document-pagination [data-direction="previous"]',
+  );
   const next = page.locator('.document-pagination [data-direction="next"]');
   await expect(next).toHaveCSS("text-align", "right");
   await expect(next).toHaveCSS("justify-content", "flex-end");
@@ -126,12 +143,25 @@ test("reader feedback, next navigation and long Docs menu align visibly", async 
   const previousBox = await previous.boundingBox();
   const nextBox = await next.boundingBox();
   expect(Math.abs(previousBox!.x - article!.x)).toBeLessThan(2);
-  expect(Math.abs(nextBox!.x + nextBox!.width - article!.x - article!.width)).toBeLessThan(2);
-  const feedback = await page.getByRole("region", { name: "Content feedback" }).locator(":scope > div").boundingBox();
-  expect(Math.abs((feedback!.x + feedback!.width / 2) - (article!.x + article!.width / 2))).toBeLessThan(2);
-  await page.screenshot({ path: info.outputPath("reader-footer-and-docs-fade.png") });
+  expect(
+    Math.abs(nextBox!.x + nextBox!.width - article!.x - article!.width),
+  ).toBeLessThan(2);
+  const feedback = await page
+    .getByRole("region", { name: "Content feedback" })
+    .locator(":scope > div")
+    .boundingBox();
+  expect(
+    Math.abs(
+      feedback!.x + feedback!.width / 2 - (article!.x + article!.width / 2),
+    ),
+  ).toBeLessThan(2);
+  await page.screenshot({
+    path: info.outputPath("reader-footer-and-docs-fade.png"),
+  });
   await next.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: info.outputPath("reader-pagination-desktop.png") });
+  await page.screenshot({
+    path: info.outputPath("reader-pagination-desktop.png"),
+  });
   await tree.evaluate((element) => (element.scrollTop = element.scrollHeight));
   await expect(tree).toHaveAttribute("data-scroll-fade-before", "true");
   await expect(tree).toHaveAttribute("data-scroll-fade-after", "false");
@@ -140,11 +170,20 @@ test("reader feedback, next navigation and long Docs menu align visibly", async 
   const narrowPrevious = await previous.boundingBox();
   const narrowNext = await next.boundingBox();
   expect(Math.abs(narrowPrevious!.x - narrowArticle!.x)).toBeLessThan(2);
-  expect(Math.abs(narrowNext!.x + narrowNext!.width - narrowArticle!.x - narrowArticle!.width)).toBeLessThan(2);
+  expect(
+    Math.abs(
+      narrowNext!.x +
+        narrowNext!.width -
+        narrowArticle!.x -
+        narrowArticle!.width,
+    ),
+  ).toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("reader-footer-phone.png") });
 });
 
-test("empty For you card keeps its wording and uses the quieter border", async ({ page }, info) => {
+test("empty For you card keeps its wording and uses the quieter border", async ({
+  page,
+}, info) => {
   await page.goto("/courses");
   const card = page.locator(".for-you [data-slot=card]").first();
   await expect(card).toHaveCSS("border-top-style", "dotted");
@@ -427,14 +466,13 @@ for (const signedIn of [false, true]) {
         .locator(`a[href="/docs/${ids[0]}"]`)
         .click();
       await expect(page.locator(".sidebar")).not.toHaveClass(/open/);
-    } else {
-      await page.locator(`.knowledge-section a[href="/docs/${ids[0]}"]`).click();
     }
     await expect(
       page.getByRole("heading", { name: items[0].title }),
     ).toBeVisible();
+    await expect(page).toHaveURL(new RegExp(`/docs/${ids[0]}$`));
     await page.goBack();
-    await expect(page).toHaveURL(/\/docs$/);
+    await expect(page).toHaveURL(/\/updates$/);
     await page.goForward();
     await expect(
       page.getByRole("heading", { name: items[0].title }),
@@ -587,12 +625,18 @@ test("client navigation rechecks publication, item type and installation access"
   page,
   request,
 }) => {
+  const adjacentDoc = {
+    ...items[0],
+    id: "00000000-0000-4000-8000-000000000025",
+    title: "Adjacent published document",
+  };
   const coldDoc = {
     ...items[0],
     id: "00000000-0000-4000-8000-000000000024",
     title: "Another published document",
   };
-  const all = documents([...items, coldDoc]);
+  // Keep the target beyond the first article's eagerly prefetched Next link.
+  const all = documents([...items, adjacentDoc, coldDoc]);
   for (const change of [
     "unpublished",
     "deleted",
@@ -601,10 +645,9 @@ test("client navigation rechecks publication, item type and installation access"
   ] as const) {
     await fixture(request, { documents: all });
     await page.goto("/docs");
-    const link = page.locator(
-      `.knowledge-section a[href="/docs/${coldDoc.id}"]`,
-    );
-    await expect(link).toBeVisible();
+    const link = page
+      .getByRole("navigation", { name: "Documents", exact: true })
+      .locator(`a[href="/docs/${coldDoc.id}"]`);
     if (change === "private")
       await fixture(request, { settings: { access: "private", logoUrl: "" } });
     else if (change === "deleted")
@@ -625,6 +668,8 @@ test("client navigation rechecks publication, item type and installation access"
             : row,
         ),
       });
+    if ((page.viewportSize()?.width || 0) < 768)
+      await page.getByRole("button", { name: "Open navigation" }).click();
     await link.click();
     if (change === "private") await expect(page).toHaveURL(/\/sign-in/);
     else
@@ -914,16 +959,23 @@ test("hydration keeps one article, breadcrumbs navigate, and lesson links open t
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  if (info.project.name === "phone")
-    await page.getByRole("link", { name: /Back to docs/ }).click();
-  else {
+  await expect(page.getByRole("link", { name: /Back to docs/ })).toHaveCount(0);
+  if (info.project.name === "phone") {
+    await page.getByRole("button", { name: "Open navigation" }).click();
+    await page
+      .getByRole("navigation", { name: "Primary" })
+      .getByRole("link", { name: "Docs", exact: true })
+      .click();
+    await expect(page.locator(".sidebar")).toHaveClass(/open/);
+    await page.getByRole("button", { name: "Close navigation" }).click();
+  } else {
     const crumb = page
       .getByRole("navigation", { name: "Breadcrumb" })
       .getByRole("link", { name: "Docs", exact: true });
     await crumb.focus();
     await crumb.press("Enter");
   }
-  await expect(page).toHaveURL("/docs");
+  await expect(page).toHaveURL(new RegExp(`/docs/${ids[0]}$`));
   await page.goto(`/courses/${ids[2]}`);
   await page.getByRole("link", { name: /Second lesson/ }).click();
   await expect(

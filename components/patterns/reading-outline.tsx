@@ -92,6 +92,7 @@ export function ReadingOutline({
   if (!headings.length) return null;
   return (
     <aside className="reading-outline" aria-label="On this page">
+      <p className="reading-outline-title">On this page</p>
       <details ref={ref} open>
         <summary>
           On this page

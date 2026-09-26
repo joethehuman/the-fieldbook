@@ -1,4 +1,4 @@
-import { Article, ReadingBack } from "@/components/patterns/reading";
+import { Article } from "@/components/patterns/reading";
 import { ReaderFeedback } from "@/components/reader/ReaderFeedback";
 import { readerItem, readerMetadata } from "@production/lib/reader";
 import { siteOrigins } from "@production/lib/env";
@@ -19,7 +19,6 @@ export default async function Page({ params }: Props) {
       sectionOrder={context.docCategoryOrder}
       sections={context.docSections}
       sameSiteOrigins={siteOrigins()}
-      back={<ReadingBack kind="doc" clientNavigation />}
     >
       <ReaderFeedback key={item.id} contentId={item.id} />
     </Article>

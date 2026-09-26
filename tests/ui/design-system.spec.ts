@@ -345,9 +345,12 @@ test("learner routes and narrow navigation remain usable", async ({
     ["docs", "Docs"],
   ]) {
     await page.goto(`/#${route}`);
-    await expect(
-      page.getByRole("heading", { name: heading, exact: true }).first(),
-    ).toBeVisible();
+    if (route === "docs")
+      await expect(page.locator("article h1")).toBeVisible();
+    else
+      await expect(
+        page.getByRole("heading", { name: heading, exact: true }).first(),
+      ).toBeVisible();
     await noOverflow(page);
   }
   await expect(page.locator(".app-footer > span")).toHaveText(

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { reconcileDemoPublication } from "@/lib/demo-publication";
 import { AppBar } from "./patterns/app-bar";
 import { DocumentTree } from "./patterns/document-tree";
+import { DocsEmpty } from "./patterns/docs-empty";
 import type { ReadingState } from "@/lib/reading";
 import { Article, CourseOverview } from "./patterns/reading";
 import { Course } from "./Course";
@@ -65,7 +66,7 @@ import {
   contentPath,
   organizationHomePath,
 } from "@/lib/navigation";
-import { docSections } from "@/lib/docs-navigation";
+import { orderedDocs } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
 import Feedback from "./Feedback";
@@ -266,6 +267,7 @@ export default function Fieldbook({
   ) {
     if (!(await canLeave())) return;
     if (v !== "docs" || id) setMenu(false);
+    const destinationId = !runtime && v === "docs" && !id ? firstDoc?.id : id;
     if (
       runtime &&
       (initialReading ||
@@ -285,14 +287,16 @@ export default function Fieldbook({
       return;
     }
     setView(v);
-    setSelected(id || null);
+    setSelected(destinationId || null);
     setCourseOrigin(origin);
     setTargetLesson(lesson);
     setSearch("");
-    const curriculum = v === "learn" && id?.startsWith("curriculum:");
+    const curriculum =
+      v === "learn" && destinationId?.startsWith("curriculum:");
     const path = curriculum
-      ? `curricula/${encodeURIComponent(id!.slice(11))}`
-      : sectionPaths[v] + (id ? "/" + encodeURIComponent(id) : "");
+      ? `curricula/${encodeURIComponent(destinationId!.slice(11))}`
+      : sectionPaths[v] +
+        (destinationId ? "/" + encodeURIComponent(destinationId) : "");
     const query = lesson
       ? `?lesson=${encodeURIComponent(lesson)}`
       : origin
@@ -494,9 +498,16 @@ export default function Fieldbook({
           (c) => c.id === selected.slice(11) && c.status === "published",
         )
       : undefined;
-  const item = visible.find((c) => c.id === selected);
   const courses = visible.filter((c) => c.kind === "course");
   const docs = visible.filter((c) => c.kind === "doc");
+  const firstDoc = orderedDocs(
+    docs,
+    branding.docCategoryOrder,
+    branding.docSections,
+  )[0];
+  const item = visible.find(
+    (c) => c.id === (selected || (view === "docs" ? firstDoc?.id : null)),
+  );
   const currentTitle =
     view === "learn"
       ? "Courses"
@@ -573,7 +584,7 @@ export default function Fieldbook({
             }
             order={branding.docCategoryOrder}
             sections={branding.docSections}
-            selected={selected}
+            selected={selected || firstDoc?.id || null}
             href={(id) =>
               runtime
                 ? contentPath("doc", id)
@@ -1017,14 +1028,11 @@ export default function Fieldbook({
               item={item}
               name={branding.name}
               back={
-                <Button
-                  variant="link"
-                  onClick={() =>
-                    navigate(item.kind === "doc" ? "docs" : "briefs")
-                  }
-                >
-                  ← Back to {item.kind === "doc" ? "docs" : "updates"}
-                </Button>
+                item.kind === "doc" ? null : (
+                  <Button variant="link" onClick={() => navigate("briefs")}>
+                    ← Back to updates
+                  </Button>
+                )
               }
             >
               {runtime && user.id === "guest" ? (
@@ -1054,73 +1062,7 @@ export default function Fieldbook({
               guest={uid === "guest"}
             />
           ) : view === "docs" ? (
-            <>
-              <PageHeading title="Docs" />
-              {docs.some((d) => d.id === "start") && (
-                <div
-                  className="knowledge-feature"
-                  onClick={() => navigate("docs", "start")}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") navigate("docs", "start");
-                  }}
-                >
-                  <div>
-                    <h2>Start here</h2>
-                    <span className="text-link">
-                      Open guide <ArrowRight size={17} />
-                    </span>
-                  </div>
-                  <BookOpen size={76} strokeWidth={1} />
-                </div>
-              )}
-              <div className="knowledge-grid">
-                {docSections(
-                  docs,
-                  branding.docCategoryOrder,
-                  branding.docSections,
-                ).map((section) => (
-                  <section className="knowledge-section" key={section.id}>
-                    <BookOpen size={22} />
-                    <h2>{section.name}</h2>
-                    <p>
-                      {section.docs.length +
-                        section.folders.reduce(
-                          (count, child) => count + child.docs.length,
-                          0,
-                        )}{" "}
-                      articles
-                    </p>
-                    {section.docs.map((d) => (
-                      <NavigationButton
-                        variant="ghost"
-                        onClick={() => navigate("docs", d.id)}
-                        key={d.id}
-                      >
-                        {d.title}
-                        <ChevronRight size={16} />
-                      </NavigationButton>
-                    ))}
-                    {section.folders.map((child) => (
-                      <div key={child.id}>
-                        <h3>{child.name}</h3>
-                        {child.docs.map((d) => (
-                          <NavigationButton
-                            variant="ghost"
-                            onClick={() => navigate("docs", d.id)}
-                            key={d.id}
-                          >
-                            {d.title}
-                            <ChevronRight size={16} />
-                          </NavigationButton>
-                        ))}
-                      </div>
-                    ))}
-                  </section>
-                ))}
-              </div>
-            </>
+            <DocsEmpty />
           ) : (
             <>
               <PageHeading title="Updates" />
