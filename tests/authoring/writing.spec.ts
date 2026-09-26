@@ -158,6 +158,26 @@ test("editor footer stays after its content", async ({ page }, info) => {
     (el) => el.getBoundingClientRect().bottom,
   );
   expect(footerTop).toBeGreaterThanOrEqual(editorBottom - 1);
+  const beforePull = await page.evaluate(() => {
+    const editor = document.querySelector("form.editor")!;
+    const footer = document.querySelector(".app-footer")!;
+    const bar = document.querySelector(".topbar")!;
+    return [editor, footer, bar].map((el) => el.getBoundingClientRect().top);
+  });
+  await editor.evaluate((el) =>
+    el.dispatchEvent(
+      new WheelEvent("wheel", { deltaY: 160, bubbles: true, cancelable: true }),
+    ),
+  );
+  const afterPull = await page.evaluate(() => {
+    const editor = document.querySelector("form.editor")!;
+    const footer = document.querySelector(".app-footer")!;
+    const bar = document.querySelector(".topbar")!;
+    return [editor, footer, bar].map((el) => el.getBoundingClientRect().top);
+  });
+  expect(afterPull[0] - beforePull[0]).toBeLessThan(0);
+  expect(afterPull[1] - beforePull[1]).toBeCloseTo(afterPull[0] - beforePull[0], 0);
+  expect(afterPull[2]).toBe(beforePull[2]);
   await page.screenshot({ path: info.outputPath("editor-footer.png") });
 });
 

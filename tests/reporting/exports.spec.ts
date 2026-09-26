@@ -660,8 +660,9 @@ test("app bar stays visible over long administration reports", async ({
   await section(page, "Progress");
   await page.screenshot({ path: info.outputPath("bar-report-top.png") });
   const panel = page.getByRole("tabpanel", { name: "Progress" });
-  await panel.evaluate((el) => el.scrollTo(0, 1000));
-  expect(await panel.evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
+  const area = page.locator("#main-content");
+  await area.evaluate((el) => el.scrollTo(0, 1000));
+  expect(await area.evaluate((el) => el.scrollTop)).toBeGreaterThan(100);
   expect(await page.evaluate(() => scrollY)).toBe(0);
   expect(
     await page

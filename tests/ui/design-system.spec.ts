@@ -155,7 +155,7 @@ test("learning groups: shared controls, save and reload", async ({
   ).toHaveText("Account executives");
 });
 
-test("admin menu scroll stays put while the new panel starts at the top", async ({
+test("admin menu stays in place while content and footer share one scroll", async ({
   page,
 }, testInfo) => {
   test.skip(testInfo.project.name !== "desktop");
@@ -170,6 +170,7 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
     "Content, people, and the settings that keep your organization running.",
   );
   const panel = page.getByRole("tabpanel", { name: "Content" });
+  const area = page.locator("#main-content");
   const shellPositions = await page.evaluate(() => ({
     header: document.querySelector(".topbar")!.getBoundingClientRect().top,
     sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
@@ -185,17 +186,17 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   await panel.hover();
   await page.mouse.wheel(0, 500);
   await expect
-    .poll(() => panel.evaluate((element) => element.scrollTop))
+    .poll(() => area.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(0);
   expect(await nav.evaluate((element) => element.scrollTop)).toBe(before);
-  await panel.evaluate((element) => (element.scrollTop = element.scrollHeight));
-  await page.mouse.wheel(0, 500);
-  await expect
-    .poll(() =>
-      page.locator("#main-content").evaluate((element) => element.scrollTop),
-    )
-    .toBeGreaterThan(0);
+  expect(await panel.evaluate((element) => element.scrollTop)).toBe(0);
+  await area.evaluate((element) => (element.scrollTop = element.scrollHeight));
   await expect(page.locator(".app-footer")).toBeInViewport();
+  const separation = await page.evaluate(() =>
+    document.querySelector(".app-footer")!.getBoundingClientRect().top -
+    document.querySelector(".admin-panel")!.getBoundingClientRect().bottom,
+  );
+  expect(separation).toBeGreaterThanOrEqual(-1);
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   expect(
     await page.evaluate(() => ({
@@ -267,9 +268,10 @@ test("scrollbars leave room beside Admin feedback controls and cards", async ({
   await expect(panel.getByText("Feedback alongside the scrollbar")).toHaveCount(
     3,
   );
-  expect(await panel.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
-    true,
-  );
+  expect(
+    await page.locator("#main-content").evaluate((el) => el.scrollHeight > el.clientHeight),
+  ).toBe(true);
+  expect(await panel.evaluate((el) => el.scrollTop)).toBe(0);
   const distanceFromPanelEdge = (locator: ReturnType<Page["locator"]>) =>
     locator.evaluate((el) => {
       const panel = el.closest(".admin-panel")!;

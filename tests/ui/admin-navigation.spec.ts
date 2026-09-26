@@ -33,6 +33,52 @@ test("admin content pulls without moving either navigation area", async ({
   expect(movement.slice(1)).toEqual([0, 0, 0]);
 });
 
+test("long admin content and footer use one scroll path", async ({ page }) => {
+  const data = freshWorkspace();
+  data.content.push(
+    ...Array.from({ length: 36 }, (_, index) => ({
+      ...data.content[0],
+      id: `scroll-fixture-${index}`,
+      title: `Scroll fixture ${index}`,
+    })),
+  );
+  await page.addInitScript((workspace) => {
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+  }, data);
+  await page.goto("/#admin");
+  const panel = page.locator(".admin-panel");
+  const area = page.locator("#main-content");
+  const footer = page.locator(".app-footer");
+  await expect(panel).toBeVisible();
+  expect(await area.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  expect(await panel.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+  await area.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await expect(footer).toBeInViewport();
+  const before = await page.evaluate(() => {
+    const content = document.querySelector(".admin-panel")!.firstElementChild!;
+    const footer = document.querySelector(".app-footer")!;
+    const nav = document.querySelector('[data-slot="admin-navigation"]')!;
+    const bar = document.querySelector(".topbar")!;
+    return [content, footer, nav, bar].map((el) => el.getBoundingClientRect().top);
+  });
+  await panel.evaluate((el) =>
+    el.dispatchEvent(
+      new WheelEvent("wheel", { deltaY: 160, bubbles: true, cancelable: true }),
+    ),
+  );
+  const after = await page.evaluate(() => {
+    const content = document.querySelector(".admin-panel")!.firstElementChild!;
+    const footer = document.querySelector(".app-footer")!;
+    const nav = document.querySelector('[data-slot="admin-navigation"]')!;
+    const bar = document.querySelector(".topbar")!;
+    return [content, footer, nav, bar].map((el) => el.getBoundingClientRect().top);
+  });
+  expect(after[0] - before[0]).toBeLessThan(0);
+  expect(after[1] - before[1]).toBeCloseTo(after[0] - before[0], 0);
+  expect(after.slice(2)).toEqual(before.slice(2));
+});
+
 async function section(page: Page, name: string) {
   const picker = page.getByRole("combobox", {
     name: "Administration section",

@@ -36,7 +36,7 @@ test("Docs sections drag by their handle and save the resulting row order", asyn
   expect(await rows.count()).toBeGreaterThan(1);
   await rows.nth(1).scrollIntoViewIfNeeded();
   await rows.first().getByRole("button", { name: /^Reorder / }).scrollIntoViewIfNeeded();
-  await page.locator(".admin-panel").evaluate((element) => { element.scrollTop += 120; });
+  await page.locator("#main-content").evaluate((element) => { element.scrollTop += 120; });
   const first = await rows.first().locator("strong").innerText();
   const source = await rows.first().getByRole("button", { name: /^Reorder / }).boundingBox();
   const target = await rows.nth(1).boundingBox();
