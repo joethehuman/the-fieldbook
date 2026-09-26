@@ -264,16 +264,19 @@ export function ReaderShell({
           </nav>
           <ReaderSearch />
         </AppBar>
-        <main id="main-content" className="main-content" tabIndex={-1}>
+        <div id="main-content" className="app-scroll" tabIndex={-1}>
+        <main className="main-content">
           {context.user && <ReaderGuestImport />}
           {children}
         </main>
         <footer className="app-footer">
-          {context.branding.name} <span>{context.branding.tagline}</span>
+          <span className="footer-name">{context.branding.name}</span>
+          <span className="footer-tagline">{context.branding.tagline}</span>
           {context.branding.privacyUrl && section !== "privacy" && (
             <Link href={context.branding.privacyUrl}>Privacy policy</Link>
           )}
         </footer>
+        </div>
       </div>
     </div>
   );

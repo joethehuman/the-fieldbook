@@ -111,10 +111,22 @@
     width: min(24rem, 40vw);
     max-width: 100%;
   }
+  .app-scroll {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 0;
+    flex-direction: column;
+    overflow-y: auto;
+    overscroll-behavior: none;
+    scroll-padding-block-start: var(--anchor-offset);
+    scrollbar-gutter: stable both-edges;
+    outline: none;
+  }
   .main-content {
     container: workspace / inline-size;
     display: grid;
-    flex: 1 1 auto;
+    flex: 1 0 auto;
     align-content: start;
     grid-template-columns: minmax(0, 1fr);
     min-width: 0;
@@ -124,28 +136,20 @@
     gap: var(--space-8);
     margin-inline: auto;
     padding: var(--space-8) var(--space-6);
-    overflow-y: auto;
-    overscroll-behavior: none;
-    scroll-padding-block-start: var(--anchor-offset);
-    scrollbar-gutter: stable both-edges;
-    outline: none;
   }
   .app-footer {
     display: flex;
     flex: none;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
     width: 100%;
     max-width: var(--page-width);
-    max-height: 30dvh;
     margin-inline: auto;
     border-top: 1px solid var(--border);
     padding-block: var(--space-6);
     padding-inline: var(--space-6);
-    overflow-y: auto;
-    overscroll-behavior: none;
-    scrollbar-gutter: stable;
     color: var(--muted-foreground);
     font-size: 0.75rem;
   }
@@ -154,8 +158,7 @@
     flex: 1 1 auto;
     grid-template-columns: 11rem minmax(0, 1fr);
     gap: var(--space-8);
-    min-height: 0;
-    align-items: stretch;
+    align-items: start;
   }
   .admin-content {
     display: flex;
@@ -164,10 +167,12 @@
   .admin-workspace {
     display: flex;
     flex: 1 1 auto;
-    min-height: 0;
     flex-direction: column;
   }
   [data-slot="admin-navigation"] {
+    position: sticky;
+    top: var(--space-8);
+    height: calc(100dvh - var(--app-bar-height, 4rem) - var(--space-8) - var(--space-8));
     min-height: 0;
     overflow: hidden;
   }
@@ -178,10 +183,13 @@
   @container workspace (width < 48rem) {
     .admin-layout {
       grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: auto minmax(0, 1fr);
     }
     [data-slot="admin-navigation"] {
+      top: var(--space-6);
+      z-index: 1;
+      height: auto;
       overflow: visible;
+      background: var(--background);
     }
     .editor-layout {
       grid-template-columns: minmax(0, 1fr);
@@ -200,13 +208,8 @@
   }
   .admin-panel {
     display: flow-root;
-    min-height: 0;
     padding-bottom: var(--space-6);
     padding-inline-end: var(--space-4);
-    overflow-y: auto;
-    overscroll-behavior: none;
-    scroll-padding-block-start: var(--anchor-offset);
-    scrollbar-gutter: stable;
   }
   .admin-panel > * + * {
     margin-block-start: var(--space-6);
@@ -711,7 +714,15 @@
       padding: var(--space-6) var(--space-4);
     }
     .app-footer {
-      padding: var(--space-4);
+      justify-content: flex-start;
+      gap: var(--space-1) var(--space-4);
+      padding: var(--space-2) var(--space-4);
+    }
+    .app-footer .footer-name {
+      display: none;
+    }
+    .app-footer .footer-tagline {
+      flex-basis: 100%;
     }
     .topbar {
       padding-inline: var(--space-4);

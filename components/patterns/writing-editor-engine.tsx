@@ -502,7 +502,7 @@ export default function WritingEditorEngine({
     activeLine.current = line instanceof HTMLElement ? line : null;
     const rect = rangeRect?.height ? rangeRect : line?.getBoundingClientRect();
     if (!rect) return;
-    const viewport = root.current?.closest(".main-content")?.getBoundingClientRect();
+    const viewport = root.current?.closest(".app-scroll")?.getBoundingClientRect();
     const spaceAbove = rect.top - (viewport?.top ?? 0);
     const spaceBelow = (viewport?.bottom ?? window.innerHeight) - rect.bottom;
     const above = spaceBelow < 220 && spaceAbove > spaceBelow;

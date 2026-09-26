@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Place the footer after page content instead of fixing it in the viewport. Keep the mobile footer compact with the configured tagline and privacy link, without a custom pull animation.
+
 - Move account, team and organization actions into a shared profile menu for learners, managers, administrators and guests. Add general Fieldbook feedback through a dismissible dialog and include it in administrator feedback reports. Keep demo profile switching separate. Existing installations need `20260926182840_general_feedback.sql` before this feedback action can save.
 
 - Open course cards directly in a responsive lesson player, with curriculum-aware return navigation, a sticky course outline, image expansion, a larger video view, and a final feedback and Complete course action. Curriculum cards open an ordered course-card page.
@@ -22,7 +24,7 @@ No versions have been released. Package and MCP version strings do not constitut
 - Open a new demo session on the profile chooser, remove the redundant top-bar demo button, and keep “About this demo” in the footer at the surrounding text size.
 - Center the shared opening message and loading bar. Show the hosted privacy policy in the app shell and return to Courses without booting the legacy workspace. Open curricula in the reader shell, and prefetch likely course destinations while preserving private access checks.
 
-- Keep the shared header, footer and sidebar stable at scroll limits across the demo and production app. Page content scrolls within the viewport, with separate scroll areas for Administration sections and their selected panel. Scrollable surfaces leave room for overlay scrollbars beside their content and controls.
+- Keep the shared header and sidebar stable at scroll limits across the demo and production app. Page content scrolls within the viewport; the Administration section list retains its own scroll. Scrollable surfaces leave room for overlay scrollbars beside their content and controls.
 - Remove redundant Administration headings and keep its section list independently scrollable, simplify the guest account label and Courses home, move Docs/Updates category into article metadata, and add date and title sorting to learning-group content pickers.
 - Display the installation name without a logo or icon in the demo and installed application. Remove logo upload from Identity settings and the redundant “Your Organization” sidebar label; give the name more room and lighter, clearer type.
 
