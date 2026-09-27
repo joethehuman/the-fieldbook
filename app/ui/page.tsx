@@ -592,7 +592,6 @@ export default function ComponentCatalog() {
               ...seedContent.find((item) => item.kind === "doc")!,
               body: "## Start here\n\nA readable article with a shared heading outline.\n\n### A useful detail\n\nSubheadings retain their hierarchy.\n\n## Start here\n\nRepeated headings have unique links.",
             }}
-            name="Sample Fieldbook"
           />
         </SplitPanel>
         <Course course={seedContent.find((item) => item.kind === "course")!}
