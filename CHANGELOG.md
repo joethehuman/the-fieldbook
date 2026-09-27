@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Show the Courses progress card beside For you courses on iPad-sized screens with enough room; keep the phone layout stacked and the Docs outline behavior unchanged.
+
 - Remove the displayed author from Docs and Updates articles, and separate Doc parent and subsection names with a slash in article metadata.
 
 - Keep the Docs On this page outline closed on narrow screens and visible on wide screens from the first render, without a resize-driven flash.

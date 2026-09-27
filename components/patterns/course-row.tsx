@@ -9,12 +9,14 @@ export function CourseRow({
   heading,
   description,
   leading,
+  splitAt,
 }: {
   title: string;
   children: ReactNode;
   heading?: ReactNode;
   description?: ReactNode;
   leading?: ReactNode;
+  splitAt?: "tablet" | "xl";
 }) {
   const row = useRef<HTMLDivElement>(null);
   const [scrollable, setScrollable] = useState(false);
@@ -49,6 +51,7 @@ export function CourseRow({
       <SplitPanel
         split={!!leading && Children.count(children) > 0}
         align="stretch"
+        splitAt={splitAt}
       >
         {leading}
         <div
