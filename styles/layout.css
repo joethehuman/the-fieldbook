@@ -781,11 +781,14 @@
     .sidebar-account-secondary {
       opacity: 1;
       visibility: visible;
-      transition: opacity 90ms ease 90ms, visibility 0s;
+      transition: opacity 160ms ease, visibility 0s;
     }
     .sidebar-nav-text,
     .nav-count {
       white-space: nowrap;
+    }
+    .app:not(.sidebar-collapsed) .document-tree {
+      animation: sidebar-content-appear 160ms ease both;
     }
     .app.sidebar-collapsed {
       --active-sidebar-width: var(--sidebar-rail-width);
@@ -804,7 +807,7 @@
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
-      transition: opacity 70ms ease, visibility 0s linear 70ms;
+      transition: opacity 160ms ease, visibility 0s linear 160ms;
     }
     .sidebar-collapsed .sidebar-toggle {
       transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 1px));
@@ -814,6 +817,9 @@
     }
   }
   @media (prefers-reduced-motion: reduce) {
+    .app:not(.sidebar-collapsed) .document-tree {
+      animation: none;
+    }
     .sidebar,
     .main-shell,
     .sidebar-heading .logo,
@@ -825,6 +831,10 @@
     .sidebar-account-secondary {
       transition: none;
     }
+  }
+  @keyframes sidebar-content-appear {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
 
