@@ -171,19 +171,22 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
                   return <li key={item.id}>
                     <div className="grid gap-2">
                       <strong>{item.prompt}</strong>
-                      <span>{saved?.correct ? "Correct" : "Needs another try"} · Your answer: {selected.join(", ") || "Unavailable"}</span>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                        <Badge variant={saved?.correct ? "success" : "destructive"}>{saved?.correct ? "Correct" : "Incorrect"}</Badge>
+                        <span><strong>Your answer:</strong> {selected.join(", ") || "Unavailable"}</span>
+                      </div>
                       {item.explanation && <Note>{item.explanation}</Note>}
                     </div>
                   </li>;
                 })}
               </ol>
             </details>}
-            <ActionGroup>
+            {feedback}
+            <ActionGroup className="justify-center">
               {(score === undefined || score < course.questions.length) && <Button variant="outline" onClick={retry}>Retry quiz</Button>}
               {!complete && quizUnlocked(course, p?.attempts) && <Button onClick={completeEarlierProgress} loading={busy}>Finish course</Button>}
-              {complete && <Button onClick={onBack}>Close course <ArrowRight size={16} /></Button>}
+              {complete && <Button onClick={onBack}>Close course</Button>}
             </ActionGroup>
-            {feedback}
           </> : <>
             <span className="eyebrow">Question {questionIndex + 1} of {course.questions.length}</span>
             <h2 ref={heading} tabIndex={-1}>Check your knowledge</h2>
@@ -213,7 +216,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             {complete ? <>
               <p>You’ve finished this course. Feedback is optional.</p>
               {feedback}
-              <ActionGroup><Button onClick={onBack}>Close course <ArrowRight size={16} /></Button></ActionGroup>
+              <ActionGroup className="justify-center"><Button onClick={onBack}>Close course</Button></ActionGroup>
             </> : <>
               <p>Complete every lesson to finish this course.</p>
               <ActionGroup>

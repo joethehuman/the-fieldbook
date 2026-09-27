@@ -1,10 +1,14 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 
-async function openCourse(page: Page, mode: "required" | "optional" | "no-quiz") {
+async function openCourse(page: Page, mode: "required" | "optional" | "no-quiz", longLesson = false) {
   const data = freshWorkspace();
   const course = data.content.find((item) => item.id === "course-2")!;
   course.requirePassing = mode === "required";
+  if (longLesson) {
+    course.lessons[1].body += "\n\n" + "A fuller explanation of the lesson.\n\n".repeat(80);
+    course.body += "\n\n" + "A useful overview for this course.\n\n".repeat(9);
+  }
   if (mode === "no-quiz") course.questions = [];
   await page.addInitScript((workspace) => {
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
@@ -33,6 +37,8 @@ test("required quiz shows one question at a time, grades, and retries", async ({
   await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(page.getByRole("heading", { name: "1 of 2 correct" })).toBeVisible();
   await cardAtTop(page, ".course-quiz");
+  await page.getByText("Review answers").click();
+  await expect(page.locator('[data-slot="badge"]', { hasText: "Incorrect" })).toBeVisible();
   await page.screenshot({ path: info.outputPath("required-quiz-results.png") });
   await expect(page.getByRole("button", { name: "Close course" })).toHaveCount(0);
   await expect(page.getByRole("region", { name: "Content feedback" })).toBeVisible();
@@ -43,6 +49,11 @@ test("required quiz shows one question at a time, grades, and retries", async ({
   await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(page.getByRole("heading", { name: "2 of 2 correct" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Close course" })).toBeVisible();
+  await expect.poll(async () => {
+    const card = await page.locator(".course-quiz").boundingBox();
+    const button = await page.getByRole("button", { name: "Close course" }).boundingBox();
+    return Math.abs((button!.x + button!.width / 2) - (card!.x + card!.width / 2));
+  }).toBeLessThan(2);
 });
 
 test("optional quiz completes after a missed answer and still offers retry", async ({ page }, info) => {
@@ -55,9 +66,10 @@ test("optional quiz completes after a missed answer and still offers retry", asy
   await expect(page.getByRole("heading", { name: "1 of 2 correct" })).toBeVisible();
   await expect(page.getByText("Course complete.")).toBeVisible();
   await cardAtTop(page, ".course-quiz");
-  await page.screenshot({ path: info.outputPath("optional-quiz-results.png") });
   await page.getByText("Review answers").click();
-  await expect(page.getByText("Needs another try")).toBeVisible();
+  await expect(page.locator('[data-slot="badge"]', { hasText: "Incorrect" })).toBeVisible();
+  await expect(page.locator("strong", { hasText: "Your answer:" }).first()).toBeVisible();
+  await page.screenshot({ path: info.outputPath("optional-quiz-results.png") });
   await expect(page.getByRole("button", { name: "Retry quiz" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Close course" })).toBeVisible();
 });
@@ -74,4 +86,19 @@ test("last no-quiz lesson completes and opens expanded feedback", async ({ page 
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("Feedback saved.")).toBeVisible();
   await expect(page.getByRole("button", { name: "Close course" })).toBeVisible();
+  await expect.poll(async () => {
+    const card = await page.locator(".course-finish-card").boundingBox();
+    const button = await page.getByRole("button", { name: "Close course" }).boundingBox();
+    return Math.abs((button!.x + button!.width / 2) - (card!.x + card!.width / 2));
+  }).toBeLessThan(2);
+});
+
+test("course sidebar keeps its position between a lesson and the quiz", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 934 });
+  await openCourse(page, "required", true);
+  const back = page.getByRole("button", { name: "Back to courses" });
+  const lessonTop = (await back.boundingBox())!.y;
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await expect(page.getByText("Question 1 of 2")).toBeVisible();
+  await expect.poll(async () => Math.abs((await back.boundingBox())!.y - lessonTop)).toBeLessThan(2);
 });

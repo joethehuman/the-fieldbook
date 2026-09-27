@@ -736,6 +736,7 @@
   .course-sidebar .quiz-number { background: var(--surface); border: 1px solid var(--border); }
   .course-about details { display: none; }
   .course-reader { display: grid; min-width: 0; gap: var(--space-5); }
+  .course-reader-final { min-height: 100dvh; align-content: start; }
   .course-lesson, .course-quiz, .course-finish-card { min-width: 0; }
   .course-lesson, .course-quiz, .course-finish-card { scroll-margin-block-start: var(--anchor-offset); }
   .course-continue { display: flex; justify-content: flex-end; border-top: 1px solid var(--border); padding-top: var(--space-5); }
@@ -765,7 +766,6 @@
     .course-player .lesson-layout, .course-builder { grid-template-columns: minmax(0, 1fr); }
     .course-sidebar { position: static; max-height: none; }
     .course-sidebar .lesson-nav { grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; }
-    .course-reader-final { min-height: 100dvh; align-content: start; }
     .course-about details { display: block; }
     .course-desktop-summary { display: none; }
     .course-builder-steps { display: none; }
