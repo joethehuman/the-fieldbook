@@ -82,6 +82,24 @@ test("real snapshot/progress/settings boundaries with synthetic PostgREST: no an
     });
     assert.equal(result.passed, false);
     assert.equal(result.attemptPassed, true);
+    const failedFinish = await recordProgress(null, {
+      contentId: course.id,
+      version: course.version,
+      lessons: ["lesson"],
+      answers: [1],
+      complete: true,
+    });
+    assert.equal(failedFinish.passed, false);
+    assert.equal(failedFinish.attemptPassed, false);
+    assert.equal(failedFinish.attempts.length, 1);
+    const passedFinish = await recordProgress(null, {
+      contentId: course.id,
+      version: course.version,
+      lessons: ["lesson"],
+      answers: [0],
+      complete: true,
+    });
+    assert.equal(passedFinish.passed, true);
     assert.ok(requests.every((r) => r.method === "GET"));
     assert.equal(JSON.stringify(data.users), before);
     const admin = { ...data.users[0], role: "admin" as const };

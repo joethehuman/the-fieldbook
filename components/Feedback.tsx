@@ -22,11 +22,13 @@ export default function Feedback({
   user,
   data,
   onChange,
+  expanded = false,
 }: {
   content: Content;
   user: User;
   data: Workspace;
   onChange: (d: Workspace) => void | Promise<void>;
+  expanded?: boolean;
 }) {
   const saved = data.feedback?.find(
     (f) => f.userId === user.id && f.contentId === content.id,
@@ -56,6 +58,7 @@ export default function Feedback({
       key={`${content.id}:${user.id}`}
       saved={saved}
       onSave={save}
+      expanded={expanded}
     />
   );
 }

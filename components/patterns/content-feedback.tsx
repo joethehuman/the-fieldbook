@@ -29,10 +29,12 @@ export function ContentFeedback({
   saved,
   onSave,
   disabled = false,
+  expanded = false,
 }: {
   saved?: { rating: Rating; comment?: string };
   onSave: (rating: Rating, comment: string) => void | Promise<void>;
   disabled?: boolean;
+  expanded?: boolean;
 }) {
   const desktop = useSyncExternalStore(
     subscribeViewport,
@@ -73,7 +75,7 @@ export function ContentFeedback({
           ? "Feedback saved."
           : "Rating saved. You can add an optional comment.",
       );
-      if (finish) close();
+      if (finish && !expanded) close();
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -120,11 +122,11 @@ export function ContentFeedback({
   const panel = (
     <form
       id={`${id}-panel`}
-      aria-label="Did you find this useful?"
+      aria-label={expanded ? "Course feedback" : "Did you find this useful?"}
       aria-busy={pending}
       className="min-w-0"
       onKeyDown={(event) => {
-        if (event.key === "Escape" && !desktop) {
+        if (event.key === "Escape" && !desktop && !expanded) {
           event.preventDefault();
           close();
         }
@@ -173,7 +175,7 @@ export function ContentFeedback({
         )}
       </div>
       <CardFooter className="sticky bottom-0 justify-end px-3">
-        {!desktop && (
+        {!desktop && !expanded && (
           <Button
             type="button"
             variant="ghost"
@@ -194,6 +196,12 @@ export function ContentFeedback({
         </Button>
       </CardFooter>
     </form>
+  );
+  if (expanded) return (
+    <section aria-label="Content feedback" className="w-full min-w-0">
+      <div className="rounded-lg border border-border bg-background">{panel}</div>
+      <p role="status" className="mt-2 text-copy text-muted-foreground">{status}</p>
+    </section>
   );
   return (
     <section aria-label="Content feedback" className="flex min-w-0 flex-col items-center">

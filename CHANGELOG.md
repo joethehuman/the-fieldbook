@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Show one quiz question per course step, then a scored results screen with review, retry and optional feedback. An eligible final quiz submission or the last lesson of a no-quiz course now records completion before the shared finish screen; Close course only navigates away.
+
 - Remove the workspace footer and tagline control. Find the published privacy policy and demo information in the account menu; account pages retain their privacy link.
 - Keep standalone account pages in their own scroll area so a pull gesture cannot leave the demo profile chooser or installed sign-in card clipped on mobile.
 

@@ -21,33 +21,34 @@ test("one builder grades single and multiple answers as exact sets with stable I
   assert.equal(validQuestion({ ...course.questions[0], options: ["A"] }), false);
 });
 
-test("optional quiz records incorrect answers then waits for Complete course", () => {
+test("optional quiz records an incorrect attempt and completes in the same save", () => {
   let workspace = freshWorkspace();
   const course = { ...workspace.content.find((item) => item.id === "course-2")!, requirePassing: false };
   const userId = workspace.users[0].id;
   for (const lesson of course.lessons) workspace = updateProgress(workspace, userId, course, lesson.id);
-  workspace = updateProgress(workspace, userId, course, undefined, [[2], [2]]);
+  workspace = updateProgress(workspace, userId, course, undefined, [[2], [2]], true);
   const progress = workspace.progress[userId].find((entry) => entry.content_id === course.id)!;
   assert.equal(progress.attempts?.[0].passed, false);
   assert.equal(progress.attempts?.[0].answers?.[0].questionId, course.questions[0].id);
   assert.equal(quizUnlocked(course, progress.attempts), true);
-  assert.equal(isComplete(course, workspace.progress[userId]), false);
-  workspace = updateProgress(workspace, userId, course, undefined, undefined, true);
   assert.equal(isComplete(course, workspace.progress[userId]), true);
 });
 
-test("existing quizzes retain passing requirement and no-quiz lessons still need final action", () => {
+test("required failure saves an attempt, retry completes, and no-quiz final lesson completes", () => {
   let workspace = freshWorkspace();
   const old = workspace.content.find((item) => item.id === "course-2")!;
   const userId = workspace.users[0].id;
   assert.equal(requiresPassing(old), true);
   for (const lesson of old.lessons) workspace = updateProgress(workspace, userId, old, lesson.id);
-  workspace = updateProgress(workspace, userId, old, undefined, [[2], [2]]);
+  workspace = updateProgress(workspace, userId, old, undefined, [[2], [2]], true);
+  assert.equal(isComplete(old, workspace.progress[userId]), false);
+  assert.equal(workspace.progress[userId].find((entry) => entry.content_id === old.id)?.attempts?.length, 1);
   assert.throws(() => updateProgress(workspace, userId, old, undefined, undefined, true), /Finish the lessons and quiz/);
+  workspace = updateProgress(workspace, userId, old, undefined, [[0], [1]], true);
+  assert.equal(isComplete(old, workspace.progress[userId]), true);
   const noQuiz = { ...old, id: "no-quiz", questions: [] };
-  for (const lesson of noQuiz.lessons) workspace = updateProgress(workspace, userId, noQuiz, lesson.id);
-  assert.equal(isComplete(noQuiz, workspace.progress[userId]), false);
-  workspace = updateProgress(workspace, userId, noQuiz, undefined, undefined, true);
+  for (const lesson of noQuiz.lessons.slice(0, -1)) workspace = updateProgress(workspace, userId, noQuiz, lesson.id);
+  workspace = updateProgress(workspace, userId, noQuiz, noQuiz.lessons.at(-1)!.id, undefined, true);
   assert.equal(isComplete(noQuiz, workspace.progress[userId]), true);
 });
 

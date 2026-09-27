@@ -6,6 +6,7 @@ test("reordering shows the whole row in motion and retains arrow controls", asyn
   const rows = page.locator(".learning-order [data-slot=reorder-row]");
   await expect(rows.first()).toContainText("Company essentials");
   const handle = rows.first().getByRole("button", { name: /Reorder Company essentials/ });
+  await handle.scrollIntoViewIfNeeded();
   const box = await handle.boundingBox();
   const second = await rows.nth(1).boundingBox();
   expect(box && second).toBeTruthy();

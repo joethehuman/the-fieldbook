@@ -415,11 +415,11 @@ test("guest Updates and curriculum learning, browser progress and account transi
     .click();
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await page.getByRole("radio", { name: "Correct", exact: true }).check();
-  await page.getByRole("button", { name: "Check answers" }).click();
+  await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(
-    page.getByText("All answers are correct."),
+    page.getByRole("heading", { name: "1 of 1 correct" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Complete course" }).click();
+  await page.getByRole("button", { name: "Close course" }).click();
   await page.reload();
   await nav(page, "Courses");
   await expect(page.locator(".for-you")).toContainText(

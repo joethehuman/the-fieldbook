@@ -1148,14 +1148,14 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
   }).toBeGreaterThanOrEqual(0);
   await page.screenshot({ path: info.outputPath("course-quiz-entry.png") });
   await page.getByRole("radio", { name: "Second", exact: true }).check();
-  await page.getByRole("button", { name: "Check answers" }).click();
+  await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(
-    page.getByText("All answers are correct."),
+    page.getByRole("heading", { name: "1 of 1 correct" }),
   ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Content feedback" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Complete course" }).click();
+  await page.getByRole("button", { name: "Close course" }).click();
   await page.reload();
   await expect.poll(async () => page.evaluate(() =>
     JSON.parse(localStorage.getItem("fieldbook.guest-progress.v1") || "[]")[0]?.passed,
@@ -1267,19 +1267,21 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
   await page.getByRole("button", { name: "Next lesson" }).click();
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await page.getByRole("radio", { name: "First", exact: true }).check();
-  await page.getByRole("button", { name: "Check answers" }).click();
+  await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(
-    page.getByText("Some answers need another try. Review and retry when ready."),
+    page.getByText("Answer all questions correctly to complete this course. Retry when you’re ready."),
   ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Close course" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Retry quiz" }).click();
   await page.getByRole("radio", { name: "Second", exact: true }).check();
-  await page.getByRole("button", { name: "Check answers" }).click();
+  await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(
-    page.getByText("All answers are correct."),
+    page.getByRole("heading", { name: "1 of 1 correct" }),
   ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Content feedback" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Complete course" }).click();
+  await page.getByRole("button", { name: "Close course" }).click();
   await expect(page).toHaveURL(/\/courses$/);
   await expect.poll(async () => {
     const rows = await (await request.get(`${backend}/rest/v1/fb_progress?content_id=eq.${ids[2]}`)).json();

@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
-export function ReaderFeedback({ contentId }: { contentId: string }) {
+export function ReaderFeedback({ contentId, expanded = false }: { contentId: string; expanded?: boolean }) {
   const [current, setCurrent] = useState<{
     rating: "up" | "down";
     comment: string;
@@ -28,6 +28,7 @@ export function ReaderFeedback({ contentId }: { contentId: string }) {
   return (
     <ContentFeedback
       saved={current}
+      expanded={expanded}
       onSave={async (rating, comment) => {
         const response = await fetch("/api/feedback", {
           method: "POST",

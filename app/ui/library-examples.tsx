@@ -272,7 +272,7 @@ export function LibraryExamples() {
       <SettingsSection
         id="catalog-content-feedback"
         title={<h3>Content feedback</h3>}
-        guidance="Use at the end of an article or completed lesson. Ratings save immediately. Send saves the optional plain-text comment and closes on success. Escape or Close dismisses without discarding the draft; errors remain open for retry. Desktop uses a popover; phones expand inline."
+        guidance="Use at the end of an article or course. Ratings save immediately. Send saves the optional plain-text comment. The compact form uses a desktop popover or expands on phones; a no-quiz finish screen can show the full form inline."
       >
         <Field orientation="horizontal">
           <Switch checked={failFeedback} onCheckedChange={setFailFeedback} />
@@ -289,6 +289,8 @@ export function LibraryExamples() {
             setFeedback({ rating, comment });
           }}
         />
+        <p className="text-copy text-muted-foreground">Expanded course finish example</p>
+        <ContentFeedback expanded onSave={async () => {}} />
         <p className="text-copy text-muted-foreground">Disabled example</p>
         <ContentFeedback disabled onSave={() => {}} />
       </SettingsSection>
