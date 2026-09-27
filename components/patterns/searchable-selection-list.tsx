@@ -5,6 +5,7 @@ import { Input } from "../ui/input";
 import { Field, FieldGroup } from "../ui/field";
 import { FormField } from "./form-field";
 import { EmptyState } from "./layout";
+import { Button } from "../ui/button";
 import { Pagination } from "./pagination";
 
 export type SelectionOption = {
@@ -35,10 +36,13 @@ export function SearchableSelectionList({
   const groupName = useId();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
-  const matches = options.filter((option) =>
-    `${option.label} ${option.description || ""}`
-      .toLowerCase()
-      .includes(query.trim().toLowerCase()),
+  const [selectedOnly, setSelectedOnly] = useState(false);
+  const matches = options.filter(
+    (option) =>
+      (!selectedOnly || value.includes(option.id)) &&
+      `${option.label} ${option.description || ""}`
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()),
   );
   const currentPage = Math.min(
     page,
@@ -60,6 +64,78 @@ export function SearchableSelectionList({
           }}
         />
       </FormField>
+      {selectionMode === "multiple" && options.length > 1 && (
+        <div className="flex flex-wrap items-center gap-3">
+          {matches.length > 1 && (
+            <Field orientation="horizontal">
+              <Checkbox
+                aria-label="Select this page"
+                disabled={disabled || !matches.length}
+                checked={
+                  matches
+                    .slice((currentPage - 1) * 10, currentPage * 10)
+                    .every((o) => value.includes(o.id)) && !!matches.length
+                    ? true
+                    : matches
+                          .slice((currentPage - 1) * 10, currentPage * 10)
+                          .some((o) => value.includes(o.id))
+                      ? "indeterminate"
+                      : false
+                }
+                onCheckedChange={(checked) => {
+                  const ids = matches
+                    .slice((currentPage - 1) * 10, currentPage * 10)
+                    .map((o) => o.id);
+                  onChange(
+                    checked === true
+                      ? [...new Set([...value, ...ids])]
+                      : value.filter((id) => !ids.includes(id)),
+                  );
+                }}
+              />
+              Select this page
+            </Field>
+          )}
+          {matches.length > 10 && (
+            <Button
+              type="button"
+              variant="link"
+              disabled={disabled}
+              onClick={() =>
+                onChange([...new Set([...value, ...matches.map((o) => o.id)])])
+              }
+            >
+              Select all {matches.length} matching items
+            </Button>
+          )}
+          {!!value.length && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={disabled}
+              onClick={() => {
+                setSelectedOnly(!selectedOnly);
+                setQuery("");
+                setPage(1);
+              }}
+            >
+              {selectedOnly
+                ? "Show all options"
+                : `Review ${value.length} selected`}
+            </Button>
+          )}
+          {!!value.length && (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={disabled}
+              onClick={() => onChange([])}
+            >
+              Clear selection
+            </Button>
+          )}
+        </div>
+      )}
       <div className="grid gap-3">
         {matches
           .slice((currentPage - 1) * 10, currentPage * 10)

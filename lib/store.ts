@@ -1,8 +1,11 @@
+import { expireDemoDeleted } from "./bulk-actions";
 import { withPublishedSnapshots } from "./demo-publication";
 import { seedContent } from "./seed";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 import { gradeQuiz, quizUnlocked } from "./course-quiz";
 export type Workspace = {
+  cleanupStatus?: { configured: boolean; lastRun?: string };
+  deletedItems?: import("./bulk-actions").DeletedItem[];
   settings?: import("./settings").SiteSettings;
   revision?: number;
   governanceRevision?: number;
@@ -169,7 +172,10 @@ export function loadWorkspace(): Workspace {
     const renamed = renamedProfiles[user.id];
     if (renamed?.previous.includes(user.name)) user.name = renamed.name;
   }
-  return withPublishedSnapshots(data);
+  const upgraded = withPublishedSnapshots(data);
+  const current = expireDemoDeleted(upgraded);
+  if (current !== upgraded) saveWorkspace(current);
+  return current;
 }
 export function saveWorkspace(data: Workspace) {
   localStorage.setItem(KEY, JSON.stringify(data));
@@ -203,14 +209,26 @@ export function updateProgress(
   )
     p.lessons.push(lessonId);
   if (answers && course.lessons.every((l) => p!.lessons.includes(l.id))) {
-    const selections = answers.map((answer) => Array.isArray(answer) ? answer : [answer]);
+    const selections = answers.map((answer) =>
+      Array.isArray(answer) ? answer : [answer],
+    );
     const graded = gradeQuiz(course, selections);
-    (p.attempts ??= []).push({ at: new Date().toISOString(), version: course.version, passed: graded.passed, answers: graded.answers });
+    (p.attempts ??= []).push({
+      at: new Date().toISOString(),
+      version: course.version,
+      passed: graded.passed,
+      answers: graded.answers,
+    });
   }
   if (complete) {
     const unlocked = quizUnlocked(course, p.attempts);
-    if (!course.lessons.every((lesson) => p!.lessons.includes(lesson.id)) || (!unlocked && !answers))
-      throw new Error("Finish the lessons and quiz before completing this course.");
+    if (
+      !course.lessons.every((lesson) => p!.lessons.includes(lesson.id)) ||
+      (!unlocked && !answers)
+    )
+      throw new Error(
+        "Finish the lessons and quiz before completing this course.",
+      );
     if (unlocked) p.passed = true;
   }
   return next;

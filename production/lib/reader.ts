@@ -41,6 +41,7 @@ export type ReaderItem = Pick<
   | "category"
   | "folder"
   | "sectionId"
+  | "sectionOrder"
   | "status"
   | "createdAt"
   | "updatedAt"
@@ -70,7 +71,7 @@ const publishedIndex = unstable_cache(
       db()
         .from("fb_documents")
         .select(
-          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,groups:published->groups",
+          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,sectionOrder:published->sectionOrder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,groups:published->groups",
           { count: "exact" },
         )
         .not("published", "is", null)
@@ -149,6 +150,7 @@ export const readerContext = cache(async (destination: string) => {
       category: item.category,
       folder: item.folder || "",
       sectionId: item.sectionId || undefined,
+      sectionOrder: item.sectionOrder,
       kind: "doc",
       status: "published",
     }));

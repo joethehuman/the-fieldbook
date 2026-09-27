@@ -13,9 +13,10 @@ const contentIndex = async (): Promise<Content[]> => {
     db()
       .from("fb_documents")
       .select(
-        "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,groups:draft->groups,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
+        "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,sectionOrder:draft->>sectionOrder,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,groups:draft->groups,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
         { count: "exact" },
       )
+      .is("deleted_at", null)
       .order("id")
       .range(from, to),
   );
@@ -26,6 +27,7 @@ const contentIndex = async (): Promise<Content[]> => {
     category: row.category || "",
     folder: row.folder || "",
     sectionId: row.sectionId || undefined,
+    sectionOrder: row.sectionOrder ? Number(row.sectionOrder) : undefined,
     kind: row.kind,
     status: row.status,
     version: Number(row.version) || 1,
@@ -71,6 +73,45 @@ export async function adminSnapshot(
     progress: {},
     feedback: [],
   };
+  const deleted = await readAll((from, to) =>
+    db()
+      .from("fb_deleted_items")
+      .select(
+        "entity,id,name,kind,revision,deleted_at,purge_after,deleted_by,purging,error",
+        { count: "exact" },
+      )
+      .order("id")
+      .order("entity")
+      .range(from, to),
+  );
+  const actors = [...new Set(deleted.map((d) => d.deleted_by))];
+  const { data: names, error: namesError } = actors.length
+    ? await db().from("fb_profiles").select("id,name").in("id", actors)
+    : { data: [], error: null };
+  check(namesError);
+  data.deletedItems = deleted.map((d) => ({
+    id: d.id,
+    entity: d.entity,
+    name: d.name,
+    kind: d.kind,
+    revision: d.revision,
+    deletedAt: d.deleted_at,
+    purgeAfter: d.purge_after,
+    deletedBy:
+      names?.find((p) => p.id === d.deleted_by)?.name || "Former administrator",
+    purging: d.purging,
+    error: d.error || undefined,
+  }));
+  const { data: cleanup, error: cleanupError } = await db()
+    .from("fb_cleanup_config")
+    .select("endpoint,last_run")
+    .eq("id", true)
+    .single();
+  check(cleanupError);
+  data.cleanupStatus = {
+    configured: !!cleanup?.endpoint,
+    lastRun: cleanup?.last_run || undefined,
+  };
   if (scope === "content") return data;
 
   if (scope === "feedback") {
@@ -90,7 +131,7 @@ export async function adminSnapshot(
           .range(from, to),
       ),
     ]);
-    data.users = people.map(profile);
+    data.users = people.filter((p) => !p.deleted_at).map(profile);
     data.feedback = ratings.map((row) => ({
       id: row.id,
       userId: row.user_id || "guest",
@@ -111,6 +152,7 @@ export async function adminSnapshot(
         .select("id,draft,published,revision,published_revision,updated_at", {
           count: "exact",
         })
+        .is("deleted_at", null)
         .eq("draft->>kind", "course")
         .order("id")
         .range(from, to),

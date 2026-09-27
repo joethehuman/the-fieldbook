@@ -47,6 +47,7 @@ export function createMcp(
       const { data, error } = await db()
         .from("fb_documents")
         .select("*")
+        .is("deleted_at", null)
         .order("updated_at", { ascending: false })
         .limit(500);
       check(error);

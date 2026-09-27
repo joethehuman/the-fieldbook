@@ -5,6 +5,7 @@ import {
   HttpError,
   errorResponse,
 } from "@production/lib/auth";
+import { env } from "@production/lib/env";
 import { db } from "@production/lib/db";
 import {
   governanceSchema,
@@ -45,6 +46,27 @@ export async function POST(req: Request) {
         throw new HttpError(
           503,
           "Preview setup is incomplete. Onboarding changes are not available yet.",
+        );
+    }
+    if (body.operation !== "pending") {
+      const { data: owner, error: ownerError } = await db()
+        .from("fb_profiles")
+        .select("id")
+        .eq("email", env().owner)
+        .maybeSingle();
+      if (ownerError) throw ownerError;
+      const incomingOwner = body.users?.find(
+        (u: { id: string }) => u.id === owner?.id,
+      );
+      if (
+        owner &&
+        (!incomingOwner ||
+          !incomingOwner.active ||
+          incomingOwner.role !== "admin")
+      )
+        throw new HttpError(
+          400,
+          "The installation owner must remain an active administrator.",
         );
     }
     const { data, error } = await db().rpc("fb_save_governance", {

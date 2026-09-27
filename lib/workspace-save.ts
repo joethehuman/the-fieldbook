@@ -116,8 +116,7 @@ export function createWorkspaceSaver(
       const removed = pendingBefore.filter(
         (p) => !pendingAfter.some((x) => x.email === p.email),
       );
-      if (changed.length + removed.length > 1)
-        throw new Error("Save one pending account at a time.");
+
       for (const p of changed)
         enqueue("/api/governance", {
           operation: "pending",
@@ -134,8 +133,16 @@ export function createWorkspaceSaver(
 
       let completed = 0;
       try {
+        let governanceRevision = before.governanceRevision;
         for (const [path, body] of operations) {
-          await send(path, body);
+          if (path === "/api/governance")
+            (body as { expected: number | undefined }).expected =
+              governanceRevision;
+          const response = await send(path, body);
+          if (path === "/api/governance")
+            governanceRevision =
+              (response as { revision?: number } | undefined)?.revision ??
+              governanceRevision! + 1;
           completed++;
         }
       } catch (error) {

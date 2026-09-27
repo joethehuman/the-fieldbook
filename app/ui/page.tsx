@@ -1,4 +1,5 @@
 "use client";
+import { BulkExamples } from "./bulk-examples";
 import { WritingExamples } from "./writing-examples";
 import { LibraryExamples } from "./library-examples";
 import { ControlExamples } from "./control-examples";
@@ -104,6 +105,7 @@ export default function ComponentCatalog() {
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
       <ControlExamples />
+      <BulkExamples />
       <LibraryExamples />
       <WritingExamples />
       <section className="grid gap-4" aria-label="Save confirmations">
@@ -594,9 +596,16 @@ export default function ComponentCatalog() {
             }}
           />
         </SplitPanel>
-        <Course course={seedContent.find((item) => item.kind === "course")!}
-          progress={[]} initialLessonId={seedContent.find((item) => item.kind === "course")!.lessons[0]?.id}
-          backLabel="Back to courses" onBack={() => {}} onDemoProgress={() => true} />
+        <Course
+          course={seedContent.find((item) => item.kind === "course")!}
+          progress={[]}
+          initialLessonId={
+            seedContent.find((item) => item.kind === "course")!.lessons[0]?.id
+          }
+          backLabel="Back to courses"
+          onBack={() => {}}
+          onDemoProgress={() => true}
+        />
       </section>
     </ReadingPage>
   );

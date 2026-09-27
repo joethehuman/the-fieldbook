@@ -1,4 +1,8 @@
 "use client";
+import { BulkActions } from "./patterns/bulk-actions";
+import { useBulkSelection } from "./patterns/bulk-selection";
+import { SelectableRows } from "./patterns/selectable-rows";
+import { peopleCommands } from "./PeopleBulkActions";
 import { FormField } from "@/components/patterns/form-field";
 import { Input } from "@/components/ui/input";
 
@@ -21,6 +25,14 @@ export function PendingPeople({
   const [editing, setEditing] = useState<Pending | null>(null),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const rows = (data.pendingUsers || []).filter((p) =>
+    (p.name + " " + p.email).toLowerCase().includes(query.toLowerCase()),
+  );
+  const selection = useBulkSelection(
+    "pending" + query,
+    rows.map((p) => p.email),
+  );
   async function save(person: Pending, revoke = false) {
     setBusy(true);
     setError("");
@@ -64,29 +76,42 @@ export function PendingPeople({
         Pre-register account
       </Button>
       {error && <p role="alert">{error}</p>}
-      {(data.pendingUsers || []).map((p) => (
-        <div className="report-course" key={p.email}>
-          <span>
-            {p.name} · {p.email} · {p.role}
-          </span>
-          <ActionGroup>
-            <Button
-              variant="link"
-              disabled={busy}
-              onClick={() => setEditing(p)}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="link"
-              disabled={busy}
-              onClick={() => void save(p, true)}
-            >
-              Revoke
-            </Button>
-          </ActionGroup>
-        </div>
-      ))}
+      <FormField label="Find a pending account">
+        <Input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </FormField>
+      <BulkActions
+        collectionSize={selection.collectionSize}
+        selected={selection.actionIds}
+        onSelectionChange={selection.setSelected}
+        noun="pending accounts"
+        commands={peopleCommands(data, selection.actionIds, onChange, true)}
+      />
+      <SelectableRows
+        label="Pending accounts"
+        selected={selection.selected}
+        onChange={selection.setSelected}
+        scope={query}
+        rows={rows.map((p) => ({
+          id: p.email,
+          label: p.name,
+          detail: (
+            <>
+              {p.email} · {p.role}{" "}
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => setEditing(p)}
+              >
+                Edit {p.name}
+              </Button>
+            </>
+          ),
+        }))}
+      />
       {editing && (
         <form
           className="profile-form"

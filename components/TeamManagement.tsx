@@ -1,5 +1,9 @@
 "use client";
 
+import { BulkActions } from "./patterns/bulk-actions";
+import { Checkbox } from "./ui/choice";
+import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
+import { BulkPicker } from "./patterns/bulk-selection";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import type { Workspace } from "@/lib/store";
@@ -75,10 +79,6 @@ export function TeamsAdmin({
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Team | null>(null);
   const baseline = useRef<Team | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [chosen, setChosen] = useState<string[]>([]);
-  const [reviewing, setReviewing] = useState(false);
-  const [reviewPage, setReviewPage] = useState(1);
   const [moving, setMoving] = useState<{
     mode: "into" | "out";
     id: string;
@@ -92,10 +92,8 @@ export function TeamsAdmin({
   const { confirm } = useInteractionDialog();
   const destination = useRevealTarget<HTMLElement>();
   const memberList = useRevealTarget<HTMLHeadingElement>();
-  const addPanel = useRevealTarget<HTMLElement>();
   const team = teams.find((t) => t.id === selected);
   const dirty =
-    !!chosen.length ||
     moving?.choice != null ||
     (!!editing && JSON.stringify(editing) !== JSON.stringify(baseline.current));
   const guard = useRef(async () => true);
@@ -119,10 +117,6 @@ export function TeamsAdmin({
 
   function resetDraft() {
     setMoving(null);
-    setAdding(false);
-    setChosen([]);
-    setReviewing(false);
-    setReviewPage(1);
     setEditing(null);
     setNotice("");
   }
@@ -148,7 +142,7 @@ export function TeamsAdmin({
       setNotice("");
     }
   }
-  async function commit(next: Workspace, message: string) {
+  async function commit(next: Workspace, message: string, propagate = false) {
     if (saving.current) return false;
     saving.current = true;
     setBusy(true);
@@ -158,6 +152,7 @@ export function TeamsAdmin({
       notify(message);
       return true;
     } catch (error) {
+      if (propagate) throw error;
       setNotice(
         error instanceof Error ? error.message : "Could not save. Try again.",
       );
@@ -302,39 +297,6 @@ export function TeamsAdmin({
       destination.reveal();
     }
   }
-  async function addMembers() {
-    if (!team || saving.current || !chosen.length) return;
-    if (
-      chosen.some(
-        (id) =>
-          !data.users.some(
-            (u) => u.id === id && u.active && u.teamId !== team.id,
-          ),
-      )
-    ) {
-      setNotice(
-        "The available people changed. Go back and review your selections.",
-      );
-      return;
-    }
-    if (
-      await commit(
-        {
-          ...data,
-          users: data.users.map((u) =>
-            chosen.includes(u.id) ? { ...u, teamId: team.id } : u,
-          ),
-        },
-        "Team members updated.",
-      )
-    ) {
-      resetDraft();
-      setPage(1);
-      setQuery("");
-      setIncludeSubteams(false);
-      memberList.reveal();
-    }
-  }
   async function removeMember(user: User) {
     if (!team || user.teamId !== team.id || saving.current) return;
     if (
@@ -373,6 +335,15 @@ export function TeamsAdmin({
     )
     .sort(byName);
   const children = teams.filter((t) => t.parentId === selected).sort(byName);
+  const rosterSelection = useBulkSelection(
+    selected + tab + query + includeSubteams,
+    members.map((u) => u.id),
+    members.filter((u) => u.teamId === team?.id).map((u) => u.id),
+  );
+  const teamSelection = useBulkSelection(
+    selected,
+    teams.map((t) => t.id),
+  );
   const currentPage = Math.min(
     page,
     Math.max(1, Math.ceil(members.length / PAGE_SIZE)),
@@ -380,13 +351,6 @@ export function TeamsAdmin({
   const eligible = data.users
     .filter((u) => u.active && u.teamId !== selected)
     .sort(byName);
-  const chosenUsers = data.users
-    .filter((u) => chosen.includes(u.id))
-    .sort(byName);
-  const currentReviewPage = Math.min(
-    reviewPage,
-    Math.max(1, Math.ceil(chosenUsers.length / PAGE_SIZE)),
-  );
   const teamName = (id?: string) =>
     teams.find((t) => t.id === id)?.name || "No team";
 
@@ -463,7 +427,60 @@ export function TeamsAdmin({
               Add team
             </Button>
           </SectionHeader>
+
           <HierarchyList
+            selectionActions={
+              <BulkActions
+                singleItemActions={false}
+                collectionSize={teamSelection.collectionSize}
+                selected={teamSelection.actionIds}
+                onSelectionChange={teamSelection.setSelected}
+                noun="teams"
+                commands={([true, false] as const).map((add) => ({
+                  id: add ? "add-groups" : "remove-groups",
+                  label: add
+                    ? "Add to learning groups"
+                    : "Remove from learning groups",
+                  description:
+                    "Change direct team links. Subteams are not included automatically. People and saved progress are preserved.",
+                  options: data.groups.map((g) => ({
+                    id: g.id,
+                    label: g.name,
+                  })),
+                  apply: async (ids) => {
+                    if (
+                      !(await commit(
+                        {
+                          ...data,
+                          groups: data.groups.map((g) =>
+                            ids.includes(g.id)
+                              ? {
+                                  ...g,
+                                  teamIds: add
+                                    ? [
+                                        ...new Set([
+                                          ...(g.teamIds || []),
+                                          ...teamSelection.actionIds,
+                                        ]),
+                                      ]
+                                    : (g.teamIds || []).filter(
+                                        (id) =>
+                                          !teamSelection.actionIds.includes(id),
+                                      ),
+                                }
+                              : g,
+                          ),
+                        },
+                        "Team links updated.",
+                      ))
+                    )
+                      throw new Error("Could not save team links.");
+                  },
+                }))}
+              />
+            }
+            selected={teamSelection.selected}
+            onSelectionChange={teamSelection.setSelected}
             label="Teams"
             disabled={busy}
             onOpen={(id) => void openTeam(id)}
@@ -733,133 +750,35 @@ export function TeamsAdmin({
                   title={<h3 {...memberList.targetProps}>Team members</h3>}
                   description="Each person has one direct reporting team. Inactive accounts are labeled; pending accounts are managed in People."
                 >
-                  <Button
-                    disabled={busy || adding}
-                    onClick={() => {
-                      setAdding(true);
-                      setNotice("");
-                      addPanel.reveal();
+                  <BulkPicker
+                    title="Add members"
+                    description={`Add people to ${team.name}. People already in a different team move here. Manager reporting and team-linked assignments change; saved progress remains.`}
+                    options={eligible.map((u) => ({
+                      id: u.id,
+                      label: u.name,
+                      description: u.email + " · " + teamName(u.teamId),
+                    }))}
+                    actionLabel="Add members"
+                    onApply={async (ids) => {
+                      if (
+                        !(await commit(
+                          {
+                            ...data,
+                            users: data.users.map((u) =>
+                              ids.includes(u.id)
+                                ? { ...u, teamId: team.id }
+                                : u,
+                            ),
+                          },
+                          "Members added.",
+                          true,
+                        ))
+                      )
+                        throw new Error("Could not save members.");
                     }}
-                  >
-                    Add members
-                  </Button>
+                    disabled={busy}
+                  />
                 </SectionHeader>
-                {adding && (
-                  <SettingsSection
-                    {...addPanel.targetProps}
-                    id="team-add-members"
-                    title={
-                      <h3>
-                        {reviewing
-                          ? "Review member changes"
-                          : `Add members to ${team.name}`}
-                      </h3>
-                    }
-                    guidance="Adding someone from another team moves their direct membership. Team-linked learning assignments may change; saved course progress is retained."
-                    actions={
-                      <ActionGroup>
-                        <Button
-                          variant="outline"
-                          disabled={busy}
-                          onClick={async () => {
-                            if (await guard.current()) {
-                              resetDraft();
-                              memberList.reveal();
-                            }
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                        {reviewing ? (
-                          <>
-                            <Button
-                              variant="outline"
-                              disabled={busy}
-                              onClick={() => {
-                                setChosen((ids) =>
-                                  ids.filter((id) =>
-                                    eligible.some((u) => u.id === id),
-                                  ),
-                                );
-                                setReviewing(false);
-                                setNotice("");
-                                addPanel.reveal();
-                              }}
-                            >
-                              Back to selection
-                            </Button>
-                            <Button
-                              loading={busy}
-                              onClick={() => void addMembers()}
-                            >
-                              Apply changes
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            disabled={!chosen.length}
-                            onClick={() => {
-                              setReviewing(true);
-                              setReviewPage(1);
-                              addPanel.reveal();
-                            }}
-                          >
-                            Review {chosen.length} selected
-                          </Button>
-                        )}
-                      </ActionGroup>
-                    }
-                  >
-                    {notice && <Alert variant="destructive">{notice}</Alert>}
-                    {reviewing ? (
-                      <>
-                        <p>
-                          {chosenUsers.length} people will join {team.name}.
-                        </p>
-                        <ul className="grid gap-3">
-                          {chosenUsers
-                            .slice(
-                              (currentReviewPage - 1) * PAGE_SIZE,
-                              currentReviewPage * PAGE_SIZE,
-                            )
-                            .map((u) => (
-                              <li
-                                key={u.id}
-                                className="text-copy [overflow-wrap:anywhere]"
-                              >
-                                <strong>{u.name}</strong> · {u.email}
-                                <span className="block text-muted-foreground">
-                                  {u.teamId
-                                    ? `Move from ${teamName(u.teamId)} to ${team.name}`
-                                    : `Add to ${team.name}`}
-                                </span>
-                              </li>
-                            ))}
-                        </ul>
-                        <Pagination
-                          label="Selected members"
-                          page={currentReviewPage}
-                          total={chosenUsers.length}
-                          pageSize={PAGE_SIZE}
-                          onPageChange={setReviewPage}
-                          disabled={busy}
-                        />
-                      </>
-                    ) : (
-                      <SearchableSelectionList
-                        label="Find people to add"
-                        options={eligible.map((u) => ({
-                          id: u.id,
-                          label: u.name,
-                          description: `${u.email} · ${teamName(u.teamId)}`,
-                        }))}
-                        value={chosen}
-                        onChange={setChosen}
-                        disabled={busy}
-                      />
-                    )}
-                  </SettingsSection>
-                )}
                 <FilterBar>
                   <FormField label="Find a member">
                     <Input
@@ -885,12 +804,94 @@ export function TeamsAdmin({
                     </SelectField>
                   </FormField>
                 </FilterBar>
+                <BulkActions
+                  singleItemActions={false}
+                  collectionSize={rosterSelection.collectionSize}
+                  selected={rosterSelection.actionIds}
+                  onSelectionChange={rosterSelection.setSelected}
+                  noun="members"
+                  commands={[
+                    {
+                      id: "remove",
+                      label: "Remove from team",
+                      description:
+                        "Remove direct membership from this team. Reporting and team-linked assignments change; saved history remains.",
+                      apply: async () => {
+                        if (
+                          !(await commit(
+                            {
+                              ...data,
+                              users: data.users.map((u) =>
+                                rosterSelection.actionIds.includes(u.id) &&
+                                u.teamId === team.id
+                                  ? { ...u, teamId: undefined }
+                                  : u,
+                              ),
+                            },
+                            "Members removed.",
+                            true,
+                          ))
+                        )
+                          throw new Error("Could not save members.");
+                      },
+                    },
+                    {
+                      id: "move",
+                      label: "Move to team",
+                      description:
+                        "Move these direct members to one destination team. Manager reporting and team-linked assignments change; saved history remains.",
+                      selectionMode: "single",
+                      options: teams
+                        .filter((t) => t.id !== team.id)
+                        .map((t) => ({
+                          id: t.id,
+                          label: teamPath(t.id, teams),
+                        })),
+                      apply: async (ids) => {
+                        if (
+                          !(await commit(
+                            {
+                              ...data,
+                              users: data.users.map((u) =>
+                                rosterSelection.actionIds.includes(u.id) &&
+                                u.teamId === team.id
+                                  ? { ...u, teamId: ids[0] }
+                                  : u,
+                              ),
+                            },
+                            "Members moved.",
+                            true,
+                          ))
+                        )
+                          throw new Error("Could not save members.");
+                      },
+                    },
+                  ]}
+                />
                 {members.length ? (
                   <TableContainer>
                     <DataTable layout="teamMembers" aria-label="Team members">
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Person</TableHead>
+                          <TableHead>
+                            <div className="flex items-center gap-3">
+                              {rosterSelection.canSelect && (
+                                <SelectRows
+                                  label="Select this page of direct members"
+                                  ids={members
+                                    .slice(
+                                      (currentPage - 1) * PAGE_SIZE,
+                                      currentPage * PAGE_SIZE,
+                                    )
+                                    .filter((u) => u.teamId === team.id)
+                                    .map((u) => u.id)}
+                                  value={rosterSelection.selected}
+                                  onChange={rosterSelection.setSelected}
+                                />
+                              )}
+                              Person
+                            </div>
+                          </TableHead>
                           <TableHead>Direct team</TableHead>
                           <TableHead>
                             <span className="sr-only">Actions</span>
@@ -906,7 +907,27 @@ export function TeamsAdmin({
                           .map((u) => (
                             <TableRow key={u.id}>
                               <TableCell>
-                                <strong>{u.name}</strong>
+                                <div className="flex items-center gap-3">
+                                  {rosterSelection.canSelect && (
+                                    <Checkbox
+                                      aria-label={`Select ${u.name}`}
+                                      disabled={u.teamId !== team.id}
+                                      checked={rosterSelection.selected.includes(
+                                        u.id,
+                                      )}
+                                      onCheckedChange={(v) =>
+                                        rosterSelection.toggle(u.id, v === true)
+                                      }
+                                    />
+                                  )}
+                                  <strong>{u.name}</strong>
+                                </div>
+                                {u.teamId !== team.id && (
+                                  <small>
+                                    Inherited from a subteam; manage the direct
+                                    team.
+                                  </small>
+                                )}
                                 <small>{u.email}</small>
                                 {!u.active && <Badge>Inactive</Badge>}
                               </TableCell>
@@ -915,7 +936,7 @@ export function TeamsAdmin({
                                 {u.teamId === selected ? (
                                   <Button
                                     variant="link"
-                                    disabled={busy || adding}
+                                    disabled={busy}
                                     aria-label={`Remove ${u.name} from team`}
                                     onClick={() => void removeMember(u)}
                                   >
@@ -943,6 +964,22 @@ export function TeamsAdmin({
                       ? "No members match your search."
                       : "No members in this view. Add existing people or include subteams."}
                   </EmptyState>
+                )}
+                {members.filter((u) => u.teamId === team.id).length >
+                  PAGE_SIZE && (
+                  <Button
+                    type="button"
+                    variant="link"
+                    onClick={() =>
+                      rosterSelection.setSelected(
+                        members
+                          .filter((u) => u.teamId === team.id)
+                          .map((u) => u.id),
+                      )
+                    }
+                  >
+                    Select all matching direct members
+                  </Button>
                 )}
                 <Pagination
                   label="Team members"

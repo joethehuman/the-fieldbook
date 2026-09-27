@@ -1,4 +1,11 @@
 "use client";
+import { Pagination } from "./patterns/pagination";
+import { contentRelationshipCommands } from "./bulk-relationships";
+import type { BulkHandler } from "@/lib/bulk-actions";
+import { AdminBulkActions } from "./AdminBulkActions";
+import { RecentlyDeleted } from "./RecentlyDeleted";
+import { PeopleBulkActions } from "./PeopleBulkActions";
+import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { CreatableCombobox } from "./ui/creatable-combobox";
 import { DocSectionPicker } from "./DocSectionPicker";
 import DocSectionCreate from "./DocSectionCreate";
@@ -160,6 +167,12 @@ const adminSections = [
     label: "Organization Settings",
     items: [
       {
+        id: "deleted",
+        name: "Recently deleted",
+        description: "Recover deleted content and users for 30 days.",
+        icon: Trash2,
+      },
+      {
         id: "settings-identity",
         name: "Identity",
         description: "Installation name, welcome description and privacy link.",
@@ -200,6 +213,7 @@ const adminSections = [
   },
 ];
 type Props = {
+  onBulk: BulkHandler;
   data: Workspace;
   user: User;
   onOpenTab?: (tab: string) => Promise<void>;
@@ -217,6 +231,7 @@ type Props = {
 };
 const id = () => crypto.randomUUID();
 export default function Admin({
+  onBulk,
   data,
   user,
   onOpenTab,
@@ -252,11 +267,101 @@ export default function Admin({
     [sort, setSort] = useState("title"),
     [peopleRole, setPeopleRole] = useState("all"),
     [peopleGroup, setPeopleGroup] = useState("all"),
+    [peopleTeam, setPeopleTeam] = useState("all"),
     [peopleStatus, setPeopleStatus] = useState("all"),
     [detailScope, setDetailScope] = useState<{
       groupId?: string;
       userId?: string;
     } | null>(null);
+  const [contentStatus, setContentStatus] = useState("all"),
+    [contentSection, setContentSection] = useState("all"),
+    [page, setPage] = useState(1);
+  const contentRows = data.content
+    .filter(
+      (c) =>
+        (filter === "all" || c.kind === filter) &&
+        (contentStatus === "all" ||
+          (contentStatus === "published"
+            ? !!c.publishedRevision
+            : !c.publishedRevision)) &&
+        (contentSection === "all" ||
+          sectionForDoc(
+            c,
+            availableDocSections(
+              data.content.filter((c) => c.kind === "doc"),
+              data.settings?.docCategoryOrder,
+              data.settings?.docSections,
+            ),
+          )?.id === contentSection) &&
+        (category === "all" || c.category === category) &&
+        `${c.title} ${c.summary} ${c.folder}`
+          .toLowerCase()
+          .includes(query.toLowerCase()),
+    )
+    .sort((a, b) =>
+      sort === "title"
+        ? a.title.localeCompare(b.title)
+        : sort === "updated"
+          ? b.updatedAt.localeCompare(a.updatedAt)
+          : a.updatedAt.localeCompare(b.updatedAt),
+    );
+  const peopleRows = data.users
+    .filter(
+      (u) =>
+        `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()) &&
+        (peopleTeam === "all" ||
+          (peopleTeam === "none" ? !u.teamId : u.teamId === peopleTeam)) &&
+        (peopleRole === "all" || u.role === peopleRole) &&
+        (peopleGroup === "all" ||
+          effectiveGroups(u, data.groups).has(peopleGroup)) &&
+        (peopleStatus === "all" || u.active === (peopleStatus === "active")),
+    )
+    .sort((a, b) =>
+      sort === "reverse"
+        ? b.name.localeCompare(a.name)
+        : a.name.localeCompare(b.name),
+    );
+  const selection = useBulkSelection(
+    [
+      tab,
+      filter,
+      query,
+      category,
+      peopleRole,
+      peopleGroup,
+      peopleStatus,
+      peopleTeam,
+      contentStatus,
+      contentSection,
+    ].join("|"),
+    (tab === "people" ? peopleRows : contentRows).map((row) => row.id),
+  );
+  useEffect(() => {
+    setPage(1);
+  }, [
+    tab,
+    filter,
+    query,
+    category,
+    peopleRole,
+    peopleGroup,
+    peopleStatus,
+    peopleTeam,
+    contentStatus,
+    contentSection,
+  ]);
+  const currentPage = Math.min(
+    page,
+    Math.max(
+      1,
+      Math.ceil((tab === "people" ? peopleRows : contentRows).length / 25),
+    ),
+  );
+  const contentPage = contentRows.slice(
+    (currentPage - 1) * 25,
+    currentPage * 25,
+  );
+  const peoplePage = peopleRows.slice((currentPage - 1) * 25, currentPage * 25);
   const manageLearning: LearningHandler = async (action) => {
     if (onLearning) return onLearning(action);
     const next = structuredClone(data);
@@ -294,6 +399,40 @@ export default function Admin({
     }
     await onChange(next);
   };
+  async function manageLearningMany(
+    actions: import("@/lib/learning").LearningAction[],
+  ) {
+    if (onLearning) {
+      const revisions = new Map<string, number>();
+      let completed = 0;
+      try {
+        for (const action of actions) {
+          const expected = revisions.get(action.contentId) ?? action.expected;
+          await onLearning({ ...action, expected });
+          revisions.set(action.contentId, expected + 1);
+          completed++;
+        }
+      } catch (error) {
+        throw new Error(
+          `${completed} of ${actions.length} relationship changes confirmed. ${(error as Error).message}`,
+        );
+      }
+      return;
+    }
+    const next = structuredClone(data);
+    for (const action of actions) {
+      for (const collection of [next.content, next.publishedContent || []]) {
+        const c = collection.find((c) => c.id === action.contentId);
+        if (c)
+          c.groups =
+            action.operation === "target"
+              ? [...new Set([...c.groups, action.groupId!])]
+              : c.groups.filter((id) => id !== action.groupId);
+      }
+    }
+    await onChange(next);
+  }
+
   function create(kind: Content["kind"]) {
     setEditing({
       id: id(),
@@ -395,6 +534,7 @@ export default function Admin({
         onUpload={onUpload}
         production={production}
         onLearning={manageLearning}
+        onLearningMany={manageLearningMany}
         onWorkspaceChange={onChange}
         registerNavigationGuard={registerNavigationGuard}
         onReload={onReload}
@@ -416,6 +556,7 @@ export default function Admin({
           data={data}
           onChange={onChange}
           onLearning={manageLearning}
+          onLearningMany={manageLearningMany}
           initialGroup={detailScope.groupId}
         />
       </>
@@ -547,7 +688,9 @@ export default function Admin({
             ></SectionHeader>
           )}
           {notice && <Alert variant="destructive">{notice}</Alert>}
-          {tab.startsWith("settings-") ? (
+          {tab === "deleted" ? (
+            <RecentlyDeleted data={data} onBulk={onBulk} />
+          ) : tab.startsWith("settings-") ? (
             <SiteSettingsPanel
               key={tab}
               section={
@@ -575,6 +718,7 @@ export default function Admin({
                     value={filter}
                     onValueChange={(value) => {
                       setFilter(value);
+                      setContentSection("all");
                       setCategory("all");
                     }}
                     options={[
@@ -609,27 +753,63 @@ export default function Admin({
                     placeholder="Title, summary, or folder"
                   />
                 </FormField>
-                <FormField label="Category">
+                {filter !== "doc" && (
+                  <FormField label="Category">
+                    <SelectField
+                      value={category}
+                      onValueChange={(value) => setCategory(value)}
+                    >
+                      <option value="all">All categories</option>
+                      {[
+                        ...new Set(
+                          data.content
+                            .filter(
+                              (c) => filter === "all" || c.kind === filter,
+                            )
+                            .map((c) => c.category),
+                        ),
+                      ]
+                        .sort()
+                        .map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                    </SelectField>
+                  </FormField>
+                )}
+                <FormField label="Publication status">
                   <SelectField
-                    value={category}
-                    onValueChange={(value) => setCategory(value)}
+                    value={contentStatus}
+                    onValueChange={setContentStatus}
                   >
-                    <option value="all">All categories</option>
-                    {[
-                      ...new Set(
-                        data.content
-                          .filter((c) => filter === "all" || c.kind === filter)
-                          .map((c) => c.category),
-                      ),
-                    ]
-                      .sort()
-                      .map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
+                    <option value="all">All statuses</option>
+                    <option value="published">Published</option>
+                    <option value="draft">Draft only</option>
                   </SelectField>
                 </FormField>
+                {filter === "doc" && (
+                  <FormField label="Docs section">
+                    <SelectField
+                      value={contentSection}
+                      onValueChange={setContentSection}
+                    >
+                      <option value="all">All sections</option>
+                      {availableDocSections(
+                        data.content.filter((c) => c.kind === "doc"),
+                        data.settings?.docCategoryOrder,
+                        data.settings?.docSections,
+                      ).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.parentId
+                            ? `${data.settings?.docSections?.find((p) => p.id === s.parentId)?.name || s.legacyCategory} / `
+                            : ""}
+                          {s.name}
+                        </option>
+                      ))}
+                    </SelectField>
+                  </FormField>
+                )}
                 <FormField label="Sort content">
                   <SelectField
                     value={sort}
@@ -641,10 +821,33 @@ export default function Admin({
                   </SelectField>
                 </FormField>
               </FilterBar>
+              <AdminBulkActions
+                data={data}
+                collectionSize={selection.collectionSize}
+                selected={selection.actionIds}
+                onSelectionChange={selection.setSelected}
+                onBulk={onBulk}
+                extraCommands={contentRelationshipCommands(
+                  data,
+                  selection.actionIds,
+                  onChange,
+                  manageLearningMany,
+                )}
+              />
               <TableContainer>
-                <DataTable layout="content">
+                <DataTable layout="contentSelection">
                   <TableHeader>
                     <TableRow>
+                      <TableHead>
+                        {selection.canSelect && (
+                          <SelectRows
+                            label="Select this page"
+                            ids={contentPage.map((row) => row.id)}
+                            value={selection.selected}
+                            onChange={selection.setSelected}
+                          />
+                        )}
+                      </TableHead>
                       <TableHead>Content</TableHead>
                       <TableHead>Type</TableHead>
                       <TableHead>Status</TableHead>
@@ -655,112 +858,126 @@ export default function Admin({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.content
-                      .filter(
-                        (c) =>
-                          (filter === "all" || c.kind === filter) &&
-                          (category === "all" || c.category === category) &&
-                          `${c.title} ${c.summary} ${c.folder}`
-                            .toLowerCase()
-                            .includes(query.toLowerCase()),
-                      )
-                      .sort((a, b) =>
-                        sort === "title"
-                          ? a.title.localeCompare(b.title)
-                          : sort === "updated"
-                            ? b.updatedAt.localeCompare(a.updatedAt)
-                            : a.updatedAt.localeCompare(b.updatedAt),
-                      )
-                      .map((c) => (
-                        <TableRow key={c.id}>
-                          <TableCell>
-                            <strong>{c.title}</strong>
-                            <small>
-                              {c.category}
-                              {c.folder ? " / " + c.folder : ""}
-                            </small>
-                          </TableCell>
-                          <TableCell>
-                            {c.kind === "doc"
-                              ? "Doc"
-                              : c.kind === "brief"
-                                ? "Update"
-                                : "Course"}
-                          </TableCell>
-                          <TableCell>
-                            <PublicationStatus
-                              published={!!c.publishedRevision}
-                              hasUnpublishedChanges={hasUnpublishedEdits(
-                                c,
-                                production
-                                  ? undefined
-                                  : data.publishedContent?.find(
-                                      (live) => live.id === c.id,
-                                    ),
-                              )}
+                    {contentPage.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell>
+                          {selection.canSelect && (
+                            <Checkbox
+                              aria-label={`Select ${c.title}`}
+                              checked={selection.selected.includes(c.id)}
+                              onCheckedChange={(v) =>
+                                selection.toggle(c.id, v === true)
+                              }
                             />
-                          </TableCell>
-                          <TableCell>v{c.version}</TableCell>
-                          <TableCell>
-                            <ActionGroup>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <strong>{c.title}</strong>
+                          <small>
+                            {c.category}
+                            {c.folder ? " / " + c.folder : ""}
+                          </small>
+                        </TableCell>
+                        <TableCell>
+                          {c.kind === "doc"
+                            ? "Doc"
+                            : c.kind === "brief"
+                              ? "Update"
+                              : "Course"}
+                        </TableCell>
+                        <TableCell>
+                          <PublicationStatus
+                            published={!!c.publishedRevision}
+                            hasUnpublishedChanges={hasUnpublishedEdits(
+                              c,
+                              production
+                                ? undefined
+                                : data.publishedContent?.find(
+                                    (live) => live.id === c.id,
+                                  ),
+                            )}
+                          />
+                        </TableCell>
+                        <TableCell>v{c.version}</TableCell>
+                        <TableCell>
+                          <ActionGroup>
+                            <Button
+                              variant="link"
+                              disabled={openingItem === c.id}
+                              onClick={async () => {
+                                if (!onEdit) {
+                                  setEditing(structuredClone(c));
+                                  return;
+                                }
+                                setOpeningItem(c.id);
+                                try {
+                                  setEditing(await onEdit(c.id));
+                                  setNotice("");
+                                } catch (error) {
+                                  setNotice((error as Error).message);
+                                } finally {
+                                  setOpeningItem(null);
+                                }
+                              }}
+                            >
+                              {openingItem === c.id ? "Opening…" : "Edit"}
+                            </Button>
+
+                            {!!c.publishedRevision && (
                               <Button
                                 variant="link"
-                                disabled={openingItem === c.id}
                                 onClick={async () => {
-                                  if (!onEdit) {
-                                    setEditing(structuredClone(c));
+                                  if (
+                                    !(await confirm(
+                                      "Unpublish this item? Its draft and history will be kept.",
+                                    ))
+                                  )
                                     return;
-                                  }
-                                  setOpeningItem(c.id);
                                   try {
-                                    setEditing(await onEdit(c.id));
+                                    if (onUnpublish) await onUnpublish(c.id);
+                                    else
+                                      await onChange({
+                                        ...data,
+                                        content: data.content.filter(
+                                          (x) => x.id !== c.id,
+                                        ),
+                                      });
                                     setNotice("");
-                                  } catch (error) {
-                                    setNotice((error as Error).message);
-                                  } finally {
-                                    setOpeningItem(null);
+                                    notify("Content unpublished.");
+                                  } catch (e) {
+                                    setNotice((e as Error).message);
                                   }
                                 }}
                               >
-                                {openingItem === c.id ? "Opening…" : "Edit"}
+                                Unpublish
                               </Button>
-
-                              {!!c.publishedRevision && (
-                                <Button
-                                  variant="link"
-                                  onClick={async () => {
-                                    if (
-                                      !(await confirm(
-                                        "Unpublish this item? Its draft and history will be kept.",
-                                      ))
-                                    )
-                                      return;
-                                    try {
-                                      if (onUnpublish) await onUnpublish(c.id);
-                                      else
-                                        await onChange({
-                                          ...data,
-                                          content: data.content.filter(
-                                            (x) => x.id !== c.id,
-                                          ),
-                                        });
-                                      setNotice("");
-                                      notify("Content unpublished.");
-                                    } catch (e) {
-                                      setNotice((e as Error).message);
-                                    }
-                                  }}
-                                >
-                                  Unpublish
-                                </Button>
-                              )}
-                            </ActionGroup>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            )}
+                          </ActionGroup>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </DataTable>
               </TableContainer>
+              <Pagination
+                label="Content"
+                page={currentPage}
+                pageSize={25}
+                total={contentRows.length}
+                onPageChange={setPage}
+              />
+              {contentRows.length > 25 &&
+                selection.selected.length > 0 &&
+                selection.selected.length < contentRows.length && (
+                  <Button
+                    variant="link"
+                    onClick={() =>
+                      selection.setSelected(contentRows.map((row) => row.id))
+                    }
+                  >
+                    Select all {contentRows.length} matching items
+                  </Button>
+                )}
             </>
           ) : tab === "people" ? (
             <>
@@ -881,10 +1098,40 @@ export default function Admin({
                   </SelectField>
                 </FormField>
               </FilterBar>
+              <FormField label="Reporting team">
+                <SelectField value={peopleTeam} onValueChange={setPeopleTeam}>
+                  <option value="all">All teams</option>
+                  <option value="none">No team</option>
+                  {(data.teams || []).map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </SelectField>
+              </FormField>
+              <PeopleBulkActions
+                currentUserId={user.id}
+                data={data}
+                collectionSize={selection.collectionSize}
+                selected={selection.actionIds}
+                onChange={onChange}
+                onSelectionChange={selection.setSelected}
+                onBulk={onBulk}
+              />
               <TableContainer>
-                <DataTable layout="people">
+                <DataTable layout="peopleSelection">
                   <TableHeader>
                     <TableRow>
+                      <TableHead>
+                        {selection.canSelect && (
+                          <SelectRows
+                            label="Select this page"
+                            ids={peoplePage.map((row) => row.id)}
+                            value={selection.selected}
+                            onChange={selection.setSelected}
+                          />
+                        )}
+                      </TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Access</TableHead>
                       <TableHead>Groups</TableHead>
@@ -895,62 +1142,75 @@ export default function Admin({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {data.users
-                      .filter(
-                        (u) =>
-                          `${u.name} ${u.email}`
-                            .toLowerCase()
-                            .includes(query.toLowerCase()) &&
-                          (peopleRole === "all" || u.role === peopleRole) &&
-                          (peopleGroup === "all" ||
-                            effectiveGroups(u, data.groups).has(peopleGroup)) &&
-                          (peopleStatus === "all" ||
-                            u.active === (peopleStatus === "active")),
-                      )
-                      .sort((a, b) =>
-                        sort === "reverse"
-                          ? b.name.localeCompare(a.name)
-                          : a.name.localeCompare(b.name),
-                      )
-                      .map((u) => (
-                        <TableRow key={u.id}>
-                          <TableCell>
-                            <strong>{u.name}</strong>
-                            <small>{u.email}</small>
-                          </TableCell>
-                          <TableCell>{u.role}</TableCell>
-                          <TableCell>
-                            {data.groups
-                              .filter((g) =>
-                                effectiveGroups(u, data.groups).has(g.id),
-                              )
-                              .map((g) => g.name)
-                              .join(", ") || "No groups"}
-                          </TableCell>
-                          <TableCell>
-                            {u.active ? "Active" : "Inactive"}
-                          </TableCell>
-                          <TableCell>
-                            <ActionGroup>
-                              <Button
-                                variant="link"
-                                onClick={() => setPerson(structuredClone(u))}
-                              >
-                                Edit
-                              </Button>
-                              <Button
-                                variant="link"
-                                onClick={() => setDetailScope({ userId: u.id })}
-                              >
-                                Courses & progress
-                              </Button>
-                            </ActionGroup>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                    {peoplePage.map((u) => (
+                      <TableRow key={u.id}>
+                        <TableCell>
+                          {selection.canSelect && (
+                            <Checkbox
+                              aria-label={`Select ${u.name}`}
+                              checked={selection.selected.includes(u.id)}
+                              onCheckedChange={(v) =>
+                                selection.toggle(u.id, v === true)
+                              }
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <strong>{u.name}</strong>
+                          <small>{u.email}</small>
+                        </TableCell>
+                        <TableCell>{u.role}</TableCell>
+                        <TableCell>
+                          {data.groups
+                            .filter((g) =>
+                              effectiveGroups(u, data.groups).has(g.id),
+                            )
+                            .map((g) => g.name)
+                            .join(", ") || "No groups"}
+                        </TableCell>
+                        <TableCell>
+                          {u.active ? "Active" : "Inactive"}
+                        </TableCell>
+                        <TableCell>
+                          <ActionGroup>
+                            <Button
+                              variant="link"
+                              onClick={() => setPerson(structuredClone(u))}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              variant="link"
+                              onClick={() => setDetailScope({ userId: u.id })}
+                            >
+                              Courses & progress
+                            </Button>
+                          </ActionGroup>
+                        </TableCell>
+                      </TableRow>
+                    ))}
                   </TableBody>
                 </DataTable>
               </TableContainer>
+              <Pagination
+                label="People"
+                page={currentPage}
+                pageSize={25}
+                total={peopleRows.length}
+                onPageChange={setPage}
+              />
+              {peopleRows.length > 25 &&
+                selection.selected.length > 0 &&
+                selection.selected.length < peopleRows.length && (
+                  <Button
+                    variant="link"
+                    onClick={() =>
+                      selection.setSelected(peopleRows.map((row) => row.id))
+                    }
+                  >
+                    Select all {peopleRows.length} matching items
+                  </Button>
+                )}
             </>
           ) : tab === "curricula" ? (
             <Curricula
@@ -963,6 +1223,7 @@ export default function Admin({
               data={data}
               onChange={onChange}
               onLearning={manageLearning}
+              onLearningMany={manageLearningMany}
             />
           ) : (
             <TeamProgress data={data} user={user} />
@@ -1080,6 +1341,7 @@ export default function Admin({
   );
 }
 export function Editor({
+  onLearningMany,
   onWorkspaceChange,
   onLearning,
   content,
@@ -1100,6 +1362,9 @@ export function Editor({
   onSave: (c: Content) => Content | void | Promise<Content | void>;
   onCancel: () => void;
   onLearning?: LearningHandler;
+  onLearningMany?: (
+    actions: import("@/lib/learning").LearningAction[],
+  ) => Promise<void>;
   onWorkspaceChange?: (
     data: Workspace,
     options?: { locallyHandled?: boolean },
@@ -1289,14 +1554,25 @@ export function Editor({
       setError("Use a supported HTTPS YouTube, Vimeo, Loom, MP4, or WebM URL.");
       return;
     }
-    if (c.kind === "course" && saveStatus === "published" && c.lessons.some((l) => hasMissingImageAlt(l.body))) {
+    if (
+      c.kind === "course" &&
+      saveStatus === "published" &&
+      c.lessons.some((l) => hasMissingImageAlt(l.body))
+    ) {
       setError("Add alternative text to every lesson image before publishing.");
       return;
     }
     const liveCourse = data.publishedContent?.find((item) => item.id === c.id);
-    if (c.kind === "course" && saveStatus === "published" && !refresh && liveCourse &&
-      requiresPassing(c) !== requiresPassing(liveCourse)) {
-      setError("Changing the quiz completion rule requires publishing a new version. Choose Publish a new version in the course settings.");
+    if (
+      c.kind === "course" &&
+      saveStatus === "published" &&
+      !refresh &&
+      liveCourse &&
+      requiresPassing(c) !== requiresPassing(liveCourse)
+    ) {
+      setError(
+        "Changing the quiz completion rule requires publishing a new version. Choose Publish a new version in the course settings.",
+      );
       return;
     }
     savingNow.current = true;
@@ -1366,6 +1642,7 @@ export function Editor({
           <LearningGroups
             data={data}
             onChange={onWorkspaceChange}
+            onLearningMany={onLearningMany}
             onLearning={onLearning}
           />
         )}
@@ -1507,35 +1784,60 @@ export function Editor({
             : "Saving or refreshing. Keep this page open."}
         </p>
       )}
-      <FieldGroup disabled={busy} className={`editor-layout${c.kind === "course" ? " course-editor-layout" : ""}`}>
-        {c.kind === "course" && <section className="course-editor-metadata" aria-label="Course introduction">
-          <FormField label="Title">
-            <Input required maxLength={160} value={c.title} onChange={(e) => set("title", e.target.value)} placeholder="Give it a clear, useful title" />
-          </FormField>
-          <FormField label="Short description">
-            <Textarea required rows={3} maxLength={300} value={c.summary} onChange={(e) => set("summary", e.target.value)} placeholder="What will people learn?" />
-          </FormField>
-        </section>}
+      <FieldGroup
+        disabled={busy}
+        className={`editor-layout${c.kind === "course" ? " course-editor-layout" : ""}`}
+      >
+        {c.kind === "course" && (
+          <section
+            className="course-editor-metadata"
+            aria-label="Course introduction"
+          >
+            <FormField label="Title">
+              <Input
+                required
+                maxLength={160}
+                value={c.title}
+                onChange={(e) => set("title", e.target.value)}
+                placeholder="Give it a clear, useful title"
+              />
+            </FormField>
+            <FormField label="Short description">
+              <Textarea
+                required
+                rows={3}
+                maxLength={300}
+                value={c.summary}
+                onChange={(e) => set("summary", e.target.value)}
+                placeholder="What will people learn?"
+              />
+            </FormField>
+          </section>
+        )}
         <section className="editor-main">
-          {c.kind !== "course" && <><FormField label="Title">
-            <Input
-              required
-              maxLength={160}
-              value={c.title}
-              onChange={(e) => set("title", e.target.value)}
-              placeholder="Give it a clear, useful title"
-            />
-          </FormField>
-          <FormField label="Short description">
-            <Textarea
-              required
-              rows={2}
-              maxLength={300}
-              value={c.summary}
-              onChange={(e) => set("summary", e.target.value)}
-              placeholder="What will people find here?"
-            />
-          </FormField></>}
+          {c.kind !== "course" && (
+            <>
+              <FormField label="Title">
+                <Input
+                  required
+                  maxLength={160}
+                  value={c.title}
+                  onChange={(e) => set("title", e.target.value)}
+                  placeholder="Give it a clear, useful title"
+                />
+              </FormField>
+              <FormField label="Short description">
+                <Textarea
+                  required
+                  rows={2}
+                  maxLength={300}
+                  value={c.summary}
+                  onChange={(e) => set("summary", e.target.value)}
+                  placeholder="What will people find here?"
+                />
+              </FormField>
+            </>
+          )}
           {c.kind !== "course" ? (
             <WritingEditor
               label={c.kind === "doc" ? "Doc content" : "Update content"}

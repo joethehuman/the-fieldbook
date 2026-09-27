@@ -58,6 +58,7 @@ import {
   Download,
   RotateCcw,
 } from "lucide-react";
+import { applyDemoBulk } from "@/lib/bulk-actions";
 import type { FieldbookRuntime } from "@/lib/runtime";
 import {
   sectionPaths,
@@ -862,6 +863,17 @@ export default function Fieldbook({
                 data={data}
                 user={user}
                 onChange={persist}
+                onBulk={async (action) => {
+                  if (runtime?.admin) {
+                    const result = await runtime.admin.bulk(action);
+                    setData(result.data);
+                    return result.results;
+                  }
+                  const result = applyDemoBulk(data, user, action);
+                  saveWorkspace(result.data);
+                  setData(result.data);
+                  return result.results;
+                }}
                 onOpenTab={
                   runtime?.admin
                     ? async (next) => {

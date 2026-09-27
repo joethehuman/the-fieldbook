@@ -84,7 +84,7 @@ createServer(async (req, res) => {
   for await (const chunk of req) body += chunk;
   if (url.pathname === "/fixture") {
     const change = JSON.parse(body || "{}");
-    fixtureGeneration++;
+    fixtureGeneration = change.governanceRevision ?? fixtureGeneration + 1;
     documents = change.documents || [];
     reads = 0;
     authReads = 0;
@@ -147,6 +147,13 @@ createServer(async (req, res) => {
       curricula: configuredCurricula,
     });
   }
+  if (url.pathname === "/rest/v1/fb_deleted_items")
+    return send(res, [], 200, { "Content-Range": "*/0" });
+  if (url.pathname === "/rest/v1/fb_cleanup_config")
+    return send(res, {
+      endpoint: "https://example.test/cleanup",
+      last_run: new Date().toISOString(),
+    });
   if (url.pathname === "/rest/v1/fb_media")
     return send(res, { path: `uploads/${file}`, mime: "image/png" });
   if (url.pathname.startsWith("/storage/v1/object/sign/"))

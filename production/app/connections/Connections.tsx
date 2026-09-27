@@ -1,4 +1,10 @@
 "use client";
+import { BulkActions } from "@/components/patterns/bulk-actions";
+import {
+  useBulkSelection,
+  SelectRows,
+} from "@/components/patterns/bulk-selection";
+import { Checkbox } from "@/components/ui/choice";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/patterns/layout";
 import { Button } from "@/components/ui/button";
@@ -11,6 +17,11 @@ import { useEffect, useState } from "react";
 export default function Connections({ branding }: { branding: Branding }) {
   const [items, setItems] = useState<any[]>([]),
     [error, setError] = useState("");
+  const selection = useBulkSelection(
+    "connections",
+    items.map((c) => c.client_id),
+    items.filter((c) => c.enabled).map((c) => c.client_id),
+  );
   const [loading, setLoading] = useState(true);
   const [revoking, setRevoking] = useState<string | null>(null);
   async function load() {
@@ -63,9 +74,66 @@ export default function Connections({ branding }: { branding: Branding }) {
           <span className="sr-only">Loading connections…</span>
         </div>
       )}
+      <BulkActions
+        singleItemActions={false}
+        collectionSize={selection.collectionSize}
+        selected={selection.actionIds}
+        onSelectionChange={selection.setSelected}
+        noun="connections"
+        commands={[
+          {
+            id: "revoke",
+            label: "Revoke selected connections",
+            description:
+              "Immediately stop these AI tools’ access for your account. Reconnecting requires authorization again.",
+            destructive: true,
+            acknowledgment: "I understand these connections will lose access.",
+            apply: async () => {
+              const failed: string[] = [];
+              for (const clientId of selection.actionIds) {
+                try {
+                  await request("/api/connections", { clientId });
+                } catch {
+                  failed.push(clientId);
+                }
+              }
+              await load();
+              return {
+                failed,
+                message: `${selection.actionIds.length - failed.length} connections revoked; ${failed.length} could not be fully confirmed. Review provider consent before reconnecting.`,
+              };
+            },
+          },
+        ]}
+      />
+      {selection.canSelect && (
+        <div className="flex items-center gap-3">
+          <SelectRows
+            label="Select active connections"
+            ids={items.filter((c) => c.enabled).map((c) => c.client_id)}
+            value={selection.selected}
+            onChange={selection.setSelected}
+          />
+          Select active connections
+        </div>
+      )}
       {items.map((c) => (
         <Card className="grid gap-4" key={c.client_id}>
-          <h2>{c.client_name}</h2>
+          <div className="flex items-center gap-3">
+            {selection.canSelect && (
+              <Checkbox
+                aria-label={`Select ${c.client_name}`}
+                disabled={
+                  !c.enabled && !selection.selected.includes(c.client_id)
+                }
+                checked={selection.selected.includes(c.client_id)}
+                onCheckedChange={(v) =>
+                  selection.toggle(c.client_id, v === true)
+                }
+              />
+            )}
+            <h2>{c.client_name}</h2>
+          </div>
           <p>{c.enabled ? "Connected" : "Revoked"}</p>
           {c.enabled && (
             <Button

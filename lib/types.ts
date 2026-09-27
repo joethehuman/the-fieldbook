@@ -25,6 +25,7 @@ export type Content = {
   category: string;
   folder: string;
   sectionId?: string;
+  sectionOrder?: number;
   status: "draft" | "published";
   version: number;
   updatedAt: string;
