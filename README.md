@@ -32,11 +32,12 @@ Provider accounts, quotas, pricing, and backups are the operator's responsibilit
 ## Deploy your own instance
 
 1. Obtain your own copy of the code. Once releases exist, start from a named release and keep a separate `production` branch in your repository; see [versions and upgrades](docs/upgrading.md).
-2. Create your Supabase project and apply the included migrations in order.
+2. Create your Supabase project and apply every included migration in filename order. The recovery migrations also install the deletion worker's hourly schedule.
 3. Import **your repository** into Vercel with **Root Directory = `production`**, including source files outside that directory.
 4. Configure the five required environment variables, Google sign-in, and matching domain/callback URLs.
-5. Sign in as your configured administrator, create content, and complete the deployment checks.
-6. Optionally connect ChatGPT to your instance's `/api/mcp` endpoint.
+5. Set the deletion worker's endpoint to this deployed installation and verify its first request; this is required for 30-day permanent deletion.
+6. Sign in as your configured administrator, create content, and complete the deployment checks.
+7. Optionally connect ChatGPT to your instance's `/api/mcp` endpoint.
 
 **Follow the [complete installation guide](production/README.md).** A GitHub fork or Vercel deployment does not create your database or configure authentication automatically.
 
