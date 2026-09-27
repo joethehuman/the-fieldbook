@@ -14,7 +14,6 @@ export default async function Page({ params }: Props) {
   return (
     <Article
       item={item}
-      name={context.branding.name}
       documents={context.docs}
       sectionOrder={context.docCategoryOrder}
       sections={context.docSections}
