@@ -18,6 +18,7 @@ export type ReaderShellContext = {
     managesTeam: boolean;
   } | null;
   branding: {
+    homePage?: SiteSettings["homePage"];
     name: string;
     accent: string;
     privacyUrl: string | null;

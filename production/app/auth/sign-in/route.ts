@@ -9,7 +9,7 @@ export function GET(req: Request) {
   response.headers.set("Cache-Control", "private, no-store");
   response.cookies.set(
     SIGN_IN_RETURN_COOKIE,
-    safeNext(url.searchParams.get("next")),
+    safeNext(url.searchParams.get("next"), "/"),
     {
       httpOnly: true,
       secure: url.protocol === "https:",

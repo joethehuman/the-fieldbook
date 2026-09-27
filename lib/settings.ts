@@ -27,6 +27,7 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
+  homePage?: "updates" | "courses" | "docs";
   guestGroupId?: string | null;
   docCategoryOrder?: string[];
   docSections?: import("./docs-navigation").DocSection[];
@@ -42,6 +43,7 @@ export type SiteSettings = {
   registration: "open" | "closed";
 };
 export const defaultSettings: SiteSettings = {
+  homePage: "courses",
   guestGroupId: null,
   newUserStage: "existing",
   onboardingDays: 90,
