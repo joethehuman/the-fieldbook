@@ -143,6 +143,22 @@ for (const app of ["demo", "production"] as const) {
       animations: "disabled",
       path: info.outputPath(`${app}-docs-landing-${info.project.name}.png`),
     });
+    if (app === "production") {
+      await request.post(`${backend}/fixture`, {
+        data: {
+          settings: {
+            access: "public",
+            docCategoryOrder: ["Getting started", "Reference"],
+          },
+          documents: rows(arranged),
+        },
+      });
+      await page.reload();
+      await expect(page.locator("article h1")).toHaveText(arranged[0].title);
+      await expect(
+        page.locator(`.document-tree a[href="/docs/${arranged[0].id}"]`),
+      ).toHaveAttribute("aria-current", "page");
+    }
   });
 
   test(`${app}: Docs has a useful empty page`, async ({
