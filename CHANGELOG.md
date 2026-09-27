@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Open Docs directly on the first published article in the saved order, prefetch neighboring Docs while reading, and highlight the selected Doc with a layout-stable accent color.
+
 - Call course and content organization Category throughout administration, course browsing and the UI catalog. Existing saved categories remain unchanged.
 
 - Warm the administrator or team destination when its account-menu action is opened, and warm reader destinations on administrator navigation intent. Show a slim, layout-stable header indicator after confirmed navigation; keep Team progress inside the reader shell while its report loads.

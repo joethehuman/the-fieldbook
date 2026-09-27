@@ -475,10 +475,18 @@ for (const signedIn of [false, true]) {
     await expect(
       page.getByRole("heading", { name: items[0].title }),
     ).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`/docs/${ids[0]}$`));
+    const narrow = (page.viewportSize()?.width || 0) < 768;
+    await expect(page).toHaveURL(
+      narrow ? new RegExp(`/docs/${ids[0]}$`) : /\/docs$/,
+    );
     await page.goBack();
+    if (narrow) {
+      await expect(page).toHaveURL(/\/docs$/);
+      await page.goBack();
+    }
     await expect(page).toHaveURL(/\/updates$/);
     await page.goForward();
+    if (narrow) await page.goForward();
     await expect(
       page.getByRole("heading", { name: items[0].title }),
     ).toBeVisible();
@@ -1055,7 +1063,7 @@ test("hydration keeps one article, breadcrumbs navigate, and lesson links open t
     await crumb.focus();
     await crumb.press("Enter");
   }
-  await expect(page).toHaveURL(new RegExp(`/docs/${ids[0]}$`));
+  await expect(page).toHaveURL(/\/docs$/);
   await page.goto(`/courses/${ids[2]}`);
   await page.getByRole("link", { name: /Second lesson/ }).click();
   await expect(

@@ -129,7 +129,7 @@ export function DocumentTree({
       variant="ghost"
       size="sm"
       key={doc.id}
-      className="document-link w-full justify-start rounded-control px-2 py-1 text-left text-sm font-normal leading-snug whitespace-normal break-words [overflow-wrap:anywhere] aria-[current=page]:font-semibold aria-[current=page]:text-foreground text-foreground/80 hover:bg-muted-hover hover:text-foreground focus-visible:ring-inset focus-visible:ring-offset-0"
+      className="document-link w-full justify-start rounded-control px-2 py-1 text-left text-sm font-normal leading-snug whitespace-normal break-words [overflow-wrap:anywhere] text-foreground/80 aria-[current=page]:text-[color:color-mix(in_srgb,var(--brand)_35%,var(--foreground))] hover:bg-muted-hover hover:text-foreground focus-visible:ring-inset focus-visible:ring-offset-0"
     >
       {onOpen ? (
         <a
