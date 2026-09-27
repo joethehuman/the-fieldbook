@@ -1,4 +1,8 @@
 "use client";
+import { BulkActions } from "./patterns/bulk-actions";
+import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
+import { Checkbox } from "./ui/choice";
+import { curriculumGroupCommands } from "./bulk-relationships";
 import { BulkPicker } from "./patterns/bulk-selection";
 import { Badge } from "./ui/badge";
 import { Note } from "@/components/ui/note";
@@ -35,7 +39,6 @@ export default function Curricula({
   const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
   const [editing, setEditing] = useState<Curriculum | null>(null);
-  const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const { confirm } = useInteractionDialog();
@@ -58,6 +61,7 @@ export default function Curricula({
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy]);
+  const selection = useBulkSelection(editing?.id || "curricula");
   const all = data.curricula || [];
   const content = data.publishedContent || data.content;
   const linked = (id: string) =>
@@ -177,7 +181,7 @@ export default function Curricula({
             <ActionGroup>
               <BulkPicker
                 title="Add courses"
-                description="Append selected courses in selection order. Save the curriculum to apply your changes."
+                description="Append selected courses in the picker’s listed order. Save the curriculum to apply your changes."
                 options={content
                   .filter(
                     (c) =>
@@ -198,27 +202,31 @@ export default function Curricula({
                 }
                 actionLabel="Add courses"
               />
-              <BulkPicker
-                title="Remove courses"
-                description="Remove selected courses from this playlist. Course content and learning history are preserved. Save the curriculum to apply your changes."
-                options={editing.courseIds.map((id) => ({
-                  id,
-                  label:
-                    content.find((c) => c.id === id)?.title ||
-                    "Unavailable course",
-                }))}
-                onApply={(ids) =>
-                  setEditing({
-                    ...editing,
-                    courseIds: editing.courseIds.filter(
-                      (id) => !ids.includes(id),
-                    ),
-                  })
-                }
-                actionLabel="Remove courses"
-              />
             </ActionGroup>
+            <BulkActions
+              selected={selection.selected}
+              onSelectionChange={selection.setSelected}
+              commands={[
+                {
+                  id: "remove",
+                  label: "Remove from curriculum",
+                  successMessage:
+                    "Course links removed from this draft. Save the curriculum to apply.",
+                  description:
+                    "Remove these course links. Course content and history remain. Save the curriculum to apply the changes.",
+                  apply: () =>
+                    setEditing({
+                      ...editing,
+                      courseIds: editing.courseIds.filter(
+                        (id) => !selection.selected.includes(id),
+                      ),
+                    }),
+                },
+              ]}
+            />
             <OrderedLearning
+              selected={selection.selected}
+              onSelectionChange={selection.setSelected}
               items={editing.courseIds.map((id) => ({
                 id,
                 label:
@@ -237,47 +245,6 @@ export default function Curricula({
                 })
               }
             />
-            <FormField label="Find a course">
-              <Input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search the course library"
-              />
-            </FormField>
-            <div className="learning-search-results">
-              {content
-                .filter(
-                  (c) =>
-                    c.kind === "course" &&
-                    c.status === "published" &&
-                    !editing.courseIds.includes(c.id) &&
-                    (c.title + " " + c.category)
-                      .toLowerCase()
-                      .includes(query.toLowerCase()),
-                )
-                .map((c) => (
-                  <div className="learning-search-result" key={c.id}>
-                    <span>
-                      <strong>{c.title}</strong>
-                      <small>{c.category}</small>
-                    </span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      aria-label={`Add ${c.title}`}
-                      onClick={() =>
-                        setEditing({
-                          ...editing,
-                          courseIds: [...editing.courseIds, c.id],
-                        })
-                      }
-                    >
-                      Add
-                    </Button>
-                  </div>
-                ))}
-            </div>
             <FormField
               label="Status"
               description="Published curricula are available in the library and can be added to learning groups."
@@ -346,13 +313,70 @@ export default function Curricula({
                 savedCurriculum.current = draft;
                 setEditing(draft);
                 destination.reveal();
-                setQuery("");
                 setNotice("");
               }}
             >
               Create curriculum
             </Button>
           </SectionHeader>
+          <BulkActions
+            selected={selection.selected}
+            onSelectionChange={selection.setSelected}
+            noun="curricula"
+            commands={[
+              ...([true, false] as const).map((published) => ({
+                id: published ? "publish" : "unpublish",
+                label: published ? "Publish selected" : "Unpublish selected",
+                description: published
+                  ? "Make these curricula available in the library. Each must contain published courses."
+                  : "Return these curricula to draft. Remove their learning-group links first. Course history is preserved.",
+                apply: async () => {
+                  if (
+                    published &&
+                    all.some(
+                      (c) =>
+                        selection.selected.includes(c.id) &&
+                        (!c.courseIds.length ||
+                          c.courseIds.some(
+                            (id) =>
+                              !content.some(
+                                (p) => p.id === id && p.status === "published",
+                              ),
+                          )),
+                    )
+                  )
+                    throw new Error(
+                      "Each curriculum needs at least one published course and no unavailable courses.",
+                    );
+                  if (
+                    !published &&
+                    selection.selected.some((id) => linked(id).length)
+                  )
+                    throw new Error(
+                      "Remove learning-group links before unpublishing these curricula.",
+                    );
+                  await onChange({
+                    ...data,
+                    curricula: all.map((c) =>
+                      selection.selected.includes(c.id)
+                        ? { ...c, status: published ? "published" : "draft" }
+                        : c,
+                    ),
+                  });
+                },
+              })),
+              ...curriculumGroupCommands(data, selection.selected, onChange),
+            ]}
+          />
+          <div className="flex items-center gap-3">
+            <SelectRows
+              label="Select all curricula"
+              ids={all.map((c) => c.id)}
+              value={selection.selected}
+              onChange={selection.setSelected}
+            />
+            Select all curricula
+          </div>
           <div className="group-grid">
             {all.map((c) => (
               <Card className="flex flex-col p-0 sm:p-0" key={c.id}>
@@ -362,7 +386,16 @@ export default function Curricula({
                   >
                     {c.status}
                   </Badge>
-                  <h3>{c.name}</h3>
+                  <div className="flex items-center gap-3">
+                    <Checkbox
+                      aria-label={`Select ${c.name}`}
+                      checked={selection.selected.includes(c.id)}
+                      onCheckedChange={(v) =>
+                        selection.toggle(c.id, v === true)
+                      }
+                    />
+                    <h3>{c.name}</h3>
+                  </div>
                   <p>{c.description}</p>
                 </CardContent>
                 <CardFooter className="mt-auto">
@@ -378,7 +411,6 @@ export default function Curricula({
                         savedCurriculum.current = structuredClone(c);
                         setEditing(structuredClone(c));
                         destination.reveal();
-                        setQuery("");
                         setNotice("");
                       }}
                     >

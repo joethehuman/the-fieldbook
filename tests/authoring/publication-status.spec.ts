@@ -43,7 +43,7 @@ test("publication badges stay compact while unpublished edits remain visible", a
     }, data);
   }
   await page.goto(production ? "/admin" : "/#admin");
-  const table = page.locator('table[data-layout="content"]');
+  const table = page.locator('table[data-layout="contentSelection"]');
   const edited = table
     .getByRole("row")
     .filter({ hasText: "Unpublished edits fixture" });

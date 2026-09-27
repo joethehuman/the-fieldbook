@@ -399,12 +399,13 @@ test("curriculum builder uses shared fields and preserves saved sequence", async
   await page
     .getByRole("textbox", { name: "Description", exact: true })
     .fill("A synthetic playlist for UI verification.");
-  await page
-    .getByRole("button", { name: "Add Start with the customer", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Add Know the platform", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Add courses", exact: true }).click();
+  const picker = page.getByRole("dialog");
+  await picker
+    .getByRole("checkbox", { name: /Start with the customer/ })
+    .check();
+  await picker.getByRole("checkbox", { name: /Know the platform/ }).check();
+  await picker.getByRole("button", { name: /^Add courses 2$/ }).click();
   await page
     .getByRole("button", { name: "Move Know the platform up", exact: true })
     .click();

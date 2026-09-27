@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Checkbox } from "../ui/choice";
 import { Button } from "../ui/button";
+import { useToast } from "../ui/toast";
 import { ActionGroup } from "../ui/action-group";
 import { Alert } from "../ui/alert";
 import {
@@ -20,14 +21,22 @@ export function useBulkSelection(scope: string) {
   const [selected, setSelected] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const previous = useRef(scope);
+  const notify = useToast();
   useEffect(() => {
     if (previous.current !== scope) {
       previous.current = scope;
-      if (selected.length)
+      if (selected.length) {
         setNotice("Selection cleared because the view changed.");
+        notify("Selection cleared because the view changed.");
+      } else setNotice("");
       setSelected([]);
     }
-  }, [scope, selected.length]);
+  }, [scope, selected.length, notify]);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(""), 4000);
+    return () => clearTimeout(timer);
+  }, [notice]);
   return {
     selected,
     setSelected,
@@ -96,7 +105,7 @@ export function BulkSelectionBar({
   );
 }
 
-/** Focused multi-add/remove dialog. Checkbox state is selection, never membership. */
+/** Add relationships dialog. Checkbox state is selection, never membership. */
 export function BulkPicker({
   title,
   description,
@@ -157,11 +166,13 @@ export function BulkPicker({
           />
           {!!chosen.length && (
             <p className="text-copy text-muted-foreground">
-              Selected:{" "}
+              Selected ({chosen.length}):{" "}
               {options
                 .filter((o) => chosen.includes(o.id))
+                .slice(0, 5)
                 .map((o) => o.label)
                 .join(", ")}
+              {chosen.length > 5 ? ` and ${chosen.length - 5} more` : ""}
             </p>
           )}
           <DialogFooter>
@@ -177,17 +188,24 @@ export function BulkPicker({
               type="button"
               variant={destructive ? "destructive" : "default"}
               loading={busy}
-              disabled={!chosen.length}
+              disabled={!chosen.length || !!error}
               onClick={async () => {
                 if (running.current) return;
                 running.current = true;
                 setBusy(true);
                 setError("");
                 try {
-                  await onApply(chosen);
+                  await onApply(
+                    options
+                      .filter((o) => chosen.includes(o.id))
+                      .map((o) => o.id),
+                  );
                   setOpen(false);
                 } catch (e) {
-                  setError((e as Error).message);
+                  setError(
+                    (e as Error).message +
+                      " Close this dialog and review the current list before trying again.",
+                  );
                 } finally {
                   running.current = false;
                   setBusy(false);

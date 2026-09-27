@@ -1,6 +1,8 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
+import { SelectRows } from "./bulk-selection";
+import { Checkbox } from "../ui/choice";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -24,11 +26,17 @@ export function HierarchyList({
   label,
   onOpen,
   disabled = false,
+  selected,
+  onSelectionChange,
+  selectionActions,
 }: {
   items: HierarchyItem[];
   label: string;
   onOpen: (id: string) => void;
   disabled?: boolean;
+  selected?: string[];
+  onSelectionChange?: (ids: string[]) => void;
+  selectionActions?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -78,6 +86,20 @@ export function HierarchyList({
           >
             <li>
               <div className="flex min-w-0 items-start gap-2 border-b border-border px-3 py-3 last:border-b-0">
+                {selected && onSelectionChange && (
+                  <Checkbox
+                    aria-label={`Select ${item.label}`}
+                    disabled={disabled}
+                    checked={selected.includes(item.id)}
+                    onCheckedChange={(v) =>
+                      onSelectionChange(
+                        v === true
+                          ? [...selected, item.id]
+                          : selected.filter((id) => id !== item.id),
+                      )
+                    }
+                  />
+                )}
                 {hasChildren ? (
                   <CollapsibleTrigger asChild>
                     <Button
@@ -144,10 +166,25 @@ export function HierarchyList({
         <Input
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            onSelectionChange?.([]);
+          }}
           placeholder="Team name or manager"
         />
       </FormField>
+      {selectionActions}
+      {selected && onSelectionChange && (
+        <div className="flex items-center gap-3">
+          <SelectRows
+            label="Select all matching teams"
+            ids={matches.map((i) => i.id)}
+            value={selected}
+            onChange={onSelectionChange}
+          />
+          Select all matching teams (subteams are not selected automatically)
+        </div>
+      )}
       {matches.length ? (
         <ul
           aria-label={label}

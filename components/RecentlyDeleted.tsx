@@ -1,4 +1,9 @@
 "use client";
+import { Pagination } from "./patterns/pagination";
+import { FormField } from "./patterns/form-field";
+import { Input } from "./ui/input";
+import { SelectField } from "./ui/select";
+import { Button } from "./ui/button";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
 import type { BulkHandler } from "@/lib/bulk-actions";
@@ -24,7 +29,10 @@ export function RecentlyDeleted({
   onBulk: BulkHandler;
 }) {
   const [filter, setFilter] = useState("all");
-  const selection = useBulkSelection(filter);
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState("newest");
+  const [page, setPage] = useState(1);
+  const selection = useBulkSelection(filter + query);
   const displayData = {
     ...data,
     deletedItems: data.deletedItems?.map((d) => ({
@@ -33,8 +41,19 @@ export function RecentlyDeleted({
     })),
   };
   const rows = (displayData.deletedItems || []).filter(
-    (d) => filter === "all" || d.entity === filter,
+    (d) =>
+      (filter === "all" || d.entity === filter) &&
+      d.name.toLowerCase().includes(query.toLowerCase()),
   );
+  rows.sort((a, b) =>
+    sort === "name"
+      ? a.name.localeCompare(b.name)
+      : sort === "deadline"
+        ? a.purgeAfter.localeCompare(b.purgeAfter)
+        : b.deletedAt.localeCompare(a.deletedAt),
+  );
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / 25)));
+  const visible = rows.slice((currentPage - 1) * 25, currentPage * 25);
   return (
     <div className="grid gap-4">
       <p>
@@ -56,14 +75,32 @@ export function RecentlyDeleted({
       <FilterOptions
         label="Deleted item type"
         value={filter}
-        onValueChange={setFilter}
+        onValueChange={(v) => {
+          setFilter(v);
+          setPage(1);
+        }}
         options={[
           { value: "all", label: "All" },
           { value: "content", label: "Content" },
           { value: "user", label: "Users" },
         ]}
       />
-      {selection.notice && <p role="status">{selection.notice}</p>}
+      <FormField label="Search recently deleted">
+        <Input
+          value={query}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(1);
+          }}
+        />
+      </FormField>
+      <FormField label="Sort deleted items">
+        <SelectField value={sort} onValueChange={setSort}>
+          <option value="newest">Recently deleted first</option>
+          <option value="deadline">Permanent deletion soonest</option>
+          <option value="name">Name A–Z</option>
+        </SelectField>
+      </FormField>
       <AdminBulkActions
         data={displayData}
         selected={selection.selected}
@@ -92,7 +129,7 @@ export function RecentlyDeleted({
             <TableRow>
               <TableHead>
                 <SelectRows
-                  ids={rows
+                  ids={visible
                     .filter(
                       (d) =>
                         !d.purging && Date.parse(d.purgeAfter) > Date.now(),
@@ -109,7 +146,7 @@ export function RecentlyDeleted({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((d) => (
+            {visible.map((d) => (
               <TableRow key={`${d.entity}:${d.id}`}>
                 <TableCell>
                   <Checkbox
@@ -152,6 +189,30 @@ export function RecentlyDeleted({
           </TableBody>
         </DataTable>
       </TableContainer>
+      {rows.length > 25 && (
+        <Button
+          type="button"
+          variant="link"
+          onClick={() =>
+            selection.setSelected(
+              rows
+                .filter(
+                  (d) => !d.purging && Date.parse(d.purgeAfter) > Date.now(),
+                )
+                .map((d) => d.id),
+            )
+          }
+        >
+          Select all matching recoverable items
+        </Button>
+      )}
+      <Pagination
+        label="Recently deleted"
+        page={currentPage}
+        pageSize={25}
+        total={rows.length}
+        onPageChange={setPage}
+      />
       {!rows.length && <p>No recently deleted items.</p>}
     </div>
   );

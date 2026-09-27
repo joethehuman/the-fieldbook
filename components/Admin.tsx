@@ -1,5 +1,6 @@
 "use client";
 import { Pagination } from "./patterns/pagination";
+import { contentRelationshipCommands } from "./bulk-relationships";
 import type { BulkHandler } from "@/lib/bulk-actions";
 import { AdminBulkActions } from "./AdminBulkActions";
 import { RecentlyDeleted } from "./RecentlyDeleted";
@@ -401,26 +402,36 @@ export default function Admin({
     actions: import("@/lib/learning").LearningAction[],
   ) {
     if (onLearning) {
-      for (const action of actions) await onLearning(action);
+      const revisions = new Map<string, number>();
+      let completed = 0;
+      try {
+        for (const action of actions) {
+          const expected = revisions.get(action.contentId) ?? action.expected;
+          await onLearning({ ...action, expected });
+          revisions.set(action.contentId, expected + 1);
+          completed++;
+        }
+      } catch (error) {
+        throw new Error(
+          `${completed} of ${actions.length} relationship changes confirmed. ${(error as Error).message}`,
+        );
+      }
       return;
     }
-    const ids = new Map(actions.map((action) => [action.contentId, action]));
-    await onChange({
-      ...data,
-      content: data.content.map((c) => {
-        const action = ids.get(c.id);
-        return action
-          ? {
-              ...c,
-              groups:
-                action.operation === "target"
-                  ? [...new Set([...c.groups, action.groupId!])]
-                  : c.groups.filter((id) => id !== action.groupId),
-            }
-          : c;
-      }),
-    });
+    const next = structuredClone(data);
+    for (const action of actions) {
+      for (const collection of [next.content, next.publishedContent || []]) {
+        const c = collection.find((c) => c.id === action.contentId);
+        if (c)
+          c.groups =
+            action.operation === "target"
+              ? [...new Set([...c.groups, action.groupId!])]
+              : c.groups.filter((id) => id !== action.groupId);
+      }
+    }
+    await onChange(next);
   }
+
   function create(kind: Content["kind"]) {
     setEditing({
       id: id(),
@@ -741,27 +752,31 @@ export default function Admin({
                     placeholder="Title, summary, or folder"
                   />
                 </FormField>
-                <FormField label="Category">
-                  <SelectField
-                    value={category}
-                    onValueChange={(value) => setCategory(value)}
-                  >
-                    <option value="all">All categories</option>
-                    {[
-                      ...new Set(
-                        data.content
-                          .filter((c) => filter === "all" || c.kind === filter)
-                          .map((c) => c.category),
-                      ),
-                    ]
-                      .sort()
-                      .map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                  </SelectField>
-                </FormField>
+                {filter !== "doc" && (
+                  <FormField label="Category">
+                    <SelectField
+                      value={category}
+                      onValueChange={(value) => setCategory(value)}
+                    >
+                      <option value="all">All categories</option>
+                      {[
+                        ...new Set(
+                          data.content
+                            .filter(
+                              (c) => filter === "all" || c.kind === filter,
+                            )
+                            .map((c) => c.category),
+                        ),
+                      ]
+                        .sort()
+                        .map((t) => (
+                          <option key={t} value={t}>
+                            {t}
+                          </option>
+                        ))}
+                    </SelectField>
+                  </FormField>
+                )}
                 <FormField label="Publication status">
                   <SelectField
                     value={contentStatus}
@@ -805,12 +820,17 @@ export default function Admin({
                   </SelectField>
                 </FormField>
               </FilterBar>
-              {selection.notice && <p role="status">{selection.notice}</p>}
               <AdminBulkActions
                 data={data}
                 selected={selection.selected}
                 onSelectionChange={selection.setSelected}
                 onBulk={onBulk}
+                extraCommands={contentRelationshipCommands(
+                  data,
+                  selection.selected,
+                  onChange,
+                  manageLearningMany,
+                )}
               />
               <TableContainer>
                 <DataTable layout="contentSelection">
@@ -1072,20 +1092,6 @@ export default function Admin({
                   </SelectField>
                 </FormField>
               </FilterBar>
-              {selection.notice && <p role="status">{selection.notice}</p>}
-              <AdminBulkActions
-                data={data}
-                selected={selection.selected}
-                onSelectionChange={selection.setSelected}
-                onBulk={onBulk}
-                entity="user"
-              />
-              <PeopleBulkActions
-                data={data}
-                selected={selection.selected}
-                onChange={onChange}
-                onComplete={() => selection.setSelected([])}
-              />
               <FormField label="Reporting team">
                 <SelectField value={peopleTeam} onValueChange={setPeopleTeam}>
                   <option value="all">All teams</option>
@@ -1097,6 +1103,14 @@ export default function Admin({
                   ))}
                 </SelectField>
               </FormField>
+              <PeopleBulkActions
+                currentUserId={user.id}
+                data={data}
+                selected={selection.selected}
+                onChange={onChange}
+                onSelectionChange={selection.setSelected}
+                onBulk={onBulk}
+              />
               <TableContainer>
                 <DataTable layout="peopleSelection">
                   <TableHeader>

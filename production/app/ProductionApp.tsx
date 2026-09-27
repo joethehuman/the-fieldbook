@@ -234,6 +234,43 @@ function createAdminRuntime(initial: {
         (item) => !before.content.some((previous) => previous.id === item.id),
       );
       if (created) openItem = created.id;
+      if (
+        scope === "content" &&
+        ["groups", "curricula", "teams", "users", "pendingUsers"].some(
+          (key) =>
+            JSON.stringify(before[key as keyof Workspace]) !==
+            JSON.stringify(after[key as keyof Workspace]),
+        )
+      ) {
+        const complete = await fresh("governance");
+        if (complete.governanceRevision !== before.governanceRevision)
+          throw new Error(
+            "Organization data changed. Refresh before applying these changes.",
+          );
+        const prior = before;
+        before = {
+          ...before,
+          users: complete.users,
+          teams: complete.teams,
+          pendingUsers: complete.pendingUsers,
+        };
+        after = {
+          ...after,
+          users:
+            JSON.stringify(prior.users) === JSON.stringify(after.users)
+              ? complete.users
+              : after.users,
+          teams:
+            JSON.stringify(prior.teams) === JSON.stringify(after.teams)
+              ? complete.teams
+              : after.teams,
+          pendingUsers:
+            JSON.stringify(prior.pendingUsers) ===
+            JSON.stringify(after.pendingUsers)
+              ? complete.pendingUsers
+              : after.pendingUsers,
+        };
+      }
       const saved = await saver(before, after);
       clearCached();
       cached.set(scope, saved);

@@ -302,6 +302,30 @@ Use `WritingEditor` for Docs/Updates body editing. It combines a lazy MDXEditor 
 
 Use `CreatableCombobox` for editable category names: suggestions filter as you type, new names have an Add option, arrow keys/Enter select and Escape dismisses. Free text remains valid on blur; trim it and reuse an existing case-insensitive match. Pair with `FormField`. Category creation persists with its content save, not as a separate request.
 
-## Bulk selection
+## Bulk actions: two supported methods
 
-Use `BulkSelectionBar`, `SelectRows`, and `BulkPicker` for contextual multi-item operations. Checkbox state indicates selection, not persisted membership. Paginated collections select the current page and offer an explicit all-matching action. Clear selections on scope changes and announce the change. Pickers retain choices through search/pages and commit only on Apply. Use a descriptive confirmation and acknowledgment for deletion, show item-level failures, and prevent repeated submission. The `/ui` catalog includes these patterns.
+Bulk actions live in the screen that owns the records or relationships. There are exactly two compositions. The interactive `/ui` catalog demonstrates both.
+
+### 1. Select existing rows → Bulk actions
+
+Use `SelectRows` / row `Checkbox` controls with `useBulkSelection`, then `BulkActions`. Show one contextual bar: selected count, **Bulk actions**, and Clear selection. Put every command affecting that selection in the menu. Never add a parallel row of bulk command buttons or ask users to select the same records again in a dialog.
+
+Use `SelectableRows` for compact relationship lists, the declared `DataTable` schema for tables, and optional selection on `OrderedLearning` or `HierarchyList` for those layouts. Selecting a parent never implicitly selects descendants. A header checkbox selects the current page; an explicit **Select all N matching** action may extend the scope. Keep selection across pages, clear it when the owning record, tab, search or filter changes, and briefly announce that reset.
+
+Commands supply descriptions, eligibility and domain handlers to `BulkActions`; primitives do not fetch or mutate business data. Disable ineligible commands with a visible reason. Category/section commands require a single content type. Single destinations use `SelectField` with existing valid options; multiple destinations use `SearchableSelectionList`. No free-text creation within a bulk destination control. Parameter dialogs show the source count and effect, then one Apply action.
+
+Keep destructive commands at the bottom, in destructive styling, separated by a divider. **Remove from group/team/curriculum** removes a relationship and preserves records/history. **Delete selected** must explain immediate loss of access/publication, Recently deleted, restoration within 30 days and subsequent permanent deletion including associated history, with an explicit acknowledgment. Do not label unlinking as Delete. Account restoration leaves accounts inactive; content restoration leaves drafts. Revoke preregistration/connection must state its distinct effect without promising recovery.
+
+### 2. Add relationships → multi-select picker
+
+Use one `BulkPicker` opened by **Add members**, **Add courses**, **Add Updates**, or the appropriate noun. Do not keep a duplicate inline single-add browser alongside it. The picker uses `SearchableSelectionList`: search, pagination, page/all-matching selection, selected count, Review selected, Clear, Cancel and one Apply button. Choices survive search/page changes and remain provisional until Apply; Cancel clears them. Exclude relationships already present. If adding team members moves them from another direct team, show their current team and explain the move before Apply.
+
+Append ordered learning items in the displayed option order, deduplicate by stable ID, and retain drag handles and up/down controls for individual ordering. In an editor with an existing Save contract, Apply stages the relationship change and explicitly tells the user to Save; it must not silently save the entire editor.
+
+### Shared behavior and future hierarchy moves
+
+Capture the selected source IDs when opening a command, prevent double submission, preserve selection for failed records, and report confirmed partial results. On an uncertain request, reload/reconcile and require review before retrying; never automatically resend it. Domain handlers must enforce permissions, eligibility and revision checks on the server as well as in the interface. Disabled inherited memberships explain their source; they cannot be removed as direct links.
+
+Future bulk hierarchy moves must use method 1: select existing nodes, choose **Move**, select a single destination, review effects and Apply. Do not introduce another selection dialog or bulk button row. Validate cycles, nesting limits and overlapping ancestor/descendant selections before saving. The owning hierarchy implementation defines those domain rules; this pattern does not authorize or implement hierarchy moves.
+
+Verify populated, empty, long-label, disabled, mixed-type, partial-failure and recovery states; page/all-matching scope; keyboard/focus behavior; desktop and phone; and both demo and installed-app entry points. One shared primitive passing a test does not establish coverage of every owning screen.

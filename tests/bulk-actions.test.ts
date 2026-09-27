@@ -28,7 +28,9 @@ test("bulk category preserves an unpublished body and published copy, dates and 
       entity: "content",
       operation: "category",
       items: [{ id: c.id, expected: 2 }],
-      value: "New category",
+      value: data.content.find(
+        (p) => p.kind === "brief" && p.category !== c.category,
+      )!.category,
     },
     now,
   );
@@ -209,5 +211,33 @@ test("a stale item fails independently and leaves its saved content untouched", 
   assert.deepEqual(
     result.data.content.find((c) => c.id === first.id),
     first,
+  );
+});
+
+test("bulk category rejects free text and mixed content types", () => {
+  const { data, actor } = fixture();
+  const update = data.content.find((c) => c.kind === "brief")!;
+  const course = data.content.find((c) => c.kind === "course")!;
+  assert.throws(
+    () => metadataPatch(data, update, "category", "Unconfigured category"),
+    /existing/,
+  );
+  assert.throws(
+    () =>
+      applyDemoBulk(
+        data,
+        actor,
+        {
+          entity: "content",
+          operation: "category",
+          value: update.category,
+          items: [update, course].map((c) => ({
+            id: c.id,
+            expected: c.revision!,
+          })),
+        },
+        now,
+      ),
+    /type/,
   );
 });

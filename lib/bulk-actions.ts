@@ -52,7 +52,9 @@ export function metadataPatch(
         c.kind === item.kind &&
         c.category.toLowerCase() === clean.toLowerCase(),
     );
-    return { category: existing?.category || clean };
+    if (!existing)
+      throw new Error("Choose an existing category for this content type.");
+    return { category: existing.category };
   }
   const sections = availableDocSections(
     data.content.filter((c) => c.kind === "doc"),
@@ -117,6 +119,18 @@ export function applyDemoBulk(
   now = Date.now(),
 ) {
   const data = structuredClone(expireDemoDeleted(before, now));
+  if (["category", "section"].includes(request.operation)) {
+    const selected = request.items.map((i) =>
+      data.content.find((c) => c.id === i.id),
+    );
+    if (
+      selected.some((c) => !c) ||
+      new Set(selected.map((c) => c?.kind)).size !== 1
+    )
+      throw new Error(
+        "Select one content type to change its category or section.",
+      );
+  }
   const results: BulkResult[] = [];
   data.deletedItems ||= [];
   for (const target of request.items) {

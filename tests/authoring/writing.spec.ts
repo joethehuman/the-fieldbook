@@ -115,6 +115,9 @@ async function setup(
   );
   await page.goto(production ? "/admin" : "/#admin");
   await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Back to content", exact: true }),
+  ).toBeVisible();
   const read = async (): Promise<Workspace> =>
     production
       ? state
@@ -176,6 +179,9 @@ test("visual Markdown round trip, explicit draft saves, republish and unpublish"
     page.getByText("Unpublished edits", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Back to content", exact: true }),
+  ).toBeVisible();
   await expect(editor).toContainText("A private addition.");
   await page
     .getByRole("button", { name: "Publish changes", exact: true })
@@ -472,6 +478,9 @@ for (const kind of ["Doc", "Update"]) {
       .filter({ hasText: `New ${kind}` })
       .getByRole("button", { name: "Edit", exact: true })
       .click();
+    await expect(
+      page.getByRole("textbox", { name: "Title", exact: true }),
+    ).toHaveValue(`New ${kind}`);
     if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
     if (kind === "Doc") {
       await expect(

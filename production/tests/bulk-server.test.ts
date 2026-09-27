@@ -172,3 +172,47 @@ test("worker authenticates, retries an Auth lock without early deletion, and del
     },
   );
 });
+
+test("mixed-type category requests are rejected before any write", async () => {
+  const ids = [id, "00000000-0000-4000-8000-000000000003"];
+  let writes = 0;
+  await fixture(
+    (url, method) => {
+      if (method !== "GET") writes++;
+      if (url.pathname.endsWith("fb_config"))
+        return {
+          settings: {},
+          revision: 1,
+          governance_revision: 1,
+          groups: [],
+          curricula: [],
+        };
+      if (url.pathname.endsWith("fb_documents"))
+        return ids.map((id, i) => ({
+          id,
+          kind: i ? "course" : "brief",
+          category: "Existing",
+          title: "Fixture",
+          revision: 1,
+          status: "published",
+          updated_at: "2026-09-27T00:00:00Z",
+        }));
+      if (url.pathname.endsWith("fb_deleted_items")) return [];
+      if (url.pathname.endsWith("fb_cleanup_config"))
+        return { endpoint: "https://example.test/cleanup", last_run: null };
+      throw new Error(`Unexpected request: ${url.pathname}`);
+    },
+    async () => {
+      await assert.rejects(
+        bulkAction(admin, {
+          entity: "content",
+          operation: "category",
+          value: "Existing",
+          items: ids.map((id) => ({ id, expected: 1 })),
+        }),
+        /one content type/,
+      );
+      assert.equal(writes, 0);
+    },
+  );
+});

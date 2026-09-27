@@ -18,6 +18,7 @@ export async function syncAuthoringProvider(page: Page, data: Workspace) {
   await page.request.post("http://127.0.0.1:3130/fixture", {
     data: {
       settings: data.settings,
+      governanceRevision: data.governanceRevision,
       groups: data.groups,
       curricula: data.curricula,
       documents: data.content.map((item) => ({

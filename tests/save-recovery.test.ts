@@ -74,23 +74,39 @@ test("lost mutation response is uncertain even if the server saved it", async ()
     return true;
   });
 });
-test("invalid multi-account plan is rejected before any mutation", async () => {
-  const { before, after } = fixture();
-  after.pendingUsers = ["a", "b"].map((name) => ({
+test("pending account batches chain confirmed revisions and stop on conflict", async () => {
+  const before = freshWorkspace();
+  before.governanceRevision = 10;
+  const after = structuredClone(before);
+  after.pendingUsers = ["a", "b", "c"].map((name) => ({
     name,
     email: name + "@example.test",
     role: "learner",
     groups: [],
   }));
-  let writes = 0;
+  const expected: number[] = [];
   const save = createWorkspaceSaver(
-    async () => {
-      writes++;
+    async (_path, body) => {
+      expected.push((body as { expected: number }).expected);
+      return { revision: 10 + expected.length };
     },
     async () => after,
   );
-  await assert.rejects(save(before, after), /one pending account/);
-  assert.equal(writes, 0);
+  await save(before, after);
+  assert.deepEqual(expected, [10, 11, 12]);
+  let writes = 0;
+  const conflict = createWorkspaceSaver(
+    async () => {
+      if (++writes === 2) throw new RequestError("Revision conflict", 409);
+      return { revision: 11 };
+    },
+    async () => before,
+  );
+  await assert.rejects(
+    conflict(before, after),
+    /1 of 3 changes confirmed saved/,
+  );
+  assert.equal(writes, 2);
 });
 test("simultaneous save is rejected instead of duplicating writes", async () => {
   const { before, after } = fixture();

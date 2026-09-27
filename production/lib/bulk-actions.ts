@@ -55,6 +55,19 @@ export async function bulkAction(
   const workspace = ["category", "section"].includes(request.operation)
     ? await adminSnapshot(user, "content")
     : undefined;
+  if (workspace && ["category", "section"].includes(request.operation)) {
+    const selected = request.items.map((i) =>
+      workspace.content.find((c) => c.id === i.id),
+    );
+    if (
+      selected.some((c) => !c) ||
+      new Set(selected.map((c) => c?.kind)).size !== 1
+    )
+      throw new HttpError(
+        400,
+        "Select one content type to change its category or section.",
+      );
+  }
   if (workspace && request.operation === "section")
     request.items.sort((a, b) => {
       const first = workspace.content.find((c) => c.id === a.id),

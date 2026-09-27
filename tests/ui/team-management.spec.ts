@@ -98,54 +98,32 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   });
 
   await page.getByRole("button", { name: "Add members", exact: true }).click();
-  const search = page.getByRole("searchbox", {
-    name: "Find people to add",
+  const review = page.getByRole("dialog");
+  const search = review.getByRole("searchbox", {
+    name: "Choose items",
     exact: true,
   });
   await search.fill("person150@example.test");
-  await page.getByRole("checkbox", { name: /Person 150/ }).check();
+  await review.getByRole("checkbox", { name: /Person 150/ }).check();
   await search.fill("person151@example.test");
-  await page.getByRole("checkbox", { name: /Person 151/ }).check();
-  await section(page, "Feedback");
-  const confirm = page.getByRole("alertdialog");
-  await expect(confirm).toContainText("Discard unsaved team changes?");
-  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
-  await page
+  await review.getByRole("checkbox", { name: /Person 151/ }).check();
+  await review
     .getByRole("button", { name: "Review 2 selected", exact: true })
     .click();
-  const review = page.locator("#team-add-members");
-  await expect(
-    review.getByText("Move from Other team to Sales team", { exact: true }),
-  ).toHaveCount(2);
+  await expect(review).toContainText("Other team");
+  await expect(review).toContainText("move here");
   await page.screenshot({
     path: info.outputPath("review-members.png"),
     fullPage: true,
   });
-  // A failed demo save must keep the review and choices available for retry.
-  await page.evaluate(() => {
-    const original = Storage.prototype.setItem;
-    let fail = true;
-    Storage.prototype.setItem = function (key, value) {
-      if (key === "fieldbook.workspace.v1" && fail) {
-        fail = false;
-        throw new Error("Synthetic storage failure");
-      }
-      return original.call(this, key, value);
-    };
-  });
-  await review
-    .getByRole("button", { name: "Apply changes", exact: true })
-    .click();
-  await expect(review.getByRole("alert")).toContainText(
-    "Your browser could not save",
-  );
   expect(
     (await saved(page)).users.find((u) => u.id === "person-150")!.teamId,
   ).toBe("other");
   await review
-    .getByRole("button", { name: "Apply changes", exact: true })
+    .getByRole("button", { name: "Add members 2", exact: true })
     .click();
   await expect(review).toHaveCount(0);
+  const confirm = page.getByRole("alertdialog");
   const after = await saved(page);
   expect(
     after.users

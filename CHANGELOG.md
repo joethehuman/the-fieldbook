@@ -4,6 +4,9 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Standardized contextual bulk actions and multi-select Add pickers across content, people, teams, learning groups and curricula, with existing-category choices, pending-account batches, connection revocation and searchable recovery.
+
+
 - Add contextual bulk content, people, team and learning-group actions, multi-item learning pickers, and 30-day recoverable deletion. Recently deleted supports restoration; an authenticated hourly cleanup worker erases expired records and associated learning history. Requires the recovery and scheduler migrations and endpoint configuration described in [bulk actions](docs/bulk-actions.md).
 
 - Show the Courses progress card beside For you courses on iPad-sized screens with enough room; keep the phone layout stacked and the Docs outline behavior unchanged.

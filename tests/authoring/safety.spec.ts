@@ -209,9 +209,7 @@ test("browser back can be canceled without unmounting the editor", async ({
   ).toBeVisible();
   await openNav(page);
   await page.getByRole("button", { name: "Account menu" }).click();
-  await page
-    .getByRole("menuitem", { name: "Manage organization" })
-    .click();
+  await page.getByRole("menuitem", { name: "Manage organization" }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   await page.getByLabel("Title", { exact: true }).fill("History protected");
   await page.evaluate(() => history.back());
@@ -289,20 +287,27 @@ test("failed learning-group save shows one concise inline error", async ({
     .getByRole("button", { name: `Manage ${state.groups[0].name}` })
     .click();
   await page
-    .getByRole("button", { name: `Add ${state.content[0].title}` })
+    .getByRole("button", { name: "Add courses or curricula", exact: true })
+    .click();
+  const picker = page.getByRole("dialog");
+  await picker
+    .getByRole("checkbox", { name: new RegExp(state.content[0].title) })
+    .check();
+  await picker
+    .getByRole("button", { name: "Add items 1", exact: true })
     .click();
   const saveAlerts = page.locator('[data-slot="alert"]');
   await expect(saveAlerts).toHaveCount(1);
-  await expect(saveAlerts).toContainText(
-    "Couldn't save this group. Check the current list before trying again.",
-  );
+  await expect(saveAlerts).toContainText("0 of 1 changes confirmed saved");
   await expect(saveAlerts).toContainText(
     "Reference: 00000000-0000-4000-8000-000000000010",
   );
-  await expect(page.getByText("0 of 1 changes confirmed saved")).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: `Add ${state.content[0].title}` }),
-  ).toBeEnabled();
+    picker.getByRole("button", { name: "Add items 1", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    picker.getByRole("checkbox", { name: new RegExp(state.content[0].title) }),
+  ).toBeChecked();
   await page.screenshot({
     animations: "disabled",
     path: info.outputPath("group-save-error.png"),
@@ -527,17 +532,26 @@ test("draft saves and publication share one transient confirmation", async ({
   await expect(toast).toHaveCount(0, { timeout: 6000 });
 });
 
-test("course builder edits one lesson at a time and keeps one final quiz", async ({ page }, info) => {
+test("course builder edits one lesson at a time and keeps one final quiz", async ({
+  page,
+}, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   await expect(page.getByRole("heading", { name: "Lesson 1" })).toBeVisible();
   const metadata = page.getByRole("region", { name: "Course introduction" });
-  await expect(metadata.getByRole("textbox", { name: "Title", exact: true })).toBeVisible();
+  await expect(
+    metadata.getByRole("textbox", { name: "Title", exact: true }),
+  ).toBeVisible();
   if ((page.viewportSize()?.width || 0) >= 1024) {
     const details = await metadata.boundingBox();
-    const outline = await page.getByRole("navigation", { name: "Edit course step" }).boundingBox();
+    const outline = await page
+      .getByRole("navigation", { name: "Edit course step" })
+      .boundingBox();
     expect(details!.x).toBeGreaterThan(outline!.x);
   }
-  await page.screenshot({ path: info.outputPath("course-builder-layout.png"), fullPage: true });
+  await page.screenshot({
+    path: info.outputPath("course-builder-layout.png"),
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Add lesson" }).click();
   await page.getByLabel("Lesson title").fill("Second lesson");
   await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
@@ -547,58 +561,134 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   const caret = await page.evaluate(() => {
     const selection = window.getSelection()!;
     const range = selection.getRangeAt(0).getBoundingClientRect();
-    const anchor = selection.anchorNode instanceof Element ? selection.anchorNode : selection.anchorNode?.parentElement;
-    const rect = range.height ? range : anchor?.closest("p, h1, h2, h3, li, blockquote")?.getBoundingClientRect();
+    const anchor =
+      selection.anchorNode instanceof Element
+        ? selection.anchorNode
+        : selection.anchorNode?.parentElement;
+    const rect = range.height
+      ? range
+      : anchor
+          ?.closest("p, h1, h2, h3, li, blockquote")
+          ?.getBoundingClientRect();
     if (!rect) throw new Error("Expected a visible insertion line");
     return { top: rect.top, bottom: rect.bottom };
   });
-  const scrollBefore = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  const scrollBefore = await page
+    .locator(".main-content")
+    .evaluate((node) => node.scrollTop);
   await writing.press("/");
-  await expect(page.getByRole("menu", { name: "Insert content" })).toBeVisible();
-  await expect(writing.locator(".writing-command-line")).toHaveAttribute("data-slash-query", "Type to search");
-  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::before").content)).toBe('"/"');
-  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::after").content)).toBe('"Type to search"');
-  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => {
-    const lineBreak = node.querySelector("br");
-    return !lineBreak || getComputedStyle(lineBreak).display === "none";
-  })).toBe(true);
-  await expect(page.locator(".writing-editor .writing-content:not([contenteditable])")).toBeHidden();
+  await expect(
+    page.getByRole("menu", { name: "Insert content" }),
+  ).toBeVisible();
+  await expect(writing.locator(".writing-command-line")).toHaveAttribute(
+    "data-slash-query",
+    "Type to search",
+  );
+  await expect
+    .poll(() =>
+      writing
+        .locator(".writing-command-line")
+        .evaluate((node) => getComputedStyle(node, "::before").content),
+    )
+    .toBe('"/"');
+  await expect
+    .poll(() =>
+      writing
+        .locator(".writing-command-line")
+        .evaluate((node) => getComputedStyle(node, "::after").content),
+    )
+    .toBe('"Type to search"');
+  await expect
+    .poll(() =>
+      writing.locator(".writing-command-line").evaluate((node) => {
+        const lineBreak = node.querySelector("br");
+        return !lineBreak || getComputedStyle(lineBreak).display === "none";
+      }),
+    )
+    .toBe(true);
+  await expect(
+    page.locator(".writing-editor .writing-content:not([contenteditable])"),
+  ).toBeHidden();
   await expect(writing).toBeFocused();
-  const menu = (await page.getByRole("menu", { name: "Insert content" }).boundingBox())!;
-  expect(Math.min(Math.abs(menu.y - caret.bottom), Math.abs(menu.y + menu.height - caret.top))).toBeLessThan(24);
+  const menu = (await page
+    .getByRole("menu", { name: "Insert content" })
+    .boundingBox())!;
+  expect(
+    Math.min(
+      Math.abs(menu.y - caret.bottom),
+      Math.abs(menu.y + menu.height - caret.top),
+    ),
+  ).toBeLessThan(24);
   expect(menu.y).toBeGreaterThanOrEqual(0);
   expect(menu.y + menu.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-  expect(await page.locator(".main-content").evaluate((node) => node.scrollTop)).toBe(scrollBefore);
-  await page.screenshot({ path: info.outputPath("course-builder-slash.png"), fullPage: true });
+  expect(
+    await page.locator(".main-content").evaluate((node) => node.scrollTop),
+  ).toBe(scrollBefore);
+  await page.screenshot({
+    path: info.outputPath("course-builder-slash.png"),
+    fullPage: true,
+  });
   await page.keyboard.type("hea");
-  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::after").content)).toBe('"hea"');
+  await expect
+    .poll(() =>
+      writing
+        .locator(".writing-command-line")
+        .evaluate((node) => getComputedStyle(node, "::after").content),
+    )
+    .toBe('"hea"');
   await expect(page.getByRole("menuitem")).toHaveCount(2);
   await page.keyboard.press("Enter");
   await expect(writing).toBeFocused();
-  await expect.poll(() => page.evaluate(() => { const anchor = window.getSelection()?.anchorNode; return (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("h2")?.tagName; })).toBe("H2");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const anchor = window.getSelection()?.anchorNode;
+        return (
+          anchor instanceof Element ? anchor : anchor?.parentElement
+        )?.closest("h2")?.tagName;
+      }),
+    )
+    .toBe("H2");
   await page.keyboard.type("A heading here");
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/## A heading here/);
+  await expect(
+    page.getByRole("textbox", { name: "Lesson content Markdown" }),
+  ).toHaveValue(/## A heading here/);
   await page.getByRole("button", { name: "Add quiz" }).click();
-  await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Quiz", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("button", { name: "Add quiz" })).toHaveCount(0);
   await page.getByRole("button", { name: "Add answer" }).click();
-  await expect(page.getByRole("textbox", { name: "Answer 3 for question 1" })).toBeVisible();
-  await page.getByRole("textbox", { name: "Answer 3 for question 1" }).fill("Third choice");
-  await page.getByRole("checkbox", { name: "Correct answer 3 for question 1" }).check();
+  await expect(
+    page.getByRole("textbox", { name: "Answer 3 for question 1" }),
+  ).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Answer 3 for question 1" })
+    .fill("Third choice");
+  await page
+    .getByRole("checkbox", { name: "Correct answer 3 for question 1" })
+    .check();
   await page.getByRole("button", { name: "Add question" }).click();
   await expect(page.getByRole("heading", { name: "Question 2" })).toBeVisible();
   if ((page.viewportSize()?.width || 0) < 1120) {
     await page.getByRole("combobox", { name: "Edit course step" }).click();
     await page.getByRole("option", { name: /Second lesson/ }).click();
   } else {
-    await page.getByRole("navigation", { name: "Edit course step" }).getByRole("button", { name: /Second lesson/ }).click();
+    await page
+      .getByRole("navigation", { name: "Edit course step" })
+      .getByRole("button", { name: /Second lesson/ })
+      .click();
   }
   await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Quiz", exact: true }),
+  ).toHaveCount(0);
 });
 
-test("inline media chooser inserts a video where the slash command was opened", async ({ page }, info) => {
+test("inline media chooser inserts a video where the slash command was opened", async ({
+  page,
+}, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.click();
@@ -613,17 +703,29 @@ test("inline media chooser inserts a video where the slash command was opened", 
   await expect(writing.locator(".writing-media-line")).toBeVisible();
   const chooser = page.getByRole("dialog", { name: "Insert video" });
   await expect(chooser).toBeVisible();
-  await chooser.getByRole("textbox", { name: "Video URL" }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await chooser
+    .getByRole("textbox", { name: "Video URL" })
+    .fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   await chooser.getByRole("button", { name: "Insert video" }).click();
   await expect(chooser).toHaveCount(0);
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/Before the video[\s\S]*\[Video\]\(https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ\)[\s\S]*After the video/);
+  await expect(
+    page.getByRole("textbox", { name: "Lesson content Markdown" }),
+  ).toHaveValue(
+    /Before the video[\s\S]*\[Video\]\(https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ\)[\s\S]*After the video/,
+  );
 });
 
-test("wide course tables scroll inside the editor and show a reading edge", async ({ page }, info) => {
+test("wide course tables scroll inside the editor and show a reading edge", async ({
+  page,
+}, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await page.getByRole("textbox", { name: "Lesson content Markdown" }).fill("Text above the table.\n\n| One | Two | Three | Four | Five | Six |\n| --- | --- | --- | --- | --- | --- |\n| A | B | C | D | E | F |\n\nText below the table.");
+  await page
+    .getByRole("textbox", { name: "Lesson content Markdown" })
+    .fill(
+      "Text above the table.\n\n| One | Two | Three | Four | Five | Six |\n| --- | --- | --- | --- | --- | --- |\n| A | B | C | D | E | F |\n\nText below the table.",
+    );
   await page.getByRole("button", { name: "Write", exact: true }).click();
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   const table = writing.locator("table").first();
@@ -631,31 +733,57 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   const widths = await table.evaluate((node) => {
     const wrapper = node.closest('[data-lexical-decorator="true"]');
     const editor = node.closest(".writing-content");
-    return { table: node.scrollWidth, wrapper: wrapper?.clientWidth || 0, wrapperScroll: wrapper?.scrollWidth || 0, editor: editor?.scrollWidth || 0, editorWidth: editor?.clientWidth || 0 };
+    return {
+      table: node.scrollWidth,
+      wrapper: wrapper?.clientWidth || 0,
+      wrapperScroll: wrapper?.scrollWidth || 0,
+      editor: editor?.scrollWidth || 0,
+      editorWidth: editor?.clientWidth || 0,
+    };
   });
   expect(widths.table).toBeGreaterThan(widths.wrapper);
   expect(widths.wrapperScroll).toBeGreaterThan(widths.wrapper);
   expect(widths.editor).toBeLessThanOrEqual(widths.editorWidth + 2);
-  const trailingControlWidth = await table.locator("tfoot th").last().evaluate((cell) => cell.getBoundingClientRect().width);
+  const trailingControlWidth = await table
+    .locator("tfoot th")
+    .last()
+    .evaluate((cell) => cell.getBoundingClientRect().width);
   expect(trailingControlWidth).toBeLessThan(50);
   await table.getByRole("button", { name: "Column menu" }).first().click();
-  await expect(page.getByTitle("Insert a column to the right of this one")).toBeVisible();
-  await table.evaluate((node) => { const scroller = node.closest('[data-lexical-decorator="true"]'); if (scroller) scroller.scrollLeft = 180; });
-  await expect(page.getByTitle("Insert a column to the right of this one")).toHaveCount(0);
-  await page.screenshot({ path: info.outputPath("course-editor-wide-table.png") });
+  await expect(
+    page.getByTitle("Insert a column to the right of this one"),
+  ).toBeVisible();
+  await table.evaluate((node) => {
+    const scroller = node.closest('[data-lexical-decorator="true"]');
+    if (scroller) scroller.scrollLeft = 180;
+  });
+  await expect(
+    page.getByTitle("Insert a column to the right of this one"),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: info.outputPath("course-editor-wide-table.png"),
+  });
   await page.getByRole("button", { name: "Preview draft" }).click();
   const reader = page.locator(".markdown-table-wrap");
   await expect(reader).toHaveAttribute("data-more-right", "true");
-  await page.screenshot({ path: info.outputPath("course-table-more-columns.png") });
-  await reader.locator(".markdown-table").evaluate((node) => { node.scrollLeft = node.scrollWidth; });
+  await page.screenshot({
+    path: info.outputPath("course-table-more-columns.png"),
+  });
+  await reader.locator(".markdown-table").evaluate((node) => {
+    node.scrollLeft = node.scrollWidth;
+  });
   await expect(reader).toHaveAttribute("data-more-right", "false");
   await page.screenshot({ path: info.outputPath("course-table-scroll.png") });
 });
 
-test("slash Table inserts at the selected line and unmatched searches can return to writing", async ({ page }, info) => {
+test("slash Table inserts at the selected line and unmatched searches can return to writing", async ({
+  page,
+}, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await page.getByRole("textbox", { name: "Lesson content Markdown" }).fill("Before\n\nAfter");
+  await page
+    .getByRole("textbox", { name: "Lesson content Markdown" })
+    .fill("Before\n\nAfter");
   await page.getByRole("button", { name: "Write", exact: true }).click();
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.locator("p").first().click();
@@ -667,18 +795,33 @@ test("slash Table inserts at the selected line and unmatched searches can return
   await page.keyboard.press("Enter");
   await expect(writing.locator("table")).toBeVisible();
   await expect(writing.locator("table tbody tr")).toHaveCount(3);
-  await expect(writing.locator("table tbody tr").first().locator(":is(td, th):not([data-tool-cell])")).toHaveCount(3);
-  const beforeTable = await writing.locator("table").evaluate((node) => node.closest('[data-lexical-decorator="true"]')?.previousElementSibling?.textContent);
+  await expect(
+    writing
+      .locator("table tbody tr")
+      .first()
+      .locator(":is(td, th):not([data-tool-cell])"),
+  ).toHaveCount(3);
+  const beforeTable = await writing
+    .locator("table")
+    .evaluate(
+      (node) =>
+        node.closest('[data-lexical-decorator="true"]')?.previousElementSibling
+          ?.textContent,
+    );
   expect(beforeTable).toBe("Before");
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/Before[\s\S]*\|[\s\S]*After/);
+  await expect(
+    page.getByRole("textbox", { name: "Lesson content Markdown" }),
+  ).toHaveValue(/Before[\s\S]*\|[\s\S]*After/);
   await page.getByRole("button", { name: "Write", exact: true }).click();
   await writing.locator("p").last().click();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
   await page.keyboard.press("/");
   await page.keyboard.type("unlikely-block-name");
-  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(0);
+  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(
+    0,
+  );
   await expect(writing.locator(".writing-command-line")).toHaveCount(0);
   await expect(writing).toBeFocused();
   await page.keyboard.type(" continues");
@@ -688,9 +831,13 @@ test("slash Table inserts at the selected line and unmatched searches can return
   await page.keyboard.press("/");
   await page.keyboard.type("another-unknown-block");
   await writing.locator("p", { hasText: "Before" }).click();
-  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(0);
+  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/\/unlikely-block-name continues/);
+  await expect(
+    page.getByRole("textbox", { name: "Lesson content Markdown" }),
+  ).toHaveValue(/\/unlikely-block-name continues/);
 });
 
 test("slash Table can be chosen with the pointer", async ({ page }, info) => {
@@ -703,10 +850,17 @@ test("slash Table can be chosen with the pointer", async ({ page }, info) => {
   await page.getByRole("menuitem", { name: "Table" }).click();
   const table = writing.locator("table");
   await expect(table).toBeVisible();
-  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(0);
+  await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(
+    0,
+  );
   await table.getByRole("button", { name: "Column menu" }).first().click();
   await page.getByTitle("Insert a column to the right of this one").click();
-  await expect(table.locator("tbody tr").first().locator(":is(td, th):not([data-tool-cell])")).toHaveCount(4);
+  await expect(
+    table
+      .locator("tbody tr")
+      .first()
+      .locator(":is(td, th):not([data-tool-cell])"),
+  ).toHaveCount(4);
   await table.getByRole("button", { name: "Row menu" }).first().click();
   await page.getByTitle("Insert a row below this one").click();
   await expect(table.locator("tbody tr")).toHaveCount(4);
@@ -714,10 +868,14 @@ test("slash Table can be chosen with the pointer", async ({ page }, info) => {
   await expect(table).toHaveCount(0);
 });
 
-test("slash list begins on the chosen line without an extra blank block", async ({ page }, info) => {
+test("slash list begins on the chosen line without an extra blank block", async ({
+  page,
+}, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await page.getByRole("textbox", { name: "Lesson content Markdown" }).fill("Before\n\nAfter");
+  await page
+    .getByRole("textbox", { name: "Lesson content Markdown" })
+    .fill("Before\n\nAfter");
   await page.getByRole("button", { name: "Write", exact: true }).click();
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.locator("p").first().click();
@@ -737,18 +895,25 @@ test("slash list begins on the chosen line without an extra blank block", async 
       previousText: before?.textContent,
       previousTag: before?.tagName,
       nextText: after?.textContent,
-      gap: list.getBoundingClientRect().top - (before?.getBoundingClientRect().bottom || 0),
+      gap:
+        list.getBoundingClientRect().top -
+        (before?.getBoundingClientRect().bottom || 0),
     };
   });
   expect(structure.previousTag).toBe("P");
   expect(structure.previousText).toBe("Before");
   expect(structure.nextText).toBe("After");
   expect(structure.gap).toBeLessThan(64);
-  await writing.screenshot({ path: info.outputPath("slash-list-between-paragraphs.png") });
+  await writing.screenshot({
+    path: info.outputPath("slash-list-between-paragraphs.png"),
+  });
 });
 
 test("pasted image uploads at the editor caret", async ({ page }, info) => {
-  test.skip(!info.project.name.startsWith("production"), "The browser-local demo has no media storage.");
+  test.skip(
+    !info.project.name.startsWith("production"),
+    "The browser-local demo has no media storage.",
+  );
   const { control } = await setup(page, true, "course", true);
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.click();
@@ -759,18 +924,35 @@ test("pasted image uploads at the editor caret", async ({ page }, info) => {
   await writing.locator("p").nth(1).click();
   await writing.evaluate((node) => {
     const data = new DataTransfer();
-    data.items.add(new File(["synthetic"], "pasted.png", { type: "image/png" }));
-    node.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    data.items.add(
+      new File(["synthetic"], "pasted.png", { type: "image/png" }),
+    );
+    node.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: data,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   });
   await expect.poll(() => control.uploaded).toBe(true);
   control.releaseUpload();
   await expect(writing.locator("img")).toHaveAttribute("src", /\/api\/media\//);
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/Before the image[\s\S]*!\[pasted\]\(\/api\/media\/[\s\S]*After the image/);
+  await expect(
+    page.getByRole("textbox", { name: "Lesson content Markdown" }),
+  ).toHaveValue(
+    /Before the image[\s\S]*!\[pasted\]\(\/api\/media\/[\s\S]*After the image/,
+  );
 });
 
-test("image chooser uploads into the selected lesson line", async ({ page }, info) => {
-  test.skip(!info.project.name.startsWith("production"), "The browser-local demo has no media storage.");
+test("image chooser uploads into the selected lesson line", async ({
+  page,
+}, info) => {
+  test.skip(
+    !info.project.name.startsWith("production"),
+    "The browser-local demo has no media storage.",
+  );
   const { control } = await setup(page, true, "course", true);
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.click();
@@ -778,10 +960,18 @@ test("image chooser uploads into the selected lesson line", async ({ page }, inf
   await page.getByRole("menuitem", { name: "Image", exact: true }).click();
   const chooser = page.getByRole("dialog", { name: "Insert image" });
   await expect(writing.locator(".writing-media-line")).toBeVisible();
-  await chooser.getByRole("textbox", { name: "Image alternative text" }).fill("Course diagram");
+  await chooser
+    .getByRole("textbox", { name: "Image alternative text" })
+    .fill("Course diagram");
   const fileChooser = page.waitForEvent("filechooser");
   await chooser.getByRole("button", { name: "Choose image" }).click();
-  await (await fileChooser).setFiles({ name: "diagram.png", mimeType: "image/png", buffer: Buffer.from("synthetic") });
+  await (
+    await fileChooser
+  ).setFiles({
+    name: "diagram.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("synthetic"),
+  });
   await expect.poll(() => control.uploaded).toBe(true);
   control.releaseUpload();
   await expect(writing.locator("img")).toHaveAttribute("alt", "Course diagram");
@@ -793,38 +983,74 @@ for (const { command, query, marker } of [
   { command: "Numbered list", query: "number", marker: /1\. A list item/ },
 ]) {
   test(`${command} keeps the caret in the new list`, async ({ page }, info) => {
-    await setup(page, info.project.name.startsWith("production"), "course", true);
+    await setup(
+      page,
+      info.project.name.startsWith("production"),
+      "course",
+      true,
+    );
     const writing = page.getByRole("textbox", { name: "Lesson content" });
     await writing.click();
     await page.keyboard.press("/");
     await page.keyboard.type(query);
     await page.keyboard.press("Enter");
     await expect(writing.locator(".writing-pending-list")).toBeVisible();
-    await expect.poll(() => writing.locator(".writing-pending-list").evaluate((node) => getComputedStyle(node, "::before").content)).toBe(command === "Bulleted list" ? '"•"' : '"1."');
+    await expect
+      .poll(() =>
+        writing
+          .locator(".writing-pending-list")
+          .evaluate((node) => getComputedStyle(node, "::before").content),
+      )
+      .toBe(command === "Bulleted list" ? '"•"' : '"1."');
     await page.keyboard.type("A list item");
-    await expect.poll(() => page.evaluate(() => { const anchor = window.getSelection()?.anchorNode; return (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("li")?.tagName; })).toBe("LI");
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const anchor = window.getSelection()?.anchorNode;
+          return (
+            anchor instanceof Element ? anchor : anchor?.parentElement
+          )?.closest("li")?.tagName;
+        }),
+      )
+      .toBe("LI");
     await page.getByRole("button", { name: "Markdown", exact: true }).click();
-    await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(marker);
+    await expect(
+      page.getByRole("textbox", { name: "Lesson content Markdown" }),
+    ).toHaveValue(marker);
   });
 }
 
-test("Insert menus use full rows and can be dismissed", async ({ page }, info) => {
+test("Insert menus use full rows and can be dismissed", async ({
+  page,
+}, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.locator("p").first().click();
   await page.keyboard.press("/");
   const menu = page.getByRole("menu", { name: "Insert content" });
-  await expect(menu.getByRole("menuitem", { name: "Close menu esc" })).toBeVisible();
+  await expect(
+    menu.getByRole("menuitem", { name: "Close menu esc" }),
+  ).toBeVisible();
   const options = menu.locator(".writing-slash-options");
-  const overflows = await options.evaluate((node) => node.scrollHeight - node.clientHeight > 2);
-  await expect(options).toHaveAttribute("data-scroll-fade-after", String(overflows));
+  const overflows = await options.evaluate(
+    (node) => node.scrollHeight - node.clientHeight > 2,
+  );
+  await expect(options).toHaveAttribute(
+    "data-scroll-fade-after",
+    String(overflows),
+  );
   if (overflows) {
-    await options.evaluate((node) => { node.scrollTop = node.scrollHeight; node.dispatchEvent(new Event("scroll")); });
+    await options.evaluate((node) => {
+      node.scrollTop = node.scrollHeight;
+      node.dispatchEvent(new Event("scroll"));
+    });
     await expect(options).toHaveAttribute("data-scroll-fade-before", "true");
     await expect(options).toHaveAttribute("data-scroll-fade-after", "false");
   }
   const menuWidth = (await menu.boundingBox())!.width;
-  const rowWidth = (await menu.getByRole("menuitem", { name: "Heading" }).boundingBox())!.width;
+  const rowWidth = (await menu
+    .getByRole("menuitem", { name: "Heading" })
+    .boundingBox())!.width;
   expect(rowWidth).toBeGreaterThan(menuWidth - 24);
   await page.keyboard.type("hea");
   await page.keyboard.press("Escape");
@@ -832,11 +1058,15 @@ test("Insert menus use full rows and can be dismissed", async ({ page }, info) =
   await expect(writing.locator(".writing-command-line")).toHaveCount(0);
   await page.keyboard.type("ding");
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/\/heading/);
+  await expect(
+    page.getByRole("textbox", { name: "Lesson content Markdown" }),
+  ).toHaveValue(/\/heading/);
   await page.getByRole("button", { name: "Write", exact: true }).click();
   await page.getByRole("button", { name: "Insert", exact: true }).click();
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Heading" })).not.toBeFocused();
+  await expect(
+    menu.getByRole("menuitem", { name: "Heading" }),
+  ).not.toBeFocused();
   await menu.getByRole("menuitem", { name: "Close menu esc" }).click();
   await expect(menu).toHaveCount(0);
   await page.getByRole("button", { name: "Insert", exact: true }).focus();
@@ -846,7 +1076,9 @@ test("Insert menus use full rows and can be dismissed", async ({ page }, info) =
   await expect(menu).toHaveCount(0);
 });
 
-test("slash insertion stays beside a blank line after lesson prose", async ({ page }, info) => {
+test("slash insertion stays beside a blank line after lesson prose", async ({
+  page,
+}, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.click();
@@ -854,25 +1086,42 @@ test("slash insertion stays beside a blank line after lesson prose", async ({ pa
   await page.keyboard.type("First line");
   await page.keyboard.press("Enter");
   await page.screenshot({ path: info.outputPath("blank-lesson-line.png") });
-  const oldScroll = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  const oldScroll = await page
+    .locator(".main-content")
+    .evaluate((node) => node.scrollTop);
   const line = (await writing.locator("p").last().boundingBox())!;
   await page.keyboard.press("/");
   const menu = page.getByRole("menu", { name: "Insert content" });
   await expect(menu).toBeVisible();
   await expect(writing).toBeFocused();
   const box = (await menu.boundingBox())!;
-  const newScroll = await page.locator(".main-content").evaluate((node) => node.scrollTop);
+  const newScroll = await page
+    .locator(".main-content")
+    .evaluate((node) => node.scrollTop);
   expect(Math.abs(newScroll - oldScroll)).toBeLessThan(8);
   expect(box.y).toBeGreaterThanOrEqual(0);
   expect(box.y + box.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   expect(Math.abs(box.x - line.x)).toBeLessThan(24);
-  expect(box.y >= line.y + line.height - 12 || box.y + box.height <= line.y + 12).toBe(true);
+  expect(
+    box.y >= line.y + line.height - 12 || box.y + box.height <= line.y + 12,
+  ).toBe(true);
   await page.screenshot({ path: info.outputPath("blank-line-commands.png") });
   await page.keyboard.type("call");
   await page.keyboard.press("Enter");
   await expect(writing).toBeFocused();
-  await expect.poll(() => page.evaluate(() => { const anchor = window.getSelection()?.anchorNode; return (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("blockquote")?.tagName; })).toBe("BLOCKQUOTE");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const anchor = window.getSelection()?.anchorNode;
+        return (
+          anchor instanceof Element ? anchor : anchor?.parentElement
+        )?.closest("blockquote")?.tagName;
+      }),
+    )
+    .toBe("BLOCKQUOTE");
   await page.keyboard.type("A callout here");
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
-  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/First line[\s\S]*> A callout here/);
+  await expect(
+    page.getByRole("textbox", { name: "Lesson content Markdown" }),
+  ).toHaveValue(/First line[\s\S]*> A callout here/);
 });
