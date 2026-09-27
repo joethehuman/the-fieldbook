@@ -56,6 +56,11 @@ test("artwork schema accepts older items and validates saved titles and images",
   assert.equal(
     contentSchema.safeParse({ ...update, cardArt: { ...art, version: 2 } })
       .success,
+    true,
+  );
+  assert.equal(
+    contentSchema.safeParse({ ...update, cardArt: { ...art, version: 3 } })
+      .success,
     false,
   );
 });

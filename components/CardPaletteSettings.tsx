@@ -161,7 +161,7 @@ export function CardPaletteSettings({
                 art={{
                   source: "generated",
                   shortTitle: "Your first API call",
-                  version: 1,
+                  version: 2,
                   seed: 289,
                 }}
                 settings={settings}
@@ -176,7 +176,7 @@ export function CardPaletteSettings({
                 art={{
                   source: "generated",
                   shortTitle: "Project setup, simplified",
-                  version: 1,
+                  version: 2,
                   seed: 0,
                 }}
                 settings={settings}
@@ -190,7 +190,7 @@ export function CardPaletteSettings({
                 art={{
                   source: "generated",
                   shortTitle: "Start building",
-                  version: 1,
+                  version: 2,
                   seed: 291,
                 }}
                 settings={settings}

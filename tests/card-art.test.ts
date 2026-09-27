@@ -1,10 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  artComposition,
+  CARD_ART_COMPOSITIONS,
+  CARD_ART_VERSION,
   cardPalettePresets,
   graphemeCount,
   isArtworkOnlyUpdate,
-  nextArtSeed,
+  randomArtSeed,
   resolvedCardArt,
   resolvedCardPalette,
   shortTitleFallback,
@@ -18,6 +21,7 @@ test("art seeds and fallback titles stay tied to an item, with many distinct arr
   const title = "Very long launch announcement for everyone";
   const a = resolvedCardArt("course-a", title);
   assert.equal(a.seed, stableArtSeed("course-a"));
+  assert.equal(a.version, CARD_ART_VERSION);
   assert.deepEqual(a, resolvedCardArt("course-a", title));
   assert.notEqual(a.seed, resolvedCardArt("course-b", title).seed);
   assert.equal(graphemeCount(shortTitleFallback("🙂".repeat(41))), 40);
@@ -25,21 +29,34 @@ test("art seeds and fallback titles stay tied to an item, with many distinct arr
   const seen = new Set(
     Array.from({ length: 200 }, (_, i) => {
       const seed = stableArtSeed(`course-${i}`);
-      return [
-        seed % 8,
-        (seed >>> 8) % 95,
-        (seed >>> 17) % 50,
-        (seed >>> 23) % 13,
-      ].join(":");
+      return artComposition(seed);
     }),
   );
-  assert.ok(seen.size >= 100);
-  assert.notEqual(nextArtSeed(a.seed), a.seed);
+  assert.equal(seen.size, CARD_ART_COMPOSITIONS);
   assert.deepEqual(
     resolvedCardArt("old-course", title, undefined, "/api/media/old.png")
       .source,
     "upload",
   );
+});
+
+test("Shuffle draws a new seed and avoids recent compositions and families", () => {
+  const recent = Array.from({ length: 12 }, (_, i) => i);
+  const candidates = [0, 21, 22];
+  const seed = randomArtSeed(recent, () => candidates.shift()!);
+  assert.equal(seed, 22);
+  assert.equal(artComposition(seed), 22);
+  assert.equal(
+    randomArtSeed(recent, () => 0),
+    12,
+  );
+  let candidate = 0;
+  const history = [0];
+  for (let i = 0; i < 24; i++) {
+    const next = randomArtSeed(history, () => candidate++ % 30);
+    history.push(next);
+  }
+  assert.equal(new Set(history.map(artComposition)).size, 25);
 });
 
 test("palette follows accent, while presets and custom colors stay fixed", () => {

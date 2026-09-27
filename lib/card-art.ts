@@ -1,11 +1,12 @@
 import type { SiteSettings } from "./settings";
 import type { Content } from "./types";
 
-export const CARD_ART_VERSION = 1;
+export const CARD_ART_VERSION = 2;
+export const CARD_ART_COMPOSITIONS = 30;
 export type CardArt = {
   source: "generated" | "upload";
   shortTitle: string;
-  version: 1;
+  version: 1 | 2;
   seed: number;
   imageUrl?: string;
 };
@@ -50,8 +51,33 @@ export function stableArtSeed(id: string): number {
   for (const char of id) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
   return hash >>> 0;
 }
-export function nextArtSeed(seed: number): number {
-  return (Math.imul(seed ^ 0x9e3779b9, 1664525) + 1013904223) >>> 0;
+export function artComposition(seed: number): number {
+  return seed % CARD_ART_COMPOSITIONS;
+}
+
+function secureArtSeed(): number {
+  return crypto.getRandomValues(new Uint32Array(1))[0];
+}
+
+export function randomArtSeed(
+  recentSeeds: number[],
+  randomUint32: () => number = secureArtSeed,
+): number {
+  const recent = recentSeeds.slice(-25).map(artComposition);
+  const recentFamilies = recent.slice(-2).map((slot) => slot % 10);
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const candidate = randomUint32() >>> 0;
+    const slot = artComposition(candidate);
+    if (!recent.includes(slot) && !recentFamilies.includes(slot % 10))
+      return candidate;
+  }
+  // A random source that repeatedly returns one value must not hang the editor.
+  const candidate = randomUint32() >>> 0;
+  const available = Array.from(
+    { length: CARD_ART_COMPOSITIONS },
+    (_, i) => i,
+  ).filter((slot) => !recent.includes(slot));
+  return available[candidate % available.length];
 }
 export function resolvedCardArt(
   id: string,

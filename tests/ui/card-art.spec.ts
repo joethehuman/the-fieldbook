@@ -12,14 +12,14 @@ async function section(page: Page, name: string) {
   } else await page.getByRole("tab", { name, exact: true }).click();
 }
 
-test("catalog shows eight generated families without horizontal overflow", async ({
+test("catalog shows thirty generated compositions without horizontal overflow", async ({
   page,
 }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/ui");
   const gallery = page.getByRole("region", { name: "Generated card artwork" });
-  await expect(gallery.locator(".card-artwork")).toHaveCount(8);
+  await expect(gallery.locator(".card-artwork")).toHaveCount(30);
   await expect(gallery.getByText("Design 1", { exact: true })).toBeVisible();
   expect(
     await page.evaluate(
@@ -27,7 +27,9 @@ test("catalog shows eight generated families without horizontal overflow", async
     ),
   ).toBe(true);
   expect(errors).toEqual([]);
-  await gallery.screenshot({ path: info.outputPath("card-art-families.png") });
+  await gallery.screenshot({
+    path: info.outputPath("card-art-compositions.png"),
+  });
 });
 
 test("Identity palette and Update Shuffle save the chosen design", async ({
@@ -71,6 +73,17 @@ test("Identity palette and Update Shuffle save the chosen design", async ({
   expect(await editor.locator(".card-artwork-geometry").innerHTML()).not.toBe(
     first,
   );
+  const seen = new Set<string>();
+  for (let i = 0; i < 25; i++) {
+    if (i > 0)
+      await editor.getByRole("button", { name: "Shuffle artwork" }).click();
+    seen.add(
+      (await editor
+        .locator(".card-artwork")
+        .getAttribute("data-art-composition")) || "",
+    );
+  }
+  expect(seen.size).toBe(25);
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
   const saved = await page.evaluate(() =>

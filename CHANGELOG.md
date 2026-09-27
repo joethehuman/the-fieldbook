@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Add shared generated card artwork for Updates, Courses and Curricula, with saved Shuffle designs, custom images, and Identity palette controls. [Artwork guide](docs/card-artwork.md).
+- Add shared generated card artwork for Updates, Courses and Curricula, with 30 compositions, random Shuffle choices that avoid recent repeats, custom images, and Identity palette controls. Previously saved artwork keeps its original design. [Artwork guide](docs/card-artwork.md).
 
 - Hide bulk selection controls for empty and single-item admin collections, retaining ordinary item actions and Add controls.
 

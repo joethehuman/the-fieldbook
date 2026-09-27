@@ -10,7 +10,12 @@ import { SelectField } from "@/components/ui/select";
 import { CardArtwork } from "./card-artwork";
 import type { SiteSettings } from "@/lib/settings";
 import type { CardArt } from "@/lib/card-art";
-import { graphemeCount, nextArtSeed, resolvedCardArt } from "@/lib/card-art";
+import {
+  CARD_ART_VERSION,
+  graphemeCount,
+  randomArtSeed,
+  resolvedCardArt,
+} from "@/lib/card-art";
 import type { UploadMedia } from "@/components/MarkdownEditor";
 
 export function CardArtEditor({
@@ -39,6 +44,10 @@ export function CardArtEditor({
   onBusyChange?: (busy: boolean) => void;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
+  const shuffleHistory = useRef<{ id: string; seeds: number[] }>({
+    id,
+    seeds: [],
+  });
   const [uploading, setUploading] = useState(false);
   const [notice, setNotice] = useState("");
   const current = resolvedCardArt(id, title, art, legacyCover);
@@ -47,9 +56,9 @@ export function CardArtEditor({
     <section className="grid gap-3" aria-label="Card artwork editor">
       <h3>Card artwork</h3>
       <FieldDescription>
-        Generated designs use your Identity artwork palette. Shuffle previews a
-        new design; save this item to keep it. A custom image replaces only the
-        artwork above the card text.
+        Generated designs use your Identity artwork palette. Shuffle explores
+        different designs and avoids recent repeats; save this item to keep the
+        choice. A custom image replaces only the artwork above the card text.
       </FieldDescription>
       <div className="card-artwork-preview">
         <CardArtwork
@@ -105,10 +114,20 @@ export function CardArtEditor({
           size="sm"
           disabled={disabled || uploading}
           onClick={() => {
+            if (shuffleHistory.current.id !== id)
+              shuffleHistory.current = { id, seeds: [] };
+            if (shuffleHistory.current.seeds.at(-1) !== current.seed)
+              shuffleHistory.current.seeds.push(current.seed);
+            const seed = randomArtSeed(shuffleHistory.current.seeds);
+            shuffleHistory.current.seeds = [
+              ...shuffleHistory.current.seeds,
+              seed,
+            ].slice(-25);
             onChange({
               ...current,
               source: "generated",
-              seed: nextArtSeed(current.seed),
+              version: CARD_ART_VERSION,
+              seed,
             });
             setNotice("New design previewed. Save to keep it.");
           }}

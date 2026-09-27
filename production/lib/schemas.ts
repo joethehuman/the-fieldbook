@@ -12,7 +12,7 @@ export const cardArtSchema = z
   .object({
     source: z.enum(["generated", "upload"]),
     shortTitle: text(160),
-    version: z.literal(1),
+    version: z.union([z.literal(1), z.literal(2)]),
     seed: z.number().int().min(0).max(4294967295),
     imageUrl: cardImageReference.optional(),
   })

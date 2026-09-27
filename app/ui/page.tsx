@@ -112,28 +112,28 @@ export default function ComponentCatalog() {
       <section className="grid gap-4" aria-label="Generated card artwork">
         <SectionHeader
           title={<h2>Generated card artwork</h2>}
-          description="Eight families share a saved seed and palette, with varied geometry within each family."
+          description="Thirty curated compositions use ten motif families. A saved seed keeps each design stable while the palette can recolor it."
         />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 8 }, (_, family) => {
-            const seed = family + 256 * (family % 3);
+          {Array.from({ length: 30 }, (_, slot) => {
+            const seed = slot + 300 * (slot % 3);
             return (
               <CardArtwork
-                key={family}
-                id={`catalog-${family}`}
-                title={`Example design ${family + 1}`}
+                key={slot}
+                id={`catalog-${slot}`}
+                title={`Example design ${slot + 1}`}
                 kind={
-                  family % 3 === 0
+                  slot % 3 === 0
                     ? "brief"
-                    : family % 3 === 1
+                    : slot % 3 === 1
                       ? "course"
                       : "curriculum"
                 }
-                category={family % 3 === 2 ? undefined : "Product"}
+                category={slot % 3 === 2 ? undefined : "Product"}
                 art={{
                   source: "generated",
-                  shortTitle: `Design ${family + 1}`,
-                  version: 1,
+                  shortTitle: `Design ${slot + 1}`,
+                  version: 2,
                   seed,
                 }}
               />
