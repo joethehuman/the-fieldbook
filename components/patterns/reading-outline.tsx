@@ -14,22 +14,6 @@ export function ReadingOutline({
   const ref = useRef<HTMLDetailsElement>(null);
   const headingKey = headings.map((heading) => heading.id).join("|");
   useEffect(() => {
-    const container = ref.current?.closest(".reading-layout");
-    if (!container) return;
-    let previousWide: boolean | undefined;
-    const adapt = () => {
-      const wide =
-        container.clientWidth >=
-        60 * parseFloat(getComputedStyle(document.documentElement).fontSize);
-      if (ref.current && wide !== previousWide) ref.current.open = wide;
-      previousWide = wide;
-    };
-    const observer = new ResizeObserver(adapt);
-    observer.observe(container);
-    adapt();
-    return () => observer.disconnect();
-  }, []);
-  useEffect(() => {
     const scrollport = ref.current?.closest<HTMLElement>(".main-content");
     if (!scrollport) return;
     let frame = 0;
@@ -90,35 +74,37 @@ export function ReadingOutline({
     };
   }, [headingKey]);
   if (!headings.length) return null;
+  const links = (mobile: boolean) =>
+    headings.map((heading) => (
+      <a
+        key={heading.id}
+        href={`${prefix}${heading.id}`}
+        data-depth={heading.depth}
+        aria-current={active === heading.id ? "location" : undefined}
+        onClick={
+          mobile
+            ? () => {
+                if (ref.current) ref.current.open = false;
+              }
+            : undefined
+        }
+      >
+        {heading.text}
+      </a>
+    ));
   return (
     <aside className="reading-outline" aria-label="On this page">
       <p className="reading-outline-title">On this page</p>
-      <details ref={ref} open>
+      <details ref={ref} className="reading-outline-disclosure">
         <summary>
           On this page
           <ChevronRight size={14} aria-hidden="true" />
         </summary>
-        <nav aria-label="Article sections">
-          {headings.map((heading) => (
-            <a
-              key={heading.id}
-              href={`${prefix}${heading.id}`}
-              data-depth={heading.depth}
-              aria-current={active === heading.id ? "location" : undefined}
-              onClick={() => {
-                if (
-                  ref.current &&
-                  getComputedStyle(ref.current.closest(".reading-outline")!)
-                    .position !== "sticky"
-                )
-                  ref.current.open = false;
-              }}
-            >
-              {heading.text}
-            </a>
-          ))}
-        </nav>
+        <nav aria-label="Article sections">{links(true)}</nav>
       </details>
+      <nav className="reading-outline-wide" aria-label="Article sections">
+        {links(false)}
+      </nav>
     </aside>
   );
 }

@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep the Docs On this page outline closed on narrow screens and visible on wide screens from the first render, without a resize-driven flash.
+
 - Apply the saved installation accent to links, selected Docs and feedback, focus highlights and account pages; keep link text readable for light accent colors.
 
 - Open Docs directly on the first published article in the saved order, prefetch neighboring Docs while reading, and highlight the selected Doc with a layout-stable accent color.
