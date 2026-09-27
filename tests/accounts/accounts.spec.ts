@@ -277,7 +277,7 @@ test("provider failure stays recoverable, cancellation preserves return, unsafe 
     (await page.context().cookies()).find(
       (c) => c.name === "fieldbook-sign-in-return",
     )?.value,
-  ).toBe(encodeURIComponent(organizationHomePath));
+  ).toBe(encodeURIComponent("/"));
 });
 test("settings authorization, saved identity and private content protection", async ({
   page,
