@@ -58,6 +58,8 @@ If you have customized the code, Git may report conflicts. Resolve and review th
 5. Follow the release's deployment order. If schema changes are incompatible with the old code, use a maintenance window instead of allowing old and new code to write concurrently. A Vercel code deployment does not automatically apply these SQL files.
 6. Merge the reviewed update into your `production` branch. Vercel deploys it. Verify login, content editing/publication, learner progress, uploads, and MCP; record the installed release and migrations.
 
+If the target version introduces recoverable deletion, apply all five recovery/cleanup migrations before deploying its server code. After that code is live, configure the worker endpoint in the same Supabase project and verify its first request. Follow [deletion worker setup](bulk-actions.md#install-or-upgrade-the-cleanup-worker); a scheduled job with no endpoint does not perform permanent deletion. Do not point a preview database at the production app.
+
 Your content and settings remain in your own Supabase project. An upgrade must preserve them, but database migrations can change their structure; backups and release-specific instructions matter.
 
 ## Rollback
