@@ -145,7 +145,22 @@ export function ReaderShell({
               <Link
                 href={href}
                 prefetch
-                onClick={href === "/docs" ? undefined : close}
+                onClick={(event) => {
+                  if (href !== "/docs") {
+                    close();
+                    return;
+                  }
+                  if (
+                    event.button ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  )
+                    return;
+                  event.preventDefault();
+                  startNavigation(() => router.push("/docs"));
+                }}
               >
                 <Icon size={19} />
                 {label}
@@ -160,7 +175,12 @@ export function ReaderShell({
             sections={context.docSections}
             selected={selected}
             href={(id) => `/docs/${encodeURIComponent(id)}`}
-            onNavigate={close}
+            onNavigate={(id) => {
+              close();
+              startNavigation(() =>
+                router.push(`/docs/${encodeURIComponent(id)}`),
+              );
+            }}
             storageKey="fieldbook.documents.production"
           />
         )}
