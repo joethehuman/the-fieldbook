@@ -3,7 +3,7 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 
 /** Only fade an edge while the scroll area has hidden content beyond it. */
-export function useScrollFade<T extends HTMLElement>() {
+export function useScrollFade<T extends HTMLElement>(active = true) {
   const ref = useRef<T>(null);
   const [edges, setEdges] = useState({ before: false, after: false });
   const measure = useCallback(() => {
@@ -19,6 +19,7 @@ export function useScrollFade<T extends HTMLElement>() {
   }, []);
 
   useLayoutEffect(() => {
+    if (!active) return;
     const element = ref.current;
     if (!element) return;
     measure();
@@ -30,7 +31,7 @@ export function useScrollFade<T extends HTMLElement>() {
       resize.disconnect();
       mutation.disconnect();
     };
-  }, [measure]);
+  }, [active, measure]);
 
   return { ref, measure, edges };
 }

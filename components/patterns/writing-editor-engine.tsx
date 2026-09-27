@@ -1,6 +1,7 @@
 "use client";
 
 import { writingVideoPlugin } from "./writing-video";
+import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -26,7 +27,6 @@ import {
   applyListType$,
   currentListType$,
   openLinkEditDialog$,
-  insertTable$,
   $createTableNode,
   insertCodeBlock$,
   useCodeBlockEditorContext,
@@ -54,16 +54,12 @@ import {
 import {
   Bold,
   Italic,
-  Code,
   List,
   ListOrdered,
   Link,
-  Table,
-  ImagePlus,
-  Video,
   Undo,
   Redo,
-  FileCode,
+  Plus,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip } from "../ui/tooltip";
@@ -101,16 +97,12 @@ function PlainCodeEditor({
 }
 
 function WritingToolbar({
-  upload,
-  embedVideo,
+  onInsert,
   onEditorReady,
   disabled,
-  canUpload,
 }: {
-  canUpload: boolean;
-  upload: (type: "image" | "video") => void;
-  embedVideo: () => void;
-  onEditorReady: (editor: LexicalEditor | null, actions: { heading: () => void; quote: () => void; table: () => void }) => void;
+  onInsert: (trigger: HTMLButtonElement, fromKeyboard: boolean) => void;
+  onEditorReady: (editor: LexicalEditor | null, actions: { heading: () => void; quote: () => void; codeBlock: () => void; inlineCode: () => void }) => void;
   disabled: boolean;
 }) {
   const editor = useCellValue(activeEditor$);
@@ -119,8 +111,8 @@ function WritingToolbar({
   const applyFormat = usePublisher(applyFormat$);
   const applyList = usePublisher(applyListType$);
   const link = usePublisher(openLinkEditDialog$);
-  const table = usePublisher(insertTable$);
   const code = usePublisher(insertCodeBlock$);
+  const pointerSelection = useRef<BaseSelection | null>(null);
   const [canUndo, setCanUndo] = useState(false),
     [canRedo, setCanRedo] = useState(false);
   useEffect(() => {
@@ -132,9 +124,10 @@ function WritingToolbar({
     onEditorReady(editor, {
       heading: () => convert("heading"),
       quote: () => convert("quote"),
-      table: () => table({ rows: 3, columns: 3 }),
+      codeBlock: () => code({ code: "", language: "" }),
+      inlineCode: () => applyFormat("code"),
     });
-  }, [editor, onEditorReady, table]);
+  }, [editor, onEditorReady, code, applyFormat]);
   useEffect(() => {
     if (!editor) return;
     const undo = editor.registerCommand(
@@ -158,6 +151,14 @@ function WritingToolbar({
       redo();
     };
   }, [editor]);
+  function preserveSelection(run: () => void, pointerClick: boolean) {
+    const selection = pointerClick ? pointerSelection.current : null;
+    pointerSelection.current = null;
+    if (!selection || !editor) { run(); return; }
+    editor.update(() => $setSelection(selection.clone()), { discrete: true });
+    editor.focus();
+    run();
+  }
   const actions = [
     {
       label: "Undo",
@@ -184,12 +185,6 @@ function WritingToolbar({
       pressed: !!(format & 2),
     },
     {
-      label: "Inline code",
-      icon: Code,
-      run: () => applyFormat("code"),
-      pressed: !!(format & 16),
-    },
-    {
       label: "Bulleted list",
       icon: List,
       run: () => applyList(list === "bullet" ? "" : "bullet"),
@@ -202,50 +197,40 @@ function WritingToolbar({
       pressed: list === "number",
     },
     { label: "Link", icon: Link, run: () => link() },
-    { label: "Table", icon: Table, run: () => table({ rows: 3, columns: 2 }) },
-    {
-      label: "Code block",
-      icon: FileCode,
-      run: () => code({ code: "", language: "" }),
-    },
-    {
-      label: "Upload image",
-      icon: ImagePlus,
-      run: () => upload("image"),
-      unavailable: !canUpload,
-    },
-    {
-      label: "Upload video",
-      icon: Video,
-      run: () => upload("video"),
-      unavailable: !canUpload,
-    },
-    { label: "Embed video", icon: Video, run: embedVideo },
   ];
   return (
-    <div
-      className="flex min-w-0 flex-wrap items-center gap-1"
-      role="group"
-      aria-label="Formatting"
-    >
-      <BlockTypeSelect />
-      {actions.map(({ label, icon: Icon, run, unavailable, pressed }) => (
-        <Tooltip key={label} content={label}>
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            aria-label={label}
-            aria-pressed={pressed}
-            className={pressed ? "bg-accent" : undefined}
-            disabled={disabled || unavailable}
-            onMouseDown={(event) => event.preventDefault()}
-            onClick={run}
-          >
-            <Icon />
-          </Button>
-        </Tooltip>
-      ))}
+    <div className="writing-toolbar">
+      <div className="writing-toolbar-controls" role="group" aria-label="Formatting">
+        <BlockTypeSelect />
+        {actions.map(({ label, icon: Icon, run, unavailable, pressed }) => (
+          <Tooltip key={label} content={label}>
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              aria-label={label}
+              aria-pressed={pressed}
+              className={pressed ? "bg-accent" : undefined}
+              disabled={disabled || unavailable}
+              onPointerDown={() => editor?.getEditorState().read(() => {
+                pointerSelection.current = $getSelection()?.clone() || null;
+              })}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={(event) => preserveSelection(run, event.detail > 0 && label !== "Undo" && label !== "Redo")}
+            >
+              <Icon />
+            </Button>
+          </Tooltip>
+        ))}
+        <Button type="button" size="sm" variant="outline" disabled={disabled}
+          aria-haspopup="menu"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={(event) => onInsert(event.currentTarget, event.detail === 0)}>
+          <Plus /> Insert
+        </Button>
+      </div>
+      <p className="writing-toolbar-help writing-toolbar-help-desktop">Type / at the start of a line to insert content.</p>
+      <p className="writing-toolbar-help writing-toolbar-help-mobile">Tap Insert to add content.</p>
     </div>
   );
 }
@@ -267,15 +252,20 @@ export default function WritingEditorEngine({
   const slashMenu = useRef<HTMLDivElement>(null);
   const mediaMenu = useRef<HTMLDivElement>(null);
   const lexicalEditor = useRef<LexicalEditor | null>(null);
-  const blockActions = useRef<{ heading: () => void; quote: () => void; table: () => void } | null>(null);
+  const blockActions = useRef<{ heading: () => void; quote: () => void; codeBlock: () => void; inlineCode: () => void } | null>(null);
   const pendingList = useRef<"bullet" | "number" | null>(null);
   const mediaSelection = useRef<BaseSelection | null>(null);
   const slashSelection = useRef<BaseSelection | null>(null);
+  const toolbarSelection = useRef<BaseSelection | null>(null);
   const activeLine = useRef<HTMLElement | null>(null);
   const [media, setMedia] = useState<"image" | "video">("image");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [slashOpen, setSlashOpen] = useState(false);
+  const slashFade = useScrollFade<HTMLDivElement>(slashOpen);
+  const [slashFromToolbar, setSlashFromToolbar] = useState(false);
+  const insertTrigger = useRef<HTMLButtonElement | null>(null);
+  const focusInsertItem = useRef(false);
   const [slashQuery, setSlashQuery] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [slashPosition, setSlashPosition] = useState({ top: 0, left: 0, above: false, maxHeight: 360 });
@@ -290,7 +280,8 @@ export default function WritingEditorEngine({
     slashMenu.current.style.left = `${slashPosition.left}px`;
     slashMenu.current.style.transform = slashPosition.above ? "translateY(-100%)" : "";
     slashMenu.current.style.maxHeight = `${slashPosition.maxHeight}px`;
-  }, [slashOpen, slashPosition]);
+    if (slashFromToolbar && focusInsertItem.current) slashMenu.current.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+  }, [slashOpen, slashPosition, slashFromToolbar]);
   useLayoutEffect(() => {
     if (!mediaChooser || !mediaMenu.current) return;
     mediaMenu.current.style.top = `${mediaPosition.top}px`;
@@ -311,14 +302,14 @@ export default function WritingEditorEngine({
   useEffect(() => {
     const line = activeLine.current;
     if (!line) return;
-    if (slashOpen) {
-      line.dataset.slashQuery = slashQuery ? `/${slashQuery}` : "/Type to search";
+    if (slashOpen && !slashFromToolbar) {
+      line.dataset.slashQuery = slashQuery || "Type to search";
       line.classList.add("writing-command-line");
     } else {
       line.classList.remove("writing-command-line");
       delete line.dataset.slashQuery;
     }
-  }, [slashOpen, slashQuery]);
+  }, [slashOpen, slashQuery, slashFromToolbar]);
   useEffect(() => {
     const close = (event: PointerEvent) => {
       if (pendingList.current && !root.current?.contains(event.target as Node)) clearPendingList();
@@ -376,6 +367,10 @@ export default function WritingEditorEngine({
     });
     setSlashOpen(false);
     if (kind === "bullet" || kind === "number") {
+      if (slashFromToolbar && activeLine.current?.textContent?.trim()) {
+        lexical?.update(() => $insertList(kind));
+        return;
+      }
       // Lexical drops an empty list, so keep its marker visible until the first character arrives.
       pendingList.current = kind;
       requestAnimationFrame(() => {
@@ -418,8 +413,8 @@ export default function WritingEditorEngine({
     }, { discrete: true });
     lexical.focus();
   }
-  function keepSlashAsText() {
-    const text = `/${slashQuery}`;
+  function keepSlashAsText(query = slashQuery) {
+    const text = `/${query}`;
     const lexical = lexicalEditor.current;
     let index = -1;
     lexical?.getEditorState().read(() => {
@@ -482,15 +477,37 @@ export default function WritingEditorEngine({
     { name: "Numbered list", terms: "numbers list", run: () => chooseBlock("number") },
     { name: "Callout", terms: "quote callout", run: () => chooseBlock("quote") },
     { name: "Table", terms: "table grid rows columns", run: insertTableAtCaret },
+    { name: "Code block", terms: "code block", run: () => { setSlashOpen(false); blockActions.current?.codeBlock(); } },
+    { name: "Inline code", terms: "code inline text", run: () => { setSlashOpen(false); blockActions.current?.inlineCode(); } },
     { name: "Image", terms: "image photo", run: () => openMedia("image") },
     { name: "Upload video", terms: "video upload file", run: () => openMedia("video") },
     { name: "Embed video link", terms: "video embed link", run: () => openMedia("video", "link") },
   ];
-  const matchingCommands = slashCommands.filter(({ name, terms }) => `${name} ${terms}`.toLowerCase().includes(slashQuery.trim().toLowerCase()));
-  function openSlash() {
-    slashSelection.current = null;
+  const commandsFor = (query: string) => slashCommands.filter(({ name, terms }) => `${name} ${terms}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const matchingCommands = commandsFor(slashQuery);
+  function closeInsertMenu() {
+    if (slashFromToolbar) {
+      setSlashOpen(false);
+      insertTrigger.current?.focus({ preventScroll: true });
+    } else keepSlashAsText();
+  }
+  function openSlash(trigger?: HTMLButtonElement, fromKeyboard = false) {
+    if (trigger && slashMenu.current && insertTrigger.current === trigger) {
+      setSlashOpen(false);
+      return;
+    }
+    insertTrigger.current = trigger || null;
+    focusInsertItem.current = fromKeyboard;
+    setSlashFromToolbar(!!trigger);
+    slashSelection.current = trigger ? toolbarSelection.current?.clone() || null : null;
+    let savedLine: HTMLElement | null = null;
     lexicalEditor.current?.getEditorState().read(() => {
-      slashSelection.current = $getSelection()?.clone() || null;
+      const selection = $getSelection();
+      if (!slashSelection.current) slashSelection.current = selection?.clone() || null;
+      if ($isRangeSelection(slashSelection.current)) {
+        const anchor = lexicalEditor.current?.getElementByKey(slashSelection.current.anchor.getNode().getKey());
+        savedLine = anchor?.closest("p, h1, h2, h3, li, blockquote") as HTMLElement | null;
+      }
     });
     const selection = window.getSelection();
     const rangeRect = selection?.rangeCount ? selection.getRangeAt(0).getBoundingClientRect() : null;
@@ -499,14 +516,14 @@ export default function WritingEditorEngine({
     const rootChild = anchorNode?.childNodes[selection?.anchorOffset ?? 0] || anchorNode?.childNodes[Math.max(0, (selection?.anchorOffset ?? 0) - 1)];
     const selectedLine = rootChild instanceof Element ? rootChild : rootChild?.parentElement;
     const line = anchor?.closest("p, h1, h2, h3, li, blockquote") || selectedLine?.closest("p, h1, h2, h3, li, blockquote") || root.current?.querySelector(".writing-content p:last-child");
-    activeLine.current = line instanceof HTMLElement ? line : null;
-    const rect = rangeRect?.height ? rangeRect : line?.getBoundingClientRect();
+    activeLine.current = savedLine || (line instanceof HTMLElement ? line : null);
+    const rect = trigger?.getBoundingClientRect() || (rangeRect?.height ? rangeRect : line?.getBoundingClientRect());
     if (!rect) return;
     const viewport = root.current?.closest(".main-content")?.getBoundingClientRect();
     const spaceAbove = rect.top - (viewport?.top ?? 0);
     const spaceBelow = (viewport?.bottom ?? window.innerHeight) - rect.bottom;
     const above = spaceBelow < 220 && spaceAbove > spaceBelow;
-    const width = Math.min(320, window.innerWidth - 16);
+    const width = Math.min(288, window.innerWidth - 16);
     setSlashPosition({
       top: above ? rect.top - 8 : rect.bottom + 8,
       left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
@@ -514,6 +531,17 @@ export default function WritingEditorEngine({
       maxHeight: Math.max(160, Math.min(360, (above ? spaceAbove : spaceBelow) - 16)),
     });
     setSlashQuery(""); setSlashIndex(0); setSlashOpen(true);
+  }
+  function runInsertCommand(run: () => void) {
+    if (!slashFromToolbar) { run(); return; }
+    const lexical = lexicalEditor.current;
+    const selection = slashSelection.current;
+    if (!lexical) { run(); return; }
+    lexical.update(() => {
+      if (selection) $setSelection(selection.clone());
+    }, { discrete: true });
+    lexical.focus();
+    run();
   }
   function insertVideo() {
     if (!videoSource(videoUrl)) {
@@ -544,23 +572,21 @@ export default function WritingEditorEngine({
     toolbarPlugin({
       toolbarContents: () => (
         <WritingToolbar
+          onInsert={openSlash}
           onEditorReady={(active, actions) => { if (active) lexicalEditor.current = active; blockActions.current = actions; }}
-          canUpload={!!onUpload}
           disabled={disabled || busy}
-          embedVideo={() => openMedia("video", "link")}
-          upload={(type) => {
-            if (!onUpload) {
-              setError("Uploads are unavailable in this view.");
-              return;
-            }
-            openMedia(type);
-          }}
         />
       ),
     }),
   ], [onUpload, disabled, busy]);
   return (
     <div ref={root} className="writing-editor rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {
+      if (event.target instanceof Element && event.target.closest(".writing-toolbar-controls")) {
+        toolbarSelection.current = null;
+        lexicalEditor.current?.getEditorState().read(() => {
+          toolbarSelection.current = $getSelection()?.clone() || null;
+        });
+      }
       if (slashMenu.current?.contains(event.target as Node) || mediaMenu.current?.contains(event.target as Node)) return;
       if (pendingList.current && activeLine.current && !activeLine.current.contains(event.target as Node)) clearPendingList();
       if (slashOpen && activeLine.current && !activeLine.current.contains(event.target as Node)) setSlashOpen(false);
@@ -613,15 +639,21 @@ export default function WritingEditorEngine({
         }
       }
       if (slashOpen && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
-        if (event.key === "Escape") { event.preventDefault(); setSlashOpen(false); return; }
+        if (event.key === "Escape") { event.preventDefault(); closeInsertMenu(); return; }
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
           if (matchingCommands.length) setSlashIndex((index) => (index + (event.key === "ArrowDown" ? 1 : -1) + matchingCommands.length) % matchingCommands.length);
           return;
         }
-        if (event.key === "Enter") { event.preventDefault(); if (matchingCommands.length) matchingCommands[slashIndex]?.run(); else keepSlashAsText(); return; }
+        if (event.key === "Enter") { event.preventDefault(); matchingCommands[slashIndex]?.run(); return; }
         if (event.key === "Backspace") { event.preventDefault(); if (slashQuery) setSlashQuery((query) => query.slice(0, -1)); else setSlashOpen(false); setSlashIndex(0); return; }
-        if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); setSlashQuery((query) => query + event.key); setSlashIndex(0); return; }
+        if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+          event.preventDefault();
+          const nextQuery = slashQuery + event.key;
+          if (commandsFor(nextQuery).length) { setSlashQuery(nextQuery); setSlashIndex(0); }
+          else keepSlashAsText(nextQuery);
+          return;
+        }
       }
       if (event.key === "/" && !disabled && !busy && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
         const selection = window.getSelection();
@@ -635,10 +667,21 @@ export default function WritingEditorEngine({
           {error}
         </Alert>
       )}
-      {slashOpen && createPortal(<div ref={slashMenu} role="menu" aria-label="Insert content. Type to search, use arrow keys to choose, then press Enter." className="writing-slash-menu">
-        <div className="writing-slash-options">
-          {matchingCommands.length ? matchingCommands.map((command, index) => <Button key={command.name} type="button" size="sm" variant="ghost" role="menuitem" aria-current={index === slashIndex ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setSlashIndex(index)} onClick={command.run}>{command.name}</Button>) : <><p className="muted">No matching blocks</p><Button type="button" size="sm" variant="ghost" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={keepSlashAsText}>Keep /{slashQuery} as text</Button></>}
+      {slashOpen && createPortal(<div ref={slashMenu} role="menu" aria-label={slashFromToolbar ? "Insert content" : "Insert content. Type to search, use arrow keys to choose, then press Enter."} className="writing-slash-menu" onKeyDown={(event) => {
+        if (!slashFromToolbar) return;
+        if (event.key === "Tab") setSlashOpen(false);
+        if (event.key === "Escape") { event.preventDefault(); closeInsertMenu(); }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+          event.preventDefault();
+          const items = Array.from(slashMenu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') || []);
+          const index = items.indexOf(document.activeElement as HTMLButtonElement);
+          items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
+        }
+      }}>
+        <div ref={slashFade.ref} className="writing-slash-options scroll-fade" data-scroll-fade-before={slashFade.edges.before} data-scroll-fade-after={slashFade.edges.after} onScroll={slashFade.measure}>
+          {matchingCommands.map((command, index) => <Button key={command.name} type="button" size="sm" variant="ghost" role="menuitem" aria-current={!slashFromToolbar && index === slashIndex ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setSlashIndex(index)} onClick={() => runInsertCommand(command.run)}>{command.name}</Button>)}
         </div>
+        <div className="writing-slash-footer"><Button type="button" size="sm" variant="ghost" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={closeInsertMenu}><span>Close menu</span><kbd>esc</kbd></Button></div>
       </div>, document.body)}
       {mediaChooser && createPortal(<div ref={mediaMenu} className="writing-media-chooser" role="dialog" aria-label={`Insert ${mediaChooser}`} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeMedia(); editor.current?.focus(undefined, { preventScroll: true }); } }}>
         <div className="writing-media-tabs"><Button type="button" variant="ghost" aria-pressed={mediaTab === "upload"} onClick={() => setMediaTab("upload")}>Upload</Button><Button type="button" variant="ghost" aria-pressed={mediaTab === "link"} onClick={() => setMediaTab("link")}>Link</Button></div>
