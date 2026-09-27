@@ -150,15 +150,6 @@ export default function SiteSettingsPanel({
             placeholder="No published policy"
             description="Set or publish this link in Organization Settings → Privacy policy. Hosted and external policies use the same published setting across the application."
           />
-          <TextField
-            id="footer-tagline"
-            label="Footer tagline"
-            maxLength={180}
-            value={settings.tagline}
-            onChange={(e) =>
-              setSettings({ ...settings, tagline: e.target.value })
-            }
-          />
           <FieldGroup className="brand-control">
             <legend>Accent color</legend>
             <FieldDescription>

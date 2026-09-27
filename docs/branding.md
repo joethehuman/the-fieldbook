@@ -3,8 +3,10 @@
 Administrators configure one installation identity in **Organization Settings → Identity**. The workspace, sign-in, AI consent and connection pages use that identity. There are no separate login settings or custom authentication instructions.
 
 - **Installation name:** required, up to 60 characters. Existing installations keep their name; missing names display Fieldbook.
-- **Welcome description:** optional plain text, up to 180 characters, shown beneath the application-provided sign-in instructions. Existing installations default to no welcome description. The existing footer tagline remains separate.
+- **Welcome description:** optional plain text, up to 180 characters, shown beneath the application-provided sign-in instructions. Existing installations default to no welcome description.
 - **Privacy-policy link:** the branding section displays the current published link. Edit and explicitly publish it in **Organization Settings → Privacy policy**, using either a hosted notice or an external HTTPS URL. Draft policy edits do not alter account-page links. See [privacy setup](privacy-setup.md).
+
+The application has no footer or tagline setting. A published privacy policy appears in the workspace account menu and on sign-in and other account pages. Existing saved tagline values are retained for compatibility but are no longer shown or editable.
 
 Save settings to apply branding. Settings writes require an active administrator, a same-origin request and the current settings revision. If another administrator changes the settings, reload and review before saving again. Names and descriptions are text, not HTML or Markdown.
 

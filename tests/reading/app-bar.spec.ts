@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
+import { defaultPrivacy, defaultSettings } from "../../lib/settings";
 import type { Content } from "../../lib/types";
 
 for (const app of ["demo", "production"]) {
@@ -64,19 +65,13 @@ for (const app of ["demo", "production"]) {
         path: info.outputPath(`${app}-${kind}-top.png`),
       });
       const main = page.locator("#main-content");
-      const footer = page.locator(".app-footer");
-      const footerBottom = await footer.evaluate(
-        (el) => el.getBoundingClientRect().bottom,
-      );
+      await expect(page.locator(".app-footer")).toHaveCount(0);
       await main.evaluate((el) => el.scrollTo(0, 1200));
       expect(await main.evaluate((el) => el.scrollTop)).toBeGreaterThan(200);
       expect(await page.evaluate(() => scrollY)).toBe(0);
       expect(await bar.evaluate((el) => el.getBoundingClientRect().top)).toBe(
         0,
       );
-      expect(
-        await footer.evaluate((el) => el.getBoundingClientRect().bottom),
-      ).toBe(footerBottom);
       await page.screenshot({
         path: info.outputPath(`${app}-${kind}-scrolled.png`),
       });
@@ -97,7 +92,12 @@ for (const app of ["demo", "production"]) {
         path: info.outputPath(`${app}-${kind}-enlarged.png`),
       });
       if (app === "demo") {
-        const about = footer.getByRole("button", { name: "About this demo" });
+        const account = page.getByRole("button", { name: "Account menu" });
+        if (!(await account.isVisible()))
+          await page.getByRole("button", { name: "Open navigation" }).click();
+        await account.click();
+        await page.screenshot({ path: info.outputPath(`${app}-${kind}-account-menu.png`) });
+        const about = page.getByRole("menuitem", { name: "About this demo" });
         await about.click();
         const dialog = page.getByRole("dialog");
         await expect(dialog).toBeVisible();
@@ -110,7 +110,14 @@ for (const app of ["demo", "production"]) {
           path: info.outputPath(`${app}-${kind}-dialog.png`),
         });
         await page.keyboard.press("Escape");
-        await expect(about).toBeFocused();
+        await expect(
+          page.getByRole("button", {
+            name:
+              info.project.name === "phone"
+                ? "Open navigation"
+                : "Account menu",
+          }),
+        ).toBeFocused();
       }
     });
   }
@@ -124,18 +131,51 @@ test("demo opens on profile choice before the first selection", async ({
     page.getByRole("heading", { name: "Choose a demo profile" }),
   ).toBeVisible();
   await page.getByRole("button", { name: /Alex Edwards/ }).click();
-  const footer = page.locator(".app-footer");
-  const about = footer.getByRole("button", { name: "About this demo" });
-  await expect(about).toBeVisible();
+  await expect(page.locator(".app-footer")).toHaveCount(0);
+  const account = page.getByRole("button", { name: "Account menu" });
+  if (!(await account.isVisible()))
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await account.click();
+  await expect(
+    page.getByRole("menuitem", { name: "About this demo" }),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Demo organization" }),
   ).toHaveCount(0);
-  expect(await about.evaluate((el) => getComputedStyle(el).fontSize)).toBe(
-    await footer
-      .locator("span")
-      .first()
-      .evaluate((el) => getComputedStyle(el).fontSize),
-  );
   await page.reload();
-  await expect(about).toBeVisible();
+  if (!(await account.isVisible()))
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await account.click();
+  await expect(
+    page.getByRole("menuitem", { name: "About this demo" }),
+  ).toBeVisible();
+});
+
+test("demo account menu opens its published privacy policy", async ({ page }) => {
+  const data = freshWorkspace();
+  data.settings = {
+    ...defaultSettings,
+    privacy: {
+      ...defaultPrivacy,
+      published: {
+        ...defaultPrivacy.draft,
+        operatorName: "Demo operator",
+        contactEmail: "demo@example.com",
+        body: "Demo published policy.",
+      },
+      publishedAt: "2026-09-26T00:00:00.000Z",
+    },
+  };
+  await page.addInitScript((workspace) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+  }, data);
+  await page.goto("http://localhost:3132/");
+  const account = page.getByRole("button", { name: "Account menu" });
+  if (!(await account.isVisible()))
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  await account.click();
+  await page.getByRole("menuitem", { name: "Privacy policy" }).click();
+  await expect(page).toHaveURL(/\/privacy$/);
+  await expect(page.getByText("Demo published policy.")).toBeVisible();
 });

@@ -4,7 +4,10 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Simplify the shared Docs, Updates and Courses writing toolbar. Keep common formatting and Undo/Redo visible, add a touch-friendly Insert menu for blocks and media, and show brief desktop and mobile guidance below the controls.
+- Remove the workspace footer and tagline control. Find the published privacy policy and demo information in the account menu; account pages retain their privacy link.
+- Keep standalone account pages in their own scroll area so a pull gesture cannot leave the demo profile chooser or installed sign-in card clipped on mobile.
+
+- Simplify the shared Docs, Updates and Courses writing toolbar. Keep common formatting and Undo/Redo visible, add a touch-friendly Insert menu for blocks and media, and show brief desktop and mobile guidance below the controls. Give the Insert menus full-row choices, an inline slash search hint, and a fade when more options can be scrolled into view.
 
 - Move account, team and organization actions into a shared profile menu for learners, managers, administrators and guests. Add general Fieldbook feedback through a dismissible dialog and include it in administrator feedback reports. Keep demo profile switching separate. Existing installations need `20260926182840_general_feedback.sql` before this feedback action can save.
 

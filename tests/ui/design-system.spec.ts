@@ -172,8 +172,6 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   const panel = page.getByRole("tabpanel", { name: "Content" });
   const shellPositions = await page.evaluate(() => ({
     header: document.querySelector(".topbar")!.getBoundingClientRect().top,
-    footer: document.querySelector(".app-footer")!.getBoundingClientRect()
-      .bottom,
     sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
   }));
   await nav.hover();
@@ -196,8 +194,6 @@ test("admin menu scroll stays put while the new panel starts at the top", async 
   expect(
     await page.evaluate(() => ({
       header: document.querySelector(".topbar")!.getBoundingClientRect().top,
-      footer: document.querySelector(".app-footer")!.getBoundingClientRect()
-        .bottom,
       sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
     })),
   ).toEqual(shellPositions);
@@ -223,8 +219,6 @@ test("short pages keep the shared shell fixed at both scroll limits", async ({
   await expect(page.getByText("No updates published yet.")).toBeVisible();
   const before = await page.evaluate(() => ({
     header: document.querySelector(".topbar")!.getBoundingClientRect().top,
-    footer: document.querySelector(".app-footer")!.getBoundingClientRect()
-      .bottom,
     sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
   }));
   await main.hover();
@@ -235,8 +229,6 @@ test("short pages keep the shared shell fixed at both scroll limits", async ({
   expect(
     await page.evaluate(() => ({
       header: document.querySelector(".topbar")!.getBoundingClientRect().top,
-      footer: document.querySelector(".app-footer")!.getBoundingClientRect()
-        .bottom,
       sidebar: document.querySelector(".sidebar")!.getBoundingClientRect().top,
     })),
   ).toEqual(before);
@@ -353,9 +345,7 @@ test("learner routes and narrow navigation remain usable", async ({
       ).toBeVisible();
     await noOverflow(page);
   }
-  await expect(page.locator(".app-footer > span")).toHaveText(
-    "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS",
-  );
+  await expect(page.locator(".app-footer")).toHaveCount(0);
   await page.goto("/#courses");
   const firstChannel = page.locator(".library .channel").first();
   const channelHeading = await firstChannel
@@ -447,12 +437,8 @@ test("course completion still works through shared choices and controls", async 
       level: 1,
     }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: /^Next lesson/ })
-    .click();
-  await page
-    .getByRole("button", { name: "Quiz Check your knowledge" })
-    .click();
+  await page.getByRole("button", { name: /^Next lesson/ }).click();
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await page
     .getByRole("radio", { name: "The customer’s goal", exact: true })
     .check();
@@ -465,7 +451,9 @@ test("course completion still works through shared choices and controls", async 
   await expect(
     page.getByRole("button", { name: "Complete course", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Complete course", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Complete course", exact: true })
+    .click();
   await page.reload();
   await expect(
     page.getByText("Completed", { exact: true }).first(),

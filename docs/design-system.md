@@ -116,7 +116,7 @@ The `/ui` catalog demonstrates mixed course/curriculum cards, the labeled browse
 
 `AccountMenu` is the shared sidebar identity and action surface in the demo and installed app. The calling shell supplies role-authorized destinations and the feedback persistence callback. The menu never grants access by itself; installed-app routes still enforce server permissions. Guest guidance and sign-in live in the menu. No theme control is currently offered.
 
-`InstallationIdentity` displays the installation name in the workspace and on account pages. `BrandedAccount` composes it with `AccountPage` and the published privacy link. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.
+`InstallationIdentity` displays the installation name in the workspace and on account pages. `BrandedAccount` composes it with `AccountPage` and the published privacy link. `AccountPage` keeps the document fixed while its own scroll area holds a short card in place and lets taller account content scroll. Use the same identity on sign-in, consent and connection pages; keep each page's purpose, provider actions and authorization outside the shared pattern. The demo profile picker uses this layout with explicit simulation disclosures. The `/ui` catalog includes the shared identity.
 
 ## Search results
 
@@ -156,7 +156,7 @@ The `/ui` catalog includes a document tree, repeated headings, an outline and se
 
 ## Persistent application bar
 
-`AppBar` owns the shared header in `Fieldbook`. The application shell fills the viewport: the header and footer stay in place, while `.main-content` owns page scrolling and the sidebar owns its own scroll. Administration divides the available content area into independently scrolling section navigation and panel. Keep the opaque header background and border. Its layer (15) is below navigation/backdrop (20/30), dialogs (40) and portaled menus (50). Search stays inside the bar's stacking context. Standalone account and full-screen routes do not acquire this shell.
+`AppBar` owns the shared header in `Fieldbook`. The application shell fills the viewport: the header stays in place, while `.main-content` owns page scrolling and the sidebar owns its own scroll. There is no application footer. Published privacy and demo information are available from the account menu. Administration divides the available content area into independently scrolling section navigation and panel. Keep the opaque header background and border. Its layer (15) is below navigation/backdrop (20/30), dialogs (40) and portaled menus (50). Search stays inside the bar's stacking context. Standalone account and full-screen routes do not acquire this shell.
 
 A ResizeObserver supplies `--app-bar-height` for wrapped controls and enlarged text. The main scroll area and nested Admin panel use local scroll padding and heading margins; the bar's height is not added to those offsets. The Docs outline tracks the main scroll area and uses `--anchor-offset` for its sticky top and bounded height. Preserve native fragment/history behavior and navigation guards. SearchPanel bounds its height by the remaining viewport, and retains its trigger-relative desktop and bar-relative phone placement. Verify short and long content, scroll limits, long breadcrumbs, enlarged text, search, heading links and dialog focus in both applications.
 
