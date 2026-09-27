@@ -124,7 +124,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
           <div className="course-about">
             <details><summary>About this course</summary><p>{course.summary}</p><p>{course.duration} min · {course.lessons.length} lessons</p>{course.body && <div className="markdown"><Markdown linkContext="course">{course.body}</Markdown></div>}</details>
             <p className="course-desktop-summary">{course.summary}</p>
-            <div className="course-detail-meta course-desktop-summary"><Clock size={16} /> {course.duration} min · {course.lessons.length} lessons {complete && <Badge variant="success">Completed</Badge>}</div>
+            <div className="course-detail-meta course-desktop-summary"><Clock size={16} /> {course.duration} min · {course.lessons.length} lessons <Badge variant="success" className={complete ? undefined : "invisible"} aria-hidden={!complete}>Completed</Badge></div>
             {course.body && <div className="markdown course-desktop-summary"><Markdown linkContext="course">{course.body}</Markdown></div>}
           </div>
         </div>

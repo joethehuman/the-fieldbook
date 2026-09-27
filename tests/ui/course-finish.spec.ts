@@ -27,6 +27,13 @@ async function cardAtTop(page: Page, selector: string) {
     return card!.y - viewport!.y;
   }).toBeLessThan(70);
 }
+async function outlineOffset(page: Page) {
+  return page.evaluate(() => {
+    const sidebar = document.querySelector(".course-sidebar")!.getBoundingClientRect();
+    const outline = document.querySelector(".course-sidebar .lesson-nav")!.getBoundingClientRect();
+    return outline.top - sidebar.top;
+  });
+}
 
 test("required quiz shows one question at a time, grades, and retries", async ({ page }, info) => {
   await openCourse(page, "required");
@@ -66,9 +73,12 @@ test("optional quiz completes after a missed answer and still offers retry", asy
   await page.getByRole("radio", { name: "Every available feature" }).check();
   await page.getByRole("button", { name: "Submit and continue" }).click();
   await page.getByRole("radio", { name: "With an agreed next step" }).check();
+  const outlineBeforeCompletion = await outlineOffset(page);
   await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(page.getByRole("heading", { name: "1 of 2 correct" })).toBeVisible();
   await expect(page.getByText("Course complete.")).toBeVisible();
+  await expect.poll(async () => Math.abs((await outlineOffset(page)) - outlineBeforeCompletion)).toBeLessThan(2);
+  if (info.project.name === "desktop") await expect(page.locator('.course-detail-meta [data-slot="badge"]')).toBeVisible();
   await expect(page.getByRole("region", { name: "Content feedback" })).toBeVisible();
   await cardAtTop(page, ".course-quiz");
   await page.getByText("Review answers").click();
@@ -81,8 +91,10 @@ test("optional quiz completes after a missed answer and still offers retry", asy
 
 test("last no-quiz lesson completes and opens expanded feedback", async ({ page }, info) => {
   await openCourse(page, "no-quiz");
+  const outlineBeforeCompletion = await outlineOffset(page);
   await page.getByRole("button", { name: "Finish course Course complete" }).click();
   await expect(page.getByRole("heading", { name: "Course complete" })).toBeVisible();
+  await expect.poll(async () => Math.abs((await outlineOffset(page)) - outlineBeforeCompletion)).toBeLessThan(2);
   await expect(page.getByRole("textbox", { name: "Your feedback (optional)" })).toBeVisible();
   await cardAtTop(page, ".course-finish-card");
   await page.screenshot({ path: info.outputPath("no-quiz-finish.png") });
