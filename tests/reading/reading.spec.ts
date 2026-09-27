@@ -212,6 +212,19 @@ test("installation root opens the current home without a workspace snapshot", as
   expect(workspaceReads).toBe(0);
 });
 
+test("installation root follows the saved Updates or Docs home", async ({ request }) => {
+  for (const homePage of ["updates", "docs"] as const) {
+    await fixture(request, { settings: { access: "public", homePage } });
+    const response = await request.get("/", { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers().location).toBe(`/${homePage}`);
+    const home = await request.get(`/${homePage}`);
+    expect(home.status()).toBe(200);
+    if (homePage === "docs")
+      expect(await home.text()).toContain("Published doc title");
+  }
+});
+
 test("current section URLs are canonical and retired names do not open the app", async ({
   request,
 }) => {

@@ -143,6 +143,26 @@ export default function SiteSettingsPanel({
               setSettings({ ...settings, welcomeDescription: e.target.value })
             }
           />
+          <FormField
+            label="Home page"
+            description="The page people open from your installation address. Docs opens the first published article in your Docs order."
+          >
+            <SelectField
+              value={settings.homePage || "courses"}
+              onValueChange={(value) =>
+                setSettings({
+                  ...settings,
+                  homePage: value as "updates" | "courses" | "docs",
+                })
+              }
+              disabled={busy}
+              aria-label="Home page"
+            >
+              <option value="updates">Updates</option>
+              <option value="courses">Courses</option>
+              <option value="docs">Docs</option>
+            </SelectField>
+          </FormField>
           <TextField
             id="privacy-policy-link"
             label="Privacy-policy link"

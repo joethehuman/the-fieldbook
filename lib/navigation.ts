@@ -1,5 +1,17 @@
-// Change this one destination if the installation home moves to Updates.
+import type { SiteSettings } from "./settings";
+
 export const organizationHomePath = "/courses";
+
+export function homePath(settings?: Pick<SiteSettings, "homePage">): string {
+  switch (settings?.homePage) {
+    case "updates":
+      return "/updates";
+    case "docs":
+      return "/docs";
+    default:
+      return organizationHomePath;
+  }
+}
 
 export const sectionPaths = {
   learn: "courses",

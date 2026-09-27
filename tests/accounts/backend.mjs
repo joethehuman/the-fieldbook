@@ -133,6 +133,7 @@ createServer(async (req, res) => {
       return send(res, {
         name: settings.name ?? null,
         accent: settings.accent ?? null,
+        homePage: settings.homePage ?? null,
         welcomeDescription: settings.welcomeDescription ?? null,
         access: settings.access ?? null,
         policyMode: settings.privacy?.published?.mode ?? null,

@@ -135,6 +135,7 @@ const publishedPrivacySchema = privacyDocumentSchema.refine(
 );
 export const settingsSchema = z
   .object({
+    homePage: z.enum(["updates", "courses", "docs"]).default("courses"),
     guestGroupId: text(80).min(1).nullable().optional(),
     docCategoryOrder: z
       .array(text(80).trim().min(1))

@@ -10,7 +10,7 @@ import { publicBranding } from "@production/lib/branding";
 import { errorResponse } from "@production/lib/errors";
 import { AccountUnavailable } from "../AccountUnavailable";
 import Link from "next/link";
-import { organizationHomePath } from "@/lib/navigation";
+import { homePath } from "@/lib/navigation";
 export const dynamic = "force-dynamic";
 export default async function SignIn({
   searchParams,
@@ -39,6 +39,7 @@ export default async function SignIn({
       <ReturnFragment
         destination={safeNext(
           (await cookies()).get(SIGN_IN_RETURN_COOKIE)?.value,
+          homePath(branding),
         )}
       />
       <header className="sign-in-heading">
@@ -63,7 +64,7 @@ export default async function SignIn({
       </Button>
       {branding.access === "public" && (
         <nav className="sign-in-footer" aria-label="Sign-in links">
-          <Link href={organizationHomePath}>Back to browsing</Link>
+          <Link href={homePath(branding)}>Back to browsing</Link>
         </nav>
       )}
     </BrandedAccount>

@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { ReaderSearch } from "./ReaderSearch";
 import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
-import { organizationHomePath } from "@/lib/navigation";
+import { homePath } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "@/components/patterns/brand-theme-sync";
@@ -288,7 +288,7 @@ export function ReaderShell({
           </Button>
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
-              <Link href={organizationHomePath} prefetch>
+              <Link href={homePath(context.branding)} prefetch>
                 Organization
               </Link>
             </Button>

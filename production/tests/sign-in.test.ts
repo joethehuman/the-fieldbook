@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { GET } from "../app/auth/sign-in/route";
 import { SIGN_IN_RETURN_COOKIE } from "../lib/sign-in";
-import { organizationHomePath } from "../../lib/navigation";
 
 test("sign-in hides the return path while remembering docs, query and anchor", () => {
   const next = "/docs?topic=setup#google";
@@ -36,9 +35,6 @@ test("sign-in rejects external return destinations and defaults to home", () => 
         `https://fieldbook.example/auth/sign-in?next=${encodeURIComponent(next)}`,
       ),
     );
-    assert.equal(
-      response.cookies.get(SIGN_IN_RETURN_COOKIE)?.value,
-      organizationHomePath,
-    );
+    assert.equal(response.cookies.get(SIGN_IN_RETURN_COOKIE)?.value, "/");
   }
 });

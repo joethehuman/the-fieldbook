@@ -10,6 +10,7 @@ export async function GET(req: Request) {
   const next = safeNext(
     requestUrl.searchParams.get("next") ??
       cookieStore.get(SIGN_IN_RETURN_COOKIE)?.value,
+    "/",
   );
   try {
     const origin = env().origin;

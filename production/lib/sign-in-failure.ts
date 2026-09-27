@@ -20,7 +20,7 @@ export function signInFailure(origin: string, next: string, error?: unknown) {
     );
   const response = NextResponse.redirect(url);
   response.headers.set("Cache-Control", "private, no-store");
-  response.cookies.set(SIGN_IN_RETURN_COOKIE, safeNext(next), {
+  response.cookies.set(SIGN_IN_RETURN_COOKIE, safeNext(next, "/"), {
     httpOnly: true,
     secure: url.protocol === "https:",
     sameSite: "lax",
