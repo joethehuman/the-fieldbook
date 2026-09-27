@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Warm the administrator or team destination when its account-menu action is opened, and warm reader destinations on administrator navigation intent. Show a slim, layout-stable header indicator after confirmed navigation; keep Team progress inside the reader shell while its report loads.
+
 - Show one quiz question per course step, then a scored results screen with review, retry and optional feedback. An eligible final quiz submission or the last lesson of a no-quiz course now records completion before the shared finish screen; Close course only navigates away.
 
 - Remove the workspace footer and tagline control. Find the published privacy policy and demo information in the account menu; account pages retain their privacy link.

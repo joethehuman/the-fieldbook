@@ -150,3 +150,118 @@ test("admin page and scoped data reject guests and non-administrators", async ({
   ).toBe(403);
   await context.close();
 });
+
+test("opening the account menu starts the administrator route before selection", async ({
+  page,
+  request,
+}) => {
+  await request.post(`${backend}/fixture`, {
+    data: { settings: { access: "private", logoUrl: "" } },
+  });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  let adminPrefetches = 0;
+  let documentNavigations = 0;
+  page.on("request", (req) => {
+    const url = new URL(req.url());
+    if (url.pathname === "/admin" && url.searchParams.has("_rsc"))
+      adminPrefetches++;
+    if (req.isNavigationRequest()) documentNavigations++;
+  });
+  await page.goto("/courses");
+  const menu = page.getByRole("button", { name: "Open navigation" });
+  if (await menu.isVisible()) await menu.click();
+  await expect(
+    page.getByRole("button", { name: "Account menu" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Account menu" }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Manage organization" }),
+  ).toBeVisible();
+  await expect.poll(() => adminPrefetches).toBeGreaterThan(0);
+  expect(documentNavigations).toBe(1);
+});
+
+test("confirmed editor navigation responds while its destination is loading", async ({
+  page,
+  request,
+}, info) => {
+  await request.post(`${backend}/fixture`, {
+    data: { settings: { access: "private", logoUrl: "" } },
+  });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  await page.goto("/admin");
+  await expect(page.locator(".admin-layout")).toBeVisible();
+  const picker = page.getByRole("combobox", { name: "Administration section" });
+  if (await picker.isVisible()) {
+    await picker.click();
+    await page.getByRole("option", { name: "Identity" }).click();
+  } else await page.getByRole("tab", { name: "Identity" }).click();
+  await page
+    .getByRole("textbox", { name: "Installation name" })
+    .fill("Unsaved name");
+
+  let release!: () => void;
+  const destination = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(/\/docs\?_rsc=/, async (route) => {
+    await destination;
+    await route.continue();
+  });
+  const menu = page.getByRole("button", { name: "Open navigation" });
+  if (await menu.isVisible()) await menu.click();
+  const topbar = await page.locator(".topbar").boundingBox();
+  await page
+    .getByRole("navigation", { name: "Primary" })
+    .getByRole("button", { name: "Docs", exact: true })
+    .click();
+  const confirmation = page.getByRole("alertdialog", {
+    name: "Confirm action",
+  });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole("button", { name: "Confirm" }).click();
+  try {
+    await expect(
+      page.getByRole("status", { name: "Opening page" }),
+    ).toBeVisible();
+    expect(await page.locator(".topbar").boundingBox()).toEqual(topbar);
+    await page.screenshot({ path: info.outputPath("pending-navigation.png") });
+  } finally {
+    release();
+  }
+  await expect(page).toHaveURL(/\/docs(?:\/|$)/);
+});

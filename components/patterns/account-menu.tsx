@@ -32,6 +32,9 @@ export function AccountMenu({
   guest = false,
   onManageOrganization,
   onTeamProgress,
+  onMenuOpen,
+  onManageOrganizationIntent,
+  onTeamProgressIntent,
   onSignOut,
   onSignIn,
   onSwitchDemoProfile,
@@ -49,6 +52,9 @@ export function AccountMenu({
   guest?: boolean;
   onManageOrganization?: () => void;
   onTeamProgress?: () => void;
+  onMenuOpen?: () => void;
+  onManageOrganizationIntent?: () => void;
+  onTeamProgressIntent?: () => void;
   onSignOut?: () => void;
   onSignIn?: () => void;
   onSwitchDemoProfile?: () => void;
@@ -78,7 +84,7 @@ export function AccountMenu({
             </span>
           )}
         </span>
-        <DropdownMenu>
+        <DropdownMenu onOpenChange={(open) => open && onMenuOpen?.()}>
           <DropdownMenuTrigger asChild>
             <Button
               ref={trigger}
@@ -123,13 +129,21 @@ export function AccountMenu({
               <MessageSquare className="ml-auto size-4" aria-hidden="true" />
             </DropdownMenuItem>
             {onTeamProgress && (
-              <DropdownMenuItem onSelect={onTeamProgress}>
+              <DropdownMenuItem
+                onSelect={onTeamProgress}
+                onPointerEnter={onTeamProgressIntent}
+                onFocus={onTeamProgressIntent}
+              >
                 My team’s progress{" "}
                 <GraduationCap className="ml-auto size-4" aria-hidden="true" />
               </DropdownMenuItem>
             )}
             {onManageOrganization && (
-              <DropdownMenuItem onSelect={onManageOrganization}>
+              <DropdownMenuItem
+                onSelect={onManageOrganization}
+                onPointerEnter={onManageOrganizationIntent}
+                onFocus={onManageOrganizationIntent}
+              >
                 Manage organization{" "}
                 <Settings className="ml-auto size-4" aria-hidden="true" />
               </DropdownMenuItem>
