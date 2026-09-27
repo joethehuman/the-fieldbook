@@ -1050,7 +1050,6 @@ export default function Fieldbook({
               demo={!runtime}
               onDocument={(id) => navigate("docs", id)}
               item={item}
-              name={branding.name}
               back={
                 item.kind === "doc" ? null : (
                   <Button variant="link" onClick={() => navigate("briefs")}>
