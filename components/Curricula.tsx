@@ -25,16 +25,21 @@ import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import { groupItems } from "@/lib/learning-groups";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { Button } from "./ui/button";
+import { CardArtEditor } from "./patterns/card-art-editor";
+import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
+import type { UploadMedia } from "./MarkdownEditor";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 
 export default function Curricula({
   data,
   onChange,
+  onUpload,
   registerNavigationGuard,
 }: {
   registerNavigationGuard?: RegisterNavigationGuard;
   data: Workspace;
   onChange: (data: Workspace) => void | Promise<void>;
+  onUpload?: UploadMedia;
 }) {
   const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
@@ -80,6 +85,14 @@ export default function Curricula({
       setNotice("Give the curriculum a name.");
       return;
     }
+    const art = resolvedCardArt(editing.id, name, editing.cardArt);
+    if (
+      art.source === "generated" &&
+      (!art.shortTitle.trim() || graphemeCount(art.shortTitle.trim()) > 40)
+    ) {
+      setNotice("Give generated artwork a short title of up to 40 characters.");
+      return;
+    }
     if (
       all.some(
         (c) =>
@@ -100,7 +113,15 @@ export default function Curricula({
         ...data,
         curricula: [
           ...all.filter((c) => c.id !== editing.id),
-          { ...editing, name },
+          {
+            ...editing,
+            name,
+            cardArt:
+              editing.cardArt ||
+              (all.some((c) => c.id === editing.id)
+                ? undefined
+                : resolvedCardArt(editing.id, name)),
+          },
         ],
       });
       setEditing(null);
@@ -181,6 +202,17 @@ export default function Curricula({
                 }
               />
             </FormField>
+            <CardArtEditor
+              id={editing.id}
+              title={editing.name}
+              kind="curriculum"
+              art={editing.cardArt}
+              settings={data.settings}
+              onUpload={onUpload}
+              disabled={busy}
+              onBusyChange={setBusy}
+              onChange={(cardArt) => setEditing({ ...editing, cardArt })}
+            />
             <ActionGroup>
               <BulkPicker
                 title="Add courses"

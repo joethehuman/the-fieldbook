@@ -48,7 +48,7 @@ export function updateFeedTimestamp(item: Content): number | undefined {
   };
   // The published snapshot's updatedAt is unchanged by draft-only edits. A
   // first-publication timestamp is not part of the current content model.
-  return parse(item.updatedAt) ?? parse(item.createdAt);
+  return parse(item.feedAt) ?? parse(item.updatedAt) ?? parse(item.createdAt);
 }
 export function updatesForUser(
   content: Content[],

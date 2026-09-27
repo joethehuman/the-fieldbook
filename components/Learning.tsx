@@ -131,6 +131,7 @@ export default function Learning({
         curriculum={item.curriculum}
         courses={item.courses}
         progress={progress}
+        settings={settings}
         onClick={
           linkedNavigation ? undefined : () => onCurriculum(item.curriculum.id)
         }
@@ -235,6 +236,7 @@ export default function Learning({
     <CourseCard
       key={c.id}
       course={c}
+      settings={settings}
       status={courseProgress(c, progress)}
       assigned={!guest && view !== "home" && assignedIds.has(c.id)}
       onClick={linkedNavigation ? undefined : () => onOpen(c.id)}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cardArtSchema } from "./schemas";
 const id = z.string().min(1).max(80);
 const node = z.object({
   id,
@@ -22,6 +23,7 @@ export const governanceSchema = z
           description: z.string().max(1000),
           courseIds: z.array(z.uuid()).max(1000),
           status: z.enum(["draft", "published"]),
+          cardArt: cardArtSchema.optional(),
         }),
       )
       .max(1000)

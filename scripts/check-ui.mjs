@@ -75,7 +75,11 @@ for (const file of [
               (file === "components/reader/ReaderShell.tsx" &&
                 text === "{brandThemeStyle(context.branding.accent)}") ||
               (file === "components/patterns/branded-account.tsx" &&
-                text === "{brandThemeStyle(branding.accent)}")) &&
+                text === "{brandThemeStyle(branding.accent)}") ||
+              // Card art derives two decorative CSS variables from the validated palette.
+              (file === "components/patterns/card-artwork.tsx" &&
+                text.includes('"--card-base": surface') &&
+                text.includes('"--card-highlight": highlight'))) &&
             !/(width|height|margin|padding|background|color)\s*:/.test(text)
           ))
             report(

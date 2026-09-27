@@ -29,9 +29,11 @@ export type Content = {
   status: "draft" | "published";
   version: number;
   updatedAt: string;
+  feedAt?: string;
   createdAt?: string;
   assignments?: Assignment[];
   coverImageUrl?: string;
+  cardArt?: import("./card-art").CardArt;
   duration: number;
   groups: string[];
   lessons: Lesson[];
@@ -72,6 +74,7 @@ export type Curriculum = {
   description: string;
   courseIds: string[];
   status: "draft" | "published";
+  cardArt?: import("./card-art").CardArt;
 };
 export type Group = {
   id: string;

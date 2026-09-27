@@ -4,6 +4,7 @@ import type { Content, User } from "@/lib/types";
 import { db, check } from "./db";
 import { requireAdmin, HttpError } from "./auth";
 import { contentSchema } from "./schemas";
+import { isArtworkOnlyUpdate } from "@/lib/card-art";
 import { videoSource } from "@/lib/video";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import {
@@ -216,28 +217,22 @@ export async function saveContent(
     check(mediaError);
     if (new Set(media?.map((m) => m.id)).size !== new Set(mediaIds).size)
       throw new HttpError(400, "One or more media uploads are not ready.");
-    if (c.coverImageUrl) {
-      const coverId = c.coverImageUrl.split("/").pop()!.split(".")[0];
-      const cover = media?.find((m) => m.id === coverId);
-      if (
-        !cover ||
-        !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
-          cover.mime,
-        )
-      )
-        throw new HttpError(
-          400,
-          "Choose a ready image upload for the course cover.",
-        );
+    for (const imageUrl of [c.coverImageUrl, c.cardArt?.imageUrl].filter(Boolean)) {
+      const imageId = imageUrl!.split("/").pop()!.split(".")[0];
+      const image = media?.find((m) => m.id === imageId);
+      if (!image || !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(image.mime))
+        throw new HttpError(400, "Choose a ready image upload for card artwork.");
     }
   }
   const now = new Date().toISOString();
+  const artOnlyUpdate = publish && old?.published && isArtworkOnlyUpdate(c as Content, old.published as Content);
   const { revision, publishedRevision, ...clean } = c;
   const draft = {
     ...clean,
     status: publish ? "published" : "draft",
     createdAt: old?.draft.createdAt || now,
     updatedAt: now,
+    ...(c.kind === "brief" ? { feedAt: artOnlyUpdate ? old.published.feedAt || old.published.updatedAt : now } : {}),
   };
   const { data: saved, error: saveError } = await db().rpc("fb_save_document", {
     p_id: c.id,

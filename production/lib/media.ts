@@ -36,7 +36,40 @@ export async function signedMediaUrl(file: string, user: User | null) {
       )
       .limit(1);
     check(referenceError);
-    if (!data?.length) throw new HttpError(404, "Media not found.");
+    if (!data?.length) {
+      const { data: artwork, error: artworkError } = await db()
+        .from("fb_documents")
+        .select("id")
+        .not("published", "is", null)
+        .eq("published->cardArt->>source", "upload")
+        .eq("published->cardArt->>imageUrl", reference)
+        .limit(1);
+      check(artworkError);
+      if (artwork?.length) {
+        const { data: signed, error: signError } = await db()
+          .storage.from("fieldbook-media")
+          .createSignedUrl(media.path, 300);
+        check(signError);
+        return signed!.signedUrl;
+      }
+      const { data: config, error: configError } = await db()
+        .from("fb_config")
+        .select("curricula")
+        .single();
+      check(configError);
+      if (
+        !config?.curricula?.some(
+          (curriculum: {
+            status: string;
+            cardArt?: { source?: string; imageUrl?: string };
+          }) =>
+            curriculum.status === "published" &&
+            curriculum.cardArt?.source === "upload" &&
+            curriculum.cardArt.imageUrl === reference,
+        )
+      )
+        throw new HttpError(404, "Media not found.");
+    }
   }
   const { data: signed, error: signError } = await db()
     .storage.from("fieldbook-media")

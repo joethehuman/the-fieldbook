@@ -179,67 +179,7 @@
     border-radius: var(--radius);
     background: var(--primary);
   }
-  .course-art,
-  .brief-art {
-    position: relative;
-    width: 100%;
-    height: 10rem;
-    flex-shrink: 0;
-    overflow: hidden;
-  }
-  .brief-art {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-6);
-  }
-  .art-label {
-    position: absolute;
-    z-index: 1;
-    top: var(--space-4);
-    left: var(--space-4);
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .play-disc {
-    position: absolute;
-    z-index: 1;
-    display: grid;
-    inset: 50% auto auto 50%;
-    width: 2.5rem;
-    height: 2.5rem;
-    place-items: center;
-    transform: translate(-50%, -50%);
-    border-radius: 50%;
-    background: var(--background);
-    color: var(--foreground);
-  }
-  .duration {
-    position: absolute;
-    z-index: 1;
-    bottom: var(--space-3);
-    right: var(--space-3);
-    border-radius: var(--radius-sm);
-    padding: var(--space-1) var(--space-2);
-    background: var(--background);
-    color: var(--foreground);
-    font-size: 0.6875rem;
-  }
-  .course-cover {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-  .course-art.has-cover .art-label {
-    border-radius: var(--radius-sm);
-    background: var(--background);
-    color: var(--foreground);
-    padding: var(--space-1) var(--space-2);
-  }
+
 }
 
 /* Shared document navigation and reading composition. */

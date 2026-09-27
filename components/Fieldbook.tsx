@@ -958,6 +958,7 @@ export default function Fieldbook({
           ) : curriculum ? (
             <CurriculumPage
               curriculum={curriculum}
+              settings={data.settings}
               courses={courses}
               progress={progress}
               onBack={() => navigate("learn")}
@@ -1103,6 +1104,7 @@ export default function Fieldbook({
               <PageHeading title="Updates" />
               <Updates
                 content={visible}
+                settings={data.settings}
                 user={user}
                 groups={learningGroups}
                 onOpen={(id) => navigate("briefs", id)}

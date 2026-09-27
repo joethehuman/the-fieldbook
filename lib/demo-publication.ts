@@ -1,5 +1,6 @@
 import type { Workspace } from "./store";
 import type { Content } from "./types";
+import { isArtworkOnlyUpdate } from "./card-art";
 
 /** Compare author-controlled content, not persistence bookkeeping. */
 export function contentSignature(item: Content) {
@@ -52,6 +53,7 @@ export function reconcileDemoPublication(
     const live = published.find((entry) => entry.id === item.id);
     const saved = {
       ...item,
+      ...(item.status === "published" && item.kind === "brief" ? { feedAt: live && isArtworkOnlyUpdate(item, live) ? live.feedAt || live.updatedAt : item.updatedAt } : {}),
       revision,
       publishedRevision:
         item.status === "published" ||

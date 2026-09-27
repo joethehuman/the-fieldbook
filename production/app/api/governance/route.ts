@@ -49,6 +49,37 @@ export async function POST(req: Request) {
         );
     }
     if (body.operation !== "pending") {
+      const imageIds = [
+        ...new Set(
+          (parsed.data as typeof governanceSchema._output).curricula?.flatMap(
+            (curriculum) =>
+              curriculum.cardArt?.imageUrl
+                ? [curriculum.cardArt.imageUrl.split("/").pop()!.split(".")[0]]
+                : [],
+          ) || [],
+        ),
+      ];
+      if (imageIds.length) {
+        const { data: media, error: mediaError } = await db()
+          .from("fb_media")
+          .select("id,mime")
+          .in("id", imageIds)
+          .eq("ready", true);
+        if (mediaError) throw mediaError;
+        if (
+          media?.length !== imageIds.length ||
+          media.some(
+            (item) =>
+              !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
+                item.mime,
+              ),
+          )
+        )
+          throw new HttpError(
+            400,
+            "Choose a ready image upload for curriculum artwork.",
+          );
+      }
       const { data: owner, error: ownerError } = await db()
         .from("fb_profiles")
         .select("id")

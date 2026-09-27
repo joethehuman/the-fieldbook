@@ -6,7 +6,9 @@ import {
   EmptyState,
   ContentCardFooter,
 } from "@/components/patterns/layout";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { CardArtwork } from "./patterns/card-artwork";
+import type { SiteSettings } from "@/lib/settings";
 import { updateFeedTimestamp, updatesForUser } from "@/lib/learning-groups";
 import {
   effectiveGroups,
@@ -23,11 +25,13 @@ export default function Updates({
   user,
   groups,
   onOpen,
+  settings,
 }: {
   content: Content[];
   user: User;
   groups: Group[];
   onOpen: (id: string) => void;
+  settings?: SiteSettings;
 }) {
   const { forYou, other } = updatesForUser(content, user, groups);
   const paginationKey = JSON.stringify({
@@ -80,14 +84,18 @@ export default function Updates({
       {forYou.length > 0 && (
         <section className="updates-section">
           <SectionHeader title={<h2>For you</h2>} />
-          <UpdateCards items={forYou} onOpen={onOpen} />
+          <UpdateCards items={forYou} onOpen={onOpen} settings={settings} />
         </section>
       )}
       <section className="updates-section">
         <SectionHeader
           title={<h2>{forYou.length ? "More updates" : "All updates"}</h2>}
         />
-        <UpdateCards items={visibleUpdates} onOpen={onOpen} />
+        <UpdateCards
+          items={visibleUpdates}
+          onOpen={onOpen}
+          settings={settings}
+        />
         {other.length > 0 && (
           <LoadMore
             shown={visibleUpdates.length}
@@ -110,9 +118,11 @@ export default function Updates({
 function UpdateCards({
   items,
   onOpen,
+  settings,
 }: {
   items: Content[];
   onOpen: (id: string) => void;
+  settings?: SiteSettings;
 }) {
   return (
     <div className="brief-list">
@@ -122,9 +132,14 @@ function UpdateCards({
           key={b.id}
           onClick={() => onOpen(b.id)}
         >
-          <div className={"brief-art art-" + (i % 6)}>
-            <ArrowUpRight size={36} />
-          </div>
+          <CardArtwork
+            id={b.id}
+            title={b.title}
+            kind="brief"
+            category={b.category}
+            art={b.cardArt}
+            settings={settings}
+          />
           <div className="brief-copy">
             <span className="eyebrow">{b.category}</span>
             <h3>{b.title}</h3>

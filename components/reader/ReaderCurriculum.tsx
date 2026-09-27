@@ -34,6 +34,7 @@ export function ReaderCurriculum({
   return (
     <CurriculumPage
       curriculum={curriculum}
+      settings={data.settings}
       courses={data.courses}
       progress={data.user.id === "guest" ? guestProgress : data.progress}
       onBack={() => router.push(back)}
