@@ -777,12 +777,12 @@ test("client navigation rechecks publication, item type and installation access"
 }) => {
   const adjacentDoc = {
     ...items[0],
-    id: "00000000-0000-4000-8000-000000000025",
+    id: "00000000-0000-4000-8000-000000000027",
     title: "Adjacent published document",
   };
   const coldDoc = {
     ...items[0],
-    id: "00000000-0000-4000-8000-000000000024",
+    id: "00000000-0000-4000-8000-000000000026",
     title: "Another published document",
   };
   // Keep the target beyond the first article's eagerly prefetched Next link.

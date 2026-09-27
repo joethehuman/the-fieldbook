@@ -199,13 +199,14 @@ test("browser back can be canceled without unmounting the editor", async ({
   await setup(page, production);
   await page.getByRole("button", { name: "Back to content" }).click();
   await openNav(page);
+  // This fixture resets published Docs between cases; use a collection route.
   await page
     .getByRole("navigation")
-    .getByRole("button", { name: "Docs", exact: true })
+    .getByRole("button", { name: "Updates", exact: true })
     .click();
-  await expect(page).toHaveURL(production ? /\/docs$/ : /#docs$/);
+  await expect(page).toHaveURL(production ? /\/updates$/ : /#updates$/);
   await expect(
-    page.getByRole("heading", { name: "Docs", exact: true }),
+    page.getByRole("heading", { name: "Updates", exact: true }),
   ).toBeVisible();
   await openNav(page);
   await page.getByRole("button", { name: "Account menu" }).click();
@@ -221,7 +222,7 @@ test("browser back can be canceled without unmounting the editor", async ({
   if (production) {
     await page.evaluate(() => history.back());
     await page.getByRole("button", { name: "Confirm", exact: true }).click();
-    await expect(page).toHaveURL(/\/docs$/);
+    await expect(page).toHaveURL(/\/updates$/);
   }
 });
 
