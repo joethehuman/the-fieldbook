@@ -5,7 +5,6 @@ import {
   useRef,
   useState,
   useTransition,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import Link from "next/link";
@@ -30,6 +29,8 @@ import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
 import { organizationHomePath } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
+import { brandThemeStyle } from "@/lib/brand-theme";
+import { BrandThemeSync } from "@/components/patterns/brand-theme-sync";
 
 export function ReaderShell({
   context,
@@ -67,7 +68,10 @@ export function ReaderShell({
     if (section !== "docs" || !selected) return;
     const index = orderedDocList.findIndex((doc) => doc.id === selected);
     if (index < 0) return;
-    for (const neighbor of [orderedDocList[index - 1], orderedDocList[index + 1]])
+    for (const neighbor of [
+      orderedDocList[index - 1],
+      orderedDocList[index + 1],
+    ])
       if (neighbor) router.prefetch(`/docs/${encodeURIComponent(neighbor.id)}`);
   }, [section, selected, orderedDocList, router]);
   const articleTitle = selected
@@ -114,10 +118,8 @@ export function ReaderShell({
     window.location.assign("/auth/sign-in");
   }
   return (
-    <div
-      className="app"
-      style={{ "--brand": context.branding.accent } as CSSProperties}
-    >
+    <div className="app" style={brandThemeStyle(context.branding.accent)}>
+      <BrandThemeSync accent={context.branding.accent} />
       <SkipLink href="#main-content">Skip to content</SkipLink>
       <aside className={`sidebar ${menu ? "open" : ""}`}>
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">

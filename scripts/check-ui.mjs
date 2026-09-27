@@ -67,13 +67,15 @@ for (const file of [
       for (const attr of node.attributes.properties) {
         if (!ts.isJsxAttribute(attr)) continue;
         if (attr.name.text === "style" && !primitive) {
-          // The only application-level runtime style is the operator's validated branding token.
+          // Only the shared, validated installation theme may set runtime UI colors.
           const text = attr.initializer?.getText(source) || "";
           if (!(
             ((file === "components/Fieldbook.tsx" &&
-              /"--brand": branding\.accent/.test(text)) ||
+              text === "{brandThemeStyle(branding.accent)}") ||
               (file === "components/reader/ReaderShell.tsx" &&
-                /"--brand": context\.branding\.accent/.test(text))) &&
+                text === "{brandThemeStyle(context.branding.accent)}") ||
+              (file === "components/patterns/branded-account.tsx" &&
+                text === "{brandThemeStyle(branding.accent)}")) &&
             !/(width|height|margin|padding|background|color)\s*:/.test(text)
           ))
             report(

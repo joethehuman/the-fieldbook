@@ -1,3 +1,5 @@
+import { defaultBrandAccent } from "./brand-theme";
+
 export type PrivacyDocument = {
   mode: "hosted" | "external";
   operatorName: string;
@@ -45,7 +47,7 @@ export const defaultSettings: SiteSettings = {
   catchUpDays: 30,
   welcomeDescription: "",
   name: "Fieldbook",
-  accent: "#0069ff",
+  accent: defaultBrandAccent,
   access: "public",
   registration: "open",
 };

@@ -71,7 +71,9 @@ test("account pages resist short-page pull and scroll when content is taller", a
     expect(await viewport.evaluate((element) => element.scrollTop)).toBe(0);
     expect((await card.boundingBox())!.y).toBe(top);
     await page.screenshot({
-      path: info.outputPath(url === "/sign-in" ? "sign-in.png" : "demo-chooser.png"),
+      path: info.outputPath(
+        url === "/sign-in" ? "sign-in.png" : "demo-chooser.png",
+      ),
     });
 
     await page.setViewportSize({ width: 390, height: 220 });
@@ -137,6 +139,7 @@ test("public browse, alternate brand and long-name fallback", async ({
       settings: {
         access: "public",
         name: "Northstar Academy",
+        accent: "#009908",
         welcomeDescription: "Build useful things together.",
       },
     },
@@ -160,6 +163,12 @@ test("public browse, alternate brand and long-name fallback", async ({
   await expect(
     page.getByRole("link", { name: "Back to browsing" }),
   ).toBeVisible();
+  const accountLinkColor = await page
+    .getByRole("link", { name: "Back to browsing" })
+    .evaluate((element) => getComputedStyle(element).color);
+  const [red, green, blue] = accountLinkColor.match(/\d+/g)!.map(Number);
+  expect(green).toBeGreaterThan(red + 30);
+  expect(green).toBeGreaterThan(blue + 30);
   await expect(
     page.getByRole("link", { name: "Privacy policy" }),
   ).toHaveAttribute("href", "https://example.test/privacy");
@@ -264,10 +273,22 @@ test("settings authorization, saved identity and private content protection", as
     .getByLabel("Welcome description (optional)")
     .fill("A useful place to learn.");
   await page
+    .getByRole("textbox", { name: "Accent color hex value" })
+    .fill("#009908");
+  await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
   await expect(page.getByText("Settings saved.")).toBeVisible();
   await expect(page.locator(".logo")).toContainText("Updated Academy");
+  await expect
+    .poll(() =>
+      page
+        .locator(".app")
+        .evaluate((element) =>
+          getComputedStyle(element).getPropertyValue("--brand").trim(),
+        ),
+    )
+    .toBe("#009908");
   await bounds(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.evaluate(() => window.scrollTo(0, 0));
@@ -281,6 +302,14 @@ test("settings authorization, saved identity and private content protection", as
     page.getByRole("heading", { name: "Sign in to Updated Academy" }),
   ).toBeVisible();
   await expect(page.getByText("A useful place to learn.")).toBeVisible();
+  const savedLinkColor = await page
+    .getByRole("link", { name: "Privacy policy" })
+    .evaluate((element) => getComputedStyle(element).color);
+  const [savedRed, savedGreen, savedBlue] = savedLinkColor
+    .match(/\d+/g)!
+    .map(Number);
+  expect(savedGreen).toBeGreaterThan(savedRed + 30);
+  expect(savedGreen).toBeGreaterThan(savedBlue + 30);
   await request.post(backend, { data: { role: "learner" } });
   await login(page, "/courses");
   expect(
@@ -629,7 +658,9 @@ test("public guest can send general feedback through the account menu", async ({
   } else {
     await page.getByRole("tab", { name: "Feedback", exact: true }).click();
   }
-  await expect(page.getByText("Fieldbook feedback", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Fieldbook feedback", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("Guest feedback", { exact: true })).toBeVisible();
 });
 

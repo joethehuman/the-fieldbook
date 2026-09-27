@@ -31,6 +31,7 @@ test("branding projection contains only public identity with existing-installati
       assert.ok(!url.searchParams.get("select")!.includes("draft"));
       data = {
         name: "Acme",
+        accent: "#009908",
         welcomeDescription: "Welcome aboard",
         access: "private",
         policyMode: "external",
@@ -46,6 +47,7 @@ test("branding projection contains only public identity with existing-installati
   try {
     assert.deepEqual(await publicBranding(), {
       name: "Acme",
+      accent: "#009908",
       welcomeDescription: "Welcome aboard",
       access: "private",
       privacyUrl: "https://example.test/privacy",
@@ -60,11 +62,13 @@ test("branding projection contains only public identity with existing-installati
   }
   assert.deepEqual(brandingFromSettings({}), {
     name: "Fieldbook",
+    accent: "#0069ff",
     welcomeDescription: "",
     access: "public",
     privacyUrl: null,
   });
   assert.equal(brandingFromSettings({ name: " " }).name, "Fieldbook");
+  assert.equal(brandingFromSettings({ accent: "invalid" }).accent, "#0069ff");
 });
 
 test("settings accepts old configurations and validates branding without separate login settings", () => {
