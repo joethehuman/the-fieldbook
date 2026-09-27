@@ -1,6 +1,7 @@
 /* Application geometry only. Controls, fields, actions and surfaces live in components. */
 @layer components {
   .app {
+    --active-sidebar-width: var(--sidebar-width);
     position: fixed;
     inset: 0;
     height: 100dvh;
@@ -11,7 +12,7 @@
     inset: 0 auto 0 0;
     z-index: 30;
     display: flex;
-    width: min(var(--sidebar-width), calc(100vw - 2rem));
+    width: min(var(--active-sidebar-width), calc(100vw - 2rem));
     flex-direction: column;
     gap: var(--space-6);
     overflow-y: auto;
@@ -20,6 +21,17 @@
     border-right: 1px solid var(--border);
     background: var(--muted);
     padding: var(--space-6) var(--space-4);
+    transition: width 180ms ease;
+  }
+  .sidebar-heading {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: var(--space-3);
+  }
+  .sidebar-heading .logo {
+    font-size: 1.125rem;
   }
   .logo {
     color: var(--foreground);
@@ -58,11 +70,12 @@
     height: 100%;
     min-height: 0;
     flex-direction: column;
-    margin-left: var(--sidebar-width);
+    margin-left: var(--active-sidebar-width);
     overflow: clip;
+    transition: margin-left 180ms ease;
   }
   .topbar {
-    --search-panel-width: min(48rem, calc(100vw - var(--sidebar-width) - 3rem));
+    --search-panel-width: min(48rem, calc(100vw - var(--active-sidebar-width) - 3rem));
     position: relative;
     z-index: 15;
     background: var(--background);
@@ -702,9 +715,10 @@
       grid-template-columns: minmax(0, 1fr);
     }
     .sidebar {
+      width: min(var(--sidebar-width), calc(100vw - 2rem));
       visibility: hidden;
       transform: translateX(-100%);
-      transition: transform 150ms ease;
+      transition: transform 150ms ease, visibility 150ms ease;
     }
     .sidebar.open {
       visibility: visible;
@@ -728,6 +742,7 @@
     }
     .main-shell {
       margin-left: 0;
+      transition: none;
     }
     .main-content {
       padding: var(--space-6) var(--space-4);
@@ -741,6 +756,36 @@
     .brief-list,
     .knowledge-grid {
       grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  @media (width >= 48rem) {
+    .app.sidebar-collapsed {
+      --active-sidebar-width: 4.25rem;
+    }
+    .sidebar-collapsed .sidebar {
+      overflow-x: hidden;
+      scrollbar-gutter: auto;
+      scrollbar-width: none;
+    }
+    .sidebar-collapsed .sidebar-heading {
+      display: flex;
+      justify-content: center;
+    }
+    .sidebar-collapsed .sidebar-heading .logo,
+    .sidebar-collapsed .sidebar-nav-text,
+    .sidebar-collapsed .nav-count,
+    .sidebar-collapsed .document-tree {
+      display: none;
+    }
+    .sidebar-collapsed .primary-navigation [data-slot="button"] {
+      justify-content: center;
+      padding-inline: 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .main-shell {
+      transition: none;
     }
   }
 }

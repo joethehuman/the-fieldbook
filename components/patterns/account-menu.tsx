@@ -23,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { GeneralFeedbackDialog } from "./general-feedback-dialog";
+import { cn } from "@/lib/utils";
 
 export function AccountMenu({
   initials,
@@ -30,6 +31,7 @@ export function AccountMenu({
   email,
   description,
   guest = false,
+  compact = false,
   onManageOrganization,
   onTeamProgress,
   onMenuOpen,
@@ -50,6 +52,7 @@ export function AccountMenu({
   email?: string;
   description?: string;
   guest?: boolean;
+  compact?: boolean;
   onManageOrganization?: () => void;
   onTeamProgress?: () => void;
   onMenuOpen?: () => void;
@@ -71,10 +74,13 @@ export function AccountMenu({
     <div className="@container">
       <div
         data-slot="account-button"
-        className="grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-3 border-t border-border px-2 py-4 text-left @max-[13rem]:grid-cols-[minmax(0,1fr)_auto]"
+        className={cn(
+          "grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-3 border-t border-border px-2 py-4 text-left @max-[13rem]:grid-cols-[minmax(0,1fr)_auto]",
+          compact && "md:flex md:justify-center md:px-0",
+        )}
       >
-        <InitialsAvatar initials={initials} />
-        <span className="min-w-0 @max-[13rem]:col-span-full">
+        <InitialsAvatar initials={initials} className={compact ? "md:hidden" : undefined} />
+        <span className={cn("min-w-0 @max-[13rem]:col-span-full", compact && "md:hidden")}>
           <span className="block break-words text-sm font-semibold leading-snug">
             {name}
           </span>
@@ -188,7 +194,7 @@ export function AccountMenu({
           <Button
             type="button"
             variant="ghost"
-            className="col-span-full justify-start"
+            className={cn("col-span-full justify-start", compact && "md:hidden")}
             onClick={onSwitchDemoProfile}
           >
             <ArrowLeftRight className="size-4" aria-hidden="true" />
