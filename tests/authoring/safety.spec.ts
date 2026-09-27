@@ -555,8 +555,9 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   const scrollBefore = await page.locator(".main-content").evaluate((node) => node.scrollTop);
   await writing.press("/");
   await expect(page.getByRole("menu", { name: "Insert content" })).toBeVisible();
-  await expect(writing.locator(".writing-command-line")).toHaveAttribute("data-slash-query", "/Type to search");
-  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::before").content)).toBe('"/Type to search"');
+  await expect(writing.locator(".writing-command-line")).toHaveAttribute("data-slash-query", "Type to search");
+  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::before").content)).toBe('"/"');
+  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::after").content)).toBe('"Type to search"');
   await expect(page.locator(".writing-editor .writing-content:not([contenteditable])")).toBeHidden();
   await expect(writing).toBeFocused();
   const menu = (await page.getByRole("menu", { name: "Insert content" }).boundingBox())!;
@@ -566,8 +567,8 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   expect(await page.locator(".main-content").evaluate((node) => node.scrollTop)).toBe(scrollBefore);
   await page.screenshot({ path: info.outputPath("course-builder-slash.png"), fullPage: true });
   await page.keyboard.type("hea");
-  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::before").content)).toBe('"/hea"');
-  await expect(page.getByRole("menuitem")).toHaveCount(1);
+  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::after").content)).toBe('"hea"');
+  await expect(page.getByRole("menuitem")).toHaveCount(2);
   await page.keyboard.press("Enter");
   await expect(writing).toBeFocused();
   await expect.poll(() => page.evaluate(() => { const anchor = window.getSelection()?.anchorNode; return (anchor instanceof Element ? anchor : anchor?.parentElement)?.closest("h2")?.tagName; })).toBe("H2");
@@ -673,9 +674,8 @@ test("slash Table inserts at the selected line and unmatched searches can return
   await page.keyboard.press("Enter");
   await page.keyboard.press("/");
   await page.keyboard.type("unlikely-block-name");
-  await expect(page.getByText("No matching blocks")).toBeVisible();
-  await page.keyboard.press("Enter");
   await expect(page.getByRole("menu", { name: "Insert content" })).toHaveCount(0);
+  await expect(writing.locator(".writing-command-line")).toHaveCount(0);
   await expect(writing).toBeFocused();
   await page.keyboard.type(" continues");
   await writing.locator("p", { hasText: "After" }).click();
@@ -803,6 +803,30 @@ for (const { command, query, marker } of [
     await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(marker);
   });
 }
+
+test("Insert menus use full rows and can be dismissed", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.locator("p").first().click();
+  await page.keyboard.press("/");
+  const menu = page.getByRole("menu", { name: "Insert content" });
+  await expect(menu.getByRole("menuitem", { name: "Close menu esc" })).toBeVisible();
+  const menuWidth = (await menu.boundingBox())!.width;
+  const rowWidth = (await menu.getByRole("menuitem", { name: "Heading" }).boundingBox())!.width;
+  expect(rowWidth).toBeGreaterThan(menuWidth - 24);
+  await page.keyboard.type("hea");
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(writing.locator(".writing-command-line")).toHaveCount(0);
+  await page.keyboard.type("ding");
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Lesson content Markdown" })).toHaveValue(/\/heading/);
+  await page.getByRole("button", { name: "Write", exact: true }).click();
+  await page.getByRole("button", { name: "Insert", exact: true }).click();
+  await expect(menu).toBeVisible();
+  await menu.getByRole("menuitem", { name: "Close menu esc" }).click();
+  await expect(menu).toHaveCount(0);
+});
 
 test("slash insertion stays beside a blank line after lesson prose", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true);
