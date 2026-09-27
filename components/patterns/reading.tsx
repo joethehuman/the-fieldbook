@@ -14,7 +14,6 @@ import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import type { Content } from "@/lib/types";
 import { contentPath } from "@/lib/navigation";
 import { Button } from "../ui/button";
-import { InitialsAvatar } from "../ui/initials-avatar";
 import { ContentAction } from "./content-action";
 import { IntentLink } from "./intent-link";
 import Link from "next/link";
@@ -22,7 +21,6 @@ import Link from "next/link";
 /** Shared, server-compatible reading presentation; callers own access and actions. */
 export function Article({
   item,
-  name,
   back,
   children,
   documents = [],
@@ -33,7 +31,6 @@ export function Article({
   sameSiteOrigins,
 }: {
   item: Content;
-  name: string;
   back?: ReactNode;
   children?: ReactNode;
   documents?: DocLink[];
@@ -66,21 +63,9 @@ export function Article({
             <h1>{item.title}</h1>
             <p className="article-lede">{item.summary}</p>
             <div className="article-meta">
-              <span className="article-author">
-                <InitialsAvatar
-                  initials={name
-                    .split(" ")
-                    .map((x) => x[0])
-                    .slice(0, 2)
-                    .join("")}
-                  size="sm"
-                />
-                <span>{name}</span>
-              </span>
-              <span aria-hidden="true">·</span>
               <span>
                 {placement
-                  ? sectionPath(placement, allSections)
+                  ? sectionPath(placement, allSections, " / ")
                   : item.category}
               </span>
               <span aria-hidden="true">·</span>
