@@ -10,11 +10,10 @@ export async function generateMetadata({ params }: Props) {
 }
 export default async function Page({ params }: Props) {
   const { id } = await params;
-  const { item, context } = await readerUpdateItem(id);
+  const { item } = await readerUpdateItem(id);
   return (
     <Article
       item={item}
-      name={context.branding.name}
       sameSiteOrigins={siteOrigins()}
       back={<ReadingBack kind="brief" clientNavigation />}
     >
