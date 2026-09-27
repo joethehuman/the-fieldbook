@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Show one quiz question per course step, then a scored results screen with review, retry and optional feedback. An eligible final quiz submission or the last lesson of a no-quiz course now records completion before the shared finish screen; Close course only navigates away.
+
 - Move account, team and organization actions into a shared profile menu for learners, managers, administrators and guests. Add general Fieldbook feedback through a dismissible dialog and include it in administrator feedback reports. Keep demo profile switching separate. Existing installations need `20260926182840_general_feedback.sql` before this feedback action can save.
 
 - Open course cards directly in a responsive lesson player, with curriculum-aware return navigation, a sticky course outline, image expansion, a larger video view, and a final feedback and Complete course action. Curriculum cards open an ordered course-card page.

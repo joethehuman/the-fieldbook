@@ -65,9 +65,11 @@ export async function recordProgress(user: User | null, input: unknown) {
       passed: graded.passed, answers: graded.answers,
     };
   }
-  if (a.complete && (!allDone || !quizUnlocked(c, [...priorAttempts, ...(attempt ? [attempt] : [])])))
+  const unlocked = quizUnlocked(c, [...priorAttempts, ...(attempt ? [attempt] : [])]);
+  if (a.complete && (!allDone || (!unlocked && !attempt)))
     throw new HttpError(400, "Finish the lessons and quiz before completing this course.");
-  const completed = priorCompleted || !!a.complete;
+  // A failed required attempt is recorded and returned to the learner, without completion.
+  const completed = priorCompleted || (!!a.complete && unlocked);
   if (!user)
     return { lessons, passed: completed, attemptPassed: attempt?.passed,
       attempt, attempts: attempt ? [attempt] : [] };

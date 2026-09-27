@@ -456,16 +456,17 @@ test("course completion still works through shared choices and controls", async 
   await page
     .getByRole("radio", { name: "The customer’s goal", exact: true })
     .check();
+  await page.getByRole("button", { name: "Submit and continue" }).click();
   await page
     .getByRole("radio", { name: "With an agreed next step", exact: true })
     .check();
   await page
-    .getByRole("button", { name: "Check answers", exact: true })
+    .getByRole("button", { name: "Submit and see results" })
     .click();
   await expect(
-    page.getByRole("button", { name: "Complete course", exact: true }),
+    page.getByRole("heading", { name: "2 of 2 correct" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Complete course", exact: true }).click();
+  await page.getByRole("button", { name: "Close course" }).click();
   await page.reload();
   await expect(
     page.getByText("Completed", { exact: true }).first(),

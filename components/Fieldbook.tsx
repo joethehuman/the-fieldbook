@@ -954,7 +954,7 @@ export default function Fieldbook({
               onSignIn={runtime?.signIn}
               feedback={
                 runtime && user.id === "guest" ? (
-                  <ReaderFeedback key={item.id} contentId={item.id} />
+                  <ReaderFeedback key={item.id} contentId={item.id} expanded={!item.questions.length} />
                 ) : (
                   <Feedback
                     key={item.id + user.id}
@@ -962,6 +962,7 @@ export default function Fieldbook({
                     user={user}
                     data={data}
                     onChange={persist}
+                    expanded={!item.questions.length}
                   />
                 )
               }

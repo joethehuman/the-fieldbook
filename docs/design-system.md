@@ -140,7 +140,7 @@ Do not use transient confirmations for errors, validation, pending work, quiz re
 
 ## Reading presentation
 
-`Article` stays a shared, server-compatible composition. `Course` is the shared interactive player, receiving a server-authorized, answer-redacted published course and current progress. Its initial lesson and links render as HTML; quiz submission and progress updates stay client-side. Reuse the shared Markdown renderer, and supply back navigation and feedback from the caller. Breadcrumb ancestors use real links with visible focus; their in-app click handler respects the unsaved-editor guard. Keep the existing narrow-layout breadcrumb behavior and visible article back link.
+`Article` stays a shared, server-compatible composition. `Course` is the shared interactive player, receiving a server-authorized, answer-redacted published course and current progress. Its initial lesson and links render as HTML; quiz submission and progress updates stay client-side. One quiz question occupies the reader card at a time, followed by results in that card. The same final card holds optional feedback and Close course; `ContentFeedback` uses its expanded variant for a no-quiz finish. Reuse the shared Markdown renderer, and supply back navigation and feedback from the caller. Breadcrumb ancestors use real links with visible focus; their in-app click handler respects the unsaved-editor guard. Keep the existing narrow-layout breadcrumb behavior and visible article back link.
 
 ### Document navigation and outlines
 

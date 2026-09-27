@@ -41,7 +41,8 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
     return next < 0 ? course.lessons.length : next;
   });
   const [answers, setAnswers] = useState<QuizAnswers>([]);
-  const [result, setResult] = useState<boolean | null>(null);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [showResults, setShowResults] = useState(!!p?.attempts?.length);
   const [busy, setBusy] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [image, setImage] = useState<{ src: string; alt: string } | null>(null);
@@ -53,7 +54,8 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const allDone = course.lessons.every((item) => p?.lessons.includes(item.id));
   const complete = isComplete(course, progress);
   const latestAttempt = p?.attempts?.at(-1);
-  const unlocked = allDone && (complete || !course.questions.length || result !== null && (!requiresPassing(course) || result) || quizUnlocked(course, p?.attempts));
+  const question = course.questions[questionIndex];
+  const score = latestAttempt?.answers?.filter((answer) => answer.correct).length;
   const multi = (index: number) => course.questions[index].multiple ?? correctOptionIds(course.questions[index]).length > 1;
   useEffect(() => {
     if (!guest || initialLessonId || !p || didResume.current) return;
@@ -61,7 +63,10 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
     if (step !== 0) return;
     const next = course.lessons.findIndex((item) => !p.lessons.includes(item.id));
     if (next > 0) setStep(next);
-    else if (next < 0 && !p.passed) setStep(course.lessons.length);
+    else if (next < 0 && !p.passed) {
+      setShowResults(!!p.attempts?.length);
+      setStep(course.lessons.length);
+    }
   }, [guest, initialLessonId, p, step, course.lessons]);
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return; }
@@ -69,7 +74,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
       heading.current?.focus({ preventScroll: true });
       activeCard.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
     });
-  }, [step]);
+  }, [step, questionIndex, showResults]);
   async function record(lessonId?: string, selections?: QuizAnswers, finish?: boolean) {
     return onProgress ? onProgress(lessonId, selections, finish) : onDemoProgress?.(lessonId, selections, finish);
   }
@@ -80,7 +85,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   async function next() {
     setBusy(true); setSaveError("");
     try {
-      await record(lesson.id);
+      await record(lesson.id, undefined, step === course.lessons.length - 1 && !course.questions.length);
       const following = course.lessons[step + 1];
       const href = following && lessonBaseHref
         ? `${lessonBaseHref}${lessonBaseHref.includes("?") ? "&" : "?"}lesson=${encodeURIComponent(following.id)}`
@@ -91,13 +96,21 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   }
   async function submit() {
     setBusy(true); setSaveError("");
-    try { setResult(!!(await record(undefined, answers))); }
+    try {
+      await record(undefined, answers, true);
+      setShowResults(true);
+    }
     catch (error) { setSaveError((error as Error).message); }
     finally { setBusy(false); }
   }
-  async function finish() {
+  function retry() {
+    setAnswers([]);
+    setQuestionIndex(0);
+    setShowResults(false);
+  }
+  async function completeEarlierProgress() {
     setBusy(true); setSaveError("");
-    try { await record(undefined, undefined, true); onBack(); }
+    try { await record(undefined, undefined, true); }
     catch (error) { setSaveError((error as Error).message); }
     finally { setBusy(false); }
   }
@@ -124,12 +137,12 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             <span>{item.title}</span>
             </Link> : <><span className={"step-number " + (p?.lessons.includes(item.id) ? "done" : "")}>{p?.lessons.includes(item.id) ? <Check size={13} /> : index + 1}</span><span>{item.title}</span></>}
           </NavigationButton>)}
-          {!!course.questions.length && <NavigationButton variant="ghost" className={step === course.lessons.length ? "selected quiz-step" : "quiz-step"} onClick={() => setStep(course.lessons.length)}>
-            <span className="step-number quiz-number"><CheckCircle2 size={16} /></span><span>Quiz</span>
-          </NavigationButton>}
+          <NavigationButton variant="ghost" className={step === course.lessons.length ? "selected quiz-step" : "quiz-step"} onClick={() => setStep(course.lessons.length)}>
+            <span className="step-number quiz-number"><CheckCircle2 size={16} /></span><span>{course.questions.length ? "Quiz" : "Finish course"}</span>
+          </NavigationButton>
         </nav>
       </aside>
-      <div className="course-reader">
+      <div className={`course-reader ${lesson ? "" : "course-reader-final"}`}>
         {saveError && <Alert variant="destructive" role="alert">{saveError}</Alert>}
         {lesson ? <>
           <Card ref={activeCard} className="course-lesson grid gap-6">
@@ -140,37 +153,76 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             {p?.lessons.includes(lesson.id) && <Badge variant="success"><CheckCircle2 size={16} /> Lesson completed</Badge>}
           </Card>
           <nav className="course-continue" aria-label="Continue course"><Button variant="ghost" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={next} loading={busy}>
-            <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish lessons"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Share feedback"}</span></span><ChevronRight aria-hidden="true" size={16} />
+            <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish course"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Course complete"}</span></span><ChevronRight aria-hidden="true" size={16} />
           </Button></nav>
-        </> : <>
-          {!!course.questions.length && <Card ref={activeCard} className="course-quiz grid gap-6">
-            <span className="eyebrow">Quiz</span>
+        </> : <Card ref={activeCard} className={`${course.questions.length ? "course-quiz" : "course-finish-card"} grid gap-6`}>
+          {course.questions.length ? showResults ? <>
+            <span className="eyebrow">Quiz results</span>
+            <h2 ref={heading} tabIndex={-1}>{score === undefined ? "Quiz submitted" : `${score} of ${course.questions.length} correct`}</h2>
+            <Alert role="status" variant={complete ? "success" : "default"}>
+              {complete ? "Course complete." : quizUnlocked(course, p?.attempts) ? "Your quiz is graded. Finish the course to save completion." : "Answer all questions correctly to complete this course. Retry when you’re ready."}
+            </Alert>
+            {latestAttempt?.answers && <details className="grid gap-3">
+              <summary>Review answers</summary>
+              <ol className="list-decimal space-y-4 pl-5">
+                {course.questions.map((item) => {
+                  const saved = latestAttempt.answers?.find((answer) => answer.questionId === item.id);
+                  const selected = item.options.filter((_, index) => saved?.optionIds.includes(optionIds(item)[index]));
+                  return <li key={item.id}>
+                    <div className="grid gap-2">
+                      <strong>{item.prompt}</strong>
+                      <span>{saved?.correct ? "Correct" : "Needs another try"} · Your answer: {selected.join(", ") || "Unavailable"}</span>
+                      {item.explanation && <Note>{item.explanation}</Note>}
+                    </div>
+                  </li>;
+                })}
+              </ol>
+            </details>}
+            <ActionGroup>
+              {(score === undefined || score < course.questions.length) && <Button variant="outline" onClick={retry}>Retry quiz</Button>}
+              {!complete && quizUnlocked(course, p?.attempts) && <Button onClick={completeEarlierProgress} loading={busy}>Finish course</Button>}
+              {complete && <Button onClick={onBack}>Close course <ArrowRight size={16} /></Button>}
+            </ActionGroup>
+            {feedback}
+          </> : <>
+            <span className="eyebrow">Question {questionIndex + 1} of {course.questions.length}</span>
             <h2 ref={heading} tabIndex={-1}>Check your knowledge</h2>
-            <p>{requiresPassing(course) ? "Answer every question correctly to complete this course. You can retry." : "Complete the quiz to finish this course. You can review your answers afterward."}</p>
+            {questionIndex === 0 && <p>{requiresPassing(course) ? "Answer every question correctly to complete this course. You can retry after seeing your results." : "Answer each question, then see your results. Passing is not required to complete this course."}</p>}
             {!allDone && <Note>Complete all lessons before submitting your answers.</Note>}
-            {course.questions.map((question, index) => <FieldGroup className="quiz-question" key={question.id}>
-              <legend>{index + 1}. {question.prompt}</legend>
-              {result !== null && latestAttempt?.answers?.[index] && <Badge variant={latestAttempt.answers[index].correct ? "success" : "default"}>{latestAttempt.answers[index].correct ? "Correct" : "Review this answer"}</Badge>}
-              <p className="muted">{multi(index) ? "Select all that apply." : "Select one answer."}</p>
+            <FieldGroup className="quiz-question" key={question.id}>
+              <legend>{question.prompt}</legend>
+              <p className="muted">{multi(questionIndex) ? "Select all that apply." : "Select one answer."}</p>
               {question.options.map((option, optionIndex) => <Field orientation="horizontal" variant="choice" key={optionIds(question)[optionIndex]}>
-                {multi(index) ? <Checkbox checked={answers[index]?.includes(optionIndex) || false} onCheckedChange={(checked) => {
-                  const next = [...answers]; const selected = next[index] || [];
-                  next[index] = checked ? [...selected, optionIndex] : selected.filter((value) => value !== optionIndex);
-                  setAnswers(next); setResult(null);
-                }} /> : <Radio name={question.id} checked={answers[index]?.[0] === optionIndex} onChange={() => { const next = [...answers]; next[index] = [optionIndex]; setAnswers(next); setResult(null); }} />}
+                {multi(questionIndex) ? <Checkbox checked={answers[questionIndex]?.includes(optionIndex) || false} onCheckedChange={(checked) => {
+                  const next = [...answers]; const selected = next[questionIndex] || [];
+                  next[questionIndex] = checked ? [...selected, optionIndex] : selected.filter((value) => value !== optionIndex);
+                  setAnswers(next);
+                }} /> : <Radio name={question.id} checked={answers[questionIndex]?.[0] === optionIndex} onChange={() => { const next = [...answers]; next[questionIndex] = [optionIndex]; setAnswers(next); }} />}
                 {option}
               </Field>)}
-              {result !== null && question.explanation && <Note>{question.explanation}</Note>}
-            </FieldGroup>)}
-            {result !== null && <Alert role="status" variant={result ? "success" : "default"}>{result ? "All answers are correct." : requiresPassing(course) ? "Some answers need another try. Review and retry when ready." : "Quiz submitted. You can finish the course."}</Alert>}
+            </FieldGroup>
             <ActionGroup>
-              <Button variant="outline" onClick={() => setStep(0)}>Review lessons</Button>
-              <Button disabled={busy || !allDone || course.questions.some((_, index) => !answers[index]?.length)} onClick={submit} loading={busy}>{result === null ? "Check answers" : "Try again"}</Button>
+              {questionIndex > 0 && <Button variant="outline" onClick={() => setQuestionIndex(questionIndex - 1)}>Previous question</Button>}
+              <Button disabled={busy || !allDone || !answers[questionIndex]?.length} onClick={questionIndex === course.questions.length - 1 ? submit : () => setQuestionIndex(questionIndex + 1)} loading={busy}>
+                {questionIndex === course.questions.length - 1 ? "Submit and see results" : "Submit and continue"} <ArrowRight size={16} />
+              </Button>
             </ActionGroup>
-          </Card>}
-          {unlocked && <div className="course-finish">{feedback}<Button variant="default" onClick={finish} loading={busy}>Complete course <ArrowRight size={16} /></Button></div>}
-          {complete && !unlocked && <Note>This course was already completed. Your completion is preserved.</Note>}
-        </>}
+          </> : <>
+            <span className="eyebrow">Finish course</span>
+            <h2 ref={heading} tabIndex={-1}>{complete ? "Course complete" : "Finish the lessons"}</h2>
+            {complete ? <>
+              <p>You’ve finished this course. Feedback is optional.</p>
+              {feedback}
+              <ActionGroup><Button onClick={onBack}>Close course <ArrowRight size={16} /></Button></ActionGroup>
+            </> : <>
+              <p>Complete every lesson to finish this course.</p>
+              <ActionGroup>
+                <Button variant="outline" onClick={() => setStep(0)}>Review lessons</Button>
+                {allDone && <Button onClick={completeEarlierProgress} loading={busy}>Finish course</Button>}
+              </ActionGroup>
+            </>}
+          </>}
+        </Card>}
       </div>
     </div>
     <Dialog open={!!image} onOpenChange={(open) => { if (!open) setImage(null); }}>

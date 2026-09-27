@@ -50,15 +50,6 @@ export function ReaderCoursePlayer({
       (entry) =>
         entry.content_id === course.id && entry.version === course.version,
     );
-    if (!signedIn && complete) {
-      const saved: GuestProgress = { ...(prior || {
-        content_id: course.id, version: course.version, lessons: [], attempts: [],
-      }), passed: true };
-      const next = [...progress.filter((entry) => entry.content_id !== course.id || entry.version !== course.version), saved];
-      setProgress(next);
-      localStorage.setItem(guestKey, JSON.stringify(next));
-      return undefined;
-    }
     const response = await fetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -127,7 +118,7 @@ export function ReaderCoursePlayer({
           `/auth/sign-in?next=${encodeURIComponent(window.location.pathname + window.location.search)}`,
         )
       }
-      feedback={<ReaderFeedback key={course.id} contentId={course.id} />}
+      feedback={<ReaderFeedback key={course.id} contentId={course.id} expanded={!course.questions.length} />}
     />
   );
 }

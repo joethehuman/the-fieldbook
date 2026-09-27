@@ -208,9 +208,10 @@ export function updateProgress(
     (p.attempts ??= []).push({ at: new Date().toISOString(), version: course.version, passed: graded.passed, answers: graded.answers });
   }
   if (complete) {
-    if (!course.lessons.every((lesson) => p!.lessons.includes(lesson.id)) || !quizUnlocked(course, p.attempts))
+    const unlocked = quizUnlocked(course, p.attempts);
+    if (!course.lessons.every((lesson) => p!.lessons.includes(lesson.id)) || (!unlocked && !answers))
       throw new Error("Finish the lessons and quiz before completing this course.");
-    p.passed = true;
+    if (unlocked) p.passed = true;
   }
   return next;
 }
