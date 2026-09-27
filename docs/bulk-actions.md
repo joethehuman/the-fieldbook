@@ -26,7 +26,7 @@ The demo simulates recovery in browser storage. Its expiry cleanup runs when the
 
 ## Install or upgrade the cleanup worker
 
-Apply the `bulk_actions_recovery`, `deletion_schedule`, `bulk_recovery_references`, and `account_deletion_lock` migrations in order before deploying this version. Rehearse in a separate non-production backend first. The migrations preserve existing records, add recoverable deletion and media cleanup tables, and install an hourly Supabase Cron job using `pg_cron` and `pg_net`.
+Apply the `bulk_actions_recovery`, `deletion_schedule`, `bulk_recovery_references`, `account_deletion_lock`, and `media_cleanup_lock` migrations in order before deploying this version. Rehearse in a separate non-production backend first. The migrations preserve existing records, add recoverable deletion and media cleanup tables, and install an hourly Supabase Cron job using `pg_cron` and `pg_net`.
 
 After deploying the server application, set its own backend's endpoint from an operator SQL session:
 
