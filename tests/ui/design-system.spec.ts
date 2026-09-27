@@ -446,9 +446,7 @@ test("course completion still works through shared choices and controls", async 
   await page
     .getByRole("radio", { name: "With an agreed next step", exact: true })
     .check();
-  await page
-    .getByRole("button", { name: "Submit and see results" })
-    .click();
+  await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(
     page.getByRole("heading", { name: "2 of 2 correct" }),
   ).toBeVisible();
@@ -811,7 +809,7 @@ test("new user guidance belongs to the grey fieldset footer and labels its selec
   await snapshotReview(page, info, "new-users-footer");
 });
 
-test("feedback remains usable with enlarged text and independent of branding and dark preference", async ({
+test("feedback remains usable with enlarged text and branded selection under dark preference", async ({
   page,
 }, info) => {
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
@@ -819,6 +817,7 @@ test("feedback remains usable with enlarged text and independent of branding and
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
     document.documentElement.style.setProperty("--brand", "#b42318");
+    document.documentElement.style.setProperty("--link", "#b42318");
   });
   const catalog = page.locator("#catalog-content-feedback");
   await catalog
@@ -834,7 +833,7 @@ test("feedback remains usable with enlarged text and independent of branding and
   ).toBeEnabled();
   await expect(
     form.getByRole("button", { name: "Useful", exact: true }),
-  ).toHaveCSS("color", "rgb(23, 92, 211)");
+  ).toHaveCSS("color", "rgb(180, 35, 24)");
   await form
     .getByRole("textbox")
     .fill(

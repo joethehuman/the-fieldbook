@@ -8,7 +8,7 @@ export async function publicBranding() {
   const { data, error } = await db()
     .from("fb_config")
     .select(
-      "name:settings->>name,welcomeDescription:settings->>welcomeDescription,access:settings->>access,policyMode:settings->privacy->published->>mode,policyUrl:settings->privacy->published->>url",
+      "name:settings->>name,accent:settings->>accent,welcomeDescription:settings->>welcomeDescription,access:settings->>access,policyMode:settings->privacy->published->>mode,policyUrl:settings->privacy->published->>url",
     )
     .eq("id", true)
     .single();
@@ -20,6 +20,7 @@ export async function publicBranding() {
     );
   const branding = brandingFromSettings({
     name: data.name || undefined,
+    accent: data.accent || undefined,
     welcomeDescription: data.welcomeDescription || undefined,
     access: data.access === "private" ? "private" : "public",
     privacy: {

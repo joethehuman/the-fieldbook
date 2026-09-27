@@ -1,6 +1,7 @@
 import { defaultSettings, privacyHref, type SiteSettings } from "./settings";
 export type Branding = {
   name: string;
+  accent: string;
   welcomeDescription: string;
   privacyUrl: string | null;
   access: "public" | "private";
@@ -11,6 +12,9 @@ export function brandingFromSettings(
   const policy = privacyHref({ ...defaultSettings, ...settings });
   return {
     name: settings.name?.trim().slice(0, 60) || defaultSettings.name,
+    accent: /^#[0-9a-f]{6}$/i.test(settings.accent || "")
+      ? settings.accent!
+      : defaultSettings.accent,
     welcomeDescription: settings.welcomeDescription?.trim().slice(0, 180) || "",
     privacyUrl:
       policy && (policy === "/privacy" || /^https:\/\//i.test(policy))

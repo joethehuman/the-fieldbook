@@ -17,6 +17,8 @@ import { RequestError } from "@/lib/workspace-save";
 import { BrandedAccount } from "./patterns/branded-account";
 import { InstallationIdentity } from "./patterns/installation-identity";
 import { brandingFromSettings } from "@/lib/branding";
+import { brandThemeStyle } from "@/lib/brand-theme";
+import { BrandThemeSync } from "./patterns/brand-theme-sync";
 import { CurriculumPage } from "./CurriculumPage";
 import { Badge } from "@/components/ui/badge";
 import { SkipLink } from "./patterns/skip-link";
@@ -43,7 +45,6 @@ import {
   useState,
   useTransition,
   type ReactNode,
-  type CSSProperties,
 } from "react";
 import {
   BookOpen,
@@ -518,14 +519,8 @@ export default function Fieldbook({
             ? "Team progress"
             : "Administration";
   return (
-    <div
-      className="app"
-      style={
-        {
-          "--brand": branding.accent,
-        } as CSSProperties
-      }
-    >
+    <div className="app" style={brandThemeStyle(branding.accent)}>
+      <BrandThemeSync accent={branding.accent} />
       <SkipLink
         href="#main-content"
         onClick={(event) => {
@@ -985,7 +980,11 @@ export default function Fieldbook({
               onSignIn={runtime?.signIn}
               feedback={
                 runtime && user.id === "guest" ? (
-                  <ReaderFeedback key={item.id} contentId={item.id} expanded={!item.questions.length} />
+                  <ReaderFeedback
+                    key={item.id}
+                    contentId={item.id}
+                    expanded={!item.questions.length}
+                  />
                 ) : (
                   <Feedback
                     key={item.id + user.id}

@@ -113,11 +113,7 @@ const readerAccess = cache(async (destination: string) => {
   return { user, config };
 });
 function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
-  const branding = brandingFromSettings(config.settings);
-  return {
-    ...branding,
-    accent: config.settings.accent || "#0069ff",
-  };
+  return brandingFromSettings(config.settings);
 }
 function readerAccount(
   user: User | null,

@@ -153,7 +153,8 @@ export default function SiteSettingsPanel({
           <FieldGroup className="brand-control">
             <legend>Accent color</legend>
             <FieldDescription>
-              Used for links and highlights across your organization.
+              Used for links and highlights across your organization. Link text
+              darkens when needed for readability.
             </FieldDescription>
             <div className="color-control">
               <Input

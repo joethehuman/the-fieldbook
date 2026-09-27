@@ -54,6 +54,74 @@ async function fixture(request: any, items = docs) {
   });
 }
 for (const app of ["demo", "production"] as const) {
+  test(`${app}: saved accent colors breadcrumbs, authored links and selected Docs`, async ({
+    page,
+    request,
+  }, info) => {
+    const first = {
+      ...docs[0],
+      body: "Read [the guide](https://example.com/guide) for details.",
+    };
+    const arranged = [first, docs[1]];
+    if (app === "demo") {
+      const data = freshWorkspace();
+      data.content = arranged;
+      data.publishedContent = arranged;
+      data.settings = { ...defaultSettings, accent: "#009908" };
+      await page.addInitScript((workspace) => {
+        localStorage.setItem(
+          "fieldbook.workspace.v1",
+          JSON.stringify(workspace),
+        );
+        sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+      }, data);
+      await page.goto("http://localhost:3132/#docs");
+    } else {
+      await request.post(`${backend}/fixture`, {
+        data: {
+          settings: { access: "public", accent: "#009908" },
+          documents: rows(arranged),
+        },
+      });
+      await page.goto("/docs");
+    }
+    const breadcrumb = page
+      .getByRole("navigation", { name: "Breadcrumb" })
+      .getByRole("link", { name: "Organization" });
+    const authored = page.locator("article").getByRole("link", {
+      name: "the guide",
+    });
+    await expect(authored).toBeVisible();
+    const linkColor = await authored.evaluate(
+      (element) => getComputedStyle(element).color,
+    );
+    const [red, green, blue] = linkColor.match(/\d+/g)!.map(Number);
+    expect(green).toBeGreaterThan(red + 30);
+    expect(green).toBeGreaterThan(blue + 30);
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          getComputedStyle(document.documentElement)
+            .getPropertyValue("--brand")
+            .trim(),
+        ),
+      )
+      .toBe("#009908");
+    if (info.project.name === "desktop")
+      await expect(breadcrumb).toHaveCSS("color", linkColor);
+    if (info.project.name === "phone")
+      await page.getByRole("button", { name: "Open navigation" }).click();
+    const active = page
+      .getByRole("navigation", { name: "Documents", exact: true })
+      .getByRole("link", { name: first.title });
+    await expect(active).toHaveAttribute("aria-current", "page");
+    await expect(active).toHaveCSS("color", linkColor);
+    await page.screenshot({
+      animations: "disabled",
+      path: info.outputPath(`${app}-green-accent-${info.project.name}.png`),
+    });
+  });
+
   test(`${app}: Docs opens the first document in sidebar order`, async ({
     page,
     request,
@@ -598,7 +666,9 @@ test("a cold Doc click keeps the article visible and shows header progress", asy
       .getByRole("navigation", { name: "Documents", exact: true })
       .getByRole("link", { name: items[2].title })
       .click();
-    await expect(page.getByRole("status", { name: "Opening page" })).toBeVisible();
+    await expect(
+      page.getByRole("status", { name: "Opening page" }),
+    ).toBeVisible();
     await expect(page.locator("article h1")).toHaveText(items[0].title);
   } finally {
     release();

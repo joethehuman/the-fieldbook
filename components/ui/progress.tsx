@@ -71,7 +71,7 @@ function RingGraphic({
         pathLength="100"
         strokeDasharray={`${value} 100`}
         strokeLinecap={value ? "round" : "butt"}
-        className={summary ? "text-brand" : "text-primary"}
+        className={summary ? "text-link" : "text-primary"}
       />
     </svg>
   );

@@ -98,7 +98,7 @@
     display: none;
   }
   ::selection {
-    background: var(--accent);
-    color: var(--accent-foreground);
+    background: var(--selected);
+    color: var(--selected-foreground);
   }
 }

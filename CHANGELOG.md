@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Apply the saved installation accent to links, selected Docs and feedback, focus highlights and account pages; keep link text readable for light accent colors.
+
 - Open Docs directly on the first published article in the saved order, prefetch neighboring Docs while reading, and highlight the selected Doc with a layout-stable accent color.
 
 - Call course and content organization Category throughout administration, course browsing and the UI catalog. Existing saved categories remain unchanged.

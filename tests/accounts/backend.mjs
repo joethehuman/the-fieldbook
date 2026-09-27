@@ -132,6 +132,7 @@ createServer(async (req, res) => {
     if (select.includes("name:settings->>name"))
       return send(res, {
         name: settings.name ?? null,
+        accent: settings.accent ?? null,
         welcomeDescription: settings.welcomeDescription ?? null,
         access: settings.access ?? null,
         policyMode: settings.privacy?.published?.mode ?? null,
