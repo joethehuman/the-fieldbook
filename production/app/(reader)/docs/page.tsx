@@ -40,7 +40,6 @@ export default async function Page() {
   return (
     <Article
       item={item}
-      name={context.branding.name}
       documents={context.docs}
       sectionOrder={context.docCategoryOrder}
       sections={context.docSections}
