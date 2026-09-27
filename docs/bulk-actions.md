@@ -33,30 +33,60 @@ The demo simulates recovery in browser storage. Its expiry cleanup runs when the
 
 ## Install or upgrade the cleanup worker
 
-Apply the `bulk_actions_recovery`, `deletion_schedule`, `bulk_recovery_references`, `account_deletion_lock`, and `media_cleanup_lock` migrations in order before deploying this version. Rehearse in a separate non-production backend first. The migrations preserve existing records, add recoverable deletion and media cleanup tables, and install an hourly Supabase Cron job using `pg_cron` and `pg_net`.
+On a fresh installation, apply **every** migration from the checked-out release in filename order, including these final five files. On an existing installation, back up the database and Storage separately, rehearse the upgrade in an isolated backend, then apply only the migrations not already recorded. Apply these five in this order **before** deploying the matching server code:
 
-After deploying the server application, set its own backend's endpoint from an operator SQL session:
+1. `supabase/migrations/20260927150657_bulk_actions_recovery.sql`
+2. `supabase/migrations/20260927151228_deletion_schedule.sql`
+3. `supabase/migrations/20260927151533_bulk_recovery_references.sql`
+4. `supabase/migrations/20260927152156_account_deletion_lock.sql`
+5. `supabase/migrations/20260927153217_media_cleanup_lock.sql`
+
+The migrations preserve existing records, add recoverable deletion and media cleanup tables, and install an hourly [Supabase Cron](https://supabase.com/docs/guides/cron) job using `pg_cron` and `pg_net`. The schedule alone does **not** complete setup: its endpoint is initially empty, so it cannot call the worker until you configure it.
+
+After the server application is deployed, use an operator SQL session in **that installation's Supabase project** to set the endpoint. Use the final HTTPS hostname that serves the application directly. Check that it does not redirect to another hostname, because the Authorization header can be lost across a redirect:
 
 ```sql
 update public.fb_cleanup_config
-set endpoint = 'https://YOUR-INSTALLATION.example/api/internal/purge-deleted'
-where id;
+set endpoint = 'https://YOUR-DIRECT-APP-HOST.example/api/internal/purge-deleted'
+where id = true;
 ```
 
-A private database-generated credential authenticates the job. It is held in the service-only cleanup configuration and sent in the Authorization header. Do not expose it to browsers or commit it. Keep preview and production endpoints pointed at their respective databases. The endpoint must be reachable by Supabase; deployment protection or a firewall must permit this worker request. Do not point a preview database at production.
+A private database-generated credential authenticates the job. It is held in the service-only cleanup configuration and sent in the Authorization header. Do not copy, display, log, or commit it. Keep preview and production endpoints pointed at their respective applications and databases. The endpoint must be reachable by Supabase; deployment protection or a firewall must permit this worker request. Do not point a preview database at production.
 
 The job runs at minute 17 each hour. No item is purged before its deadline; successful cleanup normally occurs within the following hour. Batches are bounded and durable claims prevent restoration once permanent deletion starts. Failed or interrupted claims retry after at least 15 minutes on a subsequent scheduled run. Storage failures retain their cleanup queue entries. Large backlogs may need more runs.
 
-Check the first invocation before considering setup complete:
+For a **fresh, empty installation**, you can send the exact request used by the scheduled job from the same operator SQL session. Keep the returned `request_id`; do not substitute a hard-coded number when checking the response. This request can process due deletions on an existing installation, so review its queue before using it during an upgrade.
 
 ```sql
-select endpoint, last_run from public.fb_cleanup_config where id;
+select net.http_post(
+  url := endpoint,
+  headers := jsonb_build_object(
+    'Content-Type', 'application/json',
+    'Authorization', 'Bearer ' || secret
+  ),
+  body := '{}'::jsonb,
+  timeout_milliseconds := 60000
+) as request_id
+from public.fb_cleanup_config
+where id = true and endpoint is not null;
+```
+
+The HTTP request starts after the SQL transaction commits. Check that its response appears and is HTTP 200, then confirm that `last_run` advanced. An empty installation should return `{"removed":0,"failed":0}`. A successful SQL job only means the HTTP request was queued; it does not prove the app accepted it. Check the active schedule and the first **timed** invocation as well:
+
+```sql
+select endpoint, last_run from public.fb_cleanup_config where id = true;
+select id, status_code, content, error_msg
+from net._http_response where id = YOUR_REQUEST_ID;
+select jobname, schedule, active
+from cron.job where jobname = 'fieldbook-purge-deleted';
 select entity, id, purge_after, purging, error
 from public.fb_deleted_items order by purge_after;
 select jobid, status, start_time, end_time, return_message
-from cron.job_run_details order by start_time desc limit 10;
+from cron.job_run_details
+where jobid = (select jobid from cron.job where jobname = 'fieldbook-purge-deleted')
+order by start_time desc limit 10;
 ```
 
-The SQL job succeeding means its HTTP request was queued. Also inspect `net._http_response` for a successful response and verify that `last_run` advanced. Recently deleted warns when the endpoint is unconfigured or the worker has not checked in for over two hours. A delayed item remains inactive; errors do not reset its deadline or expose it to learners.
+Replace `YOUR_REQUEST_ID` with the numeric ID returned by the manual request; do not paste the credential into a query. `pg_net` responses are retained only temporarily, so inspect them promptly. If the response is 401, confirm that the endpoint is the direct, nonredirecting app hostname and that the request reached the intended installation. If it is missing, check network reachability and deployment protection. Recently deleted warns when the endpoint is unconfigured or the worker has not checked in for over two hours. A delayed item remains inactive; errors do not reset its deadline or expose it to learners.
 
 Auth and Storage deletion use supported Supabase APIs. If an imported account owns Storage objects outside Fieldbook's service-created bucket objects, ownership can block Auth deletion. Resolve those ownership references through supported provider tools and let the job retry; do not delete shared media or manipulate Auth/Storage system tables directly.
