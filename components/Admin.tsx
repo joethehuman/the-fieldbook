@@ -99,7 +99,8 @@ import {
   Settings,
   MessageSquare,
 } from "lucide-react";
-import CourseCoverEditor from "./CourseCoverEditor";
+import { CardArtEditor } from "./patterns/card-art-editor";
+import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
 import { type UploadMedia } from "./MarkdownEditor";
 import { CourseBuilder } from "./CourseBuilder";
 import { requiresPassing, validQuestion } from "@/lib/course-quiz";
@@ -1216,6 +1217,7 @@ export default function Admin({
             <Curricula
               data={data}
               onChange={onChange}
+              onUpload={onUpload}
               registerNavigationGuard={registerAdminGuard}
             />
           ) : tab === "groups" ? (
@@ -1531,6 +1533,17 @@ export function Editor({
     e.preventDefault();
     const saveStatus = intent || (c.kind === "course" ? c.status : "draft");
     if (busy || pendingUploads.current || savingNow.current) return;
+    if (c.kind !== "doc") {
+      const art = resolvedCardArt(c.id, c.title, c.cardArt, c.coverImageUrl);
+      if (
+        art.source === "generated" &&
+        (!art.shortTitle.trim() || graphemeCount(art.shortTitle.trim()) > 40)
+      ) {
+        setError("Give generated artwork a short title of up to 40 characters.");
+        setSettingsOpen(true);
+        return;
+      }
+    }
     if (c.kind === "doc" && !sectionForDoc(c, docSections)) {
       setError("Choose a Docs section before saving.");
       setSettingsOpen(true);
@@ -1600,6 +1613,9 @@ export function Editor({
         );
       const saved: Content = {
         ...c,
+        ...(c.kind !== "doc" && !existing && !c.cardArt
+          ? { cardArt: resolvedCardArt(c.id, c.title, undefined, c.coverImageUrl) }
+          : {}),
         status: saveStatus,
         ...(latest
           ? {
@@ -2033,18 +2049,34 @@ export function Editor({
                   />
                 </SettingsSection>
               )}
+              {c.kind !== "doc" && (
+                <CardArtEditor
+                  id={c.id}
+                  title={c.title}
+                  kind={c.kind}
+                  category={c.category}
+                  art={c.cardArt}
+                  legacyCover={c.coverImageUrl}
+                  settings={data.settings}
+                  onUpload={upload}
+                  disabled={busy}
+                  onChange={(cardArt) =>
+                    setC((current) => ({
+                      ...current,
+                      cardArt,
+                      ...(current.kind === "course" &&
+                      cardArt.source === "upload" &&
+                      cardArt.imageUrl
+                        ? { coverImageUrl: cardArt.imageUrl }
+                        : {}),
+                    }))
+                  }
+                />
+              )}
               {c.kind === "course" && (
                 <>
                   <section className="editor-setting-section">
                     <h3>Course details</h3>
-                    <CourseCoverEditor
-                      url={c.coverImageUrl}
-                      onUpload={upload}
-                      disabled={busy}
-                      onChange={(url) =>
-                        setC((current) => ({ ...current, coverImageUrl: url }))
-                      }
-                    />
                     <FormField label="Estimated minutes">
                       <Input
                         type="number"

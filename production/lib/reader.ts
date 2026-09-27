@@ -45,6 +45,8 @@ export type ReaderItem = Pick<
   | "status"
   | "createdAt"
   | "updatedAt"
+  | "cardArt"
+  | "feedAt"
 >;
 type IndexRow = ReaderItem & {
   groups: string[];
@@ -52,6 +54,7 @@ type IndexRow = ReaderItem & {
 type CourseRow = IndexRow & {
   assignments?: Content["assignments"];
   coverImageUrl?: string;
+  cardArt?: Content["cardArt"];
   duration?: number;
   version?: number;
   lessons?: Content["lessons"];
@@ -71,7 +74,7 @@ const publishedIndex = unstable_cache(
       db()
         .from("fb_documents")
         .select(
-          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,sectionOrder:published->sectionOrder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,groups:published->groups",
+          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,sectionOrder:published->sectionOrder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,feedAt:published->>feedAt,cardArt:published->cardArt,groups:published->groups",
           { count: "exact" },
         )
         .not("published", "is", null)
@@ -87,7 +90,7 @@ const publishedCourseIndex = unstable_cache(
       db()
         .from("fb_documents")
         .select(
-          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,groups:published->groups,assignments:published->assignments,coverImageUrl:published->>coverImageUrl,duration:published->>duration,version:published->>version,lessons:published->lessons,questions:published->questions",
+          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,cardArt:published->cardArt,groups:published->groups,assignments:published->assignments,coverImageUrl:published->>coverImageUrl,duration:published->>duration,version:published->>version,lessons:published->lessons,questions:published->questions",
           { count: "exact" },
         )
         .not("published", "is", null)
@@ -170,8 +173,8 @@ export const readerContext = cache(async (destination: string) => {
   const updates = published
     .filter((item) => item.kind === "brief")
     .sort((a, b) => {
-      const left = Date.parse(a.updatedAt || a.createdAt || "");
-      const right = Date.parse(b.updatedAt || b.createdAt || "");
+      const left = Date.parse(a.feedAt || a.updatedAt || a.createdAt || "");
+      const right = Date.parse(b.feedAt || b.updatedAt || b.createdAt || "");
       if (Number.isFinite(left) && Number.isFinite(right))
         return right - left || a.id.localeCompare(b.id);
       if (Number.isFinite(right)) return 1;
@@ -193,6 +196,8 @@ export const readerContext = cache(async (destination: string) => {
     status: item.status,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
+    feedAt: item.feedAt,
+    cardArt: item.cardArt,
   });
   return {
     user: readerAccount(user, config),
@@ -204,6 +209,7 @@ export const readerContext = cache(async (destination: string) => {
       settings.docSections || [],
     ),
     docSections: settings.docSections || [],
+    settings,
     forYou: forYou.map(expose),
     otherUpdates: updates
       .filter((item) => !featuredIds.has(item.id))
@@ -337,6 +343,7 @@ function courseSummary(row: CourseRow): Content {
     createdAt: row.createdAt,
     assignments: row.assignments ?? undefined,
     coverImageUrl: row.coverImageUrl,
+    cardArt: row.cardArt,
     duration: Number(row.duration || 0),
     groups: row.groups || [],
     lessons: (row.lessons || []).map(({ id }) => ({

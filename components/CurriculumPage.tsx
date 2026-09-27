@@ -1,4 +1,5 @@
 import type { Content, Curriculum, Progress } from "@/lib/types";
+import type { SiteSettings } from "@/lib/settings";
 import { curriculumCourses } from "@/lib/learning-cards";
 import { courseProgress } from "@/lib/course-progress";
 import { PageHeader, EmptyState } from "./patterns/layout";
@@ -9,6 +10,7 @@ import Link from "next/link";
 export function CurriculumPage({
   curriculum,
   courses,
+  settings,
   progress,
   onBack,
   onOpen,
@@ -18,6 +20,7 @@ export function CurriculumPage({
 }: {
   curriculum: Curriculum;
   courses: Content[];
+  settings?: SiteSettings;
   progress: Progress[];
   onBack: () => void;
   onOpen: (id: string) => void;
@@ -34,7 +37,7 @@ export function CurriculumPage({
         <h1>{curriculum.name}</h1>
         <p>{curriculum.description}</p>
       </PageHeader>
-      <CardGrid>{items.map((course) => <CourseCard key={course.id} course={course} status={courseProgress(course, progress)} href={courseHref?.(course.id)} onClick={courseHref ? undefined : () => onOpen(course.id)} />)}</CardGrid>
+      <CardGrid>{items.map((course) => <CourseCard key={course.id} course={course} settings={settings} status={courseProgress(course, progress)} href={courseHref?.(course.id)} onClick={courseHref ? undefined : () => onOpen(course.id)} />)}</CardGrid>
       {!items.length && (
         <EmptyState>
           No courses are available in this curriculum yet.

@@ -432,7 +432,7 @@ for (const mode of ["refresh", "lost-response", "conflict"] as const)
     expect(control.saves).toBe(1);
   });
 
-for (const media of ["inline-video", "lesson-video", "cover"] as const)
+for (const media of ["inline-video", "lesson-video", "card-art"] as const)
   test(`course ${media} cannot be removed or saved while uploading`, async ({
     page,
   }, info) => {
@@ -442,13 +442,13 @@ for (const media of ["inline-video", "lesson-video", "cover"] as const)
     );
     const { control, state } = await setup(page, true, "course");
     const file = {
-      name: media === "cover" ? "cover.png" : "lesson.mp4",
-      mimeType: media === "cover" ? "image/png" : "video/mp4",
+      name: media === "card-art" ? "cover.png" : "lesson.mp4",
+      mimeType: media === "card-art" ? "image/png" : "video/mp4",
       buffer: Buffer.from("synthetic"),
     };
     const input =
-      media === "cover"
-        ? page.getByLabel("Upload course cover", { exact: true })
+      media === "card-art"
+        ? page.getByLabel("Upload card artwork", { exact: true })
         : media === "lesson-video"
           ? page.getByLabel(/Upload opening video/).first()
           : page.locator('.writing-editor input[type="file"]').first();
@@ -476,8 +476,8 @@ for (const media of ["inline-video", "lesson-video", "cover"] as const)
     await expect(page.locator(".admin-layout")).toBeVisible();
     const saved = state.content[0];
     expect(
-      media === "cover"
-        ? saved.coverImageUrl
+      media === "card-art"
+        ? saved.cardArt?.imageUrl
         : media === "lesson-video"
           ? saved.lessons[0].videoUrl
           : saved.lessons[0].body,

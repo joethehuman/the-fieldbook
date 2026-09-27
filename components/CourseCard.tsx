@@ -2,8 +2,8 @@ import { LearningCard } from "./patterns/learning-card";
 
 import type { courseProgress } from "@/lib/course-progress";
 
-import { useState } from "react";
-import { Play } from "lucide-react";
+import { CardArtwork } from "./patterns/card-artwork";
+import type { SiteSettings } from "@/lib/settings";
 import type { Content } from "@/lib/types";
 export function CourseCard({
   course: c,
@@ -12,6 +12,7 @@ export function CourseCard({
   assigned = false,
   onClick,
   href,
+  settings,
 }: {
   course: Content;
   status: ReturnType<typeof courseProgress>;
@@ -19,11 +20,9 @@ export function CourseCard({
   assigned?: boolean;
   onClick?: () => void;
   href?: string;
+  settings?: SiteSettings;
 }) {
   const { complete, started } = status;
-  const [failedCover, setFailedCover] = useState<string | null>(null);
-  const showCover = !!c.coverImageUrl && c.coverImageUrl !== failedCover;
-  const index = Number(c.id.replace(/\D/g, "")) || 1;
   return (
     <LearningCard
       onClick={onClick}
@@ -31,7 +30,7 @@ export function CourseCard({
       title={c.title}
       description={c.summary}
       status={status}
-      metadata={`${c.lessons.length} lessons${c.questions.length ? " · Quiz" : ""}${assigned ? " · Assigned" : ""}`}
+      metadata={`${c.category} · ${c.duration} min · ${c.lessons.length} lessons${c.questions.length ? " · Quiz" : ""}${assigned ? " · Assigned" : ""}`}
       action={
         complete
           ? "Review course"
@@ -45,35 +44,15 @@ export function CourseCard({
         ) : undefined
       }
       artwork={
-        <div
-          className={
-            "course-art art-" + (index % 6) + (showCover ? " has-cover" : "")
-          }
-        >
-          {showCover ? (
-            <img
-              className="course-cover"
-              src={c.coverImageUrl}
-              alt=""
-              loading="lazy"
-              onError={() => setFailedCover(c.coverImageUrl || null)}
-            />
-          ) : (
-            <div className="art-grid" />
-          )}
-          <span className="art-label">{c.category}</span>
-          {!showCover && (
-            <div className={"abstract abstract-" + (index % 3)}>
-              <i />
-              <i />
-              <i />
-            </div>
-          )}
-          <span className="play-disc">
-            <Play size={17} fill="currentColor" />
-          </span>
-          <span className="duration">{c.duration} min</span>
-        </div>
+        <CardArtwork
+          id={c.id}
+          title={c.title}
+          kind="course"
+          category={c.category}
+          art={c.cardArt}
+          legacyCover={c.coverImageUrl}
+          settings={settings}
+        />
       }
     />
   );

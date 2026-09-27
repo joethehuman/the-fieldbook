@@ -1,5 +1,7 @@
 import { IntentLink } from "@/components/patterns/intent-link";
-import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { CardArtwork } from "@/components/patterns/card-artwork";
+import type { SiteSettings } from "@/lib/settings";
 import { ContentAction } from "@/components/patterns/content-action";
 import {
   ContentCardFooter,
@@ -18,7 +20,13 @@ export async function generateMetadata() {
       : {}),
   };
 }
-function Cards({ items }: { items: ReaderItem[] }) {
+function Cards({
+  items,
+  settings,
+}: {
+  items: ReaderItem[];
+  settings: SiteSettings;
+}) {
   return (
     <div className="brief-list">
       {items.map((item, index) => (
@@ -31,9 +39,14 @@ function Cards({ items }: { items: ReaderItem[] }) {
             href={`/updates/${encodeURIComponent(item.id)}`}
             eager={index === 0}
           >
-            <div className={`brief-art art-${index % 6}`}>
-              <ArrowUpRight size={36} />
-            </div>
+            <CardArtwork
+              id={item.id}
+              title={item.title}
+              kind="brief"
+              category={item.category}
+              art={item.cardArt}
+              settings={settings}
+            />
             <div className="brief-copy">
               <span className="eyebrow">{item.category}</span>
               <h3>{item.title}</h3>
@@ -46,7 +59,7 @@ function Cards({ items }: { items: ReaderItem[] }) {
                 }
               >
                 {new Date(
-                  item.updatedAt || item.createdAt || "",
+                  item.feedAt || item.updatedAt || item.createdAt || "",
                 ).toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
@@ -62,7 +75,7 @@ function Cards({ items }: { items: ReaderItem[] }) {
   );
 }
 export default async function Page() {
-  const { forYou, otherUpdates } = await readerContext("/updates");
+  const { forYou, otherUpdates, settings } = await readerContext("/updates");
   return (
     <>
       <PageHeader>
@@ -71,14 +84,14 @@ export default async function Page() {
       {!!forYou.length && (
         <section className="updates-section">
           <SectionHeader title={<h2>For you</h2>} />
-          <Cards items={forYou} />
+          <Cards items={forYou} settings={settings} />
         </section>
       )}
       <section className="updates-section">
         <SectionHeader
           title={<h2>{forYou.length ? "More updates" : "All updates"}</h2>}
         />
-        <Cards items={otherUpdates} />
+        <Cards items={otherUpdates} settings={settings} />
         {!otherUpdates.length && (
           <EmptyState>
             {forYou.length

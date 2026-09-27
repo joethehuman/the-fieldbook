@@ -481,6 +481,11 @@
   .brief-copy p {
     color: var(--muted-foreground);
     font-size: 0.875rem;
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow-wrap: anywhere;
   }
   .brief-copy h3 {
     font-size: 1.0625rem;

@@ -37,6 +37,7 @@ export type SiteSettings = {
   welcomeDescription?: string;
   name: string;
   accent: string;
+  cardPalette?: import("./card-art").CardPaletteSetting;
   access: "public" | "private";
   registration: "open" | "closed";
 };
@@ -48,6 +49,7 @@ export const defaultSettings: SiteSettings = {
   welcomeDescription: "",
   name: "Fieldbook",
   accent: defaultBrandAccent,
+  cardPalette: { mode: "follow" },
   access: "public",
   registration: "open",
 };

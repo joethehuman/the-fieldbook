@@ -13,7 +13,7 @@ const contentIndex = async (): Promise<Content[]> => {
     db()
       .from("fb_documents")
       .select(
-        "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,sectionOrder:draft->>sectionOrder,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,groups:draft->groups,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
+        "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,sectionOrder:draft->sectionOrder,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,feedAt:draft->>feedAt,cardArt:draft->cardArt,groups:draft->groups,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
         { count: "exact" },
       )
       .is("deleted_at", null)
@@ -39,6 +39,8 @@ const contentIndex = async (): Promise<Content[]> => {
     assignments: row.assignments || [],
     duration: Number(row.duration) || 5,
     coverImageUrl: row.coverImageUrl || undefined,
+    cardArt: row.cardArt || undefined,
+    feedAt: row.feedAt || undefined,
     body: "",
     lessons: [],
     questions: [],

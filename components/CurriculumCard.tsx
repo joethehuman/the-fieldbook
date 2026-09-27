@@ -1,4 +1,5 @@
-import { Layers } from "lucide-react";
+import { CardArtwork } from "./patterns/card-artwork";
+import type { SiteSettings } from "@/lib/settings";
 import type { Content, Curriculum, Progress } from "@/lib/types";
 import { curriculumProgress } from "@/lib/learning-cards";
 import { LearningCard } from "./patterns/learning-card";
@@ -8,12 +9,14 @@ export function CurriculumCard({
   progress,
   onClick,
   href,
+  settings,
 }: {
   curriculum: Curriculum;
   courses: Content[];
   progress: Progress[];
   onClick?: () => void;
   href?: string;
+  settings?: SiteSettings;
 }) {
   const status = curriculumProgress(courses, progress);
   return (
@@ -26,18 +29,13 @@ export function CurriculumCard({
       onClick={onClick}
       href={href}
       artwork={
-        <div className="course-art art-1">
-          <div className="art-grid" />
-          <span className="art-label">Curriculum</span>
-          <div className="abstract abstract-1">
-            <i />
-            <i />
-            <i />
-          </div>
-          <span className="play-disc">
-            <Layers size={17} />
-          </span>
-        </div>
+        <CardArtwork
+          id={curriculum.id}
+          title={curriculum.name}
+          kind="curriculum"
+          art={curriculum.cardArt}
+          settings={settings}
+        />
       }
     />
   );

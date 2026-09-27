@@ -72,7 +72,7 @@ async function fixture(
       });
     }
     if (url.pathname.endsWith("/fb_config"))
-      return reply({ settings: data.settings, revision: 1, curricula: [] });
+      return reply({ settings: data.settings, revision: 1, curricula: data.curricula });
     if (url.pathname.endsWith("/rpc/fb_governance_snapshot")) {
       const actor = JSON.parse(String(init?.body)).p_actor;
       const users =
@@ -131,6 +131,10 @@ async function fixture(
             : text?.includes(match[3].slice(1, -1));
         }),
       );
+    }
+    for (const [column, value] of [["published->cardArt->>source", "source"], ["published->cardArt->>imageUrl", "imageUrl"]] as const) {
+      const filter = params.get(column);
+      if (filter) rows = rows.filter((row) => row.published?.cardArt?.[value] === filter.slice(3));
     }
     const order = params.get("order");
     if (order) {
@@ -253,6 +257,7 @@ function dataFixture() {
     progress,
     feedback,
     settings: { ...defaultSettings },
+    curricula: [] as { status: string; cardArt?: { source: string; imageUrl: string } }[],
     cap: 137,
     ready: true,
     signs: 0,
@@ -368,6 +373,7 @@ test("published media lookup covers old articles, lessons, videos and covers wit
       { lessons: [{ body: `![Image](${reference})` }] },
       { lessons: [{ videoUrl: reference }] },
       { coverImageUrl: reference },
+      { cardArt: { source: "upload", shortTitle: "Cover", version: 1, seed: 3, imageUrl: reference } },
     ]) {
       old.published = { ...course, ...fragment } as any;
       assert.match(
@@ -378,9 +384,13 @@ test("published media lookup covers old articles, lessons, videos and covers wit
     old.published = null as any;
     old.draft.body = reference;
     await assert.rejects(signedMediaUrl(file, learner), /Media not found/);
-    assert.equal(f.signs, 4);
+    assert.equal(f.signs, 5);
     await signedMediaUrl(file, admin);
     await assert.rejects(signedMediaUrl(file, null), /Media not found/);
+    f.curricula.push({ status: "published", cardArt: { source: "upload", imageUrl: reference } });
+    await signedMediaUrl(file, learner);
+    f.curricula[0].status = "draft";
+    await assert.rejects(signedMediaUrl(file, learner), /Media not found/);
     f.settings.access = "private";
     await assert.rejects(signedMediaUrl(file, null), /Sign in/);
     await assert.rejects(signedMediaUrl(file, learner), /Media not found/);
@@ -390,13 +400,13 @@ test("published media lookup covers old articles, lessons, videos and covers wit
       signedMediaUrl("invalid.png", admin),
       /Media not found/,
     );
-    assert.equal(f.signs, 5);
+    assert.equal(f.signs, 7);
     assert.ok(
       f.requests
         .filter((u) => u.pathname.endsWith("fb_documents"))
         .every(
           (u) =>
-            u.searchParams.has("or") && u.searchParams.get("select") === "id",
+            (u.searchParams.has("or") || u.searchParams.has("published->cardArt->>source")) && u.searchParams.get("select") === "id",
         ),
     );
   }));

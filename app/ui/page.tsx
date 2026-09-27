@@ -18,6 +18,7 @@ import {
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
 import { LearningCard } from "@/components/patterns/learning-card";
+import { CardArtwork } from "@/components/patterns/card-artwork";
 import { BrowseToolbar } from "@/components/patterns/layout";
 import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
@@ -108,6 +109,12 @@ export default function ComponentCatalog() {
       <BulkExamples />
       <LibraryExamples />
       <WritingExamples />
+      <section className="grid gap-4" aria-label="Generated card artwork">
+        <SectionHeader title={<h2>Generated card artwork</h2>} description="Eight families share a saved seed and palette, with varied geometry within each family." />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 8 }, (_, seed) => <CardArtwork key={seed} id={`catalog-${seed}`} title={`Example design ${seed + 1}`} kind={seed % 3 === 0 ? "brief" : seed % 3 === 1 ? "course" : "curriculum"} category={seed % 3 === 2 ? undefined : "Product"} art={{ source: "generated", shortTitle: `Design ${seed + 1}`, version: 1, seed }} />)}
+        </div>
+      </section>
       <section className="grid gap-4" aria-label="Save confirmations">
         <SectionHeader
           title={<h2>Save confirmations</h2>}
@@ -239,11 +246,7 @@ export default function ComponentCatalog() {
                 started: value > 0,
               }}
               artwork={
-                <div className="course-art art-1">
-                  <span className="art-label">
-                    {value === 33 ? "Curriculum" : "Course"}
-                  </span>
-                </div>
+                <CardArtwork id={`catalog-learning-${value}`} title="Example course" kind={value === 33 ? "curriculum" : "course"} category={value === 33 ? undefined : "Product"} />
               }
               action={value === 33 ? "View curriculum" : "Start course"}
               onClick={() => {}}

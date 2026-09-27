@@ -1,6 +1,37 @@
 import { z } from "zod";
 import { validateDocSections } from "@/lib/docs-navigation";
+import { cardPalettePresets, graphemeCount } from "@/lib/card-art";
 const text = (max: number) => z.string().max(max);
+export const cardImageReference = z
+  .string()
+  .regex(
+    /^\/api\/media\/[a-f0-9-]{36}\.(png|jpg|webp|gif)$/,
+    "Upload an image using Fieldbook.",
+  );
+export const cardArtSchema = z
+  .object({
+    source: z.enum(["generated", "upload"]),
+    shortTitle: text(160),
+    version: z.literal(1),
+    seed: z.number().int().min(0).max(4294967295),
+    imageUrl: cardImageReference.optional(),
+  })
+  .superRefine((art, ctx) => {
+    if (
+      graphemeCount(art.shortTitle) > 40 ||
+      (art.source === "generated" && !art.shortTitle.trim())
+    )
+      ctx.addIssue({
+        code: "custom",
+        message:
+          "Generated card artwork needs a short title of up to 40 characters.",
+      });
+    if (art.source === "upload" && !art.imageUrl)
+      ctx.addIssue({
+        code: "custom",
+        message: "Upload a card image before saving.",
+      });
+  });
 export const contentBaseSchema = z.object({
   id: z.uuid(),
   kind: z.enum(["doc", "brief", "course"]),
@@ -19,6 +50,7 @@ export const contentBaseSchema = z.object({
       "Upload a course cover using Fieldbook.",
     )
     .optional(),
+  cardArt: cardArtSchema.optional(),
   duration: z.number().int().min(0).max(10000),
   requirePassing: z.boolean().optional(),
   groups: z.array(text(80)).max(100),
@@ -65,6 +97,7 @@ export const contentBaseSchema = z.object({
     .optional(),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime(),
+  feedAt: z.iso.datetime().optional(),
   revision: z.number().int().min(0).optional(),
   publishedRevision: z.number().int().nullable().optional(),
 });
@@ -138,6 +171,28 @@ export const settingsSchema = z
     tagline: text(180).optional(),
     welcomeDescription: text(180).trim().default(""),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+    cardPalette: z
+      .discriminatedUnion("mode", [
+        z.object({ mode: z.literal("follow") }),
+        z.object({
+          mode: z.literal("preset"),
+          preset: z.enum(
+            Object.keys(cardPalettePresets) as [
+              keyof typeof cardPalettePresets,
+              ...(keyof typeof cardPalettePresets)[],
+            ],
+          ),
+        }),
+        z.object({
+          mode: z.literal("custom"),
+          colors: z.object({
+            base: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+            accent1: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+            accent2: z.string().regex(/^#[0-9a-fA-F]{6}$/),
+          }),
+        }),
+      ])
+      .optional(),
     access: z.enum(["public", "private"]),
     registration: z.enum(["open", "closed"]),
   })

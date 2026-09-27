@@ -13,6 +13,7 @@ import { DocSectionsSettings } from "./DocSectionsSettings";
 import { ActionGroup } from "./ui/action-group";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
+import { CardPaletteSettings } from "./CardPaletteSettings";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import { equalJson } from "@/lib/equal-json";
@@ -184,6 +185,7 @@ export default function SiteSettingsPanel({
               />
             </div>
           </FieldGroup>
+          <CardPaletteSettings settings={settings} onChange={(cardPalette) => setSettings({ ...settings, cardPalette })} />
         </SettingsGroup>
       )}
       {section === "docs" && (

@@ -43,7 +43,7 @@ export function LearningCard({
           {title}
         </h3>
         {detail}
-        <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">
+        <p className="line-clamp-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
           {description}
         </p>
         <ContentCardFooter
