@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { InstallationIdentity } from "./installation-identity";
 
+export const sidebarPrimaryLinkClassName =
+  "sidebar-primary-link w-[var(--sidebar-nav-width)] overflow-hidden whitespace-nowrap px-[9px] transition-[width,background-color,color] duration-[180ms]";
+
 export function useDesktopSidebar(courseKey?: string) {
   const [collapsed, setCollapsed] = useState(Boolean(courseKey));
 
@@ -54,7 +57,7 @@ export function SidebarHeading({
           type="button"
           variant="ghost"
           size="icon"
-          className="sidebar-toggle max-md:hidden"
+          className="sidebar-toggle max-md:hidden transition-[transform,background-color,color] duration-[180ms]"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-keyshortcuts="Meta+Shift+S"
           aria-controls="main-sidebar"

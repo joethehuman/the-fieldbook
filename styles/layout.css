@@ -1,7 +1,10 @@
 /* Application geometry only. Controls, fields, actions and surfaces live in components. */
 @layer components {
   .app {
+    --sidebar-rail-width: 4.25rem;
+    --sidebar-inner-width: calc(var(--sidebar-width) - var(--space-4) - var(--space-4) - 1px);
     --active-sidebar-width: var(--sidebar-width);
+    --sidebar-nav-width: var(--sidebar-inner-width);
     position: fixed;
     inset: 0;
     height: 100dvh;
@@ -16,6 +19,7 @@
     flex-direction: column;
     gap: var(--space-6);
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: none;
     scrollbar-gutter: stable;
     border-right: 1px solid var(--border);
@@ -27,7 +31,7 @@
     display: grid;
     min-width: 0;
     grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
+    align-items: center;
     gap: var(--space-3);
   }
   .sidebar-heading .logo {
@@ -711,6 +715,9 @@
     }
   }
   @media (width < 48rem) {
+    .app {
+      --sidebar-nav-width: 100%;
+    }
     .lesson-nav {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -759,32 +766,63 @@
     }
   }
   @media (width >= 48rem) {
+    .sidebar-heading,
+    .primary-navigation,
+    .document-tree,
+    .sidebar-bottom {
+      width: var(--sidebar-inner-width);
+    }
+    .sidebar-heading .logo,
+    .sidebar-nav-text,
+    .nav-count,
+    .document-tree,
+    .sidebar-account-avatar,
+    .sidebar-account-identity,
+    .sidebar-account-secondary {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 90ms ease 90ms, visibility 0s;
+    }
+    .sidebar-nav-text,
+    .nav-count {
+      white-space: nowrap;
+    }
     .app.sidebar-collapsed {
-      --active-sidebar-width: 4.25rem;
+      --active-sidebar-width: var(--sidebar-rail-width);
+      --sidebar-nav-width: 2.25rem;
     }
     .sidebar-collapsed .sidebar {
-      overflow-x: hidden;
-      scrollbar-gutter: auto;
       scrollbar-width: none;
-    }
-    .sidebar-collapsed .sidebar-heading {
-      display: flex;
-      justify-content: center;
     }
     .sidebar-collapsed .sidebar-heading .logo,
     .sidebar-collapsed .sidebar-nav-text,
     .sidebar-collapsed .nav-count,
-    .sidebar-collapsed .document-tree {
-      display: none;
+    .sidebar-collapsed .document-tree,
+    .sidebar-collapsed .sidebar-account-avatar,
+    .sidebar-collapsed .sidebar-account-identity,
+    .sidebar-collapsed .sidebar-account-secondary {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 70ms ease, visibility 0s linear 70ms;
     }
-    .sidebar-collapsed .primary-navigation [data-slot="button"] {
-      justify-content: center;
-      padding-inline: 0;
+    .sidebar-collapsed .sidebar-toggle {
+      transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 1px));
+    }
+    .sidebar-collapsed .sidebar-account-trigger {
+      transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 9px));
     }
   }
   @media (prefers-reduced-motion: reduce) {
     .sidebar,
-    .main-shell {
+    .main-shell,
+    .sidebar-heading .logo,
+    .sidebar-nav-text,
+    .nav-count,
+    .document-tree,
+    .sidebar-account-avatar,
+    .sidebar-account-identity,
+    .sidebar-account-secondary {
       transition: none;
     }
   }

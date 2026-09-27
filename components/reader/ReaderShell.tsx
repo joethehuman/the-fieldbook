@@ -19,6 +19,7 @@ import {
 import { AppBar } from "@/components/patterns/app-bar";
 import {
   SidebarHeading,
+  sidebarPrimaryLinkClassName,
   useDesktopSidebar,
 } from "@/components/patterns/desktop-sidebar";
 import { DocumentTree } from "@/components/patterns/document-tree";
@@ -144,7 +145,7 @@ export function ReaderShell({
             <NavigationButton
               asChild
               key={href}
-              className={section === href.slice(1) ? "active" : ""}
+              className={`${sidebarPrimaryLinkClassName} ${section === href.slice(1) ? "active" : ""}`}
             >
               <Link
                 href={href}
@@ -193,7 +194,6 @@ export function ReaderShell({
         )}
         <div className="sidebar-bottom">
           <AccountMenu
-            compact={collapsed}
             name={context.user?.name || "Guest"}
             email={context.user?.email}
             guest={!context.user}

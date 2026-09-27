@@ -15,7 +15,11 @@ import { ContentSearch } from "./ContentSearch";
 import { InitialsAvatar } from "./ui/initials-avatar";
 import { RequestError } from "@/lib/workspace-save";
 import { BrandedAccount } from "./patterns/branded-account";
-import { SidebarHeading, useDesktopSidebar } from "./patterns/desktop-sidebar";
+import {
+  SidebarHeading,
+  sidebarPrimaryLinkClassName,
+  useDesktopSidebar,
+} from "./patterns/desktop-sidebar";
 import { brandingFromSettings } from "@/lib/branding";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "./patterns/brand-theme-sync";
@@ -564,7 +568,7 @@ export default function Fieldbook({
           ).map((n) => (
             <NavigationButton
               variant="ghost"
-              className={view === n.key ? "active" : ""}
+              className={`${sidebarPrimaryLinkClassName} ${view === n.key ? "active" : ""}`}
               key={n.key}
               aria-label={n.title}
               title={collapsed ? n.title : undefined}
@@ -615,7 +619,6 @@ export default function Fieldbook({
         )}
         <div className="sidebar-bottom">
           <AccountMenu
-            compact={collapsed}
             initials={initials(user.name)}
             name={runtime && uid === "guest" ? "Guest" : user.name}
             email={uid === "guest" ? undefined : user.email}
