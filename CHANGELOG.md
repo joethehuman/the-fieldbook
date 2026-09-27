@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Remove the displayed author from Docs and Updates articles, and separate Doc parent and subsection names with a slash in article metadata.
+
 - Keep the Docs On this page outline closed on narrow screens and visible on wide screens from the first render, without a resize-driven flash.
 
 - Apply the saved installation accent to links, selected Docs and feedback, focus highlights and account pages; keep link text readable for light accent colors.
