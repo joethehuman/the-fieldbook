@@ -32,7 +32,7 @@ export function DocumentTree({
   selected: string | null;
   href: (id: string) => string;
   onOpen?: (id: string) => void;
-  onNavigate?: () => void;
+  onNavigate?: (id: string) => void;
   storageKey?: string;
 }) {
   const fade = useScrollFade<HTMLElement>();
@@ -146,13 +146,16 @@ export function DocumentTree({
           onClick={(event) => {
             remember();
             if (
+              onNavigate &&
               !event.button &&
               !event.metaKey &&
               !event.ctrlKey &&
               !event.shiftKey &&
               !event.altKey
-            )
-              onNavigate?.();
+            ) {
+              event.preventDefault();
+              onNavigate(doc.id);
+            }
           }}
         >
           {doc.title}
