@@ -181,7 +181,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
                 })}
               </ol>
             </details>}
-            {feedback}
+            {complete && feedback}
             <ActionGroup className="justify-center">
               {(score === undefined || score < course.questions.length) && <Button variant="outline" onClick={retry}>Retry quiz</Button>}
               {!complete && quizUnlocked(course, p?.attempts) && <Button onClick={completeEarlierProgress} loading={busy}>Finish course</Button>}
@@ -206,7 +206,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             </FieldGroup>
             <ActionGroup>
               {questionIndex > 0 && <Button variant="outline" onClick={() => setQuestionIndex(questionIndex - 1)}>Previous question</Button>}
-              <Button disabled={busy || !allDone || !answers[questionIndex]?.length} onClick={questionIndex === course.questions.length - 1 ? submit : () => setQuestionIndex(questionIndex + 1)} loading={busy}>
+              <Button className="transition-none" disabled={busy || !allDone || !answers[questionIndex]?.length} onClick={questionIndex === course.questions.length - 1 ? submit : () => setQuestionIndex(questionIndex + 1)} loading={busy}>
                 {questionIndex === course.questions.length - 1 ? "Submit and see results" : "Submit and continue"} <ArrowRight size={16} />
               </Button>
             </ActionGroup>

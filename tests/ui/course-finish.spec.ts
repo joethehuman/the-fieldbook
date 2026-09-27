@@ -41,7 +41,7 @@ test("required quiz shows one question at a time, grades, and retries", async ({
   await expect(page.locator('[data-slot="badge"]', { hasText: "Incorrect" })).toBeVisible();
   await page.screenshot({ path: info.outputPath("required-quiz-results.png") });
   await expect(page.getByRole("button", { name: "Close course" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "Content feedback" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Content feedback" })).toHaveCount(0);
   await page.getByRole("button", { name: "Retry quiz" }).click();
   await page.getByRole("radio", { name: "The customer’s goal" }).check();
   await page.getByRole("button", { name: "Submit and continue" }).click();
@@ -49,6 +49,7 @@ test("required quiz shows one question at a time, grades, and retries", async ({
   await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(page.getByRole("heading", { name: "2 of 2 correct" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Close course" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Content feedback" })).toBeVisible();
   await expect.poll(async () => {
     const card = await page.locator(".course-quiz").boundingBox();
     const button = await page.getByRole("button", { name: "Close course" }).boundingBox();
@@ -65,6 +66,7 @@ test("optional quiz completes after a missed answer and still offers retry", asy
   await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(page.getByRole("heading", { name: "1 of 2 correct" })).toBeVisible();
   await expect(page.getByText("Course complete.")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Content feedback" })).toBeVisible();
   await cardAtTop(page, ".course-quiz");
   await page.getByText("Review answers").click();
   await expect(page.locator('[data-slot="badge"]', { hasText: "Incorrect" })).toBeVisible();
@@ -101,4 +103,36 @@ test("course sidebar keeps its position between a lesson and the quiz", async ({
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await expect(page.getByText("Question 1 of 2")).toBeVisible();
   await expect.poll(async () => Math.abs((await back.boundingBox())!.y - lessonTop)).toBeLessThan(2);
+});
+
+test("next question's submit button starts disabled without showing its enabled color", async ({ page }, info) => {
+  await openCourse(page, "required");
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("radio", { name: "The customer’s goal" }).check();
+  await page.evaluate(() => {
+    const samples: string[] = [];
+    (window as Window & { quizButtonColors?: string[] }).quizButtonColors = samples;
+    const sample = () => {
+      const button = Array.from(document.querySelectorAll("button"))
+        .find((candidate) => candidate.textContent?.includes("Submit and see results"));
+      if (button) {
+        samples.push(getComputedStyle(button).backgroundColor);
+        if (samples.length >= 15) return;
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  await page.getByRole("button", { name: "Submit and continue" }).click();
+  const submit = page.getByRole("button", { name: "Submit and see results" });
+  await expect(submit).toBeDisabled();
+  await expect.poll(() => page.evaluate(() => (window as Window & { quizButtonColors?: string[] }).quizButtonColors?.length || 0)).toBe(15);
+  const colors = await page.evaluate(() => (window as Window & { quizButtonColors?: string[] }).quizButtonColors || []);
+  expect(new Set(colors).size, colors.join(", ")).toBe(1);
+  const transitionDuration = await submit.evaluate((button) => getComputedStyle(button).transitionDuration);
+  expect(transitionDuration.split(",").every((duration) => parseFloat(duration) === 0)).toBe(true);
+  await page.screenshot({ path: info.outputPath("quiz-question-disabled.png") });
+  await page.getByRole("radio", { name: "With an agreed next step" }).check();
+  await expect(submit).toBeEnabled();
+  await expect.poll(() => submit.evaluate((button) => getComputedStyle(button).backgroundColor)).not.toBe(colors[0]);
 });
