@@ -529,6 +529,68 @@ for (const signedIn of [false, true]) {
     expect(workspaceReads).toBe(0);
   });
 }
+test("Courses home splits its progress card on iPad in the installed app", async ({
+  page,
+  request,
+}, info) => {
+  await fixture(request, {
+    settings: { access: "private", logoUrl: "" },
+    groups: [{ id: "learning-group", name: "Learners" }],
+    userGroups: ["learning-group"],
+    documents: documents([
+      items[0],
+      items[1],
+      { ...items[2], groups: ["learning-group"], assignments: undefined },
+    ]),
+  });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  await page.goto("/courses");
+  const home = page.locator(".for-you");
+  const summary = home.locator('[data-slot="card"]').first();
+  const row = home.getByRole("region", { name: "For you" });
+  await expect(row.locator(".course-card")).toHaveCount(1);
+  for (const width of [820, 1024, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    const summaryBox = await summary.boundingBox();
+    const rowBox = await row.boundingBox();
+    const ring = summary.locator('[data-slot="progress-ring"]');
+    const ringBox = await ring.boundingBox();
+    const graphicBox = await ring.locator("svg").boundingBox();
+    expect(ringBox!.x).toBeGreaterThanOrEqual(summaryBox!.x);
+    expect(ringBox!.x + ringBox!.width).toBeLessThanOrEqual(
+      summaryBox!.x + summaryBox!.width,
+    );
+    expect(Math.abs(graphicBox!.x - ringBox!.x)).toBeLessThan(2);
+    if (width >= 820) {
+      expect(rowBox!.x).toBeGreaterThan(summaryBox!.x + summaryBox!.width);
+      expect(Math.abs(rowBox!.y - summaryBox!.y)).toBeLessThan(2);
+    } else {
+      expect(Math.abs(rowBox!.x - summaryBox!.x)).toBeLessThan(2);
+      expect(rowBox!.y).toBeGreaterThan(
+        summaryBox!.y + summaryBox!.height,
+      );
+    }
+    await home.screenshot({ path: info.outputPath(`courses-${width}.png`) });
+  }
+});
+
 test("Courses share reader navigation and show the signed-in account immediately", async ({
   page,
   request,
