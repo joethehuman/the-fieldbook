@@ -62,11 +62,6 @@
     color: var(--muted-foreground);
     font-size: 0.8125rem;
   }
-  .article-author {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-  }
   .markdown {
     min-width: 0;
     color: var(--foreground);
