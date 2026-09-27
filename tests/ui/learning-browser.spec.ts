@@ -73,7 +73,7 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 
-test("For you uses curriculum cards, one channel picker and a simple ordered page", async ({
+test("For you uses curriculum cards, one category picker and a simple ordered page", async ({
   page,
 }, info) => {
   await seed(page);
@@ -86,9 +86,9 @@ test("For you uses curriculum cards, one channel picker and a simple ordered pag
     "1 of 3 courses complete",
   );
   await expect(
-    page.getByRole("group", { name: "Course channels" }),
+    page.getByRole("group", { name: "Course categories" }),
   ).toHaveCount(0);
-  await expect(page.getByRole("combobox", { name: "Channel" })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Category" })).toBeVisible();
   await expect(
     page.getByRole("button", { name: "View in progress" }),
   ).toHaveCount(0);
@@ -109,7 +109,7 @@ test("For you uses curriculum cards, one channel picker and a simple ordered pag
   await expect(library.locator(".course-card")).toHaveCount(1);
   await page.getByRole("switch", { name: "Hide completed" }).check();
   await expect(library.locator(".course-card")).toHaveCount(1);
-  await page.getByRole("combobox", { name: "Channel", exact: true }).click();
+  await page.getByRole("combobox", { name: "Category", exact: true }).click();
   await page
     .getByRole("option", { name: "Sales foundations", exact: true })
     .click();

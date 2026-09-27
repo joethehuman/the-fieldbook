@@ -301,7 +301,7 @@ export default function Admin({
       title: "",
       summary: "",
       body: "",
-      category: kind === "course" ? "New channel" : "",
+      category: kind === "course" ? "New category" : "",
       folder: "",
       status: "draft",
       version: 1,
@@ -609,12 +609,12 @@ export default function Admin({
                     placeholder="Title, summary, or folder"
                   />
                 </FormField>
-                <FormField label="Channel / category">
+                <FormField label="Category">
                   <SelectField
                     value={category}
                     onValueChange={(value) => setCategory(value)}
                   >
-                    <option value="all">All channels / categories</option>
+                    <option value="all">All categories</option>
                     {[
                       ...new Set(
                         data.content
@@ -1703,9 +1703,7 @@ export function Editor({
                     )}
                   </>
                 ) : (
-                  <FormField
-                    label={c.kind === "course" ? "Channel" : "Category"}
-                  >
+                  <FormField label="Category">
                     <CreatableCombobox
                       required
                       value={c.category}
@@ -1713,14 +1711,8 @@ export function Editor({
                       options={data.content
                         .filter((item) => item.kind === c.kind)
                         .map((item) => item.category)}
-                      listLabel={
-                        c.kind === "course" ? "Channels" : "Categories"
-                      }
-                      placeholder={
-                        c.kind === "course"
-                          ? "Choose or add channel…"
-                          : "Choose or add category…"
-                      }
+                      listLabel="Categories"
+                      placeholder="Choose or add category…"
                     />
                   </FormField>
                 )}

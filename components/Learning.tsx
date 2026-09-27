@@ -78,7 +78,7 @@ export default function Learning({
   );
   const [hideCompleted, setHideCompleted] = useState(false);
   const [query, setQuery] = useState("");
-  const [topic, setTopic] = useState("All channels");
+  const [topic, setTopic] = useState("All categories");
   const [sort, setSort] = useState("recommended");
   const state = learningState(courses, user, groups, progress, settings);
   const completed = assigned.filter((c) => isComplete(c, progress));
@@ -154,7 +154,7 @@ export default function Learning({
   ).filter(
     (item) =>
       (!hideCompleted || !completeCard(item)) &&
-      (topic === "All channels" ||
+      (topic === "All categories" ||
         cardCourses(item).some((c) => c.category === topic)) &&
       [
         cardTitle(item),
@@ -224,7 +224,7 @@ export default function Learning({
   const filtered = ordered(
     source.filter(
       (c) =>
-        (topic === "All channels" || c.category === topic) &&
+        (topic === "All categories" || c.category === topic) &&
         [c.title, c.summary, c.category]
           .join(" ")
           .toLowerCase()
@@ -247,7 +247,7 @@ export default function Learning({
     setView(next);
     setHideCompleted(false);
     setQuery("");
-    setTopic("All channels");
+    setTopic("All categories");
   }
   function browseLibrary() {
     document.getElementById("all-courses")?.scrollIntoView({
@@ -431,13 +431,13 @@ export default function Learning({
               />
             </SearchField>
           </Field>
-          <FormField label="Channel">
+          <FormField label="Category">
             <SelectField
-              aria-label="Channel"
+              aria-label="Category"
               value={topic}
               onValueChange={setTopic}
             >
-              {["All channels", ...topics].map((t) => (
+              {["All categories", ...topics].map((t) => (
                 <option key={t} value={t}>
                   {t}
                 </option>
@@ -487,7 +487,7 @@ export default function Learning({
           : filtered.length) && (
           <EmptyState>
             <h3>
-              {query || topic !== "All channels"
+              {query || topic !== "All categories"
                 ? "No matching courses"
                 : view === "assigned" && hideCompleted && assigned.length
                   ? "You’re up to date"
@@ -501,14 +501,14 @@ export default function Learning({
                         ? "No completed courses yet"
                         : "No courses yet"}
             </h3>
-            {(query || topic !== "All channels") && (
-              <p>Try another channel or search term.</p>
+            {(query || topic !== "All categories") && (
+              <p>Try another category or search term.</p>
             )}
             {view === "assigned" &&
               hideCompleted &&
               !!assigned.length &&
               !query &&
-              topic === "All channels" && (
+              topic === "All categories" && (
                 <p>Turn off Hide completed to review assigned courses.</p>
               )}
           </EmptyState>
