@@ -1,6 +1,7 @@
 "use client";
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   useTransition,
@@ -28,6 +29,7 @@ import { ReaderSearch } from "./ReaderSearch";
 import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
 import { organizationHomePath } from "@/lib/navigation";
+import { orderedDocs } from "@/lib/docs-navigation";
 
 export function ReaderShell({
   context,
@@ -52,7 +54,22 @@ export function ReaderShell({
           : pathname.startsWith("/courses")
             ? "courses"
             : "updates";
-  const selected = pathname.split("/")[2] || null;
+  const orderedDocList = useMemo(
+    () =>
+      orderedDocs(context.docs, context.docCategoryOrder, context.docSections),
+    [context.docs, context.docCategoryOrder, context.docSections],
+  );
+  const selected =
+    pathname === "/docs"
+      ? orderedDocList[0]?.id || null
+      : pathname.split("/")[2] || null;
+  useEffect(() => {
+    if (section !== "docs" || !selected) return;
+    const index = orderedDocList.findIndex((doc) => doc.id === selected);
+    if (index < 0) return;
+    for (const neighbor of [orderedDocList[index - 1], orderedDocList[index + 1]])
+      if (neighbor) router.prefetch(`/docs/${encodeURIComponent(neighbor.id)}`);
+  }, [section, selected, orderedDocList, router]);
   const articleTitle = selected
     ? section === "docs"
       ? context.docs.find((doc) => doc.id === selected)?.title
@@ -189,7 +206,8 @@ export function ReaderShell({
             }
             onMenuOpen={() => {
               if (context.user?.role === "admin") router.prefetch("/admin");
-              else if (context.user?.role === "manager") router.prefetch("/team");
+              else if (context.user?.role === "manager")
+                router.prefetch("/team");
             }}
             onManageOrganizationIntent={() => router.prefetch("/admin")}
             onTeamProgressIntent={() => router.prefetch("/team")}

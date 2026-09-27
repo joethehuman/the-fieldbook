@@ -90,7 +90,7 @@ for (const app of ["demo", "production"] as const) {
         },
       });
       await page.goto("/docs");
-      await expect(page).toHaveURL(new RegExp(`/docs/${arranged[1].id}$`));
+      await expect(page).toHaveURL(/\/docs$/);
     }
     await expect(page.locator("article h1")).toHaveText(arranged[1].title);
     await expect(page.getByRole("link", { name: /Back to docs/ })).toHaveCount(
@@ -103,8 +103,42 @@ for (const app of ["demo", "production"] as const) {
         .getByRole("navigation", { name: "Documents", exact: true })
         .getByRole("link", { name: arranged[1].title }),
     ).toHaveAttribute("aria-current", "page");
+    const active = page
+      .getByRole("navigation", { name: "Documents", exact: true })
+      .getByRole("link", { name: arranged[1].title });
+    const inactive = page
+      .getByRole("navigation", { name: "Documents", exact: true })
+      .getByRole("link", { name: arranged[2].title });
+    expect(
+      await active.evaluate((node) => getComputedStyle(node).fontWeight),
+    ).toBe(
+      await inactive.evaluate((node) => getComputedStyle(node).fontWeight),
+    );
+    expect(
+      await active.evaluate((node) => getComputedStyle(node).color),
+    ).not.toBe(await inactive.evaluate((node) => getComputedStyle(node).color));
     if (info.project.name === "phone")
       await page.getByRole("button", { name: "Close navigation" }).click();
+    if (app === "production" && info.project.name === "desktop") {
+      const navigations = await page.evaluate(
+        () => performance.getEntriesByType("navigation").length,
+      );
+      await page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: "Courses" })
+        .click();
+      await page
+        .getByRole("navigation", { name: "Primary" })
+        .getByRole("link", { name: "Docs" })
+        .click();
+      await expect(page).toHaveURL(/\/docs$/);
+      await expect(page.locator("article h1")).toHaveText(arranged[1].title);
+      expect(
+        await page.evaluate(
+          () => performance.getEntriesByType("navigation").length,
+        ),
+      ).toBe(navigations);
+    }
     await page.screenshot({
       animations: "disabled",
       path: info.outputPath(`${app}-docs-landing-${info.project.name}.png`),
@@ -502,6 +536,13 @@ test("server navigation is published-only, updates across publication and works 
   expect(updated).toContain(docs[41].title);
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
+  const landing = await request.get("/docs", { maxRedirects: 0 });
+  expect(landing.status()).toBe(200);
+  await page.goto("http://localhost:3131/docs");
+  await expect(page.locator("article h1")).toHaveText(docs[0].title);
+  await expect(
+    page.locator(`.document-tree a[href="/docs/${docs[0].id}"]`),
+  ).toHaveAttribute("aria-current", "page");
   await page.goto(
     `http://localhost:3131/docs/${docs[39].id}#heading-overview-2`,
   );
