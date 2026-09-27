@@ -1,6 +1,7 @@
 "use client";
 
 import { writingVideoPlugin } from "./writing-video";
+import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -261,6 +262,7 @@ export default function WritingEditorEngine({
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [slashOpen, setSlashOpen] = useState(false);
+  const slashFade = useScrollFade<HTMLDivElement>(slashOpen);
   const [slashFromToolbar, setSlashFromToolbar] = useState(false);
   const insertTrigger = useRef<HTMLButtonElement | null>(null);
   const focusInsertItem = useRef(false);
@@ -676,7 +678,7 @@ export default function WritingEditorEngine({
           items[(index + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
         }
       }}>
-        <div className="writing-slash-options">
+        <div ref={slashFade.ref} className="writing-slash-options scroll-fade" data-scroll-fade-before={slashFade.edges.before} data-scroll-fade-after={slashFade.edges.after} onScroll={slashFade.measure}>
           {matchingCommands.map((command, index) => <Button key={command.name} type="button" size="sm" variant="ghost" role="menuitem" aria-current={!slashFromToolbar && index === slashIndex ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setSlashIndex(index)} onClick={() => runInsertCommand(command.run)}>{command.name}</Button>)}
         </div>
         <div className="writing-slash-footer"><Button type="button" size="sm" variant="ghost" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={closeInsertMenu}><span>Close menu</span><kbd>esc</kbd></Button></div>

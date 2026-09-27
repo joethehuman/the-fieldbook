@@ -558,6 +558,10 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   await expect(writing.locator(".writing-command-line")).toHaveAttribute("data-slash-query", "Type to search");
   await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::before").content)).toBe('"/"');
   await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => getComputedStyle(node, "::after").content)).toBe('"Type to search"');
+  await expect.poll(() => writing.locator(".writing-command-line").evaluate((node) => {
+    const lineBreak = node.querySelector("br");
+    return !lineBreak || getComputedStyle(lineBreak).display === "none";
+  })).toBe(true);
   await expect(page.locator(".writing-editor .writing-content:not([contenteditable])")).toBeHidden();
   await expect(writing).toBeFocused();
   const menu = (await page.getByRole("menu", { name: "Insert content" }).boundingBox())!;
@@ -811,6 +815,14 @@ test("Insert menus use full rows and can be dismissed", async ({ page }, info) =
   await page.keyboard.press("/");
   const menu = page.getByRole("menu", { name: "Insert content" });
   await expect(menu.getByRole("menuitem", { name: "Close menu esc" })).toBeVisible();
+  const options = menu.locator(".writing-slash-options");
+  const overflows = await options.evaluate((node) => node.scrollHeight - node.clientHeight > 2);
+  await expect(options).toHaveAttribute("data-scroll-fade-after", String(overflows));
+  if (overflows) {
+    await options.evaluate((node) => { node.scrollTop = node.scrollHeight; node.dispatchEvent(new Event("scroll")); });
+    await expect(options).toHaveAttribute("data-scroll-fade-before", "true");
+    await expect(options).toHaveAttribute("data-scroll-fade-after", "false");
+  }
   const menuWidth = (await menu.boundingBox())!.width;
   const rowWidth = (await menu.getByRole("menuitem", { name: "Heading" }).boundingBox())!.width;
   expect(rowWidth).toBeGreaterThan(menuWidth - 24);

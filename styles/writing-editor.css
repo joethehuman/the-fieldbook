@@ -94,6 +94,7 @@
   color: var(--foreground);
   pointer-events: none;
 }
+.writing-editor .writing-content:focus-within > p.writing-command-line > br { display: none; }
 .writing-editor .writing-content:focus-within > p.writing-command-line::after {
   content: attr(data-slash-query);
   display: inline-block;
