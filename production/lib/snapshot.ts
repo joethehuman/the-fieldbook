@@ -52,7 +52,10 @@ export async function snapshot(user: User | null): Promise<Workspace> {
   }
   const documents = await readAll((from, to) => {
     const query = admin
-      ? db().from("fb_documents").select("*", { count: "exact" })
+      ? db()
+          .from("fb_documents")
+          .select("*", { count: "exact" })
+          .is("deleted_at", null)
       : db()
           .from("fb_documents")
           .select("id,published,revision,published_revision,updated_at", {

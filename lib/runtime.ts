@@ -20,6 +20,10 @@ export type FieldbookRuntime = {
   signIn: () => void;
   signOut: () => Promise<void>;
   admin?: {
+    bulk: (request: import("./bulk-actions").BulkRequest) => Promise<{
+      data: Workspace;
+      results: import("./bulk-actions").BulkResult[];
+    }>;
     prefetch: () => void;
     prepare: (
       scope: "content" | "governance" | "feedback",

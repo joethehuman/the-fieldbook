@@ -11,7 +11,7 @@ export type DocSection = {
 export type DocLink = Pick<
   Content,
   "id" | "title" | "category" | "folder" | "kind" | "status"
-> & { sectionId?: string };
+> & { sectionId?: string; sectionOrder?: number };
 export type DocBranch = {
   id: string;
   name: string;
@@ -49,8 +49,12 @@ export function availableDocSections(
   const aliases = new Map(
     result
       .filter((section) => section.legacyCategory)
-      .map((section) =>
-        [legacyId(section.legacyCategory!, section.legacyFolder ?? ""), section.id] as const,
+      .map(
+        (section) =>
+          [
+            legacyId(section.legacyCategory!, section.legacyFolder ?? ""),
+            section.id,
+          ] as const,
       ),
   );
   const add = (category: string, folder = "") => {
@@ -291,9 +295,9 @@ export function docSections(
   const branch = (section: DocSection): DocBranch => ({
     id: section.id,
     name: section.name,
-    docs: published.filter(
-      (doc) => sectionForDoc(doc, sections)?.id === section.id,
-    ),
+    docs: published
+      .filter((doc) => sectionForDoc(doc, sections)?.id === section.id)
+      .sort((a, b) => (a.sectionOrder || 0) - (b.sectionOrder || 0)),
     folders: sections
       .filter((item) => item.parentId === section.id)
       .map(branch),

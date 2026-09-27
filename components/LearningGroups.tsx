@@ -1,4 +1,5 @@
 "use client";
+import { BulkPicker } from "./patterns/bulk-selection";
 import { Note } from "@/components/ui/note";
 import { FormField } from "@/components/patterns/form-field";
 import { BrowseToolbar } from "@/components/patterns/layout";
@@ -38,6 +39,7 @@ export default function LearningGroups({
   data,
   onChange,
   onLearning,
+  onLearningMany,
   initialGroup,
 }: {
   data: Workspace;
@@ -46,6 +48,9 @@ export default function LearningGroups({
     options?: { locallyHandled?: boolean },
   ) => void | Promise<void>;
   onLearning: LearningHandler;
+  onLearningMany?: (
+    actions: import("@/lib/learning").LearningAction[],
+  ) => Promise<void>;
   initialGroup?: string;
 }) {
   const destination = useRevealTarget<HTMLElement>();
@@ -323,40 +328,128 @@ export default function LearningGroups({
                       </SelectField>
                     </FormField>
                     <h3>Teams</h3>
-                    <FieldDescription id="group-teams-help">
-                      Team membership stays in sync. Each selected team includes
-                      its direct members; select child teams separately.
+                    <FieldDescription>
+                      Linked teams supply their direct members. Child teams must
+                      be linked separately.
                     </FieldDescription>
-                    <div className="group-picker-options">
-                      {(data.teams || []).map((t) => (
-                        <Field
-                          orientation="horizontal"
-                          className="group-picker-option"
-                          key={t.id}
-                        >
-                          <Checkbox
-                            aria-describedby="group-teams-help"
-                            checked={group.teamIds?.includes(t.id) || false}
-                            onCheckedChange={(checked) =>
-                              changeGroup({
-                                teamIds:
-                                  checked === true
-                                    ? [...(group.teamIds || []), t.id]
-                                    : (group.teamIds || []).filter(
-                                        (id) => id !== t.id,
-                                      ),
-                              })
-                            }
-                          />
-                          {t.name}
-                        </Field>
-                      ))}
-                    </div>
-                    {!data.teams?.length && (
-                      <p>Create a team in Teams to link it here.</p>
-                    )}
+                    <ActionGroup>
+                      <BulkPicker
+                        title="Add teams"
+                        description="Link the selected teams to this learning group. Their direct members receive its assignments and updates."
+                        options={(data.teams || [])
+                          .filter((t) => !group.teamIds?.includes(t.id))
+                          .map((t) => ({ id: t.id, label: t.name }))}
+                        onApply={async (ids) => {
+                          if (
+                            !(await changeGroup({
+                              teamIds: [
+                                ...new Set([...(group.teamIds || []), ...ids]),
+                              ],
+                            }))
+                          )
+                            throw new Error(
+                              "Could not save. Review the group before retrying.",
+                            );
+                        }}
+                        actionLabel="Add teams"
+                      />
+                      <BulkPicker
+                        title="Remove teams"
+                        description="Remove these direct team links. Individual and inherited memberships remain; saved learning history is preserved."
+                        options={(data.teams || [])
+                          .filter((t) => group.teamIds?.includes(t.id))
+                          .map((t) => ({ id: t.id, label: t.name }))}
+                        onApply={async (ids) => {
+                          if (
+                            !(await changeGroup({
+                              teamIds: group.teamIds?.filter(
+                                (id) => !ids.includes(id),
+                              ),
+                            }))
+                          )
+                            throw new Error(
+                              "Could not save. Review the group before retrying.",
+                            );
+                        }}
+                        actionLabel="Remove teams"
+                      />
+                    </ActionGroup>
+                    <p>
+                      {(data.teams || [])
+                        .filter((t) => group.teamIds?.includes(t.id))
+                        .map((t) => t.name)
+                        .join(", ") || "No directly linked teams."}
+                    </p>
                     <h3>People</h3>
-                    <FormField label="Find a person">
+                    <ActionGroup>
+                      <BulkPicker
+                        title="Add people"
+                        description="Add individual memberships. Overlapping team and group assignments are deduplicated."
+                        options={data.users
+                          .filter(
+                            (u) => u.active && !u.groups.includes(group.id),
+                          )
+                          .map((u) => ({
+                            id: u.id,
+                            label: u.name,
+                            description: u.email,
+                          }))}
+                        onApply={async (ids) => {
+                          if (
+                            !(await save({
+                              ...data,
+                              users: data.users.map((u) =>
+                                ids.includes(u.id)
+                                  ? {
+                                      ...u,
+                                      groups: [
+                                        ...new Set([...u.groups, group.id]),
+                                      ],
+                                    }
+                                  : u,
+                              ),
+                            }))
+                          )
+                            throw new Error(
+                              "Could not save. Review the group before retrying.",
+                            );
+                        }}
+                        actionLabel="Add people"
+                      />
+                      <BulkPicker
+                        title="Remove people"
+                        description="Remove individual memberships. Membership supplied by a team or child group remains. Saved learning history is preserved."
+                        options={data.users
+                          .filter((u) => u.groups.includes(group.id))
+                          .map((u) => ({
+                            id: u.id,
+                            label: u.name,
+                            description: u.email,
+                          }))}
+                        onApply={async (ids) => {
+                          if (
+                            !(await save({
+                              ...data,
+                              users: data.users.map((u) =>
+                                ids.includes(u.id)
+                                  ? {
+                                      ...u,
+                                      groups: u.groups.filter(
+                                        (id) => id !== group.id,
+                                      ),
+                                    }
+                                  : u,
+                              ),
+                            }))
+                          )
+                            throw new Error(
+                              "Could not save. Review the group before retrying.",
+                            );
+                        }}
+                        actionLabel="Remove people"
+                      />
+                    </ActionGroup>
+                    <FormField label="Find a member">
                       <Input
                         type="search"
                         value={query}
@@ -366,69 +459,106 @@ export default function LearningGroups({
                     </FormField>
                     <div className="membership-list">
                       {data.users
-                        .filter((u) => matches(u.name + " " + u.email))
-                        .map((u) => {
-                          const via =
-                            u.teamId && group.teamIds?.includes(u.teamId);
-                          const effective = effectiveGroups(u, data.groups).has(
-                            group.id,
-                          );
-                          return (
-                            <Field
-                              orientation="horizontal"
-                              className="membership-person"
-                              key={u.id}
-                            >
-                              <Checkbox
-                                checked={u.groups.includes(group.id)}
-                                onCheckedChange={(checked) =>
-                                  save({
-                                    ...data,
-                                    users: data.users.map((p) =>
-                                      p.id === u.id
-                                        ? {
-                                            ...p,
-                                            groups:
-                                              checked === true
-                                                ? [...p.groups, group.id]
-                                                : p.groups.filter(
-                                                    (id) => id !== group.id,
-                                                  ),
-                                          }
-                                        : p,
-                                    ),
-                                  })
-                                }
-                              />
-                              <span>
-                                <strong>{u.name}</strong>
-                                <small>
-                                  {u.email}
-                                  {!u.active ? " · Inactive" : ""}
-                                </small>
-                              </span>
+                        .filter(
+                          (u) =>
+                            effectiveGroups(u, data.groups).has(group.id) &&
+                            matches(u.name + " " + u.email),
+                        )
+                        .map((u) => (
+                          <div className="membership-person" key={u.id}>
+                            <span>
+                              <strong>{u.name}</strong>
                               <small>
-                                {via
-                                  ? "Via team"
-                                  : effective && !u.groups.includes(group.id)
-                                    ? "Via child group"
-                                    : ""}
-                                {u.groups.includes(group.id)
-                                  ? " · Individually added"
-                                  : ""}
+                                {u.email}
+                                {!u.active ? " · Inactive" : ""}
                               </small>
-                            </Field>
-                          );
-                        })}
+                            </span>
+                            <small>
+                              {[
+                                u.groups.includes(group.id)
+                                  ? "Individually added"
+                                  : "",
+                                u.teamId && group.teamIds?.includes(u.teamId)
+                                  ? "Via team"
+                                  : "",
+                                !u.groups.includes(group.id) &&
+                                !(u.teamId && group.teamIds?.includes(u.teamId))
+                                  ? "Via child group"
+                                  : "",
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </small>
+                          </div>
+                        ))}
                     </div>
-                    <FieldDescription>
-                      Check a person to add them individually. Unchecking does
-                      not remove membership supplied by a team or child group.
-                    </FieldDescription>
                   </>
                 ) : tab === "learning" ? (
                   <>
                     <h3>Recommended sequence</h3>
+                    <ActionGroup>
+                      <BulkPicker
+                        title="Add courses or curricula"
+                        description="Append selected items to the recommended sequence. Overlapping courses count once."
+                        options={[
+                          ...published
+                            .filter((c) => c.kind === "course")
+                            .map((c) => ({
+                              id: `course:${c.id}`,
+                              label: c.title,
+                              description: "Course",
+                            })),
+                          ...curricula
+                            .filter((c) => c.status === "published")
+                            .map((c) => ({
+                              id: `curriculum:${c.id}`,
+                              label: c.name,
+                              description: "Curriculum",
+                            })),
+                        ].filter((o) => !items.some((i) => key(i) === o.id))}
+                        onApply={async (ids) => {
+                          if (
+                            !(await changeGroup({
+                              learningItems: [
+                                ...items,
+                                ...ids.map((id) => ({
+                                  kind: id.startsWith("course:")
+                                    ? ("course" as const)
+                                    : ("curriculum" as const),
+                                  id: id.slice(id.indexOf(":") + 1),
+                                })),
+                              ],
+                            }))
+                          )
+                            throw new Error("Could not save the sequence.");
+                        }}
+                        actionLabel="Add items"
+                      />
+                      <BulkPicker
+                        title="Remove learning items"
+                        description="Remove these direct assignments. Inherited assignments and saved progress remain."
+                        options={items.map((i) => ({
+                          id: key(i),
+                          label:
+                            i.kind === "course"
+                              ? content.find((c) => c.id === i.id)?.title ||
+                                "Unavailable course"
+                              : curricula.find((c) => c.id === i.id)?.name ||
+                                "Unavailable curriculum",
+                        }))}
+                        onApply={async (ids) => {
+                          if (
+                            !(await changeGroup({
+                              learningItems: items.filter(
+                                (i) => !ids.includes(key(i)),
+                              ),
+                            }))
+                          )
+                            throw new Error("Could not save the sequence.");
+                        }}
+                        actionLabel="Remove items"
+                      />
+                    </ActionGroup>
                     <FieldDescription>
                       Add courses or reusable curricula. Reorder to recommend
                       what to take next. Every course stays available.
@@ -568,6 +698,43 @@ export default function LearningGroups({
                 ) : (
                   <>
                     <h3>Updates for this group</h3>
+                    <ActionGroup>
+                      {([true, false] as const).map((add) => (
+                        <BulkPicker
+                          key={String(add)}
+                          title={add ? "Add updates" : "Remove updates"}
+                          description="Change this group’s For you updates. Everyone can still explore published updates."
+                          options={published
+                            .filter(
+                              (c) =>
+                                c.kind === "brief" &&
+                                c.groups.includes(group.id) !== add,
+                            )
+                            .map((c) => ({ id: c.id, label: c.title }))}
+                          onApply={async (ids) => {
+                            await (
+                              onLearningMany ||
+                              (async (actions) => {
+                                for (const action of actions)
+                                  await onLearning(action);
+                              })
+                            )(
+                              ids.map((contentId) => ({
+                                operation: add
+                                  ? ("target" as const)
+                                  : ("untarget" as const),
+                                contentId,
+                                groupId: group.id,
+                                expected:
+                                  data.content.find((c) => c.id === contentId)
+                                    ?.revision || 0,
+                              })),
+                            );
+                          }}
+                          actionLabel={add ? "Add updates" : "Remove updates"}
+                        />
+                      ))}
+                    </ActionGroup>
                     <FieldDescription>
                       These updates appear in For you, newest first. Updates
                       never affect learning completion.

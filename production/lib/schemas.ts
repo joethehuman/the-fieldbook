@@ -10,6 +10,7 @@ export const contentBaseSchema = z.object({
   category: text(80).trim().min(1),
   folder: text(300),
   sectionId: text(1500).optional(),
+  sectionOrder: z.number().int().nonnegative().optional(),
   status: z.enum(["draft", "published"]),
   version: z.number().int().min(1),
   coverImageUrl: text(2000)
@@ -153,6 +154,9 @@ export const progressSchema = z.object({
   lessonId: text(100).optional(),
   lessons: z.array(text(100)).max(100).optional(),
   answers: z.array(z.number().int().min(0).max(9)).max(100).optional(),
-  selections: z.array(z.array(z.number().int().min(0).max(4)).min(1).max(4)).max(100).optional(),
+  selections: z
+    .array(z.array(z.number().int().min(0).max(4)).min(1).max(4))
+    .max(100)
+    .optional(),
   complete: z.boolean().optional(),
 });

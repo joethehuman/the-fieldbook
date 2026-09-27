@@ -79,8 +79,21 @@ const runtime: FieldbookRuntime = {
       (p) => p.content_id === course.id && p.version === course.version,
     );
     if (!currentUser && complete) {
-      const p: GuestProgress = { ...(prior || { content_id: course.id, version: course.version, lessons: [], attempts: [] }), passed: true };
-      const progress = [...current.filter((x) => x.content_id !== course.id || x.version !== course.version), p];
+      const p: GuestProgress = {
+        ...(prior || {
+          content_id: course.id,
+          version: course.version,
+          lessons: [],
+          attempts: [],
+        }),
+        passed: true,
+      };
+      const progress = [
+        ...current.filter(
+          (x) => x.content_id !== course.id || x.version !== course.version,
+        ),
+        p,
+      ];
       localStorage.setItem(GUEST_KEY, JSON.stringify(progress));
       return { progress };
     }
@@ -97,7 +110,9 @@ const runtime: FieldbookRuntime = {
       version: course.version,
       lessons: r.lessons,
       passed: r.passed || prior?.passed || false,
-      attempts: currentUser ? r.attempts || prior?.attempts || [] : [...(prior?.attempts || []), ...(r.attempt ? [r.attempt] : [])],
+      attempts: currentUser
+        ? r.attempts || prior?.attempts || []
+        : [...(prior?.attempts || []), ...(r.attempt ? [r.attempt] : [])],
     };
     // Retain answers only for guest import; the server re-grades them after sign-in.
     if (!currentUser)
@@ -106,7 +121,12 @@ const runtime: FieldbookRuntime = {
         answers?.map((selection) => selection[0]),
         r.attemptPassed,
       );
-    if (!currentUser) (p as GuestProgress).guestSelections = guestSelectionsForImport(prior as GuestProgress | undefined, answers, r.attemptPassed);
+    if (!currentUser)
+      (p as GuestProgress).guestSelections = guestSelectionsForImport(
+        prior as GuestProgress | undefined,
+        answers,
+        r.attemptPassed,
+      );
     const progress = [
       ...current.filter(
         (x) => !(x.content_id === p.content_id && x.version === p.version),
@@ -231,6 +251,38 @@ function createAdminRuntime(initial: {
       return fresh();
     },
     admin: {
+      bulk: async (action) => {
+        const results: import("@/lib/bulk-actions").BulkResult[] = [];
+        let latest = cached.get(scope) || initial.data;
+        openItem = null;
+        for (let start = 0; start < action.items.length; start += 100) {
+          const items = action.items.slice(start, start + 100);
+          try {
+            const response = await request("/api/admin/bulk", {
+              ...action,
+              items,
+              governanceExpected: start
+                ? latest.governanceRevision
+                : action.governanceExpected,
+            });
+            results.push(...response.results);
+          } catch (error) {
+            results.push(
+              ...action.items.slice(start).map((item) => ({
+                id: item.id,
+                status: "failed" as const,
+                message: `Could not confirm this batch. Refresh and review before retrying. ${(error as Error).message}`,
+              })),
+            );
+            clearCached();
+            latest = await fresh();
+            break;
+          }
+          clearCached();
+          latest = await fresh();
+        }
+        return { data: latest, results };
+      },
       prefetch: () => {
         // Warm the two first-visit sections after Content has painted. A tab
         // click shares the same in-flight read instead of starting another.

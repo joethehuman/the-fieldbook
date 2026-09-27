@@ -1,4 +1,5 @@
 "use client";
+import { BulkPicker } from "./patterns/bulk-selection";
 import { Badge } from "./ui/badge";
 import { Note } from "@/components/ui/note";
 import { FormField } from "@/components/patterns/form-field";
@@ -173,6 +174,50 @@ export default function Curricula({
                 }
               />
             </FormField>
+            <ActionGroup>
+              <BulkPicker
+                title="Add courses"
+                description="Append selected courses in selection order. Save the curriculum to apply your changes."
+                options={content
+                  .filter(
+                    (c) =>
+                      c.kind === "course" &&
+                      c.status === "published" &&
+                      !editing.courseIds.includes(c.id),
+                  )
+                  .map((c) => ({
+                    id: c.id,
+                    label: c.title,
+                    description: c.category,
+                  }))}
+                onApply={(ids) =>
+                  setEditing({
+                    ...editing,
+                    courseIds: [...new Set([...editing.courseIds, ...ids])],
+                  })
+                }
+                actionLabel="Add courses"
+              />
+              <BulkPicker
+                title="Remove courses"
+                description="Remove selected courses from this playlist. Course content and learning history are preserved. Save the curriculum to apply your changes."
+                options={editing.courseIds.map((id) => ({
+                  id,
+                  label:
+                    content.find((c) => c.id === id)?.title ||
+                    "Unavailable course",
+                }))}
+                onApply={(ids) =>
+                  setEditing({
+                    ...editing,
+                    courseIds: editing.courseIds.filter(
+                      (id) => !ids.includes(id),
+                    ),
+                  })
+                }
+                actionLabel="Remove courses"
+              />
+            </ActionGroup>
             <OrderedLearning
               items={editing.courseIds.map((id) => ({
                 id,

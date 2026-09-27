@@ -29,7 +29,6 @@ Vercel does not run the SQL migrations automatically. Keep a private record of a
 
 Follow the [MCP setup guide](../docs/mcp-setup.md) for client registration, callback URLs, ChatGPT/Claude setup, and troubleshooting. MCP is optional for browsing and admin editing.
 
-
 The authenticated endpoint is `FIELDBOOK_URL/api/mcp`. It runs inside this Next.js deployment.
 
 1. Enable Supabase Auth's **OAuth 2.1 Server**. Set the authorization/consent path to `/oauth/consent` under the application's Site URL. Prefer manual client registration with the exact callback URI supplied by the client. Leave dynamic registration off unless a chosen client requires it and you accept its registration exposure.
@@ -69,14 +68,14 @@ Copy `.env.example` to `.env.local` in this directory and supply a dedicated dev
 
 Copy [`.env.example`](.env.example). These values belong to your deployment, never to committed source:
 
-| Variable | Meaning |
-|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Its publishable key; not an administrator credential |
-| `SUPABASE_SECRET_KEY` | Server-only project secret; never expose in browser code or an AI prompt |
-| `FIELDBOOK_URL` | One canonical origin, e.g. `https://learn.example.org`; no path |
-| `FIELDBOOK_OWNER_EMAIL` | Exact verified Google email that bootstraps the first administrator |
-| `FIELDBOOK_UPLOAD_MAX_BYTES` | Optional upload limit; keep at or below the bucket's configured limit (initially 50 MB) |
+| Variable                               | Meaning                                                                                 |
+| -------------------------------------- | --------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Your Supabase project URL                                                               |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Its publishable key; not an administrator credential                                    |
+| `SUPABASE_SECRET_KEY`                  | Server-only project secret; never expose in browser code or an AI prompt                |
+| `FIELDBOOK_URL`                        | One canonical origin, e.g. `https://learn.example.org`; no path                         |
+| `FIELDBOOK_OWNER_EMAIL`                | Exact verified Google email that bootstraps the first administrator                     |
+| `FIELDBOOK_UPLOAD_MAX_BYTES`           | Optional upload limit; keep at or below the bucket's configured limit (initially 50 MB) |
 
 Redeploy after changing deployment environment variables. The owner setting bootstraps a new profile; changing it does not transfer an existing administrator role or demote a previous administrator.
 
@@ -133,3 +132,7 @@ Public browsing works without a learning-group selection. To populate For you in
 ## Reading pages
 
 Published Docs, Updates and course overviews render on the server and follow the existing public/private setting. No new settings or migration are needed. Keep the supplied private/no-store cache policy when operating behind a CDN. See [reading architecture and verification](../docs/reading-pages.md).
+
+## Recoverable deletion and scheduled cleanup
+
+Content and user deletion requires the database recovery migrations and an hourly cleanup worker. Complete the endpoint configuration and first-run verification in [Bulk actions and recently deleted items](../docs/bulk-actions.md) for each environment. Applying the schema alone does not complete scheduler setup.

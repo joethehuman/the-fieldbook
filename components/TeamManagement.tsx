@@ -1,5 +1,6 @@
 "use client";
 
+import { BulkPicker } from "./patterns/bulk-selection";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, MoreHorizontal } from "lucide-react";
 import type { Workspace } from "@/lib/store";
@@ -69,6 +70,8 @@ export function TeamsAdmin({
 }) {
   const teams = data.teams || [];
   const [selected, setSelected] = useState("");
+  const [moveMembers, setMoveMembers] = useState<string[]>([]);
+  const [moveTarget, setMoveTarget] = useState("");
   const [tab, setTab] = useState("members");
   const [query, setQuery] = useState("");
   const [includeSubteams, setIncludeSubteams] = useState(false);
@@ -885,6 +888,93 @@ export function TeamsAdmin({
                     </SelectField>
                   </FormField>
                 </FilterBar>
+                <ActionGroup>
+                  <BulkPicker
+                    title="Remove members"
+                    description="Remove direct membership from this team. Team-linked learning assignments and manager reporting change; saved progress is preserved."
+                    options={direct.map((u) => ({
+                      id: u.id,
+                      label: u.name,
+                      description: u.email,
+                    }))}
+                    onApply={async (ids) => {
+                      await onChange({
+                        ...data,
+                        users: data.users.map((u) =>
+                          ids.includes(u.id) ? { ...u, teamId: undefined } : u,
+                        ),
+                      });
+                    }}
+                    actionLabel="Remove members"
+                    disabled={busy}
+                  />
+                  <BulkPicker
+                    title="Move members to another team"
+                    description="Choose direct members to move. The next step lets you choose their destination team."
+                    options={direct.map((u) => ({
+                      id: u.id,
+                      label: u.name,
+                      description: u.email,
+                    }))}
+                    onApply={async (ids) => {
+                      setMoveMembers(ids);
+                    }}
+                    actionLabel="Choose destination"
+                    disabled={busy}
+                  />
+                </ActionGroup>
+                {moveMembers.length > 0 && (
+                  <div className="grid gap-3">
+                    <FormField
+                      label={`Destination for ${moveMembers.length} selected members`}
+                      description="Manager visibility and team-linked assignments will change. Saved course progress is preserved."
+                    >
+                      <SelectField
+                        value={moveTarget}
+                        onValueChange={setMoveTarget}
+                      >
+                        <option value="">Choose a team</option>
+                        {teams
+                          .filter((t) => t.id !== team.id)
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {t.name}
+                            </option>
+                          ))}
+                      </SelectField>
+                    </FormField>
+                    <ActionGroup>
+                      <Button
+                        variant="outline"
+                        onClick={() => setMoveMembers([])}
+                      >
+                        Cancel move
+                      </Button>
+                      <Button
+                        disabled={!moveTarget || busy}
+                        onClick={async () => {
+                          if (
+                            await commit(
+                              {
+                                ...data,
+                                users: data.users.map((u) =>
+                                  moveMembers.includes(u.id) &&
+                                  u.teamId === team.id
+                                    ? { ...u, teamId: moveTarget }
+                                    : u,
+                                ),
+                              },
+                              "Members moved.",
+                            )
+                          )
+                            setMoveMembers([]);
+                        }}
+                      >
+                        Move {moveMembers.length} members
+                      </Button>
+                    </ActionGroup>
+                  </div>
+                )}
                 {members.length ? (
                   <TableContainer>
                     <DataTable layout="teamMembers" aria-label="Team members">

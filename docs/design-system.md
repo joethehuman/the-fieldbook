@@ -179,30 +179,37 @@ The global focus token follows the installation's readable link color with a vis
 
 The first section of `/ui` compares button/input variants and live validation; `/ui#shared-library` covers the wider library and usage decisions. Hover and Tab exercise actual states rather than painted imitations. `tests/ui/control-pilot.spec.ts` covers label/help/error associations, disabled keyboard skipping, validation, loading dimensions, reduced motion and saved branding at desktop/tablet/phone sizes.
 
-
 ## Form composition and information
 
 Use `TextField` for a text input with a supplied stable ID (including server-rendered presentation). Use `FormField` inside interactive forms to wrap **one** Input, Textarea or SelectField. FormField uses React `useId` unless the control already has an ID, preserves existing descriptions and invalid state, and links its label/help/error without including helper copy in the control's name. It does not validate, transform values or save. Pass the actual control directly, not an arbitrary wrapper or fragment. Keep refs and event handlers on that control.
 
 ```tsx
-<FormField label="Parent team" description="Reporting includes its subteams." error={error}>
+<FormField
+  label="Parent team"
+  description="Reporting includes its subteams."
+  error={error}
+>
   <SelectField value={parentId} onValueChange={setParentId}>
     <option value="">No parent</option>
-    {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+    {teams.map((team) => (
+      <option key={team.id} value={team.id}>
+        {team.name}
+      </option>
+    ))}
   </SelectField>
 </FormField>
 ```
 
 Use FieldGroup and a legend for related choices, native Field labels for checkbox/radio rows, and SettingsSection for a titled settings group. Supply SettingsSection an ID to name its section and fieldset; disabled applies to the group's native fieldset. Keep save and publish operations distinct. Descriptions for manager scope, parent groups, privacy contacts, completion windows and media constraints belong with the applicable controls. Context that applies to the whole screen remains outside individual labels.
 
-| Information | Use | Avoid |
-| --- | --- | --- |
-| Persistent control guidance | FormField description or FieldDescription connected by `aria-describedby` | A tooltip as the only instruction |
-| Invalid field | FormField/TextField error, or associated FieldError with `aria-invalid` | Color alone; changing validation rules in presentation |
-| Persistent context | Note, optionally warning tone | Live-region announcements for static instructions |
-| New failure or important result | Alert, with appropriate role and recovery action | Auto-dismissing errors |
-| Completed save | Existing Toast | Stacked or persistent success banners |
-| Supplemental icon hint | Tooltip around an already named focusable control | Interactive content, disabled-only help, replacement for `aria-label` |
+| Information                     | Use                                                                       | Avoid                                                                 |
+| ------------------------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Persistent control guidance     | FormField description or FieldDescription connected by `aria-describedby` | A tooltip as the only instruction                                     |
+| Invalid field                   | FormField/TextField error, or associated FieldError with `aria-invalid`   | Color alone; changing validation rules in presentation                |
+| Persistent context              | Note, optionally warning tone                                             | Live-region announcements for static instructions                     |
+| New failure or important result | Alert, with appropriate role and recovery action                          | Auto-dismissing errors                                                |
+| Completed save                  | Existing Toast                                                            | Stacked or persistent success banners                                 |
+| Supplemental icon hint          | Tooltip around an already named focusable control                         | Interactive content, disabled-only help, replacement for `aria-label` |
 
 Tooltip uses the public Radix primitive, including hover/focus, Escape, collision handling and portaling. Providers wrap children in each layout without converting those server layouts or their children into client-rendered pages. Editor formatting hints use it; essential upload limitations remain visible. See [Radix Tooltip](https://www.radix-ui.com/primitives/docs/components/tooltip) and [shadcn Field](https://ui.shadcn.com/docs/components/base/field) for composition and accessibility contracts.
 
@@ -235,31 +242,31 @@ Use the public [Geist examples](https://vercel.com/geist/introduction) to judge 
 
 The following mapping covers the current shared library. Several Fieldbook patterns combine primitives because a course, report or reading screen is a product composition, not a single registry component.
 
-| Fieldbook components/patterns | Closest reference | Application and choice |
-| --- | --- | --- |
-| Button, ActionGroup, NavigationButton, CsvExport | Geist Button; shadcn Button | Shared variants and 32/36px sizing across learner/admin/account screens. Neutral primary actions; named icon actions; disabled/loading retains labels. Export owns formatting separately. |
-| Input, Textarea, TextField, FormField, Field | Geist Input, Textarea, Label; shadcn Field | Authoring, settings, accounts and filters share connected labels, help and errors. Keep native file/color/date semantics. |
-| Card, SettingsSection, SectionHeader, FieldGroup | Geist Fieldset; shadcn Card/Field | White content, subtle border, 20px inset, grey footer with guidance and actions. Save/validation stays in features. Group-level guidance does not replace a control's accessible description. |
-| Avatar, InitialsAvatar, AccountMenu | Geist Avatar/Entity and menu; shadcn Avatar/DropdownMenu | Filled neutral fallback and a separate three-dot trigger. Identity stays inert; role actions and general feedback are menu items. |
-| Select, SelectField | Geist Select; shadcn Select | Existing Radix focus/typeahead/portal model retained; wrapping values and disabled choices. Select values, not actions. |
-| Checkbox, Radio, Switch, GroupPicker | Geist Checkbox/Radio/Toggle; shadcn Checkbox/Switch | Radix checkbox/switch, native named radios. Geist's component named Switch is segmented selection; its Toggle matches our boolean Switch. Preserve group selection and save semantics. |
-| Tabs, ResponsiveTabsNavigation, FilterOptions | Geist Tabs/Switch; shadcn Tabs | Underline tabs for sibling panels; vertical navigation retains readable rows. Collection filters remain pressed buttons, not fake tabs. Narrow administration uses an equivalent Select. |
-| DropdownMenu, Tooltip | Geist Menu/Tooltip; shadcn DropdownMenu/Tooltip | Rounded menu, restrained focus surface, disabled actions; 150ms tooltip delay. Required guidance must stay visible. Portals remain above dialogs. |
-| Dialog, DialogFooter, InteractionDialogProvider | Geist Modal; shadcn Dialog/AlertDialog | White body and grey action footer; keyboard trap, Escape and return focus remain Radix-owned. Destructive confirmations retain safe initial focus. |
-| ContentFeedback, Popover | Geist Feedback; shadcn Popover | Two-choice feedback at the end of reading and courses. Compact pill, desktop panel or mobile inline form, immediate ratings, optional comments, retained failure drafts and focus return. |
-| Note, Alert, Toast | Geist Note/Toast; shadcn Alert | Note is persistent context, Alert announces errors/results, Toast briefly acknowledges a completed action. Retain one replacing toast and existing save behavior; never move actionable failures solely into a toast. |
-| Badge | Geist Badge; shadcn Badge | Compact filled status labels, semantic colors plus text. Not an interactive control. |
-| Table primitives, TableContainer, DataTable | Geist Table; shadcn Table | Quiet header/dividers, shared numeric alignment and stable column schemas. Retain contained overflow and full reporting data. |
-| Progress, ProgressRing, ProgressStatus | Geist Progress/Gauge; shadcn Progress | Determinate course progress; accessible percentage and completion label. Preserve calculation/version rules and brand accent. No invented warning thresholds. |
-| Spinner, Skeleton, EmptyState | Geist Spinner/Skeleton/Empty State; shadcn Spinner/Skeleton/Empty | Activity differs from progress. Reduced-motion support, known-layout placeholders, quiet solid empty-state surface with useful next action. Never show an invented progress percentage. |
-| LoadMore | Geist Load More Button | Full-width reveal control with count. Retain local-slice behavior; do not label it network pagination. |
-| Collapsible, DocumentTree, ReadingOutline | Geist Collapse and Vercel Docs navigation; shadcn Collapsible | Fixed top-level headings, compact indented links and chevrons only on focusable subsection triggers. Selected ancestors are revealed and open state is retained. Closed subsection content remains mounted and hidden. Outline follows available article width. |
-| Article, Course, ReadingPage | Vercel Docs article composition | Compact article reading and a responsive course summary/lesson split. Article content remains server-rendered; the course player receives authorized server content and owns learner interaction. |
-| LearningCard, ContentAction, ContentCardFooter, CourseRow, LaunchList | Geist Entity and card composition | Quiet border/hover, aligned metadata/actions; retain horizontal browsing, curriculum sequencing and course-specific cover art. ContentCardFooter is tile metadata; CardFooter is a surface footer. |
-| OrderedLearning, ReorderRow | Geist Entity composition | Preserve drag, keyboard and explicit up/down movement; use aligned identity/action columns. Reordering has no single Geist replacement. |
-| SearchField, SearchPanel, SearchResult | Geist Search Input/Entity | Keep bounded nonmodal search so unsaved authoring stays mounted, with Escape/focus return and clear empty/loading results. A command menu would change product behavior. |
-| AppBar, InstallationIdentity, BrandedAccount, AccountPage, SkipLink | Vercel Docs shell; shadcn composition | Retain installation name/colors, sticky app bar, breadcrumb links, skip target and server authentication boundaries. |
-| Stack, SplitPanel, PageHeader, CollectionToolbar, Toolbar, FilterBar, BrowseToolbar, StatusActions, Callout | Geist composition principles; shadcn Card/Field | Shared spacing, associated descriptions and wrapping actions. Keep feature data/handlers outside layout helpers. |
+| Fieldbook components/patterns                                                                               | Closest reference                                                 | Application and choice                                                                                                                                                                                                                                          |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Button, ActionGroup, NavigationButton, CsvExport                                                            | Geist Button; shadcn Button                                       | Shared variants and 32/36px sizing across learner/admin/account screens. Neutral primary actions; named icon actions; disabled/loading retains labels. Export owns formatting separately.                                                                       |
+| Input, Textarea, TextField, FormField, Field                                                                | Geist Input, Textarea, Label; shadcn Field                        | Authoring, settings, accounts and filters share connected labels, help and errors. Keep native file/color/date semantics.                                                                                                                                       |
+| Card, SettingsSection, SectionHeader, FieldGroup                                                            | Geist Fieldset; shadcn Card/Field                                 | White content, subtle border, 20px inset, grey footer with guidance and actions. Save/validation stays in features. Group-level guidance does not replace a control's accessible description.                                                                   |
+| Avatar, InitialsAvatar, AccountMenu                                                                         | Geist Avatar/Entity and menu; shadcn Avatar/DropdownMenu          | Filled neutral fallback and a separate three-dot trigger. Identity stays inert; role actions and general feedback are menu items.                                                                                                                               |
+| Select, SelectField                                                                                         | Geist Select; shadcn Select                                       | Existing Radix focus/typeahead/portal model retained; wrapping values and disabled choices. Select values, not actions.                                                                                                                                         |
+| Checkbox, Radio, Switch, GroupPicker                                                                        | Geist Checkbox/Radio/Toggle; shadcn Checkbox/Switch               | Radix checkbox/switch, native named radios. Geist's component named Switch is segmented selection; its Toggle matches our boolean Switch. Preserve group selection and save semantics.                                                                          |
+| Tabs, ResponsiveTabsNavigation, FilterOptions                                                               | Geist Tabs/Switch; shadcn Tabs                                    | Underline tabs for sibling panels; vertical navigation retains readable rows. Collection filters remain pressed buttons, not fake tabs. Narrow administration uses an equivalent Select.                                                                        |
+| DropdownMenu, Tooltip                                                                                       | Geist Menu/Tooltip; shadcn DropdownMenu/Tooltip                   | Rounded menu, restrained focus surface, disabled actions; 150ms tooltip delay. Required guidance must stay visible. Portals remain above dialogs.                                                                                                               |
+| Dialog, DialogFooter, InteractionDialogProvider                                                             | Geist Modal; shadcn Dialog/AlertDialog                            | White body and grey action footer; keyboard trap, Escape and return focus remain Radix-owned. Destructive confirmations retain safe initial focus.                                                                                                              |
+| ContentFeedback, Popover                                                                                    | Geist Feedback; shadcn Popover                                    | Two-choice feedback at the end of reading and courses. Compact pill, desktop panel or mobile inline form, immediate ratings, optional comments, retained failure drafts and focus return.                                                                       |
+| Note, Alert, Toast                                                                                          | Geist Note/Toast; shadcn Alert                                    | Note is persistent context, Alert announces errors/results, Toast briefly acknowledges a completed action. Retain one replacing toast and existing save behavior; never move actionable failures solely into a toast.                                           |
+| Badge                                                                                                       | Geist Badge; shadcn Badge                                         | Compact filled status labels, semantic colors plus text. Not an interactive control.                                                                                                                                                                            |
+| Table primitives, TableContainer, DataTable                                                                 | Geist Table; shadcn Table                                         | Quiet header/dividers, shared numeric alignment and stable column schemas. Retain contained overflow and full reporting data.                                                                                                                                   |
+| Progress, ProgressRing, ProgressStatus                                                                      | Geist Progress/Gauge; shadcn Progress                             | Determinate course progress; accessible percentage and completion label. Preserve calculation/version rules and brand accent. No invented warning thresholds.                                                                                                   |
+| Spinner, Skeleton, EmptyState                                                                               | Geist Spinner/Skeleton/Empty State; shadcn Spinner/Skeleton/Empty | Activity differs from progress. Reduced-motion support, known-layout placeholders, quiet solid empty-state surface with useful next action. Never show an invented progress percentage.                                                                         |
+| LoadMore                                                                                                    | Geist Load More Button                                            | Full-width reveal control with count. Retain local-slice behavior; do not label it network pagination.                                                                                                                                                          |
+| Collapsible, DocumentTree, ReadingOutline                                                                   | Geist Collapse and Vercel Docs navigation; shadcn Collapsible     | Fixed top-level headings, compact indented links and chevrons only on focusable subsection triggers. Selected ancestors are revealed and open state is retained. Closed subsection content remains mounted and hidden. Outline follows available article width. |
+| Article, Course, ReadingPage                                                                                | Vercel Docs article composition                                   | Compact article reading and a responsive course summary/lesson split. Article content remains server-rendered; the course player receives authorized server content and owns learner interaction.                                                               |
+| LearningCard, ContentAction, ContentCardFooter, CourseRow, LaunchList                                       | Geist Entity and card composition                                 | Quiet border/hover, aligned metadata/actions; retain horizontal browsing, curriculum sequencing and course-specific cover art. ContentCardFooter is tile metadata; CardFooter is a surface footer.                                                              |
+| OrderedLearning, ReorderRow                                                                                 | Geist Entity composition                                          | Preserve drag, keyboard and explicit up/down movement; use aligned identity/action columns. Reordering has no single Geist replacement.                                                                                                                         |
+| SearchField, SearchPanel, SearchResult                                                                      | Geist Search Input/Entity                                         | Keep bounded nonmodal search so unsaved authoring stays mounted, with Escape/focus return and clear empty/loading results. A command menu would change product behavior.                                                                                        |
+| AppBar, InstallationIdentity, BrandedAccount, AccountPage, SkipLink                                         | Vercel Docs shell; shadcn composition                             | Retain installation name/colors, sticky app bar, breadcrumb links, skip target and server authentication boundaries.                                                                                                                                            |
+| Stack, SplitPanel, PageHeader, CollectionToolbar, Toolbar, FilterBar, BrowseToolbar, StatusActions, Callout | Geist composition principles; shadcn Card/Field                   | Shared spacing, associated descriptions and wrapping actions. Keep feature data/handlers outside layout helpers.                                                                                                                                                |
 
 There is one supported light interface theme. Do not claim dark-mode support because the reference has it. The neutral color and type changes affect every shared consumer, including standalone sign-in/consent pages; installation branding remains a separate token. Decorative book-cover experiments, new calendars, charts, command palettes and other unused reference families are outside this component library's current product needs.
 
@@ -271,20 +278,17 @@ The feature owns `saved` and async `onSave`; the pattern owns the draft, pending
 
 Use `SettingsSection guidance` for group-wide consequences and operational instructions, including a single-control group such as New users. It renders in the grey footer even without a Save button. Connect applicable controls to the section's `${id}-guidance` with `aria-describedby`; FormField preserves it. Field-specific limits, formats and validation remain adjacent to their control. Do not put all helper text in one footer or use a bare Card for a settings group. Pending accounts uses the same footer contract; its pre-registration behavior is unchanged.
 
-
 ## Admin destinations and collection cards
 
 Use `CardContent` for a collection item's title and content, and `CardFooter` for its metadata and actions. Use `SettingsSection` for an editor with group guidance and save/cancel actions; a `FilterBar` is for collection filters, not an editing form. Filters align at the top so a long selected value cannot lift neighboring labels; let complete fields wrap on narrow screens.
 
 `useRevealTarget` connects an explicit tab or drill-in action to its rendered destination. Spread `targetProps` onto the destination heading or named region and call `reveal()` after accepting navigation guards. It focuses the destination without an extra jump, then scrolls below the sticky application bar. Call `reveal(false)` for tabs to retain Radix keyboard focus. The request runs after rendering, including repeated selections; reduced motion uses an immediate scroll. Do not trigger it from ordinary typing or filtering. Feedback item drill-ins clear conflicting filters, name the scope, and offer All feedback to return.
 
-
 ### Large rosters and bounded selection
 
 Use a full-width detail view for a roster or hierarchy, with a small shared Dialog only for focused metadata editing. `Pagination` presents one-based pages of an already-loaded collection; the caller owns filtering, stable sorting, page clamping and destination reveal. It does not imply server pagination. Team members use the `teamMembers` DataTable schema with contained horizontal scrolling on narrow screens.
 
 `SearchableSelectionList` composes FormField, Input, Field and Pagination for bounded selection. Use Checkbox for multiple people or `selectionMode="single"` (named native Radio controls) for one team; supply a relevant placeholder and empty message. It displays ten matches per page and retains controlled selections across searches and pages. Keep changes in the feature until its explicit review/apply step; the pattern never mutates people or assigns teams. The catalog's Searchable member selection example exercises more than one page. Features own empty states, move descriptions, permission checks, errors and navigation guards.
-
 
 ### Reporting hierarchy
 
@@ -297,3 +301,7 @@ Use a full-width SettingsSection for selecting and reviewing a branch move. Disp
 Use `WritingEditor` for Docs/Updates body editing. It combines a lazy MDXEditor engine with Fieldbook buttons, tooltips, source textarea and reader preview. Keep save/publication intent outside the editor; use explicit actions rather than a status dropdown. See [authoring behavior and extension guidance](authoring.md). The catalog includes editable and read-only examples.
 
 Use `CreatableCombobox` for editable category names: suggestions filter as you type, new names have an Add option, arrow keys/Enter select and Escape dismisses. Free text remains valid on blur; trim it and reuse an existing case-insensitive match. Pair with `FormField`. Category creation persists with its content save, not as a separate request.
+
+## Bulk selection
+
+Use `BulkSelectionBar`, `SelectRows`, and `BulkPicker` for contextual multi-item operations. Checkbox state indicates selection, not persisted membership. Paginated collections select the current page and offer an explicit all-matching action. Clear selections on scope changes and announce the change. Pickers retain choices through search/pages and commit only on Apply. Use a descriptive confirmation and acknowledgment for deletion, show item-level failures, and prevent repeated submission. The `/ui` catalog includes these patterns.

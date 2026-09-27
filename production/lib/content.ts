@@ -6,7 +6,11 @@ import { requireAdmin, HttpError } from "./auth";
 import { contentSchema } from "./schemas";
 import { videoSource } from "@/lib/video";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
-import { correctOptionIds, requiresPassing, validQuestion } from "@/lib/course-quiz";
+import {
+  correctOptionIds,
+  requiresPassing,
+  validQuestion,
+} from "@/lib/course-quiz";
 import {
   availableDocSections,
   sectionForDoc,
@@ -57,7 +61,7 @@ export async function getContent(id: string, user: User | null, draft = false) {
     .eq("id", id)
     .maybeSingle();
   check(error);
-  if (!data || (!draft && !data.published))
+  if (!data || data.deleted_at || (!draft && !data.published))
     throw new HttpError(404, "Content not found.");
   const c = document(data, draft);
   return draft ? c : redact(c);
@@ -132,12 +136,21 @@ export async function saveContent(
     .eq("id", c.id)
     .maybeSingle();
   check(error);
+  if (old?.deleted_at)
+    throw new HttpError(400, "Restore this item before editing it.");
   if (c.kind === "course" && c.requirePassing === undefined && !old?.published)
     c.requirePassing = false;
-  if (publish && c.kind === "course" && old?.published?.kind === "course" &&
+  if (
+    publish &&
+    c.kind === "course" &&
+    old?.published?.kind === "course" &&
     requiresPassing(c) !== requiresPassing(old.published as Content) &&
-    c.version === old.published.version)
-    throw new HttpError(400, "Changing the quiz completion rule requires publishing a new course version.");
+    c.version === old.published.version
+  )
+    throw new HttpError(
+      400,
+      "Changing the quiz completion rule requires publishing a new course version.",
+    );
   if (expected !== (old?.revision ?? 0))
     throw new HttpError(
       409,
@@ -179,8 +192,15 @@ export async function saveContent(
     );
   if (c.lessons.some((l) => l.videoUrl && !videoSource(l.videoUrl)))
     throw new HttpError(400, "Unsupported video URL.");
-  if (publish && c.kind === "course" && c.lessons.some((l) => hasMissingImageAlt(l.body)))
-    throw new HttpError(400, "Add alternative text to every lesson image before publishing.");
+  if (
+    publish &&
+    c.kind === "course" &&
+    c.lessons.some((l) => hasMissingImageAlt(l.body))
+  )
+    throw new HttpError(
+      400,
+      "Add alternative text to every lesson image before publishing.",
+    );
   const serialized = JSON.stringify(c);
   const mediaIds = [
     ...serialized.matchAll(
