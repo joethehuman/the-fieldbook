@@ -12,6 +12,7 @@ const candidates = Array.from({ length: 22 }, (_, i) => ({
 }));
 export function BulkExamples() {
   const [rows, setRows] = useState(candidates.slice(0, 3));
+  const [moveNotice, setMoveNotice] = useState("");
   const selection = useBulkSelection(
     "example",
     rows.map((r) => r.id),
@@ -25,6 +26,7 @@ export function BulkExamples() {
         single-item Actions menu and empty state; bulk controls appear only with
         two or more items.
       </p>
+      {moveNotice && <p role="status">{moveNotice}</p>}
       <BulkPicker
         title="Add example courses"
         description="Search and select multiple courses. Apply adds them in the listed order; Cancel saves nothing."
@@ -39,6 +41,18 @@ export function BulkExamples() {
         selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
         commands={[
+          {
+            id: "move",
+            label: "Move to example section",
+            description: "Move the selected rows to one destination. Existing IDs and order stay intact.",
+            options: [
+              { id: "guides", label: "Guides" },
+              { id: "reference", label: "Reference" },
+            ],
+            selectionMode: "single",
+            review: (values, ids) => <p>{ids.length} selected rows → {values[0] === "guides" ? "Guides" : "Reference"}. The selection is reviewed before applying.</p>,
+            apply: (values, ids) => setMoveNotice(`${ids?.length || 0} rows moved to ${values[0] === "guides" ? "Guides" : "Reference"}.`),
+          },
           {
             id: "remove",
             label: "Remove from example",

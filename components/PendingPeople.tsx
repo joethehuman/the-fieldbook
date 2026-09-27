@@ -14,6 +14,7 @@ import { SelectField } from "./ui/select";
 import { OnboardingFields } from "./OnboardingFields";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
+import { teamPath } from "@/lib/team-hierarchy";
 type Pending = NonNullable<Workspace["pendingUsers"]>[number];
 export function PendingPeople({
   data,
@@ -175,7 +176,7 @@ export function PendingPeople({
               <option value="">No team</option>
               {data.teams?.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {teamPath(t.id, data.teams || [])}
                 </option>
               ))}
             </SelectField>

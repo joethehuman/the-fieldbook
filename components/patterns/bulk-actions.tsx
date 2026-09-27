@@ -40,7 +40,8 @@ export type BulkCommand = {
   selectionMode?: "single" | "multiple";
   field?: "date";
   fieldLabel?: string;
-  apply: (values: string[]) => Promise<void | {
+  review?: (values: string[], sourceIds: string[]) => ReactNode;
+  apply: (values: string[], sourceIds?: string[]) => Promise<void | {
     failed: string[];
     message: string;
     details?: string[];
@@ -194,6 +195,7 @@ export function BulkActions({
                 No eligible destinations. Create one in its owning screen first.
               </p>
             )}
+            {values.some(Boolean) && command.review?.(values, active.ids)}
             {command.field === "date" && (
               <FormField label={command.fieldLabel || "Onboarding start date"}>
                 <Input
@@ -237,7 +239,7 @@ export function BulkActions({
                   setBusy(true);
                   setError("");
                   try {
-                    const result = await command.apply(values);
+                    const result = await command.apply(values, active.ids);
                     if (result) {
                       onSelectionChange(result.failed);
                       if (result.failed.length) setResultNotice(result);

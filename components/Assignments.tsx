@@ -22,6 +22,7 @@ import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
+import { groupPath } from "@/lib/group-hierarchy";
 import {
   ancestorIds,
   effectiveGroups,
@@ -339,7 +340,7 @@ export function Assignments({
           >
             {data.groups.map((g) => (
               <option key={g.id} value={g.id}>
-                {g.name}
+                {groupPath(g.id, data.groups)}
               </option>
             ))}
           </SelectField>

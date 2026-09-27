@@ -58,6 +58,8 @@ import { SelectField } from "./ui/select";
 import LearningGroups from "./LearningGroups";
 import Curricula from "./Curricula";
 import { groupItems } from "@/lib/learning-groups";
+import { groupPath } from "@/lib/group-hierarchy";
+import { teamPath } from "@/lib/team-hierarchy";
 import { Assignments, type LearningHandler } from "./Assignments";
 import {
   availableDocSections,
@@ -1074,7 +1076,7 @@ export default function Admin({
                     <option value="all">All groups</option>
                     {data.groups.map((g) => (
                       <option key={g.id} value={g.id}>
-                        {g.name}
+                        {groupPath(g.id, data.groups)}
                       </option>
                     ))}
                   </SelectField>
@@ -1105,7 +1107,7 @@ export default function Admin({
                   <option value="none">No team</option>
                   {(data.teams || []).map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name}
+                      {teamPath(t.id, data.teams || [])}
                     </option>
                   ))}
                 </SelectField>
@@ -1309,7 +1311,7 @@ export default function Admin({
                   <option value="">No team</option>
                   {(data.teams || []).map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name}
+                      {teamPath(t.id, data.teams || [])}
                     </option>
                   ))}
                 </SelectField>

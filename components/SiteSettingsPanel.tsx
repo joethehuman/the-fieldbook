@@ -15,6 +15,7 @@ import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { CardPaletteSettings } from "./CardPaletteSettings";
 import { availableDocSections } from "@/lib/docs-navigation";
+import { groupPath } from "@/lib/group-hierarchy";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import { equalJson } from "@/lib/equal-json";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
@@ -193,8 +194,11 @@ export default function SiteSettingsPanel({
           id="settings-docs"
           title={<h3>Document sections</h3>}
           description="Organize top-level sections and their subsections. Documents can sit at either level."
-          guidance="Use the placement menu and arrow buttons to move sections. Move documents and subsections before deleting a section. Empty sections remain available in the editor; readers see sections with published documents."
-          actions={saveAction}
+          guidance="Expand a section to see its subsections. Reorder within a level, or use Move to… to change a section’s parent. Move documents and subsections before deleting a section. Empty sections remain available in the editor; readers see sections with published documents."
+          actions={<ActionGroup>
+            {dirty && <Button type="button" variant="outline" disabled={busy} onClick={() => { setSettings(savedSettings.current); setNotice("Changes discarded."); }}>Discard changes</Button>}
+            {saveAction}
+          </ActionGroup>}
         >
           <DocSectionsSettings
             sections={docSections}
@@ -330,7 +334,7 @@ export default function SiteSettingsPanel({
                     )}
                   {data.groups.map((g) => (
                     <option key={g.id} value={`group:${g.id}`}>
-                      {g.name}
+                      {groupPath(g.id, data.groups)}
                     </option>
                   ))}
                 </SelectField>

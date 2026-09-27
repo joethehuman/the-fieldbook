@@ -2,7 +2,7 @@
 import { BulkActions } from "./patterns/bulk-actions";
 import { SelectableRows } from "./patterns/selectable-rows";
 import { groupLearningCommands } from "./bulk-relationships";
-import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
+import { useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
 import { Note } from "@/components/ui/note";
 import { FormField } from "@/components/patterns/form-field";
@@ -10,18 +10,17 @@ import { useToast } from "./ui/toast";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SelectField } from "./ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
-import { Checkbox } from "@/components/ui/choice";
 import { useRevealTarget } from "./patterns/use-reveal-target";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { Alert } from "@/components/ui/alert";
 import { ActionGroup } from "@/components/ui/action-group";
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import {
+  ancestorIds,
   canParent,
   effectiveGroups,
   type Group,
@@ -36,6 +35,9 @@ import { Button } from "./ui/button";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import type { LearningHandler } from "./Assignments";
 import { SaveRecoveryError } from "@/lib/save-recovery";
+import { HierarchyList } from "./patterns/hierarchy-list";
+import { groupMembershipSources, groupMoveImpact, groupPath, moveGroup } from "@/lib/group-hierarchy";
+import { teamPath } from "@/lib/team-hierarchy";
 
 const key = (i: LearningItem) => `${i.kind}:${i.id}`;
 export default function LearningGroups({
@@ -65,6 +67,10 @@ export default function LearningGroups({
   const [updateSort, setUpdateSort] =
     useState<GroupBrowseSort>("updated-newest");
   const [name, setName] = useState("");
+  const [createParent, setCreateParent] = useState("");
+  const [moveParent, setMoveParent] = useState<string | null>(null);
+  const [linkedOpen, setLinkedOpen] = useState(true);
+  const [childrenOpen, setChildrenOpen] = useState(true);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const learnMany =
@@ -193,6 +199,15 @@ export default function LearningGroups({
     selected,
     data.groups.map((g) => g.id),
   );
+  const parentGroups = group ? [...data.groups]
+    .filter((g) => g.id !== group.id && canParent(group.id, g.id, data.groups))
+    .sort((a, b) => groupPath(a.id, data.groups).localeCompare(groupPath(b.id, data.groups))) : [];
+  const selectedMove = group && moveParent !== null ? (() => {
+    try { return groupMoveImpact(data, group.id, moveParent || undefined); }
+    catch { return null; }
+  })() : null;
+  const childGroups = group ? data.groups.filter((g) => g.parentId === group.id) : [];
+  const inheritedGroups = group ? [...data.groups].filter((g) => g.id !== group.id && canParent(g.id, group.id, data.groups) === false) : [];
   return (
     <section
       {...destination.targetProps}
@@ -232,13 +247,14 @@ export default function LearningGroups({
                     ...data,
                     groups: [
                       ...data.groups,
-                      { id, name: clean, learningItems: [], teamIds: [] },
+                      { id, name: clean, parentId: createParent || undefined, learningItems: [], teamIds: [] },
                     ],
                   },
                   "Learning group created.",
                 )
               ) {
                 setName("");
+                setCreateParent("");
                 setSelected(id);
                 destination.reveal();
               }
@@ -252,6 +268,12 @@ export default function LearningGroups({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Account executives"
               />
+            </FormField>
+            <FormField label="Parent group" description="Optional. Members of a child group also receive the parent group’s learning and Updates.">
+              <SelectField value={createParent} onValueChange={setCreateParent} disabled={busy}>
+                <option value="">Top level</option>
+                {data.groups.map((g) => <option key={g.id} value={g.id}>{groupPath(g.id, data.groups)}</option>)}
+              </SelectField>
             </FormField>
             <Button loading={busy} type="submit">
               <Plus size={16} />
@@ -269,67 +291,50 @@ export default function LearningGroups({
               overviewSelection.actionIds,
               onChange,
               learnMany,
-            )}
+            ).concat([{
+              id: "move",
+              label: "Move selected groups",
+              description: "Move each selected branch to one parent. Child groups follow their parent; inherited learning and Update relevance may change. Direct links and history stay attached.",
+              options: [{ id: "root", label: "Top level" }, ...data.groups.map((g) => ({ id: g.id, label: groupPath(g.id, data.groups) }))],
+              selectionMode: "single" as const,
+              review: (values: string[], ids: string[]) => {
+                try {
+                  if (ids.some((id) => [...ancestorIds(id, data.groups)].some((ancestor) => ancestor !== id && ids.includes(ancestor))))
+                    throw new Error("Select a parent or a descendant, not both.");
+                  const destination = values[0] === "root" ? undefined : values[0];
+                  let working = data;
+                  const impacts = ids.map((id) => {
+                    const impact = groupMoveImpact(working, id, destination);
+                    working = { ...working, groups: impact.next };
+                    return impact;
+                  });
+                  return <ul className="text-copy">{impacts.map((impact) => <li key={impact.from}>{impact.from} → {impact.to} · {impact.branch.length} groups · {impact.gainedCourses} new / {impact.lostCourses} removed effective course assignments · {impact.gainedUpdates} added / {impact.lostUpdates} removed Update links{impact.guest && ` · guest recommendations: ${impact.guest.gainedCourses} added / ${impact.guest.lostCourses} removed courses`}</li>)}</ul>;
+                } catch (error) { return <p role="alert">{(error as Error).message}</p>; }
+              },
+              apply: async (values: string[], ids: string[] = []) => {
+                if (ids.some((id) => [...ancestorIds(id, data.groups)].some((ancestor) => ancestor !== id && ids.includes(ancestor))))
+                  throw new Error("Select either a parent or its child group, not both.");
+                const destination = values[0] === "root" ? undefined : values[0];
+                let next = data.groups;
+                for (const id of ids) next = moveGroup(next, id, destination);
+                await onChange({ ...data, groups: next }, { locallyHandled: true });
+              },
+            }])}
           />
-          {overviewSelection.canSelect && (
-            <div className="flex items-center gap-3">
-              <SelectRows
-                label="Select all learning groups"
-                ids={data.groups.map((g) => g.id)}
-                value={overviewSelection.selected}
-                onChange={overviewSelection.setSelected}
-              />
-              Select all learning groups
-            </div>
-          )}
-          <div className="group-grid">
-            {data.groups.map((g) => (
-              <Card className="flex flex-col p-0 sm:p-0" key={g.id}>
-                <CardContent>
-                  <div className="flex items-center gap-3">
-                    {overviewSelection.canSelect && (
-                      <Checkbox
-                        aria-label={`Select ${g.name}`}
-                        checked={overviewSelection.selected.includes(g.id)}
-                        onCheckedChange={(v) =>
-                          overviewSelection.toggle(g.id, v === true)
-                        }
-                      />
-                    )}
-                    <h3 className="font-semibold">{g.name}</h3>
-                  </div>
-                </CardContent>
-                <CardFooter className="mt-auto">
-                  <p className="text-copy text-muted-foreground">
-                    {
-                      data.users.filter(
-                        (u) =>
-                          u.active && effectiveGroups(u, data.groups).has(g.id),
-                      ).length
-                    }{" "}
-                    people ·{" "}
-                    {
-                      expandLearning(groupItems(g, content), curricula).filter(
-                        (id) => published.some((c) => c.id === id),
-                      ).length
-                    }{" "}
-                    assigned courses
-                  </p>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setSelected(g.id);
-                      destination.reveal();
-                      setQuery("");
-                      setNotice("");
-                    }}
-                  >
-                    Manage {g.name}
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+          <HierarchyList
+            label="Learning groups"
+            items={[...data.groups].sort((a, b) => a.name.localeCompare(b.name)).map((g) => ({
+              id: g.id,
+              parentId: g.parentId,
+              label: g.name,
+              description: groupPath(g.id, data.groups),
+              meta: `${data.users.filter((u) => u.active && effectiveGroups(u, data.groups).has(g.id)).length} active people · ${data.groups.filter((child) => child.parentId === g.id).length} child groups · ${expandLearning(groupItems(g, content), curricula).filter((id) => published.some((c) => c.id === id)).length} direct assigned courses`,
+            }))}
+            selected={overviewSelection.selected}
+            onSelectionChange={overviewSelection.setSelected}
+            disabled={busy}
+            onOpen={(id) => { setSelected(id); destination.reveal(); setQuery(""); setNotice(""); }}
+          />
         </>
       ) : (
         <>
@@ -346,10 +351,18 @@ export default function LearningGroups({
           <SectionHeader
             title={<h2>{group.name}</h2>}
             description={
-              <>Members receive this group’s courses and updates in For you.</>
+              <>{groupPath(group.id, data.groups)} · Members receive this group’s courses and Updates in For you.</>
             }
           >
             <ActionGroup>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => { setCreateParent(group.id); setSelected(""); destination.reveal(); }}
+              >
+                Add child group
+              </Button>
+              <Button variant="outline" disabled={busy} onClick={() => setMoveParent(group.parentId || "")}>Move group</Button>
               <Button
                 variant="outline"
                 disabled={busy}
@@ -383,6 +396,41 @@ export default function LearningGroups({
               </Button>
             </ActionGroup>
           </SectionHeader>
+          {moveParent !== null && (
+            <div className="grid gap-3 rounded-lg border border-border p-4">
+              <h3>Review group move</h3>
+              <p className="text-copy text-muted-foreground">The whole child-group branch moves. Direct members, linked teams, and learning history stay attached. Inherited assignments and Update relevance may change.</p>
+              <FormField label="New parent group">
+                <SelectField value={moveParent} onValueChange={setMoveParent} disabled={busy}>
+                  <option value="">Top level</option>
+                  {parentGroups.map((g) => <option key={g.id} value={g.id}>{groupPath(g.id, data.groups)}</option>)}
+                </SelectField>
+              </FormField>
+              {selectedMove ? (
+                <div className="grid gap-1 text-copy">
+                  <p>{selectedMove.from} → {selectedMove.to}</p>
+                  <p>{selectedMove.branch.length} groups in this branch.</p>
+                  <p>{selectedMove.gainedCourses} new and {selectedMove.lostCourses} removed effective course assignments across members; {selectedMove.gainedUpdates} added and {selectedMove.lostUpdates} removed Update relevance links. Overlaps are counted once.</p>
+                  {selectedMove.guest && <p>Guest recommendations: {selectedMove.guest.gainedCourses} added / {selectedMove.guest.lostCourses} removed courses; {selectedMove.guest.gainedUpdates} added / {selectedMove.guest.lostUpdates} removed Updates.</p>}
+                </div>
+              ) : <p role="alert">Choose a different valid parent.</p>}
+              <ActionGroup>
+                <Button variant="outline" disabled={busy} onClick={() => setMoveParent(null)}>Cancel</Button>
+                <Button disabled={busy || !selectedMove} onClick={async () => {
+                  if (!selectedMove) return;
+                  if (await save({ ...data, groups: selectedMove.next }, "Learning group moved.")) setMoveParent(null);
+                }}>Apply move</Button>
+              </ActionGroup>
+            </div>
+          )}
+          <div className="grid gap-2">
+            <div className="flex items-center gap-2"><Button type="button" variant="ghost" size="icon" aria-label={`${childrenOpen ? "Collapse" : "Expand"} child groups`} aria-expanded={childrenOpen} onClick={() => setChildrenOpen((value) => !value)}><ChevronRight className={childrenOpen ? "rotate-90" : ""} aria-hidden="true" /></Button><h3>Child groups · {childGroups.length}</h3></div>
+            {childrenOpen && (childGroups.length ? childGroups.map((child) => (
+              <Button key={child.id} variant="link" className="justify-start" onClick={() => { setSelected(child.id); setMoveParent(null); destination.reveal(); }}>
+                {groupPath(child.id, data.groups)}
+              </Button>
+            )) : <p className="text-copy text-muted-foreground">No child groups.</p>)}
+          </div>
           <Tabs
             value={tab}
             onValueChange={(value) => {
@@ -402,28 +450,8 @@ export default function LearningGroups({
               <FieldGroup disabled={busy}>
                 {tab === "members" ? (
                   <>
-                    <FormField
-                      label="Parent learning group"
-                      description="Members also receive courses and updates from parent groups."
-                    >
-                      <SelectField
-                        disabled={busy}
-                        value={group.parentId || ""}
-                        onValueChange={(value) =>
-                          changeGroup({ parentId: value || undefined })
-                        }
-                      >
-                        <option value="">No parent</option>
-                        {data.groups
-                          .filter((g) => canParent(group.id, g.id, data.groups))
-                          .map((g) => (
-                            <option value={g.id} key={g.id}>
-                              {g.name}
-                            </option>
-                          ))}
-                      </SelectField>
-                    </FormField>
-                    <h3>Teams</h3>
+                    <p className="text-copy text-muted-foreground">Parent: {group.parentId ? groupPath(group.parentId, data.groups) : "Top level"}. Child-group members are included here; this group’s direct members do not automatically join its children.</p>
+                    <div className="flex items-center gap-2"><Button type="button" variant="ghost" size="icon" aria-label={`${linkedOpen ? "Collapse" : "Expand"} linked teams`} aria-expanded={linkedOpen} onClick={() => setLinkedOpen((value) => !value)}><ChevronRight className={linkedOpen ? "rotate-90" : ""} aria-hidden="true" /></Button><h3>Linked teams · {linkedTeams.length}</h3></div>
                     <FieldDescription>
                       Linked teams supply their direct members. Child teams must
                       be linked separately.
@@ -434,7 +462,7 @@ export default function LearningGroups({
                         description="Link the selected teams to this learning group. Their direct members receive its assignments and updates."
                         options={(data.teams || [])
                           .filter((t) => !group.teamIds?.includes(t.id))
-                          .map((t) => ({ id: t.id, label: t.name }))}
+                          .map((t) => ({ id: t.id, label: teamPath(t.id, data.teams || []) }))}
                         onApply={async (ids) => {
                           if (
                             !(await bulkChangeGroup({
@@ -450,7 +478,7 @@ export default function LearningGroups({
                         actionLabel="Add teams"
                       />
                     </ActionGroup>
-                    <BulkActions
+                    {linkedOpen && <><BulkActions
                       collectionSize={teamSelection.collectionSize}
                       selected={teamSelection.actionIds}
                       onSelectionChange={teamSelection.setSelected}
@@ -477,11 +505,12 @@ export default function LearningGroups({
                       label="Linked teams"
                       rows={linkedTeams.map((t) => ({
                         id: t.id,
-                        label: t.name,
+                        label: teamPath(t.id, data.teams || []),
+                        detail: `${data.users.filter((u) => u.teamId === t.id && u.active).length} direct active people. Child teams are linked separately.`,
                       }))}
                       selected={teamSelection.selected}
                       onChange={teamSelection.setSelected}
-                    />
+                    /></>}
                     <h3>People</h3>
                     <ActionGroup>
                       <BulkPicker
@@ -566,12 +595,13 @@ export default function LearningGroups({
                       rows={groupMembers.map((u) => ({
                         id: u.id,
                         label: u.name,
-                        detail: u.email,
+                        detail: <>{u.email} · {u.active ? "Active" : "Inactive"}<br />{groupMembershipSources(u, group.id, data).join(" · ")}</>,
                         disabledReason: !u.groups.includes(group.id)
                           ? "Included through a team or child group; manage that source to remove membership."
                           : undefined,
                       }))}
                     />
+                    <p className="text-copy text-muted-foreground">{groupMembers.filter((u) => u.active).length} active · {groupMembers.filter((u) => !u.active).length} inactive · {(data.pendingUsers || []).filter((u) => u.groups.includes(group.id) || (!!u.teamId && !!group.teamIds?.includes(u.teamId))).length} pending direct memberships</p>
                   </>
                 ) : tab === "learning" ? (
                   <>
@@ -621,10 +651,20 @@ export default function LearningGroups({
                     </FieldDescription>
                     {group.parentId && (
                       <Note>
-                        Courses from parent groups come first. Manage those
-                        courses in the parent group.
+                        Courses from parent groups come first. Manage them in their owning group.
                       </Note>
                     )}
+                    {inheritedGroups.filter((g) => groupItems(g, content).length).map((owner) => (
+                      <div key={owner.id} className="rounded-md border border-border p-3 text-copy">
+                        <p>Inherited from {groupPath(owner.id, data.groups)}</p>
+                        <ul className="list-disc ps-5">
+                          {groupItems(owner, content).map((item) => {
+                            const curriculum = item.kind === "curriculum" ? curricula.find((c) => c.id === item.id) : undefined;
+                            return <li key={key(item)}>{item.kind === "course" ? content.find((c) => c.id === item.id)?.title || "Unavailable course" : `${curriculum?.name || "Unavailable curriculum"} · ${curriculum?.courseIds.map((id) => content.find((c) => c.id === id)?.title || "Unavailable course").join(", ") || "No courses"}`}</li>;
+                          })}
+                        </ul>
+                      </div>
+                    ))}
                     <BulkActions
                       singleItemActions={false}
                       collectionSize={learningSelection.collectionSize}
@@ -665,7 +705,7 @@ export default function LearningGroups({
                               "Unavailable curriculum",
                         detail:
                           i.kind === "curriculum"
-                            ? `Curriculum · ${curricula.find((c) => c.id === i.id)?.courseIds.length || 0} courses`
+                            ? `Curriculum · ${curricula.find((c) => c.id === i.id)?.courseIds.map((id) => content.find((c) => c.id === id)?.title || "Unavailable course").join(", ") || "No courses"}`
                             : "Course",
                       }))}
                       disabled={busy}
@@ -692,6 +732,10 @@ export default function LearningGroups({
                 ) : (
                   <>
                     <h3>Updates for this group</h3>
+                    {inheritedGroups.map((owner) => {
+                      const inherited = published.filter((c) => c.kind === "brief" && c.groups.includes(owner.id));
+                      return inherited.length ? <p key={owner.id} className="text-copy text-muted-foreground">Inherited from {groupPath(owner.id, data.groups)}: {inherited.map((c) => c.title).join(" · ")}</p> : null;
+                    })}
                     <BulkPicker
                       title="Add Updates"
                       description="Add Updates to this group’s For you list. Everyone can still explore published Updates."

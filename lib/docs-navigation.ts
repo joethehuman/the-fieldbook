@@ -201,7 +201,8 @@ export function reorderDocSection(
   const target = siblings[siblings.indexOf(index) + offset];
   if (target === undefined) return sections;
   const next = [...sections];
-  [next[index], next[target]] = [next[target], next[index]];
+  const [moved] = next.splice(index, 1);
+  next.splice(target, 0, moved);
   return next;
 }
 export function sectionForDoc(

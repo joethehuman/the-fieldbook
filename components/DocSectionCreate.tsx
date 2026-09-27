@@ -11,15 +11,17 @@ export default function DocSectionCreate({
   sections,
   onCreate,
   onCancel,
+  initialParentId = "",
   disabled = false,
 }: {
   sections: DocSection[];
   onCreate: (section: DocSection) => void | Promise<void>;
   onCancel?: () => void;
+  initialParentId?: string;
   disabled?: boolean;
 }) {
   const [name, setName] = useState("");
-  const [parentId, setParentId] = useState("");
+  const [parentId, setParentId] = useState(initialParentId);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function create() {
@@ -31,7 +33,7 @@ export default function DocSectionCreate({
       setBusy(true);
       await onCreate(section);
       setName("");
-      setParentId("");
+      setParentId(initialParentId);
     } catch (error) {
       setError((error as Error).message);
     } finally {
