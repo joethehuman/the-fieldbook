@@ -76,6 +76,26 @@
     border-bottom: 1px solid var(--border);
     padding: var(--space-3) var(--space-6);
   }
+  .app-bar-progress {
+    position: absolute;
+    inset: auto 0 -1px;
+    height: 2px;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .app-bar-progress span {
+    display: block;
+    width: 34%;
+    height: 100%;
+    background: var(--primary);
+    animation: loading-sweep 1.2s ease-in-out infinite alternate;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app-bar-progress span {
+      animation: none;
+      width: 100%;
+    }
+  }
   .topbar > [data-slot="search-root"] {
     margin-left: auto;
     flex: 0 1 auto;
@@ -684,6 +704,22 @@
     .sidebar.open {
       visibility: visible;
       transform: translateX(0);
+    }
+    .sidebar.open.navigation-pending::after {
+      content: "";
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 34%;
+      height: 2px;
+      background: var(--primary);
+      animation: loading-sweep 1.2s ease-in-out infinite alternate;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .sidebar.open.navigation-pending::after {
+        animation: none;
+        width: 100%;
+      }
     }
     .main-shell {
       margin-left: 0;

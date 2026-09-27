@@ -3,6 +3,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useTransition,
   type CSSProperties,
   type ReactNode,
 } from "react";
@@ -39,6 +40,7 @@ export function ReaderShell({
   const trigger = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const router = useRouter();
+  const [navigationPending, startNavigation] = useTransition();
   const section = pathname.startsWith("/docs")
     ? "docs"
     : pathname.startsWith("/team")
@@ -172,7 +174,7 @@ export function ReaderShell({
               context.user?.role === "admin"
                 ? () => {
                     close();
-                    router.push("/admin");
+                    startNavigation(() => router.push("/admin"));
                   }
                 : undefined
             }
@@ -181,10 +183,16 @@ export function ReaderShell({
               (context.user.role === "manager" || context.user.managesTeam)
                 ? () => {
                     close();
-                    router.push("/team");
+                    startNavigation(() => router.push("/team"));
                   }
                 : undefined
             }
+            onMenuOpen={() => {
+              if (context.user?.role === "admin") router.prefetch("/admin");
+              else if (context.user?.role === "manager") router.prefetch("/team");
+            }}
+            onManageOrganizationIntent={() => router.prefetch("/admin")}
+            onTeamProgressIntent={() => router.prefetch("/team")}
             onSignOut={context.user ? signOut : undefined}
             privacyHref={
               section === "privacy" ? null : context.branding.privacyUrl
@@ -226,7 +234,7 @@ export function ReaderShell({
         />
       )}
       <div className="main-shell">
-        <AppBar>
+        <AppBar pending={navigationPending}>
           <Button
             variant="ghost"
             size="icon"

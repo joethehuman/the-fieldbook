@@ -41,6 +41,7 @@ import {
   useEffect,
   useRef,
   useState,
+  useTransition,
   type ReactNode,
   type CSSProperties,
 } from "react";
@@ -104,6 +105,7 @@ export default function Fieldbook({
   onLoaded?: (user: User | null) => void;
 } = {}) {
   const router = useRouter();
+  const [navigationPending, startNavigation] = useTransition();
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
@@ -280,7 +282,7 @@ export default function Fieldbook({
       if (lesson) query.set("lesson", lesson);
       if (origin) query.set("curriculum", origin);
       const destination = `/${path}${query.size ? `?${query}` : ""}`;
-      router.push(destination);
+      startNavigation(() => router.push(destination));
       return;
     }
     setView(v);
@@ -533,7 +535,9 @@ export default function Fieldbook({
       >
         Skip to content
       </SkipLink>
-      <aside className={"sidebar " + (menu ? "open" : "")}>
+      <aside
+        className={`sidebar ${menu ? "open" : ""} ${navigationPending ? "navigation-pending" : ""}`}
+      >
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
           <InstallationIdentity name={data.settings?.name} />
           <Button
@@ -563,6 +567,18 @@ export default function Fieldbook({
               className={view === n.key ? "active" : ""}
               key={n.key}
               onClick={() => navigate(n.key)}
+              onPointerEnter={() => {
+                if (runtime && initialAdmin)
+                  router.prefetch(`/${sectionPaths[n.key]}`);
+              }}
+              onFocus={() => {
+                if (runtime && initialAdmin)
+                  router.prefetch(`/${sectionPaths[n.key]}`);
+              }}
+              onTouchStart={() => {
+                if (runtime && initialAdmin)
+                  router.prefetch(`/${sectionPaths[n.key]}`);
+              }}
             >
               <n.icon size={19} />
               {n.title}
@@ -621,6 +637,9 @@ export default function Fieldbook({
                 ? () => navigate("team")
                 : undefined
             }
+            onTeamProgressIntent={() => {
+              if (runtime && initialAdmin) router.prefetch("/team");
+            }}
             onSignOut={runtime && uid !== "guest" ? logout : undefined}
             onSignIn={runtime && uid === "guest" ? logout : undefined}
             onSwitchDemoProfile={!runtime ? logout : undefined}
@@ -685,7 +704,7 @@ export default function Fieldbook({
         />
       )}
       <div className="main-shell">
-        <AppBar>
+        <AppBar pending={navigationPending}>
           <Button
             variant="ghost"
             size="icon"
@@ -811,7 +830,8 @@ export default function Fieldbook({
               runtime={runtime}
               onOpen={async (r) => {
                 if (runtime) {
-                  if (await canLeave()) router.push(r.href);
+                  if (await canLeave())
+                    startNavigation(() => router.push(r.href));
                   return;
                 }
                 await navigate(
