@@ -824,7 +824,13 @@ test("Insert menus use full rows and can be dismissed", async ({ page }, info) =
   await page.getByRole("button", { name: "Write", exact: true }).click();
   await page.getByRole("button", { name: "Insert", exact: true }).click();
   await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Heading" })).not.toBeFocused();
   await menu.getByRole("menuitem", { name: "Close menu esc" }).click();
+  await expect(menu).toHaveCount(0);
+  await page.getByRole("button", { name: "Insert", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(menu.getByRole("menuitem", { name: "Heading" })).toBeFocused();
+  await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
 });
 

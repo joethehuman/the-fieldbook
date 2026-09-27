@@ -100,7 +100,7 @@ function WritingToolbar({
   onEditorReady,
   disabled,
 }: {
-  onInsert: (trigger: HTMLButtonElement) => void;
+  onInsert: (trigger: HTMLButtonElement, fromKeyboard: boolean) => void;
   onEditorReady: (editor: LexicalEditor | null, actions: { heading: () => void; quote: () => void; codeBlock: () => void; inlineCode: () => void }) => void;
   disabled: boolean;
 }) {
@@ -224,7 +224,7 @@ function WritingToolbar({
         <Button type="button" size="sm" variant="outline" disabled={disabled}
           aria-haspopup="menu"
           onMouseDown={(event) => event.preventDefault()}
-          onClick={(event) => onInsert(event.currentTarget)}>
+          onClick={(event) => onInsert(event.currentTarget, event.detail === 0)}>
           <Plus /> Insert
         </Button>
       </div>
@@ -263,6 +263,7 @@ export default function WritingEditorEngine({
   const [slashOpen, setSlashOpen] = useState(false);
   const [slashFromToolbar, setSlashFromToolbar] = useState(false);
   const insertTrigger = useRef<HTMLButtonElement | null>(null);
+  const focusInsertItem = useRef(false);
   const [slashQuery, setSlashQuery] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
   const [slashPosition, setSlashPosition] = useState({ top: 0, left: 0, above: false, maxHeight: 360 });
@@ -277,7 +278,7 @@ export default function WritingEditorEngine({
     slashMenu.current.style.left = `${slashPosition.left}px`;
     slashMenu.current.style.transform = slashPosition.above ? "translateY(-100%)" : "";
     slashMenu.current.style.maxHeight = `${slashPosition.maxHeight}px`;
-    if (slashFromToolbar) slashMenu.current.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+    if (slashFromToolbar && focusInsertItem.current) slashMenu.current.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
   }, [slashOpen, slashPosition, slashFromToolbar]);
   useLayoutEffect(() => {
     if (!mediaChooser || !mediaMenu.current) return;
@@ -488,12 +489,13 @@ export default function WritingEditorEngine({
       insertTrigger.current?.focus({ preventScroll: true });
     } else keepSlashAsText();
   }
-  function openSlash(trigger?: HTMLButtonElement) {
+  function openSlash(trigger?: HTMLButtonElement, fromKeyboard = false) {
     if (trigger && slashMenu.current && insertTrigger.current === trigger) {
       setSlashOpen(false);
       return;
     }
     insertTrigger.current = trigger || null;
+    focusInsertItem.current = fromKeyboard;
     setSlashFromToolbar(!!trigger);
     slashSelection.current = trigger ? toolbarSelection.current?.clone() || null : null;
     let savedLine: HTMLElement | null = null;
