@@ -58,12 +58,15 @@
 .writing-slash-options .muted { padding: var(--space-3); }
 .writing-editor .mdxeditor-toolbar {
   position: static;
-  flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
   border-radius: var(--radius) var(--radius) 0 0;
   background: var(--muted);
   padding: var(--space-2);
 }
+.writing-toolbar { width: 100%; min-width: 0; }
+.writing-toolbar-controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.writing-toolbar-help { margin: var(--space-2) 0 0; color: var(--muted-foreground); font-size: .875rem; line-height: 1.4; }
+.writing-toolbar-help-mobile { display: none; }
 .writing-editor .writing-content {
   min-height: 24rem;
   padding: var(--space-6);
@@ -181,12 +184,19 @@
   .writing-editor .writing-content [data-lexical-decorator="true"] table tbody [data-tool-cell="true"] button { opacity: .7; }
 }
 .writing-editor [data-toolbar-item][role="combobox"] {
+  width: 9rem;
+  min-width: 9rem;
+  max-width: 9rem;
   min-height: 2.25rem;
 }
 .mdxeditor-popup-container {
   z-index: 60;
 }
 @media (max-width: 600px) {
+  .writing-toolbar-controls [data-slot="button"] { min-width: 2.75rem; min-height: 2.75rem; }
+  .writing-editor [data-toolbar-item][role="combobox"] { min-height: 2.75rem; }
+  .writing-toolbar-help-desktop { display: none; }
+  .writing-toolbar-help-mobile { display: block; }
   .writing-editor .writing-content {
     padding: var(--space-4);
   }

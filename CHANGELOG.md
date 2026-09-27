@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Simplify the shared Docs, Updates and Courses writing toolbar. Keep common formatting and Undo/Redo visible, add a touch-friendly Insert menu for blocks and media, and show brief desktop and mobile guidance below the controls.
+
 - Move account, team and organization actions into a shared profile menu for learners, managers, administrators and guests. Add general Fieldbook feedback through a dismissible dialog and include it in administrator feedback reports. Keep demo profile switching separate. Existing installations need `20260926182840_general_feedback.sql` before this feedback action can save.
 
 - Open course cards directly in a responsive lesson player, with curriculum-aware return navigation, a sticky course outline, image expansion, a larger video view, and a final feedback and Complete course action. Curriculum cards open an ordered course-card page.
