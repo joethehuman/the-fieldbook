@@ -85,7 +85,7 @@ export function CardArtEditor({
       </FormField>
       <FormField
         label="Short title"
-        description={`Up to 40 characters. Shown within two lines on generated artwork (${graphemeCount(current.shortTitle)}/40).`}
+        description={`Can differ from the full title. Up to 40 characters, shown within two lines on generated artwork (${graphemeCount(current.shortTitle)}/40).`}
       >
         <Input
           value={current.shortTitle}

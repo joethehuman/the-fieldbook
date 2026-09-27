@@ -76,10 +76,10 @@ for (const file of [
                 text === "{brandThemeStyle(context.branding.accent)}") ||
               (file === "components/patterns/branded-account.tsx" &&
                 text === "{brandThemeStyle(branding.accent)}") ||
-              // Card art uses two server-validated palette values as decorative CSS variables.
+              // Card art derives two decorative CSS variables from the validated palette.
               (file === "components/patterns/card-artwork.tsx" &&
-                text.includes('"--card-base": backgroundPair[0]') &&
-                text.includes('"--card-highlight": backgroundPair[1]'))) &&
+                text.includes('"--card-base": surface') &&
+                text.includes('"--card-highlight": highlight'))) &&
             !/(width|height|margin|padding|background|color)\s*:/.test(text)
           ))
             report(

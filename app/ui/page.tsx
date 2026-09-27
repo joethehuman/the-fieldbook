@@ -110,9 +110,35 @@ export default function ComponentCatalog() {
       <LibraryExamples />
       <WritingExamples />
       <section className="grid gap-4" aria-label="Generated card artwork">
-        <SectionHeader title={<h2>Generated card artwork</h2>} description="Eight families share a saved seed and palette, with varied geometry within each family." />
+        <SectionHeader
+          title={<h2>Generated card artwork</h2>}
+          description="Eight families share a saved seed and palette, with varied geometry within each family."
+        />
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 8 }, (_, seed) => <CardArtwork key={seed} id={`catalog-${seed}`} title={`Example design ${seed + 1}`} kind={seed % 3 === 0 ? "brief" : seed % 3 === 1 ? "course" : "curriculum"} category={seed % 3 === 2 ? undefined : "Product"} art={{ source: "generated", shortTitle: `Design ${seed + 1}`, version: 1, seed }} />)}
+          {Array.from({ length: 8 }, (_, family) => {
+            const seed = family + 256 * (family % 3);
+            return (
+              <CardArtwork
+                key={family}
+                id={`catalog-${family}`}
+                title={`Example design ${family + 1}`}
+                kind={
+                  family % 3 === 0
+                    ? "brief"
+                    : family % 3 === 1
+                      ? "course"
+                      : "curriculum"
+                }
+                category={family % 3 === 2 ? undefined : "Product"}
+                art={{
+                  source: "generated",
+                  shortTitle: `Design ${family + 1}`,
+                  version: 1,
+                  seed,
+                }}
+              />
+            );
+          })}
         </div>
       </section>
       <section className="grid gap-4" aria-label="Save confirmations">
@@ -246,7 +272,12 @@ export default function ComponentCatalog() {
                 started: value > 0,
               }}
               artwork={
-                <CardArtwork id={`catalog-learning-${value}`} title="Example course" kind={value === 33 ? "curriculum" : "course"} category={value === 33 ? undefined : "Product"} />
+                <CardArtwork
+                  id={`catalog-learning-${value}`}
+                  title="Example course"
+                  kind={value === 33 ? "curriculum" : "course"}
+                  category={value === 33 ? undefined : "Product"}
+                />
               }
               action={value === 33 ? "View curriculum" : "Start course"}
               onClick={() => {}}

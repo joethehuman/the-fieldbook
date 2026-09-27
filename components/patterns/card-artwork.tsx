@@ -4,6 +4,19 @@ import { resolvedCardArt, resolvedCardPalette } from "@/lib/card-art";
 import type { SiteSettings } from "@/lib/settings";
 import { CardImage } from "./card-image";
 
+function mix(a: string, b: string, weight: number) {
+  return `#${[1, 3, 5]
+    .map((index) =>
+      Math.round(
+        parseInt(a.slice(index, index + 2), 16) * (1 - weight) +
+          parseInt(b.slice(index, index + 2), 16) * weight,
+      )
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
 function geometry(seed: number, color1: string, color2: string) {
   const family = seed % 8;
   const shift = ((seed >>> 8) % 95) - 42;
@@ -12,19 +25,20 @@ function geometry(seed: number, color1: string, color2: string) {
   const common = {
     fill: "none",
     stroke: color1,
-    strokeWidth: 2,
-    opacity: 0.52,
+    strokeWidth: 2.5,
+    opacity: 0.72,
   };
   const accent = {
     fill: "none",
     stroke: color2,
-    strokeWidth: 5,
-    opacity: 0.65,
+    strokeWidth: 4,
+    opacity: 0.82,
   };
   switch (family) {
     case 0:
       return (
         <g transform={`translate(${shift} 0) rotate(${turn} 430 145)`}>
+          <circle cx="610" cy="12" r="126" fill={color2} opacity="0.58" />
           {Array.from({ length: 12 }, (_, i) => (
             <ellipse
               key={i}
@@ -40,6 +54,11 @@ function geometry(seed: number, color1: string, color2: string) {
     case 1:
       return (
         <g transform={`translate(${shift} 0) rotate(${turn} 450 150)`}>
+          <path
+            d="M410 -70 C280 80 570 178 438 370 L780 370 L780 -70 Z"
+            fill={color2}
+            opacity="0.28"
+          />
           {Array.from({ length: 15 }, (_, i) => (
             <path
               key={i}
@@ -52,6 +71,15 @@ function geometry(seed: number, color1: string, color2: string) {
     case 2:
       return (
         <g transform={`translate(${shift} 0) rotate(${turn} 420 150)`}>
+          <rect
+            x="405"
+            y="-68"
+            width="300"
+            height="300"
+            rx="48"
+            fill={color2}
+            opacity="0.26"
+          />
           {Array.from({ length: 10 }, (_, i) => (
             <rect
               key={i}
@@ -68,6 +96,7 @@ function geometry(seed: number, color1: string, color2: string) {
     case 3:
       return (
         <g transform={`translate(${shift} 0) rotate(${turn} 420 145)`}>
+          <path d="M490 -70 H750 V370 H300 Z" fill={color2} opacity="0.24" />
           {Array.from({ length: 16 }, (_, i) => (
             <path
               key={i}
@@ -80,6 +109,7 @@ function geometry(seed: number, color1: string, color2: string) {
     case 4:
       return (
         <g transform={`translate(${shift} 0) rotate(${turn} 440 150)`}>
+          <circle cx="620" cy="315" r="178" fill={color2} opacity="0.34" />
           {Array.from({ length: 11 }, (_, i) => (
             <path
               key={i}
@@ -92,6 +122,11 @@ function geometry(seed: number, color1: string, color2: string) {
     case 5:
       return (
         <g transform={`translate(${shift} 0) rotate(${turn} 430 150)`}>
+          <path
+            d="M340 -80 Q470 55 650 -80 V380 Q480 255 340 380 Z"
+            fill={color2}
+            opacity="0.23"
+          />
           {Array.from({ length: 12 }, (_, i) => (
             <path
               key={i}
@@ -104,6 +139,11 @@ function geometry(seed: number, color1: string, color2: string) {
     case 6:
       return (
         <g transform={`translate(${shift} 0) rotate(${turn} 430 150)`}>
+          <path
+            d="M475 -80 L780 280 L780 380 L375 -80 Z"
+            fill={color2}
+            opacity="0.25"
+          />
           {Array.from({ length: 11 }, (_, i) => (
             <path
               key={i}
@@ -116,6 +156,7 @@ function geometry(seed: number, color1: string, color2: string) {
     default:
       return (
         <g transform={`translate(${shift} 0) rotate(${turn} 435 150)`}>
+          <circle cx="550" cy="125" r="145" fill={color2} opacity="0.26" />
           {Array.from({ length: 13 }, (_, i) => (
             <circle
               key={i}
@@ -151,14 +192,19 @@ export function CardArtwork({
 }) {
   const resolved = resolvedCardArt(id, title, art, legacyCover);
   const colors = palette || resolvedCardPalette(settings);
-  const backgroundPair = (
-    [
-      [colors.base, colors.accent2],
-      [colors.accent2, colors.base],
-      [colors.base, colors.accent1],
-      [colors.accent1, colors.base],
-    ] as const
-  )[resolved.seed % 4];
+  const dark = (resolved.seed >>> 8) % 3 !== 0;
+  const surface = dark
+    ? mix(colors.base, "#0b1d2c", 0.72)
+    : mix(colors.base, "#ffffff", 0.76);
+  const highlight = dark
+    ? mix(colors.accent1, "#0b1d2c", 0.56)
+    : mix(colors.accent2, "#ffffff", 0.72);
+  const line = dark
+    ? mix(colors.accent1, "#ffffff", 0.3)
+    : mix(colors.accent1, "#152f3d", 0.08);
+  const detail = dark
+    ? mix(colors.accent2, "#ffffff", 0.08)
+    : mix(colors.accent2, "#ffffff", 0.1);
   const generated = (
     <>
       <svg
@@ -167,8 +213,9 @@ export function CardArtwork({
         preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        {geometry(resolved.seed, colors.accent1, colors.accent2)}
+        {geometry(resolved.seed, line, detail)}
       </svg>
+      <div className="card-artwork-wash" aria-hidden="true" />
       <div className="card-artwork-copy">
         <span className="card-artwork-type">
           {kind === "brief"
@@ -185,10 +232,11 @@ export function CardArtwork({
   return (
     <div
       className="card-artwork"
+      data-tone={dark ? "dark" : "light"}
       style={
         {
-          "--card-base": backgroundPair[0],
-          "--card-highlight": backgroundPair[1],
+          "--card-base": surface,
+          "--card-highlight": highlight,
         } as CSSProperties
       }
     >
