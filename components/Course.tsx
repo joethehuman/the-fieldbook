@@ -142,7 +142,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
           </NavigationButton>
         </nav>
       </aside>
-      <div className={`course-reader ${lesson ? "" : "course-reader-final"}`}>
+      <div className="course-reader">
         {saveError && <Alert variant="destructive" role="alert">{saveError}</Alert>}
         {lesson ? <>
           <Card ref={activeCard} className="course-lesson grid gap-6">

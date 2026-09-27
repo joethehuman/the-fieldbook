@@ -1,12 +1,15 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 
-async function openCourse(page: Page, mode: "required" | "optional" | "no-quiz", longLesson = false) {
+async function openCourse(page: Page, mode: "required" | "optional" | "no-quiz", { longFirstLesson = false, startAtFirstLesson = false }: {
+  longFirstLesson?: boolean;
+  startAtFirstLesson?: boolean;
+} = {}) {
   const data = freshWorkspace();
   const course = data.content.find((item) => item.id === "course-2")!;
   course.requirePassing = mode === "required";
-  if (longLesson) {
-    course.lessons[1].body += "\n\n" + "A fuller explanation of the lesson.\n\n".repeat(80);
+  if (longFirstLesson) {
+    course.lessons[0].body += "\n\n" + "A fuller explanation of the lesson.\n\n".repeat(80);
     course.body += "\n\n" + "A useful overview for this course.\n\n".repeat(9);
   }
   if (mode === "no-quiz") course.questions = [];
@@ -15,7 +18,7 @@ async function openCourse(page: Page, mode: "required" | "optional" | "no-quiz",
     sessionStorage.setItem("fieldbook.profile.v1", "demo-learner");
   }, data);
   await page.goto("/#courses/course-2");
-  await page.getByRole("button", { name: /^Next lesson/ }).click();
+  if (!startAtFirstLesson) await page.getByRole("button", { name: /^Next lesson/ }).click();
 }
 async function cardAtTop(page: Page, selector: string) {
   await expect.poll(async () => {
@@ -95,13 +98,27 @@ test("last no-quiz lesson completes and opens expanded feedback", async ({ page 
   }).toBeLessThan(2);
 });
 
-test("course sidebar keeps its position between a lesson and the quiz", async ({ page }) => {
+test("course sidebar keeps its position across long and short lessons and the quiz", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "The sidebar stacks above the reader on narrow screens.");
   await page.setViewportSize({ width: 1440, height: 934 });
-  await openCourse(page, "required", true);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openCourse(page, "required", { longFirstLesson: true, startAtFirstLesson: true });
   const back = page.getByRole("button", { name: "Back to courses" });
   const lessonTop = (await back.boundingBox())!.y;
+  await page.screenshot({ path: info.outputPath("lesson-1-layout.png") });
+  await page.getByRole("button", { name: /^Next lesson/ }).click();
+  await expect(page.getByRole("heading", { name: "Put it into practice" })).toBeVisible();
+  await cardAtTop(page, ".course-lesson");
+  await expect.poll(async () => Math.abs((await back.boundingBox())!.y - lessonTop)).toBeLessThan(2);
+  await page.screenshot({ path: info.outputPath("lesson-2-layout.png") });
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await expect(page.getByText("Question 1 of 2")).toBeVisible();
+  await cardAtTop(page, ".course-quiz");
+  await expect.poll(async () => Math.abs((await back.boundingBox())!.y - lessonTop)).toBeLessThan(2);
+  await page.screenshot({ path: info.outputPath("quiz-layout.png") });
+  await page.getByRole("navigation", { name: "In this course" }).getByRole("button", { name: /The big idea/ }).click();
+  await expect(page.getByRole("heading", { name: "The big idea" })).toBeVisible();
+  await cardAtTop(page, ".course-lesson");
   await expect.poll(async () => Math.abs((await back.boundingBox())!.y - lessonTop)).toBeLessThan(2);
 });
 
