@@ -61,8 +61,11 @@ export default function Curricula({
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy]);
-  const selection = useBulkSelection(editing?.id || "curricula");
   const all = data.curricula || [];
+  const selection = useBulkSelection(
+    editing?.id || "curricula",
+    editing ? editing.courseIds : all.map((c) => c.id),
+  );
   const content = data.publishedContent || data.content;
   const linked = (id: string) =>
     data.groups.filter((g) =>
@@ -204,7 +207,9 @@ export default function Curricula({
               />
             </ActionGroup>
             <BulkActions
-              selected={selection.selected}
+              singleItemActions={false}
+              collectionSize={selection.collectionSize}
+              selected={selection.actionIds}
               onSelectionChange={selection.setSelected}
               commands={[
                 {
@@ -218,7 +223,7 @@ export default function Curricula({
                     setEditing({
                       ...editing,
                       courseIds: editing.courseIds.filter(
-                        (id) => !selection.selected.includes(id),
+                        (id) => !selection.actionIds.includes(id),
                       ),
                     }),
                 },
@@ -320,7 +325,9 @@ export default function Curricula({
             </Button>
           </SectionHeader>
           <BulkActions
-            selected={selection.selected}
+            singleItemActions={false}
+            collectionSize={selection.collectionSize}
+            selected={selection.actionIds}
             onSelectionChange={selection.setSelected}
             noun="curricula"
             commands={[
@@ -335,7 +342,7 @@ export default function Curricula({
                     published &&
                     all.some(
                       (c) =>
-                        selection.selected.includes(c.id) &&
+                        selection.actionIds.includes(c.id) &&
                         (!c.courseIds.length ||
                           c.courseIds.some(
                             (id) =>
@@ -350,7 +357,7 @@ export default function Curricula({
                     );
                   if (
                     !published &&
-                    selection.selected.some((id) => linked(id).length)
+                    selection.actionIds.some((id) => linked(id).length)
                   )
                     throw new Error(
                       "Remove learning-group links before unpublishing these curricula.",
@@ -358,25 +365,27 @@ export default function Curricula({
                   await onChange({
                     ...data,
                     curricula: all.map((c) =>
-                      selection.selected.includes(c.id)
+                      selection.actionIds.includes(c.id)
                         ? { ...c, status: published ? "published" : "draft" }
                         : c,
                     ),
                   });
                 },
               })),
-              ...curriculumGroupCommands(data, selection.selected, onChange),
+              ...curriculumGroupCommands(data, selection.actionIds, onChange),
             ]}
           />
-          <div className="flex items-center gap-3">
-            <SelectRows
-              label="Select all curricula"
-              ids={all.map((c) => c.id)}
-              value={selection.selected}
-              onChange={selection.setSelected}
-            />
-            Select all curricula
-          </div>
+          {selection.canSelect && (
+            <div className="flex items-center gap-3">
+              <SelectRows
+                label="Select all curricula"
+                ids={all.map((c) => c.id)}
+                value={selection.selected}
+                onChange={selection.setSelected}
+              />
+              Select all curricula
+            </div>
+          )}
           <div className="group-grid">
             {all.map((c) => (
               <Card className="flex flex-col p-0 sm:p-0" key={c.id}>
@@ -387,13 +396,15 @@ export default function Curricula({
                     {c.status}
                   </Badge>
                   <div className="flex items-center gap-3">
-                    <Checkbox
-                      aria-label={`Select ${c.name}`}
-                      checked={selection.selected.includes(c.id)}
-                      onCheckedChange={(v) =>
-                        selection.toggle(c.id, v === true)
-                      }
-                    />
+                    {selection.canSelect && (
+                      <Checkbox
+                        aria-label={`Select ${c.name}`}
+                        checked={selection.selected.includes(c.id)}
+                        onCheckedChange={(v) =>
+                          selection.toggle(c.id, v === true)
+                        }
+                      />
+                    )}
                     <h3>{c.name}</h3>
                   </div>
                   <p>{c.description}</p>

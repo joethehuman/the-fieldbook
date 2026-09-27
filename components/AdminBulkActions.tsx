@@ -6,6 +6,7 @@ import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
 export function AdminBulkActions({
   data,
   selected,
+  collectionSize,
   onSelectionChange,
   onBulk,
   entity = "content",
@@ -14,6 +15,7 @@ export function AdminBulkActions({
 }: {
   data: Workspace;
   selected: string[];
+  collectionSize: number;
   onSelectionChange: (ids: string[]) => void;
   onBulk: BulkHandler;
   entity?: "content" | "user";
@@ -134,6 +136,7 @@ export function AdminBulkActions({
       ];
   return (
     <BulkActions
+      collectionSize={collectionSize}
       selected={selected}
       onSelectionChange={onSelectionChange}
       commands={commands}

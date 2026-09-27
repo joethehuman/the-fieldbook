@@ -308,6 +308,8 @@ Bulk actions live in the screen that owns the records or relationships. There ar
 
 ### 1. Select existing rows → Bulk actions
 
+**Collection-size rule:** Show bulk row checkboxes, select-page/select-all controls and the Bulk actions bar only when the full matching collection contains more than one item. Count before pagination, never by selected count. Zero items shows no selection controls; one item retains ordinary item actions. Where no equivalent row/editor actions exist, reuse the shared command menu labeled **Actions**, without a selection bar; do not duplicate existing controls. Add/create controls remain available. In Add pickers keep the individual choice input and Apply for one candidate, but hide batch selection helpers for zero/one matching choices. Preserve Review/Clear when selections span searches.
+
 Use `SelectRows` / row `Checkbox` controls with `useBulkSelection`, then `BulkActions`. Show one contextual bar: selected count, **Bulk actions**, and Clear selection. Put every command affecting that selection in the menu. Never add a parallel row of bulk command buttons or ask users to select the same records again in a dialog.
 
 Use `SelectableRows` for compact relationship lists, the declared `DataTable` schema for tables, and optional selection on `OrderedLearning` or `HierarchyList` for those layouts. Selecting a parent never implicitly selects descendants. A header checkbox selects the current page; an explicit **Select all N matching** action may extend the scope. Keep selection across pages, clear it when the owning record, tab, search or filter changes, and briefly announce that reset.

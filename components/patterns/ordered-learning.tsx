@@ -1,6 +1,6 @@
 "use client";
 import { Checkbox } from "../ui/choice";
-import { SelectRows } from "./bulk-selection";
+import { canBulkSelect, SelectRows } from "./bulk-selection";
 import { ReorderRow } from "./reorder-row";
 import type { ReactNode } from "react";
 import { useRowReorder } from "./use-row-reorder";
@@ -39,7 +39,7 @@ export function OrderedLearning({
   }
   return (
     <>
-      {selected && onSelectionChange && (
+      {canBulkSelect(items.length) && selected && onSelectionChange && (
         <div className="flex items-center gap-3">
           <SelectRows
             ids={items.map((i) => i.id)}
@@ -81,19 +81,21 @@ export function OrderedLearning({
             }
             title={
               <>
-                {selected && onSelectionChange && (
-                  <Checkbox
-                    aria-label={`Select ${item.label}`}
-                    checked={selected.includes(item.id)}
-                    onCheckedChange={(v) =>
-                      onSelectionChange(
-                        v === true
-                          ? [...selected, item.id]
-                          : selected.filter((id) => id !== item.id),
-                      )
-                    }
-                  />
-                )}
+                {canBulkSelect(items.length) &&
+                  selected &&
+                  onSelectionChange && (
+                    <Checkbox
+                      aria-label={`Select ${item.label}`}
+                      checked={selected.includes(item.id)}
+                      onCheckedChange={(v) =>
+                        onSelectionChange(
+                          v === true
+                            ? [...selected, item.id]
+                            : selected.filter((id) => id !== item.id),
+                        )
+                      }
+                    />
+                  )}
                 <span className="mr-2 text-xs text-muted-foreground">
                   {index + 1}
                 </span>

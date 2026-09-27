@@ -32,7 +32,6 @@ export function RecentlyDeleted({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
-  const selection = useBulkSelection(filter + query);
   const displayData = {
     ...data,
     deletedItems: data.deletedItems?.map((d) => ({
@@ -44,6 +43,13 @@ export function RecentlyDeleted({
     (d) =>
       (filter === "all" || d.entity === filter) &&
       d.name.toLowerCase().includes(query.toLowerCase()),
+  );
+  const selection = useBulkSelection(
+    filter + query,
+    rows.map((d) => d.id),
+    rows
+      .filter((d) => !d.purging && Date.parse(d.purgeAfter) > Date.now())
+      .map((d) => d.id),
   );
   rows.sort((a, b) =>
     sort === "name"
@@ -103,7 +109,8 @@ export function RecentlyDeleted({
       </FormField>
       <AdminBulkActions
         data={displayData}
-        selected={selection.selected}
+        collectionSize={selection.collectionSize}
+        selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
         recovery
         onBulk={async (request) => {
@@ -128,16 +135,18 @@ export function RecentlyDeleted({
           <TableHeader>
             <TableRow>
               <TableHead>
-                <SelectRows
-                  ids={visible
-                    .filter(
-                      (d) =>
-                        !d.purging && Date.parse(d.purgeAfter) > Date.now(),
-                    )
-                    .map((d) => d.id)}
-                  value={selection.selected}
-                  onChange={selection.setSelected}
-                />
+                {selection.canSelect && (
+                  <SelectRows
+                    ids={visible
+                      .filter(
+                        (d) =>
+                          !d.purging && Date.parse(d.purgeAfter) > Date.now(),
+                      )
+                      .map((d) => d.id)}
+                    value={selection.selected}
+                    onChange={selection.setSelected}
+                  />
+                )}
               </TableHead>
               <TableHead>Item</TableHead>
               <TableHead>Deleted</TableHead>
@@ -149,14 +158,18 @@ export function RecentlyDeleted({
             {visible.map((d) => (
               <TableRow key={`${d.entity}:${d.id}`}>
                 <TableCell>
-                  <Checkbox
-                    aria-label={`Select ${d.name}`}
-                    disabled={
-                      d.purging || Date.parse(d.purgeAfter) <= Date.now()
-                    }
-                    checked={selection.selected.includes(d.id)}
-                    onCheckedChange={(v) => selection.toggle(d.id, v === true)}
-                  />
+                  {selection.canSelect && (
+                    <Checkbox
+                      aria-label={`Select ${d.name}`}
+                      disabled={
+                        d.purging || Date.parse(d.purgeAfter) <= Date.now()
+                      }
+                      checked={selection.selected.includes(d.id)}
+                      onCheckedChange={(v) =>
+                        selection.toggle(d.id, v === true)
+                      }
+                    />
+                  )}
                 </TableCell>
                 <TableCell>
                   <strong>{d.name}</strong>

@@ -26,7 +26,13 @@ export function PendingPeople({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [query, setQuery] = useState("");
-  const selection = useBulkSelection("pending" + query);
+  const rows = (data.pendingUsers || []).filter((p) =>
+    (p.name + " " + p.email).toLowerCase().includes(query.toLowerCase()),
+  );
+  const selection = useBulkSelection(
+    "pending" + query,
+    rows.map((p) => p.email),
+  );
   async function save(person: Pending, revoke = false) {
     setBusy(true);
     setError("");
@@ -78,38 +84,33 @@ export function PendingPeople({
         />
       </FormField>
       <BulkActions
-        selected={selection.selected}
+        collectionSize={selection.collectionSize}
+        selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
         noun="pending accounts"
-        commands={peopleCommands(data, selection.selected, onChange, true)}
+        commands={peopleCommands(data, selection.actionIds, onChange, true)}
       />
       <SelectableRows
         label="Pending accounts"
         selected={selection.selected}
         onChange={selection.setSelected}
         scope={query}
-        rows={(data.pendingUsers || [])
-          .filter((p) =>
-            (p.name + " " + p.email)
-              .toLowerCase()
-              .includes(query.toLowerCase()),
-          )
-          .map((p) => ({
-            id: p.email,
-            label: p.name,
-            detail: (
-              <>
-                {p.email} · {p.role}{" "}
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => setEditing(p)}
-                >
-                  Edit {p.name}
-                </Button>
-              </>
-            ),
-          }))}
+        rows={rows.map((p) => ({
+          id: p.email,
+          label: p.name,
+          detail: (
+            <>
+              {p.email} · {p.role}{" "}
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => setEditing(p)}
+              >
+                Edit {p.name}
+              </Button>
+            </>
+          ),
+        }))}
       />
       {editing && (
         <form

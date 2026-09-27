@@ -17,7 +17,13 @@ import {
   type SelectionOption,
 } from "./searchable-selection-list";
 
-export function useBulkSelection(scope: string) {
+/** Count the full matching collection, never just the current page or selection. */
+export const canBulkSelect = (count: number) => count > 1;
+export function useBulkSelection(
+  scope: string,
+  ids: string[],
+  eligibleIds = ids,
+) {
   const [selected, setSelected] = useState<string[]>([]);
   const [notice, setNotice] = useState("");
   const previous = useRef(scope);
@@ -37,8 +43,17 @@ export function useBulkSelection(scope: string) {
     const timer = setTimeout(() => setNotice(""), 4000);
     return () => clearTimeout(timer);
   }, [notice]);
+  useEffect(() => {
+    if (!canBulkSelect(ids.length) && selected.length) setSelected([]);
+  }, [ids.length, selected.length]);
   return {
-    selected,
+    selected: selected.filter((id) => eligibleIds.includes(id)),
+    actionIds:
+      ids.length === 1
+        ? eligibleIds
+        : selected.filter((id) => eligibleIds.includes(id)),
+    collectionSize: ids.length,
+    canSelect: canBulkSelect(ids.length),
     setSelected,
     notice,
     toggle: (id: string, checked: boolean) => {

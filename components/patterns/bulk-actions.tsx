@@ -5,6 +5,7 @@ import {
   SearchableSelectionList,
   type SelectionOption,
 } from "./searchable-selection-list";
+import { ActionGroup } from "../ui/action-group";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/choice";
 import { Field } from "../ui/field";
@@ -39,9 +40,7 @@ export type BulkCommand = {
   selectionMode?: "single" | "multiple";
   field?: "date";
   fieldLabel?: string;
-  apply: (
-    values: string[],
-  ) => Promise<void | {
+  apply: (values: string[]) => Promise<void | {
     failed: string[];
     message: string;
     details?: string[];
@@ -50,12 +49,17 @@ export type BulkCommand = {
 /** Existing rows -> one menu. Target choices are parameters, never a second row selection. */
 export function BulkActions({
   selected,
+  collectionSize,
+  singleItemActions = true,
   onSelectionChange,
   commands,
   noun = "items",
   children,
 }: {
   selected: string[];
+  collectionSize: number;
+  /** Omit the fallback when ordinary row/editor actions already cover this collection. */
+  singleItemActions?: boolean;
   onSelectionChange: (ids: string[]) => void;
   commands: BulkCommand[];
   noun?: string;
@@ -76,51 +80,63 @@ export function BulkActions({
     details?: string[];
   } | null>(null);
   const command = active?.command;
+  const commandLabel = (c: BulkCommand) =>
+    collectionSize === 1 ? c.label.replace(/\bselected ?/, "").trim() : c.label;
+  const menu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="outline">
+          {collectionSize > 1 ? "Bulk actions" : "Actions"}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        {commands.map((c, i) => (
+          <div key={c.id}>
+            {c.destructive && !commands[i - 1]?.destructive && i > 0 && (
+              <DropdownMenuSeparator />
+            )}
+            <DropdownMenuItem
+              disabled={!!c.disabledReason}
+              className={
+                c.destructive
+                  ? "text-destructive focus:text-destructive"
+                  : undefined
+              }
+              onSelect={() => {
+                setActive({
+                  command: { ...c, label: commandLabel(c) },
+                  ids: [...selected],
+                });
+                setResultNotice(null);
+                setValues([]);
+                setAck(false);
+                setError("");
+              }}
+            >
+              {commandLabel(c)}
+            </DropdownMenuItem>
+            {c.disabledReason && (
+              <p className="px-3 pb-2 text-xs text-muted-foreground">
+                {c.disabledReason}
+              </p>
+            )}
+          </div>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   return (
     <>
-      <BulkSelectionBar
-        count={selected.length}
-        onClear={() => onSelectionChange([])}
-      >
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button type="button" variant="outline">
-              Bulk actions
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {commands.map((c, i) => (
-              <div key={c.id}>
-                {c.destructive && !commands[i - 1]?.destructive && i > 0 && (
-                  <DropdownMenuSeparator />
-                )}
-                <DropdownMenuItem
-                  disabled={!!c.disabledReason}
-                  className={
-                    c.destructive
-                      ? "text-destructive focus:text-destructive"
-                      : undefined
-                  }
-                  onSelect={() => {
-                    setActive({ command: c, ids: [...selected] });
-                    setResultNotice(null);
-                    setValues([]);
-                    setAck(false);
-                    setError("");
-                  }}
-                >
-                  {c.label}
-                </DropdownMenuItem>
-                {c.disabledReason && (
-                  <p className="px-3 pb-2 text-xs text-muted-foreground">
-                    {c.disabledReason}
-                  </p>
-                )}
-              </div>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </BulkSelectionBar>
+      {collectionSize > 1 ? (
+        <BulkSelectionBar
+          count={selected.length}
+          onClear={() => onSelectionChange([])}
+        >
+          {menu}
+        </BulkSelectionBar>
+      ) : singleItemActions && collectionSize === 1 && selected.length === 1 ? (
+        <ActionGroup>{menu}</ActionGroup>
+      ) : null}
       {resultNotice && (
         <Alert variant="destructive">
           <p>{resultNotice.message}</p>

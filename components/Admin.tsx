@@ -334,6 +334,7 @@ export default function Admin({
       contentStatus,
       contentSection,
     ].join("|"),
+    (tab === "people" ? peopleRows : contentRows).map((row) => row.id),
   );
   useEffect(() => {
     setPage(1);
@@ -822,12 +823,13 @@ export default function Admin({
               </FilterBar>
               <AdminBulkActions
                 data={data}
-                selected={selection.selected}
+                collectionSize={selection.collectionSize}
+                selected={selection.actionIds}
                 onSelectionChange={selection.setSelected}
                 onBulk={onBulk}
                 extraCommands={contentRelationshipCommands(
                   data,
-                  selection.selected,
+                  selection.actionIds,
                   onChange,
                   manageLearningMany,
                 )}
@@ -837,12 +839,14 @@ export default function Admin({
                   <TableHeader>
                     <TableRow>
                       <TableHead>
-                        <SelectRows
-                          label="Select this page"
-                          ids={contentPage.map((row) => row.id)}
-                          value={selection.selected}
-                          onChange={selection.setSelected}
-                        />
+                        {selection.canSelect && (
+                          <SelectRows
+                            label="Select this page"
+                            ids={contentPage.map((row) => row.id)}
+                            value={selection.selected}
+                            onChange={selection.setSelected}
+                          />
+                        )}
                       </TableHead>
                       <TableHead>Content</TableHead>
                       <TableHead>Type</TableHead>
@@ -857,13 +861,15 @@ export default function Admin({
                     {contentPage.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell>
-                          <Checkbox
-                            aria-label={`Select ${c.title}`}
-                            checked={selection.selected.includes(c.id)}
-                            onCheckedChange={(v) =>
-                              selection.toggle(c.id, v === true)
-                            }
-                          />
+                          {selection.canSelect && (
+                            <Checkbox
+                              aria-label={`Select ${c.title}`}
+                              checked={selection.selected.includes(c.id)}
+                              onCheckedChange={(v) =>
+                                selection.toggle(c.id, v === true)
+                              }
+                            />
+                          )}
                         </TableCell>
                         <TableCell>
                           <strong>{c.title}</strong>
@@ -1106,7 +1112,8 @@ export default function Admin({
               <PeopleBulkActions
                 currentUserId={user.id}
                 data={data}
-                selected={selection.selected}
+                collectionSize={selection.collectionSize}
+                selected={selection.actionIds}
                 onChange={onChange}
                 onSelectionChange={selection.setSelected}
                 onBulk={onBulk}
@@ -1116,12 +1123,14 @@ export default function Admin({
                   <TableHeader>
                     <TableRow>
                       <TableHead>
-                        <SelectRows
-                          label="Select this page"
-                          ids={peoplePage.map((row) => row.id)}
-                          value={selection.selected}
-                          onChange={selection.setSelected}
-                        />
+                        {selection.canSelect && (
+                          <SelectRows
+                            label="Select this page"
+                            ids={peoplePage.map((row) => row.id)}
+                            value={selection.selected}
+                            onChange={selection.setSelected}
+                          />
+                        )}
                       </TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Access</TableHead>
@@ -1136,13 +1145,15 @@ export default function Admin({
                     {peoplePage.map((u) => (
                       <TableRow key={u.id}>
                         <TableCell>
-                          <Checkbox
-                            aria-label={`Select ${u.name}`}
-                            checked={selection.selected.includes(u.id)}
-                            onCheckedChange={(v) =>
-                              selection.toggle(u.id, v === true)
-                            }
-                          />
+                          {selection.canSelect && (
+                            <Checkbox
+                              aria-label={`Select ${u.name}`}
+                              checked={selection.selected.includes(u.id)}
+                              onCheckedChange={(v) =>
+                                selection.toggle(u.id, v === true)
+                              }
+                            />
+                          )}
                         </TableCell>
                         <TableCell>
                           <strong>{u.name}</strong>

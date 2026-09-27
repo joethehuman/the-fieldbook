@@ -15,9 +15,13 @@ import type { Branding } from "@/lib/branding";
 import { request, RequestError } from "@/lib/workspace-save";
 import { useEffect, useState } from "react";
 export default function Connections({ branding }: { branding: Branding }) {
-  const selection = useBulkSelection("connections");
   const [items, setItems] = useState<any[]>([]),
     [error, setError] = useState("");
+  const selection = useBulkSelection(
+    "connections",
+    items.map((c) => c.client_id),
+    items.filter((c) => c.enabled).map((c) => c.client_id),
+  );
   const [loading, setLoading] = useState(true);
   const [revoking, setRevoking] = useState<string | null>(null);
   async function load() {
@@ -71,7 +75,9 @@ export default function Connections({ branding }: { branding: Branding }) {
         </div>
       )}
       <BulkActions
-        selected={selection.selected}
+        singleItemActions={false}
+        collectionSize={selection.collectionSize}
+        selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
         noun="connections"
         commands={[
@@ -84,7 +90,7 @@ export default function Connections({ branding }: { branding: Branding }) {
             acknowledgment: "I understand these connections will lose access.",
             apply: async () => {
               const failed: string[] = [];
-              for (const clientId of selection.selected) {
+              for (const clientId of selection.actionIds) {
                 try {
                   await request("/api/connections", { clientId });
                 } catch {
@@ -94,13 +100,13 @@ export default function Connections({ branding }: { branding: Branding }) {
               await load();
               return {
                 failed,
-                message: `${selection.selected.length - failed.length} connections revoked; ${failed.length} could not be fully confirmed. Review provider consent before reconnecting.`,
+                message: `${selection.actionIds.length - failed.length} connections revoked; ${failed.length} could not be fully confirmed. Review provider consent before reconnecting.`,
               };
             },
           },
         ]}
       />
-      {!!items.length && (
+      {selection.canSelect && (
         <div className="flex items-center gap-3">
           <SelectRows
             label="Select active connections"
@@ -114,12 +120,18 @@ export default function Connections({ branding }: { branding: Branding }) {
       {items.map((c) => (
         <Card className="grid gap-4" key={c.client_id}>
           <div className="flex items-center gap-3">
-            <Checkbox
-              aria-label={`Select ${c.client_name}`}
-              disabled={!c.enabled && !selection.selected.includes(c.client_id)}
-              checked={selection.selected.includes(c.client_id)}
-              onCheckedChange={(v) => selection.toggle(c.client_id, v === true)}
-            />
+            {selection.canSelect && (
+              <Checkbox
+                aria-label={`Select ${c.client_name}`}
+                disabled={
+                  !c.enabled && !selection.selected.includes(c.client_id)
+                }
+                checked={selection.selected.includes(c.client_id)}
+                onCheckedChange={(v) =>
+                  selection.toggle(c.client_id, v === true)
+                }
+              />
+            )}
             <h2>{c.client_name}</h2>
           </div>
           <p>{c.enabled ? "Connected" : "Revoked"}</p>

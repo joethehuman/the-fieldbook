@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, type ReactNode } from "react";
 import { Checkbox } from "../ui/choice";
-import { SelectRows } from "./bulk-selection";
+import { canBulkSelect, SelectRows } from "./bulk-selection";
 import { Button } from "../ui/button";
 import { Pagination } from "./pagination";
 export function SelectableRows({
@@ -29,42 +29,46 @@ export function SelectableRows({
   const eligible = rows.filter((r) => !r.disabledReason);
   return (
     <div className="grid gap-3" role="group" aria-label={label}>
-      <div className="flex flex-wrap items-center gap-3">
-        <SelectRows
-          label={`Select this page of ${label}`}
-          ids={shown.filter((r) => !r.disabledReason).map((r) => r.id)}
-          value={selected}
-          onChange={onChange}
-        />
-        <span>Select this page</span>
-        {eligible.length > 25 && (
-          <Button
-            type="button"
-            variant="link"
-            onClick={() => onChange(eligible.map((r) => r.id))}
-          >
-            Select all {eligible.length} matching items
-          </Button>
-        )}
-      </div>
+      {canBulkSelect(rows.length) && (
+        <div className="flex flex-wrap items-center gap-3">
+          <SelectRows
+            label={`Select this page of ${label}`}
+            ids={shown.filter((r) => !r.disabledReason).map((r) => r.id)}
+            value={selected}
+            onChange={onChange}
+          />
+          <span>Select this page</span>
+          {eligible.length > 25 && (
+            <Button
+              type="button"
+              variant="link"
+              onClick={() => onChange(eligible.map((r) => r.id))}
+            >
+              Select all {eligible.length} matching items
+            </Button>
+          )}
+        </div>
+      )}
       <ul className="grid gap-2">
         {shown.map((r) => (
           <li
             key={r.id}
             className="flex items-start gap-3 rounded-md border border-border p-3"
           >
-            <Checkbox
-              aria-label={`Select ${r.label}`}
-              disabled={!!r.disabledReason}
-              checked={selected.includes(r.id)}
-              onCheckedChange={(v) =>
-                onChange(
-                  v === true
-                    ? [...new Set([...selected, r.id])]
-                    : selected.filter((id) => id !== r.id),
-                )
-              }
-            />
+            {canBulkSelect(rows.length) && (
+              <Checkbox
+                aria-label={`Select ${r.label}`}
+                disabled={!!r.disabledReason}
+                checked={selected.includes(r.id)}
+                onCheckedChange={(v) =>
+                  onChange(
+                    v === true
+                      ? [...new Set([...selected, r.id])]
+                      : selected.filter((id) => id !== r.id),
+                  )
+                }
+              />
+            )}
             <div className="min-w-0 [overflow-wrap:anywhere]">
               <strong>{r.label}</strong>
               {r.detail && (

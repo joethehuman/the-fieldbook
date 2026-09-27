@@ -121,6 +121,33 @@ test("bulk content group assignment preserves complete organization; pending bat
       expect(data.pendingUsers!.every((p) => p.groups.includes(group.id))).toBe(
         true,
       );
+      const pending = page.locator("#pending-accounts");
+      await pending
+        .getByRole("searchbox", { name: "Find a pending account" })
+        .fill("Pending one");
+      await expect(pending.getByRole("checkbox")).toHaveCount(0);
+      await expect(
+        pending.getByRole("button", { name: "Bulk actions", exact: true }),
+      ).toHaveCount(0);
+      await pending
+        .getByRole("button", { name: "Actions", exact: true })
+        .click();
+      await page
+        .getByRole("menuitem", {
+          name: "Remove from learning groups",
+          exact: true,
+        })
+        .click();
+      await dialog
+        .getByRole("checkbox", { name: group.name, exact: true })
+        .check();
+      await dialog
+        .getByRole("button", { name: "Apply changes", exact: true })
+        .click();
+      await expect(dialog).toHaveCount(0);
+      expect(writes).toBe(4);
+      expect(data.pendingUsers![0].groups).not.toContain(group.id);
+      expect(data.pendingUsers![1].groups).toContain(group.id);
     }
   }
   expect(

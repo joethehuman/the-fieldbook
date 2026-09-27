@@ -121,6 +121,7 @@ export function peopleCommands(
 export function PeopleBulkActions({
   data,
   selected,
+  collectionSize,
   onChange,
   onSelectionChange,
   onBulk,
@@ -128,6 +129,7 @@ export function PeopleBulkActions({
 }: {
   data: Workspace;
   selected: string[];
+  collectionSize: number;
   onChange: (data: Workspace) => void | Promise<void>;
   onSelectionChange: (ids: string[]) => void;
   onBulk: BulkHandler;
@@ -136,6 +138,7 @@ export function PeopleBulkActions({
   return (
     <AdminBulkActions
       data={data}
+      collectionSize={collectionSize}
       selected={selected}
       onSelectionChange={onSelectionChange}
       onBulk={onBulk}

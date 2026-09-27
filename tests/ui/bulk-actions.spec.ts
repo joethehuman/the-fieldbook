@@ -55,14 +55,12 @@ test("content selection, explicit deletion, recovery and clean navigation", asyn
   await expect(
     page.getByRole("cell", { name: "Bulk recovery fixture Doc", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("checkbox", {
-      name: "Select Bulk recovery fixture",
-      exact: true,
-    })
-    .check();
-  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Restore selected" }).click();
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Bulk actions", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Restore", exact: true }).click();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Apply changes", exact: true })
@@ -108,7 +106,7 @@ test("all matching selection crosses pages and group pickers wait for Apply", as
     teamId: undefined,
   });
   const sample = data.content.find((c) => c.kind === "brief")!;
-  data.content = Array.from({ length: 32 }, (_, i) => ({
+  data.content = Array.from({ length: 26 }, (_, i) => ({
     ...sample,
     id: `bulk-${i}`,
     title: `Bulk update ${String(i).padStart(2, "0")}`,
@@ -125,11 +123,24 @@ test("all matching selection crosses pages and group pickers wait for Apply", as
     page.getByRole("region", { name: "Selected items" }),
   ).toContainText("25 selected");
   await page
-    .getByRole("button", { name: "Select all 32 matching items" })
+    .getByRole("button", { name: "Select all 26 matching items" })
     .click();
   await expect(
     page.getByRole("region", { name: "Selected items" }),
-  ).toContainText("32 selected");
+  ).toContainText("26 selected");
+  await page
+    .getByRole("navigation", { name: "Content pages" })
+    .getByRole("button", { name: "Next", exact: true })
+    .click();
+  await expect(
+    page.getByRole("checkbox", { name: "Select this page", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("checkbox", { name: "Select Bulk update 25", exact: true }),
+  ).toBeChecked();
+  await expect(
+    page.getByRole("region", { name: "Selected items" }),
+  ).toContainText("26 selected");
   await section(page, "Learning groups");
   await page
     .getByRole("button", { name: /^Manage / })
@@ -262,9 +273,10 @@ test("group learning, Updates and linked teams use selected rows", async ({
   await expect(page.locator(".learning-order li")).toHaveCount(0);
   await page.getByRole("tab", { name: "Updates", exact: true }).click();
   await page.getByRole("button", { name: "Add Updates", exact: true }).click();
-  await dialog
-    .getByRole("checkbox", { name: "Select this page", exact: true })
-    .check();
+  await expect(
+    dialog.getByRole("checkbox", { name: "Select this page", exact: true }),
+  ).toHaveCount(0);
+  await dialog.getByRole("checkbox").check();
   await dialog.getByRole("button", { name: /^Add Updates / }).click();
   await page
     .getByRole("checkbox", {
@@ -283,5 +295,117 @@ test("group learning, Updates and linked teams use selected rows", async ({
       name: "Select this page of Linked teams",
       exact: true,
     }),
+  ).toHaveCount(0);
+});
+
+test("collection size controls bulk visibility and keeps single-item actions", async ({
+  page,
+}, info) => {
+  await page.goto("/ui");
+  const example = page.getByRole("region", { name: "Bulk selection example" });
+  await example
+    .getByRole("checkbox", { name: "Select Example course 1", exact: true })
+    .check();
+  // One selected out of three still has the bulk menu.
+  await expect(
+    example.getByRole("button", { name: "Bulk actions", exact: true }),
   ).toBeVisible();
+  await example
+    .getByRole("checkbox", { name: "Select Example course 2", exact: true })
+    .check();
+  await example
+    .getByRole("button", { name: "Bulk actions", exact: true })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Remove from example", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Apply changes" })
+    .click();
+  await expect(example.getByRole("checkbox")).toHaveCount(0);
+  await expect(
+    example.getByRole("region", { name: "Selected items" }),
+  ).toHaveCount(0);
+  await example.getByRole("button", { name: "Actions", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Remove from example", exact: true })
+    .click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Apply changes" })
+    .click();
+  await expect(example.getByText("No items in this list.")).toBeVisible();
+  await expect(example.getByRole("checkbox")).toHaveCount(0);
+  await expect(
+    example.getByRole("button", { name: "Actions", exact: true }),
+  ).toHaveCount(0);
+  await example
+    .getByRole("button", { name: "Add example courses", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("searchbox").fill("Example course 22");
+  await expect(
+    dialog.getByRole("checkbox", { name: "Select this page", exact: true }),
+  ).toHaveCount(0);
+  await dialog
+    .getByRole("checkbox", { name: "Example course 22", exact: true })
+    .check();
+  await dialog
+    .getByRole("button", { name: "Add courses 1", exact: true })
+    .click();
+  await expect(example.getByRole("checkbox")).toHaveCount(0);
+  await expect(
+    example.getByText("Example course 22", { exact: true }),
+  ).toBeVisible();
+  await example.screenshot({
+    path: info.outputPath("single-item-catalog.png"),
+  });
+});
+
+test("single curriculum and empty or single linked teams have no bulk controls", async ({
+  page,
+}, info) => {
+  const data = freshWorkspace();
+  data.curricula = data.curricula!.slice(0, 1);
+  const group = data.groups[0];
+  group.teamIds = [];
+  await page.addInitScript((workspace) => {
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+  }, data);
+  await page.goto("/#admin");
+  await section(page, "Curricula");
+  await expect(page.getByRole("checkbox")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Create curriculum", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({ path: info.outputPath("single-curriculum.png") });
+  await section(page, "Learning groups");
+  await page
+    .getByRole("button", { name: `Manage ${group.name}`, exact: true })
+    .click();
+  await page.getByRole("tab", { name: "Members", exact: true }).click();
+  const teams = page.getByRole("group", { name: "Linked teams", exact: true });
+  await expect(teams.getByRole("checkbox")).toHaveCount(0);
+  await page.getByRole("button", { name: "Add teams", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("checkbox", { name: data.teams![0].name, exact: true })
+    .check();
+  await dialog
+    .getByRole("button", { name: "Add teams 1", exact: true })
+    .click();
+  await expect(teams.getByRole("checkbox")).toHaveCount(0);
+  await expect(teams).toContainText(data.teams![0].name);
+  await page.screenshot({ path: info.outputPath("single-linked-team.png") });
+  // Only the teams list has a single-item menu in this fixture.
+  await page.getByRole("button", { name: "Actions", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Remove team links", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
+  await expect(teams).toContainText("No items in this list.");
 });

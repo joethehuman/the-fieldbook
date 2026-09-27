@@ -1,7 +1,7 @@
 "use client";
 import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
-import { SelectRows } from "./bulk-selection";
+import { canBulkSelect, SelectRows } from "./bulk-selection";
 import { Checkbox } from "../ui/choice";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -86,20 +86,22 @@ export function HierarchyList({
           >
             <li>
               <div className="flex min-w-0 items-start gap-2 border-b border-border px-3 py-3 last:border-b-0">
-                {selected && onSelectionChange && (
-                  <Checkbox
-                    aria-label={`Select ${item.label}`}
-                    disabled={disabled}
-                    checked={selected.includes(item.id)}
-                    onCheckedChange={(v) =>
-                      onSelectionChange(
-                        v === true
-                          ? [...selected, item.id]
-                          : selected.filter((id) => id !== item.id),
-                      )
-                    }
-                  />
-                )}
+                {canBulkSelect(matches.length) &&
+                  selected &&
+                  onSelectionChange && (
+                    <Checkbox
+                      aria-label={`Select ${item.label}`}
+                      disabled={disabled}
+                      checked={selected.includes(item.id)}
+                      onCheckedChange={(v) =>
+                        onSelectionChange(
+                          v === true
+                            ? [...selected, item.id]
+                            : selected.filter((id) => id !== item.id),
+                        )
+                      }
+                    />
+                  )}
                 {hasChildren ? (
                   <CollapsibleTrigger asChild>
                     <Button
@@ -173,8 +175,9 @@ export function HierarchyList({
           placeholder="Team name or manager"
         />
       </FormField>
-      {selectionActions}
-      {selected && onSelectionChange && (
+      {(canBulkSelect(matches.length) || items.length === 1) &&
+        selectionActions}
+      {canBulkSelect(matches.length) && selected && onSelectionChange && (
         <div className="flex items-center gap-3">
           <SelectRows
             label="Select all matching teams"

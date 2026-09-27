@@ -2,6 +2,8 @@
 
 Administrators select rows where they already work. Content and People tables select the visible page; the action below the table explicitly selects all matching results. Changing a filter or administration section clears selection. Operations show counts and reasons for unsuccessful items. Refresh and review after an uncertain response before retrying.
 
+Bulk selection controls appear only when the matching list has at least two items, counting across all pages. Empty and single-item lists retain Add/create and individual actions.
+
 All commands affecting selected rows live in one **Bulk actions** menu. Delete is separated at the bottom. To add relationships that are not listed yet, use the screen’s **Add** picker: search, select a page or all matches, review selected items, and Apply. Cancel saves nothing. The [design-system contract](design-system.md#bulk-actions-two-supported-methods) defines these two reusable methods.
 
 - **Content:** publish saved drafts, unpublish, delete, or choose an existing category for Updates/Courses. Category changes require one content type; they cannot create categories. Docs use **Move to section**, including top-level sections and subsections. Metadata changes update both copies without publishing other draft edits, changing course versions, or resetting learning dates. Published Updates/Courses can be added to or removed from learning groups; Courses can be added to curricula. Bulk publication uses the usual validation and advances publication dates for Updates.

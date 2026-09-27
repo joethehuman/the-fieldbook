@@ -92,10 +92,6 @@ export function TeamsAdmin({
   const { confirm } = useInteractionDialog();
   const destination = useRevealTarget<HTMLElement>();
   const memberList = useRevealTarget<HTMLHeadingElement>();
-  const rosterSelection = useBulkSelection(
-    selected + tab + query + includeSubteams,
-  );
-  const teamSelection = useBulkSelection(selected);
   const team = teams.find((t) => t.id === selected);
   const dirty =
     moving?.choice != null ||
@@ -339,6 +335,15 @@ export function TeamsAdmin({
     )
     .sort(byName);
   const children = teams.filter((t) => t.parentId === selected).sort(byName);
+  const rosterSelection = useBulkSelection(
+    selected + tab + query + includeSubteams,
+    members.map((u) => u.id),
+    members.filter((u) => u.teamId === team?.id).map((u) => u.id),
+  );
+  const teamSelection = useBulkSelection(
+    selected,
+    teams.map((t) => t.id),
+  );
   const currentPage = Math.min(
     page,
     Math.max(1, Math.ceil(members.length / PAGE_SIZE)),
@@ -426,7 +431,9 @@ export function TeamsAdmin({
           <HierarchyList
             selectionActions={
               <BulkActions
-                selected={teamSelection.selected}
+                singleItemActions={false}
+                collectionSize={teamSelection.collectionSize}
+                selected={teamSelection.actionIds}
                 onSelectionChange={teamSelection.setSelected}
                 noun="teams"
                 commands={([true, false] as const).map((add) => ({
@@ -453,12 +460,12 @@ export function TeamsAdmin({
                                     ? [
                                         ...new Set([
                                           ...(g.teamIds || []),
-                                          ...teamSelection.selected,
+                                          ...teamSelection.actionIds,
                                         ]),
                                       ]
                                     : (g.teamIds || []).filter(
                                         (id) =>
-                                          !teamSelection.selected.includes(id),
+                                          !teamSelection.actionIds.includes(id),
                                       ),
                                 }
                               : g,
@@ -798,7 +805,9 @@ export function TeamsAdmin({
                   </FormField>
                 </FilterBar>
                 <BulkActions
-                  selected={rosterSelection.selected}
+                  singleItemActions={false}
+                  collectionSize={rosterSelection.collectionSize}
+                  selected={rosterSelection.actionIds}
                   onSelectionChange={rosterSelection.setSelected}
                   noun="members"
                   commands={[
@@ -813,7 +822,7 @@ export function TeamsAdmin({
                             {
                               ...data,
                               users: data.users.map((u) =>
-                                rosterSelection.selected.includes(u.id) &&
+                                rosterSelection.actionIds.includes(u.id) &&
                                 u.teamId === team.id
                                   ? { ...u, teamId: undefined }
                                   : u,
@@ -844,7 +853,7 @@ export function TeamsAdmin({
                             {
                               ...data,
                               users: data.users.map((u) =>
-                                rosterSelection.selected.includes(u.id) &&
+                                rosterSelection.actionIds.includes(u.id) &&
                                 u.teamId === team.id
                                   ? { ...u, teamId: ids[0] }
                                   : u,
@@ -866,18 +875,20 @@ export function TeamsAdmin({
                         <TableRow>
                           <TableHead>
                             <div className="flex items-center gap-3">
-                              <SelectRows
-                                label="Select this page of direct members"
-                                ids={members
-                                  .slice(
-                                    (currentPage - 1) * PAGE_SIZE,
-                                    currentPage * PAGE_SIZE,
-                                  )
-                                  .filter((u) => u.teamId === team.id)
-                                  .map((u) => u.id)}
-                                value={rosterSelection.selected}
-                                onChange={rosterSelection.setSelected}
-                              />
+                              {rosterSelection.canSelect && (
+                                <SelectRows
+                                  label="Select this page of direct members"
+                                  ids={members
+                                    .slice(
+                                      (currentPage - 1) * PAGE_SIZE,
+                                      currentPage * PAGE_SIZE,
+                                    )
+                                    .filter((u) => u.teamId === team.id)
+                                    .map((u) => u.id)}
+                                  value={rosterSelection.selected}
+                                  onChange={rosterSelection.setSelected}
+                                />
+                              )}
                               Person
                             </div>
                           </TableHead>
@@ -897,16 +908,18 @@ export function TeamsAdmin({
                             <TableRow key={u.id}>
                               <TableCell>
                                 <div className="flex items-center gap-3">
-                                  <Checkbox
-                                    aria-label={`Select ${u.name}`}
-                                    disabled={u.teamId !== team.id}
-                                    checked={rosterSelection.selected.includes(
-                                      u.id,
-                                    )}
-                                    onCheckedChange={(v) =>
-                                      rosterSelection.toggle(u.id, v === true)
-                                    }
-                                  />
+                                  {rosterSelection.canSelect && (
+                                    <Checkbox
+                                      aria-label={`Select ${u.name}`}
+                                      disabled={u.teamId !== team.id}
+                                      checked={rosterSelection.selected.includes(
+                                        u.id,
+                                      )}
+                                      onCheckedChange={(v) =>
+                                        rosterSelection.toggle(u.id, v === true)
+                                      }
+                                    />
+                                  )}
                                   <strong>{u.name}</strong>
                                 </div>
                                 {u.teamId !== team.id && (

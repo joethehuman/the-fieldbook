@@ -64,36 +64,38 @@ export function SearchableSelectionList({
           }}
         />
       </FormField>
-      {selectionMode === "multiple" && (
+      {selectionMode === "multiple" && options.length > 1 && (
         <div className="flex flex-wrap items-center gap-3">
-          <Field orientation="horizontal">
-            <Checkbox
-              aria-label="Select this page"
-              disabled={disabled || !matches.length}
-              checked={
-                matches
-                  .slice((currentPage - 1) * 10, currentPage * 10)
-                  .every((o) => value.includes(o.id)) && !!matches.length
-                  ? true
-                  : matches
-                        .slice((currentPage - 1) * 10, currentPage * 10)
-                        .some((o) => value.includes(o.id))
-                    ? "indeterminate"
-                    : false
-              }
-              onCheckedChange={(checked) => {
-                const ids = matches
-                  .slice((currentPage - 1) * 10, currentPage * 10)
-                  .map((o) => o.id);
-                onChange(
-                  checked === true
-                    ? [...new Set([...value, ...ids])]
-                    : value.filter((id) => !ids.includes(id)),
-                );
-              }}
-            />
-            Select this page
-          </Field>
+          {matches.length > 1 && (
+            <Field orientation="horizontal">
+              <Checkbox
+                aria-label="Select this page"
+                disabled={disabled || !matches.length}
+                checked={
+                  matches
+                    .slice((currentPage - 1) * 10, currentPage * 10)
+                    .every((o) => value.includes(o.id)) && !!matches.length
+                    ? true
+                    : matches
+                          .slice((currentPage - 1) * 10, currentPage * 10)
+                          .some((o) => value.includes(o.id))
+                      ? "indeterminate"
+                      : false
+                }
+                onCheckedChange={(checked) => {
+                  const ids = matches
+                    .slice((currentPage - 1) * 10, currentPage * 10)
+                    .map((o) => o.id);
+                  onChange(
+                    checked === true
+                      ? [...new Set([...value, ...ids])]
+                      : value.filter((id) => !ids.includes(id)),
+                  );
+                }}
+              />
+              Select this page
+            </Field>
+          )}
           {matches.length > 10 && (
             <Button
               type="button"

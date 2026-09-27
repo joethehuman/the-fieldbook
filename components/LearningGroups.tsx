@@ -67,11 +67,6 @@ export default function LearningGroups({
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const teamSelection = useBulkSelection(selected + tab);
-  const peopleSelection = useBulkSelection(selected + tab + query);
-  const learningSelection = useBulkSelection(selected + tab);
-  const updateSelection = useBulkSelection(selected + tab + query);
-  const overviewSelection = useBulkSelection(selected);
   const learnMany =
     onLearningMany ||
     (async (actions: import("@/lib/learning").LearningAction[]) => {
@@ -157,6 +152,47 @@ export default function LearningGroups({
   }
   const matches = (name: string) =>
     name.toLowerCase().includes(query.trim().toLowerCase());
+  const linkedTeams = (data.teams || []).filter((t) =>
+    group?.teamIds?.includes(t.id),
+  );
+  const groupMembers = data.users.filter(
+    (u) =>
+      group &&
+      effectiveGroups(u, data.groups).has(group.id) &&
+      matches(u.name + " " + u.email),
+  );
+  const groupUpdates = sortGroupBrowseItems(
+    published
+      .filter(
+        (c) =>
+          c.kind === "brief" &&
+          group &&
+          c.groups.includes(group.id) &&
+          matches(c.title),
+      )
+      .map((c) => ({ ...c, name: c.title })),
+    updateSort,
+  );
+  const teamSelection = useBulkSelection(
+    selected + tab,
+    linkedTeams.map((t) => t.id),
+  );
+  const peopleSelection = useBulkSelection(
+    selected + tab + query,
+    groupMembers.map((u) => u.id),
+    groupMembers
+      .filter((u) => group && u.groups.includes(group.id))
+      .map((u) => u.id),
+  );
+  const learningSelection = useBulkSelection(selected + tab, items.map(key));
+  const updateSelection = useBulkSelection(
+    selected + tab + query,
+    groupUpdates.map((c) => c.id),
+  );
+  const overviewSelection = useBulkSelection(
+    selected,
+    data.groups.map((g) => g.id),
+  );
   return (
     <section
       {...destination.targetProps}
@@ -223,37 +259,43 @@ export default function LearningGroups({
             </Button>
           </form>
           <BulkActions
-            selected={overviewSelection.selected}
+            singleItemActions={false}
+            collectionSize={overviewSelection.collectionSize}
+            selected={overviewSelection.actionIds}
             onSelectionChange={overviewSelection.setSelected}
             noun="groups"
             commands={groupLearningCommands(
               data,
-              overviewSelection.selected,
+              overviewSelection.actionIds,
               onChange,
               learnMany,
             )}
           />
-          <div className="flex items-center gap-3">
-            <SelectRows
-              label="Select all learning groups"
-              ids={data.groups.map((g) => g.id)}
-              value={overviewSelection.selected}
-              onChange={overviewSelection.setSelected}
-            />
-            Select all learning groups
-          </div>
+          {overviewSelection.canSelect && (
+            <div className="flex items-center gap-3">
+              <SelectRows
+                label="Select all learning groups"
+                ids={data.groups.map((g) => g.id)}
+                value={overviewSelection.selected}
+                onChange={overviewSelection.setSelected}
+              />
+              Select all learning groups
+            </div>
+          )}
           <div className="group-grid">
             {data.groups.map((g) => (
               <Card className="flex flex-col p-0 sm:p-0" key={g.id}>
                 <CardContent>
                   <div className="flex items-center gap-3">
-                    <Checkbox
-                      aria-label={`Select ${g.name}`}
-                      checked={overviewSelection.selected.includes(g.id)}
-                      onCheckedChange={(v) =>
-                        overviewSelection.toggle(g.id, v === true)
-                      }
-                    />
+                    {overviewSelection.canSelect && (
+                      <Checkbox
+                        aria-label={`Select ${g.name}`}
+                        checked={overviewSelection.selected.includes(g.id)}
+                        onCheckedChange={(v) =>
+                          overviewSelection.toggle(g.id, v === true)
+                        }
+                      />
+                    )}
                     <h3 className="font-semibold">{g.name}</h3>
                   </div>
                 </CardContent>
@@ -409,7 +451,8 @@ export default function LearningGroups({
                       />
                     </ActionGroup>
                     <BulkActions
-                      selected={teamSelection.selected}
+                      collectionSize={teamSelection.collectionSize}
+                      selected={teamSelection.actionIds}
                       onSelectionChange={teamSelection.setSelected}
                       commands={[
                         {
@@ -421,7 +464,7 @@ export default function LearningGroups({
                             if (
                               !(await bulkChangeGroup({
                                 teamIds: group.teamIds?.filter(
-                                  (id) => !teamSelection.selected.includes(id),
+                                  (id) => !teamSelection.actionIds.includes(id),
                                 ),
                               }))
                             )
@@ -432,9 +475,10 @@ export default function LearningGroups({
                     />
                     <SelectableRows
                       label="Linked teams"
-                      rows={(data.teams || [])
-                        .filter((t) => group.teamIds?.includes(t.id))
-                        .map((t) => ({ id: t.id, label: t.name }))}
+                      rows={linkedTeams.map((t) => ({
+                        id: t.id,
+                        label: t.name,
+                      }))}
                       selected={teamSelection.selected}
                       onChange={teamSelection.setSelected}
                     />
@@ -484,7 +528,8 @@ export default function LearningGroups({
                       />
                     </FormField>
                     <BulkActions
-                      selected={peopleSelection.selected}
+                      collectionSize={peopleSelection.collectionSize}
+                      selected={peopleSelection.actionIds}
                       onSelectionChange={peopleSelection.setSelected}
                       commands={[
                         {
@@ -497,7 +542,7 @@ export default function LearningGroups({
                               !(await bulkSave({
                                 ...data,
                                 users: data.users.map((u) =>
-                                  peopleSelection.selected.includes(u.id)
+                                  peopleSelection.actionIds.includes(u.id)
                                     ? {
                                         ...u,
                                         groups: u.groups.filter(
@@ -518,20 +563,14 @@ export default function LearningGroups({
                       scope={query}
                       selected={peopleSelection.selected}
                       onChange={peopleSelection.setSelected}
-                      rows={data.users
-                        .filter(
-                          (u) =>
-                            effectiveGroups(u, data.groups).has(group.id) &&
-                            matches(u.name + " " + u.email),
-                        )
-                        .map((u) => ({
-                          id: u.id,
-                          label: u.name,
-                          detail: u.email,
-                          disabledReason: !u.groups.includes(group.id)
-                            ? "Included through a team or child group; manage that source to remove membership."
-                            : undefined,
-                        }))}
+                      rows={groupMembers.map((u) => ({
+                        id: u.id,
+                        label: u.name,
+                        detail: u.email,
+                        disabledReason: !u.groups.includes(group.id)
+                          ? "Included through a team or child group; manage that source to remove membership."
+                          : undefined,
+                      }))}
                     />
                   </>
                 ) : tab === "learning" ? (
@@ -587,7 +626,9 @@ export default function LearningGroups({
                       </Note>
                     )}
                     <BulkActions
-                      selected={learningSelection.selected}
+                      singleItemActions={false}
+                      collectionSize={learningSelection.collectionSize}
+                      selected={learningSelection.actionIds}
                       onSelectionChange={learningSelection.setSelected}
                       commands={[
                         {
@@ -600,7 +641,7 @@ export default function LearningGroups({
                               !(await bulkChangeGroup({
                                 learningItems: items.filter(
                                   (i) =>
-                                    !learningSelection.selected.includes(
+                                    !learningSelection.actionIds.includes(
                                       key(i),
                                     ),
                                 ),
@@ -708,7 +749,8 @@ export default function LearningGroups({
                       </SelectField>
                     </FormField>
                     <BulkActions
-                      selected={updateSelection.selected}
+                      collectionSize={updateSelection.collectionSize}
+                      selected={updateSelection.actionIds}
                       onSelectionChange={updateSelection.setSelected}
                       commands={[
                         {
@@ -718,7 +760,7 @@ export default function LearningGroups({
                             "Remove direct audience links. Published Updates remain available to everyone allowed into the installation.",
                           apply: async () => {
                             await learnMany(
-                              updateSelection.selected.map((contentId) => ({
+                              updateSelection.actionIds.map((contentId) => ({
                                 operation: "untarget",
                                 contentId,
                                 groupId: group.id,
@@ -736,17 +778,7 @@ export default function LearningGroups({
                       scope={query}
                       selected={updateSelection.selected}
                       onChange={updateSelection.setSelected}
-                      rows={sortGroupBrowseItems(
-                        published
-                          .filter(
-                            (c) =>
-                              c.kind === "brief" &&
-                              c.groups.includes(group.id) &&
-                              matches(c.title),
-                          )
-                          .map((c) => ({ ...c, name: c.title })),
-                        updateSort,
-                      ).map((c) => ({
+                      rows={groupUpdates.map((c) => ({
                         id: c.id,
                         label: c.title,
                         detail: c.category,

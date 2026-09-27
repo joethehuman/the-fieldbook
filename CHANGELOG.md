@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Hide bulk selection controls for empty and single-item admin collections, retaining ordinary item actions and Add controls.
+
 - Standardized contextual bulk actions and multi-select Add pickers across content, people, teams, learning groups and curricula, with existing-category choices, pending-account batches, connection revocation and searchable recovery.
 
 
