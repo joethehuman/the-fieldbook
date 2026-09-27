@@ -138,7 +138,10 @@
   .markdown-table {
     overflow-x: auto;
   }
-  .markdown-table-wrap { position: relative; min-width: 0; }
+  .markdown-table-wrap {
+    position: relative;
+    min-width: 0;
+  }
   .markdown-table-wrap[data-more-right="true"]::after {
     content: "";
     position: absolute;
@@ -380,6 +383,9 @@
     padding-inline-end: var(--space-3);
     scrollbar-gutter: stable;
   }
+  .reading-outline .reading-outline-wide {
+    display: none;
+  }
   .reading-outline a {
     color: var(--muted-foreground);
     font-size: 0.8125rem;
@@ -472,11 +478,14 @@
       position: sticky;
       top: var(--anchor-offset);
     }
-    .reading-outline summary {
+    .reading-outline .reading-outline-disclosure {
       display: none;
     }
     .reading-outline-title {
       display: block;
+    }
+    .reading-outline .reading-outline-wide {
+      display: grid;
     }
     .reading-outline nav {
       max-height: calc(

@@ -54,6 +54,52 @@ async function fixture(request: any, items = docs) {
   });
 }
 for (const app of ["demo", "production"] as const) {
+  test(`${app}: tablet Docs outline stays closed through navigation`, async ({
+    page,
+    request,
+  }, info) => {
+    const arranged = docs.slice(0, 2);
+    await page.setViewportSize({ width: 820, height: 1050 });
+    if (app === "demo") {
+      const data = freshWorkspace();
+      data.content = arranged;
+      data.publishedContent = arranged;
+      await page.addInitScript((workspace) => {
+        localStorage.setItem(
+          "fieldbook.workspace.v1",
+          JSON.stringify(workspace),
+        );
+        sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+      }, data);
+      await page.goto(`http://localhost:3132/#docs/${arranged[0].id}`);
+    } else {
+      await fixture(request, arranged);
+      const response = await request.get(`/docs/${arranged[0].id}`);
+      expect(await response.text()).toContain(
+        '<details class="reading-outline-disclosure">',
+      );
+      await page.goto(`/docs/${arranged[0].id}`);
+    }
+    const outline = page.getByRole("complementary", { name: "On this page" });
+    const disclosure = outline.locator("details");
+    await expect(disclosure).not.toHaveAttribute("open");
+    await expect(outline.locator(".reading-outline-wide")).toBeHidden();
+    await expect(outline.locator("summary")).toBeVisible();
+    await page.screenshot({
+      animations: "disabled",
+      path: info.outputPath(`${app}-tablet-outline.png`),
+    });
+    await page
+      .getByRole("navigation", { name: "Previous and next documents" })
+      .getByRole("link", { name: /Next/ })
+      .click();
+    await expect(page.locator("article h1")).toHaveText(arranged[1].title);
+    await expect(disclosure).not.toHaveAttribute("open");
+    await page.goBack();
+    await expect(page.locator("article h1")).toHaveText(arranged[0].title);
+    await expect(disclosure).not.toHaveAttribute("open");
+  });
+
   test(`${app}: saved accent colors breadcrumbs, authored links and selected Docs`, async ({
     page,
     request,
@@ -292,7 +338,9 @@ for (const app of ["demo", "production"] as const) {
       .toBeGreaterThanOrEqual(0);
     await expect(
       page.locator(
-        '[aria-label="Article sections"] a[aria-current="location"]',
+        info.project.name === "phone"
+          ? '.reading-outline-disclosure a[aria-current="location"]'
+          : '.reading-outline-wide a[aria-current="location"]',
       ),
     ).toHaveAttribute("href", /heading-overview-2$/);
     await page.screenshot({
@@ -405,6 +453,7 @@ for (const app of ["demo", "production"] as const) {
     await marker.press("Tab");
     const outline = page.getByRole("complementary", { name: "On this page" });
     if (info.project.name === "phone") {
+      await expect(outline.locator("details")).not.toHaveAttribute("open");
       await expect(outline.locator("summary")).toHaveCSS(
         "justify-content",
         "flex-start",
@@ -432,11 +481,11 @@ for (const app of ["demo", "production"] as const) {
       await bar.evaluate((el) => el.getBoundingClientRect().bottom),
     );
     await expect(
-      outline.getByRole("link", {
-        name: "Finish",
-        exact: true,
-        includeHidden: true,
-      }),
+      outline.locator(
+        info.project.name === "phone"
+          ? '.reading-outline-disclosure a[href$="heading-finish"]'
+          : '.reading-outline-wide a[href$="heading-finish"]',
+      ),
     ).toHaveAttribute("aria-current", "location");
     await page.screenshot({
       animations: "disabled",
