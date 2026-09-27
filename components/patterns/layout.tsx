@@ -181,17 +181,21 @@ export function SplitPanel({
   children,
   split = true,
   align = "start",
+  splitAt = "xl",
 }: {
   children: React.ReactNode;
   split?: boolean;
   align?: "start" | "stretch";
+  splitAt?: "tablet" | "xl";
 }) {
   return (
     <div
       className={cn(
         "grid min-w-0 gap-6",
         align === "stretch" ? "items-stretch" : "items-start",
-        split && "xl:grid-cols-[18rem_minmax(0,1fr)]",
+        split && (splitAt === "tablet"
+          ? "min-[820px]:grid-cols-[13rem_minmax(0,1fr)] lg:grid-cols-[18rem_minmax(0,1fr)]"
+          : "xl:grid-cols-[18rem_minmax(0,1fr)]"),
       )}
     >
       {children}

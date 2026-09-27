@@ -102,6 +102,8 @@ Reference conventions: [shadcn composition](https://ui.shadcn.com/docs), [themin
 
 `CourseRow` owns its SectionHeader and native horizontal scrolling. Pass a heading and optional description; do not add carousel arrow controls. Optional `leading` content shares a stretch-aligned SplitPanel with the cards. When that panel becomes one column, its summary card fills the row, while its actions retain their natural width. Keep the strip reachable by touch, horizontal mouse/trackpad scrolling and keyboard focus when it overflows.
 
+The Courses home uses the `tablet` split variant so the progress card sits beside For you courses from 820px upward. Other SplitPanel and CourseRow uses retain their wider default breakpoint.
+
 `BrowseToolbar` aligns labeled fields to their control baseline and wraps whole fields on narrow screens. Use Search, a single Category SelectField, and Sort for a full collection browser. A short fixed set of primary views may use FilterOptions; growing taxonomies belong in a dropdown. When a home page already groups cards under category headings, do not repeat category filter buttons. Result counts and Hide completed belong in the SectionHeader action area, separate from search/sort controls.
 
 `LaunchList` remains a general ordered sequence pattern. Curriculum detail pages use shared `LearningCard` and `CardGrid` in saved order, with the Curriculum eyebrow, title and description. Do not add sorting, category filters or course editing controls to a learner playlist.

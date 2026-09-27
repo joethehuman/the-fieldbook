@@ -284,7 +284,7 @@ test("no assignments show personal activity without labeling other courses", asy
   });
 });
 
-test("course rows scroll directly and the completion card fills narrow layouts", async ({
+test("course rows scroll directly and the completion card splits on iPad", async ({
   page,
 }, info) => {
   await seed(page, false, true);
@@ -330,7 +330,7 @@ test("course rows scroll directly and the completion card fills narrow layouts",
   await expect(
     product.getByRole("region", { name: "Completed optional learning" }),
   ).not.toHaveAttribute("tabindex", "0");
-  for (const width of [1024, 390]) {
+  for (const width of [820, 1024, 390]) {
     await page.setViewportSize({ width, height: 844 });
     const summary = await home
       .locator('[data-slot="card"]')
@@ -342,8 +342,14 @@ test("course rows scroll directly and the completion card fills narrow layouts",
       .first()
       .getByRole("button", { name: "Start course" })
       .boundingBox();
-    expect(Math.abs(summary!.x - strip!.x)).toBeLessThan(2);
-    expect(Math.abs(summary!.width - strip!.width)).toBeLessThan(2);
+    if (width >= 820) {
+      expect(strip!.x).toBeGreaterThan(summary!.x + summary!.width);
+      expect(Math.abs(summary!.y - strip!.y)).toBeLessThan(2);
+    } else {
+      expect(Math.abs(summary!.x - strip!.x)).toBeLessThan(2);
+      expect(Math.abs(summary!.width - strip!.width)).toBeLessThan(2);
+      expect(strip!.y).toBeGreaterThan(summary!.y + summary!.height);
+    }
     expect(action!.width).toBeLessThan(summary!.width * 0.7);
     expect(
       Math.abs(

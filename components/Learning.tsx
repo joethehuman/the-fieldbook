@@ -358,6 +358,7 @@ export default function Learning({
               title="For you"
               heading={forYouHeading}
               leading={progressCard}
+              splitAt="tablet"
             >
               {outstandingCards.map(displayCard)}
             </CourseRow>
