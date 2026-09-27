@@ -95,6 +95,7 @@ test("last no-quiz lesson completes and opens expanded feedback", async ({ page 
   await page.getByRole("button", { name: "Finish course Course complete" }).click();
   await expect(page.getByRole("heading", { name: "Course complete" })).toBeVisible();
   await expect.poll(async () => Math.abs((await outlineOffset(page)) - outlineBeforeCompletion)).toBeLessThan(2);
+  await expect(page.getByRole("form", { name: "Course feedback" })).toBeVisible();
   await expect(page.getByRole("textbox", { name: "Your feedback (optional)" })).toBeVisible();
   await cardAtTop(page, ".course-finish-card");
   await page.screenshot({ path: info.outputPath("no-quiz-finish.png") });

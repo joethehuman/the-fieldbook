@@ -133,7 +133,8 @@ export const settingsSchema = z
       })
       .optional(),
     name: text(60).trim().min(1),
-    tagline: text(180),
+    // Retain previously saved values without requiring the retired setting.
+    tagline: text(180).optional(),
     welcomeDescription: text(180).trim().default(""),
     accent: z.string().regex(/^#[0-9a-fA-F]{6}$/),
     access: z.enum(["public", "private"]),

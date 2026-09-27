@@ -186,6 +186,10 @@ export function ReaderShell({
                 : undefined
             }
             onSignOut={context.user ? signOut : undefined}
+            privacyHref={
+              section === "privacy" ? null : context.branding.privacyUrl
+            }
+            onPrivacyOpen={close}
             onSignIn={
               !context.user
                 ? () => window.location.assign("/auth/sign-in")
@@ -268,12 +272,6 @@ export function ReaderShell({
           {context.user && <ReaderGuestImport />}
           {children}
         </main>
-        <footer className="app-footer">
-          {context.branding.name} <span>{context.branding.tagline}</span>
-          {context.branding.privacyUrl && section !== "privacy" && (
-            <Link href={context.branding.privacyUrl}>Privacy policy</Link>
-          )}
-        </footer>
       </div>
     </div>
   );

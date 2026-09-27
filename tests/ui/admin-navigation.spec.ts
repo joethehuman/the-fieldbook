@@ -17,9 +17,6 @@ async function revealed(target: Locator) {
       target.evaluate((el) => {
         const top = el.getBoundingClientRect().top;
         const panel = el.closest(".admin-panel")?.getBoundingClientRect();
-        const footer = document
-          .querySelector(".app-footer")
-          ?.getBoundingClientRect();
         const bar =
           parseFloat(
             getComputedStyle(document.documentElement).getPropertyValue(
@@ -28,8 +25,7 @@ async function revealed(target: Locator) {
           ) || 64;
         return (
           top >= Math.max(bar, panel?.top ?? bar) &&
-          top <
-            Math.min(panel?.bottom ?? innerHeight, footer?.top ?? innerHeight)
+          top < (panel?.bottom ?? innerHeight)
         );
       }),
     )

@@ -122,7 +122,7 @@ export function ContentFeedback({
   const panel = (
     <form
       id={`${id}-panel`}
-      aria-label="Did you find this useful?"
+      aria-label={expanded ? "Course feedback" : "Did you find this useful?"}
       aria-busy={pending}
       className="min-w-0"
       onKeyDown={(event) => {

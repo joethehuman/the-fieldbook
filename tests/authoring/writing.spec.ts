@@ -288,10 +288,11 @@ test("contextual headings, links and table cells serialize as reader-compatible 
   );
   await editor.press("ControlOrMeta+End");
   await editor.press("Enter");
-  await page.getByRole("button", { name: "Table", exact: true }).click();
+  await page.getByRole("button", { name: "Insert", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Table", exact: true }).click();
   const table = editor.getByRole("table");
   await table.getByRole("textbox").first().fill("Topic");
-  await table.getByRole("textbox").nth(2).fill("Useful detail");
+  await table.getByRole("textbox").nth(3).fill("Useful detail");
   await page.getByRole("button", { name: "Save draft", exact: true }).click();
   await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
   const body = (await read()).content[0].body;

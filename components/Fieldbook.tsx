@@ -624,6 +624,17 @@ export default function Fieldbook({
             onSignOut={runtime && uid !== "guest" ? logout : undefined}
             onSignIn={runtime && uid === "guest" ? logout : undefined}
             onSwitchDemoProfile={!runtime ? logout : undefined}
+            privacyHref={policyHref}
+            onPrivacyOpen={() => setMenu(false)}
+            onAboutDemo={
+              !runtime
+                ? (trigger) => {
+                    demoTrigger.current = trigger.current;
+                    setMenu(false);
+                    setShowDemo(true);
+                  }
+                : undefined
+            }
             onFeedbackOpen={() => setMenu(false)}
             onFeedbackClose={() => {
               if (window.matchMedia("(max-width: 767px)").matches)
@@ -1069,36 +1080,15 @@ export default function Fieldbook({
             </>
           )}
         </main>
-        <footer className="app-footer">
-          {branding.name} <span>{branding.tagline}</span>
-          {policyHref &&
-            (policyHref === "/privacy" ? (
-              <Link href="/privacy">Privacy policy</Link>
-            ) : (
-              <a href={policyHref}>Privacy policy</a>
-            ))}
-          {!runtime && (
-            <Button
-              variant="link"
-              size="sm"
-              className="text-xs font-normal text-muted-foreground"
-              type="button"
-              onClick={(event) => {
-                demoTrigger.current = event.currentTarget;
-                setShowDemo(true);
-              }}
-            >
-              About this demo
-            </Button>
-          )}
-        </footer>
       </div>
       <Dialog open={showDemo} onOpenChange={setShowDemo}>
         <DialogContent
           className="demo-dialog"
           onCloseAutoFocus={(event) => {
             event.preventDefault();
-            demoTrigger.current?.focus();
+            if (window.matchMedia("(max-width: 767px)").matches)
+              menuTrigger.current?.focus();
+            else demoTrigger.current?.focus();
           }}
         >
           <Button

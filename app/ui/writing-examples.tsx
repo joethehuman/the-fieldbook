@@ -17,7 +17,7 @@ export function WritingExamples() {
     <section id="writing" className="grid gap-6">
       <SectionHeader
         title={<h2>Visual writing</h2>}
-        description="Docs, Updates and course lessons share visual Markdown editing. Type / at the start of a paragraph for insertions; the toolbar remains available. Unsupported formatting falls back to source without discarding text."
+        description="Docs, Updates and course lessons share visual Markdown editing. Use Insert or type / at the start of a line to add content. Unsupported formatting falls back to source without discarding text."
       />
       <Field orientation="horizontal">
         <Checkbox
