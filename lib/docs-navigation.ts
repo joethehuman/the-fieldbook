@@ -224,7 +224,11 @@ export function deleteDocSection(
     throw new Error("Move this section's documents before deleting it.");
   return sections.filter((section) => section.id !== id);
 }
-export function sectionPath(section: DocSection, sections: DocSection[], separator = " → ") {
+export function sectionPath(
+  section: DocSection,
+  sections: DocSection[],
+  separator = " → ",
+) {
   const parent = sections.find((item) => item.id === section.parentId);
   return parent ? parent.name + separator + section.name : section.name;
 }
