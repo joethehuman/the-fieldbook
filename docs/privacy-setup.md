@@ -1,6 +1,6 @@
 # Privacy notices belong to the installation
 
-Fieldbook provides a policy editor, draft/publish controls, a public `/privacy` page, and footer/sign-in links. The operator supplies the actual notice in Settings. No personal operator identity or policy ships as a production default. Policies are stored in the installation's database, not in this repository.
+Fieldbook provides a policy editor, draft/publish controls, a public `/privacy` page, and links in the account menu and on sign-in pages. The operator supplies the actual notice in Settings. No personal operator identity or policy ships as a production default. Policies are stored in the installation's database, not in this repository.
 
 Hosted policies support an email, an HTTPS contact-page link, or both. A contact page is a link to an operator-maintained page, not a built-in form or email service. Google OAuth separately requires an eligible support email; do not assume a forwarding alias automatically qualifies.
 

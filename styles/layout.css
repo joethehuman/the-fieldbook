@@ -130,25 +130,6 @@
     scrollbar-gutter: stable both-edges;
     outline: none;
   }
-  .app-footer {
-    display: flex;
-    flex: none;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    gap: var(--space-4);
-    width: 100%;
-    max-width: var(--page-width);
-    max-height: 30dvh;
-    margin-inline: auto;
-    border-top: 1px solid var(--border);
-    padding-block: var(--space-6);
-    padding-inline: var(--space-6);
-    overflow-y: auto;
-    overscroll-behavior: none;
-    scrollbar-gutter: stable;
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-  }
   .admin-layout {
     display: grid;
     flex: 1 1 auto;
@@ -709,9 +690,6 @@
     }
     .main-content {
       padding: var(--space-6) var(--space-4);
-    }
-    .app-footer {
-      padding: var(--space-4);
     }
     .topbar {
       padding-inline: var(--space-4);

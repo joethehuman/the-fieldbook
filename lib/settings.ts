@@ -34,7 +34,6 @@ export type SiteSettings = {
   privacy?: PrivacySettings;
   welcomeDescription?: string;
   name: string;
-  tagline: string;
   accent: string;
   access: "public" | "private";
   registration: "open" | "closed";
@@ -46,7 +45,6 @@ export const defaultSettings: SiteSettings = {
   catchUpDays: 30,
   welcomeDescription: "",
   name: "Fieldbook",
-  tagline: "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS",
   accent: "#0069ff",
   access: "public",
   registration: "open",
@@ -60,8 +58,9 @@ export function publicSettings(
   const {
     guestGroupId: _guestGroupId,
     logoUrl: _legacyLogoUrl,
+    tagline: _legacyTagline,
     ...visible
-  } = settings as SiteSettings & { logoUrl?: string };
+  } = settings as SiteSettings & { logoUrl?: string; tagline?: string };
   const docs = content.filter(
     (item) => item.kind === "doc" && item.status === "published",
   );

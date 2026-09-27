@@ -50,6 +50,44 @@ test.beforeEach(async ({ request, page }) => {
     });
   await request.post(backend, { data: {} });
 });
+test("account pages resist short-page pull and scroll when content is taller", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "phone");
+  for (const [url, heading] of [
+    ["http://127.0.0.1:3132", "Choose a demo profile"],
+    ["/sign-in", "Sign in to Acme Learning"],
+  ]) {
+    await page.setViewportSize({ width: 390, height: 812 });
+    await page.goto(url);
+    const card = page.getByRole("main");
+    const viewport = page.locator('[data-slot="account-viewport"]');
+    await expect(card.getByRole("heading", { name: heading })).toBeVisible();
+    const top = (await card.boundingBox())!.y;
+
+    await page.mouse.wheel(0, -500);
+    await page.mouse.wheel(0, 500);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    expect(await viewport.evaluate((element) => element.scrollTop)).toBe(0);
+    expect((await card.boundingBox())!.y).toBe(top);
+    await page.screenshot({
+      path: info.outputPath(url === "/sign-in" ? "sign-in.png" : "demo-chooser.png"),
+    });
+
+    await page.setViewportSize({ width: 390, height: 220 });
+    await page.mouse.move(195, 110);
+    await page.mouse.wheel(0, 500);
+    await expect
+      .poll(() => viewport.evaluate((element) => element.scrollTop))
+      .toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+    await page.mouse.wheel(0, -500);
+    await expect
+      .poll(() => viewport.evaluate((element) => element.scrollTop))
+      .toBe(0);
+    await expect(card.getByRole("heading", { name: heading })).toBeVisible();
+  }
+});
 test("private deep link goes directly to branded sign-in and survives synthetic OAuth", async ({
   page,
   request,
