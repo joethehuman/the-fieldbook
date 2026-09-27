@@ -24,7 +24,7 @@ Apply `supabase/migrations/202609200004_learning_groups.sql` after all previous 
 
 Group plans are authoritative for course assignments. A revision-checked governance save updates memberships, curricula, expanded course lists and affected content metadata in one database transaction. Existing assignment timestamps survive whenever that group's course assignment remains active. No learner progress or course versions are rewritten. Update audience changes preserve both the published body and unrelated draft edits. Governance and audience writes retain admin authorization and audit records. Public browsing does not depend on group membership.
 
-Course assignment changes through ordinary content/MCP writes are rejected with instructions to use Learning groups. Content editing, publication and Update targeting remain available through the existing content API. Docs have no audience tags. The existing `category` field backs the user-facing Channel label for courses; no category-data conversion is needed.
+Course assignment changes through ordinary content/MCP writes are rejected with instructions to use Learning groups. Content editing, publication and Update targeting remain available through the existing content API. Docs have no audience tags. The existing `category` field backs the user-facing Category label for courses; no category-data conversion is needed.
 
 1. Back up the installation and record the current code and migration versions.
 2. Apply the migration to an isolated Supabase preview, never a preview pointing at the production backend. The migration can also be exercised by the local PGlite integration test with synthetic data.

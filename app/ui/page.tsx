@@ -256,9 +256,9 @@ export default function ComponentCatalog() {
             </SearchField>
           </Field>
           <Field>
-            Channel
+            Category
             <SelectField value="all" onValueChange={() => {}}>
-              <option value="all">All channels</option>
+              <option value="all">All categories</option>
             </SelectField>
           </Field>
           <Field>
