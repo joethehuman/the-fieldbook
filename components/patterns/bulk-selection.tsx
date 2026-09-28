@@ -118,13 +118,13 @@ export function BulkSelectionBar({
         {count ? `${count} selected` : range || `${total} ${noun}`}
         {count && range ? ` · ${range}` : ""}
       </span>
-      <ActionGroup>
-        {children}
+      <ActionGroup className="ms-auto justify-end">
         {count > 0 && (
           <Button variant="ghost" onClick={onClear}>
             Clear selection
           </Button>
         )}
+        {children}
       </ActionGroup>
     </div>
   );

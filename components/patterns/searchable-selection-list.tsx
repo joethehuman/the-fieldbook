@@ -70,12 +70,6 @@ export function SearchableSelectionList({
       </FormField>
       {selectionMode === "multiple" && options.length > 1 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3">
-          <span className="text-copy text-muted-foreground" role="status">
-            {value.length} selected ·{" "}
-            {matches.length
-              ? `${(currentPage - 1) * 10 + 1}–${Math.min(currentPage * 10, matches.length)} of ${matches.length} shown`
-              : "0 results"}
-          </span>
           {pageOptions.length > 1 && (
             <Field orientation="horizontal" className="gap-2">
               <Checkbox
@@ -122,6 +116,12 @@ export function SearchableSelectionList({
                 Select all {matches.length} matching
               </Button>
             )}
+          <span className="ms-auto text-copy tabular-nums text-muted-foreground" role="status">
+            {value.length} selected ·{" "}
+            {matches.length
+              ? `${(currentPage - 1) * 10 + 1}–${Math.min(currentPage * 10, matches.length)} of ${matches.length} shown`
+              : "0 results"}
+          </span>
           {!!value.length && (
             <Button
               type="button"
@@ -135,7 +135,7 @@ export function SearchableSelectionList({
             >
               {selectedOnly
                 ? "Show all options"
-                : `Review ${value.length} selected`}
+                : "Review selected"}
             </Button>
           )}
           {!!value.length && (

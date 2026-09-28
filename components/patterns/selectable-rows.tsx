@@ -35,16 +35,6 @@ export function SelectableRows({
     <div className="grid gap-3" role="group" aria-label={label}>
       {canBulkSelect(rows.length) && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3">
-          {(rows.length > 25 || selected.length > 0) && (
-            <span className="text-copy text-muted-foreground" role="status">
-              {selected.length
-                ? `${selected.length} selected${rows.length > 25 ? " · " : ""}`
-                : ""}
-              {rows.length > 25
-                ? `${(current - 1) * 25 + 1}–${Math.min(current * 25, rows.length)} of ${rows.length} shown`
-                : ""}
-            </span>
-          )}
           <SelectRows
             label={
               rows.length > shown.length
@@ -71,6 +61,16 @@ export function SelectableRows({
                 Select all {eligible.length} matching
               </Button>
             )}
+          {(rows.length > 25 || selected.length > 0) && (
+            <span className="ms-auto text-copy text-muted-foreground" role="status">
+              {selected.length
+                ? `${selected.length} selected${rows.length > 25 ? " · " : ""}`
+                : ""}
+              {rows.length > 25
+                ? `${(current - 1) * 25 + 1}–${Math.min(current * 25, rows.length)} of ${rows.length} shown`
+                : ""}
+            </span>
+          )}
         </div>
       )}
       <ul className="grid gap-2">
