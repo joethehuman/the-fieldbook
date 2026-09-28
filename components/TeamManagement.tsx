@@ -5,7 +5,7 @@ import { Checkbox } from "./ui/choice";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import { ancestorIds, canParent, type Team, type User } from "@/lib/types";
@@ -419,17 +419,21 @@ export function TeamsAdmin({
           <SectionHeader
             title={<h2>Teams</h2>}
             description="Organize reporting teams, managers and membership."
-          >
-            <Button
-              onClick={() =>
-                void editTeam({ id: crypto.randomUUID(), name: "" })
-              }
-            >
-              Add team
-            </Button>
-          </SectionHeader>
+          />
 
           <HierarchyList
+            searchAction={
+              <Button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void editTeam({ id: crypto.randomUUID(), name: "" })
+                }
+              >
+                <Plus aria-hidden="true" />
+                Add team
+              </Button>
+            }
             selectionActions={
               <BulkActions
                 singleItemActions={false}

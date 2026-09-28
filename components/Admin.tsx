@@ -30,7 +30,6 @@ import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
 import { DataTable } from "./patterns/data-table";
 import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation";
-import { FilterOptions } from "./patterns/filter-options";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { useRevealTarget } from "./patterns/use-reveal-target";
@@ -85,7 +84,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
-import { Tabs, TabsTrigger, TabsContent } from "./ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 
 import {
   Plus,
@@ -716,21 +715,21 @@ export default function Admin({
             <>
               <CollectionToolbar
                 filters={
-                  <FilterOptions
-                    label="Content type"
+                  <Tabs
                     value={filter}
                     onValueChange={(value) => {
                       setFilter(value);
                       setContentSection("all");
                       setCategory("all");
                     }}
-                    options={[
-                      { value: "all", label: "All content" },
-                      { value: "doc", label: "Docs" },
-                      { value: "brief", label: "Updates" },
-                      { value: "course", label: "Courses" },
-                    ]}
-                  />
+                  >
+                    <TabsList aria-label="Content type">
+                      <TabsTrigger value="all">All content</TabsTrigger>
+                      <TabsTrigger value="doc">Docs</TabsTrigger>
+                      <TabsTrigger value="brief">Updates</TabsTrigger>
+                      <TabsTrigger value="course">Courses</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 }
               >
                 <ActionGroup>

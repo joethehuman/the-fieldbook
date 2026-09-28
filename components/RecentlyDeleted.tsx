@@ -1,6 +1,7 @@
 "use client";
 import { Pagination } from "./patterns/pagination";
 import { FormField } from "./patterns/form-field";
+import { Toolbar } from "./patterns/layout";
 import { Input } from "./ui/input";
 import { SelectField } from "./ui/select";
 import { Button } from "./ui/button";
@@ -91,22 +92,26 @@ export function RecentlyDeleted({
           { value: "user", label: "Users" },
         ]}
       />
-      <FormField label="Search recently deleted">
-        <Input
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(1);
-          }}
-        />
-      </FormField>
-      <FormField label="Sort deleted items">
-        <SelectField value={sort} onValueChange={setSort}>
-          <option value="newest">Recently deleted first</option>
-          <option value="deadline">Permanent deletion soonest</option>
-          <option value="name">Name A–Z</option>
-        </SelectField>
-      </FormField>
+      <Toolbar className="items-start">
+        <FormField className="min-w-[14rem] flex-1" label="Search recently deleted" visuallyHiddenLabel>
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search recently deleted"
+          />
+        </FormField>
+        <FormField className="w-full sm:w-64" label="Sort deleted items" visuallyHiddenLabel>
+          <SelectField value={sort} onValueChange={setSort}>
+            <option value="newest">Recently deleted first</option>
+            <option value="deadline">Permanent deletion soonest</option>
+            <option value="name">Name A–Z</option>
+          </SelectField>
+        </FormField>
+      </Toolbar>
       <AdminBulkActions
         data={displayData}
         range={
