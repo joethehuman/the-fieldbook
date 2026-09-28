@@ -7,6 +7,8 @@ import { FormField } from "./form-field";
 import { EmptyState } from "./layout";
 import { Button } from "../ui/button";
 import { Pagination } from "./pagination";
+import { SelectionSummary } from "./selection-summary";
+import { ActionGroup } from "../ui/action-group";
 
 export type SelectionOption = {
   id: string;
@@ -100,6 +102,14 @@ export function SearchableSelectionList({
                 : `Select all ${pageOptions.length}`}
             </Field>
           )}
+          <SelectionSummary
+            range={
+              matches.length
+                ? `${(currentPage - 1) * 10 + 1}–${Math.min(currentPage * 10, matches.length)} of ${matches.length} shown`
+                : "0 results"
+            }
+            count={value.length}
+          />
           {matches.length > pageOptions.length &&
             pageSelected === pageOptions.length &&
             value.length < matches.length && (
@@ -116,37 +126,29 @@ export function SearchableSelectionList({
                 Select all {matches.length} matching
               </Button>
             )}
-          <span className="ms-auto text-copy tabular-nums text-muted-foreground" role="status">
-            {value.length} selected ·{" "}
-            {matches.length
-              ? `${(currentPage - 1) * 10 + 1}–${Math.min(currentPage * 10, matches.length)} of ${matches.length} shown`
-              : "0 results"}
-          </span>
           {!!value.length && (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={disabled}
-              onClick={() => {
-                setSelectedOnly(!selectedOnly);
-                setQuery("");
-                setPage(1);
-              }}
-            >
-              {selectedOnly
-                ? "Show all options"
-                : "Review selected"}
-            </Button>
-          )}
-          {!!value.length && (
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={disabled}
-              onClick={() => onChange([])}
-            >
-              Clear selection
-            </Button>
+            <ActionGroup className="ms-auto justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={disabled}
+                onClick={() => {
+                  setSelectedOnly(!selectedOnly);
+                  setQuery("");
+                  setPage(1);
+                }}
+              >
+                {selectedOnly ? "Show all options" : "Review selected"}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                disabled={disabled}
+                onClick={() => onChange([])}
+              >
+                Clear selection
+              </Button>
+            </ActionGroup>
           )}
         </div>
       )}

@@ -5,6 +5,7 @@ import { Checkbox } from "../ui/choice";
 import { Button } from "../ui/button";
 import { useToast } from "../ui/toast";
 import { ActionGroup } from "../ui/action-group";
+import { SelectionSummary } from "./selection-summary";
 import { Alert } from "../ui/alert";
 import {
   Dialog,
@@ -115,17 +116,14 @@ export function BulkSelectionBar({
       role="region"
       aria-label="Selected items"
     >
-      <span role="status" className="text-copy text-muted-foreground">
-        {count ? `${count} selected` : range || `${total} ${noun}`}
-        {count && range ? ` · ${range}` : ""}
-      </span>
-      <ActionGroup>
-        {children}
+      <SelectionSummary range={range || `${total} ${noun}`} count={count} />
+      <ActionGroup className="ms-auto justify-end">
         {count > 0 && (
           <Button variant="ghost" onClick={onClear}>
             Clear selection
           </Button>
         )}
+        {children}
       </ActionGroup>
     </div>
   );
