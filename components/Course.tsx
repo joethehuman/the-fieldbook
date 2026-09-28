@@ -18,7 +18,7 @@ import { correctOptionIds, optionIds, quizUnlocked, requiresPassing, type QuizAn
 import { isComplete, type Content, type Progress } from "@/lib/types";
 
 export function Course({ course, progress, onBack, backLabel, onProgress, onDemoProgress,
-  guest = false, onSignIn, feedback, initialLessonId, curriculumTitle, backHref, lessonBaseHref }: {
+  guest = false, feedback, initialLessonId, curriculumTitle, backHref, lessonBaseHref }: {
   course: Content;
   progress: Progress[];
   onBack: () => void;
@@ -117,7 +117,6 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   return <div className="course-detail course-player">
     <div className="lesson-layout">
       <aside className="course-sidebar">
-        {backHref ? <Button asChild variant="link" className="justify-self-start"><Link href={backHref}>← {backLabel}</Link></Button> : <Button variant="link" className="justify-self-start" onClick={onBack}>← {backLabel}</Button>}
         <Card className="course-sidebar-panel">
           <div className="course-detail-heading">
             <span className="eyebrow">{curriculumTitle || course.category}</span>
@@ -128,7 +127,6 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
               <div className="course-detail-meta course-desktop-summary"><Clock size={16} /> {course.duration} min · {course.lessons.length} lessons <Badge variant="success" className={complete ? undefined : "invisible"} aria-hidden={!complete}>Completed</Badge></div>
             </div>
           </div>
-          {guest && onSignIn && <p className="guest-progress-note">Progress is saved in this browser. <Button variant="link" onClick={onSignIn}>Sign in to keep it →</Button></p>}
           <nav className="lesson-nav" aria-label="In this course">
             <h2>In this course</h2>
             {course.lessons.map((item, index) => <NavigationButton variant="ghost" asChild={!!lessonBaseHref} className={step === index ? "selected" : ""} onClick={lessonBaseHref ? undefined : () => selectLesson(index)} key={item.id}>
@@ -141,6 +139,9 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
               <span className="step-number quiz-number"><CheckCircle2 size={16} /></span><span>{course.questions.length ? "Quiz" : "Finish course"}</span>
             </NavigationButton>
           </nav>
+          <div className="course-sidebar-exit">
+            {backHref ? <Button asChild variant="link"><Link href={backHref} aria-label={`Exit course, ${backLabel.toLowerCase()}`}>← Exit course</Link></Button> : <Button variant="link" onClick={onBack}>← Exit course</Button>}
+          </div>
         </Card>
       </aside>
       <div className="course-reader">
