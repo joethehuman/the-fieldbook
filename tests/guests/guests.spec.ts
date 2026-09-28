@@ -286,9 +286,11 @@ async function nav(page: Page, name: string) {
   if (await open.isVisible()) await open.click();
   const navigation = page.getByRole("navigation", { name: "Primary" });
   const label = new RegExp(`^${name}(\\s+\\d+)?$`);
-  const link = navigation.getByRole("link", { name: label }).first();
-  if (await link.count()) await link.click();
-  else await navigation.getByRole("button", { name: label }).first().click();
+  await navigation
+    .getByRole("link", { name: label })
+    .or(navigation.getByRole("button", { name: label }))
+    .first()
+    .click();
 }
 
 test("optional existing selection, explicit named creation, save flow and retained private setting", async ({
