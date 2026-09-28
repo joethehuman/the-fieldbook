@@ -887,8 +887,7 @@
   .course-sidebar .quiz-number { background: var(--surface); border: 1px solid var(--border); }
   .course-about details { display: none; }
   .course-reader { display: grid; align-content: start; width: min(100%, var(--reading-width)); min-width: 0; min-height: 100dvh; gap: var(--space-5); }
-  .course-lesson, .course-quiz, .course-finish-card { min-width: 0; }
-  .course-lesson { padding-top: var(--space-6); }
+  .course-lesson, .course-quiz, .course-finish-card { min-width: 0; padding-top: var(--space-6); }
   .course-lesson, .course-quiz, .course-finish-card { scroll-margin-block-start: var(--anchor-offset); }
   .course-continue { display: flex; justify-content: flex-end; border-top: 1px solid var(--border); margin-top: var(--space-12); padding-top: var(--space-5); }
   .course-continue [data-slot="button"] { max-width: 100%; text-align: right; }
@@ -918,7 +917,7 @@
     .course-sidebar { position: static; }
     .course-sidebar-panel { max-height: none; overflow: visible; }
     .course-sidebar .lesson-nav { grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; flex: none; }
-    .course-lesson { padding-top: 0; }
+    .course-lesson, .course-quiz, .course-finish-card { padding-top: 0; }
     .course-about details { display: block; }
     .course-desktop-summary { display: none; }
     .course-builder-steps { display: none; }

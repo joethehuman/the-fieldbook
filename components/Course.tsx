@@ -157,7 +157,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
           <nav className="course-continue" aria-label="Continue course"><Button variant="ghost" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={next} loading={busy}>
             <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish course"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Course complete"}</span></span><ChevronRight aria-hidden="true" size={16} />
           </Button></nav>
-        </> : <Card ref={activeCard} className={`${course.questions.length ? "course-quiz" : "course-finish-card"} grid gap-6`}>
+        </> : <section ref={activeCard} className={`${course.questions.length ? "course-quiz" : "course-finish-card"} grid gap-6`}>
           {course.questions.length ? showResults ? <>
             <span className="eyebrow">Quiz results</span>
             <h2 ref={heading} tabIndex={-1}>{score === undefined ? "Quiz submitted" : `${score} of ${course.questions.length} correct`}</h2>
@@ -227,7 +227,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
               </ActionGroup>
             </>}
           </>}
-        </Card>}
+        </section>}
       </div>
     </div>
     <Dialog open={!!image} onOpenChange={(open) => { if (!open) setImage(null); }}>

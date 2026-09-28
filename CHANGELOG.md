@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Align the course details and lesson headings in the player, move Exit course beneath the outline, and keep long outlines scrolling between fixed details and exit. Show lessons without a card border, hide the redundant guest notice and legacy course body text, and show the short description once.
+- Align the course details and lesson headings in the player, move Exit course beneath the outline, and keep long outlines scrolling between fixed details and exit. Show lessons, quizzes and the finish view without an outer card border, hide the redundant guest notice and legacy course body text, and show the short description once.
 
 - Keep Bulk actions and result-range labels in place as selection changes. Show selected counts after persistent range text and put Clear selection before the anchored menu across tables and pickers.
 
