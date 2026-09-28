@@ -2,6 +2,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Checkbox } from "../ui/choice";
 import { canBulkSelect, SelectRows } from "./bulk-selection";
+import { SelectionSummary } from "./selection-summary";
 import { Button } from "../ui/button";
 import { Pagination } from "./pagination";
 export function SelectableRows({
@@ -50,6 +51,16 @@ export function SelectableRows({
               ? `Select page (${shownEligible.length})`
               : `Select all ${shownEligible.length}`}
           </span>
+          {(rows.length > 25 || selected.length > 0) && (
+            <SelectionSummary
+              range={
+                rows.length > 25
+                  ? `${(current - 1) * 25 + 1}–${Math.min(current * 25, rows.length)} of ${rows.length} shown`
+                  : undefined
+              }
+              count={selected.length}
+            />
+          )}
           {eligible.length > shownEligible.length &&
             shownSelected === shownEligible.length &&
             selected.length < eligible.length && (
@@ -61,16 +72,6 @@ export function SelectableRows({
                 Select all {eligible.length} matching
               </Button>
             )}
-          {(rows.length > 25 || selected.length > 0) && (
-            <span className="ms-auto text-copy text-muted-foreground" role="status">
-              {selected.length
-                ? `${selected.length} selected${rows.length > 25 ? " · " : ""}`
-                : ""}
-              {rows.length > 25
-                ? `${(current - 1) * 25 + 1}–${Math.min(current * 25, rows.length)} of ${rows.length} shown`
-                : ""}
-            </span>
-          )}
         </div>
       )}
       <ul className="grid gap-2">
