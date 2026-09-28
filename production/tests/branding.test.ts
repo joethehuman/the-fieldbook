@@ -32,6 +32,7 @@ test("branding projection contains only public identity with existing-installati
       data = {
         name: "Acme",
         accent: "#009908",
+        homePage: "docs",
         welcomeDescription: "Welcome aboard",
         access: "private",
         policyMode: "external",
@@ -48,6 +49,7 @@ test("branding projection contains only public identity with existing-installati
     assert.deepEqual(await publicBranding(), {
       name: "Acme",
       accent: "#009908",
+      homePage: "docs",
       welcomeDescription: "Welcome aboard",
       access: "private",
       privacyUrl: "https://example.test/privacy",
@@ -61,6 +63,7 @@ test("branding projection contains only public identity with existing-installati
     process.env = oldEnv;
   }
   assert.deepEqual(brandingFromSettings({}), {
+    homePage: "courses",
     name: "Fieldbook",
     accent: "#0069ff",
     welcomeDescription: "",
@@ -69,9 +72,22 @@ test("branding projection contains only public identity with existing-installati
   });
   assert.equal(brandingFromSettings({ name: " " }).name, "Fieldbook");
   assert.equal(brandingFromSettings({ accent: "invalid" }).accent, "#0069ff");
+  assert.equal(
+    brandingFromSettings({ homePage: "updates" }).homePage,
+    "updates",
+  );
 });
 
 test("settings accepts old configurations and validates branding without separate login settings", () => {
+  assert.equal(
+    settingsSchema.parse({ ...defaultSettings, homePage: undefined }).homePage,
+    "courses",
+  );
+  assert.equal(
+    settingsSchema.safeParse({ ...defaultSettings, homePage: "invalid" })
+      .success,
+    false,
+  );
   assert.equal(settingsSchema.parse(defaultSettings).welcomeDescription, "");
   assert.equal(
     settingsSchema.parse({

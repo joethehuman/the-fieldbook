@@ -68,7 +68,7 @@ import {
   sectionPaths,
   resolveSection,
   contentPath,
-  organizationHomePath,
+  homePath,
 } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
@@ -196,7 +196,12 @@ export default function Fieldbook({
       return;
     }
     try {
-      setData(loadWorkspace());
+      const workspace = loadWorkspace();
+      setData(workspace);
+      if (!window.location.hash)
+        setView(
+          resolveSection(homePath(workspace.settings).slice(1)) || "learn",
+        );
       const savedProfile = sessionStorage.getItem(SESSION);
       setUid(
         savedProfile &&
@@ -452,6 +457,8 @@ export default function Fieldbook({
     demoGuest?.user || data.users.find((u) => u.id === uid && u.active);
   const learningGroups = demoGuest?.groups || data.groups;
   const branding = { ...defaultSettings, ...data.settings };
+  const landingPath = homePath(branding);
+  const landingView = resolveSection(landingPath.slice(1)) || "learn";
   const policyHref = privacyHref(branding);
   if (!user)
     return (
@@ -725,7 +732,7 @@ export default function Fieldbook({
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
               <a
-                href={runtime ? organizationHomePath : "#courses"}
+                href={runtime ? landingPath : `#${landingPath.slice(1)}`}
                 onClick={(event) => {
                   if (
                     event.metaKey ||
@@ -735,7 +742,7 @@ export default function Fieldbook({
                   )
                     return;
                   event.preventDefault();
-                  void navigate("learn");
+                  void navigate(landingView);
                 }}
               >
                 Organization

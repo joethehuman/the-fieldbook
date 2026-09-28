@@ -50,6 +50,37 @@ test.beforeEach(async ({ request, page }) => {
     });
   await request.post(backend, { data: {} });
 });
+test("administrator saves the home page under Identity", async ({
+  page,
+  request,
+}, info) => {
+  await login(page);
+  const picker = page.getByRole("combobox", { name: "Administration section" });
+  if ((page.viewportSize()?.width || 0) < 1024) {
+    await picker.click();
+    await page.getByRole("option", { name: /Identity/ }).click();
+  } else await page.getByRole("tab", { name: /Identity/ }).click();
+  const home = page.getByRole("combobox", { name: "Home page" });
+  await expect(home).toHaveText("Courses");
+  await home.click();
+  await page.getByRole("option", { name: "Docs", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(page.getByText("Settings saved.")).toBeVisible();
+  await page.locator(".main-content").evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await page.locator(".admin-panel").evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await page.screenshot({
+    path: info.outputPath("identity-home-page.png"),
+    fullPage: true,
+  });
+  const response = await request.get("/", { maxRedirects: 0 });
+  expect(response.headers().location).toBe("/docs");
+});
 test("account pages resist short-page pull and scroll when content is taller", async ({
   page,
 }, info) => {
@@ -246,7 +277,7 @@ test("provider failure stays recoverable, cancellation preserves return, unsafe 
     (await page.context().cookies()).find(
       (c) => c.name === "fieldbook-sign-in-return",
     )?.value,
-  ).toBe(encodeURIComponent(organizationHomePath));
+  ).toBe(encodeURIComponent("/"));
 });
 test("settings authorization, saved identity and private content protection", async ({
   page,

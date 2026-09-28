@@ -9,6 +9,7 @@ export async function GET(req: Request) {
   const jar = await cookies();
   const next = safeNext(
     url.searchParams.get("next") ?? jar.get(SIGN_IN_RETURN_COOKIE)?.value,
+    "/",
   );
   let origin = url.origin;
   try {
