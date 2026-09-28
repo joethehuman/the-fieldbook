@@ -32,6 +32,7 @@ import {
   type GroupBrowseSort,
 } from "@/lib/group-browse-sort";
 import { Button } from "./ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "./ui/dialog";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import type { LearningHandler } from "./Assignments";
 import { SaveRecoveryError } from "@/lib/save-recovery";
@@ -68,6 +69,7 @@ export default function LearningGroups({
     useState<GroupBrowseSort>("updated-newest");
   const [name, setName] = useState("");
   const [createParent, setCreateParent] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
   const [moveParent, setMoveParent] = useState<string | null>(null);
   const [linkedOpen, setLinkedOpen] = useState(true);
   const [childrenOpen, setChildrenOpen] = useState(true);
@@ -208,13 +210,20 @@ export default function LearningGroups({
   })() : null;
   const childGroups = group ? data.groups.filter((g) => g.parentId === group.id) : [];
   const inheritedGroups = group ? [...data.groups].filter((g) => g.id !== group.id && canParent(g.id, group.id, data.groups) === false) : [];
+  function closeCreate() {
+    if (busy) return;
+    setCreateOpen(false);
+    setName("");
+    setCreateParent("");
+    setNotice("");
+  }
   return (
     <section
       {...destination.targetProps}
       aria-label={group ? group.name : "Learning groups"}
       className="learning-admin"
     >
-      {notice && <Alert variant="destructive">{notice}</Alert>}
+      {notice && !createOpen && <Alert variant="destructive">{notice}</Alert>}
       {!group ? (
         <>
           <SectionHeader
@@ -226,60 +235,6 @@ export default function LearningGroups({
               </>
             }
           ></SectionHeader>
-          <form
-            className="group-create"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              const clean = name.trim();
-              if (!clean) return;
-              if (
-                data.groups.some(
-                  (g) => g.name.toLowerCase() === clean.toLowerCase(),
-                )
-              ) {
-                setNotice("That group already exists.");
-                return;
-              }
-              const id = crypto.randomUUID();
-              if (
-                await save(
-                  {
-                    ...data,
-                    groups: [
-                      ...data.groups,
-                      { id, name: clean, parentId: createParent || undefined, learningItems: [], teamIds: [] },
-                    ],
-                  },
-                  "Learning group created.",
-                )
-              ) {
-                setName("");
-                setCreateParent("");
-                setSelected(id);
-                destination.reveal();
-              }
-            }}
-          >
-            <FormField label="New learning group">
-              <Input
-                required
-                maxLength={80}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Account executives"
-              />
-            </FormField>
-            <FormField label="Parent group" description="Optional. Members of a child group also receive the parent group’s learning and Updates.">
-              <SelectField value={createParent} onValueChange={setCreateParent} disabled={busy}>
-                <option value="">Top level</option>
-                {data.groups.map((g) => <option key={g.id} value={g.id}>{groupPath(g.id, data.groups)}</option>)}
-              </SelectField>
-            </FormField>
-            <Button loading={busy} type="submit">
-              <Plus size={16} />
-              Create group
-            </Button>
-          </form>
           <BulkActions
             singleItemActions={false}
             collectionSize={overviewSelection.collectionSize}
@@ -323,6 +278,12 @@ export default function LearningGroups({
           />
           <HierarchyList
             label="Learning groups"
+            searchAction={
+              <Button type="button" disabled={busy} onClick={() => { setCreateParent(""); setNotice(""); setCreateOpen(true); }}>
+                <Plus aria-hidden="true" />
+                Create group
+              </Button>
+            }
             items={[...data.groups].sort((a, b) => a.name.localeCompare(b.name)).map((g) => ({
               id: g.id,
               parentId: g.parentId,
@@ -358,7 +319,7 @@ export default function LearningGroups({
               <Button
                 variant="outline"
                 disabled={busy}
-                onClick={() => { setCreateParent(group.id); setSelected(""); destination.reveal(); }}
+                onClick={() => { setCreateParent(group.id); setNotice(""); setCreateOpen(true); }}
               >
                 Add child group
               </Button>
@@ -835,6 +796,54 @@ export default function LearningGroups({
           </Tabs>
         </>
       )}
+      <Dialog open={createOpen} onOpenChange={(open) => { if (!open) closeCreate(); }}>
+        <DialogContent
+          onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
+          onPointerDownOutside={(event) => { if (busy) event.preventDefault(); }}
+        >
+          <DialogTitle>Create learning group</DialogTitle>
+          <DialogDescription>Name the group and optionally place it beneath an existing group.</DialogDescription>
+          <form className="grid gap-4" onSubmit={async (event) => {
+            event.preventDefault();
+            const clean = name.trim();
+            if (!clean) return;
+            if (data.groups.some((g) => g.name.toLowerCase() === clean.toLowerCase())) {
+              setNotice("That group already exists.");
+              return;
+            }
+            const id = crypto.randomUUID();
+            if (await save({
+              ...data,
+              groups: [...data.groups, { id, name: clean, parentId: createParent || undefined, learningItems: [], teamIds: [] }],
+            }, "Learning group created.")) {
+              setCreateOpen(false);
+              setName("");
+              setCreateParent("");
+              setSelected(id);
+              destination.reveal();
+            }
+          }}>
+            {notice && <Alert variant="destructive">{notice}</Alert>}
+            <FieldGroup disabled={busy}>
+              <FormField label="New learning group">
+                <Input required maxLength={80} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Account executives" />
+              </FormField>
+              <FormField label="Parent group" description="Optional. Members of a child group also receive the parent group’s learning and Updates.">
+                <SelectField value={createParent} onValueChange={setCreateParent} disabled={busy}>
+                  <option value="">Top level</option>
+                  {data.groups.map((candidate) => <option key={candidate.id} value={candidate.id}>{groupPath(candidate.id, data.groups)}</option>)}
+                </SelectField>
+              </FormField>
+            </FieldGroup>
+            <DialogFooter className="justify-end">
+              <ActionGroup>
+                <Button type="button" variant="outline" disabled={busy} onClick={closeCreate}>Cancel</Button>
+                <Button type="submit" loading={busy}>Create group</Button>
+              </ActionGroup>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

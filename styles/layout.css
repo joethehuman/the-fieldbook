@@ -272,15 +272,13 @@
     border-top: 1px solid var(--border);
     padding-top: var(--space-6);
   }
-  .assignment-filters,
-  .group-create {
+  .assignment-filters {
     display: flex;
     flex-wrap: wrap;
     align-items: end;
     gap: var(--space-3);
   }
-  .assignment-filters > [data-slot="field"],
-  .group-create > [data-slot="field"] {
+  .assignment-filters > [data-slot="field"] {
     flex: 1;
     min-width: 12rem;
   }

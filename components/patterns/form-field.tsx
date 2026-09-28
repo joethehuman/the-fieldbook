@@ -20,6 +20,7 @@ export function FormField({
   label,
   description,
   error,
+  visuallyHiddenLabel = false,
   children,
   className,
   ...props
@@ -27,6 +28,7 @@ export function FormField({
   label: ReactNode;
   description?: ReactNode;
   error?: ReactNode;
+  visuallyHiddenLabel?: boolean;
   children: ReactElement<ControlProps>;
 }) {
   const generatedId = useId();
@@ -45,7 +47,7 @@ export function FormField({
       className={cn("grid min-w-0 gap-2", className)}
       {...props}
     >
-      <Field htmlFor={id}>{label}</Field>
+      <Field htmlFor={id} className={visuallyHiddenLabel ? "sr-only" : undefined}>{label}</Field>
       {cloneElement(children, {
         id,
         "aria-describedby": describedBy,

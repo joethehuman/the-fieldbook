@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Show Docs sections, learning groups and teams as expandable hierarchies. Move branches with destination and effect review, show membership sources and full paths, and keep Docs reordering consistent with its drag preview. Simplify Docs section actions and make branch drops explicit. Shared selection rows center checkboxes and radios, show page/all-result scope, and keep Select all and Bulk actions fixed while selection counts and Clear selection appear. Docs changes still need Save settings.
+- Show Docs sections, learning groups and teams as expandable hierarchies. Move branches with destination and effect review, show membership sources and full paths, and keep Docs reordering consistent with its drag preview. Create learning groups in a dialog; keep the search field beside the Create group button. Simplify Docs section actions and make branch drops explicit. Shared selection rows center checkboxes and radios, show page/all-result scope, and keep Select all and Bulk actions fixed while selection counts and Clear selection appear. Docs changes still need Save settings.
 
 - Add shared generated card artwork for Updates, Courses and Curricula, with 30 compositions, random Shuffle choices that avoid recent repeats, custom images, and Identity palette controls. Previously saved artwork keeps its original design. [Artwork guide](docs/card-artwork.md).
 

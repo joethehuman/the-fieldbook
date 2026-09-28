@@ -116,18 +116,40 @@ test("learning groups: shared controls, save and reload", async ({
   await expect(
     page.getByRole("heading", { name: "Learning groups", exact: true }),
   ).toHaveCount(1);
-  await page
-    .getByRole("textbox", { name: "New learning group" })
-    .fill("Sales design test");
-  await page.getByRole("button", { name: "Create group", exact: true }).click();
+  const search = page.getByRole("searchbox", { name: "Find learning groups" });
+  const createButton = page.getByRole("button", { name: "Create group", exact: true });
+  await expect(search).toBeVisible();
+  if (testInfo.project.name === "desktop") {
+    const searchBox = await search.boundingBox();
+    const buttonBox = await createButton.boundingBox();
+    expect(Math.abs(searchBox!.y - buttonBox!.y)).toBeLessThan(2);
+  }
+  await testInfo.attach("learning-groups-overview", {
+    body: await page.screenshot({ fullPage: true, path: testInfo.outputPath("overview.png") }),
+    contentType: "image/png",
+  });
+  await createButton.click();
+  const createDialog = page.getByRole("dialog", { name: "Create learning group" });
+  await expect(createDialog).toBeVisible();
+  await testInfo.attach("learning-group-create-dialog", {
+    body: await page.screenshot({ fullPage: true, path: testInfo.outputPath("create-dialog.png") }),
+    contentType: "image/png",
+  });
+  await createDialog.getByRole("textbox", { name: "New learning group" }).fill("Sales design test");
+  const createParent = createDialog.getByRole("combobox", { name: "Parent group" });
+  await expect(createParent).toHaveText("Top level");
+  await createParent.click();
+  await page.getByRole("option", { name: "Account executives", exact: true }).click();
+  await expect(createParent).toHaveText("Account executives");
+  await createDialog.getByRole("button", { name: "Create group" }).click();
+  await expect(createDialog).not.toBeVisible();
   // Creation opens the detail view.
+  await expect(page.locator(".learning-admin")).toContainText("Account executives / Sales design test");
+  await page.getByRole("button", { name: "Add child group" }).click();
+  await expect(createDialog.getByRole("combobox", { name: "Parent group" })).toHaveText("Account executives / Sales design test");
+  await createDialog.getByRole("button", { name: "Cancel" }).click();
+  await expect(createDialog).not.toBeVisible();
   await page.getByRole("tab", { name: "Members", exact: true }).click();
-  const parent = page.getByRole("combobox", { name: "Parent learning group" });
-  await parent.click();
-  await page
-    .getByRole("option", { name: "Account executives", exact: true })
-    .click();
-  await expect(parent).toHaveText("Account executives");
   await page.getByRole("tab", { name: "Updates", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Updates for this group" }),
@@ -146,13 +168,12 @@ test("learning groups: shared controls, save and reload", async ({
   });
   await page.reload();
   await adminSection(page, "Learning groups");
+  await page.getByRole("searchbox", { name: "Find learning groups" }).fill("Sales design test");
   await page
     .getByRole("button", { name: "Manage Sales design test", exact: true })
     .click();
   await page.getByRole("tab", { name: "Members", exact: true }).click();
-  await expect(
-    page.getByRole("combobox", { name: "Parent learning group" }),
-  ).toHaveText("Account executives");
+  await expect(page.locator(".learning-admin")).toContainText("Parent: Account executives");
 });
 
 test("admin menu scroll stays put while the new panel starts at the top", async ({

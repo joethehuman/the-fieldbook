@@ -29,6 +29,7 @@ export function HierarchyList({
   selected,
   onSelectionChange,
   selectionActions,
+  searchAction,
 }: {
   items: HierarchyItem[];
   label: string;
@@ -37,6 +38,7 @@ export function HierarchyList({
   selected?: string[];
   onSelectionChange?: (ids: string[]) => void;
   selectionActions?: ReactNode;
+  searchAction?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -161,20 +163,25 @@ export function HierarchyList({
   }
   return (
     <div className="grid min-w-0 gap-4">
-      <FormField
-        label={`Find ${label.toLowerCase()}`}
-        description={`Search includes matching ${label.toLowerCase()} and their parents. Expand a row to explore its branch.`}
-      >
-        <Input
-          type="search"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            onSelectionChange?.([]);
-          }}
-          placeholder={`Find ${label.toLowerCase()}`}
-        />
-      </FormField>
+      <div className="flex flex-wrap items-start gap-3">
+        <FormField
+          className="min-w-[16rem] flex-1"
+          label={`Find ${label.toLowerCase()}`}
+          visuallyHiddenLabel={!!searchAction}
+          description={`Search includes matching ${label.toLowerCase()} and their parents. Expand a row to explore its branch.`}
+        >
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              onSelectionChange?.([]);
+            }}
+            placeholder={`Find ${label.toLowerCase()}`}
+          />
+        </FormField>
+        {searchAction}
+      </div>
       {(canBulkSelect(matches.length) || items.length === 1) &&
         selectionActions}
       {canBulkSelect(matches.length) && selected && onSelectionChange && (
