@@ -391,9 +391,15 @@ export function Assignments({
         <p>Create a group to define its assigned courses.</p>
       )}
       <p className="muted">
-        {data.settings?.onboardingDays ?? 90} days for new users ·{" "}
-        {data.settings?.catchUpDays ?? 30} days to catch up with new assigned
-        courses. Manage these windows in Settings.
+        {data.settings?.dueDatesEnabled === false ? (
+          <>Due dates are off. Manage them in Settings.</>
+        ) : (
+          <>
+            {data.settings?.onboardingDays ?? 90} days for new users ·{" "}
+            {data.settings?.catchUpDays ?? 30} days to catch up with new assigned
+            courses. Manage these windows in Settings.
+          </>
+        )}
       </p>
       {notice && <Alert variant="destructive">{notice}</Alert>}
       <FormField label="Find a course">

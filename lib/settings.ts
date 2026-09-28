@@ -32,6 +32,7 @@ export type SiteSettings = {
   docCategoryOrder?: string[];
   docSections?: import("./docs-navigation").DocSection[];
   newUserStage?: "existing" | "newhire";
+  dueDatesEnabled?: boolean;
   onboardingDays?: number;
   catchUpDays?: number;
   privacy?: PrivacySettings;
@@ -46,6 +47,7 @@ export const defaultSettings: SiteSettings = {
   homePage: "courses",
   guestGroupId: null,
   newUserStage: "existing",
+  dueDatesEnabled: true,
   onboardingDays: 90,
   catchUpDays: 30,
   welcomeDescription: "",

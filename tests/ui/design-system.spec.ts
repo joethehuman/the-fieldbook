@@ -298,7 +298,7 @@ test("admin destinations and editor render without overflow or errors", async ({
     "Progress",
     "Identity",
     "Docs navigation",
-    "Assignment window",
+    "Due dates",
     "Access",
     "Privacy",
     "MCP",
@@ -536,7 +536,7 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
     d = await description.boundingBox();
   expect(d!.y).toBeGreaterThanOrEqual(h!.y + h!.height);
   expect(Math.abs(d!.x - h!.x)).toBeLessThan(1);
-  const nav = page.getByRole("tab", { name: "Assignment window", exact: true });
+  const nav = page.getByRole("tab", { name: "Due dates", exact: true });
   if (await nav.isVisible()) {
     await expect(nav).toHaveCSS("text-align", "left");
     const icons = await page
