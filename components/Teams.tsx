@@ -58,7 +58,19 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
           report={() => teamProgressCsv(rows)}
         />
       </SectionHeader>
-      <FilterBar>
+      <FilterBar search={
+        <FormField label="Find a team member" visuallyHiddenLabel>
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPerson("");
+            }}
+            placeholder="Find a team member by name or email"
+          />
+        </FormField>
+      }>
         <FormField label="Reporting team">
           <SelectField
             value={teamId}
@@ -78,16 +90,6 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
                 </option>
               ))}
           </SelectField>
-        </FormField>
-        <FormField label="Find a team member">
-          <Input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPerson("");
-            }}
-            placeholder="Name or email"
-          />
         </FormField>
       </FilterBar>
       <p className="muted">

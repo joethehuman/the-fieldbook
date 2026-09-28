@@ -27,6 +27,7 @@ import { MoreHorizontal, ChevronDown } from "lucide-react";
 import { PublicationStatus } from "./patterns/publication-status";
 import { FieldDescription } from "./ui/field";
 import { FormField } from "@/components/patterns/form-field";
+import { FilterOptions } from "./patterns/filter-options";
 import { useToast } from "./ui/toast";
 import { DataTable } from "./patterns/data-table";
 import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation";
@@ -715,29 +716,30 @@ export default function Admin({
             <>
               <CollectionToolbar
                 filters={
-                  <Tabs
+                  <FilterOptions
+                    label="Content type"
+                    variant="underline"
                     value={filter}
                     onValueChange={(value) => {
                       setFilter(value);
                       setContentSection("all");
                       setCategory("all");
                     }}
-                  >
-                    <TabsList aria-label="Content type">
-                      <TabsTrigger value="all">All content</TabsTrigger>
-                      <TabsTrigger value="doc">Docs</TabsTrigger>
-                      <TabsTrigger value="brief">Updates</TabsTrigger>
-                      <TabsTrigger value="course">Courses</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+                    options={[
+                      { value: "all", label: "All content" },
+                      { value: "doc", label: "Docs" },
+                      { value: "brief", label: "Updates" },
+                      { value: "course", label: "Courses" },
+                    ]}
+                  />
                 }
               >
                 <ActionGroup>
-                  <Button variant="outline" onClick={() => create("doc")}>
+                  <Button onClick={() => create("doc")}>
                     <Plus size={15} />
                     Doc
                   </Button>
-                  <Button variant="outline" onClick={() => create("brief")}>
+                  <Button onClick={() => create("brief")}>
                     <Plus size={15} />
                     Update
                   </Button>
@@ -747,14 +749,16 @@ export default function Admin({
                   </Button>
                 </ActionGroup>
               </CollectionToolbar>
-              <FilterBar>
-                <FormField label="Search content">
+              <FilterBar search={
+                <FormField label="Search content" visuallyHiddenLabel>
                   <Input
+                    type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Title, summary, or folder"
+                    placeholder="Search content by title, summary, or folder"
                   />
                 </FormField>
+              }>
                 {filter !== "doc" && (
                   <FormField label="Category">
                     <SelectField
@@ -1053,14 +1057,16 @@ export default function Admin({
                   </Button>
                 )}
               </Toolbar>
-              <FilterBar>
-                <FormField label="Search profiles">
+              <FilterBar search={
+                <FormField label="Search profiles" visuallyHiddenLabel>
                   <Input
+                    type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Name or email"
+                    placeholder="Search profiles by name or email"
                   />
                 </FormField>
+              }>
                 <FormField label="Role">
                   <SelectField
                     value={peopleRole}
@@ -1104,8 +1110,7 @@ export default function Admin({
                     <option value="reverse">Name Z–A</option>
                   </SelectField>
                 </FormField>
-              </FilterBar>
-              <FormField label="Reporting team">
+                <FormField label="Reporting team">
                 <SelectField value={peopleTeam} onValueChange={setPeopleTeam}>
                   <option value="all">All teams</option>
                   <option value="none">No team</option>
@@ -1115,7 +1120,8 @@ export default function Admin({
                     </option>
                   ))}
                 </SelectField>
-              </FormField>
+                </FormField>
+              </FilterBar>
               <PeopleBulkActions
                 currentUserId={user.id}
                 data={data}
@@ -1994,11 +2000,11 @@ export function Editor({
                     />
                     <Button
                       type="button"
-                      variant="outline"
                       disabled={busy}
                       onClick={() => setCreatingSection((open) => !open)}
                     >
-                      Create section
+                      <Plus aria-hidden="true" />
+                      {creatingSection ? "Close section form" : "Create section"}
                     </Button>
                     {creatingSection && (
                       <DocSectionCreate

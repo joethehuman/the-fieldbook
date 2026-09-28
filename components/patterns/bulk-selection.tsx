@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Plus } from "lucide-react";
 import { Checkbox } from "../ui/choice";
 import { Button } from "../ui/button";
 import { useToast } from "../ui/toast";
@@ -118,13 +119,13 @@ export function BulkSelectionBar({
         {count ? `${count} selected` : range || `${total} ${noun}`}
         {count && range ? ` · ${range}` : ""}
       </span>
-      <ActionGroup className="ms-auto justify-end">
+      <ActionGroup>
+        {children}
         {count > 0 && (
           <Button variant="ghost" onClick={onClear}>
             Clear selection
           </Button>
         )}
-        {children}
       </ActionGroup>
     </div>
   );
@@ -159,7 +160,6 @@ export function BulkPicker({
     <>
       <Button
         type="button"
-        variant="outline"
         disabled={disabled || !options.length}
         onClick={() => {
           setChosen([]);
@@ -167,6 +167,7 @@ export function BulkPicker({
           setOpen(true);
         }}
       >
+        <Plus aria-hidden="true" />
         {title}
       </Button>
       <Dialog

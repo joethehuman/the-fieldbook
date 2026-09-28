@@ -11,6 +11,7 @@ import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { DocSectionsSettings } from "./DocSectionsSettings";
 import { ActionGroup } from "./ui/action-group";
+import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { CardPaletteSettings } from "./CardPaletteSettings";
@@ -349,7 +350,6 @@ export default function SiteSettingsPanel({
               <ActionGroup>
                 <Button
                   type="button"
-                  variant="outline"
                   disabled={busy}
                   onClick={async () => {
                     const name = (
@@ -397,6 +397,7 @@ export default function SiteSettingsPanel({
                     }
                   }}
                 >
+                  <Plus aria-hidden="true" />
                   Create guest group
                 </Button>
               </ActionGroup>

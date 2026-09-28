@@ -21,6 +21,7 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import { groupPath } from "@/lib/group-hierarchy";
 import {
@@ -384,6 +385,7 @@ export function Assignments({
             </SelectField>
           </FormField>
           <Button variant="default" disabled={busy || !available.length}>
+            <Plus aria-hidden="true" />
             Add to assigned courses
           </Button>
         </form>

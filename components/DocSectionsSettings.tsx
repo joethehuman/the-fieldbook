@@ -1,6 +1,6 @@
 "use client";
 import { Fragment, useState, type DragEvent, type ReactNode } from "react";
-import { ChevronRight, GripVertical, MoreHorizontal } from "lucide-react";
+import { ChevronRight, GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import {
   availableDocSections,
   deleteDocSection,
@@ -316,10 +316,11 @@ export function DocSectionsSettings({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <Button
           type="button"
-          variant="outline"
+          variant={creatingRoot ? "outline" : "default"}
           disabled={disabled || !!conflict}
           onClick={() => setCreatingRoot((value) => !value)}
         >
+          {!creatingRoot && <Plus aria-hidden="true" />}
           {creatingRoot ? "Cancel new section" : "New section"}
         </Button>
         <Button

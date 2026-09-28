@@ -125,16 +125,27 @@ export function Toolbar({ className, ...props }: ComponentProps<"div">) {
     />
   );
 }
-export function FilterBar({ className, ...props }: ComponentProps<"div">) {
+export function FilterBar({
+  search,
+  className,
+  children,
+  ...props
+}: ComponentProps<"div"> & { search?: ReactNode }) {
   return (
     <div
       data-slot="filter-bar"
       className={cn(
-        "flex min-w-0 flex-wrap items-start gap-4 rounded-lg border border-border bg-muted/40 p-4 [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1",
+        "min-w-0 gap-4 rounded-lg border border-border bg-muted/40 p-4",
+        search
+          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 [&>[data-slot=field]]:min-w-0"
+          : "flex flex-wrap items-start [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1",
         className,
       )}
       {...props}
-    />
+    >
+      {search && <div className="col-span-full min-w-0">{search}</div>}
+      {children}
+    </div>
   );
 }
 export function EmptyState({ className, ...props }: ComponentProps<"div">) {

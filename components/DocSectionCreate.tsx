@@ -5,6 +5,7 @@ import { Input } from "./ui/input";
 import { SelectField } from "./ui/select";
 import { Button } from "./ui/button";
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import { createDocSection, type DocSection } from "@/lib/docs-navigation";
 
 export default function DocSectionCreate({
@@ -79,10 +80,10 @@ export default function DocSectionCreate({
       <ActionGroup>
         <Button
           type="button"
-          variant="outline"
           disabled={disabled || busy || !name.trim()}
           onClick={create}
         >
+          <Plus aria-hidden="true" />
           {busy ? "Creating…" : "Create section"}
         </Button>
         {onCancel && (

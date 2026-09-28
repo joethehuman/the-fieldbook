@@ -3,6 +3,7 @@ import { Card, CardContent, CardFooter } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
+import { FilterOptions } from "./patterns/filter-options";
 import { ContentFeedback } from "./patterns/content-feedback";
 import { CsvExport } from "./patterns/csv-export";
 import { feedbackRows, feedbackCsv } from "@/lib/reporting";
@@ -97,14 +98,27 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
         )}
         <CsvExport filename="feedback" report={() => feedbackCsv(records)} />
       </SectionHeader>
-      <FilterBar>
-        <FormField label="Search feedback">
+      <FilterOptions
+        label="Feedback rating"
+        variant="underline"
+        value={rating}
+        onValueChange={setRating}
+        options={[
+          { value: "all", label: "All ratings" },
+          { value: "up", label: "Useful" },
+          { value: "down", label: "Not useful" },
+        ]}
+      />
+      <FilterBar search={
+        <FormField label="Search feedback" visuallyHiddenLabel>
           <Input
+            type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Content title or comment"
+            placeholder="Search feedback by content title or comment"
           />
         </FormField>
+      }>
         <FormField label="Content type">
           <SelectField
             value={kind}
@@ -130,16 +144,6 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
                   {c.title}
                 </option>
               ))}
-          </SelectField>
-        </FormField>
-        <FormField label="Rating">
-          <SelectField
-            value={rating}
-            onValueChange={(value) => setRating(value)}
-          >
-            <option value="all">All ratings</option>
-            <option value="up">Useful</option>
-            <option value="down">Not useful</option>
           </SelectField>
         </FormField>
         <FormField label="Sort feedback">

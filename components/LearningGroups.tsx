@@ -13,7 +13,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
-import { SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { FilterBar, SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { Alert } from "@/components/ui/alert";
 import { ActionGroup } from "@/components/ui/action-group";
 import { useState } from "react";
@@ -317,10 +317,10 @@ export default function LearningGroups({
           >
             <ActionGroup>
               <Button
-                variant="outline"
                 disabled={busy}
                 onClick={() => { setCreateParent(group.id); setNotice(""); setCreateOpen(true); }}
               >
+                <Plus aria-hidden="true" />
                 Add child group
               </Button>
               <Button variant="outline" disabled={busy} onClick={() => setMoveParent(group.parentId || "")}>Move group</Button>
@@ -724,14 +724,17 @@ export default function LearningGroups({
                       }}
                       actionLabel="Add Updates"
                     />
-                    <FormField label="Find an update">
-                      <Input
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search Updates"
-                      />
-                    </FormField>
-                    <FormField label="Sort updates for this group">
+                    <FilterBar search={
+                      <FormField label="Find an update" visuallyHiddenLabel>
+                        <Input
+                          type="search"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="Find an update"
+                        />
+                      </FormField>
+                    }>
+                      <FormField label="Sort updates for this group">
                       <SelectField
                         value={updateSort}
                         onValueChange={(v) =>
@@ -752,7 +755,8 @@ export default function LearningGroups({
                         </option>
                         <option value="title">Title A–Z</option>
                       </SelectField>
-                    </FormField>
+                      </FormField>
+                    </FilterBar>
                     <BulkActions
                       collectionSize={updateSelection.collectionSize}
                       selected={updateSelection.actionIds}

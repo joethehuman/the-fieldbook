@@ -813,8 +813,8 @@ export function TeamsAdmin({
                     disabled={busy}
                   />
                 </SectionHeader>
-                <FilterBar>
-                  <FormField label="Find a member">
+                <FilterBar search={
+                  <FormField label="Find a member" visuallyHiddenLabel>
                     <Input
                       type="search"
                       value={query}
@@ -822,9 +822,10 @@ export function TeamsAdmin({
                         setQuery(e.target.value);
                         setPage(1);
                       }}
-                      placeholder="Name or email"
+                      placeholder="Find a member by name or email"
                     />
                   </FormField>
+                }>
                   <FormField label="Membership scope">
                     <SelectField
                       value={includeSubteams ? "all" : "direct"}
@@ -1050,6 +1051,7 @@ export function TeamsAdmin({
                         })
                       }
                     >
+                      <Plus aria-hidden="true" />
                       Create subteam
                     </Button>
                   </ActionGroup>

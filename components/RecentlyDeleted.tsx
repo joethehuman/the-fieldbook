@@ -81,6 +81,7 @@ export function RecentlyDeleted({
         )}
       <FilterOptions
         label="Deleted item type"
+        variant="underline"
         value={filter}
         onValueChange={(v) => {
           setFilter(v);
