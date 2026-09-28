@@ -351,11 +351,23 @@ test("course rows scroll directly and the completion card splits on iPad", async
       expect(strip!.y).toBeGreaterThan(summary!.y + summary!.height);
     }
     expect(action!.width).toBeLessThan(summary!.width * 0.7);
-    expect(
-      Math.abs(
-        action!.x + action!.width / 2 - (summary!.x + summary!.width / 2),
-      ),
-    ).toBeLessThan(2);
+    await expect
+      .poll(async () => {
+        const settledSummary = await home
+          .locator('[data-slot="card"]')
+          .first()
+          .boundingBox();
+        const settledAction = await home
+          .locator('[data-slot="card"]')
+          .first()
+          .getByRole("button", { name: "Start course" })
+          .boundingBox();
+        return Math.abs(
+          settledAction!.x + settledAction!.width / 2 -
+            (settledSummary!.x + settledSummary!.width / 2),
+        );
+      })
+      .toBeLessThan(2);
     await page.setViewportSize({ width, height: 1400 });
     await row.evaluate((element) => element.blur());
     await home.screenshot({

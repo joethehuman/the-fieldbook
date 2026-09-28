@@ -1,6 +1,10 @@
 /* Application geometry only. Controls, fields, actions and surfaces live in components. */
 @layer components {
   .app {
+    --sidebar-rail-width: 4.25rem;
+    --sidebar-inner-width: calc(var(--sidebar-width) - var(--space-4) - var(--space-4) - 1px);
+    --active-sidebar-width: var(--sidebar-width);
+    --sidebar-nav-width: var(--sidebar-inner-width);
     position: fixed;
     inset: 0;
     height: 100dvh;
@@ -11,15 +15,27 @@
     inset: 0 auto 0 0;
     z-index: 30;
     display: flex;
-    width: min(var(--sidebar-width), calc(100vw - 2rem));
+    width: min(var(--active-sidebar-width), calc(100vw - 2rem));
     flex-direction: column;
     gap: var(--space-6);
     overflow-y: auto;
+    overflow-x: hidden;
     overscroll-behavior: none;
     scrollbar-gutter: stable;
     border-right: 1px solid var(--border);
     background: var(--muted);
     padding: var(--space-6) var(--space-4);
+    transition: width 180ms ease;
+  }
+  .sidebar-heading {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .sidebar-heading .logo {
+    font-size: 1.125rem;
   }
   .logo {
     color: var(--foreground);
@@ -58,11 +74,12 @@
     height: 100%;
     min-height: 0;
     flex-direction: column;
-    margin-left: var(--sidebar-width);
+    margin-left: var(--active-sidebar-width);
     overflow: clip;
+    transition: margin-left 180ms ease;
   }
   .topbar {
-    --search-panel-width: min(48rem, calc(100vw - var(--sidebar-width) - 3rem));
+    --search-panel-width: min(48rem, calc(100vw - var(--active-sidebar-width) - 3rem));
     position: relative;
     z-index: 15;
     background: var(--background);
@@ -698,13 +715,17 @@
     }
   }
   @media (width < 48rem) {
+    .app {
+      --sidebar-nav-width: 100%;
+    }
     .lesson-nav {
       grid-template-columns: minmax(0, 1fr);
     }
     .sidebar {
+      width: min(var(--sidebar-width), calc(100vw - 2rem));
       visibility: hidden;
       transform: translateX(-100%);
-      transition: transform 150ms ease;
+      transition: transform 150ms ease, visibility 150ms ease;
     }
     .sidebar.open {
       visibility: visible;
@@ -728,6 +749,7 @@
     }
     .main-shell {
       margin-left: 0;
+      transition: none;
     }
     .main-content {
       padding: var(--space-6) var(--space-4);
@@ -742,6 +764,77 @@
     .knowledge-grid {
       grid-template-columns: minmax(0, 1fr);
     }
+  }
+  @media (width >= 48rem) {
+    .sidebar-heading,
+    .primary-navigation,
+    .document-tree,
+    .sidebar-bottom {
+      width: var(--sidebar-inner-width);
+    }
+    .sidebar-heading .logo,
+    .sidebar-nav-text,
+    .nav-count,
+    .document-tree,
+    .sidebar-account-avatar,
+    .sidebar-account-identity,
+    .sidebar-account-secondary {
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 160ms ease, visibility 0s;
+    }
+    .sidebar-nav-text,
+    .nav-count {
+      white-space: nowrap;
+    }
+    .app:not(.sidebar-collapsed) .document-tree {
+      animation: sidebar-content-appear 160ms ease both;
+    }
+    .app.sidebar-collapsed {
+      --active-sidebar-width: var(--sidebar-rail-width);
+      --sidebar-nav-width: 2.25rem;
+    }
+    .sidebar-collapsed .sidebar {
+      scrollbar-width: none;
+    }
+    .sidebar-collapsed .sidebar-heading .logo,
+    .sidebar-collapsed .sidebar-nav-text,
+    .sidebar-collapsed .nav-count,
+    .sidebar-collapsed .document-tree,
+    .sidebar-collapsed .sidebar-account-avatar,
+    .sidebar-collapsed .sidebar-account-identity,
+    .sidebar-collapsed .sidebar-account-secondary {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+      transition: opacity 160ms ease, visibility 0s linear 160ms;
+    }
+    .sidebar-collapsed .sidebar-toggle {
+      transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 1px));
+    }
+    .sidebar-collapsed .sidebar-account-trigger {
+      transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 9px));
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .app:not(.sidebar-collapsed) .document-tree {
+      animation: none;
+    }
+    .sidebar,
+    .main-shell,
+    .sidebar-heading .logo,
+    .sidebar-nav-text,
+    .nav-count,
+    .document-tree,
+    .sidebar-account-avatar,
+    .sidebar-account-identity,
+    .sidebar-account-secondary {
+      transition: none;
+    }
+  }
+  @keyframes sidebar-content-appear {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
 

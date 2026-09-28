@@ -1,6 +1,7 @@
 import { TooltipProvider } from "../components/ui/tooltip";
 import { ToastProvider } from "../components/ui/toast";
 import { InteractionDialogProvider } from "../components/ui/interaction-dialog";
+import { DesktopSidebarProvider } from "../components/patterns/desktop-sidebar-state";
 import { GeistSans } from "geist/font/sans";
 import type { Metadata } from "next";
 import "./globals.css";
@@ -16,11 +17,13 @@ export default function RootLayout({
   return (
     <html lang="en" className={GeistSans.variable}>
       <body>
-        <TooltipProvider>
-          <ToastProvider>
-            <InteractionDialogProvider>{children}</InteractionDialogProvider>
-          </ToastProvider>
-        </TooltipProvider>
+        <DesktopSidebarProvider>
+          <TooltipProvider>
+            <ToastProvider>
+              <InteractionDialogProvider>{children}</InteractionDialogProvider>
+            </ToastProvider>
+          </TooltipProvider>
+        </DesktopSidebarProvider>
       </body>
     </html>
   );
