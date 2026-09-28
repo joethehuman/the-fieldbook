@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock } from "lucide-react";
+import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Minus, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Alert } from "./ui/alert";
@@ -18,7 +18,7 @@ import { correctOptionIds, optionIds, quizUnlocked, requiresPassing, type QuizAn
 import { isComplete, type Content, type Progress } from "@/lib/types";
 
 export function Course({ course, progress, onBack, backLabel, onProgress, onDemoProgress,
-  guest = false, onSignIn, feedback, initialLessonId, curriculumTitle, backHref, lessonBaseHref }: {
+  guest = false, feedback, initialLessonId, curriculumTitle, backHref, lessonBaseHref }: {
   course: Content;
   progress: Progress[];
   onBack: () => void;
@@ -117,45 +117,47 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   return <div className="course-detail course-player">
     <div className="lesson-layout">
       <aside className="course-sidebar">
-        {backHref ? <Button asChild variant="link" className="justify-self-start"><Link href={backHref}>← {backLabel}</Link></Button> : <Button variant="link" className="justify-self-start" onClick={onBack}>← {backLabel}</Button>}
-        <div className="course-detail-heading">
-          <span className="eyebrow">{curriculumTitle || course.category}</span>
-          <h1>{course.title}</h1>
-          <div className="course-about">
-            <details><summary>About this course</summary><p>{course.summary}</p><p>{course.duration} min · {course.lessons.length} lessons</p>{course.body && <div className="markdown"><Markdown linkContext="course">{course.body}</Markdown></div>}</details>
-            <p className="course-desktop-summary">{course.summary}</p>
-            <div className="course-detail-meta course-desktop-summary"><Clock size={16} /> {course.duration} min · {course.lessons.length} lessons <Badge variant="success" className={complete ? undefined : "invisible"} aria-hidden={!complete}>Completed</Badge></div>
-            {course.body && <div className="markdown course-desktop-summary"><Markdown linkContext="course">{course.body}</Markdown></div>}
+        <Card className="course-sidebar-panel">
+          <div className="course-detail-heading">
+            <span className="eyebrow">{curriculumTitle || course.category}</span>
+            <h1>{course.title}</h1>
+            <div className="course-about">
+              <details><summary><span>About this course</span><span className="course-about-toggle" aria-hidden="true"><Plus className="course-about-plus" size={16} /><Minus className="course-about-minus" size={16} /></span></summary><div className="course-about-content"><p>{course.summary}</p><div className="course-detail-meta"><span className="course-duration"><Clock size={16} aria-hidden="true" />{course.duration} min</span><span aria-hidden="true">·</span><span>{course.lessons.length} lessons</span></div></div></details>
+              <p className="course-desktop-summary">{course.summary}</p>
+              <div className="course-detail-meta course-desktop-summary"><span className="course-duration"><Clock size={16} aria-hidden="true" />{course.duration} min</span><span aria-hidden="true">·</span><span>{course.lessons.length} lessons</span><Badge variant="success" className={complete ? undefined : "invisible"} aria-hidden={!complete}>Completed</Badge></div>
+            </div>
           </div>
-        </div>
-        {guest && onSignIn && <p className="guest-progress-note">Progress is saved in this browser. <Button variant="link" onClick={onSignIn}>Sign in to keep it →</Button></p>}
-        <nav className="lesson-nav" aria-label="In this course">
-          <h2>In this course</h2>
-          {course.lessons.map((item, index) => <NavigationButton variant="ghost" asChild={!!lessonBaseHref} className={step === index ? "selected" : ""} onClick={lessonBaseHref ? undefined : () => selectLesson(index)} key={item.id}>
-            {lessonBaseHref ? <Link prefetch={false} href={`${lessonBaseHref}${lessonBaseHref.includes("?") ? "&" : "?"}lesson=${encodeURIComponent(item.id)}`} onClick={(event) => { event.preventDefault(); selectLesson(index, event.currentTarget.href); }}>
-            <span className={"step-number " + (p?.lessons.includes(item.id) ? "done" : "")}>{p?.lessons.includes(item.id) ? <Check size={13} /> : index + 1}</span>
-            <span>{item.title}</span>
-            </Link> : <><span className={"step-number " + (p?.lessons.includes(item.id) ? "done" : "")}>{p?.lessons.includes(item.id) ? <Check size={13} /> : index + 1}</span><span>{item.title}</span></>}
-          </NavigationButton>)}
-          <NavigationButton variant="ghost" className={step === course.lessons.length ? "selected quiz-step" : "quiz-step"} onClick={() => setStep(course.lessons.length)}>
-            <span className="step-number quiz-number"><CheckCircle2 size={16} /></span><span>{course.questions.length ? "Quiz" : "Finish course"}</span>
-          </NavigationButton>
-        </nav>
+          <nav className="lesson-nav" aria-label="In this course">
+            <h2>In this course</h2>
+            {course.lessons.map((item, index) => <NavigationButton variant="ghost" asChild={!!lessonBaseHref} className={step === index ? "selected" : ""} onClick={lessonBaseHref ? undefined : () => selectLesson(index)} key={item.id}>
+              {lessonBaseHref ? <Link prefetch={false} href={`${lessonBaseHref}${lessonBaseHref.includes("?") ? "&" : "?"}lesson=${encodeURIComponent(item.id)}`} onClick={(event) => { event.preventDefault(); selectLesson(index, event.currentTarget.href); }}>
+              <span className={"step-number " + (p?.lessons.includes(item.id) ? "done" : "")}>{p?.lessons.includes(item.id) ? <Check size={13} /> : index + 1}</span>
+              <span>{item.title}</span>
+              </Link> : <><span className={"step-number " + (p?.lessons.includes(item.id) ? "done" : "")}>{p?.lessons.includes(item.id) ? <Check size={13} /> : index + 1}</span><span>{item.title}</span></>}
+            </NavigationButton>)}
+            <NavigationButton variant="ghost" className={step === course.lessons.length ? "selected quiz-step" : "quiz-step"} onClick={() => setStep(course.lessons.length)}>
+              <span className="step-number quiz-number"><CheckCircle2 size={16} /></span><span>{course.questions.length ? "Quiz" : "Finish course"}</span>
+            </NavigationButton>
+          </nav>
+          <div className="course-sidebar-exit">
+            {backHref ? <Button asChild variant="link"><Link href={backHref} aria-label={`Exit course, ${backLabel.toLowerCase()}`}>← Exit course</Link></Button> : <Button variant="link" onClick={onBack}>← Exit course</Button>}
+          </div>
+        </Card>
       </aside>
       <div className="course-reader">
         {saveError && <Alert variant="destructive" role="alert">{saveError}</Alert>}
         {lesson ? <>
-          <Card ref={activeCard} className="course-lesson grid gap-6">
+          <section ref={activeCard} className="course-lesson grid gap-6">
             <span className="eyebrow">Lesson {step + 1} of {course.lessons.length}</span>
             <h2 ref={heading} tabIndex={-1}>{lesson.title}</h2>
             {lesson.videoUrl && <CourseVideo key={lesson.videoUrl} url={lesson.videoUrl} title={`${lesson.title} video`} posterUrl={course.coverImageUrl} />}
             <div className="markdown"><Markdown linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown></div>
             {p?.lessons.includes(lesson.id) && <Badge variant="success"><CheckCircle2 size={16} /> Lesson completed</Badge>}
-          </Card>
+          </section>
           <nav className="course-continue" aria-label="Continue course"><Button variant="ghost" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={next} loading={busy}>
             <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish course"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Course complete"}</span></span><ChevronRight aria-hidden="true" size={16} />
           </Button></nav>
-        </> : <Card ref={activeCard} className={`${course.questions.length ? "course-quiz" : "course-finish-card"} grid gap-6`}>
+        </> : <section ref={activeCard} className={`${course.questions.length ? "course-quiz" : "course-finish-card"} grid gap-6`}>
           {course.questions.length ? showResults ? <>
             <span className="eyebrow">Quiz results</span>
             <h2 ref={heading} tabIndex={-1}>{score === undefined ? "Quiz submitted" : `${score} of ${course.questions.length} correct`}</h2>
@@ -225,7 +227,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
               </ActionGroup>
             </>}
           </>}
-        </Card>}
+        </section>}
       </div>
     </div>
     <Dialog open={!!image} onOpenChange={(open) => { if (!open) setImage(null); }}>
