@@ -20,8 +20,8 @@ import { AppBar } from "@/components/patterns/app-bar";
 import {
   SidebarHeading,
   sidebarPrimaryLinkClassName,
-  useDesktopSidebar,
 } from "@/components/patterns/desktop-sidebar";
+import { useDesktopSidebar } from "@/components/patterns/desktop-sidebar-state";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { AccountMenu } from "@/components/patterns/account-menu";
 import { SkipLink } from "@/components/patterns/skip-link";

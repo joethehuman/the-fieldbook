@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type Ref } from "react";
+import { type Ref } from "react";
 import { PanelLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -8,33 +8,6 @@ import { InstallationIdentity } from "./installation-identity";
 
 export const sidebarPrimaryLinkClassName =
   "sidebar-primary-link w-[var(--sidebar-nav-width)] overflow-hidden whitespace-nowrap px-[9px] transition-[width,background-color,color] duration-[180ms]";
-
-export function useDesktopSidebar(courseKey?: string) {
-  const [collapsed, setCollapsed] = useState(Boolean(courseKey));
-
-  useEffect(() => {
-    if (courseKey) setCollapsed(true);
-  }, [courseKey]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.metaKey &&
-        event.shiftKey &&
-        !event.altKey &&
-        event.key.toLowerCase() === "s" &&
-        window.matchMedia("(min-width: 48rem)").matches
-      ) {
-        event.preventDefault();
-        setCollapsed((current) => !current);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  return { collapsed, setCollapsed };
-}
 
 export function SidebarHeading({
   name,

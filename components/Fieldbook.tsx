@@ -18,8 +18,8 @@ import { BrandedAccount } from "./patterns/branded-account";
 import {
   SidebarHeading,
   sidebarPrimaryLinkClassName,
-  useDesktopSidebar,
 } from "./patterns/desktop-sidebar";
+import { useDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { brandingFromSettings } from "@/lib/branding";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "./patterns/brand-theme-sync";
