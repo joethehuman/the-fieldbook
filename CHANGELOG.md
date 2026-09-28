@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Start Docs sidebar subsections closed and show their labels at regular weight, using only the chevron to identify expandable rows.
+
 - Rename Assignment window to Due dates and let administrators turn course due dates off while retaining the saved windows. Learners then see recommended language on Courses, with no due or overdue targets; group-selected progress remains intact.
 
 - Let desktop readers collapse the shared sidebar to an aligned icon rail with a toggle or ⇧⌘S. The navigation reveals without reflowing and keeps its open or closed state across pages; opening a course collapses it, while choosing Docs reopens its navigation.
