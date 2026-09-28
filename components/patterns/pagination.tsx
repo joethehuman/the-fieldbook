@@ -8,6 +8,7 @@ export function Pagination({
   onPageChange,
   label = "Results",
   disabled = false,
+  showCount = true,
 }: {
   page: number;
   pageSize: number;
@@ -15,6 +16,7 @@ export function Pagination({
   onPageChange: (page: number) => void;
   label?: string;
   disabled?: boolean;
+  showCount?: boolean;
 }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
   return (
@@ -22,11 +24,13 @@ export function Pagination({
       aria-label={`${label} pages`}
       className="flex min-w-0 flex-wrap items-center justify-between gap-3"
     >
-      <p role="status" className="text-copy text-muted-foreground">
-        {total
-          ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
-          : "0 results"}
-      </p>
+      {showCount && (
+        <p role="status" className="text-copy text-muted-foreground">
+          {total
+            ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, total)} of ${total}`
+            : "0 results"}
+        </p>
+      )}
       {pages > 1 && (
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Button

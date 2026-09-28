@@ -55,24 +55,28 @@ test("Docs settings move and rename a subsection without losing published placem
   }, data);
   await page.goto("/#admin");
   await openSettings(page);
-  const select = page.getByRole("combobox", {
-    name: "Placement for Start → Install",
-  });
-  await select.click();
+  await page.getByRole("button", { name: "Expand Start" }).click();
+  await page
+    .getByRole("button", { name: "Actions for Start → Install" })
+    .click();
+  await page.getByRole("menuitem", { name: "Move to…" }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("combobox", { name: "Destination" })
+    .click();
   await page.getByRole("option", { name: "Reference", exact: true }).click();
-  // The visible path disambiguates the subsection after the move.
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Move section" })
+    .click();
+  await page.getByRole("button", { name: "Expand Reference" }).click();
   await expect(
-    page.getByRole("combobox", { name: "Placement for Reference → Install" }),
+    page.getByRole("button", { name: "Actions for Reference → Install" }),
   ).toBeVisible();
   await page
-    .locator('[data-slot="reorder-row"]')
-    .filter({
-      has: page.getByRole("combobox", {
-        name: "Placement for Reference → Install",
-      }),
-    })
-    .getByRole("button", { name: "Rename" })
+    .getByRole("button", { name: "Actions for Reference → Install" })
     .click();
+  await page.getByRole("menuitem", { name: "Rename" }).click();
   await page
     .getByRole("dialog")
     .getByRole("textbox", { name: "Rename section" })
@@ -82,32 +86,36 @@ test("Docs settings move and rename a subsection without losing published placem
     .getByRole("button", { name: "Save name" })
     .click();
   await expect(
-    page.getByRole("combobox", {
-      name: "Placement for Reference → Installation",
-    }),
+    page.getByRole("button", { name: "Actions for Reference → Installation" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "New section", exact: true }).click();
   await page.getByRole("textbox", { name: "New section name" }).fill("Guides");
   await page.getByRole("button", { name: "Create section" }).click();
   await expect(
-    page.getByRole("combobox", { name: "Placement for Guides" }),
+    page.getByRole("button", { name: "Actions for Guides", exact: true }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Actions for Guides", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Add subsection" }).click();
   await page.getByRole("textbox", { name: "New section name" }).fill("Setup");
-  await page.getByRole("combobox", { name: "Top-level parent" }).click();
-  await page.getByRole("option", { name: "Guides", exact: true }).click();
   await page.getByRole("button", { name: "Create section" }).click();
   await expect(
-    page.getByRole("combobox", { name: "Placement for Guides → Setup" }),
+    page.getByRole("button", { name: "Actions for Guides → Setup" }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Actions for Guides", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Add subsection" }).click();
   await page.getByRole("textbox", { name: "New section name" }).fill("setup");
-  await page.getByRole("combobox", { name: "Top-level parent" }).click();
-  await page.getByRole("option", { name: "Guides", exact: true }).click();
   await page.getByRole("button", { name: "Create section" }).click();
   await expect(
     page.getByText("Sections under the same parent need different names."),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Delete Reference → Installation" })
+    .getByRole("button", { name: "Actions for Reference → Installation" })
     .click();
+  await page.getByRole("menuitem", { name: "Delete section" }).click();
   await expect(
     page.getByText("Move this section's documents before deleting it."),
   ).toBeVisible();
@@ -115,10 +123,9 @@ test("Docs settings move and rename a subsection without losing published placem
   await expect(page.getByText("Settings saved.")).toBeVisible();
   await page.reload();
   await openSettings(page);
+  await page.getByRole("button", { name: "Expand Reference" }).click();
   await expect(
-    page.getByRole("combobox", {
-      name: "Placement for Reference → Installation",
-    }),
+    page.getByRole("button", { name: "Actions for Reference → Installation" }),
   ).toBeVisible();
   const current = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),

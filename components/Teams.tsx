@@ -31,6 +31,7 @@ import { completionPercent } from "@/lib/learning";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
 import { reportTeamIds, type User } from "@/lib/types";
+import { teamPath } from "@/lib/team-hierarchy";
 export { TeamsAdmin } from "./TeamManagement";
 export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
   const assignments = useRevealTarget<HTMLElement>();
@@ -57,7 +58,19 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
           report={() => teamProgressCsv(rows)}
         />
       </SectionHeader>
-      <FilterBar>
+      <FilterBar search={
+        <FormField label="Find a team member" visuallyHiddenLabel>
+          <Input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setPerson("");
+            }}
+            placeholder="Find a team member by name or email"
+          />
+        </FormField>
+      }>
         <FormField label="Reporting team">
           <SelectField
             value={teamId}
@@ -73,20 +86,10 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
               .filter((t) => allowed.has(t.id))
               .map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {teamPath(t.id, teams)}
                 </option>
               ))}
           </SelectField>
-        </FormField>
-        <FormField label="Find a team member">
-          <Input
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPerson("");
-            }}
-            placeholder="Name or email"
-          />
         </FormField>
       </FilterBar>
       <p className="muted">

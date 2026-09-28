@@ -27,10 +27,10 @@ import { MoreHorizontal, ChevronDown } from "lucide-react";
 import { PublicationStatus } from "./patterns/publication-status";
 import { FieldDescription } from "./ui/field";
 import { FormField } from "@/components/patterns/form-field";
+import { FilterOptions } from "./patterns/filter-options";
 import { useToast } from "./ui/toast";
 import { DataTable } from "./patterns/data-table";
 import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation";
-import { FilterOptions } from "./patterns/filter-options";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox, Radio } from "@/components/ui/choice";
 import { useRevealTarget } from "./patterns/use-reveal-target";
@@ -58,6 +58,8 @@ import { SelectField } from "./ui/select";
 import LearningGroups from "./LearningGroups";
 import Curricula from "./Curricula";
 import { groupItems } from "@/lib/learning-groups";
+import { groupPath } from "@/lib/group-hierarchy";
+import { teamPath } from "@/lib/team-hierarchy";
 import { Assignments, type LearningHandler } from "./Assignments";
 import {
   availableDocSections,
@@ -83,7 +85,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
-import { Tabs, TabsTrigger, TabsContent } from "./ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 
 import {
   Plus,
@@ -715,6 +717,7 @@ export default function Admin({
                 filters={
                   <FilterOptions
                     label="Content type"
+                    variant="underline"
                     value={filter}
                     onValueChange={(value) => {
                       setFilter(value);
@@ -731,11 +734,11 @@ export default function Admin({
                 }
               >
                 <ActionGroup>
-                  <Button variant="outline" onClick={() => create("doc")}>
+                  <Button onClick={() => create("doc")}>
                     <Plus size={15} />
                     Doc
                   </Button>
-                  <Button variant="outline" onClick={() => create("brief")}>
+                  <Button onClick={() => create("brief")}>
                     <Plus size={15} />
                     Update
                   </Button>
@@ -745,14 +748,16 @@ export default function Admin({
                   </Button>
                 </ActionGroup>
               </CollectionToolbar>
-              <FilterBar>
-                <FormField label="Search content">
+              <FilterBar search={
+                <FormField label="Search content" visuallyHiddenLabel>
                   <Input
+                    type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Title, summary, or folder"
+                    placeholder="Search content by title, summary, or folder"
                   />
                 </FormField>
+              }>
                 {filter !== "doc" && (
                   <FormField label="Category">
                     <SelectField
@@ -824,6 +829,11 @@ export default function Admin({
               <AdminBulkActions
                 data={data}
                 collectionSize={selection.collectionSize}
+                range={
+                  contentRows.length
+                    ? `${(currentPage - 1) * 25 + 1}–${Math.min(currentPage * 25, contentRows.length)} of ${contentRows.length} shown`
+                    : undefined
+                }
                 selected={selection.actionIds}
                 onSelectionChange={selection.setSelected}
                 onBulk={onBulk}
@@ -841,7 +851,7 @@ export default function Admin({
                       <TableHead>
                         {selection.canSelect && (
                           <SelectRows
-                            label="Select this page"
+                            label={contentRows.length > contentPage.length ? `Select page (${contentPage.length})` : `Select all ${contentRows.length}`}
                             ids={contentPage.map((row) => row.id)}
                             value={selection.selected}
                             onChange={selection.setSelected}
@@ -1046,14 +1056,16 @@ export default function Admin({
                   </Button>
                 )}
               </Toolbar>
-              <FilterBar>
-                <FormField label="Search profiles">
+              <FilterBar search={
+                <FormField label="Search profiles" visuallyHiddenLabel>
                   <Input
+                    type="search"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Name or email"
+                    placeholder="Search profiles by name or email"
                   />
                 </FormField>
+              }>
                 <FormField label="Role">
                   <SelectField
                     value={peopleRole}
@@ -1073,7 +1085,7 @@ export default function Admin({
                     <option value="all">All groups</option>
                     {data.groups.map((g) => (
                       <option key={g.id} value={g.id}>
-                        {g.name}
+                        {groupPath(g.id, data.groups)}
                       </option>
                     ))}
                   </SelectField>
@@ -1097,22 +1109,27 @@ export default function Admin({
                     <option value="reverse">Name Z–A</option>
                   </SelectField>
                 </FormField>
-              </FilterBar>
-              <FormField label="Reporting team">
+                <FormField label="Reporting team">
                 <SelectField value={peopleTeam} onValueChange={setPeopleTeam}>
                   <option value="all">All teams</option>
                   <option value="none">No team</option>
                   {(data.teams || []).map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name}
+                      {teamPath(t.id, data.teams || [])}
                     </option>
                   ))}
                 </SelectField>
-              </FormField>
+                </FormField>
+              </FilterBar>
               <PeopleBulkActions
                 currentUserId={user.id}
                 data={data}
                 collectionSize={selection.collectionSize}
+                range={
+                  peopleRows.length
+                    ? `${(currentPage - 1) * 25 + 1}–${Math.min(currentPage * 25, peopleRows.length)} of ${peopleRows.length} shown`
+                    : undefined
+                }
                 selected={selection.actionIds}
                 onChange={onChange}
                 onSelectionChange={selection.setSelected}
@@ -1125,7 +1142,7 @@ export default function Admin({
                       <TableHead>
                         {selection.canSelect && (
                           <SelectRows
-                            label="Select this page"
+                            label={peopleRows.length > peoplePage.length ? `Select page (${peoplePage.length})` : `Select all ${peopleRows.length}`}
                             ids={peoplePage.map((row) => row.id)}
                             value={selection.selected}
                             onChange={selection.setSelected}
@@ -1308,7 +1325,7 @@ export default function Admin({
                   <option value="">No team</option>
                   {(data.teams || []).map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name}
+                      {teamPath(t.id, data.teams || [])}
                     </option>
                   ))}
                 </SelectField>
@@ -1538,7 +1555,9 @@ export function Editor({
         art.source === "generated" &&
         (!art.shortTitle.trim() || graphemeCount(art.shortTitle.trim()) > 40)
       ) {
-        setError("Give generated artwork a short title of up to 40 characters.");
+        setError(
+          "Give generated artwork a short title of up to 40 characters.",
+        );
         setSettingsOpen(true);
         return;
       }
@@ -1613,7 +1632,14 @@ export function Editor({
       const saved: Content = {
         ...c,
         ...(c.kind !== "doc" && !existing && !c.cardArt
-          ? { cardArt: resolvedCardArt(c.id, c.title, undefined, c.coverImageUrl) }
+          ? {
+              cardArt: resolvedCardArt(
+                c.id,
+                c.title,
+                undefined,
+                c.coverImageUrl,
+              ),
+            }
           : {}),
         status: saveStatus,
         ...(latest
@@ -1973,11 +1999,11 @@ export function Editor({
                     />
                     <Button
                       type="button"
-                      variant="outline"
                       disabled={busy}
                       onClick={() => setCreatingSection((open) => !open)}
                     >
-                      Create section
+                      <Plus aria-hidden="true" />
+                      {creatingSection ? "Close section form" : "Create section"}
                     </Button>
                     {creatingSection && (
                       <DocSectionCreate

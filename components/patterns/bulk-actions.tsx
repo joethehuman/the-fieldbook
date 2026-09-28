@@ -40,7 +40,11 @@ export type BulkCommand = {
   selectionMode?: "single" | "multiple";
   field?: "date";
   fieldLabel?: string;
-  apply: (values: string[]) => Promise<void | {
+  review?: (values: string[], sourceIds: string[]) => ReactNode;
+  apply: (
+    values: string[],
+    sourceIds?: string[],
+  ) => Promise<void | {
     failed: string[];
     message: string;
     details?: string[];
@@ -50,6 +54,7 @@ export type BulkCommand = {
 export function BulkActions({
   selected,
   collectionSize,
+  range,
   singleItemActions = true,
   onSelectionChange,
   commands,
@@ -58,6 +63,7 @@ export function BulkActions({
 }: {
   selected: string[];
   collectionSize: number;
+  range?: string;
   /** Omit the fallback when ordinary row/editor actions already cover this collection. */
   singleItemActions?: boolean;
   onSelectionChange: (ids: string[]) => void;
@@ -85,7 +91,7 @@ export function BulkActions({
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline">
+        <Button type="button" variant="outline" disabled={!selected.length}>
           {collectionSize > 1 ? "Bulk actions" : "Actions"}
         </Button>
       </DropdownMenuTrigger>
@@ -130,6 +136,9 @@ export function BulkActions({
       {collectionSize > 1 ? (
         <BulkSelectionBar
           count={selected.length}
+          total={collectionSize}
+          noun={noun}
+          range={range}
           onClear={() => onSelectionChange([])}
         >
           {menu}
@@ -194,6 +203,7 @@ export function BulkActions({
                 No eligible destinations. Create one in its owning screen first.
               </p>
             )}
+            {values.some(Boolean) && command.review?.(values, active.ids)}
             {command.field === "date" && (
               <FormField label={command.fieldLabel || "Onboarding start date"}>
                 <Input
@@ -237,7 +247,7 @@ export function BulkActions({
                   setBusy(true);
                   setError("");
                   try {
-                    const result = await command.apply(values);
+                    const result = await command.apply(values, active.ids);
                     if (result) {
                       onSelectionChange(result.failed);
                       if (result.failed.length) setResultNotice(result);

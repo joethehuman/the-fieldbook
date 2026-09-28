@@ -29,6 +29,7 @@ export function HierarchyList({
   selected,
   onSelectionChange,
   selectionActions,
+  searchAction,
 }: {
   items: HierarchyItem[];
   label: string;
@@ -37,6 +38,7 @@ export function HierarchyList({
   selected?: string[];
   onSelectionChange?: (ids: string[]) => void;
   selectionActions?: ReactNode;
+  searchAction?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -85,7 +87,7 @@ export function HierarchyList({
             }
           >
             <li>
-              <div className="flex min-w-0 items-start gap-2 border-b border-border px-3 py-3 last:border-b-0">
+              <div className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-3 last:border-b-0">
                 {canBulkSelect(matches.length) &&
                   selected &&
                   onSelectionChange && (
@@ -161,31 +163,37 @@ export function HierarchyList({
   }
   return (
     <div className="grid min-w-0 gap-4">
-      <FormField
-        label={`Find ${label.toLowerCase()}`}
-        description="Search includes matching teams and their parents. Expand a team to explore its branch."
-      >
-        <Input
-          type="search"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            onSelectionChange?.([]);
-          }}
-          placeholder="Team name or manager"
-        />
-      </FormField>
+      <div className="flex flex-wrap items-start gap-3">
+        <FormField
+          className="min-w-0 basis-64 flex-1"
+          label={`Find ${label.toLowerCase()}`}
+          visuallyHiddenLabel={!!searchAction}
+          description={`Search includes matching ${label.toLowerCase()} and their parents. Expand a row to explore its branch.`}
+        >
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              onSelectionChange?.([]);
+            }}
+            placeholder={`Find ${label.toLowerCase()}`}
+          />
+        </FormField>
+        {searchAction}
+      </div>
       {(canBulkSelect(matches.length) || items.length === 1) &&
         selectionActions}
       {canBulkSelect(matches.length) && selected && onSelectionChange && (
         <div className="flex items-center gap-3">
           <SelectRows
-            label="Select all matching teams"
+            label={`Select all matching ${label.toLowerCase()}`}
             ids={matches.map((i) => i.id)}
             value={selected}
             onChange={onSelectionChange}
           />
-          Select all matching teams (subteams are not selected automatically)
+          Select all matching {label.toLowerCase()} (children are not selected
+          automatically)
         </div>
       )}
       {matches.length ? (
@@ -197,7 +205,9 @@ export function HierarchyList({
         </ul>
       ) : (
         <EmptyState>
-          {items.length ? "No teams match your search." : "No teams yet."}
+          {items.length
+            ? `No ${label.toLowerCase()} match your search.`
+            : `No ${label.toLowerCase()} yet.`}
         </EmptyState>
       )}
     </div>

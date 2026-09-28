@@ -86,7 +86,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await expect(
     page.getByRole("heading", { name: "Grandchild team", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Parent: Child team" }).click();
+  await page.getByRole("button", { name: "Parent: Sales team / Child team" }).click();
   await page.getByRole("tab", { name: "Subteams", exact: true }).click();
   await expect(
     page.getByRole("table", { name: "Subteams", exact: true }),
@@ -108,7 +108,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await search.fill("person151@example.test");
   await review.getByRole("checkbox", { name: /Person 151/ }).check();
   await review
-    .getByRole("button", { name: "Review 2 selected", exact: true })
+    .getByRole("button", { name: "Review selected", exact: true })
     .click();
   await expect(review).toContainText("Other team");
   await expect(review).toContainText("move here");

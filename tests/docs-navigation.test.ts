@@ -109,6 +109,20 @@ test("rename, move, promotion and sibling reorder preserve IDs and document plac
   );
 });
 
+test("drag insertion order matches the preview across three or more siblings", () => {
+  const sections = [
+    { id: "a", name: "A" },
+    { id: "a1", name: "A child", parentId: "a" },
+    { id: "b", name: "B" },
+    { id: "c", name: "C" },
+    { id: "d", name: "D" },
+  ];
+  const moved = reorderDocSection(sections, "a", 3);
+  assert.deepEqual(moved.filter((section) => !section.parentId).map((section) => section.id), ["b", "c", "d", "a"]);
+  assert.equal(moved.find((section) => section.id === "a1")?.parentId, "a");
+  assert.deepEqual(reorderDocSection(moved, "a", -3).filter((section) => !section.parentId).map((section) => section.id), ["a", "b", "c", "d"]);
+});
+
 test("write validation rejects invalid depth, cycles, parents and sibling duplicates", () => {
   const sections = [
     { id: "a", name: "A" },

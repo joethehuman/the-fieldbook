@@ -40,6 +40,8 @@ export function DataTable({
       data-layout={layout}
       className={cn(
         "table-fixed [&_td]:[overflow-wrap:anywhere] [&_th]:[overflow-wrap:anywhere]",
+        ["contentSelection", "peopleSelection", "deleted"].includes(layout) &&
+          "[&_td:first-child]:text-center [&_th:first-child]:text-center",
         layout === "teamMembers" ? "min-w-128" : "min-w-208",
         className,
       )}

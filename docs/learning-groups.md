@@ -2,9 +2,11 @@
 
 ## Administration
 
-Learning groups replaces the separate Groups and Required courses tabs. Create a group, then manage its Members, Learning and Updates views. Members can be selected individually or through live team links. A selected team includes its direct members; select child teams explicitly. Existing nested groups remain supported.
+Learning groups replaces the separate Groups and Required courses tabs. The expandable outline shows parent and child groups; select a group to manage its Members, Learning and Updates views. Search the outline beside **Create group**. The creation dialog asks for a name and optional parent; **Add child group** opens it with the current group selected as parent. Move a whole branch after reviewing the inherited learning and Update changes. Members can be selected individually or through live team links. A selected team includes its direct members; select child teams explicitly. Each person appears once in the member list, with labels for every direct, linked-team or child-group source. Parent groups include child-group members; a parent's direct members do not automatically join its children.
 
 Search the course library to add individual courses or published curricula. Reorder group items with drag handles, keyboard up/down on a handle, or the move buttons. The same controls order courses inside a curriculum. The curriculum builder is separate from the course builder. Course editors link to Learning groups; Update editors select audience groups directly. These are shared saved relationships, not independent copies.
+
+In Administration, Teams places **Add team** beside its hierarchy search. Curricula places **Create curriculum** beside a search that matches curriculum names and descriptions; bulk selection applies to the current matches.
 
 The Learning and Updates pickers can sort search results by title, creation date or last update to the published copy. The Updates picker can also keep items for this group first. Undated legacy items and curricula without saved dates follow dated results in date sorts. These controls do not change a group's recommended sequence or the order of learners' Updates. Course assignment timestamps already drive completion windows; the unassigned search results have no assignment date to sort by. Group-targeted Updates are relevance tags, not timed learning assignments.
 

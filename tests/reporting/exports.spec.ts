@@ -262,7 +262,7 @@ test("progress filters, keyboard download, member details and empty report", asy
   await section(page, "Progress");
   await select(page, "Reporting team", "Sales team");
   await page
-    .getByRole("textbox", { name: "Find a team member" })
+    .getByRole("searchbox", { name: "Find a team member" })
     .fill("zoe@example.test");
   const displayed = page.locator('table[data-layout="progress"] tbody tr');
   await expect(displayed).toHaveCount(1);
@@ -299,7 +299,7 @@ test("progress filters, keyboard download, member details and empty report", asy
   );
   await screenshot(page, info, "member-assignments");
   await page
-    .getByRole("textbox", { name: "Find a team member" })
+    .getByRole("searchbox", { name: "Find a team member" })
     .fill("no-match");
   const empty = await download(
     page,
@@ -369,8 +369,9 @@ test("feedback filters and sorting preserve text, formula protection and timesta
   expect(result.rows[3][5]).toBe('Zoë, "hello"\n東京');
   expect(result.rows[3][6]).toBe("2026-09-21T17:30:00.000Z");
   await select(page, "Content type", "Courses");
-  await select(page, "Rating", "Useful");
-  await page.getByRole("textbox", { name: "Search feedback" }).fill("東京");
+  await page.getByRole("group", { name: "Feedback rating" })
+    .getByRole("button", { name: "Useful", exact: true }).click();
+  await page.getByRole("searchbox", { name: "Search feedback" }).fill("東京");
   const filtered = await download(
     page,
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -439,7 +440,7 @@ test("large reports download every row in displayed order", async ({
   await setup(page, info, "admin", data);
   await section(page, "Progress");
   await page
-    .getByRole("textbox", { name: "Find a team member" })
+    .getByRole("searchbox", { name: "Find a team member" })
     .fill("Large person");
   const result = await download(
     page,
@@ -633,7 +634,7 @@ test("preparation state prevents duplicate clicks and reports a changed filter w
   await expect(preparing).toHaveAttribute("aria-busy", "true");
   await screenshot(page, info, "preparing");
   await page
-    .getByRole("textbox", { name: "Find a team member" })
+    .getByRole("searchbox", { name: "Find a team member" })
     .fill("no match");
   await page.clock.runFor(10);
   await expect(

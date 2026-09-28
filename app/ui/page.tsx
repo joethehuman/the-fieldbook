@@ -34,6 +34,9 @@ import {
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/patterns/search-field";
+import { FilterOptions } from "@/components/patterns/filter-options";
+import { FormField } from "@/components/patterns/form-field";
+import { FilterBar } from "@/components/patterns/layout";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
@@ -89,6 +92,10 @@ export default function ComponentCatalog() {
   const [emptyReport, setEmptyReport] = useState(false);
   const [group, setGroup] = useState("company");
   const [dialog, setDialog] = useState(false);
+  const [catalogFilter, setCatalogFilter] = useState("all");
+  const [catalogCategory, setCatalogCategory] = useState("all");
+  const [catalogStatus, setCatalogStatus] = useState("all");
+  const [catalogSort, setCatalogSort] = useState("title");
   const [items, setItems] = useState([
     "Company essentials",
     "Customer conversations",
@@ -106,6 +113,25 @@ export default function ComponentCatalog() {
         <a href="/">Back to Fieldbook</a>
       </PageHeader>
       <ControlExamples />
+      <section className="grid gap-4" aria-label="Admin collection filters">
+        <SectionHeader title={<h2>Admin collection filters</h2>} description="A short primary filter sits above full-width search and labeled dropdowns." />
+        <FilterOptions
+          label="Example content type"
+          variant="underline"
+          value={catalogFilter}
+          onValueChange={setCatalogFilter}
+          options={[
+            { value: "all", label: "All content" },
+            { value: "doc", label: "Docs" },
+            { value: "brief", label: "Updates" },
+          ]}
+        />
+        <FilterBar search={<FormField label="Search content" visuallyHiddenLabel><Input type="search" placeholder="Search content by title" /></FormField>}>
+          <FormField label="Category"><SelectField value={catalogCategory} onValueChange={setCatalogCategory}><option value="all">All categories</option><option value="sales">Sales</option></SelectField></FormField>
+          <FormField label="Publication status"><SelectField value={catalogStatus} onValueChange={setCatalogStatus}><option value="all">All statuses</option><option value="published">Published</option></SelectField></FormField>
+          <FormField label="Sort content"><SelectField value={catalogSort} onValueChange={setCatalogSort}><option value="title">Title A–Z</option><option value="updated">Recently updated</option></SelectField></FormField>
+        </FilterBar>
+      </section>
       <BulkExamples />
       <LibraryExamples />
       <WritingExamples />

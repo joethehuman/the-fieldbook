@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/choice";
 import { Input } from "@/components/ui/input";
 import { FieldGroup, FieldDescription, Field } from "@/components/ui/field";
 import { useState } from "react";
+import { ancestorIds } from "@/lib/types";
 
 export function GroupPicker({
   groups,
@@ -11,14 +12,14 @@ export function GroupPicker({
   showDescription = true,
 }: {
   showDescription?: boolean;
-  groups: { id: string; name: string }[];
+  groups: { id: string; name: string; parentId?: string }[];
   value: string[];
   onChange: (value: string[]) => void;
 }) {
   const [query, setQuery] = useState("");
-  const visible = groups.filter((group) =>
-    group.name.toLowerCase().includes(query.toLowerCase()),
-  );
+  const path = (id: string) => [...ancestorIds(id, groups)].reverse().map((key) => groups.find((group) => group.id === key)?.name || "Unknown group").join(" / ");
+  const matching = groups.filter((group) => path(group.id).toLowerCase().includes(query.toLowerCase()));
+  const visible = [...matching].sort((a, b) => path(a.id).localeCompare(path(b.id)));
   return (
     <FieldGroup className="group-picker">
       <legend>
@@ -56,7 +57,7 @@ export function GroupPicker({
                 )
               }
             />
-            <span>{group.name}</span>
+            <span>{path(group.id)}</span>
           </Field>
         ))}
         {!visible.length && (

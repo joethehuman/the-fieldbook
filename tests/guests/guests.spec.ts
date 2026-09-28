@@ -308,7 +308,7 @@ test("optional existing selection, explicit named creation, save flow and retain
   });
   await picker.focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("option", { name: "Visitors", exact: true }).click();
+  await page.getByRole("option", { name: "Broader learning group / Visitors", exact: true }).click();
   expect((await f.getData()).settings.guestGroupId).toBeNull();
   await save(page);
   expect((await f.getData()).settings.guestGroupId).toBe("visitors");
@@ -523,7 +523,7 @@ test("settings and group failures preserve edits, successful retry and pending d
     (await f.getData()).groups.some((g: any) => g.name === "New guests"),
   ).toBe(false);
   f.fail("settings");
-  await select(page, "Learning group for guests", "Visitors");
+  await select(page, "Learning group for guests", "Broader learning group / Visitors");
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();

@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Show Docs sections, learning groups and teams as expandable hierarchies. Move branches with destination and effect review, show membership sources and full paths, and keep Docs reordering consistent with its drag preview. Create learning groups in a dialog; place Teams and Curricula creation beside their search fields. Use underline filters for Content types, Feedback ratings and Recently deleted item types; put admin filter searches on a full-width top row with labeled dropdowns below. Use filled, plus-marked Add and Create actions across administration. Simplify Docs section actions and make branch drops explicit. Shared selection rows center checkboxes and radios, show page/all-result scope, and keep Select all and Bulk actions fixed while selection counts and Clear selection appear. Docs changes still need Save settings.
+
 - Start Docs sidebar subsections closed and show their labels at regular weight, using only the chevron to identify expandable rows.
 
 - Rename Assignment window to Due dates and let administrators turn course due dates off while retaining the saved windows. Learners then see recommended language on Courses, with no due or overdue targets; group-selected progress remains intact.

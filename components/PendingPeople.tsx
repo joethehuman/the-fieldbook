@@ -13,7 +13,9 @@ import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { OnboardingFields } from "./OnboardingFields";
 import { useState } from "react";
+import { Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
+import { teamPath } from "@/lib/team-hierarchy";
 type Pending = NonNullable<Workspace["pendingUsers"]>[number];
 export function PendingPeople({
   data,
@@ -58,7 +60,6 @@ export function PendingPeople({
       guidance="Pre-register a Google email. The person claims this account on verified sign-in, including when registration is closed. No email is sent."
     >
       <Button
-        variant="outline"
         disabled={busy}
         onClick={() =>
           setEditing({
@@ -73,6 +74,7 @@ export function PendingPeople({
           })
         }
       >
+        <Plus aria-hidden="true" />
         Pre-register account
       </Button>
       {error && <p role="alert">{error}</p>}
@@ -175,7 +177,7 @@ export function PendingPeople({
               <option value="">No team</option>
               {data.teams?.map((t) => (
                 <option key={t.id} value={t.id}>
-                  {t.name}
+                  {teamPath(t.id, data.teams || [])}
                 </option>
               ))}
             </SelectField>

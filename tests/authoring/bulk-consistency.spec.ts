@@ -95,11 +95,11 @@ test("bulk content group assignment preserves complete organization; pending bat
     await section(page, production ? "People" : "Demo profiles");
     await page
       .getByRole("checkbox", {
-        name: "Select this page of Pending accounts",
-        exact: true,
+        name: /^Select (page|all) .*Pending accounts/,
       })
       .check();
     await page
+      .getByRole("group", { name: "Pending accounts" })
       .getByRole("button", { name: "Bulk actions", exact: true })
       .click();
     await page

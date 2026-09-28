@@ -1,11 +1,11 @@
 "use client";
 
-import { BulkActions } from "./patterns/bulk-actions";
+import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
 import { Checkbox } from "./ui/choice";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, MoreHorizontal, Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import { ancestorIds, canParent, type Team, type User } from "@/lib/types";
@@ -55,6 +55,7 @@ import { SettingsSection } from "./patterns/settings-section";
 import { Pagination } from "./patterns/pagination";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
 import { useRevealTarget } from "./patterns/use-reveal-target";
+import { groupPath } from "@/lib/group-hierarchy";
 
 const PAGE_SIZE = 25;
 const byName = (
@@ -352,7 +353,7 @@ export function TeamsAdmin({
     .filter((u) => u.active && u.teamId !== selected)
     .sort(byName);
   const teamName = (id?: string) =>
-    teams.find((t) => t.id === id)?.name || "No team";
+    (id ? teamPath(id, teams) : "No team");
 
   function teamTable(rows: Team[]) {
     return rows.length ? (
@@ -418,17 +419,21 @@ export function TeamsAdmin({
           <SectionHeader
             title={<h2>Teams</h2>}
             description="Organize reporting teams, managers and membership."
-          >
-            <Button
-              onClick={() =>
-                void editTeam({ id: crypto.randomUUID(), name: "" })
-              }
-            >
-              Add team
-            </Button>
-          </SectionHeader>
+          />
 
           <HierarchyList
+            searchAction={
+              <Button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void editTeam({ id: crypto.randomUUID(), name: "" })
+                }
+              >
+                <Plus aria-hidden="true" />
+                Add team
+              </Button>
+            }
             selectionActions={
               <BulkActions
                 singleItemActions={false}
@@ -436,7 +441,7 @@ export function TeamsAdmin({
                 selected={teamSelection.actionIds}
                 onSelectionChange={teamSelection.setSelected}
                 noun="teams"
-                commands={([true, false] as const).map((add) => ({
+                commands={[...([true, false] as const).map((add) => ({
                   id: add ? "add-groups" : "remove-groups",
                   label: add
                     ? "Add to learning groups"
@@ -445,9 +450,9 @@ export function TeamsAdmin({
                     "Change direct team links. Subteams are not included automatically. People and saved progress are preserved.",
                   options: data.groups.map((g) => ({
                     id: g.id,
-                    label: g.name,
+                    label: groupPath(g.id, data.groups),
                   })),
-                  apply: async (ids) => {
+                  apply: async (ids: string[]) => {
                     if (
                       !(await commit(
                         {
@@ -476,7 +481,36 @@ export function TeamsAdmin({
                     )
                       throw new Error("Could not save team links.");
                   },
-                }))}
+                })), {
+                  id: "move",
+                  label: "Move selected teams",
+                  description: "Move each selected team with its subteams. Direct members, learning-group links, and history stay attached; manager reporting access follows the new hierarchy.",
+                  options: [{ id: "root", label: "Top level" }, ...teams.map((t) => ({ id: t.id, label: teamPath(t.id, teams) }))],
+                  selectionMode: "single" as const,
+                  review: (values: string[], ids: string[]) => {
+                    try {
+                      if (ids.some((id) => [...ancestorIds(id, teams)].some((ancestor) => ancestor !== id && ids.includes(ancestor))))
+                        throw new Error("Select a parent or a subteam, not both.");
+                      const destination = values[0] === "root" ? "" : values[0];
+                      let working = data;
+                      const impacts = ids.map((id) => {
+                        const impact = teamMoveImpact(working, id, destination);
+                        working = { ...working, teams: impact.next };
+                        return impact;
+                      });
+                      return <ul className="text-copy">{impacts.map((impact) => <li key={impact.from}>{impact.from} → {impact.to} · {impact.branch.length} teams · {impact.people.length} people · {impact.managers.length} managers with reporting changes</li>)}</ul>;
+                    } catch (error) { return <p role="alert">{(error as Error).message}</p>; }
+                  },
+                  apply: async (values: string[], ids: string[] = []) => {
+                    if (ids.some((id) => [...ancestorIds(id, teams)].some((ancestor) => ancestor !== id && ids.includes(ancestor))))
+                      throw new Error("Select a parent or a subteam, not both.");
+                    const destination = values[0] === "root" ? "" : values[0];
+                    let next = teams;
+                    for (const id of ids) next = moveTeam(next, id, destination);
+                    if (!(await commit({ ...data, teams: next }, "Team branches moved.")))
+                      throw new Error("Could not save the team move.");
+                  },
+                }] as BulkCommand[]}
               />
             }
             selected={teamSelection.selected}
@@ -779,8 +813,8 @@ export function TeamsAdmin({
                     disabled={busy}
                   />
                 </SectionHeader>
-                <FilterBar>
-                  <FormField label="Find a member">
+                <FilterBar search={
+                  <FormField label="Find a member" visuallyHiddenLabel>
                     <Input
                       type="search"
                       value={query}
@@ -788,9 +822,10 @@ export function TeamsAdmin({
                         setQuery(e.target.value);
                         setPage(1);
                       }}
-                      placeholder="Name or email"
+                      placeholder="Find a member by name or email"
                     />
                   </FormField>
+                }>
                   <FormField label="Membership scope">
                     <SelectField
                       value={includeSubteams ? "all" : "direct"}
@@ -1016,6 +1051,7 @@ export function TeamsAdmin({
                         })
                       }
                     >
+                      <Plus aria-hidden="true" />
                       Create subteam
                     </Button>
                   </ActionGroup>
@@ -1077,7 +1113,7 @@ export function TeamsAdmin({
                         .filter((t) => canParent(editing.id, t.id, teams))
                         .map((t) => (
                           <option key={t.id} value={t.id}>
-                            {t.name}
+                            {teamPath(t.id, teams)}
                           </option>
                         ))}
                     </SelectField>

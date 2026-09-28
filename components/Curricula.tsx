@@ -11,7 +11,7 @@ import { useToast } from "./ui/toast";
 import { SelectField } from "./ui/select";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { SectionHeader, EmptyState, Toolbar } from "@/components/patterns/layout";
 import { ActionGroup } from "@/components/ui/action-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,7 @@ import { CardArtEditor } from "./patterns/card-art-editor";
 import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
 import type { UploadMedia } from "./MarkdownEditor";
 import { useInteractionDialog } from "./ui/interaction-dialog";
+import { Plus } from "lucide-react";
 
 export default function Curricula({
   data,
@@ -46,6 +47,7 @@ export default function Curricula({
   const [editing, setEditing] = useState<Curriculum | null>(null);
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
   const { confirm } = useInteractionDialog();
   const savedCurriculum = useRef<Curriculum | null>(null);
   const dirty = !!editing && !equalJson(editing, savedCurriculum.current);
@@ -67,9 +69,13 @@ export default function Curricula({
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy]);
   const all = data.curricula || [];
+  const search = query.trim().toLowerCase();
+  const visibleCurricula = all.filter((curriculum) =>
+    `${curriculum.name} ${curriculum.description}`.toLowerCase().includes(search),
+  );
   const selection = useBulkSelection(
-    editing?.id || "curricula",
-    editing ? editing.courseIds : all.map((c) => c.id),
+    editing?.id || `curricula:${search}`,
+    editing ? editing.courseIds : visibleCurricula.map((c) => c.id),
   );
   const content = data.publishedContent || data.content;
   const linked = (id: string) =>
@@ -337,8 +343,18 @@ export default function Curricula({
             description={
               <>Create reusable playlists, then add them to learning groups.</>
             }
-          >
+          />
+          <Toolbar className="items-start">
+            <FormField className="min-w-0 basis-64 flex-1" label="Find curricula" visuallyHiddenLabel>
+              <Input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find curricula"
+              />
+            </FormField>
             <Button
+              type="button"
               onClick={() => {
                 const draft: Curriculum = {
                   id: crypto.randomUUID(),
@@ -353,9 +369,10 @@ export default function Curricula({
                 setNotice("");
               }}
             >
+              <Plus aria-hidden="true" />
               Create curriculum
             </Button>
-          </SectionHeader>
+          </Toolbar>
           <BulkActions
             singleItemActions={false}
             collectionSize={selection.collectionSize}
@@ -411,15 +428,15 @@ export default function Curricula({
             <div className="flex items-center gap-3">
               <SelectRows
                 label="Select all curricula"
-                ids={all.map((c) => c.id)}
+                ids={visibleCurricula.map((c) => c.id)}
                 value={selection.selected}
                 onChange={selection.setSelected}
               />
-              Select all curricula
+              Select all matching curricula
             </div>
           )}
           <div className="group-grid">
-            {all.map((c) => (
+            {visibleCurricula.map((c) => (
               <Card className="flex flex-col p-0 sm:p-0" key={c.id}>
                 <CardContent className="grid gap-4">
                   <Badge
@@ -476,6 +493,9 @@ export default function Curricula({
               No curricula yet. Create a playlist for onboarding or an ongoing
               learning program.
             </EmptyState>
+          )}
+          {!!all.length && !visibleCurricula.length && (
+            <EmptyState>No curricula match your search.</EmptyState>
           )}
         </>
       )}

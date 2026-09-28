@@ -1,5 +1,7 @@
 "use client";
 import type { Workspace } from "@/lib/store";
+import { groupPath } from "@/lib/group-hierarchy";
+import { teamPath } from "@/lib/team-hierarchy";
 import type { BulkHandler } from "@/lib/bulk-actions";
 import type { BulkCommand } from "./patterns/bulk-actions";
 import { AdminBulkActions } from "./AdminBulkActions";
@@ -59,7 +61,10 @@ export function peopleCommands(
         op === "add"
           ? "Add direct memberships. Overlapping assignments count once."
           : "Remove direct memberships. Inclusion through teams or child groups and saved history remain.",
-      options: data.groups.map((g) => ({ id: g.id, label: g.name })),
+      options: data.groups.map((g) => ({
+        id: g.id,
+        label: groupPath(g.id, data.groups),
+      })),
       apply: (ids: string[]) => apply(op, ids),
     })),
     {
@@ -70,7 +75,10 @@ export function peopleCommands(
       selectionMode: "single",
       options: [
         { id: "none", label: "No team" },
-        ...(data.teams || []).map((t) => ({ id: t.id, label: t.name })),
+        ...(data.teams || []).map((t) => ({
+          id: t.id,
+          label: teamPath(t.id, data.teams || []),
+        })),
       ],
       apply: (ids) => apply("team", ids),
     },
@@ -122,6 +130,7 @@ export function PeopleBulkActions({
   data,
   selected,
   collectionSize,
+  range,
   onChange,
   onSelectionChange,
   onBulk,
@@ -130,6 +139,7 @@ export function PeopleBulkActions({
   data: Workspace;
   selected: string[];
   collectionSize: number;
+  range?: string;
   onChange: (data: Workspace) => void | Promise<void>;
   onSelectionChange: (ids: string[]) => void;
   onBulk: BulkHandler;
@@ -139,6 +149,7 @@ export function PeopleBulkActions({
     <AdminBulkActions
       data={data}
       collectionSize={collectionSize}
+      range={range}
       selected={selected}
       onSelectionChange={onSelectionChange}
       onBulk={onBulk}
