@@ -91,6 +91,20 @@
     line-height: 1.4;
     letter-spacing: -0.025em;
   }
+  .course-player .course-lesson > h2 {
+    font-size: var(--type-page);
+    line-height: var(--type-page-leading);
+    letter-spacing: -0.03em;
+    overflow-wrap: anywhere;
+  }
+  .course-player .course-lesson .markdown h1 {
+    font-size: 1.75rem;
+    line-height: 1.3;
+    letter-spacing: -0.035em;
+  }
+  .course-player .course-lesson .markdown > :first-child:is(h1, h2, h3) {
+    margin-top: 0;
+  }
   .markdown ul {
     list-style: disc;
     padding-left: var(--space-6);
