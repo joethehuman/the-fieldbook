@@ -16,6 +16,23 @@ import {
 } from "@/lib/docs-navigation";
 import { useScrollFade } from "./use-scroll-fade";
 
+function selectedBranchKeys(sections: DocBranch[], selected: string | null) {
+  if (!selected) return [];
+  const keys: string[] = [];
+  const visit = (branch: DocBranch, path: string[]): boolean => {
+    const branchPath = [...path, branch.id];
+    const containsSelected =
+      branch.docs.some((doc) => doc.id === selected) ||
+      branch.folders.some((child) => visit(child, branchPath));
+    if (containsSelected) keys.push(JSON.stringify(branchPath));
+    return containsSelected;
+  };
+  sections.forEach((section) =>
+    section.folders.forEach((branch) => visit(branch, [section.id])),
+  );
+  return keys;
+}
+
 export function DocumentTree({
   docs,
   order,
@@ -47,27 +64,19 @@ export function DocumentTree({
     () => docSections(docs, order, configured),
     [docs, order, configured],
   );
-  const activeFolders = useMemo(() => {
-    const result: string[] = [];
-    const visit = (branch: DocBranch, path: string[]): boolean => {
-      const next = [...path, branch.id];
-      const nested = branch.folders.some((folder) => visit(folder, next));
-      const active = branch.docs.some((doc) => doc.id === selected) || nested;
-      if (active && path.length) result.push(JSON.stringify(next));
-      return active;
-    };
-    sections.forEach((section) => visit(section, []));
-    return result;
-  }, [sections, selected]);
-  const [expanded, setExpanded] = useState<string[]>(() => activeFolders);
+  const [expanded, setExpanded] = useState<string[]>(() =>
+    selectedBranchKeys(sections, selected),
+  );
   useEffect(() => {
-    let savedExpanded: string[] | undefined;
     if (!restored.current && storageKey) {
       try {
         const saved = JSON.parse(sessionStorage.getItem(storageKey) || "null");
         if (saved && Array.isArray(saved.expanded))
-          savedExpanded = saved.expanded.filter(
-            (key: unknown) => typeof key === "string",
+          setExpanded(
+            [...new Set([
+              ...saved.expanded.filter((key: unknown) => typeof key === "string"),
+              ...selectedBranchKeys(sections, selected),
+            ])],
           );
         if (ref.current && Number.isFinite(saved?.top))
           ref.current.scrollTop = saved.top;
@@ -76,16 +85,16 @@ export function DocumentTree({
       }
     }
     restored.current = true;
-    setExpanded((current) => {
-      const next = [
-        ...new Set([...(savedExpanded || current), ...activeFolders]),
-      ];
-      return next.length === current.length &&
-        next.every((key) => current.includes(key))
-        ? current
-        : next;
-    });
-  }, [activeFolders, storageKey]);
+  }, [storageKey, sections, selected]);
+  useEffect(() => {
+    const active = selectedBranchKeys(sections, selected);
+    if (active.length)
+      setExpanded((current) =>
+        active.every((key) => current.includes(key))
+          ? current
+          : [...new Set([...current, ...active])],
+      );
+  }, [sections, selected]);
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       const root = ref.current;

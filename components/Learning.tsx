@@ -80,6 +80,7 @@ export default function Learning({
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState("All categories");
   const [sort, setSort] = useState("recommended");
+  const useDueDates = !guest && settings?.dueDatesEnabled !== false;
   const state = learningState(courses, user, groups, progress, settings);
   const completed = assigned.filter((c) => isComplete(c, progress));
   const completedCourseCount = courses.filter((c) =>
@@ -199,7 +200,9 @@ export default function Learning({
         : view === "assigned"
           ? guest
             ? "For you"
-            : "Assigned"
+            : useDueDates
+              ? "Assigned"
+              : "Recommended"
           : view === "in-progress"
             ? "In progress"
             : view === "completed"
@@ -238,7 +241,13 @@ export default function Learning({
       course={c}
       settings={settings}
       status={courseProgress(c, progress)}
-      assigned={!guest && view !== "home" && assignedIds.has(c.id)}
+      assignmentLabel={
+        !guest && view !== "home" && assignedIds.has(c.id)
+          ? useDueDates
+            ? "Assigned"
+            : "Recommended"
+          : undefined
+      }
       onClick={linkedNavigation ? undefined : () => onOpen(c.id)}
       href={
         linkedNavigation ? `/courses/${encodeURIComponent(c.id)}` : undefined
@@ -273,16 +282,21 @@ export default function Learning({
       <div className="grid gap-2">
         <h3>
           {!assigned.length
-            ? guest
-              ? "No recommendations yet"
-              : "No courses assigned to you"
+            ? useDueDates
+              ? "No courses assigned to you"
+              : "No recommendations yet"
             : pct === 100
-              ? "Assigned courses complete"
-              : `${outstanding.length} assigned courses remaining`}
+              ? useDueDates
+                ? "Assigned courses complete"
+                : "Recommended courses complete"
+              : useDueDates
+                ? `${outstanding.length} assigned courses remaining`
+                : `${outstanding.length} recommended courses to explore`}
         </h3>
         {!!assigned.length ? (
           <p>
-            {completed.length} of {assigned.length} assigned courses complete
+            {completed.length} of {assigned.length}{" "}
+            {useDueDates ? "assigned" : "recommended"} courses complete
           </p>
         ) : !assigned.length && personalCourseCount > 0 ? (
           <p>
@@ -302,7 +316,7 @@ export default function Learning({
             Explore the course library at your own pace.
           </p>
         ) : null}
-        {!guest &&
+        {useDueDates &&
           assigned.length > 0 &&
           (state.overdue.length > 0 || state.onboarding) && (
             <p className="text-xs text-muted-foreground">
@@ -380,7 +394,10 @@ export default function Learning({
             onValueChange={(value) => changeView(value as LearningCollection)}
             options={[
               ...(!guest ? [{ value: "yours", label: "Your courses" }] : []),
-              { value: "assigned", label: guest ? "For you" : "Assigned" },
+              {
+                value: "assigned",
+                label: guest ? "For you" : useDueDates ? "Assigned" : "Recommended",
+              },
               { value: "in-progress", label: "In progress" },
               { value: "completed", label: "Completed" },
               { value: "all", label: "All courses" },
@@ -497,7 +514,9 @@ export default function Learning({
                   : view === "assigned"
                     ? guest
                       ? "No guest recommendations yet"
-                      : "No assigned courses yet"
+                      : useDueDates
+                        ? "No assigned courses yet"
+                        : "No recommended courses yet"
                     : view === "in-progress"
                       ? "No courses in progress"
                       : view === "completed"
@@ -512,7 +531,10 @@ export default function Learning({
               !!assigned.length &&
               !query &&
               topic === "All categories" && (
-                <p>Turn off Hide completed to review assigned courses.</p>
+                <p>
+                  Turn off Hide completed to review{" "}
+                  {useDueDates ? "assigned" : "recommended"} courses.
+                </p>
               )}
           </EmptyState>
         )}

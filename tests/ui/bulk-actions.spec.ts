@@ -77,7 +77,7 @@ test("content selection, explicit deletion, recovery and clean navigation", asyn
       exact: true,
     })
     .check();
-  await page.getByRole("textbox", { name: "Search content" }).fill("Bulk");
+  await page.getByRole("searchbox", { name: "Search content" }).fill("Bulk");
   await expect(
     page.getByRole("region", { name: "Selected items" }),
   ).toHaveCount(0);

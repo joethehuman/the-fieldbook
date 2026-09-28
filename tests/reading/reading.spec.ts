@@ -212,6 +212,19 @@ test("installation root opens the current home without a workspace snapshot", as
   expect(workspaceReads).toBe(0);
 });
 
+test("installation root follows the saved Updates or Docs home", async ({ request }) => {
+  for (const homePage of ["updates", "docs"] as const) {
+    await fixture(request, { settings: { access: "public", homePage } });
+    const response = await request.get("/", { maxRedirects: 0 });
+    expect(response.status()).toBe(307);
+    expect(response.headers().location).toBe(`/${homePage}`);
+    const home = await request.get(`/${homePage}`);
+    expect(home.status()).toBe(200);
+    if (homePage === "docs")
+      expect(await home.text()).toContain("Published doc title");
+  }
+});
+
 test("current section URLs are canonical and retired names do not open the app", async ({
   request,
 }) => {
@@ -568,6 +581,16 @@ test("Courses home splits its progress card on iPad in the installed app", async
   await expect(row.locator(".course-card")).toHaveCount(1);
   for (const width of [820, 1024, 390]) {
     await page.setViewportSize({ width, height: 844 });
+    // The shared sidebar moves during viewport changes; measure after it settles.
+    await page.waitForFunction(() =>
+      document
+        .getAnimations()
+        .every(
+          (animation) =>
+            animation.constructor.name !== "CSSTransition" ||
+            animation.playState !== "running",
+        ),
+    );
     const summaryBox = await summary.boundingBox();
     const rowBox = await row.boundingBox();
     const ring = summary.locator('[data-slot="progress-ring"]');

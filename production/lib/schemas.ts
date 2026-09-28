@@ -135,6 +135,7 @@ const publishedPrivacySchema = privacyDocumentSchema.refine(
 );
 export const settingsSchema = z
   .object({
+    homePage: z.enum(["updates", "courses", "docs"]).default("courses"),
     guestGroupId: text(80).min(1).nullable().optional(),
     docCategoryOrder: z
       .array(text(80).trim().min(1))
@@ -157,6 +158,7 @@ export const settingsSchema = z
       .max(500)
       .optional(),
     newUserStage: z.enum(["existing", "newhire"]).default("existing"),
+    dueDatesEnabled: z.boolean().default(true),
     onboardingDays: z.number().int().min(1).max(365).default(90),
     catchUpDays: z.number().int().min(1).max(365).default(30),
     privacy: z

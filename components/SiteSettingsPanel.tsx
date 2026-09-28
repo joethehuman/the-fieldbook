@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
+import { Switch } from "./ui/switch";
 import { DocSectionsSettings } from "./DocSectionsSettings";
 import { ActionGroup } from "./ui/action-group";
 import { Plus } from "lucide-react";
@@ -145,6 +146,26 @@ export default function SiteSettingsPanel({
               setSettings({ ...settings, welcomeDescription: e.target.value })
             }
           />
+          <FormField
+            label="Home page"
+            description="The page people open from your installation address. Docs opens the first published article in your Docs order."
+          >
+            <SelectField
+              value={settings.homePage || "courses"}
+              onValueChange={(value) =>
+                setSettings({
+                  ...settings,
+                  homePage: value as "updates" | "courses" | "docs",
+                })
+              }
+              disabled={busy}
+              aria-label="Home page"
+            >
+              <option value="updates">Updates</option>
+              <option value="courses">Courses</option>
+              <option value="docs">Docs</option>
+            </SelectField>
+          </FormField>
           <TextField
             id="privacy-policy-link"
             label="Privacy-policy link"
@@ -227,22 +248,31 @@ export default function SiteSettingsPanel({
           actions={saveAction}
           tabIndex={-1}
           disabled={busy}
-          title={<h3>Course completion windows</h3>}
-          description="Set how long learners have to complete assigned courses."
+          title={<h3>Timing windows</h3>}
+          description="Set the number of days for new users and ongoing catch-up."
           guidance={
-            <div id="completion-window-help">
-              Publishing adds to the library. Only courses selected for a group
-              join that group’s assigned learning list. Newly assigned courses
-              get a full catch-up window, even near the end of onboarding.
-              Changes recalculate targets for everyone.
+            <div id="due-dates-help">
+              When off, learners see these courses as recommendations without
+              deadlines. Turning due dates on uses the windows below to set
+              targets. Changes recalculate targets for everyone.
             </div>
           }
         >
+          <FormField label="Use due dates">
+            <Switch
+              checked={settings.dueDatesEnabled !== false}
+              disabled={busy}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, dueDatesEnabled: checked === true })
+              }
+            />
+          </FormField>
           <FormField label="New user onboarding window (days)">
             <Input
-              aria-describedby="completion-window-help"
+              aria-describedby="due-dates-help"
               type="number"
               required
+              disabled={busy || settings.dueDatesEnabled === false}
               min={1}
               max={365}
               value={settings.onboardingDays ?? 90}
@@ -256,9 +286,10 @@ export default function SiteSettingsPanel({
           </FormField>
           <FormField label="Ongoing catch-up window (days)">
             <Input
-              aria-describedby="completion-window-help"
+              aria-describedby="due-dates-help"
               type="number"
               required
+              disabled={busy || settings.dueDatesEnabled === false}
               min={1}
               max={365}
               value={settings.catchUpDays ?? 30}

@@ -165,7 +165,7 @@ export function HierarchyList({
     <div className="grid min-w-0 gap-4">
       <div className="flex flex-wrap items-start gap-3">
         <FormField
-          className="min-w-[16rem] flex-1"
+          className="min-w-0 basis-64 flex-1"
           label={`Find ${label.toLowerCase()}`}
           visuallyHiddenLabel={!!searchAction}
           description={`Search includes matching ${label.toLowerCase()} and their parents. Expand a row to explore its branch.`}

@@ -15,7 +15,11 @@ import { ContentSearch } from "./ContentSearch";
 import { InitialsAvatar } from "./ui/initials-avatar";
 import { RequestError } from "@/lib/workspace-save";
 import { BrandedAccount } from "./patterns/branded-account";
-import { InstallationIdentity } from "./patterns/installation-identity";
+import {
+  SidebarHeading,
+  sidebarPrimaryLinkClassName,
+} from "./patterns/desktop-sidebar";
+import { useDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { brandingFromSettings } from "@/lib/branding";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "./patterns/brand-theme-sync";
@@ -64,7 +68,7 @@ import {
   sectionPaths,
   resolveSection,
   contentPath,
-  organizationHomePath,
+  homePath,
 } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
@@ -149,6 +153,11 @@ export default function Fieldbook({
     [reportIssue, setReportIssue] = useState<string | undefined>(),
     [menu, setMenu] = useState(false),
     [showDemo, setShowDemo] = useState(false);
+  const { collapsed, setCollapsed } = useDesktopSidebar(
+    view === "learn" && selected && !selected.startsWith("curriculum:")
+      ? selected
+      : undefined,
+  );
   useEffect(() => {
     if (initialAdmin) {
       onLoaded?.(initialAdmin.user);
@@ -187,7 +196,12 @@ export default function Fieldbook({
       return;
     }
     try {
-      setData(loadWorkspace());
+      const workspace = loadWorkspace();
+      setData(workspace);
+      if (!window.location.hash)
+        setView(
+          resolveSection(homePath(workspace.settings).slice(1)) || "learn",
+        );
       const savedProfile = sessionStorage.getItem(SESSION);
       setUid(
         savedProfile &&
@@ -267,6 +281,7 @@ export default function Fieldbook({
     lesson?: string,
   ) {
     if (!(await canLeave())) return;
+    if (v === "docs" && !id) setCollapsed(false);
     if (v !== "docs" || id) setMenu(false);
     const destinationId = !runtime && v === "docs" && !id ? firstDoc?.id : id;
     if (
@@ -442,6 +457,8 @@ export default function Fieldbook({
     demoGuest?.user || data.users.find((u) => u.id === uid && u.active);
   const learningGroups = demoGuest?.groups || data.groups;
   const branding = { ...defaultSettings, ...data.settings };
+  const landingPath = homePath(branding);
+  const landingView = resolveSection(landingPath.slice(1)) || "learn";
   const policyHref = privacyHref(branding);
   if (!user)
     return (
@@ -520,7 +537,10 @@ export default function Fieldbook({
             ? "Team progress"
             : "Administration";
   return (
-    <div className="app" style={brandThemeStyle(branding.accent)}>
+    <div
+      className={`app ${collapsed ? "sidebar-collapsed" : ""}`}
+      style={brandThemeStyle(branding.accent)}
+    >
       <BrandThemeSync accent={branding.accent} />
       <SkipLink
         href="#main-content"
@@ -532,24 +552,19 @@ export default function Fieldbook({
         Skip to content
       </SkipLink>
       <aside
+        id="main-sidebar"
         className={`sidebar ${menu ? "open" : ""} ${navigationPending ? "navigation-pending" : ""}`}
       >
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-          <InstallationIdentity name={data.settings?.name} />
-          <Button
-            ref={menuClose}
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-label="Close navigation"
-            onClick={() => {
-              setMenu(false);
-              menuTrigger.current?.focus();
-            }}
-          >
-            <X />
-          </Button>
-        </div>
+        <SidebarHeading
+          name={data.settings?.name}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(!collapsed)}
+          onClose={() => {
+            setMenu(false);
+            menuTrigger.current?.focus();
+          }}
+          closeRef={menuClose}
+        />
         <nav className="primary-navigation" aria-label="Primary">
           {(
             [
@@ -560,9 +575,11 @@ export default function Fieldbook({
           ).map((n) => (
             <NavigationButton
               variant="ghost"
-              className={view === n.key ? "active" : ""}
+              className={`${sidebarPrimaryLinkClassName} ${view === n.key ? "active" : ""}`}
               key={n.key}
-              onClick={() => navigate(n.key)}
+              aria-label={n.title}
+              title={collapsed ? n.title : undefined}
+              onClick={() => void navigate(n.key)}
               onPointerEnter={() => {
                 if (runtime && initialAdmin)
                   router.prefetch(`/${sectionPaths[n.key]}`);
@@ -577,7 +594,7 @@ export default function Fieldbook({
               }}
             >
               <n.icon size={19} />
-              {n.title}
+              <span className="sidebar-nav-text">{n.title}</span>
               {n.key === "learn" && (
                 <span className="nav-count">{assigned.length - completed}</span>
               )}
@@ -715,7 +732,7 @@ export default function Fieldbook({
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
               <a
-                href={runtime ? organizationHomePath : "#courses"}
+                href={runtime ? landingPath : `#${landingPath.slice(1)}`}
                 onClick={(event) => {
                   if (
                     event.metaKey ||
@@ -725,7 +742,7 @@ export default function Fieldbook({
                   )
                     return;
                   event.preventDefault();
-                  void navigate("learn");
+                  void navigate(landingView);
                 }}
               >
                 Organization

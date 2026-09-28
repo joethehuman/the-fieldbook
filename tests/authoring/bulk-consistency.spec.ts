@@ -99,6 +99,7 @@ test("bulk content group assignment preserves complete organization; pending bat
       })
       .check();
     await page
+      .getByRole("group", { name: "Pending accounts" })
       .getByRole("button", { name: "Bulk actions", exact: true })
       .click();
     await page

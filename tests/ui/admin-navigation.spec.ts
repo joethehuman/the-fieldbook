@@ -107,9 +107,8 @@ test("admin destinations reveal details and keep filters and fieldset footers co
     await page.setViewportSize({ width: 1280, height: 1000 });
   }
   await section(page, "Feedback");
-  const rating = page.getByRole("combobox", { name: "Rating", exact: true });
-  await rating.click();
-  await page.getByRole("option", { name: "Useful", exact: true }).click();
+  const rating = page.getByRole("group", { name: "Feedback rating" });
+  await rating.getByRole("button", { name: "Useful", exact: true }).click();
   await expect(page.locator("article")).toHaveCount(1);
   await page
     .getByRole("button", { name: "View all feedback for this item" })
@@ -120,7 +119,7 @@ test("admin destinations reveal details and keep filters and fieldset footers co
   });
   await revealed(heading);
   await expect(heading).toBeFocused();
-  await expect(rating).toHaveText("All ratings");
+  await expect(rating.getByRole("button", { name: "All ratings" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("article")).toHaveCount(2);
   await expect(
     page.getByRole("button", { name: "View all feedback for this item" }),

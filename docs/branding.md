@@ -4,6 +4,7 @@ Administrators configure one installation identity in **Organization Settings â†
 
 - **Installation name:** required, up to 60 characters. Existing installations keep their name; missing names display Fieldbook.
 - **Welcome description:** optional plain text, up to 180 characters, shown beneath the application-provided sign-in instructions. Existing installations default to no welcome description.
+- **Home page:** choose Updates, Courses or Docs for visits to the installation address and organization-home links. Existing installations default to Courses. Docs opens the first published article in its saved order, or the existing empty state if there are no published Docs.
 - **Accent color:** a six-digit hex color used for links, selected text and feedback, focus indicators and the course progress ring. Link text is darkened only when needed for contrast on white. Neutral controls and success/error colors remain semantic.
 - **Privacy-policy link:** the branding section displays the current published link. Edit and explicitly publish it in **Organization Settings â†’ Privacy policy**, using either a hosted notice or an external HTTPS URL. Draft policy edits do not alter account-page links. See [privacy setup](privacy-setup.md).
 
@@ -23,7 +24,7 @@ Consent pages still display the connecting client, signed-in identity, requested
 
 ## What is visible before login
 
-The server projects only the installation name, accent color, welcome description, published policy mode/URL and public/private access mode for account rendering. It does not send registration rules, learning configuration, revisions, people, private content or policy drafts to account pages.
+The server projects only the installation name, accent color, home-page choice, welcome description, published policy mode/URL and public/private access mode for account rendering. It does not send registration rules, learning configuration, revisions, people, private content or policy drafts to account pages.
 
 The application displays the installation name without an icon. Previously saved logo references are ignored and removed the next time an administrator saves settings. The old public logo endpoint is unavailable, and ordinary `/api/media/[file]` access requires a published-content reference or administrator access. Uploaded files already in private Storage are not automatically deleted.
 

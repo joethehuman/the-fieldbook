@@ -345,7 +345,7 @@ export default function Curricula({
             }
           />
           <Toolbar className="items-start">
-            <FormField className="min-w-[16rem] flex-1" label="Find curricula" visuallyHiddenLabel>
+            <FormField className="min-w-0 basis-64 flex-1" label="Find curricula" visuallyHiddenLabel>
               <Input
                 type="search"
                 value={query}

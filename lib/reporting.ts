@@ -106,7 +106,9 @@ export function courseProgressRow(
       ? "Needs attention"
       : view === "team"
         ? "Outstanding"
-        : "On track";
+        : data.settings?.dueDatesEnabled === false
+          ? "In progress"
+          : "On track";
   return {
     u,
     c,

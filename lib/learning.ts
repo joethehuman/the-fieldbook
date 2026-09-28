@@ -49,7 +49,8 @@ export function addDays(day: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 export function onboardingTarget(user: User, settings?: SiteSettings) {
-  if (user.id === "guest") return undefined;
+  if (user.id === "guest" || settings?.dueDatesEnabled === false)
+    return undefined;
   return user.onboardingStart
     ? addDays(user.onboardingStart, settings?.onboardingDays ?? 90)
     : undefined;
@@ -60,7 +61,8 @@ export function learningTarget(
   groups: Group[],
   settings?: SiteSettings,
 ) {
-  if (user.id === "guest") return undefined;
+  if (user.id === "guest" || settings?.dueDatesEnabled === false)
+    return undefined;
   const started = assignmentInfo(c, user, groups).assignedAt;
   if (!started) return undefined;
   const catchUp = addDays(started, settings?.catchUpDays ?? 30),
@@ -132,7 +134,9 @@ export function learningState(
           ? "Needs attention"
           : onboarding
             ? "Getting started"
-            : "On track",
+            : settings?.dueDatesEnabled === false
+              ? "In progress"
+              : "On track",
   };
 }
 

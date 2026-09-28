@@ -27,10 +27,12 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
+  homePage?: "updates" | "courses" | "docs";
   guestGroupId?: string | null;
   docCategoryOrder?: string[];
   docSections?: import("./docs-navigation").DocSection[];
   newUserStage?: "existing" | "newhire";
+  dueDatesEnabled?: boolean;
   onboardingDays?: number;
   catchUpDays?: number;
   privacy?: PrivacySettings;
@@ -42,8 +44,10 @@ export type SiteSettings = {
   registration: "open" | "closed";
 };
 export const defaultSettings: SiteSettings = {
+  homePage: "courses",
   guestGroupId: null,
   newUserStage: "existing",
+  dueDatesEnabled: true,
   onboardingDays: 90,
   catchUpDays: 30,
   welcomeDescription: "",

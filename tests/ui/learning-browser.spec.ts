@@ -73,6 +73,29 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 
+test("due dates off keeps progress and uses recommended language", async ({ page }, info) => {
+  const data = freshWorkspace();
+  data.settings = { ...data.settings!, dueDatesEnabled: false };
+  await page.addInitScript((workspace) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-learner");
+  }, data);
+  await page.goto("/#courses");
+  const summary = page.locator('.for-you [data-slot="card"]');
+  await expect(summary).toContainText("recommended courses complete");
+  await expect(summary.getByRole("progressbar")).toHaveCount(1);
+  await expect(summary).not.toContainText(/assigned|past their target|onboarding/i);
+  await summary.screenshot({ path: info.outputPath("recommended-progress.png") });
+  await summary.getByRole("button", { name: "View all for you" }).click();
+  await expect(
+    page.getByRole("group", { name: "Course views" }).getByRole("button", {
+      name: "Recommended",
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".library")).toContainText("Recommended");
+  await expect(page.locator(".library")).not.toContainText("Assigned");
+});
+
 test("For you uses curriculum cards, one category picker and a simple ordered page", async ({
   page,
 }, info) => {
@@ -351,11 +374,23 @@ test("course rows scroll directly and the completion card splits on iPad", async
       expect(strip!.y).toBeGreaterThan(summary!.y + summary!.height);
     }
     expect(action!.width).toBeLessThan(summary!.width * 0.7);
-    expect(
-      Math.abs(
-        action!.x + action!.width / 2 - (summary!.x + summary!.width / 2),
-      ),
-    ).toBeLessThan(2);
+    await expect
+      .poll(async () => {
+        const settledSummary = await home
+          .locator('[data-slot="card"]')
+          .first()
+          .boundingBox();
+        const settledAction = await home
+          .locator('[data-slot="card"]')
+          .first()
+          .getByRole("button", { name: "Start course" })
+          .boundingBox();
+        return Math.abs(
+          settledAction!.x + settledAction!.width / 2 -
+            (settledSummary!.x + settledSummary!.width / 2),
+        );
+      })
+      .toBeLessThan(2);
     await page.setViewportSize({ width, height: 1400 });
     await row.evaluate((element) => element.blur());
     await home.screenshot({

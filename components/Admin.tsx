@@ -189,9 +189,8 @@ const adminSections = [
       },
       {
         id: "settings-courses",
-        name: "Assignment window",
-        description:
-          "Set completion windows for onboarding and ongoing courses.",
+        name: "Due dates",
+        description: "Choose whether group-selected courses have due dates.",
         icon: Layers,
       },
       {

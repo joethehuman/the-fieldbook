@@ -15,10 +15,13 @@ import {
   GraduationCap,
   Menu,
   Newspaper,
-  X,
 } from "lucide-react";
 import { AppBar } from "@/components/patterns/app-bar";
-import { InstallationIdentity } from "@/components/patterns/installation-identity";
+import {
+  SidebarHeading,
+  sidebarPrimaryLinkClassName,
+} from "@/components/patterns/desktop-sidebar";
+import { useDesktopSidebar } from "@/components/patterns/desktop-sidebar-state";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { AccountMenu } from "@/components/patterns/account-menu";
 import { SkipLink } from "@/components/patterns/skip-link";
@@ -27,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { ReaderSearch } from "./ReaderSearch";
 import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
-import { organizationHomePath } from "@/lib/navigation";
+import { homePath } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "@/components/patterns/brand-theme-sync";
@@ -64,6 +67,9 @@ export function ReaderShell({
     pathname === "/docs"
       ? orderedDocList[0]?.id || null
       : pathname.split("/")[2] || null;
+  const { collapsed, setCollapsed } = useDesktopSidebar(
+    section === "courses" && selected ? selected : undefined,
+  );
   useEffect(() => {
     if (section !== "docs" || !selected) return;
     const index = orderedDocList.findIndex((doc) => doc.id === selected);
@@ -118,35 +124,34 @@ export function ReaderShell({
     window.location.assign("/auth/sign-in");
   }
   return (
-    <div className="app" style={brandThemeStyle(context.branding.accent)}>
+    <div
+      className={`app ${collapsed ? "sidebar-collapsed" : ""}`}
+      style={brandThemeStyle(context.branding.accent)}
+    >
       <BrandThemeSync accent={context.branding.accent} />
       <SkipLink href="#main-content">Skip to content</SkipLink>
-      <aside className={`sidebar ${menu ? "open" : ""}`}>
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-          <InstallationIdentity name={context.branding.name} />
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            aria-label="Close navigation"
-            onClick={() => {
-              close();
-              trigger.current?.focus();
-            }}
-          >
-            <X />
-          </Button>
-        </div>
+      <aside id="main-sidebar" className={`sidebar ${menu ? "open" : ""}`}>
+        <SidebarHeading
+          name={context.branding.name}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(!collapsed)}
+          onClose={() => {
+            close();
+            trigger.current?.focus();
+          }}
+        />
         <nav className="primary-navigation" aria-label="Primary">
           {links.map(({ href, title: label, icon: Icon }) => (
             <NavigationButton
               asChild
               key={href}
-              className={section === href.slice(1) ? "active" : ""}
+              className={`${sidebarPrimaryLinkClassName} ${section === href.slice(1) ? "active" : ""}`}
             >
               <Link
                 href={href}
                 prefetch
+                aria-label={label}
+                title={collapsed ? label : undefined}
                 onClick={(event) => {
                   if (href !== "/docs") {
                     close();
@@ -160,12 +165,13 @@ export function ReaderShell({
                     event.altKey
                   )
                     return;
+                  setCollapsed(false);
                   event.preventDefault();
                   startNavigation(() => router.push("/docs"));
                 }}
               >
                 <Icon size={19} />
-                {label}
+                <span className="sidebar-nav-text">{label}</span>
               </Link>
             </NavigationButton>
           ))}
@@ -288,7 +294,7 @@ export function ReaderShell({
           </Button>
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
-              <Link href={organizationHomePath} prefetch>
+              <Link href={homePath(context.branding)} prefetch>
                 Organization
               </Link>
             </Button>

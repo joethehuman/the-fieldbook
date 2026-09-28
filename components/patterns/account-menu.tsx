@@ -73,8 +73,8 @@ export function AccountMenu({
         data-slot="account-button"
         className="grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-3 border-t border-border px-2 py-4 text-left @max-[13rem]:grid-cols-[minmax(0,1fr)_auto]"
       >
-        <InitialsAvatar initials={initials} />
-        <span className="min-w-0 @max-[13rem]:col-span-full">
+        <InitialsAvatar initials={initials} className="sidebar-account-avatar" />
+        <span className="sidebar-account-identity min-w-0 @max-[13rem]:col-span-full">
           <span className="block break-words text-sm font-semibold leading-snug">
             {name}
           </span>
@@ -91,7 +91,7 @@ export function AccountMenu({
               type="button"
               variant="ghost"
               size="icon"
-              className="rounded-full hover:bg-muted-hover focus-visible:bg-muted-hover @max-[13rem]:col-start-2 @max-[13rem]:row-start-1"
+              className="sidebar-account-trigger rounded-full transition-[transform,background-color,color] duration-[180ms] hover:bg-muted-hover focus-visible:bg-muted-hover @max-[13rem]:col-start-2 @max-[13rem]:row-start-1"
               aria-label="Account menu"
               title="Account menu"
             >
@@ -188,7 +188,7 @@ export function AccountMenu({
           <Button
             type="button"
             variant="ghost"
-            className="col-span-full justify-start"
+            className="sidebar-account-secondary col-span-full justify-start"
             onClick={onSwitchDemoProfile}
           >
             <ArrowLeftRight className="size-4" aria-hidden="true" />

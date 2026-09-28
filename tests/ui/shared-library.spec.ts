@@ -168,10 +168,27 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   });
   if (await picker.isVisible()) await expect(nav).toBeHidden();
   else await expect(nav).toBeVisible();
-  await section(page, "Assignment window");
-  await expect(
-    page.getByRole("spinbutton", { name: "New user onboarding window (days)" }),
-  ).toHaveAccessibleDescription(/Changes recalculate targets for everyone/);
+  await section(page, "Due dates");
+  const useDueDates = page.getByRole("switch", { name: "Use due dates" });
+  const onboardingDays = page.getByRole("spinbutton", {
+    name: "New user onboarding window (days)",
+  });
+  const catchUpDays = page.getByRole("spinbutton", {
+    name: "Ongoing catch-up window (days)",
+  });
+  await expect(onboardingDays).toHaveAccessibleDescription(
+    /Changes recalculate targets for everyone/,
+  );
+  await useDueDates.uncheck();
+  await expect(onboardingDays).toBeDisabled();
+  await expect(catchUpDays).toBeDisabled();
+  await page.screenshot({
+    path: info.outputPath("settings-due-dates-off.png"),
+    fullPage: true,
+  });
+  await useDueDates.check();
+  await expect(onboardingDays).toBeEnabled();
+  await expect(catchUpDays).toBeEnabled();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("settings-window.png"),
