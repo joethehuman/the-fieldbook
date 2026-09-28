@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock } from "lucide-react";
+import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Minus, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Alert } from "./ui/alert";
@@ -122,9 +122,9 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             <span className="eyebrow">{curriculumTitle || course.category}</span>
             <h1>{course.title}</h1>
             <div className="course-about">
-              <details><summary>About this course</summary><p>{course.summary}</p><p>{course.duration} min · {course.lessons.length} lessons</p></details>
+              <details><summary><span>About this course</span><span className="course-about-toggle" aria-hidden="true"><Plus className="course-about-plus" size={16} /><Minus className="course-about-minus" size={16} /></span></summary><div className="course-about-content"><p>{course.summary}</p><div className="course-detail-meta"><span className="course-duration"><Clock size={16} aria-hidden="true" />{course.duration} min</span><span aria-hidden="true">·</span><span>{course.lessons.length} lessons</span></div></div></details>
               <p className="course-desktop-summary">{course.summary}</p>
-              <div className="course-detail-meta course-desktop-summary"><Clock size={16} /> {course.duration} min · {course.lessons.length} lessons <Badge variant="success" className={complete ? undefined : "invisible"} aria-hidden={!complete}>Completed</Badge></div>
+              <div className="course-detail-meta course-desktop-summary"><span className="course-duration"><Clock size={16} aria-hidden="true" />{course.duration} min</span><span aria-hidden="true">·</span><span>{course.lessons.length} lessons</span><Badge variant="success" className={complete ? undefined : "invisible"} aria-hidden={!complete}>Completed</Badge></div>
             </div>
           </div>
           <nav className="lesson-nav" aria-label="In this course">
