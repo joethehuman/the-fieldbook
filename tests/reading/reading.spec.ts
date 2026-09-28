@@ -581,6 +581,16 @@ test("Courses home splits its progress card on iPad in the installed app", async
   await expect(row.locator(".course-card")).toHaveCount(1);
   for (const width of [820, 1024, 390]) {
     await page.setViewportSize({ width, height: 844 });
+    // The shared sidebar moves during viewport changes; measure after it settles.
+    await page.waitForFunction(() =>
+      document
+        .getAnimations()
+        .every(
+          (animation) =>
+            animation.constructor.name !== "CSSTransition" ||
+            animation.playState !== "running",
+        ),
+    );
     const summaryBox = await summary.boundingBox();
     const rowBox = await row.boundingBox();
     const ring = summary.locator('[data-slot="progress-ring"]');

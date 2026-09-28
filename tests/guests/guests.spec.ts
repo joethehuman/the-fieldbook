@@ -286,9 +286,11 @@ async function nav(page: Page, name: string) {
   if (await open.isVisible()) await open.click();
   const navigation = page.getByRole("navigation", { name: "Primary" });
   const label = new RegExp(`^${name}(\\s+\\d+)?$`);
-  const link = navigation.getByRole("link", { name: label }).first();
-  if (await link.count()) await link.click();
-  else await navigation.getByRole("button", { name: label }).first().click();
+  await navigation
+    .getByRole("link", { name: label })
+    .or(navigation.getByRole("button", { name: label }))
+    .first()
+    .click();
 }
 
 test("optional existing selection, explicit named creation, save flow and retained private setting", async ({
@@ -363,7 +365,7 @@ test("guest Updates and curriculum learning, browser progress and account transi
   const f = await setup(page, info);
   await expect(page.locator(".for-you")).toContainText("Guest introduction");
   await expect(page.locator(".for-you")).toContainText(
-    "0 of 2 assigned courses complete",
+    "0 of 2 recommended courses complete",
   );
   await expect(page.locator(".for-you")).not.toContainText(
     /past their target|days left in onboarding/,
@@ -423,7 +425,7 @@ test("guest Updates and curriculum learning, browser progress and account transi
   await page.reload();
   await nav(page, "Courses");
   await expect(page.locator(".for-you")).toContainText(
-    "1 of 2 assigned courses complete",
+    "1 of 2 recommended courses complete",
   );
   await nav(page, "Updates");
   await expect(page.locator(".updates-section").first()).toContainText(
@@ -483,7 +485,7 @@ test("no selection and publication changes preserve a usable library with honest
   });
   await page.goto(f.production ? "/courses" : "/");
   await expect(page.locator(".for-you")).toContainText(
-    "0 of 1 assigned courses complete",
+    "0 of 1 recommended courses complete",
   );
   await f.change((d) => {
     d.groups = d.groups.filter((g) => g.id !== "visitors");

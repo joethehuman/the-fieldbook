@@ -497,7 +497,7 @@ export default function ComponentCatalog() {
                 </TabsTrigger>
                 <TabsTrigger value="assignment">
                   <Layers />
-                  Assignment window with a longer label
+                  Due dates with a longer label
                 </TabsTrigger>
               </TabsList>
             </Tabs>

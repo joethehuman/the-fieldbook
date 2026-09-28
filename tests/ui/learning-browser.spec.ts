@@ -73,6 +73,29 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 
+test("due dates off keeps progress and uses recommended language", async ({ page }, info) => {
+  const data = freshWorkspace();
+  data.settings = { ...data.settings!, dueDatesEnabled: false };
+  await page.addInitScript((workspace) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-learner");
+  }, data);
+  await page.goto("/#courses");
+  const summary = page.locator('.for-you [data-slot="card"]');
+  await expect(summary).toContainText("recommended courses complete");
+  await expect(summary.getByRole("progressbar")).toHaveCount(1);
+  await expect(summary).not.toContainText(/assigned|past their target|onboarding/i);
+  await summary.screenshot({ path: info.outputPath("recommended-progress.png") });
+  await summary.getByRole("button", { name: "View all for you" }).click();
+  await expect(
+    page.getByRole("group", { name: "Course views" }).getByRole("button", {
+      name: "Recommended",
+    }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".library")).toContainText("Recommended");
+  await expect(page.locator(".library")).not.toContainText("Assigned");
+});
+
 test("For you uses curriculum cards, one category picker and a simple ordered page", async ({
   page,
 }, info) => {
