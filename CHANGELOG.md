@@ -4,6 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Start Docs sidebar subsections closed and show their labels at regular weight, using only the chevron to identify expandable rows.
 - Let desktop readers collapse the shared sidebar to an aligned icon rail with a toggle or ⇧⌘S. The navigation reveals without reflowing and keeps its open or closed state across pages; opening a course collapses it, while choosing Docs reopens its navigation.
 
 - Add shared generated card artwork for Updates, Courses and Curricula, with 30 compositions, random Shuffle choices that avoid recent repeats, custom images, and Identity palette controls. Previously saved artwork keeps its original design. [Artwork guide](docs/card-artwork.md).
