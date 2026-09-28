@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { assignedCourses } from "../lib/types";
-import { learningTarget, requiredSequence } from "../lib/learning";
+import { learningState, learningTarget, onboardingTarget, requiredSequence } from "../lib/learning";
 import { freshWorkspace } from "../lib/store";
 import { defaultSettings } from "../lib/settings";
 const admin = "00000000-0000-4000-8000-000000000001",
@@ -268,4 +268,12 @@ test("completion targets use the later onboarding or catch-up window and respond
     ],
   };
   assert.equal(learningTarget(newlyRequired, user, data.groups), "2026-12-20");
+  const withoutDueDates = { ...defaultSettings, dueDatesEnabled: false };
+  assert.equal(learningTarget(course, user, data.groups, withoutDueDates), undefined);
+  assert.equal(onboardingTarget(user, withoutDueDates), undefined);
+  const state = learningState([course], user, data.groups, [], withoutDueDates);
+  assert.equal(state.required.length, 1);
+  assert.equal(state.remaining.length, 1);
+  assert.deepEqual(state.overdue, []);
+  assert.equal(state.status, "In progress");
 });

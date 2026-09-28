@@ -80,6 +80,16 @@ test("branding projection contains only public identity with existing-installati
 
 test("settings accepts old configurations and validates branding without separate login settings", () => {
   assert.equal(
+    settingsSchema.parse({ ...defaultSettings, dueDatesEnabled: undefined })
+      .dueDatesEnabled,
+    true,
+  );
+  assert.equal(
+    settingsSchema.parse({ ...defaultSettings, dueDatesEnabled: false })
+      .dueDatesEnabled,
+    false,
+  );
+  assert.equal(
     settingsSchema.parse({ ...defaultSettings, homePage: undefined }).homePage,
     "courses",
   );

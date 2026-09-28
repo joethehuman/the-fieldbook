@@ -737,7 +737,7 @@ test("shared settings library and connection states work in the server app", asy
       await expect(picker).toBeFocused();
     } else await page.getByRole("tab", { name, exact: true }).click();
   }
-  await section("Assignment window");
+  await section("Due dates");
   await expect(
     page.getByRole("spinbutton", { name: "New user onboarding window (days)" }),
   ).toHaveAccessibleDescription(/Changes recalculate targets for everyone/);

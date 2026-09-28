@@ -9,7 +9,7 @@ export function CourseCard({
   course: c,
   status,
   dueDate,
-  assigned = false,
+  assignmentLabel,
   onClick,
   href,
   settings,
@@ -17,7 +17,7 @@ export function CourseCard({
   course: Content;
   status: ReturnType<typeof courseProgress>;
   dueDate?: string;
-  assigned?: boolean;
+  assignmentLabel?: "Assigned" | "Recommended";
   onClick?: () => void;
   href?: string;
   settings?: SiteSettings;
@@ -30,7 +30,7 @@ export function CourseCard({
       title={c.title}
       description={c.summary}
       status={status}
-      metadata={`${c.category} · ${c.duration} min · ${c.lessons.length} lessons${c.questions.length ? " · Quiz" : ""}${assigned ? " · Assigned" : ""}`}
+      metadata={`${c.category} · ${c.duration} min · ${c.lessons.length} lessons${c.questions.length ? " · Quiz" : ""}${assignmentLabel ? ` · ${assignmentLabel}` : ""}`}
       action={
         complete
           ? "Review course"
