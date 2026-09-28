@@ -85,7 +85,7 @@ export function HierarchyList({
             }
           >
             <li>
-              <div className="flex min-w-0 items-start gap-2 border-b border-border px-3 py-3 last:border-b-0">
+              <div className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-3 last:border-b-0">
                 {canBulkSelect(matches.length) &&
                   selected &&
                   onSelectionChange && (
@@ -185,7 +185,8 @@ export function HierarchyList({
             value={selected}
             onChange={onSelectionChange}
           />
-          Select all matching {label.toLowerCase()} (children are not selected automatically)
+          Select all matching {label.toLowerCase()} (children are not selected
+          automatically)
         </div>
       )}
       {matches.length ? (
@@ -197,7 +198,9 @@ export function HierarchyList({
         </ul>
       ) : (
         <EmptyState>
-          {items.length ? `No ${label.toLowerCase()} match your search.` : `No ${label.toLowerCase()} yet.`}
+          {items.length
+            ? `No ${label.toLowerCase()} match your search.`
+            : `No ${label.toLowerCase()} yet.`}
         </EmptyState>
       )}
     </div>

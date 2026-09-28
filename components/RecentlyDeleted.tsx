@@ -109,6 +109,11 @@ export function RecentlyDeleted({
       </FormField>
       <AdminBulkActions
         data={displayData}
+        range={
+          rows.length
+            ? `${(currentPage - 1) * 25 + 1}–${Math.min(currentPage * 25, rows.length)} of ${rows.length} shown`
+            : undefined
+        }
         collectionSize={selection.collectionSize}
         selected={selection.actionIds}
         onSelectionChange={selection.setSelected}

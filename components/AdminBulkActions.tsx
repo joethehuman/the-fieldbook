@@ -7,6 +7,7 @@ export function AdminBulkActions({
   data,
   selected,
   collectionSize,
+  range,
   onSelectionChange,
   onBulk,
   entity = "content",
@@ -16,6 +17,7 @@ export function AdminBulkActions({
   data: Workspace;
   selected: string[];
   collectionSize: number;
+  range?: string;
   onSelectionChange: (ids: string[]) => void;
   onBulk: BulkHandler;
   entity?: "content" | "user";
@@ -137,6 +139,7 @@ export function AdminBulkActions({
   return (
     <BulkActions
       collectionSize={collectionSize}
+      range={range}
       selected={selected}
       onSelectionChange={onSelectionChange}
       commands={commands}

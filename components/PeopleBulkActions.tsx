@@ -61,7 +61,10 @@ export function peopleCommands(
         op === "add"
           ? "Add direct memberships. Overlapping assignments count once."
           : "Remove direct memberships. Inclusion through teams or child groups and saved history remain.",
-      options: data.groups.map((g) => ({ id: g.id, label: groupPath(g.id, data.groups) })),
+      options: data.groups.map((g) => ({
+        id: g.id,
+        label: groupPath(g.id, data.groups),
+      })),
       apply: (ids: string[]) => apply(op, ids),
     })),
     {
@@ -72,7 +75,10 @@ export function peopleCommands(
       selectionMode: "single",
       options: [
         { id: "none", label: "No team" },
-        ...(data.teams || []).map((t) => ({ id: t.id, label: teamPath(t.id, data.teams || []) })),
+        ...(data.teams || []).map((t) => ({
+          id: t.id,
+          label: teamPath(t.id, data.teams || []),
+        })),
       ],
       apply: (ids) => apply("team", ids),
     },
@@ -124,6 +130,7 @@ export function PeopleBulkActions({
   data,
   selected,
   collectionSize,
+  range,
   onChange,
   onSelectionChange,
   onBulk,
@@ -132,6 +139,7 @@ export function PeopleBulkActions({
   data: Workspace;
   selected: string[];
   collectionSize: number;
+  range?: string;
   onChange: (data: Workspace) => void | Promise<void>;
   onSelectionChange: (ids: string[]) => void;
   onBulk: BulkHandler;
@@ -141,6 +149,7 @@ export function PeopleBulkActions({
     <AdminBulkActions
       data={data}
       collectionSize={collectionSize}
+      range={range}
       selected={selected}
       onSelectionChange={onSelectionChange}
       onBulk={onBulk}

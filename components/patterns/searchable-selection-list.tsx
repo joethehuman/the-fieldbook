@@ -48,11 +48,15 @@ export function SearchableSelectionList({
     page,
     Math.max(1, Math.ceil(matches.length / 10)),
   );
+  const pageOptions = matches.slice((currentPage - 1) * 10, currentPage * 10);
+  const pageSelected = pageOptions.filter((option) =>
+    value.includes(option.id),
+  ).length;
   return (
     <FieldGroup disabled={disabled}>
       <FormField
         label={label}
-        description={`${value.length} selected. Selections are kept while you search or change pages.`}
+        description="Selections are kept while you search or change pages."
       >
         <Input
           type="search"
@@ -65,27 +69,31 @@ export function SearchableSelectionList({
         />
       </FormField>
       {selectionMode === "multiple" && options.length > 1 && (
-        <div className="flex flex-wrap items-center gap-3">
-          {matches.length > 1 && (
-            <Field orientation="horizontal">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3">
+          <span className="text-copy text-muted-foreground" role="status">
+            {value.length} selected ·{" "}
+            {matches.length
+              ? `${(currentPage - 1) * 10 + 1}–${Math.min(currentPage * 10, matches.length)} of ${matches.length} shown`
+              : "0 results"}
+          </span>
+          {pageOptions.length > 1 && (
+            <Field orientation="horizontal" className="gap-2">
               <Checkbox
-                aria-label="Select this page"
-                disabled={disabled || !matches.length}
+                aria-label={
+                  matches.length > pageOptions.length
+                    ? `Select page (${pageOptions.length})`
+                    : `Select all ${pageOptions.length}`
+                }
+                disabled={disabled}
                 checked={
-                  matches
-                    .slice((currentPage - 1) * 10, currentPage * 10)
-                    .every((o) => value.includes(o.id)) && !!matches.length
+                  pageSelected === pageOptions.length
                     ? true
-                    : matches
-                          .slice((currentPage - 1) * 10, currentPage * 10)
-                          .some((o) => value.includes(o.id))
+                    : pageSelected
                       ? "indeterminate"
                       : false
                 }
                 onCheckedChange={(checked) => {
-                  const ids = matches
-                    .slice((currentPage - 1) * 10, currentPage * 10)
-                    .map((o) => o.id);
+                  const ids = pageOptions.map((o) => o.id);
                   onChange(
                     checked === true
                       ? [...new Set([...value, ...ids])]
@@ -93,21 +101,27 @@ export function SearchableSelectionList({
                   );
                 }}
               />
-              Select this page
+              {matches.length > pageOptions.length
+                ? `Select page (${pageOptions.length})`
+                : `Select all ${pageOptions.length}`}
             </Field>
           )}
-          {matches.length > 10 && (
-            <Button
-              type="button"
-              variant="link"
-              disabled={disabled}
-              onClick={() =>
-                onChange([...new Set([...value, ...matches.map((o) => o.id)])])
-              }
-            >
-              Select all {matches.length} matching items
-            </Button>
-          )}
+          {matches.length > pageOptions.length &&
+            pageSelected === pageOptions.length &&
+            value.length < matches.length && (
+              <Button
+                type="button"
+                variant="link"
+                disabled={disabled}
+                onClick={() =>
+                  onChange([
+                    ...new Set([...value, ...matches.map((o) => o.id)]),
+                  ])
+                }
+              >
+                Select all {matches.length} matching
+              </Button>
+            )}
           {!!value.length && (
             <Button
               type="button"
@@ -136,56 +150,60 @@ export function SearchableSelectionList({
           )}
         </div>
       )}
-      <div className="grid gap-3">
-        {matches
-          .slice((currentPage - 1) * 10, currentPage * 10)
-          .map((option) => (
-            <Field
-              key={option.id}
-              orientation="horizontal"
-              className="rounded-md border border-border p-3"
-            >
-              {selectionMode === "single" ? (
-                <Radio
-                  name={groupName}
-                  value={option.id}
-                  disabled={disabled}
-                  checked={value.includes(option.id)}
-                  onChange={() => onChange([option.id])}
-                />
-              ) : (
-                <Checkbox
-                  disabled={disabled}
-                  checked={value.includes(option.id)}
-                  onCheckedChange={(checked) =>
-                    onChange(
-                      checked === true
-                        ? [...value, option.id]
-                        : value.filter((id) => id !== option.id),
-                    )
-                  }
-                />
+      <div className="grid gap-2">
+        {pageOptions.map((option) => (
+          <Field
+            key={option.id}
+            orientation="horizontal"
+            data-selected={value.includes(option.id)}
+            className="min-h-16 rounded-md border border-border p-3 hover:bg-muted/40 data-[selected=true]:border-primary/40 data-[selected=true]:bg-selected/40"
+          >
+            {selectionMode === "single" ? (
+              <Radio
+                name={groupName}
+                value={option.id}
+                disabled={disabled}
+                checked={value.includes(option.id)}
+                onChange={() => onChange([option.id])}
+              />
+            ) : (
+              <Checkbox
+                disabled={disabled}
+                checked={value.includes(option.id)}
+                onCheckedChange={(checked) =>
+                  onChange(
+                    checked === true
+                      ? [...value, option.id]
+                      : value.filter((id) => id !== option.id),
+                  )
+                }
+              />
+            )}
+            <span className="min-w-0 [overflow-wrap:anywhere]">
+              <span className="block">{option.label}</span>
+              {option.description && (
+                <span className="block text-copy font-normal text-muted-foreground">
+                  {option.description}
+                </span>
               )}
-              <span className="min-w-0 [overflow-wrap:anywhere]">
-                <span className="block">{option.label}</span>
-                {option.description && (
-                  <span className="block text-copy font-normal text-muted-foreground">
-                    {option.description}
-                  </span>
-                )}
-              </span>
-            </Field>
-          ))}
+            </span>
+          </Field>
+        ))}
         {!matches.length && <EmptyState>{emptyMessage}</EmptyState>}
       </div>
-      <Pagination
-        label="Search results"
-        page={currentPage}
-        pageSize={10}
-        total={matches.length}
-        onPageChange={setPage}
-        disabled={disabled}
-      />
+      {(matches.length > 10 ||
+        selectionMode === "single" ||
+        options.length <= 1) && (
+        <Pagination
+          label="Search results"
+          page={currentPage}
+          pageSize={10}
+          total={matches.length}
+          onPageChange={setPage}
+          disabled={disabled}
+          showCount={selectionMode !== "multiple" || options.length <= 1}
+        />
+      )}
     </FieldGroup>
   );
 }

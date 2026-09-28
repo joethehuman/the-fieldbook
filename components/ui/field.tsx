@@ -16,9 +16,7 @@ export function Field({
       data-slot="field"
       className={cn(
         "min-w-0 text-label font-medium text-foreground",
-        orientation === "horizontal"
-          ? "flex items-start gap-3 [&>[data-slot=choice]]:mt-0.5"
-          : "grid gap-2",
+        orientation === "horizontal" ? "flex items-center gap-3" : "grid gap-2",
         variant === "choice" &&
           "rounded-md border border-border p-3 has-[:checked]:border-primary has-[:checked]:bg-muted",
         className,

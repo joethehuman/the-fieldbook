@@ -27,33 +27,58 @@ export function SelectableRows({
   const current = Math.min(page, Math.max(1, Math.ceil(rows.length / 25)));
   const shown = rows.slice((current - 1) * 25, current * 25);
   const eligible = rows.filter((r) => !r.disabledReason);
+  const shownEligible = shown.filter((r) => !r.disabledReason);
+  const shownSelected = shownEligible.filter((r) =>
+    selected.includes(r.id),
+  ).length;
   return (
     <div className="grid gap-3" role="group" aria-label={label}>
       {canBulkSelect(rows.length) && (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3">
+          {(rows.length > 25 || selected.length > 0) && (
+            <span className="text-copy text-muted-foreground" role="status">
+              {selected.length
+                ? `${selected.length} selected${rows.length > 25 ? " · " : ""}`
+                : ""}
+              {rows.length > 25
+                ? `${(current - 1) * 25 + 1}–${Math.min(current * 25, rows.length)} of ${rows.length} shown`
+                : ""}
+            </span>
+          )}
           <SelectRows
-            label={`Select this page of ${label}`}
-            ids={shown.filter((r) => !r.disabledReason).map((r) => r.id)}
+            label={
+              rows.length > shown.length
+                ? `Select page (${shownEligible.length}) of ${label}`
+                : `Select all ${shownEligible.length} ${label}`
+            }
+            ids={shownEligible.map((r) => r.id)}
             value={selected}
             onChange={onChange}
           />
-          <span>Select this page</span>
-          {eligible.length > 25 && (
-            <Button
-              type="button"
-              variant="link"
-              onClick={() => onChange(eligible.map((r) => r.id))}
-            >
-              Select all {eligible.length} matching items
-            </Button>
-          )}
+          <span>
+            {rows.length > shown.length
+              ? `Select page (${shownEligible.length})`
+              : `Select all ${shownEligible.length}`}
+          </span>
+          {eligible.length > shownEligible.length &&
+            shownSelected === shownEligible.length &&
+            selected.length < eligible.length && (
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => onChange(eligible.map((r) => r.id))}
+              >
+                Select all {eligible.length} matching
+              </Button>
+            )}
         </div>
       )}
       <ul className="grid gap-2">
         {shown.map((r) => (
           <li
             key={r.id}
-            className="flex items-start gap-3 rounded-md border border-border p-3"
+            data-selected={selected.includes(r.id)}
+            className="flex min-h-16 items-center gap-3 rounded-md border border-border p-3 hover:bg-muted/40 data-[selected=true]:bg-selected/40"
           >
             {canBulkSelect(rows.length) && (
               <Checkbox
@@ -86,13 +111,16 @@ export function SelectableRows({
         ))}
       </ul>
       {!rows.length && <p>No items in this list.</p>}
-      <Pagination
-        label={label}
-        page={current}
-        pageSize={25}
-        total={rows.length}
-        onPageChange={setPage}
-      />
+      {rows.length > 25 && (
+        <Pagination
+          label={label}
+          page={current}
+          pageSize={25}
+          total={rows.length}
+          onPageChange={setPage}
+          showCount={rows.length <= 1}
+        />
+      )}
     </div>
   );
 }

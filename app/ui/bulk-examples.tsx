@@ -21,10 +21,10 @@ export function BulkExamples() {
     <section className="grid gap-4" aria-label="Bulk selection example">
       <h2>Bulk actions: existing rows and Add picker</h2>
       <p>
-        Select existing rows, then use one Bulk actions menu. Use Add for
-        relationships that are not in this list yet. Remove rows to see the
-        single-item Actions menu and empty state; bulk controls appear only with
-        two or more items.
+        The Bulk actions menu stays in place and becomes available when rows are
+        selected. Use Add for relationships that are not listed yet. Remove rows
+        to see the single-item Actions menu and empty state; selection controls
+        appear when at least two items match.
       </p>
       {moveNotice && <p role="status">{moveNotice}</p>}
       <BulkPicker
@@ -44,14 +44,24 @@ export function BulkExamples() {
           {
             id: "move",
             label: "Move to example section",
-            description: "Move the selected rows to one destination. Existing IDs and order stay intact.",
+            description:
+              "Move the selected rows to one destination. Existing IDs and order stay intact.",
             options: [
               { id: "guides", label: "Guides" },
               { id: "reference", label: "Reference" },
             ],
             selectionMode: "single",
-            review: (values, ids) => <p>{ids.length} selected rows → {values[0] === "guides" ? "Guides" : "Reference"}. The selection is reviewed before applying.</p>,
-            apply: (values, ids) => setMoveNotice(`${ids?.length || 0} rows moved to ${values[0] === "guides" ? "Guides" : "Reference"}.`),
+            review: (values, ids) => (
+              <p>
+                {ids.length} selected rows →{" "}
+                {values[0] === "guides" ? "Guides" : "Reference"}. The selection
+                is reviewed before applying.
+              </p>
+            ),
+            apply: (values, ids) =>
+              setMoveNotice(
+                `${ids?.length || 0} rows moved to ${values[0] === "guides" ? "Guides" : "Reference"}.`,
+              ),
           },
           {
             id: "remove",

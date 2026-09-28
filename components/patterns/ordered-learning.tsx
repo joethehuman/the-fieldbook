@@ -21,7 +21,12 @@ export function OrderedLearning({
   selected?: string[];
   onSelectionChange?: (ids: string[]) => void;
 }) {
-  const drag = useRowReorder(items, (id, target) => move(id, target), disabled);
+  const drag = useRowReorder(
+    items,
+    (id, target) => move(id, target),
+    disabled,
+    (item) => item.label,
+  );
   function move(id: string, position: number) {
     const ids = items.map((i) => i.id),
       from = ids.indexOf(id);
@@ -46,7 +51,7 @@ export function OrderedLearning({
             value={selected}
             onChange={onSelectionChange}
           />
-          Select all listed items
+          Select all {items.length} listed items
         </div>
       )}
       <ol className="learning-order">
@@ -55,6 +60,13 @@ export function OrderedLearning({
             key={item.id}
             data-sortable-preview
             data-dragging={drag.active === item.id}
+            data-drop={
+              drag.destination?.id === item.id
+                ? drag.destination.side
+                : undefined
+            }
+            data-moved={drag.recentlyMoved === item.id}
+            data-selected={selected?.includes(item.id)}
             onDragOver={(e) => {
               drag.over(e, item.id);
             }}
@@ -79,28 +91,35 @@ export function OrderedLearning({
                 <GripVertical size={17} />
               </Button>
             }
+            selection={
+              canBulkSelect(items.length) && selected && onSelectionChange ? (
+                <Checkbox
+                  aria-label={`Select ${item.label}`}
+                  checked={selected.includes(item.id)}
+                  onCheckedChange={(v) =>
+                    onSelectionChange(
+                      v === true
+                        ? [...selected, item.id]
+                        : selected.filter((id) => id !== item.id),
+                    )
+                  }
+                />
+              ) : undefined
+            }
             title={
-              <>
-                {canBulkSelect(items.length) &&
-                  selected &&
-                  onSelectionChange && (
-                    <Checkbox
-                      aria-label={`Select ${item.label}`}
-                      checked={selected.includes(item.id)}
-                      onCheckedChange={(v) =>
-                        onSelectionChange(
-                          v === true
-                            ? [...selected, item.id]
-                            : selected.filter((id) => id !== item.id),
-                        )
-                      }
-                    />
-                  )}
-                <span className="mr-2 text-xs text-muted-foreground">
-                  {index + 1}
-                </span>
-                <strong>{item.label}</strong>
-              </>
+              <div className="min-w-0">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className="w-6 shrink-0 text-right text-xs tabular-nums text-muted-foreground"
+                    aria-label={`Position ${index + 1}`}
+                  >
+                    {index + 1}.
+                  </span>
+                  <strong className="min-w-0 [overflow-wrap:anywhere]">
+                    {item.label}
+                  </strong>
+                </div>
+              </div>
             }
             detail={item.detail}
             actions={

@@ -41,7 +41,10 @@ export type BulkCommand = {
   field?: "date";
   fieldLabel?: string;
   review?: (values: string[], sourceIds: string[]) => ReactNode;
-  apply: (values: string[], sourceIds?: string[]) => Promise<void | {
+  apply: (
+    values: string[],
+    sourceIds?: string[],
+  ) => Promise<void | {
     failed: string[];
     message: string;
     details?: string[];
@@ -51,6 +54,7 @@ export type BulkCommand = {
 export function BulkActions({
   selected,
   collectionSize,
+  range,
   singleItemActions = true,
   onSelectionChange,
   commands,
@@ -59,6 +63,7 @@ export function BulkActions({
 }: {
   selected: string[];
   collectionSize: number;
+  range?: string;
   /** Omit the fallback when ordinary row/editor actions already cover this collection. */
   singleItemActions?: boolean;
   onSelectionChange: (ids: string[]) => void;
@@ -86,7 +91,7 @@ export function BulkActions({
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline">
+        <Button type="button" variant="outline" disabled={!selected.length}>
           {collectionSize > 1 ? "Bulk actions" : "Actions"}
         </Button>
       </DropdownMenuTrigger>
@@ -131,6 +136,9 @@ export function BulkActions({
       {collectionSize > 1 ? (
         <BulkSelectionBar
           count={selected.length}
+          total={collectionSize}
+          noun={noun}
+          range={range}
           onClear={() => onSelectionChange([])}
         >
           {menu}

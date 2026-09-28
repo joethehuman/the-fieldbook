@@ -827,6 +827,11 @@ export default function Admin({
               <AdminBulkActions
                 data={data}
                 collectionSize={selection.collectionSize}
+                range={
+                  contentRows.length
+                    ? `${(currentPage - 1) * 25 + 1}–${Math.min(currentPage * 25, contentRows.length)} of ${contentRows.length} shown`
+                    : undefined
+                }
                 selected={selection.actionIds}
                 onSelectionChange={selection.setSelected}
                 onBulk={onBulk}
@@ -844,7 +849,7 @@ export default function Admin({
                       <TableHead>
                         {selection.canSelect && (
                           <SelectRows
-                            label="Select this page"
+                            label={contentRows.length > contentPage.length ? `Select page (${contentPage.length})` : `Select all ${contentRows.length}`}
                             ids={contentPage.map((row) => row.id)}
                             value={selection.selected}
                             onChange={selection.setSelected}
@@ -1116,6 +1121,11 @@ export default function Admin({
                 currentUserId={user.id}
                 data={data}
                 collectionSize={selection.collectionSize}
+                range={
+                  peopleRows.length
+                    ? `${(currentPage - 1) * 25 + 1}–${Math.min(currentPage * 25, peopleRows.length)} of ${peopleRows.length} shown`
+                    : undefined
+                }
                 selected={selection.actionIds}
                 onChange={onChange}
                 onSelectionChange={selection.setSelected}
@@ -1128,7 +1138,7 @@ export default function Admin({
                       <TableHead>
                         {selection.canSelect && (
                           <SelectRows
-                            label="Select this page"
+                            label={peopleRows.length > peoplePage.length ? `Select page (${peoplePage.length})` : `Select all ${peopleRows.length}`}
                             ids={peoplePage.map((row) => row.id)}
                             value={selection.selected}
                             onChange={selection.setSelected}
@@ -1541,7 +1551,9 @@ export function Editor({
         art.source === "generated" &&
         (!art.shortTitle.trim() || graphemeCount(art.shortTitle.trim()) > 40)
       ) {
-        setError("Give generated artwork a short title of up to 40 characters.");
+        setError(
+          "Give generated artwork a short title of up to 40 characters.",
+        );
         setSettingsOpen(true);
         return;
       }
@@ -1616,7 +1628,14 @@ export function Editor({
       const saved: Content = {
         ...c,
         ...(c.kind !== "doc" && !existing && !c.cardArt
-          ? { cardArt: resolvedCardArt(c.id, c.title, undefined, c.coverImageUrl) }
+          ? {
+              cardArt: resolvedCardArt(
+                c.id,
+                c.title,
+                undefined,
+                c.coverImageUrl,
+              ),
+            }
           : {}),
         status: saveStatus,
         ...(latest

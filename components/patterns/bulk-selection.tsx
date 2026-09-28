@@ -95,26 +95,36 @@ export function SelectRows({
 }
 export function BulkSelectionBar({
   count,
+  total,
+  noun,
+  range,
   onClear,
   children,
 }: {
   count: number;
+  total: number;
+  noun: string;
+  range?: string;
   onClear: () => void;
   children: ReactNode;
 }) {
-  if (!count) return null;
   return (
     <div
-      className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-muted p-3"
+      className="flex min-h-12 flex-wrap items-center justify-between gap-3 border-b border-border py-2"
       role="region"
       aria-label="Selected items"
     >
-      <span role="status">{count} selected</span>
+      <span role="status" className="text-copy text-muted-foreground">
+        {count ? `${count} selected` : range || `${total} ${noun}`}
+        {count && range ? ` · ${range}` : ""}
+      </span>
       <ActionGroup>
         {children}
-        <Button variant="ghost" onClick={onClear}>
-          Clear selection
-        </Button>
+        {count > 0 && (
+          <Button variant="ghost" onClick={onClear}>
+            Clear selection
+          </Button>
+        )}
       </ActionGroup>
     </div>
   );

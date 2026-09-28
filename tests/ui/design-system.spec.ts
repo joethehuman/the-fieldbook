@@ -548,6 +548,7 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
   }
   await snapshotReview(page, testInfo, "content-composition");
   await adminSection(page, "Docs navigation");
+  await page.getByRole("button", { name: "New section", exact: true }).click();
   await page
     .getByRole("textbox", { name: "New section name" })
     .fill("A deliberately long section title for checking aligned actions");
@@ -564,13 +565,15 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
   const firstText = await rows.first().locator("strong").innerText();
   await rows
     .first()
-    .getByRole("button", { name: /^Move .* down$/ })
+    .getByRole("button", { name: /^Actions for / })
     .click();
+  await page.getByRole("menuitem", { name: "Move down" }).click();
   await expect(rows.nth(1).locator("strong")).toHaveText(firstText);
   await rows
     .nth(1)
-    .getByRole("button", { name: /^Move .* down$/ })
+    .getByRole("button", { name: /^Actions for / })
     .click();
+  await page.getByRole("menuitem", { name: "Move down" }).click();
   await expect(rows.nth(2).locator("strong")).toHaveText(firstText);
   await page
     .getByRole("button", { name: "Save settings", exact: true })
