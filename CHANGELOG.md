@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Replace the browser-local demo's sample catalog with Hoolibook: 12 courses with three lessons and checks, 15 Docs in five ordered sections, and 10 Updates. Fresh or reset demo workspaces receive the new catalog; existing saved browser workspaces retain their content.
+
 - Align the course details and lesson headings in the player, move Exit course beneath the outline, and keep long outlines scrolling between fixed details and exit. Show lessons, quizzes and the finish view without an outer card border, hide the redundant guest notice and legacy course body text, and show the short description once. On narrow screens, navigation brings the lesson cleanly below the app bar; the course disclosure uses plus/minus controls, with more room around the outline, lesson navigation divider, and compact duration metadata. Match the lesson title to the course title size, step authored headings down beneath it, and remove the extra margin before an opening lesson heading.
 
 - Keep Bulk actions and result-range labels in place as selection changes. Show selected counts after persistent range text and put Clear selection before the anchored menu across tables and pickers.

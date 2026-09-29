@@ -1,6 +1,7 @@
 import { expireDemoDeleted } from "./bulk-actions";
 import { withPublishedSnapshots } from "./demo-publication";
-import { seedContent } from "./seed";
+import { defaultSettings } from "./settings";
+import { DOC_CATEGORY_ORDER, seedContent } from "./seed";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 import { gradeQuiz, quizUnlocked } from "./course-quiz";
 export type Workspace = {
@@ -33,12 +34,17 @@ export const DEMO_PROFILE_IDS = ["demo-learner", "demo-manager", "demo-admin"];
 const completedCourse = (id: string): Progress => ({
   content_id: id,
   version: 1,
-  lessons: [`${id}-1`, `${id}-2`],
+  lessons: [`${id}-1`, `${id}-2`, `${id}-3`],
   passed: true,
 });
 export function freshWorkspace(): Workspace {
   return {
     schema: 1,
+    settings: {
+      ...defaultSettings,
+      name: "Hoolibook",
+      docCategoryOrder: [...DOC_CATEGORY_ORDER],
+    },
     content: structuredClone(seedContent).map((c) =>
       c.kind === "brief" && ["brief-1", "brief-2"].includes(c.id)
         ? { ...c, groups: ["sales"] }
@@ -47,11 +53,11 @@ export function freshWorkspace(): Workspace {
     curricula: [
       {
         id: "sales-foundations",
-        name: "Account executive foundations",
+        name: "Hooli sales foundations",
         description:
-          "Get oriented, learn the product story, and build your discovery skills.",
+          "Build customer conversation skills using Hooli\'s current product guidance.",
         status: "published",
-        courseIds: ["course-1", "course-2", "course-3"],
+        courseIds: ["course-4", "course-11", "course-12"],
       },
     ],
     teams: [
@@ -126,21 +132,22 @@ export function freshWorkspace(): Workspace {
       {
         id: "sales",
         name: "Account executives",
-        requiredCourseIds: ["course-1", "course-2", "course-3"],
+        requiredCourseIds: ["course-4", "course-10", "course-11", "course-12"],
         learningItems: [{ kind: "curriculum", id: "sales-foundations" }],
         teamIds: [],
       },
     ],
     progress: {
-      "demo-learner": [completedCourse("course-1")],
+      "demo-learner": [completedCourse("course-4")],
       "demo-rep-2": [],
-      "demo-rep-3": [completedCourse("course-1"), completedCourse("course-2")],
+      "demo-rep-3": [completedCourse("course-4"), completedCourse("course-11")],
       "demo-rep-4": [
-        completedCourse("course-1"),
-        completedCourse("course-2"),
-        completedCourse("course-3"),
+        completedCourse("course-4"),
+        completedCourse("course-10"),
+        completedCourse("course-11"),
+        completedCourse("course-12"),
       ],
-      "demo-rep-5": [completedCourse("course-3")],
+      "demo-rep-5": [completedCourse("course-12")],
     },
   };
 }
