@@ -8,7 +8,6 @@ import {
   type SearchProvider,
 } from "@/lib/search";
 import type { Content } from "@/lib/types";
-import type { FieldbookRuntime } from "@/lib/runtime";
 import { FilterOptions } from "./patterns/filter-options";
 import {
   SearchResultCard,
@@ -20,14 +19,12 @@ import { Button } from "./ui/button";
 export function ContentSearch({
   query,
   content,
-  runtime,
   searchProvider,
   clientNavigation = false,
   onOpen,
 }: {
   query: string;
   content: Content[];
-  runtime?: FieldbookRuntime;
   searchProvider?: SearchProvider;
   clientNavigation?: boolean;
   onOpen?: (r: SearchResult) => void;
@@ -52,9 +49,7 @@ export function ContentSearch({
       try {
         const result = searchProvider
           ? await searchProvider(query, filter, controller.signal)
-          : runtime
-            ? await runtime.search(query, filter, controller.signal)
-            : demoSearch(content, query, filter);
+          : demoSearch(content, query, filter);
         if (current === generation.current && !controller.signal.aborted) {
           setResponse(result);
           setCompleted(key);
@@ -72,7 +67,7 @@ export function ContentSearch({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [query, filter, content, runtime, searchProvider, retry, key]);
+  }, [query, filter, content, searchProvider, retry, key]);
   const pending = completed !== key || state === "loading";
   return (
     <section
@@ -148,7 +143,7 @@ export function ContentSearch({
               key={r.contentId}
               result={r}
               href={
-                runtime || clientNavigation
+                clientNavigation
                   ? r.href
                   : `/?${r.lessonId ? `lesson=${encodeURIComponent(r.lessonId)}` : ""}#${r.href.split("?")[0].slice(1)}`
               }
