@@ -11,7 +11,7 @@ import {
 } from "../lib/learning";
 import { assignedLearningCards } from "../lib/learning-cards";
 import { updatesForUser, reconcileLearning } from "../lib/learning-groups";
-import { settingsSchema } from "../production/lib/schemas";
+import { settingsSchema } from "../server/schemas";
 import { publicSettings } from "../lib/settings";
 
 test("anonymous recommendations inherit parents, expand curricula and deduplicate without membership or deadlines", () => {

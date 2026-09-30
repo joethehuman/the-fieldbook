@@ -13,3 +13,7 @@ artifacts/
 
 playwright-report/
 test-results/
+
+# Generated nonsecret deployment identity
+public/fieldbook-build.json
+demo/public/fieldbook-build.json

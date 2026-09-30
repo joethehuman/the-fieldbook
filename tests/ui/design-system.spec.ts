@@ -1,4 +1,5 @@
 import { freshWorkspace } from "../../lib/store";
+import { learningUiFixture } from "../fixtures/learning-ui";
 import { test, expect, type Page } from "@playwright/test";
 
 async function noOverflow(page: Page) {
@@ -117,7 +118,10 @@ test("learning groups: shared controls, save and reload", async ({
     page.getByRole("heading", { name: "Learning groups", exact: true }),
   ).toHaveCount(1);
   const search = page.getByRole("searchbox", { name: "Find learning groups" });
-  const createButton = page.getByRole("button", { name: "Create group", exact: true });
+  const createButton = page.getByRole("button", {
+    name: "Create group",
+    exact: true,
+  });
   await expect(search).toBeVisible();
   if (testInfo.project.name === "desktop") {
     const searchBox = await search.boundingBox();
@@ -125,28 +129,46 @@ test("learning groups: shared controls, save and reload", async ({
     expect(Math.abs(searchBox!.y - buttonBox!.y)).toBeLessThan(2);
   }
   await testInfo.attach("learning-groups-overview", {
-    body: await page.screenshot({ fullPage: true, path: testInfo.outputPath("overview.png") }),
+    body: await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("overview.png"),
+    }),
     contentType: "image/png",
   });
   await createButton.click();
-  const createDialog = page.getByRole("dialog", { name: "Create learning group" });
+  const createDialog = page.getByRole("dialog", {
+    name: "Create learning group",
+  });
   await expect(createDialog).toBeVisible();
   await testInfo.attach("learning-group-create-dialog", {
-    body: await page.screenshot({ fullPage: true, path: testInfo.outputPath("create-dialog.png") }),
+    body: await page.screenshot({
+      fullPage: true,
+      path: testInfo.outputPath("create-dialog.png"),
+    }),
     contentType: "image/png",
   });
-  await createDialog.getByRole("textbox", { name: "New learning group" }).fill("Sales design test");
-  const createParent = createDialog.getByRole("combobox", { name: "Parent group" });
+  await createDialog
+    .getByRole("textbox", { name: "New learning group" })
+    .fill("Sales design test");
+  const createParent = createDialog.getByRole("combobox", {
+    name: "Parent group",
+  });
   await expect(createParent).toHaveText("Top level");
   await createParent.click();
-  await page.getByRole("option", { name: "Account executives", exact: true }).click();
+  await page
+    .getByRole("option", { name: "Account executives", exact: true })
+    .click();
   await expect(createParent).toHaveText("Account executives");
   await createDialog.getByRole("button", { name: "Create group" }).click();
   await expect(createDialog).not.toBeVisible();
   // Creation opens the detail view.
-  await expect(page.locator(".learning-admin")).toContainText("Account executives / Sales design test");
+  await expect(page.locator(".learning-admin")).toContainText(
+    "Account executives / Sales design test",
+  );
   await page.getByRole("button", { name: "Add child group" }).click();
-  await expect(createDialog.getByRole("combobox", { name: "Parent group" })).toHaveText("Account executives / Sales design test");
+  await expect(
+    createDialog.getByRole("combobox", { name: "Parent group" }),
+  ).toHaveText("Account executives / Sales design test");
   await createDialog.getByRole("button", { name: "Cancel" }).click();
   await expect(createDialog).not.toBeVisible();
   await page.getByRole("tab", { name: "Members", exact: true }).click();
@@ -168,12 +190,16 @@ test("learning groups: shared controls, save and reload", async ({
   });
   await page.reload();
   await adminSection(page, "Learning groups");
-  await page.getByRole("searchbox", { name: "Find learning groups" }).fill("Sales design test");
+  await page
+    .getByRole("searchbox", { name: "Find learning groups" })
+    .fill("Sales design test");
   await page
     .getByRole("button", { name: "Manage Sales design test", exact: true })
     .click();
   await page.getByRole("tab", { name: "Members", exact: true }).click();
-  await expect(page.locator(".learning-admin")).toContainText("Parent: Account executives");
+  await expect(page.locator(".learning-admin")).toContainText(
+    "Parent: Account executives",
+  );
 });
 
 test("admin menu scroll stays put while the new panel starts at the top", async ({
@@ -349,6 +375,7 @@ test("admin destinations and editor render without overflow or errors", async ({
 test("learner routes and narrow navigation remain usable", async ({
   page,
 }, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
   await learner(page);
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
@@ -409,6 +436,11 @@ test("learner routes and narrow navigation remain usable", async ({
 test("curriculum builder uses shared fields and preserves saved sequence", async ({
   page,
 }) => {
+  await page.addInitScript(
+    (workspace) =>
+      localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace)),
+    learningUiFixture(),
+  );
   await admin(page);
   await adminSection(page, "Curricula");
   await page
@@ -450,6 +482,12 @@ test("curriculum builder uses shared fields and preserves saved sequence", async
 test("course completion still works through shared choices and controls", async ({
   page,
 }) => {
+  await page.addInitScript((workspace) => {
+    if (!localStorage.getItem("course-ui-seeded")) {
+      localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+      localStorage.setItem("course-ui-seeded", "yes");
+    }
+  }, learningUiFixture());
   await learner(page);
   await page.goto("/#courses/course-2");
   await expect(
@@ -694,7 +732,8 @@ test("update footers and saved feedback keep text and actions separated", async 
   });
   await expect(form.getByRole("textbox")).toBeFocused();
   await form.getByRole("textbox").fill("The example was clear.");
-  await form.getByRole("button", { name: "Send", exact: true }).click();
+  await form.getByRole("button", { name: "Send", exact: true }).focus();
+  await page.keyboard.press("Enter");
   await expect(form).toBeHidden();
   await expect(
     feedback.getByRole("button", { name: "Useful", exact: true }),

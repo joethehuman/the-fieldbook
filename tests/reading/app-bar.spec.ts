@@ -28,7 +28,7 @@ for (const app of ["demo", "production"]) {
           ...item.lessons[0],
           id: `lesson-${i}`,
           title: `Lesson ${i}: Useful course material`,
-          body: "Reading material.",
+          body: item.body,
         }));
       await request.post("http://127.0.0.1:3130/fixture", {
         data: {

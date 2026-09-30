@@ -18,7 +18,7 @@ export default defineConfig({
     { name: "phone", use: { viewport: { width: 375, height: 812 } } },
   ],
   webServer: {
-    command: `node node_modules/serve/build/main.js out -l ${port} --no-clipboard`,
+    command: `node node_modules/serve/build/main.js demo/out -l ${port} --no-clipboard`,
     url: `http://127.0.0.1:${port}`,
     reuseExistingServer: !process.env.CI,
   },

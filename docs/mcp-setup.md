@@ -15,7 +15,7 @@ Knowing the URL is not permission. A normal learner login is not an MCP administ
 
 ## Set up the authorization server
 
-Complete the [production setup](../production/README.md) first, including both database migrations.
+Complete the [production setup](installation.md) first, including both database migrations.
 
 1. Set `FIELDBOOK_URL` to the final HTTPS origin and configure the matching Supabase Auth Site URL and app callback.
 2. Enable Supabase Auth's **OAuth 2.1 Server** with authorization path `/oauth/consent`.

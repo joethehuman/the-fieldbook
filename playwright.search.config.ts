@@ -26,7 +26,7 @@ export default defineConfig({
     },
     {
       command:
-        "node --require ./tests/accounts/provider.cjs node_modules/next/dist/bin/next start production -H 127.0.0.1 -p 3131",
+        "node --require ./tests/accounts/provider.cjs node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3131",
       url: "http://localhost:3131",
       reuseExistingServer: false,
       env: {

@@ -1,42 +1,73 @@
-"use client";
-import { ReadingPage } from "@/components/patterns/layout";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { loadWorkspace } from "@/lib/store";
-import { defaultSettings, type SiteSettings } from "@/lib/settings";
+import { redirect } from "next/navigation";
 import Markdown from "@/components/Markdown";
-export default function DemoPrivacyPage() {
-  const [settings, setSettings] = useState<SiteSettings | null>(null);
-  const [error, setError] = useState(false);
-  useEffect(() => {
-    try {
-      setSettings({ ...defaultSettings, ...loadWorkspace().settings });
-    } catch {
-      setError(true);
-    }
-  }, []);
-  const policy = settings?.privacy?.published;
+import { privacySettings } from "@server/privacy";
+import { actor } from "@server/auth";
+import { readConfig } from "@server/content";
+import { brandingFromSettings } from "@/lib/branding";
+import { ReaderShell } from "@/components/reader/ReaderShell";
+import { homePath } from "@/lib/navigation";
+export const dynamic = "force-dynamic";
+export const metadata = { title: "Privacy policy" };
+export default async function PrivacyPage() {
+  const [settings, user] = await Promise.all([
+    privacySettings(),
+    actor(undefined, true),
+  ]);
+  const policy = settings.privacy?.published;
+  const config = user ? await readConfig() : null;
+  if (policy?.mode === "external") redirect(policy.url);
+  const branding = brandingFromSettings(settings);
   return (
-    <ReadingPage>
-      <Link href="/">← Back to demo</Link>
-      <h1>Privacy policy preview</h1>
-      <p>
-        This is a browser-local demonstration of the policy editor, not a policy
-        for another installation.
-      </p>
-      {error ? (
-        <p>Demo settings could not be loaded.</p>
-      ) : !settings ? (
-        <p>Loading…</p>
-      ) : policy?.mode === "external" ? (
-        <a href={policy.url}>View configured privacy policy</a>
-      ) : policy ? (
-        <article className="markdown">
-          <Markdown>{policy.body}</Markdown>
-        </article>
-      ) : (
-        <p>No policy has been published in this browser.</p>
-      )}
-    </ReadingPage>
+    <ReaderShell
+      context={{
+        user: user
+          ? {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              managesTeam: (config?.teams || []).some(
+                (team: { managerId?: string }) => team.managerId === user.id,
+              ),
+            }
+          : null,
+        branding: {
+          name: branding.name,
+          accent: settings.accent,
+          privacyUrl: branding.privacyUrl,
+        },
+        docs: [],
+        docCategoryOrder: [],
+        docSections: [],
+      }}
+    >
+      <div className="mx-auto grid w-full max-w-3xl gap-6">
+        <Link href={homePath(settings)}>← {settings.name}</Link>
+        <h1>Privacy policy</h1>
+        {policy ? (
+          <>
+            <p>
+              Operated by {policy.operatorName}. Contact:{" "}
+              {policy.contactEmail && (
+                <a href={`mailto:${policy.contactEmail}`}>
+                  {policy.contactEmail}
+                </a>
+              )}
+              {policy.contactEmail && policy.contactUrl && " · "}
+              {policy.contactUrl && (
+                <a href={policy.contactUrl}>Contact the operator</a>
+              )}
+            </p>
+            <p>Last published: {settings.privacy?.publishedAt?.slice(0, 10)}</p>
+            <article className="markdown">
+              <Markdown>{policy.body}</Markdown>
+            </article>
+          </>
+        ) : (
+          <p>The operator has not published a privacy policy yet.</p>
+        )}
+      </div>
+    </ReaderShell>
   );
 }

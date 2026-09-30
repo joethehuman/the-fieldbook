@@ -10,12 +10,12 @@ Use Node.js 22.x and pnpm 10.17.1. From the repository root:
 
 ```sh
 pnpm install --frozen-lockfile
+pnpm dev:demo
+# With a dedicated development backend and root .env.local:
 pnpm dev
-# With a dedicated development backend and production/.env.local:
-pnpm dev:production
 ```
 
-Before proposing runtime changes, run `pnpm test`, `pnpm build`, and `pnpm build:production`. CI runs these checks on pull requests. For documentation-only changes, check instructions against the code and verify relative links; no new behavior tests are necessary.
+Before proposing runtime changes, run `pnpm test`, `pnpm build`, and `pnpm build:demo`. CI runs these checks on pull requests. For documentation-only changes, check instructions against the code and verify relative links; no new behavior tests are necessary.
 
 Never commit secrets, exports containing personal data, `.env.local`, or provider credentials. Examples must use placeholder domains and keys. Shared UI changes should be checked in both applications. Production authorization belongs on the server, not in hidden buttons or client state. Database changes require a new migration and upgrade guidance; do not rewrite an already-applied migration.
 

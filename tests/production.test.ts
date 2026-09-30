@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
-import { contentSchema, settingsSchema } from "../production/lib/schemas";
+import { contentSchema, settingsSchema } from "../server/schemas";
 import { videoSource } from "../lib/video";
 import { guestAnswersForImport, guestSelectionsForImport } from "../lib/guest-progress";
 

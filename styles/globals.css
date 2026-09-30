@@ -1,0 +1,104 @@
+@import "tailwindcss";
+@import "./tokens.css";
+@import "./layout.css";
+@import "./content.css";
+@import "./artwork.css";
+
+/* Explicit sources keep demo and production builds identical. */
+@source "../components";
+@source "../app";
+@source "../demo/app";
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    scrollbar-gutter: stable;
+  }
+  html:has(.topbar),
+  html:has([data-slot="account-viewport"]) {
+    overflow: clip;
+    overscroll-behavior: none;
+    scrollbar-gutter: auto;
+  }
+  html:has(.loading) {
+    scrollbar-gutter: auto;
+  }
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-size: var(--type-copy);
+    line-height: var(--type-copy-leading);
+  }
+  button,
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  button,
+  [role="button"],
+  summary {
+    touch-action: manipulation;
+  }
+  button:not(:disabled),
+  summary {
+    cursor: pointer;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  p {
+    margin: 0;
+  }
+  h1 {
+    font-size: var(--type-page);
+    font-weight: 600;
+    letter-spacing: -0.03em;
+    line-height: var(--type-page-leading);
+    overflow-wrap: anywhere;
+  }
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.4;
+  }
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.5;
+  }
+  a {
+    color: var(--link);
+    text-underline-offset: 0.2em;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  a:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 3px;
+  }
+  small {
+    font-size: 0.75rem;
+  }
+  svg {
+    flex-shrink: 0;
+  }
+  :disabled {
+    cursor: not-allowed;
+  }
+  [hidden] {
+    display: none;
+  }
+  ::selection {
+    background: var(--selected);
+    color: var(--selected-foreground);
+  }
+}

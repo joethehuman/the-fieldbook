@@ -3,17 +3,13 @@ import { ToastProvider } from "../components/ui/toast";
 import { InteractionDialogProvider } from "../components/ui/interaction-dialog";
 import { DesktopSidebarProvider } from "../components/patterns/desktop-sidebar-state";
 import { GeistSans } from "geist/font/sans";
+import "../styles/globals.css";
 import type { Metadata } from "next";
-import "./globals.css";
 export const metadata: Metadata = {
-  title: "The Fieldbook · Interactive demo",
-  description: "A lightweight home for docs, updates, and courses.",
+  title: "Fieldbook",
+  description: "Docs, updates, and courses.",
 };
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={GeistSans.variable}>
       <body>

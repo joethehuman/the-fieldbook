@@ -32,8 +32,8 @@ git push -u origin production
 
 This creates your deployment branch at the selected release, even if your fork's default branch contains newer development work. Never move an existing production branch backwards with a forced push to follow these instructions; these commands are for a new installation.
 
-3. Import your fork into Vercel. Set Root Directory to `production` and **Production Branch to `production`**. The directory and branch happen to have the same name but are separate settings. If Vercel initially deploys the default branch during import, do not use that deployment for launch; correct the branch and verify the selected commit before connecting real users.
-4. Complete the [installation guide](../production/README.md). Record the release tag, commit, applied migrations, and your configuration privately.
+3. Import your fork into Vercel. Leave Root Directory empty (repository root) and set **Production Branch to `production`**. Root Directory and Production Branch are separate settings. If Vercel initially deploys the default branch during import, do not use that deployment for launch; correct the branch and verify the selected commit before connecting real users.
+4. Complete the [installation guide](installation.md). Record the release tag, commit, applied migrations, and your configuration privately.
 
 Downloading a release ZIP is also a code snapshot, but it loses the convenient Git history used to merge later updates. Forking is the documented path.
 

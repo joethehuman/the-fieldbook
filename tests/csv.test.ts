@@ -109,7 +109,7 @@ test("team exports preserve filtered order, counts, percentage semantics and man
     rows[0].percent,
     rows[0].status,
   ]);
-  assert.equal(rows[0].percent, 33);
+  assert.equal(rows[0].percent, 25);
   assert.equal(teamProgressRows(data, manager, "other").length, 0);
   assert.equal(teamProgressRows(data, data.users[0]).length, 0);
   assert.ok(
@@ -136,7 +136,7 @@ test("team exports preserve filtered order, counts, percentage semantics and man
 test("course exports preserve current-version, deduplicated assignment and optional progress semantics", () => {
   const data = freshWorkspace(),
     user = data.users[0];
-  const course = data.content.find((c) => c.id === "course-1")!;
+  const course = data.content.find((c) => c.id === "course-4")!;
   let row = courseProgressRow(data, user, course);
   assert.equal(row.done, true);
   assert.equal(row.status, "Complete");

@@ -154,7 +154,7 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
-  production:
+  demo:
     dependencies:
       '@mdxeditor/editor':
         specifier: 4.2.5

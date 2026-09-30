@@ -35,7 +35,7 @@ const rawControls = new Set([
 for (const file of [
   ...files("app", ".tsx"),
   ...files("components", ".tsx"),
-  ...files("production/app", ".tsx"),
+  ...files("demo/app", ".tsx"),
 ]) {
   const source = ts.createSourceFile(
     file,
@@ -53,7 +53,7 @@ for (const file of [
         tag === "Table" &&
         !primitive &&
         !file.startsWith("components/patterns/") &&
-        !["components/Markdown.tsx", "app/ui/page.tsx"].includes(file)
+        !["components/Markdown.tsx", "demo/app/ui/page.tsx"].includes(file)
       )
         report(
           file,
@@ -115,7 +115,7 @@ for (const file of [
   }
   visit(source);
 }
-for (const file of ["app/globals.css", ...files("styles", ".css")]) {
+for (const file of ["styles/globals.css", ...files("styles", ".css")]) {
   const root = postcss.parse(fs.readFileSync(file, "utf8"), { from: file });
   root.walkDecls((decl) => {
     if (decl.important)

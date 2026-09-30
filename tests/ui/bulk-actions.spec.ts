@@ -237,6 +237,14 @@ test("group learning, Updates and linked teams use selected rows", async ({
   page,
 }, info) => {
   const data = freshWorkspace();
+  // Own two updates so this test exercises bulk controls independently of demo copy.
+  const updates = data.content
+    .filter((item) => item.kind === "brief")
+    .slice(0, 2);
+  data.content = data.content.filter(
+    (item) => item.kind !== "brief" || updates.includes(item),
+  );
+  for (const update of updates) update.groups = [];
   const group = data.groups[0];
   await page.addInitScript((workspace) => {
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
@@ -271,8 +279,8 @@ test("group learning, Updates and linked teams use selected rows", async ({
   await page.getByRole("button", { name: "Add Updates", exact: true }).click();
   await expect(
     dialog.getByRole("checkbox", { name: /^Select (page|all) / }),
-  ).toHaveCount(0);
-  await dialog.getByRole("checkbox").check();
+  ).toHaveCount(1);
+  await dialog.getByRole("checkbox", { name: /^Select (page|all) / }).check();
   await dialog.getByRole("button", { name: /^Add Updates / }).click();
   await page
     .getByRole("checkbox", {
@@ -375,11 +383,14 @@ test("page selection reflects partial and complete rows without selecting other 
   await pageChoice.click();
   await expect(pageChoice).toBeChecked();
   await expect(
-    picker.getByText("10 selected · 1–10 of 32 shown"),
+    picker.getByRole("status").filter({ hasText: /^10 selected$/ }),
+  ).toBeVisible();
+  await expect(
+    picker.getByRole("status").filter({ hasText: /^1–10 of 32 shown$/ }),
   ).toBeVisible();
   await picker.getByRole("button", { name: "Select all 32 matching" }).click();
   await expect(
-    picker.getByText("32 selected · 1–10 of 32 shown"),
+    picker.getByRole("status").filter({ hasText: /^32 selected$/ }),
   ).toBeVisible();
 });
 
@@ -388,6 +399,14 @@ test("single curriculum and empty or single linked teams have no bulk controls",
 }, info) => {
   const data = freshWorkspace();
   data.curricula = data.curricula!.slice(0, 1);
+  // Own two updates so this test exercises bulk controls independently of demo copy.
+  const updates = data.content
+    .filter((item) => item.kind === "brief")
+    .slice(0, 2);
+  data.content = data.content.filter(
+    (item) => item.kind !== "brief" || updates.includes(item),
+  );
+  for (const update of updates) update.groups = [];
   const group = data.groups[0];
   group.teamIds = [];
   await page.addInitScript((workspace) => {

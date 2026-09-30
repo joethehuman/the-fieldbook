@@ -25,7 +25,7 @@ The internal vocabulary can retain words from formerly published content to avoi
 
 ## Retrieval and access contract
 
-`production/lib/search.ts` owns retrieval; `lib/search.ts` defines the provider-independent contract. `GET /api/search?q=…&type=all|brief|doc|course` returns up to 30 content results plus `hasMore`. Each result carries `contentId`, `kind`, `title`, `passageId`, `lessonId`/`lessonTitle`, `publishedRevision`, `contentDate`, `excerpt`, plain highlight terms and a source `href`. One best passage represents each content item. Add words or a type filter when more matches exist; there is no total count or paging UI. The database RPC returns one JSON value, so the 31-row lookahead is not truncated by a low PostgREST row cap.
+`server/search.ts` owns retrieval; `lib/search.ts` defines the provider-independent contract. `GET /api/search?q=…&type=all|brief|doc|course` returns up to 30 content results plus `hasMore`. Each result carries `contentId`, `kind`, `title`, `passageId`, `lessonId`/`lessonTitle`, `publishedRevision`, `contentDate`, `excerpt`, plain highlight terms and a source `href`. One best passage represents each content item. Add words or a type filter when more matches exist; there is no total count or paging UI. The database RPC returns one JSON value, so the 31-row lookahead is not truncated by a low PostgREST row cap.
 
 The server's `retrievePublished` boundary also retains complete underlying source text and its published revision for later citation work. It does not return draft revision numbers as source revisions. It is not a historical revision archive: if content changes, a later consumer must compare the published revision before relying on an earlier citation. No learner chat, embeddings or Ask AI control is included.
 
