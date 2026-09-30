@@ -32,24 +32,14 @@ export function DialogContent({
   className,
   onOpenAutoFocus,
   onCloseAutoFocus,
-  side = "center",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  side?: "center" | "left" | "right";
-}) {
+}: React.ComponentProps<typeof DialogPrimitive.Content>) {
   const returnFocus = React.useRef<HTMLElement | null>(null);
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className={dialogOverlayClass} />
       <DialogPrimitive.Content
-        className={cn(
-          side === "center"
-            ? dialogContentClass
-            : "fixed inset-y-0 z-40 grid h-dvh max-h-dvh w-full max-w-lg content-start gap-4 overflow-y-auto border-border bg-background p-5 text-foreground shadow-xl outline-none",
-          side === "left" && "left-0 border-r",
-          side === "right" && "right-0 border-l",
-          className,
-        )}
+        className={cn(dialogContentClass, className)}
         {...props}
         onOpenAutoFocus={(event) => {
           returnFocus.current =

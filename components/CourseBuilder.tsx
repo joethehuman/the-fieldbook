@@ -1,10 +1,11 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronUp, Copy, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, ChevronDown, ChevronUp, Copy, MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import type { Content, Question } from "@/lib/types";
 import { correctOptionIds, optionIds, requiresPassing } from "@/lib/course-quiz";
 import type { UploadMedia } from "./MarkdownEditor";
 import { WritingEditor } from "./patterns/writing-editor";
+import { EditorFrame, type DetailsReveal } from "./patterns/editor-frame";
 import { SectionHeader } from "./patterns/layout";
 import { FormField } from "./patterns/form-field";
 import { NavigationButton } from "./patterns/navigation-button";
@@ -14,7 +15,6 @@ import { Card } from "./ui/card";
 import { Checkbox } from "./ui/choice";
 import { Field } from "./ui/field";
 import { Input } from "./ui/input";
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from "./ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { Textarea } from "./ui/textarea";
 
@@ -25,38 +25,39 @@ const newQuestion = (): Question => {
 };
 
 /** Only the active lesson or final quiz is mounted, preserving a short edit surface. */
-export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep }: {
+export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep, details, requirementsCount, revealDetails, incompleteSteps = [] }: {
   course: Content;
   onChange: (updater: (current: Content) => Content) => void;
   onUpload?: UploadMedia;
   disabled: boolean;
+  details: ReactNode;
+  requirementsCount?: number;
+  revealDetails?: DetailsReveal;
+  incompleteSteps?: string[];
   revealStep?: { id: string; request: number; target?: "title" | "body"; questionId?: string };
 }) {
   const [selectedId, setSelected] = useState(course.lessons[0]?.id || "quiz");
   const selected = course.lessons.some((lesson) => lesson.id === selectedId) || (selectedId === "quiz" && course.questions.length)
     ? selectedId : course.lessons[0]?.id || (course.questions.length ? "quiz" : "");
-  const [outlineOpen, setOutlineOpen] = useState(true);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const outlineId = useId();
+  const [canvasRequest, setCanvasRequest] = useState(0);
+  const [outlineRequest, setOutlineRequest] = useState(0);
   const panel = useRef<HTMLDivElement>(null);
-  const reopen = useRef<HTMLButtonElement>(null);
-  const hideOutline = useRef<HTMLButtonElement>(null);
   const pendingFocus = useRef(false);
-  const focusAfterDrawer = useRef(false);
   const selectedLesson = course.lessons.find((lesson) => lesson.id === selected);
-  const currentLabel = selectedLesson
-    ? `${course.lessons.indexOf(selectedLesson) + 1}. ${selectedLesson.title || "Untitled lesson"}`
-    : course.questions.length ? "Quiz" : "Choose a lesson";
-  function chooseStep(step: string, focus = false) {
-    pendingFocus.current = focus;
-    focusAfterDrawer.current = focus && drawerOpen;
+  function chooseStep(step: string) {
+    pendingFocus.current = true;
     setSelected(step);
-    setDrawerOpen(false);
+    setCanvasRequest((request) => request + 1);
   }
   useEffect(() => {
     if (!revealStep) return;
+    pendingFocus.current = false;
+    if (revealStep.id === "outline") {
+      setOutlineRequest((request) => request + 1);
+      return;
+    }
     setSelected(revealStep.id);
-    setDrawerOpen(false);
+    setCanvasRequest((request) => request + 1);
     const frame = requestAnimationFrame(() => {
       const scope = revealStep.questionId
         ? panel.current?.querySelector<HTMLElement>(`[data-question-id="${CSS.escape(revealStep.questionId)}"]`)
@@ -70,10 +71,17 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     return () => cancelAnimationFrame(frame);
   }, [revealStep]);
   useEffect(() => {
-    if (!pendingFocus.current || drawerOpen || focusAfterDrawer.current) return;
-    pendingFocus.current = false;
-    panel.current?.querySelector<HTMLInputElement>("input")?.focus();
-  }, [selected, drawerOpen]);
+    if (!pendingFocus.current) return;
+    const frame = requestAnimationFrame(() => {
+      pendingFocus.current = false;
+      const target = panel.current?.querySelector<HTMLInputElement>(
+        selected === "quiz" ? "[data-question-id] input" : 'input[aria-label="Lesson title"]',
+      );
+      (target || panel.current)?.focus({ preventScroll: true });
+      panel.current?.scrollIntoView({ block: "nearest" });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selected, canvasRequest]);
   const editLesson = (update: (lesson: Content["lessons"][number]) => Content["lessons"][number]) =>
     onChange((current) => ({ ...current, lessons: current.lessons.map((lesson) => lesson.id === selected ? update(lesson) : lesson) }));
   const editQuestion = (questionId: string, update: (question: Question) => Question) =>
@@ -88,75 +96,62 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   function addLesson() {
     const lesson = { id: id(), title: `Lesson ${course.lessons.length + 1}`, body: "" };
     onChange((current) => ({ ...current, lessons: [...current.lessons, lesson] }));
-    chooseStep(lesson.id, true);
+    chooseStep(lesson.id);
   }
-  const outline = <>
-    <nav className="course-builder-steps" aria-label="Edit course step">
-      {course.lessons.map((lesson, index) => <NavigationButton type="button" key={lesson.id} disabled={disabled} aria-current={selected === lesson.id ? "step" : undefined} className={selected === lesson.id ? "selected items-start [&>span]:w-full [&>span]:justify-start [&>span]:items-start" : "items-start [&>span]:w-full [&>span]:justify-start [&>span]:items-start"} onClick={() => chooseStep(lesson.id)}>
-        <span className="step-number">{index + 1}</span><span className="min-w-0 break-words">{lesson.title || `Lesson ${index + 1}`}</span>
-      </NavigationButton>)}
-      {!!course.questions.length && <NavigationButton type="button" disabled={disabled} aria-current={selected === "quiz" ? "step" : undefined} className={selected === "quiz" ? "selected quiz-step" : "quiz-step"} onClick={() => chooseStep("quiz")}><span className="step-number quiz-number"><Check size={15} /></span>Quiz</NavigationButton>}
-    </nav>
-    <ActionGroup className="flex-col items-stretch">
-      <Button type="button" size="sm" variant="outline" className="w-full" disabled={disabled} onClick={addLesson}><Plus size={15} /> Add lesson</Button>
-      {!course.questions.length && <Button type="button" size="sm" variant="ghost" className="w-full" disabled={disabled} onClick={() => {
-        onChange((current) => ({ ...current, questions: [newQuestion()], requirePassing: false }));
-        chooseStep("quiz", true);
-      }}><Plus size={15} /> Add quiz</Button>}
-    </ActionGroup>
-  </>;
-  return <section className={`course-builder${outlineOpen ? "" : " outline-collapsed"}`} aria-label="Course lessons and quiz">
-    <aside id={outlineId} className="course-builder-outline" aria-label="Course outline" hidden={!outlineOpen}>
-      <SectionHeader className="flex-nowrap items-center" title={<h2>Outline</h2>}>
-        <Button type="button" variant="ghost" size="icon" ref={hideOutline} aria-label="Hide course outline" aria-controls={outlineId} aria-expanded={outlineOpen} onClick={() => {
-          setOutlineOpen(false);
-          requestAnimationFrame(() => reopen.current?.focus());
-        }}><PanelLeftClose size={16} /></Button>
-      </SectionHeader>
-      {outline}
-    </aside>
-    <div className="course-builder-panel" ref={panel} tabIndex={-1}>
-      <div className="course-builder-navigation">
-        {!outlineOpen && <Button ref={reopen} type="button" variant="outline" size="sm" className="course-builder-reopen" aria-controls={outlineId} aria-expanded={false} onClick={() => { setOutlineOpen(true); requestAnimationFrame(() => hideOutline.current?.focus()); }}><PanelLeftOpen size={16} /> Show outline</Button>}
-        <Button type="button" variant="outline" size="sm" className="course-builder-drawer-trigger" aria-haspopup="dialog" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}><PanelLeftOpen size={16} /><span className="min-w-0 text-left break-words">Outline · {currentLabel}</span></Button>
-      </div>
-      <Dialog open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <DialogContent side="left" className="max-w-sm" onCloseAutoFocus={(event) => {
-          if (focusAfterDrawer.current) { event.preventDefault(); focusAfterDrawer.current = false; pendingFocus.current = false; panel.current?.querySelector<HTMLInputElement>("input")?.focus(); }
-        }}>
-          <SectionHeader className="flex-nowrap items-center" title={<DialogTitle>Course outline</DialogTitle>}><Button type="button" variant="ghost" size="icon" aria-label="Close course outline" onClick={() => setDrawerOpen(false)}><X size={16} /></Button></SectionHeader>
-          <DialogDescription>Choose a lesson or the final quiz to edit.</DialogDescription>
-          {outline}
-        </DialogContent>
-      </Dialog>
-      {selectedLesson ? <Card className="grid gap-5" key={selectedLesson.id}>
-        <SectionHeader title={<h2>Lesson {course.lessons.indexOf(selectedLesson) + 1}</h2>}>
-          <ActionGroup>
-            <Button type="button" variant="ghost" size="icon" aria-label="Move lesson up" disabled={disabled || selectedLesson === course.lessons[0]} onClick={() => move(course.lessons.indexOf(selectedLesson), -1)}><ChevronUp size={16} /></Button>
-            <Button type="button" variant="ghost" size="icon" aria-label="Move lesson down" disabled={disabled || selectedLesson === course.lessons.at(-1)} onClick={() => move(course.lessons.indexOf(selectedLesson), 1)}><ChevronDown size={16} /></Button>
-            <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="sm" aria-label="Lesson actions" disabled={disabled}><MoreHorizontal size={16} /> Lesson actions</Button></DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+  const lessonActions = selectedLesson && (
+      <ActionGroup role="group" aria-label={`Actions for ${selectedLesson.title || "selected lesson"}`}>
+        <Button type="button" variant="ghost" size="icon" aria-label="Move lesson up" disabled={disabled || selectedLesson === course.lessons[0]} onClick={() => move(course.lessons.indexOf(selectedLesson), -1)}><ChevronUp size={16} /></Button>
+        <Button type="button" variant="ghost" size="icon" aria-label="Move lesson down" disabled={disabled || selectedLesson === course.lessons.at(-1)} onClick={() => move(course.lessons.indexOf(selectedLesson), 1)}><ChevronDown size={16} /></Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label="Lesson actions" disabled={disabled}><MoreHorizontal size={16} /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
             <DropdownMenuItem disabled={disabled} onSelect={() => {
               const copy = { ...selectedLesson, id: id(), title: `${selectedLesson.title} copy` };
               onChange((current) => ({ ...current, lessons: [...current.lessons.slice(0, current.lessons.findIndex((lesson) => lesson.id === selected) + 1), copy, ...current.lessons.slice(current.lessons.findIndex((lesson) => lesson.id === selected) + 1)] }));
-              setSelected(copy.id);
+              chooseStep(copy.id);
             }}><Copy size={16} /> Duplicate lesson</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled={disabled || course.lessons.length <= 1} onSelect={() => {
               const index = course.lessons.indexOf(selectedLesson);
               onChange((current) => ({ ...current, lessons: current.lessons.filter((lesson) => lesson.id !== selected) }));
-              setSelected(course.lessons[index === 0 ? 1 : index - 1].id);
+              chooseStep(course.lessons[index === 0 ? 1 : index - 1].id);
             }}><Trash2 size={16} /> Remove lesson</DropdownMenuItem>
           </DropdownMenuContent>
-            </DropdownMenu>
-          </ActionGroup>
-        </SectionHeader>
-        <FormField label="Lesson title"><Input required value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value }))} /></FormField>
+        </DropdownMenu>
+      </ActionGroup>
+  );
+  const outline = <>
+    <nav className="course-builder-steps" aria-label="Edit course step">
+      {course.lessons.map((lesson, index) => <div key={lesson.id} className="grid gap-1"><NavigationButton type="button" disabled={disabled} aria-current={selected === lesson.id ? "step" : undefined} className={selected === lesson.id ? "selected items-start [&>span]:w-full [&>span]:justify-start [&>span]:items-start" : "items-start [&>span]:w-full [&>span]:justify-start [&>span]:items-start"} onClick={() => chooseStep(lesson.id)}>
+        <span className="step-number">{index + 1}</span><span className="grid min-w-0 gap-0.5 break-words"><span>{lesson.title || `Lesson ${index + 1}`}</span>{incompleteSteps.includes(lesson.id) && <span className="text-caption font-normal text-muted-foreground">Needs content</span>}</span>
+      </NavigationButton>{selected === lesson.id && lessonActions}</div>)}
+      {!!course.questions.length && <NavigationButton type="button" disabled={disabled} aria-current={selected === "quiz" ? "step" : undefined} className={selected === "quiz" ? "selected quiz-step" : "quiz-step"} onClick={() => chooseStep("quiz")}><span className="step-number quiz-number"><Check size={15} /></span><span className="grid min-w-0 gap-0.5"><span>Quiz</span>{incompleteSteps.includes("quiz") && <span className="text-caption font-normal text-muted-foreground">Needs content</span>}</span></NavigationButton>}
+    </nav>
+    <ActionGroup className="flex-col items-stretch">
+      <Button type="button" size="sm" variant="outline" className="w-full" disabled={disabled} onClick={addLesson}><Plus size={15} /> Add lesson</Button>
+      {!course.questions.length && <Button type="button" size="sm" variant="ghost" className="w-full" disabled={disabled} onClick={() => {
+        onChange((current) => ({ ...current, questions: [newQuestion()], requirePassing: false }));
+        chooseStep("quiz");
+      }}><Plus size={15} /> Add quiz</Button>}
+    </ActionGroup>
+  </>;
+  return <EditorFrame
+    outline={outline}
+    details={details}
+    requirementsCount={requirementsCount}
+    revealDetails={revealDetails}
+    revealCanvas={canvasRequest}
+    revealOutline={outlineRequest}
+    disabled={disabled}
+  >
+    <div className="course-builder-panel" ref={panel} tabIndex={-1} role="region" aria-label="Course lessons and quiz">
+      {selectedLesson ? <div className="grid min-w-0 gap-5" key={selectedLesson.id}>
+        <p className="text-caption text-muted-foreground">Lesson {course.lessons.indexOf(selectedLesson) + 1} of {course.lessons.length}</p>
+        <Input variant="title" aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value }))} />
         <WritingEditor label="Lesson content" value={selectedLesson.body} onChange={(body) => editLesson((lesson) => ({ ...lesson, body }))} onUpload={onUpload} disabled={disabled} />
-      </Card> : selected === "quiz" && course.questions.length ? <div className="grid gap-5">
+      </div> : selected === "quiz" && course.questions.length ? <div className="grid gap-5">
         <SectionHeader title={<h2>Quiz</h2>}><Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => {
-          onChange((current) => ({ ...current, questions: [] })); setSelected(course.lessons.at(-1)?.id || "");
+          onChange((current) => ({ ...current, questions: [] })); chooseStep(course.lessons.at(-1)?.id || "");
         }}><Trash2 size={15} /> Remove quiz</Button></SectionHeader>
         <p className="muted">The quiz always follows the lessons. Learners can retry; no passing score is required unless you enable it.</p>
         <Field orientation="horizontal"><Checkbox checked={requiresPassing(course)} onCheckedChange={(checked) => onChange((current) => ({ ...current, requirePassing: checked === true }))} /> Require all answers correct to complete</Field>
@@ -181,5 +176,5 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         <Button type="button" variant="outline" className="justify-self-start" disabled={disabled} onClick={() => onChange((current) => ({ ...current, questions: [...current.questions, newQuestion()] }))}><Plus size={15} /> Add question</Button>
       </div> : null}
     </div>
-  </section>;
+  </EditorFrame>;
 }

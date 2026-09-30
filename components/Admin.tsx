@@ -12,6 +12,7 @@ import { CreatableCombobox } from "./ui/creatable-combobox";
 import { DocSectionPicker } from "./DocSectionPicker";
 import DocSectionCreate from "./DocSectionCreate";
 import { WritingEditor } from "./patterns/writing-editor";
+import { EditorFrame, EditorDetailsGroup, type DetailsReveal } from "./patterns/editor-frame";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
 import { contentSignature, hasUnpublishedEdits } from "@/lib/demo-publication";
@@ -1432,7 +1433,6 @@ export function Editor({
   onSave,
   onCancel,
   onUpload,
-  production = false,
   registerNavigationGuard,
   onReload,
 }: {
@@ -1457,9 +1457,8 @@ export function Editor({
   const form = useRef<HTMLFormElement>(null);
   const heading = useRef<HTMLDivElement>(null);
   const [savedMessage, setSavedMessage] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [detailsReveal, setDetailsReveal] = useState<DetailsReveal>();
   const [revealStep, setRevealStep] = useState<{ id: string; request: number; target?: "title" | "body"; questionId?: string }>();
-  const settingsFocus = useRef<string | null>(null);
   const [c, setC] = useState<Content>(() => ({
       ...content,
       assignments:
@@ -1667,49 +1666,52 @@ export function Editor({
     createdSections || data.settings?.docSections,
   );
   const existing = data.content.some((x) => x.id === c.id);
-  function publicationRequirement(): { message: string; field?: string; step?: string; questionId?: string; target?: "title" | "body" } | undefined {
-    if (!c.title.trim()) return { message: "Add a title before publishing.", field: "editor-title" };
-    if (!c.summary.trim()) return { message: "Add a short description before publishing.", field: "editor-summary" };
-    if (!c.category.trim() || (c.kind === "doc" && !sectionForDoc(c, docSections)))
-      return { message: "Choose a category or Docs section before publishing.", field: "writing-organization" };
-    if (c.kind !== "doc") {
-      const art = resolvedCardArt(c.id, c.title, c.cardArt, c.coverImageUrl);
-      if ((art.source === "generated" && !art.shortTitle.trim()) || graphemeCount(art.shortTitle.trim()) > 40)
-        return { message: "Give generated artwork a short title of up to 40 characters.", field: "content-artwork" };
-      if (art.source === "upload" && !art.imageUrl)
-        return { message: "Upload a card image before publishing.", field: "content-artwork" };
+  type Requirement = { id: string; message: string; field?: string; step?: string; questionId?: string; target?: "title" | "body" };
+  const requirements: Requirement[] = [];
+  if (!c.title.trim()) requirements.push({ id: "title", message: "Add a title", field: "editor-title" });
+  if (!c.summary.trim()) requirements.push({ id: "summary", message: "Add a short description", field: "editor-summary" });
+  if (!c.category.trim() || (c.kind === "doc" && !sectionForDoc(c, docSections)))
+    requirements.push({ id: "organization", message: c.kind === "doc" ? "Choose a Docs section" : "Choose a category", field: "writing-organization" });
+  if (c.kind !== "doc") {
+    const art = resolvedCardArt(c.id, c.title, c.cardArt, c.coverImageUrl);
+    if ((art.source === "generated" && !art.shortTitle.trim()) || graphemeCount(art.shortTitle.trim()) > 40)
+      requirements.push({ id: "art-title", message: "Give artwork a short title of up to 40 characters", field: "content-artwork" });
+    if (art.source === "upload" && !art.imageUrl)
+      requirements.push({ id: "art-image", message: "Upload a card image", field: "content-artwork" });
+  }
+  if (c.kind === "course") {
+    if (!c.lessons.length) requirements.push({ id: "lessons", message: "Add a lesson", step: "outline" });
+    for (const [index, lesson] of c.lessons.entries()) {
+      const label = `Lesson ${index + 1}`;
+      if (!lesson.title.trim()) requirements.push({ id: `${lesson.id}-title`, message: `${label}: add a title`, step: lesson.id, target: "title" });
+      if (!lesson.body.trim() && !lesson.videoUrl) requirements.push({ id: `${lesson.id}-body`, message: `${label}: add content`, step: lesson.id, target: "body" });
+      if (lesson.videoUrl && !videoSource(lesson.videoUrl)) requirements.push({ id: `${lesson.id}-video`, message: `${label}: use a supported HTTPS video URL`, step: lesson.id });
+      if (hasMissingImageAlt(lesson.body)) requirements.push({ id: `${lesson.id}-alt`, message: `${label}: add image alternative text`, step: lesson.id, target: "body" });
     }
-    if (c.kind === "course") {
-      if (!c.lessons.length) return { message: "Add a complete lesson before publishing.", step: "quiz" };
-      for (const lesson of c.lessons) {
-        if (!lesson.title.trim()) return { message: "Add a title to each lesson before publishing.", step: lesson.id, target: "title" };
-        if (!lesson.body.trim() && !lesson.videoUrl) return { message: "Add content to each lesson before publishing.", step: lesson.id, target: "body" };
-        if (lesson.videoUrl && !videoSource(lesson.videoUrl)) return { message: "Use a supported HTTPS YouTube, Vimeo, Loom, MP4, or WebM URL.", step: lesson.id };
-        if (hasMissingImageAlt(lesson.body)) return { message: "Add alternative text to every lesson image before publishing.", step: lesson.id, target: "body" };
-      }
-      const question = c.questions.find((item) => !validQuestion(item));
-      if (question) return { message: "Complete each quiz question and choose its correct answers before publishing.", step: "quiz", questionId: question.id };
-      const live = data.publishedContent?.find((item) => item.id === c.id);
-      if (!refresh && live && requiresPassing(c) !== requiresPassing(live))
-        return { message: "Changing the quiz completion rule requires publishing a new version. Choose Publish a new version in course settings.", field: "course-version" };
+    for (const [index, question] of c.questions.entries())
+      if (!validQuestion(question)) requirements.push({ id: question.id, message: `Quiz question ${index + 1}: complete the question and answers`, step: "quiz", questionId: question.id });
+    const live = data.publishedContent?.find((item) => item.id === c.id);
+    if (!refresh && live && requiresPassing(c) !== requiresPassing(live))
+      requirements.push({ id: "version", message: "Publish a new version for the changed completion rule", field: "course-version" });
+  }
+  function revealRequirement(item: Requirement) {
+    if (item.step) {
+      setRevealStep({ id: item.step, request: Date.now(), target: item.target, questionId: item.questionId });
+    } else if (item.field?.startsWith("editor-")) {
+      const field = document.getElementById(item.field);
+      field?.focus({ preventScroll: true });
+      field?.scrollIntoView({ block: "nearest" });
+    } else {
+      setDetailsReveal((current) => ({ request: (current?.request || 0) + 1, field: item.field }));
     }
   }
-  const requirement = publicationRequirement();
+  const requirement = requirements[0];
   const publicationChanged = !c.publishedRevision || hasUnpublishedEdits(c, data.publishedContent?.find((item) => item.id === c.id)) || refresh;
   async function submit(e: React.FormEvent, intent: SaveIntent = "published") {
     e.preventDefault();
     if (busy || queue.current!.blocked || publishingNow.current) return;
     if (intent === "published" && requirement) {
-      setError(requirement.message);
-      if (requirement.step) {
-        setSettingsOpen(false);
-        setRevealStep({ id: requirement.step, request: Date.now(), target: requirement.target, questionId: requirement.questionId });
-      } else if (requirement.field?.startsWith("editor-")) {
-        document.getElementById(requirement.field)?.focus();
-      } else {
-        settingsFocus.current = requirement.field || null;
-        setSettingsOpen(true);
-      }
+      revealRequirement(requirement);
       return;
     }
     setError("");
@@ -1727,6 +1729,146 @@ export function Editor({
   }
   const set = (key: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: value }));
+  const details = (
+    <FieldGroup disabled={busy} className="editor-details-content">
+      <EditorDetailsGroup id="writing-readiness" title="Before publishing">
+        {requirements.length ? <ul className="grid gap-2">
+          {requirements.map((item) => <li key={item.id}>
+            <Button type="button" variant="link" size="sm" className="h-auto justify-start whitespace-normal p-0 text-left font-normal"
+              onClick={() => revealRequirement(item)}>{item.message}</Button>
+          </li>)}
+        </ul> : <p className="text-copy text-muted-foreground">{publicationChanged ? "Ready to publish." : "Published version is current."}</p>}
+        <FieldDescription>Drafts save automatically. Publish when ready for readers.</FieldDescription>
+      </EditorDetailsGroup>
+      <EditorDetailsGroup id="writing-organization" title={c.kind === "doc" ? "Docs section" : "Category"}>
+        {c.kind === "doc" ? (
+          <>
+            <DocSectionPicker
+              sections={docSections}
+              value={sectionForDoc(c, docSections)?.id || ""}
+              disabled={busy}
+              onChange={(sectionId) => {
+                const chosen = docSections.find(
+                  (item) => item.id === sectionId,
+                )!;
+                const parent = docSections.find(
+                  (item) => item.id === chosen.parentId,
+                );
+                setC((current) => ({
+                  ...current,
+                  sectionId,
+                  category: parent?.name || chosen.name,
+                  folder: parent ? chosen.name : "",
+                }));
+              }}
+            />
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() => setCreatingSection((open) => !open)}
+            >
+              <Plus aria-hidden="true" />
+              {creatingSection
+                ? "Close section form"
+                : "Create section"}
+            </Button>
+            {creatingSection && (
+              <DocSectionCreate
+                sections={docSections}
+                disabled={busy || !onWorkspaceChange}
+                onCancel={() => setCreatingSection(false)}
+                onCreate={async (section) => {
+                  if (!onWorkspaceChange)
+                    throw new Error(
+                      "Section settings are unavailable.",
+                    );
+                  const next = createDocSection(
+                    docSections,
+                    section.name,
+                    section.parentId,
+                    section.id,
+                  );
+                  await onWorkspaceChange({
+                    ...data,
+                    settings: {
+                      ...defaultSettings,
+                      ...data.settings,
+                      docSections: next,
+                      docCategoryOrder: [],
+                    },
+                  });
+                  setCreatedSections(next);
+                  const parent = next.find(
+                    (item) => item.id === section.parentId,
+                  );
+                  setC((current) => ({
+                    ...current,
+                    sectionId: section.id,
+                    category: parent?.name || section.name,
+                    folder: parent ? section.name : "",
+                  }));
+                  setCreatingSection(false);
+                }}
+              />
+            )}
+          </>
+        ) : (
+          <FormField label="Category" visuallyHiddenLabel>
+            <CreatableCombobox
+              value={c.category}
+              onValueChange={(value) => set("category", value)}
+              options={data.content
+                .filter((item) => item.kind === c.kind)
+                .map((item) => item.category)}
+              listLabel="Categories"
+              placeholder="Choose or add category…"
+            />
+          </FormField>
+        )}
+
+      </EditorDetailsGroup>
+      {c.kind === "brief" && <EditorDetailsGroup id="writing-relevance" title="Relevant groups"
+        description="Groups guide recommendations. Everyone allowed into the installation can still read this update.">
+        <GroupPicker groups={data.groups} showDescription={false} value={c.groups} onChange={(groups) => set("groups", groups)} />
+      </EditorDetailsGroup>}
+      {c.kind !== "doc" && <div id="content-artwork" className="editor-details-group">
+        <CardArtEditor id={c.id} title={c.title} kind={c.kind} category={c.category} art={c.cardArt}
+          legacyCover={c.coverImageUrl} settings={data.settings} onUpload={upload} disabled={busy} saveMode="automatic"
+          onChange={(cardArt) => setC((current) => ({ ...current, cardArt,
+            ...(current.kind === "course" && cardArt.source === "upload" && cardArt.imageUrl ? { coverImageUrl: cardArt.imageUrl } : {}),
+          }))} />
+      </div>}
+      {c.kind === "course" && <>
+        <EditorDetailsGroup id="course-duration" title="Course details">
+          <FormField label="Estimated minutes"><Input type="number" min={1} max={600} value={c.duration}
+            onChange={(event) => set("duration", Number(event.target.value))} /></FormField>
+        </EditorDetailsGroup>
+        {existing && <EditorDetailsGroup id="course-version" title="Publishing">
+          <Field orientation="horizontal"><Checkbox checked={refresh} disabled={saving} aria-describedby="course-version-help"
+            onCheckedChange={(checked) => setRefresh(checked === true)} />
+            Publish a new version and start a new completion window
+          </Field>
+          <FieldDescription id="course-version-help">Current version: {c.version}. Keep this unchecked for minor corrections.</FieldDescription>
+        </EditorDetailsGroup>}
+        <EditorDetailsGroup id="course-assignments" title="Learning groups"
+          description="Groups assign courses; completion windows are managed in organization settings.">
+          {existing && (data.publishedContent ?? data.content).some((item) => item.id === c.id && item.status === "published") && onLearning
+            ? <Button type="button" variant="outline" size="sm" onClick={async () => {
+                if (await guard.current()) setEditorTab("assignments");
+              }}>Manage learning groups</Button>
+            : <p className="text-copy text-muted-foreground">Publish this course to add it to a group’s assigned courses.</p>}
+        </EditorDetailsGroup>
+      </>}
+      <Collapsible>
+        <CollapsibleTrigger asChild><Button type="button" variant="ghost" size="sm" className="justify-start">Draft recovery</Button></CollapsibleTrigger>
+        <CollapsibleContent className="grid gap-3 pt-3">
+          <FieldDescription>Download a recovery copy or review the latest saved draft before replacing your open edits.</FieldDescription>
+          <Button type="button" variant="outline" size="sm" onClick={downloadDraft}>Download draft</Button>
+          {onReload && <Button type="button" variant="outline" size="sm" disabled={busy || saving} onClick={() => void reloadSaved()}>Review saved copy</Button>}
+        </CollapsibleContent>
+      </Collapsible>
+    </FieldGroup>
+  );
   if (editorTab === "assignments" && onLearning)
     return (
       <>
@@ -1750,20 +1892,6 @@ export function Editor({
       ref={form}
       className="editor"
       onSubmit={(event) => void submit(event, "draft")}
-      onInvalidCapture={(event) => {
-        const control = event.target as HTMLInputElement;
-        if (!control.getClientRects().length) {
-          event.preventDefault();
-          setSettingsOpen(true);
-          requestAnimationFrame(() => {
-            control.focus();
-            control
-              .closest('[data-slot="field"]')
-              ?.scrollIntoView({ block: "start" });
-            control.reportValidity();
-          });
-        }
-      }}
       onKeyDown={(event) => {
         if (
           (event.metaKey || event.ctrlKey) &&
@@ -1774,98 +1902,32 @@ export function Editor({
         }
       }}
     >
-      <DetailNavigation
-        disabled={busy}
-        items={[
-          {
-            label: "Back to content",
-            onSelect: async () => {
-              if (await guard.current()) onCancel();
-            },
-          },
-        ]}
-        current={
-          c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"
-        }
-      />
       <div ref={heading} className="editor-heading">
         <div className="editor-heading-copy">
-          <h1>
-            {existing
-              ? c.title || "Untitled"
-              : `New ${c.kind === "doc" ? "doc" : c.kind === "brief" ? "update" : "course"}`}
-          </h1>
+          <h1 className="sr-only">{c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"} editor</h1>
+          <DetailNavigation disabled={busy} items={[{
+            label: "Back to content",
+            onSelect: async () => { if (await guard.current()) onCancel(); },
+          }]} current={c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"} />
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-            <Badge
-              variant={
-                data.content.find((item) => item.id === c.id)?.publishedRevision
-                  ? "success"
-                  : "default"
-              }
-            >
-              {data.content.find((item) => item.id === c.id)?.publishedRevision
-                ? "Published"
-                : "Draft"}
-            </Badge>
+            <PublicationStatus published={!!c.publishedRevision} hasUnpublishedChanges={!!c.publishedRevision && publicationChanged} />
             <span role="status">
-              {saving || busy
-                ? uploadCount
-                  ? "Uploading media…"
-                  : "Saving…"
-                : queue.current!.blocked
-                  ? "Save failed"
-                  : dirty
-                  ? "Saving…"
-                  : savedMessage ||
-                    (existing ? "Saved" : "Not saved yet")}
+              {saving || busy ? uploadCount ? "Uploading media…" : "Saving…"
+                : queue.current!.blocked ? "Save failed"
+                : dirty ? "Saving…" : savedMessage || (existing ? "Saved" : "Not saved yet")}
             </span>
           </div>
         </div>
-        <ActionGroup>
-          <Button
-            type="button"
-            disabled={busy || publishing || queue.current!.blocked || !publicationChanged}
-            onClick={(event) => void submit(event, "published")}
-          >
-            {!publicationChanged ? "Published" : requirement ? "Review requirements" : c.publishedRevision ? "Publish changes" : "Publish"}
+        <div className="editor-publication-action">
+          <Button type="button" disabled={busy || publishing || queue.current!.blocked || !publicationChanged || requirements.length > 0}
+            aria-describedby={requirements.length ? "editor-readiness" : undefined}
+            onClick={(event) => void submit(event, "published")}>
+            {!publicationChanged ? "Published" : c.publishedRevision ? "Publish changes" : "Publish"}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={busy}
-            aria-expanded={settingsOpen}
-            aria-controls="content-settings"
-            onClick={() => {
-              setSettingsOpen(true);
-              settingsFocus.current = null;
-            }}
-          >
-            <Settings size={16} /> Settings
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label="More writing actions"
-                disabled={busy}
-              >
-                <MoreHorizontal />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={downloadDraft}>
-                Download draft
-              </DropdownMenuItem>
-              {onReload && (
-                <DropdownMenuItem onSelect={() => void reloadSaved()}>
-                  Review saved copy
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </ActionGroup>
+          {requirements.length > 0 && <p id="editor-readiness" className="text-caption text-muted-foreground" role="status">
+            {requirements.length} {requirements.length === 1 ? "item" : "items"} needed before publishing
+          </p>}
+        </div>
       </div>
       {error && (
         <Alert variant="destructive" role="alert">
@@ -1890,320 +1952,34 @@ export function Editor({
       {busy && (
         <p role="status">
           {uploadCount
-            ? "Uploading media. Keep this page open; save when the upload finishes."
+            ? "Uploading media. Keep this page open until the draft is saved."
             : "Saving or refreshing. Keep this page open."}
         </p>
       )}
-      <FieldGroup
-        disabled={busy}
-        className={`editor-layout${c.kind === "course" ? " course-editor-layout" : ""}`}
-      >
-        <section className="editor-main">
-          <section
-            className="editor-introduction"
-            aria-label={
-              c.kind === "course"
-                ? "Course introduction"
-                : "Content introduction"
-            }
-          >
-            <FormField label="Title">
-              <Input
-                id="editor-title"
-                maxLength={160}
-                value={c.title}
-                onChange={(e) => set("title", e.target.value)}
-                placeholder="Give it a clear, useful title"
-              />
-            </FormField>
-            <FormField label="Short description">
-              <Textarea
-                id="editor-summary"
-                size="compact"
-                rows={2}
-                maxLength={300}
-                value={c.summary}
-                onChange={(e) => set("summary", e.target.value)}
-                placeholder={
-                  c.kind === "course"
-                    ? "What will people learn?"
-                    : "What will people find here?"
-                }
-              />
-            </FormField>
-          </section>
-          {c.kind !== "course" ? (
-            <WritingEditor
-              label={c.kind === "doc" ? "Doc content" : "Update content"}
-              value={c.body}
-              onChange={(value) => set("body", value)}
-              onUpload={upload}
-              disabled={busy}
-            />
-          ) : (
-            <CourseBuilder
-              course={c}
-              revealStep={revealStep}
-              onChange={(updater) => setC(updater)}
-              onUpload={upload}
-              disabled={busy}
-            />
-          )}
+      <FieldGroup disabled={busy} className="editor-content">
+        <section className="editor-introduction" aria-label={c.kind === "course" ? "Course introduction" : "Content introduction"}>
+          <FormField label="Title" visuallyHiddenLabel>
+            <Input id="editor-title" variant="title" maxLength={160} value={c.title}
+              onChange={(event) => set("title", event.target.value)}
+              placeholder={`Untitled ${c.kind === "doc" ? "doc" : c.kind === "brief" ? "update" : "course"}`} />
+          </FormField>
+          <FormField label="Short description">
+            <Textarea id="editor-summary" size="compact" rows={2} maxLength={300} value={c.summary}
+              onChange={(event) => set("summary", event.target.value)}
+              placeholder={c.kind === "course" ? "What will people learn?" : "What will people find here?"} />
+          </FormField>
         </section>
+        {c.kind === "course" ? (
+          <CourseBuilder course={c} details={details} requirementsCount={requirements.length} revealDetails={detailsReveal}
+            incompleteSteps={[...new Set(requirements.flatMap((item) => item.step ? [item.step] : []))]}
+            revealStep={revealStep} onChange={(updater) => setC(updater)} onUpload={upload} disabled={busy} />
+        ) : (
+          <EditorFrame details={details} requirementsCount={requirements.length} revealDetails={detailsReveal} disabled={busy}>
+            <WritingEditor label={c.kind === "doc" ? "Doc content" : "Update content"} value={c.body}
+              onChange={(value) => set("body", value)} onUpload={upload} disabled={busy} />
+          </EditorFrame>
+        )}
       </FieldGroup>
-      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-        <DialogContent
-          id="content-settings"
-          side="right"
-          className="editor-settings-dialog"
-          onOpenAutoFocus={(event) => {
-            if (!settingsFocus.current) return;
-            event.preventDefault();
-            requestAnimationFrame(() => {
-              const section = document.getElementById(settingsFocus.current!);
-              const control = section?.querySelector<HTMLElement>('input, button, textarea, [tabindex="0"]');
-              (control || section)?.focus();
-              section?.scrollIntoView({ block: "nearest" });
-            });
-          }}
-        >
-          <SectionHeader title={<DialogTitle>Content settings</DialogTitle>}>
-            <Button type="button" variant="ghost" size="icon" aria-label="Close content settings" onClick={() => setSettingsOpen(false)}><X size={16} /></Button>
-          </SectionHeader>
-          <DialogDescription>Changes save automatically as a draft. Publish from the editor when ready.</DialogDescription>
-          {error && <Alert variant="destructive" role="alert">{error}</Alert>}
-          <FieldGroup disabled={busy} className="grid gap-6">
-              <SettingsSection
-                id="writing-publication"
-                title={<h3>Publication</h3>}
-                guidance="Draft changes save automatically. Publish when they are ready for readers."
-              >
-                <PublicationStatus published={!!c.publishedRevision}
-                  hasUnpublishedChanges={hasUnpublishedEdits(c, data.publishedContent?.find((item) => item.id === c.id)) || refresh} />
-                <p className="text-copy text-muted-foreground">
-                  {production ? "Drafts are visible to administrators." : "Saved in this browser. Other visitors do not see your edits."}
-                </p>
-              </SettingsSection>
-              <SettingsSection
-                id="writing-organization"
-                title={<h3>Organization</h3>}
-                guidance={
-                  c.kind === "doc"
-                    ? "Choose where this doc appears in Docs navigation."
-                    : "Use a clear category to help readers find related content."
-                }
-              >
-                {c.kind === "doc" ? (
-                  <>
-                    <DocSectionPicker
-                      sections={docSections}
-                      value={sectionForDoc(c, docSections)?.id || ""}
-                      disabled={busy}
-                      onChange={(sectionId) => {
-                        const chosen = docSections.find(
-                          (item) => item.id === sectionId,
-                        )!;
-                        const parent = docSections.find(
-                          (item) => item.id === chosen.parentId,
-                        );
-                        setC((current) => ({
-                          ...current,
-                          sectionId,
-                          category: parent?.name || chosen.name,
-                          folder: parent ? chosen.name : "",
-                        }));
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setCreatingSection((open) => !open)}
-                    >
-                      <Plus aria-hidden="true" />
-                      {creatingSection
-                        ? "Close section form"
-                        : "Create section"}
-                    </Button>
-                    {creatingSection && (
-                      <DocSectionCreate
-                        sections={docSections}
-                        disabled={busy || !onWorkspaceChange}
-                        onCancel={() => setCreatingSection(false)}
-                        onCreate={async (section) => {
-                          if (!onWorkspaceChange)
-                            throw new Error(
-                              "Section settings are unavailable.",
-                            );
-                          const next = createDocSection(
-                            docSections,
-                            section.name,
-                            section.parentId,
-                            section.id,
-                          );
-                          await onWorkspaceChange({
-                            ...data,
-                            settings: {
-                              ...defaultSettings,
-                              ...data.settings,
-                              docSections: next,
-                              docCategoryOrder: [],
-                            },
-                          });
-                          setCreatedSections(next);
-                          const parent = next.find(
-                            (item) => item.id === section.parentId,
-                          );
-                          setC((current) => ({
-                            ...current,
-                            sectionId: section.id,
-                            category: parent?.name || section.name,
-                            folder: parent ? section.name : "",
-                          }));
-                          setCreatingSection(false);
-                        }}
-                      />
-                    )}
-                  </>
-                ) : (
-                  <FormField label="Category">
-                    <CreatableCombobox
-                            value={c.category}
-                      onValueChange={(value) => set("category", value)}
-                      options={data.content
-                        .filter((item) => item.kind === c.kind)
-                        .map((item) => item.category)}
-                      listLabel="Categories"
-                      placeholder="Choose or add category…"
-                    />
-                  </FormField>
-                )}
-              </SettingsSection>
-              {c.kind === "brief" && (
-                <SettingsSection
-                  id="writing-relevance"
-                  title={<h3>For you</h3>}
-                  guidance="Choose groups this update is relevant to. Everyone allowed into the installation can still read it."
-                >
-                  <GroupPicker
-                    groups={data.groups}
-                    showDescription={false}
-                    value={c.groups}
-                    onChange={(groups) => set("groups", groups)}
-                  />
-                </SettingsSection>
-              )}
-              {c.kind !== "doc" && (
-                <div id="content-artwork"><CardArtEditor
-                  id={c.id}
-                  title={c.title}
-                  kind={c.kind}
-                  category={c.category}
-                  art={c.cardArt}
-                  legacyCover={c.coverImageUrl}
-                  settings={data.settings}
-                  onUpload={upload}
-                  disabled={busy}
-                  onChange={(cardArt) =>
-                    setC((current) => ({
-                      ...current,
-                      cardArt,
-                      ...(current.kind === "course" &&
-                      cardArt.source === "upload" &&
-                      cardArt.imageUrl
-                        ? { coverImageUrl: cardArt.imageUrl }
-                        : {}),
-                    }))
-                  }
-                /></div>
-              )}
-              {c.kind === "course" && (
-                <>
-                  <section className="editor-setting-section">
-                    <h3>Course details</h3>
-                    <FormField label="Estimated minutes">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={600}
-                                value={c.duration}
-                        onChange={(e) =>
-                          set("duration", Number(e.target.value))
-                        }
-                      />
-                    </FormField>
-                  </section>
-                  <section className="editor-setting-section">
-                    <h3>Assigned courses</h3>
-                    <p className="muted">
-                      Manage this course through Learning groups. Course
-                      completion windows are managed in organization settings.
-                    </p>
-                    {existing &&
-                    (data.publishedContent ?? data.content).some(
-                      (x) => x.id === c.id && x.status === "published",
-                    ) &&
-                    onLearning ? (
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={async () => {
-                          if (await guard.current()) {
-                            setSettingsOpen(false);
-                            setEditorTab("assignments");
-                          }
-                        }}
-                      >
-                        Manage learning groups
-                      </Button>
-                    ) : (
-                      <p>
-                        Publish this course to add it to a group’s assigned
-                        courses.
-                      </p>
-                    )}
-                  </section>
-                  {existing && (
-                    <section id="course-version" className="editor-setting-section">
-                      <h3>Course version</h3>
-                      <Field orientation="horizontal">
-                        <Checkbox
-                          aria-describedby="course-version-help"
-                          disabled={saving}
-                          checked={refresh}
-                          onCheckedChange={(checked) =>
-                            setRefresh(checked === true)
-                          }
-                        />
-                        Publish a new version and start a new completion window
-                      </Field>
-                      <FieldDescription id="course-version-help">
-                        Current version: {c.version}. Keep this unchecked
-                        for minor corrections.
-                      </FieldDescription>
-                    </section>
-                  )}
-                </>
-              )}
-              {c.kind === "course" && (
-                <div className="demo-note">
-                  <strong>
-                    {production
-                      ? "Saved to your organization"
-                      : "Saved in your browser"}
-                  </strong>
-                  <p>
-                    {production
-                      ? "Drafts are visible to administrators. Publish when you are ready to share with readers."
-                      : "Published content is visible to demo profiles on this device. It is not shared with other visitors."}
-                  </p>
-                </div>
-              )}
-          </FieldGroup>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setSettingsOpen(false)}>Done</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </form>
   );
 }

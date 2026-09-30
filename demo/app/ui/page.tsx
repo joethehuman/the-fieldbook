@@ -1,4 +1,6 @@
 "use client";
+import { EditorFrame, EditorDetailsGroup } from "@/components/patterns/editor-frame";
+import { NavigationButton } from "@/components/patterns/navigation-button";
 import { DetailNavigation } from "@/components/patterns/detail-navigation";
 import { BulkExamples } from "./bulk-examples";
 import { WritingExamples } from "./writing-examples";
@@ -93,6 +95,11 @@ const choices = (
 export default function ComponentCatalog() {
   const notify = useToast();
   const { prompt } = useInteractionDialog();
+  const [catalogLesson, setCatalogLesson] = useState("welcome");
+  const [catalogTitle, setCatalogTitle] = useState("Welcome to Fieldbook");
+  const [catalogBody, setCatalogBody] = useState("Write a short introduction to your course.");
+  const [catalogPlacement, setCatalogPlacement] = useState("essentials");
+  const [canvasRequest, setCanvasRequest] = useState(0);
   const [emptyReport, setEmptyReport] = useState(false);
   const [group, setGroup] = useState("company");
   const [dialog, setDialog] = useState(false);
@@ -211,6 +218,38 @@ export default function ComponentCatalog() {
       </section>
       <BulkExamples />
       <LibraryExamples />
+      <section className="grid gap-4" aria-label="Content editor frame">
+        <SectionHeader title={<h2>Content editor frame</h2>}
+          description="Persistent Outline and Details controls reveal in-page panels. The writing canvas stays mounted when either panel changes." />
+        <EditorFrame revealCanvas={canvasRequest}
+          outline={<nav className="grid gap-1" aria-label="Example course outline">
+            {[{ id: "welcome", label: "Welcome" }, { id: "practice", label: "Practice" }].map((lesson) => (
+              <NavigationButton key={lesson.id} type="button" aria-current={catalogLesson === lesson.id ? "step" : undefined}
+                className={catalogLesson === lesson.id ? "selected" : undefined}
+                onClick={() => { setCatalogLesson(lesson.id); setCanvasRequest((request) => request + 1); }}>
+                {lesson.label}
+              </NavigationButton>
+            ))}
+          </nav>}
+          details={<EditorDetailsGroup id="catalog-editor-details" title="Content details">
+            <FormField label="Category">
+              <SelectField value={catalogPlacement} onValueChange={setCatalogPlacement}>
+                <option value="essentials">Essentials</option><option value="practice">Practice</option>
+              </SelectField>
+            </FormField>
+            <FieldDescription>Publication and saving belong to the editor’s owner.</FieldDescription>
+          </EditorDetailsGroup>}>
+          <div className="grid gap-4">
+            <p className="text-caption text-muted-foreground">{catalogLesson === "welcome" ? "Lesson 1 of 2" : "Lesson 2 of 2"}</p>
+            <FormField label="Example lesson title" visuallyHiddenLabel>
+              <Input variant="title" value={catalogTitle} onChange={(event) => setCatalogTitle(event.target.value)} />
+            </FormField>
+            <FormField label="Example draft text">
+              <Textarea rows={6} value={catalogBody} onChange={(event) => setCatalogBody(event.target.value)} />
+            </FormField>
+          </div>
+        </EditorFrame>
+      </section>
       <WritingExamples />
       <section className="grid gap-4" aria-label="Generated card artwork">
         <SectionHeader

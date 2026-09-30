@@ -30,6 +30,7 @@ export function CardArtEditor({
   onUpload,
   disabled,
   onBusyChange,
+  saveMode = "manual",
 }: {
   id: string;
   title: string;
@@ -42,6 +43,7 @@ export function CardArtEditor({
   onUpload?: UploadMedia;
   disabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
+  saveMode?: "manual" | "automatic";
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const shuffleHistory = useRef<{ id: string; seeds: number[] }>({
@@ -54,11 +56,11 @@ export function CardArtEditor({
   const generated = current.source === "generated";
   return (
     <section className="grid gap-3" aria-label="Card artwork editor">
-      <h3>Card artwork</h3>
+      <h3 className={saveMode === "automatic" ? "text-sm font-semibold" : undefined}>Card artwork</h3>
       <FieldDescription>
-        Generated designs use your Identity artwork palette. Shuffle explores
-        different designs and avoids recent repeats; save this item to keep the
-        choice. A custom image replaces only the artwork above the card text.
+        {saveMode === "automatic"
+          ? "Choose generated artwork or upload an image. Changes save as a draft."
+          : "Generated designs use your Identity artwork palette. Shuffle explores different designs and avoids recent repeats; save this item to keep the choice. A custom image replaces only the artwork above the card text."}
       </FieldDescription>
       <div className="card-artwork-preview">
         <CardArtwork
@@ -129,7 +131,7 @@ export function CardArtEditor({
               version: CARD_ART_VERSION,
               seed,
             });
-            setNotice("New design previewed. Save to keep it.");
+            setNotice(saveMode === "automatic" ? "Design updated." : "New design previewed. Save to keep it.");
           }}
         >
           Shuffle artwork
@@ -161,7 +163,7 @@ export function CardArtEditor({
                 source: "generated",
                 imageUrl: undefined,
               });
-              setNotice("Image removed from the card. Save to apply.");
+              setNotice(saveMode === "automatic" ? "Card image removed." : "Image removed from the card. Save to apply.");
             }}
           >
             Remove image
@@ -197,7 +199,7 @@ export function CardArtEditor({
           try {
             const imageUrl = await onUpload(file);
             onChange({ ...current, source: "upload", imageUrl });
-            setNotice("Image uploaded. Save this item to apply it.");
+            setNotice(saveMode === "automatic" ? "Card image updated." : "Image uploaded. Save this item to apply it.");
           } catch (error) {
             setNotice(
               error instanceof Error
