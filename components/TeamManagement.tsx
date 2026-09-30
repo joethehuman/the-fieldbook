@@ -102,9 +102,9 @@ export function TeamsAdmin({
     !saving.current &&
     (!dirty || (await confirm("Discard unsaved team changes?")));
   useEffect(() => {
-    registerNavigationGuard?.(() => guard.current());
+    registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
     return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard]);
+  }, [registerNavigationGuard, dirty, busy]);
   useEffect(() => {
     function beforeUnload(event: BeforeUnloadEvent) {
       if (dirty || saving.current) {

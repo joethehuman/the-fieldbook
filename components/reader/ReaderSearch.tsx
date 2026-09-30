@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { ContentSearch } from "@/components/ContentSearch";
 import { SearchPanel } from "@/components/patterns/search-panel";
@@ -25,6 +26,8 @@ const searchReader: SearchProvider = async (query, filter, signal) => {
 export function ReaderSearch() {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  useEffect(() => setOpen(false), [pathname]);
   return (
     <SearchPanel
       id="reader-search-results"

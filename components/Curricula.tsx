@@ -55,9 +55,9 @@ export default function Curricula({
   guard.current = async () =>
     !busy && (!dirty || (await confirm("Discard unsaved curriculum changes?")));
   useEffect(() => {
-    registerNavigationGuard?.(() => guard.current());
+    registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
     return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard]);
+  }, [registerNavigationGuard, dirty, busy]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty || busy) {

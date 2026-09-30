@@ -226,6 +226,7 @@ type Props = {
     options?: { locallyHandled?: boolean },
   ) => void | Promise<void>;
   production?: boolean;
+  historyManaged?: boolean;
   onLearning?: LearningHandler;
   onUpload?: UploadMedia;
   registerNavigationGuard?: RegisterNavigationGuard;
@@ -241,6 +242,7 @@ export default function Admin({
   onUnpublish,
   onChange,
   production = false,
+  historyManaged = false,
   onUpload,
   onLearning,
   registerNavigationGuard,
@@ -251,9 +253,9 @@ export default function Admin({
   const adminPanel = useRevealTarget();
   const adminGuard = useRef<NavigationGuard | null>(null);
   const registerAdminGuard = useCallback<RegisterNavigationGuard>(
-    (guard) => {
+    (guard, options) => {
       adminGuard.current = guard;
-      registerNavigationGuard?.(guard);
+      registerNavigationGuard?.(guard, options);
     },
     [registerNavigationGuard],
   );
@@ -535,6 +537,7 @@ export default function Admin({
         onCancel={() => setEditing(null)}
         onUpload={onUpload}
         production={production}
+        historyManaged={historyManaged}
         onLearning={manageLearning}
         onLearningMany={manageLearningMany}
         onWorkspaceChange={onChange}
@@ -1368,6 +1371,7 @@ export function Editor({
   onCancel,
   onUpload,
   production = false,
+  historyManaged = false,
   registerNavigationGuard,
   onReload,
 }: {
@@ -1375,6 +1379,7 @@ export function Editor({
   registerNavigationGuard?: RegisterNavigationGuard;
   onReload?: () => Promise<Workspace>;
   production?: boolean;
+  historyManaged?: boolean;
   content: Content;
   data: Workspace;
   onSave: (c: Content) => Content | void | Promise<Content | void>;
@@ -1431,9 +1436,9 @@ export function Editor({
     );
   };
   useEffect(() => {
-    registerNavigationGuard?.(() => guard.current());
+    registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
     return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard]);
+  }, [registerNavigationGuard, dirty, busy]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty || busy) {
@@ -1445,7 +1450,7 @@ export function Editor({
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy]);
   useEffect(() => {
-    if (!production) return;
+    if (!production || historyManaged) return;
     if (!dirty && !busy) {
       historyGuardArmed.current = false;
       return;
@@ -1468,7 +1473,7 @@ export function Editor({
     };
     window.addEventListener("popstate", onBack);
     return () => window.removeEventListener("popstate", onBack);
-  }, [production, dirty, busy]);
+  }, [production, historyManaged, dirty, busy]);
   const upload: UploadMedia | undefined = onUpload
     ? async (file) => {
         pendingUploads.current++;

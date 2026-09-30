@@ -1,12 +1,9 @@
+import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { Article } from "@/components/patterns/reading";
 import { ReaderFeedback } from "@/components/reader/ReaderFeedback";
 import { DocsEmpty } from "@/components/patterns/docs-empty";
 import { orderedDocs } from "@/lib/docs-navigation";
-import {
-  readerContext,
-  readerItem,
-  readerMetadata,
-} from "@server/reader";
+import { readerContext, readerItem, readerMetadata } from "@server/reader";
 import { siteOrigins } from "@server/env";
 export async function generateMetadata() {
   const context = await readerContext("/docs");
@@ -35,17 +32,24 @@ export default async function Page() {
     context.docCategoryOrder,
     context.docSections,
   )[0];
-  if (!first) return <DocsEmpty />;
+  if (!first)
+    return (
+      <WorkspacePage section="/docs">
+        <DocsEmpty />
+      </WorkspacePage>
+    );
   const { item } = await readerItem("doc", first.id);
   return (
-    <Article
-      item={item}
-      documents={context.docs}
-      sectionOrder={context.docCategoryOrder}
-      sections={context.docSections}
-      sameSiteOrigins={siteOrigins()}
-    >
-      <ReaderFeedback key={item.id} contentId={item.id} />
-    </Article>
+    <WorkspacePage section="/docs">
+      <Article
+        item={item}
+        documents={context.docs}
+        sectionOrder={context.docCategoryOrder}
+        sections={context.docSections}
+        sameSiteOrigins={siteOrigins()}
+      >
+        <ReaderFeedback key={item.id} contentId={item.id} />
+      </Article>
+    </WorkspacePage>
   );
 }

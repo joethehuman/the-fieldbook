@@ -1,6 +1,7 @@
 "use client";
 import {
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -8,6 +9,9 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
+import type { NavigationGuard } from "@/lib/navigation-guard";
+import { useNavigationHistory } from "./use-navigation-history";
+import { WorkspaceContext } from "./WorkspaceContext";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
@@ -16,7 +20,7 @@ import {
   Menu,
   Newspaper,
 } from "lucide-react";
-import { AppBar } from "@/components/patterns/app-bar";
+import { WorkspaceFrame } from "@/components/patterns/workspace-frame";
 import {
   SidebarHeading,
   sidebarPrimaryLinkClassName,
@@ -24,40 +28,73 @@ import {
 import { useDesktopSidebar } from "@/components/patterns/desktop-sidebar-state";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { AccountMenu } from "@/components/patterns/account-menu";
-import { SkipLink } from "@/components/patterns/skip-link";
 import { NavigationButton } from "@/components/patterns/navigation-button";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ReaderSearch } from "./ReaderSearch";
 import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
 import { homePath } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
-import { brandThemeStyle } from "@/lib/brand-theme";
-import { BrandThemeSync } from "@/components/patterns/brand-theme-sync";
 
 export function ReaderShell({
-  context,
+  context: initialContext,
   children,
 }: {
   context: ReaderShellContext;
   children: ReactNode;
 }) {
+  const [accountError, setAccountError] = useState<string | null>(null);
+  const [context, updateContext] = useState(initialContext);
+  const guard = useRef<NavigationGuard | null>(null);
+  const checking = useRef(false);
+  const [protectedState, setProtectedState] = useState(false);
+  const registerNavigationGuard = useCallback(
+    (next: NavigationGuard | null, options?: { protected: boolean }) => {
+      guard.current = next;
+      setProtectedState(!!next && !!options?.protected);
+    },
+    [],
+  );
+  const shell = useMemo(
+    () => ({ updateContext, registerNavigationGuard }),
+    [registerNavigationGuard],
+  );
+  async function canLeave() {
+    if (checking.current) return false;
+    checking.current = true;
+    try {
+      return await (guard.current?.() ?? true);
+    } finally {
+      checking.current = false;
+    }
+  }
+  const { beforeNavigation, finishNavigation } = useNavigationHistory(
+    protectedState,
+    canLeave,
+  );
   const [menu, setMenu] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  const closeTrigger = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
   const router = useRouter();
   const [navigationPending, startNavigation] = useTransition();
+  useEffect(() => {
+    if (!navigationPending) finishNavigation();
+  }, [navigationPending, pathname, finishNavigation]);
   const section = pathname.startsWith("/docs")
     ? "docs"
-    : pathname.startsWith("/team")
-      ? "team"
-      : pathname.startsWith("/curricula")
-        ? "curricula"
-        : pathname.startsWith("/privacy")
-          ? "privacy"
-          : pathname.startsWith("/courses")
-            ? "courses"
-            : "updates";
+    : pathname.startsWith("/admin")
+      ? "admin"
+      : pathname.startsWith("/team")
+        ? "team"
+        : pathname.startsWith("/curricula")
+          ? "curricula"
+          : pathname.startsWith("/privacy")
+            ? "privacy"
+            : pathname.startsWith("/courses")
+              ? "courses"
+              : "updates";
   const orderedDocList = useMemo(
     () =>
       orderedDocs(context.docs, context.docCategoryOrder, context.docSections),
@@ -91,6 +128,7 @@ export function ReaderShell({
     : undefined;
   useEffect(() => {
     if (!menu) return;
+    closeTrigger.current?.focus();
     const escape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setMenu(false);
@@ -107,226 +145,278 @@ export function ReaderShell({
         ? "Courses"
         : section === "team"
           ? "Team progress"
-          : section === "privacy"
-            ? "Privacy policy"
-            : "Updates";
+          : section === "admin"
+            ? "Administration"
+            : section === "privacy"
+              ? "Privacy policy"
+              : "Updates";
   const close = () => setMenu(false);
   const links = [
     { href: "/updates", title: "Updates", icon: Newspaper },
     { href: "/courses", title: "Courses", icon: GraduationCap },
     { href: "/docs", title: "Docs", icon: BookOpen },
   ];
-  async function signOut() {
-    await fetch("/auth/logout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+  async function navigate(href: string) {
+    const previousFocus = document.activeElement;
+    if (!(await canLeave())) {
+      if (previousFocus && !previousFocus.isConnected) {
+        if (window.matchMedia("(max-width: 767px)").matches)
+          trigger.current?.focus();
+        else
+          document
+            .querySelector<HTMLButtonElement>(
+              '.sidebar [aria-label="Account menu"]',
+            )
+            ?.focus();
+      }
+      return;
+    }
+    if (href === "/docs") setCollapsed(false);
+    else close();
+    startNavigation(async () => {
+      if (await beforeNavigation()) startNavigation(() => router.push(href));
     });
-    window.location.assign("/auth/sign-in");
+  }
+  async function signOut() {
+    if (!(await canLeave())) return;
+    setAccountError(null);
+    try {
+      const response = await fetch("/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!response.ok) throw new Error("Could not sign out. Try again.");
+      window.location.replace("/");
+    } catch {
+      close();
+      setAccountError("Could not sign out. Try again.");
+    }
   }
   return (
-    <div
-      className={`app ${collapsed ? "sidebar-collapsed" : ""}`}
-      style={brandThemeStyle(context.branding.accent)}
-    >
-      <BrandThemeSync accent={context.branding.accent} />
-      <SkipLink href="#main-content">Skip to content</SkipLink>
-      <aside id="main-sidebar" className={`sidebar ${menu ? "open" : ""}`}>
-        <SidebarHeading
-          name={context.branding.name}
-          collapsed={collapsed}
-          onToggle={() => setCollapsed(!collapsed)}
-          onClose={() => {
-            close();
-            trigger.current?.focus();
-          }}
-        />
-        <nav className="primary-navigation" aria-label="Primary">
-          {links.map(({ href, title: label, icon: Icon }) => (
-            <NavigationButton
-              asChild
-              key={href}
-              className={`${sidebarPrimaryLinkClassName} ${section === href.slice(1) ? "active" : ""}`}
-            >
-              <Link
-                href={href}
-                prefetch
-                aria-label={label}
-                title={collapsed ? label : undefined}
-                onClick={(event) => {
-                  if (href !== "/docs") {
-                    close();
-                    return;
-                  }
-                  if (
-                    event.button ||
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    event.shiftKey ||
-                    event.altKey
-                  )
-                    return;
-                  setCollapsed(false);
-                  event.preventDefault();
-                  startNavigation(() => router.push("/docs"));
-                }}
-              >
-                <Icon size={19} />
-                <span className="sidebar-nav-text">{label}</span>
-              </Link>
-            </NavigationButton>
-          ))}
-        </nav>
-        {section === "docs" && (
-          <DocumentTree
-            docs={context.docs}
-            order={context.docCategoryOrder}
-            sections={context.docSections}
-            selected={selected}
-            href={(id) => `/docs/${encodeURIComponent(id)}`}
-            onNavigate={(id) => {
-              close();
-              startNavigation(() =>
-                router.push(`/docs/${encodeURIComponent(id)}`),
-              );
-            }}
-            storageKey="fieldbook.documents.production"
-          />
-        )}
-        <div className="sidebar-bottom">
-          <AccountMenu
-            name={context.user?.name || "Guest"}
-            email={context.user?.email}
-            guest={!context.user}
-            initials={
-              context.user
-                ? context.user.name
-                    .split(" ")
-                    .map((part) => part[0])
-                    .slice(0, 2)
-                    .join("")
-                : "G"
-            }
-            description={
-              context.user?.role === "admin"
-                ? "Administrator"
-                : context.user?.role === "manager"
-                  ? "Manager"
-                  : context.user
-                    ? "Learner"
-                    : undefined
-            }
-            onManageOrganization={
-              context.user?.role === "admin"
-                ? () => {
-                    close();
-                    startNavigation(() => router.push("/admin"));
-                  }
-                : undefined
-            }
-            onTeamProgress={
-              context.user &&
-              (context.user.role === "manager" || context.user.managesTeam)
-                ? () => {
-                    close();
-                    startNavigation(() => router.push("/team"));
-                  }
-                : undefined
-            }
-            onMenuOpen={() => {
-              if (context.user?.role === "admin") router.prefetch("/admin");
-              else if (context.user?.role === "manager")
-                router.prefetch("/team");
-            }}
-            onManageOrganizationIntent={() => router.prefetch("/admin")}
-            onTeamProgressIntent={() => router.prefetch("/team")}
-            onSignOut={context.user ? signOut : undefined}
-            privacyHref={
-              section === "privacy" ? null : context.branding.privacyUrl
-            }
-            onPrivacyOpen={close}
-            onSignIn={
-              !context.user
-                ? () => window.location.assign("/auth/sign-in")
-                : undefined
-            }
-            onFeedbackOpen={close}
-            onFeedbackClose={() => {
-              if (window.matchMedia("(max-width: 767px)").matches)
+    <WorkspaceContext.Provider value={shell}>
+      <WorkspaceFrame
+        accent={context.branding.accent}
+        collapsed={collapsed}
+        menu={menu}
+        pending={navigationPending}
+        admin={section === "admin"}
+        alert={
+          accountError && (
+            <Alert variant="destructive" role="alert">
+              {accountError}
+            </Alert>
+          )
+        }
+        onDismiss={close}
+        onClickCapture={(event) => {
+          const anchor = (event.target as Element).closest<HTMLAnchorElement>(
+            "a[href]",
+          );
+          if (
+            !anchor ||
+            event.defaultPrevented ||
+            event.button ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey ||
+            (anchor.target && anchor.target !== "_self") ||
+            anchor.hasAttribute("download")
+          )
+            return;
+          const target = new URL(anchor.href);
+          if (
+            target.origin !== window.location.origin ||
+            (target.pathname === window.location.pathname &&
+              target.search === window.location.search &&
+              !!target.hash) ||
+            !/^\/(admin|team|docs|updates|courses|curricula|privacy)(\/|$)/.test(
+              target.pathname,
+            )
+          )
+            return;
+          // Course lesson controls update their own current URL and player state.
+          if (
+            section === "courses" &&
+            selected &&
+            target.pathname === pathname &&
+            target.searchParams.has("lesson")
+          )
+            return;
+          event.preventDefault();
+          void navigate(target.pathname + target.search + target.hash);
+        }}
+        sidebar={
+          <>
+            <SidebarHeading
+              closeRef={closeTrigger}
+              name={context.branding.name}
+              collapsed={collapsed}
+              onToggle={() => setCollapsed(!collapsed)}
+              onClose={() => {
+                close();
                 trigger.current?.focus();
-            }}
-            onFeedback={async (rating, comment) => {
-              const response = await fetch("/api/feedback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rating, comment }),
-              });
-              if (!response.ok) {
-                const result = await response.json().catch(() => ({}));
-                throw new Error(
-                  result.error || "Could not save feedback. Try again.",
-                );
-              }
-            }}
-          />
-        </div>
-      </aside>
-      {menu && (
-        <Button
-          variant="ghost"
-          className="fixed inset-0 z-20 h-full w-full rounded-none bg-overlay p-0 hover:bg-overlay md:hidden"
-          aria-label="Dismiss navigation"
-          tabIndex={-1}
-          onClick={close}
-        />
-      )}
-      <div className="main-shell">
-        <AppBar pending={navigationPending}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            ref={trigger}
-            aria-expanded={menu}
-            aria-label="Open navigation"
-            onClick={() => setMenu(!menu)}
-          >
-            <Menu />
-          </Button>
-          <nav className="breadcrumb" aria-label="Breadcrumb">
-            <Button asChild variant="link">
-              <Link href={homePath(context.branding)} prefetch>
-                Organization
-              </Link>
-            </Button>
-            {section !== "courses" && (
-              <>
-                <ChevronRight size={14} />
-                <Button asChild variant="link">
+              }}
+            />
+            <nav className="primary-navigation" aria-label="Primary">
+              {links.map(({ href, title: label, icon: Icon }) => (
+                <NavigationButton
+                  asChild
+                  key={href}
+                  className={`${sidebarPrimaryLinkClassName} ${section === href.slice(1) ? "active" : ""}`}
+                >
                   <Link
-                    href={section === "curricula" ? "/courses" : `/${section}`}
+                    href={href}
                     prefetch
+                    aria-label={label}
+                    title={collapsed ? label : undefined}
                   >
-                    {title}
+                    <Icon size={19} />
+                    <span className="sidebar-nav-text">{label}</span>
                   </Link>
-                </Button>
-              </>
+                </NavigationButton>
+              ))}
+            </nav>
+            {section === "docs" && (
+              <DocumentTree
+                docs={context.docs}
+                order={context.docCategoryOrder}
+                sections={context.docSections}
+                selected={selected}
+                href={(id) => `/docs/${encodeURIComponent(id)}`}
+                onNavigate={(id) => {
+                  void navigate(`/docs/${encodeURIComponent(id)}`);
+                }}
+                storageKey="fieldbook.documents.production"
+              />
             )}
-            {selected && (
-              <>
-                <ChevronRight size={14} />
-                <span className="crumb-item" aria-current="page">
-                  {articleTitle || "Article"}
-                </span>
-              </>
-            )}
-          </nav>
-          <ReaderSearch />
-        </AppBar>
-        <main id="main-content" className="main-content" tabIndex={-1}>
-          {context.user && <ReaderGuestImport />}
-          {children}
-        </main>
-      </div>
-    </div>
+            <div className="sidebar-bottom">
+              <AccountMenu
+                name={context.user?.name || "Guest"}
+                email={context.user?.email}
+                guest={!context.user}
+                initials={
+                  context.user
+                    ? context.user.name
+                        .split(" ")
+                        .map((part) => part[0])
+                        .slice(0, 2)
+                        .join("")
+                    : "G"
+                }
+                description={
+                  context.user?.role === "admin"
+                    ? "Administrator"
+                    : context.user?.role === "manager"
+                      ? "Manager"
+                      : context.user
+                        ? "Learner"
+                        : undefined
+                }
+                onManageOrganization={
+                  context.user?.role === "admin"
+                    ? () => {
+                        void navigate("/admin");
+                      }
+                    : undefined
+                }
+                onTeamProgress={
+                  context.user &&
+                  (context.user.role === "manager" || context.user.managesTeam)
+                    ? () => {
+                        void navigate("/team");
+                      }
+                    : undefined
+                }
+                onMenuOpen={() => {
+                  if (context.user?.role === "admin") router.prefetch("/admin");
+                  else if (context.user?.role === "manager")
+                    router.prefetch("/team");
+                }}
+                onManageOrganizationIntent={() => router.prefetch("/admin")}
+                onTeamProgressIntent={() => router.prefetch("/team")}
+                onSignOut={context.user ? signOut : undefined}
+                privacyHref={
+                  section === "privacy" ? null : context.branding.privacyUrl
+                }
+                onPrivacyOpen={close}
+                onSignIn={
+                  !context.user
+                    ? () => window.location.assign("/auth/sign-in")
+                    : undefined
+                }
+                onFeedbackOpen={close}
+                onFeedbackClose={() => {
+                  if (window.matchMedia("(max-width: 767px)").matches)
+                    trigger.current?.focus();
+                }}
+                onFeedback={async (rating, comment) => {
+                  const response = await fetch("/api/feedback", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ rating, comment }),
+                  });
+                  if (!response.ok) {
+                    const result = await response.json().catch(() => ({}));
+                    throw new Error(
+                      result.error || "Could not save feedback. Try again.",
+                    );
+                  }
+                }}
+              />
+            </div>
+          </>
+        }
+        header={
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              ref={trigger}
+              aria-expanded={menu}
+              aria-label="Open navigation"
+              onClick={() => setMenu(!menu)}
+            >
+              <Menu />
+            </Button>
+            <nav className="breadcrumb" aria-label="Breadcrumb">
+              <Button asChild variant="link">
+                <Link href={homePath(context.branding)} prefetch>
+                  Organization
+                </Link>
+              </Button>
+              {section !== "courses" && (
+                <>
+                  <ChevronRight size={14} />
+                  <Button asChild variant="link">
+                    <Link
+                      href={
+                        section === "curricula" ? "/courses" : `/${section}`
+                      }
+                      prefetch
+                    >
+                      {title}
+                    </Link>
+                  </Button>
+                </>
+              )}
+              {selected && (
+                <>
+                  <ChevronRight size={14} />
+                  <span className="crumb-item" aria-current="page">
+                    {articleTitle || "Article"}
+                  </span>
+                </>
+              )}
+            </nav>
+            <ReaderSearch />
+          </>
+        }
+      >
+        {context.user && <ReaderGuestImport />}
+        {children}
+      </WorkspaceFrame>
+    </WorkspaceContext.Provider>
   );
 }

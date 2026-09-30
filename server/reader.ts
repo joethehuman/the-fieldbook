@@ -226,8 +226,8 @@ export const readerContext = cache(async (destination: string) => {
   };
 });
 
-export const readerTeamContext = cache(async () => {
-  const { user, config } = await readerAccess("/team");
+export const readerWorkspaceContext = cache(async (destination: string) => {
+  const { user, config } = await readerAccess(destination);
   return {
     user: readerAccount(user, config),
     branding: readerBranding(config),
@@ -236,6 +236,8 @@ export const readerTeamContext = cache(async () => {
     docSections: [],
   };
 });
+
+export const readerTeamContext = cache(() => readerWorkspaceContext("/team"));
 
 export const readerTeam = cache(async () => {
   const { user, config } = await readerAccess("/team");
@@ -552,5 +554,47 @@ export function readerMetadata(
     ...(context.branding.access === "private"
       ? { robots: { index: false, follow: false } }
       : {}),
+  };
+}
+
+// Narrow presentation DTO, memoized within the current server request only.
+export const readerShellContext = cache(async (destination: string) => {
+  if (destination === "/team" || destination === "/admin")
+    return readerWorkspaceContext(destination);
+  const context = await readerContext(destination);
+  return {
+    user: context.user,
+    branding: context.branding,
+    docs: context.docs,
+    docCategoryOrder: context.docCategoryOrder,
+    docSections: context.docSections,
+    updateTitles: [...context.forYou, ...context.otherUpdates].map(
+      ({ id, title }) => ({ id, title }),
+    ),
+    courseTitles: context.courseTitles,
+    curriculumTitles: context.curriculumTitles,
+  };
+});
+
+// Detail reads already verified the account and item. Hidden navigation needs no list read.
+export function readerDetailShellContext(
+  context: Pick<
+    import("@/lib/reader-types").ReaderShellContext,
+    "user" | "branding"
+  >,
+  section: "updates" | "courses" | "curricula",
+  item: { id: string; title: string },
+): import("@/lib/reader-types").ReaderShellContext {
+  return {
+    user: context.user,
+    branding: context.branding,
+    docs: [],
+    docCategoryOrder: [],
+    docSections: [],
+    ...(section === "updates"
+      ? { updateTitles: [{ id: item.id, title: item.title }] }
+      : section === "courses"
+        ? { courseTitles: [{ id: item.id, title: item.title }] }
+        : { curriculumTitles: [{ id: item.id, title: item.title }] }),
   };
 }

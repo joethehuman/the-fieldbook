@@ -6,7 +6,8 @@ import {
   type TestInfo,
 } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { freshWorkspace, type Workspace } from "../../lib/store";
+import { learningUiFixture } from "../fixtures/learning-ui";
+import type { Workspace } from "../../lib/store";
 
 // Read actual browser downloads, independently of the application's serializer.
 function parse(text: string): string[][] {
@@ -75,7 +76,7 @@ async function select(page: Page, name: string, option: string) {
   await page.getByRole("option", { name: option, exact: true }).click();
 }
 function fixture(): Workspace {
-  const data = freshWorkspace();
+  const data = learningUiFixture();
   data.users[0].name = 'Zoë "Example", 東京';
   data.users[0].email = "zoe@example.test";
   data.teams!.push(
