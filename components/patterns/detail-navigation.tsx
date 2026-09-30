@@ -7,10 +7,12 @@ export function DetailNavigation({
   items,
   current,
   disabled,
+  flush = false,
 }: {
   items: { label: string; onSelect: () => void | Promise<void> }[];
   current?: ReactNode;
   disabled?: boolean;
+  flush?: boolean;
 }) {
   return (
     <nav aria-label="Navigation context" data-slot="detail-navigation">
@@ -27,7 +29,7 @@ export function DetailNavigation({
               type="button"
               variant="ghost"
               size="sm"
-              className="min-w-0 max-w-full text-left"
+              className={`min-w-0 max-w-full text-left${flush && index === 0 ? " px-0" : ""}`}
               disabled={disabled}
               onClick={item.onSelect}
             >

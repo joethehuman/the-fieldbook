@@ -1911,7 +1911,7 @@ export function Editor({
     >
       <div ref={heading} className="editor-heading">
         <h1 className="sr-only">{c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"} editor</h1>
-        <DetailNavigation disabled={busy} items={[{
+        <DetailNavigation flush disabled={busy} items={[{
           label: "Back to content",
           onSelect: async () => { if (await guard.current()) onCancel(); },
         }]} />

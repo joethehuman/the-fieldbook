@@ -97,7 +97,7 @@ export function EditorFrame({
     <section ref={frame} className="editor-frame" data-panels={open} aria-label="Writing workspace">
       <div ref={controls} className="editor-frame-controls">
         {outline && (
-          <Button ref={outlineToggle} type="button" variant="ghost" size="sm"
+          <Button ref={outlineToggle} type="button" variant="ghost" size="sm" className="px-0"
             disabled={disabled}
             aria-controls={outlineId} aria-expanded={panels.outline}
             onClick={() => setPanels((current) => ({
@@ -108,7 +108,7 @@ export function EditorFrame({
             Outline{outlineContext && <span className="text-muted-foreground">· {outlineContext}</span>}
           </Button>
         )}
-        <Button ref={detailsToggle} type="button" variant="ghost" size="sm" className="ml-auto"
+        <Button ref={detailsToggle} type="button" variant="ghost" size="sm" className="ml-auto px-0"
           disabled={disabled}
           aria-controls={detailsId} aria-expanded={panels.details}
           onClick={() => setPanels((current) => ({
