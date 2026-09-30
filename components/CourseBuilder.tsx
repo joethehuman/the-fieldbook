@@ -42,16 +42,19 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   const [canvasRequest, setCanvasRequest] = useState(0);
   const [outlineRequest, setOutlineRequest] = useState(0);
   const panel = useRef<HTMLDivElement>(null);
-  const pendingFocus = useRef(false);
+  const pendingNavigation = useRef<{ step: string; instant: boolean } | null>(null);
+  const navigationFrame = useRef(0);
   const selectedLesson = course.lessons.find((lesson) => lesson.id === selected);
-  function chooseStep(step: string) {
-    pendingFocus.current = true;
-    setSelected(step);
+  function chooseStep(step: string, instant = false) {
+    cancelAnimationFrame(navigationFrame.current);
+    pendingNavigation.current = { step, instant };
+    if (instant) setSelected(step);
     setCanvasRequest((request) => request + 1);
   }
   useEffect(() => {
     if (!revealStep) return;
-    pendingFocus.current = false;
+    cancelAnimationFrame(navigationFrame.current);
+    pendingNavigation.current = null;
     if (revealStep.id === "outline") {
       setOutlineRequest((request) => request + 1);
       return;
@@ -68,20 +71,66 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
       (target || panel.current)?.focus({ preventScroll: true });
       (target?.closest('[data-slot="field"]') || panel.current)?.scrollIntoView({ block: "start" });
     });
+    navigationFrame.current = frame;
     return () => cancelAnimationFrame(frame);
   }, [revealStep]);
   useEffect(() => {
-    if (!pendingFocus.current) return;
-    const frame = requestAnimationFrame(() => {
-      pendingFocus.current = false;
-      const target = panel.current?.querySelector<HTMLInputElement>(
-        selected === "quiz" ? "[data-question-id] input" : 'input[aria-label="Lesson title"]',
-      );
-      (target || panel.current)?.focus({ preventScroll: true });
-      panel.current?.scrollIntoView({ block: "nearest" });
+    const navigation = pendingNavigation.current;
+    if (disabled) {
+      cancelAnimationFrame(navigationFrame.current);
+      pendingNavigation.current = null;
+      return;
+    }
+    if (!navigation) return;
+    let frame = 0;
+    const queueFrame = (callback: FrameRequestCallback) => {
+      frame = requestAnimationFrame(callback);
+      navigationFrame.current = frame;
+    };
+    queueFrame(() => {
+      const surface = panel.current;
+      const viewport = surface?.closest<HTMLElement>(".main-content");
+      const position = () => {
+        if (!surface || !viewport) return 0;
+        const inset = parseFloat(getComputedStyle(surface).scrollMarginBlockStart) || 0;
+        return surface.getBoundingClientRect().top - viewport.getBoundingClientRect().top - viewport.clientTop - inset;
+      };
+      const finish = () => {
+        if (pendingNavigation.current !== navigation) return;
+        pendingNavigation.current = null;
+        setSelected(navigation.step);
+        surface?.focus({ preventScroll: true });
+      };
+      const delta = position();
+      const titleHeight = surface?.querySelector<HTMLElement>('input[aria-label="Lesson title"], h2')?.getBoundingClientRect().height || 0;
+      const inset = surface ? parseFloat(getComputedStyle(surface).scrollMarginBlockStart) || 0 : 0;
+      if (!viewport || !surface || (delta >= 0 && delta + inset + titleHeight <= viewport.clientHeight)) {
+        finish();
+        return;
+      }
+      const start = viewport.scrollTop;
+      const destination = Math.max(0, start + delta);
+      if (navigation.instant || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        viewport.scrollTo({ top: destination, behavior: "instant" });
+        finish();
+        return;
+      }
+      // Scroll the outgoing lesson first: swapping a long body earlier clamps the viewport.
+      const started = performance.now();
+      const animate: FrameRequestCallback = (now) => {
+        if (pendingNavigation.current !== navigation) return;
+        const progress = Math.min(1, (now - started) / 180);
+        viewport.scrollTo({ top: start + (destination - start) * (1 - (1 - progress) ** 3), behavior: "instant" });
+        if (progress < 1) queueFrame(animate);
+        else {
+          viewport.scrollTo({ top: Math.max(0, viewport.scrollTop + position()), behavior: "instant" });
+          finish();
+        }
+      };
+      queueFrame(animate);
     });
     return () => cancelAnimationFrame(frame);
-  }, [selected, canvasRequest]);
+  }, [canvasRequest, disabled]);
   const editLesson = (update: (lesson: Content["lessons"][number]) => Content["lessons"][number]) =>
     onChange((current) => ({ ...current, lessons: current.lessons.map((lesson) => lesson.id === selected ? update(lesson) : lesson) }));
   const editQuestion = (questionId: string, update: (question: Question) => Question) =>
@@ -99,7 +148,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     chooseStep(lesson.id);
   }
   const lessonActions = selectedLesson && (
-      <ActionGroup role="group" aria-label={`Actions for ${selectedLesson.title || "selected lesson"}`}>
+      <ActionGroup className="shrink-0 flex-nowrap gap-0 pr-1" role="group" aria-label={`Actions for ${selectedLesson.title || "selected lesson"}`}>
         <Button type="button" variant="ghost" size="icon" aria-label="Move lesson up" disabled={disabled || selectedLesson === course.lessons[0]} onClick={() => move(course.lessons.indexOf(selectedLesson), -1)}><ChevronUp size={16} /></Button>
         <Button type="button" variant="ghost" size="icon" aria-label="Move lesson down" disabled={disabled || selectedLesson === course.lessons.at(-1)} onClick={() => move(course.lessons.indexOf(selectedLesson), 1)}><ChevronDown size={16} /></Button>
         <DropdownMenu>
@@ -114,7 +163,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
             <DropdownMenuItem disabled={disabled || course.lessons.length <= 1} onSelect={() => {
               const index = course.lessons.indexOf(selectedLesson);
               onChange((current) => ({ ...current, lessons: current.lessons.filter((lesson) => lesson.id !== selected) }));
-              chooseStep(course.lessons[index === 0 ? 1 : index - 1].id);
+              chooseStep(course.lessons[index === 0 ? 1 : index - 1].id, true);
             }}><Trash2 size={16} /> Remove lesson</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -122,8 +171,8 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   );
   const outline = <>
     <nav className="course-builder-steps" aria-label="Edit course step">
-      {course.lessons.map((lesson, index) => <div key={lesson.id} className="grid gap-1"><NavigationButton type="button" disabled={disabled} aria-current={selected === lesson.id ? "step" : undefined} className={selected === lesson.id ? "selected items-start [&>span]:w-full [&>span]:justify-start [&>span]:items-start" : "items-start [&>span]:w-full [&>span]:justify-start [&>span]:items-start"} onClick={() => chooseStep(lesson.id)}>
-        <span className="step-number">{index + 1}</span><span className="grid min-w-0 gap-0.5 break-words"><span>{lesson.title || `Lesson ${index + 1}`}</span>{incompleteSteps.includes(lesson.id) && <span className="text-caption font-normal text-muted-foreground">Needs content</span>}</span>
+      {course.lessons.map((lesson, index) => <div key={lesson.id} className={`flex min-w-0 items-center rounded-control${selected === lesson.id ? " bg-accent" : ""}`}><NavigationButton type="button" disabled={disabled} title={lesson.title || `Lesson ${index + 1}`} aria-current={selected === lesson.id ? "step" : undefined} className="min-w-0 flex-1 items-start [&>span]:w-full [&>span]:min-w-0 [&>span]:justify-start [&>span]:items-start" onClick={() => chooseStep(lesson.id)}>
+        <span className="step-number">{index + 1}</span><span className="grid min-w-0 gap-0.5"><span className="truncate">{lesson.title || `Lesson ${index + 1}`}</span>{incompleteSteps.includes(lesson.id) && <span className="truncate text-caption font-normal text-muted-foreground">Needs content</span>}</span>
       </NavigationButton>{selected === lesson.id && lessonActions}</div>)}
       {!!course.questions.length && <NavigationButton type="button" disabled={disabled} aria-current={selected === "quiz" ? "step" : undefined} className={selected === "quiz" ? "selected quiz-step" : "quiz-step"} onClick={() => chooseStep("quiz")}><span className="step-number quiz-number"><Check size={15} /></span><span className="grid min-w-0 gap-0.5"><span>Quiz</span>{incompleteSteps.includes("quiz") && <span className="text-caption font-normal text-muted-foreground">Needs content</span>}</span></NavigationButton>}
     </nav>
@@ -151,7 +200,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         <WritingEditor label="Lesson content" value={selectedLesson.body} onChange={(body) => editLesson((lesson) => ({ ...lesson, body }))} onUpload={onUpload} disabled={disabled} />
       </div> : selected === "quiz" && course.questions.length ? <div className="grid gap-5">
         <SectionHeader title={<h2>Quiz</h2>}><Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => {
-          onChange((current) => ({ ...current, questions: [] })); chooseStep(course.lessons.at(-1)?.id || "");
+          onChange((current) => ({ ...current, questions: [] })); chooseStep(course.lessons.at(-1)?.id || "", true);
         }}><Trash2 size={15} /> Remove quiz</Button></SectionHeader>
         <p className="muted">The quiz always follows the lessons. Learners can retry; no passing score is required unless you enable it.</p>
         <Field orientation="horizontal"><Checkbox checked={requiresPassing(course)} onCheckedChange={(checked) => onChange((current) => ({ ...current, requirePassing: checked === true }))} /> Require all answers correct to complete</Field>

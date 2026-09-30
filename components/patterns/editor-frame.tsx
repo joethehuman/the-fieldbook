@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
@@ -42,10 +42,12 @@ export function EditorFrame({
   useEffect(() => {
     const target = frame.current;
     if (!target) return;
+    const viewport = target.closest<HTMLElement>(".main-content");
     const measure = () => {
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
       const width = target.getBoundingClientRect().width;
       target.style.setProperty("--editor-controls-height", `${controls.current?.getBoundingClientRect().height || 48}px`);
+      if (viewport) target.style.setProperty("--editor-viewport-height", `${viewport.clientHeight}px`);
       wide.current = width >= 78 * rem;
       narrow.current = width < 48 * rem;
       if (!wide.current)
@@ -56,6 +58,7 @@ export function EditorFrame({
     const observer = new ResizeObserver(measure);
     observer.observe(target);
     if (controls.current) observer.observe(controls.current);
+    if (viewport) observer.observe(viewport);
     return () => observer.disconnect();
   }, []);
 
@@ -73,7 +76,7 @@ export function EditorFrame({
     return () => cancelAnimationFrame(request);
   }, [revealDetails, detailsId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!revealCanvas) return;
     setPanels((current) => ({
       outline: narrow.current ? false : current.outline,
