@@ -11,7 +11,7 @@ Fieldbook uses one owned component library across the demo and server applicatio
 | Patterns           | `components/patterns/`                     | Page/section headers, stacks, split layouts, toolbars, search fields, filters, actions, callouts, empty states, account/reading layouts, responsive navigation, group pickers and ordered course lists. |
 | Application layout | `styles/layout.css`                        | Shell and feature-specific geometry that cannot use an existing shared composition. Never a second set of control styles.                                                                               |
 | Content            | `styles/content.css`, `styles/artwork.css` | Scoped reading/media styles and shared procedural card artwork. Artwork colors do not define interface colors.                                                                                        |
-| Entry point        | `app/globals.css`                          | Tailwind imports, explicit shared-source scanning and a minimal base reset. Both application layouts import this one file.                                                                              |
+| Entry point        | `styles/globals.css`                          | Tailwind imports, explicit shared-source scanning and a minimal base reset. Both application layouts import this one file.                                                                              |
 
 The old `app/design-system.css` override sheet is deleted. Do not restore it or add another page-specific override sheet. Styles use explicit cascade layers so application geometry cannot silently override primitive utilities.
 
@@ -63,7 +63,7 @@ Before creating a new layout, check the pattern library. Extend a shared variant
 
 Both app roots use the same source and theme. Keep noninteractive primitives server-compatible and add client boundaries only for interactivity. Preserve the lazy-loaded admin bundle, local Geist font loading and direct component imports. Tailwind generates static CSS at build time; do not add runtime styling dependencies to solve layout problems.
 
-The root and production manifests must resolve matching Next/React peers. Browser testing is declared in both because Next has an optional Playwright peer; mismatched peer sets can create separate Next module instances in this shared-source repository. Keep the lockfile reproducible with the repository's pnpm version.
+The root and demo manifests must resolve matching Next/React peers. Browser testing is declared in both because Next has an optional Playwright peer; mismatched peer sets can create separate Next module instances in this shared-source repository. Keep the lockfile reproducible with the repository's pnpm version.
 
 ## Component catalog and checks
 
@@ -75,7 +75,7 @@ Run:
 pnpm check:ui
 pnpm test
 pnpm build
-pnpm build:production
+pnpm build:demo
 pnpm exec playwright install chromium
 pnpm test:ui
 ```

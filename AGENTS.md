@@ -10,14 +10,14 @@ Keep it practical and maintainable for independent operators and small teams. Pr
 
 ## Repository layout
 
-- `app/`: browser-local interactive demo with simulated identity and sample data.
-- `production/`: Next.js server application, authentication, APIs, and MCP tools.
+- `app/` and `server/`: installed server application, authentication, APIs, and MCP tools.
+- `demo/`: browser-local interactive demo with simulated identity and sample data.
 - `components/` and `lib/`: shared interface components and application models.
 - `supabase/migrations/`: database and storage migrations.
-- `tests/` and `production/tests/`: application behavior and server tests.
+- `tests/` and `tests/server/`: application behavior and server tests.
 - `docs/`: installation, operation, and release documentation.
 
-The documented production stack is Vercel, hosted Supabase, and Google sign-in. Consult `production/README.md` for setup. Do not assume that demo features are available in production or that alternative providers are supported without checking the implementation.
+The documented production stack is Vercel, hosted Supabase, and Google sign-in. Consult `docs/installation.md` for setup. Do not assume that demo features are available in production or that alternative providers are supported without checking the implementation.
 
 ## Making changes
 
@@ -46,15 +46,15 @@ Read [Fieldbook interface standards](docs/design-system.md) before changing comp
 
 Use the Node.js and pnpm versions specified in `package.json`. Install dependencies with `pnpm install --frozen-lockfile`.
 
-- `pnpm dev` runs the browser-local demo.
-- `pnpm dev:production` runs the server application with the development environment described in `production/README.md`.
+- `pnpm dev:demo` runs the browser-local demo.
+- `pnpm dev` runs the server application (`dev:production` remains a compatibility alias) with the development environment described in `docs/installation.md`.
 
 For runtime changes, run:
 
 ```sh
 pnpm test
 pnpm build
-pnpm build:production
+pnpm build:demo
 ```
 
 Add or update meaningful tests for changed behavior, particularly authorization, data persistence, and learning-progress rules. For interface changes, check affected user flows, keyboard interaction, and relevant screen sizes. Documentation-only changes need checks against the implementation and valid relative links; they do not require new behavior tests.

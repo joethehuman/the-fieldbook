@@ -1,5 +1,5 @@
 packages:
-  - production
+  - demo
 allowBuilds:
   esbuild: true
 onlyBuiltDependencies:

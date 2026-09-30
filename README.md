@@ -33,25 +33,25 @@ Provider accounts, quotas, pricing, and backups are the operator's responsibilit
 
 1. Obtain your own copy of the code. Once releases exist, start from a named release and keep a separate `production` branch in your repository; see [versions and upgrades](docs/upgrading.md).
 2. Create your Supabase project and apply every included migration in filename order. The recovery migrations also install the deletion worker's hourly schedule.
-3. Import **your repository** into Vercel with **Root Directory = `production`**, including source files outside that directory.
-4. Configure the five required environment variables, Google sign-in, and matching domain/callback URLs.
+3. Import **your repository** into Vercel with **Root Directory = repository root** (leave the field empty).
+4. Configure the required application and build-identity environment variables, Google sign-in, and matching domain/callback URLs.
 5. Set the deletion worker's endpoint to this deployed installation and verify its first request; this is required for 30-day permanent deletion.
 6. Sign in as your configured administrator, create content, and complete the deployment checks.
 7. Optionally connect ChatGPT to your instance's `/api/mcp` endpoint.
 
-**Follow the [complete installation guide](production/README.md).** A GitHub fork or Vercel deployment does not create your database or configure authentication automatically.
+**Follow the [complete installation guide](docs/installation.md).** A GitHub fork or Vercel deployment does not create your database or configure authentication automatically.
 
 ## Demo versus a working installation
 
 | | Interactive demo | Production application |
 |---|---|---|
-| Vercel Root Directory | Repository root | `production` |
+| Vercel Root Directory | `demo` | Repository root (empty field) |
 | Data | Sample content in browser storage | Your Supabase project; starts empty |
 | Identity | Simulated profiles | Google accounts and server-enforced permissions |
 | Purpose | Explore the UI, including demo-only features | Publish content and save learner progress |
 | MCP | None | Authenticated endpoint on your instance |
 
-**The default repository-root deployment is the demo.** It is not an authenticated installation. Never enter private information in it. Demo and production may be deployed as separate Vercel projects; you do not need to deploy the demo to run your own instance.
+**The default repository-root deployment is the installed application.** The optional `demo/` deployment uses synthetic browser-local data; never enter private information in it. Demo and production may be deployed as separate Vercel projects; you do not need to deploy the demo to run your own instance.
 
 ## Current capabilities and boundaries
 
@@ -69,7 +69,7 @@ The production application includes:
 
 ## Documentation
 
-- [Install on Vercel and Supabase](production/README.md)
+- [Install on Vercel and Supabase](docs/installation.md)
 - [Connect your own MCP client](docs/mcp-setup.md)
 - [Configure or change your domain](docs/domains.md)
 - [Set up published-content search](docs/search.md)
@@ -98,23 +98,23 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-This starts the browser-local demo. For the production application, configure `production/.env.local` with a separate development backend, then run `pnpm dev:production`. See the installation guide for local Google callbacks.
+This starts the installed application. Configure root `.env.local` with a separate development backend first. Run `pnpm dev:demo` for the browser-local demo; `pnpm dev:production` remains an alias for `pnpm dev`. See the installation guide for local Google callbacks.
 
 ```sh
 pnpm test
 pnpm build
-pnpm build:production
+pnpm build:demo
 ```
 
 For interface changes, also run `pnpm check:ui` and `pnpm test:ui` after installing Playwright Chromium. The demo component catalog is at `/ui`. See [CONTRIBUTING.md](CONTRIBUTING.md) for development rules and [interface standards](docs/design-system.md) for browser setup and screenshot review.
 
 ## Repository layout
 
-- `app/`: static, browser-local demo
+- `app/`, `proxy.ts`, `server/`: installed Next.js app, authorization, APIs, and MCP
+- `demo/`: static, browser-local demo
 - `components/`, `lib/`: shared interface and learning models
-- `production/`: Next.js server app, authorization, APIs, and MCP
 - `supabase/migrations/`: database and storage setup
-- `tests/`, `production/tests/`: behavior and server checks
+- `tests/`, `tests/server/`: behavior and server checks
 - `docs/`: installation, operation, and release guides
 
 ## Project status and license

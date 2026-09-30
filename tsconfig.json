@@ -25,6 +25,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "@server/*": [
+        "./server/*"
       ]
     }
   },
@@ -37,6 +40,6 @@
   ],
   "exclude": [
     "node_modules",
-    "production"
+    "demo"
   ]
 }

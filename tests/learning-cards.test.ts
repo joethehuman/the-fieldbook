@@ -11,7 +11,10 @@ import {
 function fixture() {
   const data = freshWorkspace();
   const user = data.users.find((u) => u.id === "demo-learner")!;
-  const sequence = requiredSequence(data.content, user, data.groups);
+  // Isolate the three-course curriculum; standalone coverage is added explicitly below.
+  const sequence = requiredSequence(data.content, user, data.groups).filter(
+    (course) => data.curricula![0].courseIds.includes(course.id),
+  );
   return { data, user, sequence };
 }
 test("assigned curricula replace their courses while standalone assignments remain ordered", () => {

@@ -4,6 +4,9 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- The installed application now lives at the repository root; the optional browser-local demo lives in `demo/`. Default commands run the installed app, with explicit demo commands and deployment app-identity checks. Existing installations must coordinate their Vercel root settings with this source change.
+
+
 - Keep Hoolibook's Security Basics course assigned after demo progress saves, and repair affected browser-local sessions without clearing completed lessons or quizzes.
 
 - Replace the browser-local demo's sample catalog with Hoolibook: 12 courses with three lessons and checks, 15 Docs in five ordered sections, and 10 Updates. Fresh or reset demo workspaces receive the new catalog; existing saved browser workspaces retain their content.

@@ -6,7 +6,7 @@ import {
   publicSettings,
   privacyHref,
 } from "../lib/settings";
-import { settingsSchema } from "../production/lib/schemas";
+import { settingsSchema } from "../server/schemas";
 test("retired taglines remain accepted in saved settings but are not public", () => {
   const legacy = { ...defaultSettings, tagline: "Previously saved" };
   assert.equal(settingsSchema.parse(legacy).tagline, "Previously saved");

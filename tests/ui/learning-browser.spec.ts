@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import { freshWorkspace } from "../../lib/store";
+import { learningUiFixture } from "../fixtures/learning-ui";
 
 async function seed(page: Page, allAssignedComplete = false, many = false) {
-  const data = freshWorkspace();
+  const data = learningUiFixture();
   const sample = data.content.find((c) => c.id === "course-2")!;
   const optional = {
     ...sample,
@@ -50,6 +50,7 @@ async function seed(page: Page, allAssignedComplete = false, many = false) {
       const id = `extra-${i}`;
       data.content.push({ ...sample, id, title: `Additional course ${i}` });
       data.groups[0].requiredCourseIds!.push(id);
+      data.groups[0].learningItems!.push({ kind: "course", id });
     }
   }
   await page.addInitScript((data) => {
@@ -73,8 +74,10 @@ async function noOverflow(page: Page) {
   ).toBe(true);
 }
 
-test("due dates off keeps progress and uses recommended language", async ({ page }, info) => {
-  const data = freshWorkspace();
+test("due dates off keeps progress and uses recommended language", async ({
+  page,
+}, info) => {
+  const data = learningUiFixture();
   data.settings = { ...data.settings!, dueDatesEnabled: false };
   await page.addInitScript((workspace) => {
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
@@ -84,8 +87,12 @@ test("due dates off keeps progress and uses recommended language", async ({ page
   const summary = page.locator('.for-you [data-slot="card"]');
   await expect(summary).toContainText("recommended courses complete");
   await expect(summary.getByRole("progressbar")).toHaveCount(1);
-  await expect(summary).not.toContainText(/assigned|past their target|onboarding/i);
-  await summary.screenshot({ path: info.outputPath("recommended-progress.png") });
+  await expect(summary).not.toContainText(
+    /assigned|past their target|onboarding/i,
+  );
+  await summary.screenshot({
+    path: info.outputPath("recommended-progress.png"),
+  });
   await summary.getByRole("button", { name: "View all for you" }).click();
   await expect(
     page.getByRole("group", { name: "Course views" }).getByRole("button", {
@@ -157,7 +164,7 @@ test("For you uses curriculum cards, one category picker and a simple ordered pa
     page.getByRole("heading", { name: "Know the platform", level: 1 }),
   ).toBeVisible();
   await page.reload();
-  await page.getByRole("button", { name: "Back to curriculum" }).click();
+  await page.getByRole("button", { name: "← Exit course" }).click();
   await expect(rows.nth(0)).toContainText("Completed");
   await noOverflow(page);
   await page.screenshot({
@@ -232,7 +239,7 @@ test("optional activity is resumable and all completions remain available at 100
 test("no assignments show personal activity without labeling other courses", async ({
   page,
 }, info) => {
-  const data = freshWorkspace();
+  const data = learningUiFixture();
   const learner = data.users.find((user) => user.id === "demo-learner")!;
   learner.groups = [];
   learner.teamId = undefined;
@@ -386,7 +393,8 @@ test("course rows scroll directly and the completion card splits on iPad", async
           .getByRole("button", { name: "Start course" })
           .boundingBox();
         return Math.abs(
-          settledAction!.x + settledAction!.width / 2 -
+          settledAction!.x +
+            settledAction!.width / 2 -
             (settledSummary!.x + settledSummary!.width / 2),
         );
       })
@@ -418,12 +426,8 @@ test("completion removes a course from the home queue and remains visible in bot
   await expect(
     page.getByRole("heading", { name: "Know the platform", level: 1 }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: /^Next lesson/ })
-    .click();
-  await page
-    .getByRole("button", { name: "Quiz Check your knowledge" })
-    .click();
+  await page.getByRole("button", { name: /^Next lesson/ }).click();
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await page
     .getByRole("radio", { name: "The customer’s goal", exact: true })
     .check();
@@ -432,9 +436,7 @@ test("completion removes a course from the home queue and remains visible in bot
   await page
     .getByRole("radio", { name: "With an agreed next step", exact: true })
     .check();
-  await page
-    .getByRole("button", { name: "Submit and see results" })
-    .click();
+  await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(
     page.getByRole("heading", { name: "2 of 2 correct" }),
   ).toBeVisible();

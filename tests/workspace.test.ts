@@ -13,16 +13,31 @@ import { videoSource } from "../lib/video";
 
 test("demo presents three personas and a five-rep manager team with varied completion", () => {
   const d = freshWorkspace();
-  assert.deepEqual(DEMO_PROFILE_IDS, ["demo-learner", "demo-manager", "demo-admin"]);
+  assert.deepEqual(DEMO_PROFILE_IDS, [
+    "demo-learner",
+    "demo-manager",
+    "demo-admin",
+  ]);
   const manager = d.users.find((u) => u.id === "demo-manager")!;
   const teamIds = reportTeamIds(manager, d.teams || []);
-  const reps = d.users.filter((u) => u.role === "learner" && u.teamId && teamIds.has(u.teamId));
+  const reps = d.users.filter(
+    (u) => u.role === "learner" && u.teamId && teamIds.has(u.teamId),
+  );
   assert.equal(reps.length, 5);
   assert.deepEqual(
-    reps.map((u) => assignedCourses(d.content, u, d.groups).filter((c) => isComplete(c, d.progress[u.id] || [])).length).sort(),
-    [0, 1, 1, 2, 3],
+    reps
+      .map(
+        (u) =>
+          assignedCourses(d.content, u, d.groups).filter((c) =>
+            isComplete(c, d.progress[u.id] || []),
+          ).length,
+      )
+      .sort(),
+    [0, 1, 1, 2, 4],
   );
-  assert.ok(reps.every((u) => assignedCourses(d.content, u, d.groups).length === 3));
+  assert.ok(
+    reps.every((u) => assignedCourses(d.content, u, d.groups).length === 4),
+  );
 });
 
 test("nested memberships inherit assignments once and preserve full library access", () => {
@@ -32,15 +47,15 @@ test("nested memberships inherit assignments once and preserve full library acce
     ...d.groups,
     { id: "startup", name: "Startup", parentId: "sales" },
   ];
-  assert.equal(assignedCourses(d.content, u, groups).length, 3);
+  assert.equal(assignedCourses(d.content, u, groups).length, 4);
   assert.equal(
     assignedCourses(d.content, { ...u, groups: ["startup"] }, groups).length,
-    3,
+    4,
   );
   assert.equal(
     d.content.filter((c) => c.kind === "course" && c.status === "published")
       .length,
-    6,
+    12,
   );
 });
 test("catch-up starts at the later membership or group requirement date, using the earliest continuing source", () => {
@@ -103,9 +118,14 @@ test("team manager can report on descendants, not siblings or ancestors", () => 
 });
 test("retakes record attempts without revoking completion", () => {
   let d = freshWorkspace();
-  const c = d.content.find((c) => c.id === "course-1")!;
+  const c = {
+    ...d.content.find((c) => c.id === "course-4")!,
+    questions: [
+      { id: "retry", prompt: "Choose A", options: ["A", "B"], answer: 0 },
+    ],
+  };
   const u = d.users[0];
-  d = updateProgress(d, u.id, c, undefined, [1, 0]);
+  d = updateProgress(d, u.id, c, undefined, [1]);
   assert.equal(isComplete(c, d.progress[u.id]), true);
   assert.equal(d.progress[u.id][0].attempts?.[0].passed, false);
   assert.equal(d.progress[u.id][0].attempts?.length, 1);

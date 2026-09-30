@@ -17,7 +17,7 @@ import {
   requiredSequence,
   learningTarget,
 } from "../lib/learning";
-import { governanceSchema } from "../production/lib/governance-schema";
+import { governanceSchema } from "../server/governance-schema";
 
 test("demo learning groups combine live teams, curriculum order and direct assignments without duplicate progress", () => {
   const original = freshWorkspace();

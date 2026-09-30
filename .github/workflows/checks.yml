@@ -18,10 +18,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:ui
       - run: pnpm test
-      - run: pnpm build
+      - run: pnpm build:demo
         env:
           NEXT_TELEMETRY_DISABLED: 1
-      - run: pnpm build:production
+      - run: pnpm build
         env:
           NEXT_TELEMETRY_DISABLED: 1
           NEXT_PUBLIC_SUPABASE_URL: https://test.supabase.co

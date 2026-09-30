@@ -32,6 +32,6 @@ The public hosted privacy page remains accessible before login. No other configu
 
 ## Demo and verification
 
-The repository-root demo uses the shared identity/account layout with its simulated profile picker and browser-local data disclosures. It never uses Google authentication or production accounts.
+The `demo/` application uses the shared identity/account layout with its simulated profile picker and browser-local data disclosures. It never uses Google authentication or production accounts.
 
 The account browser suite uses synthetic provider responses and checks desktop/phone flows, redirects, branding updates, permissions, fallbacks and consent controls. It does not verify hosted Google configuration, real Supabase Storage, provider consent exchange or production behavior. Before relying on a new installation, verify a private deep link and a public sign-in through real Google authentication, denied accounts and the actual consent/revoke round trip against that installation's isolated backend.

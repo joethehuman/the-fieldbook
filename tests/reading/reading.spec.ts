@@ -690,7 +690,7 @@ test("Courses share reader navigation and show the signed-in account immediately
   await expect(
     page.getByRole("heading", { name: items[2].title }),
   ).toBeVisible();
-  await page.getByRole("link", { name: /Back to courses/ }).click();
+  await page.getByRole("link", { name: "Exit course, back to courses" }).click();
   await expect(page).toHaveURL(/\/courses$/);
   if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
@@ -862,7 +862,7 @@ test("server HTML, metadata, redaction and a compact index plus one body read", 
     const html = await response.text();
     const beforeScripts = html.replace(/<script[\s\S]*?<\/script>/g, "");
     expect(beforeScripts).toContain(items[index].title);
-    expect(beforeScripts).toContain(items[index].body);
+    expect(beforeScripts).toContain(section === "courses" ? items[index].lessons[0].body : items[index].body);
     expect(html).toContain(
       `<title>${items[index].title} | Acme Learning</title>`,
     );
@@ -1108,6 +1108,7 @@ test("reading without JavaScript, responsive layout and native breadcrumbs", asy
     fullPage: true,
   });
   await page.goto(`/courses/${ids[2]}`);
+  await expect(page.getByText(items[2].lessons[0].body, { exact: true })).toBeVisible();
   await expect(
     page.getByRole("link", { name: /Second lesson/ }),
   ).toHaveAttribute("href", `/courses/${ids[2]}?lesson=second`);

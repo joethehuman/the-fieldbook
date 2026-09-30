@@ -45,12 +45,12 @@ export default defineConfig({
       reuseExistingServer: false,
     },
     {
-      command: `node node_modules/serve/build/main.js out -l ${demoPort} --no-clipboard`,
+      command: `node node_modules/serve/build/main.js demo/out -l ${demoPort} --no-clipboard`,
       url: `http://127.0.0.1:${demoPort}`,
       reuseExistingServer: false,
     },
     {
-      command: `node --require ./tests/accounts/provider.cjs node_modules/next/dist/bin/next start production -H 127.0.0.1 -p ${serverPort}`,
+      command: `node --require ./tests/accounts/provider.cjs node_modules/next/dist/bin/next start -H 127.0.0.1 -p ${serverPort}`,
       url: `http://127.0.0.1:${serverPort}`,
       reuseExistingServer: false,
       env: {

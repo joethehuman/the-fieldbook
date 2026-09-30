@@ -1,6 +1,6 @@
 # Roles and permissions
 
-These rules describe the server application. The browser-local demo simulates identities and is not an authorization boundary. See the [installation guide](../production/README.md) for authentication setup and the [learning model](learning-model.md) for assignment behavior.
+These rules describe the server application. The browser-local demo simulates identities and is not an authorization boundary. See the [installation guide](installation.md) for authentication setup and the [learning model](learning-model.md) for assignment behavior.
 
 ## Installation access
 
@@ -24,7 +24,7 @@ Administrators can pre-register a Google email without sending an invitation ema
 
 The server checks identity, role and installation access before returning protected data or accepting writes. The governance snapshot scopes reporting data before serialization. Content responses for non-administrators exclude drafts and quiz answer keys. Governance writes require an administrator, validated input and the current revision; related updates and audit records are transactional.
 
-UI visibility is not a permission check. Changes to roles, groups or reporting must preserve these boundaries and include meaningful authorization checks. Relevant entry points include `production/lib/auth.ts`, `production/lib/snapshot.ts`, `production/app/api/governance/route.ts`, and the governance server tests. Optional [MCP access](mcp-setup.md) requires an active administrator and an approved connection grant; learner and manager MCP access is not implemented.
+UI visibility is not a permission check. Changes to roles, groups or reporting must preserve these boundaries and include meaningful authorization checks. Relevant entry points include `server/auth.ts`, `server/snapshot.ts`, `app/api/governance/route.ts`, and the governance server tests. Optional [MCP access](mcp-setup.md) requires an active administrator and an approved connection grant; learner and manager MCP access is not implemented.
 
 Before using an installation, verify these rules with separate administrator, learner and manager accounts against an isolated backend. Include a manager's sibling team, anonymous/private access, draft content, stale revisions and deactivated accounts. Code inspection and demo tests do not establish that an operator's hosted authentication is configured correctly.
 

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
-import { governanceSchema } from "../production/lib/governance-schema";
+import { governanceSchema } from "../server/governance-schema";
 import { learningTarget } from "../lib/learning";
 import { assignedCourses } from "../lib/types";
 

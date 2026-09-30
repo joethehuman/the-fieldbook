@@ -29,7 +29,7 @@ No new migration, environment variable or service is required. `guestGroupId` is
 
 Recommendation resolution happens inside the existing uncached workspace read, after the public/private check. The response includes the public library and a synthetic recommendation group with the minimum sequence/curriculum data needed by the shared UI. It omits real group identities, team links, membership rosters, assignment timestamps, governance revisions, drafts and answer keys. Administrator settings writes retain authorization and revision checks and also reject a changed group configuration during saving.
 
-Group, curriculum and publication changes appear on the next workspace load/reload. Already-open workspaces retain the same loaded-snapshot behavior as signed-in learning; this feature adds no live subscription. Unpublished or deleted content is excluded from subsequent reads. Existing private media link expiry still applies; see [installation security](../production/README.md#implemented-boundaries-and-remaining-verification).
+Group, curriculum and publication changes appear on the next workspace load/reload. Already-open workspaces retain the same loaded-snapshot behavior as signed-in learning; this feature adds no live subscription. Unpublished or deleted content is excluded from subsequent reads. Existing private media link expiry still applies; see [installation security](installation.md#implemented-boundaries-and-remaining-verification).
 
 ## Verification
 
