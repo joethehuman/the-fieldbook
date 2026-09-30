@@ -268,6 +268,18 @@
     z-index: 15;
     background: var(--background);
   }
+  .editor-frame-controls[data-heading="true"] {
+    display: grid;
+    grid-template-columns: minmax(max-content, var(--editor-outline-width, 0px)) minmax(0, 1fr) minmax(max-content, var(--editor-details-width, 0px));
+    column-gap: 0;
+    transition: grid-template-columns 180ms ease;
+  }
+  .editor-frame-controls[data-heading="true"] > :first-child { justify-self: start; }
+  .editor-frame-heading { min-width: 0; padding-inline: var(--space-2); }
+  .editor-frame[data-panels="outline"] .editor-frame-heading,
+  .editor-frame[data-panels="both"] .editor-frame-heading { padding-inline-start: 0; }
+  .editor-frame[data-panels="details"] .editor-frame-heading,
+  .editor-frame[data-panels="both"] .editor-frame-heading { padding-inline-end: 0; }
   .editor-frame-body {
     display: grid;
     min-width: 0;
@@ -296,14 +308,18 @@
   .editor-frame [data-slot="input"], .editor-frame [data-slot="textarea"], .course-builder-panel {
     scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--editor-controls-height, 3rem) + var(--space-4));
   }
+  .editor-frame-heading [data-slot="input"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }
   .editor-details-content { gap: var(--space-4); }
   .editor-details-group { display: grid; gap: var(--space-3); padding-block-end: var(--space-4); border-bottom: 1px solid var(--border); }
   @keyframes editor-panel-reveal { from { opacity: 0; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) {
-    .editor-frame-body { transition: none; }
+    .editor-frame-body, .editor-frame-controls[data-heading="true"] { transition: none; }
     .editor-frame-outline, .editor-frame-details { animation: none; }
   }
   @container editor (width < 48rem) {
+    .editor-frame-controls[data-heading="true"] { display: flex; column-gap: var(--space-2); }
+    .editor-frame-controls[data-heading="true"] > :last-child { order: 2; }
+    .editor-frame[data-panels] .editor-frame-heading { order: 3; flex-basis: 100%; padding-inline: 0; }
     .editor-frame[data-panels] > .editor-frame-body { display: flex; flex-direction: column; gap: var(--space-4); }
     .editor-frame-outline, .editor-frame-details { position: static; width: 100%; max-height: 60dvh; padding-inline: var(--space-1); }
     .editor-frame-canvas { width: 100%; }

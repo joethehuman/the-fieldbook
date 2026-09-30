@@ -42,6 +42,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   const [canvasRequest, setCanvasRequest] = useState(0);
   const [outlineRequest, setOutlineRequest] = useState(0);
   const panel = useRef<HTMLDivElement>(null);
+  const lessonTitle = useRef<HTMLInputElement>(null);
   const pendingNavigation = useRef<{ step: string; instant: boolean } | null>(null);
   const navigationFrame = useRef(0);
   const selectedLesson = course.lessons.find((lesson) => lesson.id === selected);
@@ -67,9 +68,10 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         : panel.current;
       const target = revealStep.target === "body"
         ? (scope?.querySelector<HTMLElement>('[contenteditable="true"], textarea[aria-label="Lesson content Markdown"]') || scope?.querySelector<HTMLElement>('[aria-label="Editor view"] button'))
-        : scope?.querySelector<HTMLElement>("input");
+        : revealStep.id !== "quiz" ? lessonTitle.current : scope?.querySelector<HTMLElement>("input");
       (target || panel.current)?.focus({ preventScroll: true });
-      (target?.closest('[data-slot="field"]') || panel.current)?.scrollIntoView({ block: "start" });
+      if (target && target === lessonTitle.current) target.scrollIntoView({ block: "nearest" });
+      else (target?.closest('[data-slot="field"]') || panel.current)?.scrollIntoView({ block: "start" });
     });
     navigationFrame.current = frame;
     return () => cancelAnimationFrame(frame);
@@ -102,9 +104,9 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         surface?.focus({ preventScroll: true });
       };
       const delta = position();
-      const titleHeight = surface?.querySelector<HTMLElement>('input[aria-label="Lesson title"], h2')?.getBoundingClientRect().height || 0;
+      const leadingHeight = surface?.querySelector<HTMLElement>('[aria-label="Editor view"], h2')?.getBoundingClientRect().height || 0;
       const inset = surface ? parseFloat(getComputedStyle(surface).scrollMarginBlockStart) || 0 : 0;
-      if (!viewport || !surface || (delta >= 0 && delta + inset + titleHeight <= viewport.clientHeight)) {
+      if (!viewport || !surface || (delta >= 0 && delta + inset + leadingHeight <= viewport.clientHeight)) {
         finish();
         return;
       }
@@ -143,7 +145,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     });
   }
   function addLesson() {
-    const lesson = { id: id(), title: `Lesson ${course.lessons.length + 1}`, body: "" };
+    const lesson = { id: id(), title: "", body: "" };
     onChange((current) => ({ ...current, lessons: [...current.lessons, lesson] }));
     chooseStep(lesson.id);
   }
@@ -155,7 +157,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
           <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" aria-label="Lesson actions" disabled={disabled}><MoreHorizontal size={16} /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem disabled={disabled} onSelect={() => {
-              const copy = { ...selectedLesson, id: id(), title: `${selectedLesson.title} copy` };
+              const copy = { ...selectedLesson, id: id(), title: selectedLesson.title ? `${selectedLesson.title} copy` : "" };
               onChange((current) => ({ ...current, lessons: [...current.lessons.slice(0, current.lessons.findIndex((lesson) => lesson.id === selected) + 1), copy, ...current.lessons.slice(current.lessons.findIndex((lesson) => lesson.id === selected) + 1)] }));
               chooseStep(copy.id);
             }}><Copy size={16} /> Duplicate lesson</DropdownMenuItem>
@@ -187,6 +189,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   return <EditorFrame
     outline={outline}
     outlineContext={selectedLesson ? `Lesson ${course.lessons.indexOf(selectedLesson) + 1} of ${course.lessons.length}` : selected === "quiz" ? "Quiz" : undefined}
+    heading={selectedLesson && <Input key={selectedLesson.id} ref={lessonTitle} variant="title" aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value }))} />}
     details={details}
     requirementsCount={requirementsCount}
     revealDetails={revealDetails}
@@ -195,10 +198,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     disabled={disabled}
   >
     <div className="course-builder-panel" ref={panel} tabIndex={-1} role="region" aria-label="Course lessons and quiz">
-      {selectedLesson ? <div className="grid min-w-0 gap-5" key={selectedLesson.id}>
-        <Input variant="title" aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value }))} />
-        <WritingEditor label="Lesson content" value={selectedLesson.body} onChange={(body) => editLesson((lesson) => ({ ...lesson, body }))} onUpload={onUpload} disabled={disabled} />
-      </div> : selected === "quiz" && course.questions.length ? <div className="grid gap-5">
+      {selectedLesson ? <WritingEditor key={selectedLesson.id} label="Lesson content" value={selectedLesson.body} onChange={(body) => editLesson((lesson) => ({ ...lesson, body }))} onUpload={onUpload} disabled={disabled} /> : selected === "quiz" && course.questions.length ? <div className="grid gap-5">
         <SectionHeader title={<h2>Quiz</h2>}><Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => {
           onChange((current) => ({ ...current, questions: [] })); chooseStep(course.lessons.at(-1)?.id || "", true);
         }}><Trash2 size={15} /> Remove quiz</Button></SectionHeader>

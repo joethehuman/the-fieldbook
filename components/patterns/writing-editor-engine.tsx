@@ -3,7 +3,7 @@
 import { writingVideoPlugin } from "./writing-video";
 import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   MDXEditor,
@@ -108,10 +108,12 @@ function WritingToolbar({
   onInsert,
   onEditorReady,
   disabled,
+  viewControls,
 }: {
   onInsert: (trigger: HTMLButtonElement, fromKeyboard: boolean) => void;
   onEditorReady: (editor: LexicalEditor | null, actions: { heading: () => void; quote: () => void; codeBlock: () => void; inlineCode: () => void }) => void;
   disabled: boolean;
+  viewControls: ReactNode;
 }) {
   const editor = useCellValue(activeEditor$);
   const format = useCellValue(currentFormat$);
@@ -261,8 +263,7 @@ function WritingToolbar({
           <Plus /> Insert
         </Button>
       </div>
-      <p className="writing-toolbar-help writing-toolbar-help-desktop">Type / at the start of a line to insert content.</p>
-      <p className="writing-toolbar-help writing-toolbar-help-mobile">Tap Insert to add content.</p>
+      {viewControls}
     </div>
   );
 }
@@ -274,7 +275,8 @@ export default function WritingEditorEngine({
   disabled = false,
   label = "Content",
   onUnsupported,
-}: WritingEditorProps & { onUnsupported: () => void }) {
+  viewControls,
+}: WritingEditorProps & { onUnsupported: () => void; viewControls: ReactNode }) {
   const editor = useRef<MDXEditorMethods>(null);
   const initial = useRef(value);
   const current = useRef(value);
@@ -633,10 +635,11 @@ export default function WritingEditorEngine({
           onInsert={openSlash}
           onEditorReady={(active, actions) => { if (active) lexicalEditor.current = active; blockActions.current = actions; }}
           disabled={disabled || busy}
+          viewControls={viewControls}
         />
       ),
     }),
-  ], [onUpload, disabled, busy]);
+  ], [onUpload, disabled, busy, viewControls]);
   return (
     <div ref={root} className="writing-editor rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {
       if (event.target instanceof Element && event.target.closest(".writing-toolbar-controls")) {

@@ -222,6 +222,8 @@ export default function ComponentCatalog() {
         <SectionHeader title={<h2>Content editor frame</h2>}
           description="Persistent Outline and Details controls reveal in-page panels. The writing canvas stays mounted when either panel changes." />
         <EditorFrame revealCanvas={canvasRequest}
+          outlineContext={catalogLesson === "welcome" ? "Lesson 1 of 2" : "Lesson 2 of 2"}
+          heading={<Input variant="title" aria-label="Example lesson title" placeholder="Untitled lesson" value={catalogTitle} onChange={(event) => setCatalogTitle(event.target.value)} />}
           outline={<nav className="grid gap-1" aria-label="Example course outline">
             {[{ id: "welcome", label: "Welcome" }, { id: "practice", label: "Practice" }].map((lesson) => (
               <NavigationButton key={lesson.id} type="button" aria-current={catalogLesson === lesson.id ? "step" : undefined}
@@ -240,10 +242,6 @@ export default function ComponentCatalog() {
             <FieldDescription>Publication and saving belong to the editor’s owner.</FieldDescription>
           </EditorDetailsGroup>}>
           <div className="grid gap-4">
-            <p className="text-caption text-muted-foreground">{catalogLesson === "welcome" ? "Lesson 1 of 2" : "Lesson 2 of 2"}</p>
-            <FormField label="Example lesson title" visuallyHiddenLabel>
-              <Input variant="title" value={catalogTitle} onChange={(event) => setCatalogTitle(event.target.value)} />
-            </FormField>
             <FormField label="Example draft text">
               <Textarea rows={6} value={catalogBody} onChange={(event) => setCatalogBody(event.target.value)} />
             </FormField>

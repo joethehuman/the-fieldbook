@@ -11,6 +11,7 @@ export type DetailsReveal = { request: number; field?: string };
 export function EditorFrame({
   outline,
   outlineContext,
+  heading,
   details,
   requirementsCount = 0,
   revealDetails,
@@ -21,6 +22,7 @@ export function EditorFrame({
 }: {
   outline?: ReactNode;
   outlineContext?: string;
+  heading?: ReactNode;
   details: ReactNode;
   requirementsCount?: number;
   revealDetails?: DetailsReveal;
@@ -98,7 +100,7 @@ export function EditorFrame({
   const open = panels.outline ? panels.details ? "both" : "outline" : panels.details ? "details" : "none";
   return (
     <section ref={frame} className="editor-frame" data-panels={open} aria-label="Writing workspace">
-      <div ref={controls} className="editor-frame-controls">
+      <div ref={controls} className="editor-frame-controls" data-heading={heading ? "true" : undefined}>
         {outline && (
           <Button ref={outlineToggle} type="button" variant="ghost" size="sm" className="px-0"
             disabled={disabled}
@@ -111,6 +113,7 @@ export function EditorFrame({
             Outline{outlineContext && <span className="text-muted-foreground">· {outlineContext}</span>}
           </Button>
         )}
+        {heading && <div className="editor-frame-heading">{heading}</div>}
         <Button ref={detailsToggle} type="button" variant="ghost" size="sm" className="ml-auto px-0"
           disabled={disabled}
           aria-controls={detailsId} aria-expanded={panels.details}

@@ -510,7 +510,7 @@ export default function Admin({
       duration: 5,
       groups: [],
       lessons:
-        kind === "course" ? [{ id: id(), title: "Lesson 1", body: "" }] : [],
+        kind === "course" ? [{ id: id(), title: "", body: "" }] : [],
       questions: [],
       ...(kind === "course" ? { requirePassing: false } : {}),
     });
