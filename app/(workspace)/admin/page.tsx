@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
-import ProductionApp from "../ProductionApp";
+import ProductionApp from "@/app/ProductionApp";
 import { actor, requireAdmin } from "@server/auth";
+import { readerWorkspaceContext } from "@server/reader";
 import { adminSnapshot } from "@server/admin-snapshot";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,11 @@ export default async function Page() {
   requireAdmin(user);
   return (
     <ProductionApp
-      initialAdmin={{ data: await adminSnapshot(user, "content"), user }}
+      initialAdmin={{
+        data: await adminSnapshot(user, "content"),
+        user,
+        shell: await readerWorkspaceContext("/admin"),
+      }}
     />
   );
 }

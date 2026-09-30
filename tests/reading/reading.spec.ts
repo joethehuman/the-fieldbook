@@ -817,6 +817,16 @@ test("client navigation rechecks publication, item type and installation access"
     "private",
   ] as const) {
     await fixture(request, { documents: all });
+    let release!: () => void;
+    const coldRequest = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const target = `**/docs/${coldDoc.id}**`;
+    // Keep this a cold request even if intent/neighbor prefetch begins before the change.
+    await page.route(target, async (route) => {
+      await coldRequest;
+      await route.continue();
+    });
     await page.goto("/docs");
     const link = page
       .getByRole("navigation", { name: "Documents", exact: true })
@@ -844,11 +854,13 @@ test("client navigation rechecks publication, item type and installation access"
     if ((page.viewportSize()?.width || 0) < 768)
       await page.getByRole("button", { name: "Open navigation" }).click();
     await link.click();
+    release();
     if (change === "private") await expect(page).toHaveURL(/\/sign-in/);
     else
       await expect(
         page.getByRole("heading", { name: "This page isn’t available" }),
       ).toBeVisible();
+    await page.unroute(target);
   }
 });
 test("server HTML, metadata, redaction and a compact index plus one body read", async ({

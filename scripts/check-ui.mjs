@@ -70,10 +70,8 @@ for (const file of [
           // Only the shared, validated installation theme may set runtime UI colors.
           const text = attr.initializer?.getText(source) || "";
           if (!(
-            ((file === "components/Fieldbook.tsx" &&
-              text === "{brandThemeStyle(branding.accent)}") ||
-              (file === "components/reader/ReaderShell.tsx" &&
-                text === "{brandThemeStyle(context.branding.accent)}") ||
+            ((file === "components/patterns/workspace-frame.tsx" &&
+              text === "{brandThemeStyle(accent)}") ||
               (file === "components/patterns/branded-account.tsx" &&
                 text === "{brandThemeStyle(branding.accent)}") ||
               // Card art derives two decorative CSS variables from the validated palette.

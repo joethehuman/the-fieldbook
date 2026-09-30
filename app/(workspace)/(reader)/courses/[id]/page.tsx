@@ -1,16 +1,22 @@
+import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { notFound } from "next/navigation";
 import {
   readerCourseItem,
   readerCourseProgress,
   readerCourses,
   readerMetadata,
+  readerDetailShellContext,
 } from "@server/reader";
 import { ReaderCoursePlayer } from "@/components/reader/ReaderCoursePlayer";
 import type { Curriculum } from "@/lib/types";
 
 type Props = {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ lesson?: string; curriculum?: string; from?: string }>;
+  searchParams: Promise<{
+    lesson?: string;
+    curriculum?: string;
+    from?: string;
+  }>;
 };
 
 export async function generateMetadata({ params }: Props) {
@@ -25,10 +31,19 @@ export default async function Page({ params, searchParams }: Props) {
   const { item, context } = await readerCourseItem(id);
   const progress = context.user ? await readerCourseProgress(id) : [];
   if (lesson && !item.lessons.some((entry) => entry.id === lesson)) notFound();
-  const origin = curriculum ? (await readerCourses()).curricula.find((entry: Curriculum) =>
-    entry.id === curriculum && entry.status === "published" && entry.courseIds.includes(item.id),
-  ) : undefined;
+  const origin = curriculum
+    ? (await readerCourses()).curricula.find(
+        (entry: Curriculum) =>
+          entry.id === curriculum &&
+          entry.status === "published" &&
+          entry.courseIds.includes(item.id),
+      )
+    : undefined;
   return (
+    <WorkspacePage
+      section="/courses"
+      context={readerDetailShellContext(context, "courses", item)}
+    >
       <ReaderCoursePlayer
         course={item}
         lessonId={lesson}
@@ -40,5 +55,6 @@ export default async function Page({ params, searchParams }: Props) {
           (entry) => entry.version === item.version,
         )}
       />
-    );
+    </WorkspacePage>
+  );
 }

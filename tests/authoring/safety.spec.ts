@@ -166,7 +166,10 @@ test("search preserves dirty edits; canceled navigation and reload keep them unt
   await openNav(page);
   await page
     .getByRole("navigation")
-    .getByRole("button", { name: "Docs", exact: true })
+    .getByRole(info.project.name.startsWith("production") ? "link" : "button", {
+      name: "Docs",
+      exact: true,
+    })
     .click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   const closeNav = page.getByRole("button", { name: "Close navigation" });
@@ -202,7 +205,7 @@ test("browser back can be canceled without unmounting the editor", async ({
   // This fixture resets published Docs between cases; use a collection route.
   await page
     .getByRole("navigation")
-    .getByRole("button", { name: "Updates", exact: true })
+    .getByRole(production ? "link" : "button", { name: "Updates", exact: true })
     .click();
   await expect(page).toHaveURL(production ? /\/updates$/ : /#updates$/);
   await expect(
@@ -353,7 +356,10 @@ for (const failure of [false, true])
     await openNav(page);
     await page
       .getByRole("navigation")
-      .getByRole("button", { name: "Docs", exact: true })
+      .getByRole(
+        info.project.name.startsWith("production") ? "link" : "button",
+        { name: "Docs", exact: true },
+      )
       .click();
     const closeNav = page.getByRole("button", { name: "Close navigation" });
     if (await closeNav.isVisible()) await closeNav.click();

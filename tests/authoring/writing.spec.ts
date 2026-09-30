@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
+import { defaultSettings } from "../../lib/settings";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { equivalentMarkdown } from "../../lib/markdown-compatibility";
 import {
@@ -37,10 +38,32 @@ async function setup(
   kind: "doc" | "brief" = "doc",
 ) {
   let state = withPublishedSnapshots(freshWorkspace());
+  if (kind === "doc") {
+    state.settings = {
+      ...defaultSettings,
+      ...state.settings,
+      docCategoryOrder: [],
+      docSections: [
+        { id: "writing-start", name: "Start here" },
+        {
+          id: "writing-getting-started",
+          name: "Getting started",
+          parentId: "writing-start",
+        },
+      ],
+    };
+  }
   const source = state.content.find((item) => item.kind === kind)!;
   const item = {
     ...source,
     id: "writing-fixture",
+    ...(kind === "doc"
+      ? {
+          category: "Start here",
+          folder: "Getting started",
+          sectionId: "writing-getting-started",
+        }
+      : {}),
     title: "Writing fixture",
     body,
     revision: 1,

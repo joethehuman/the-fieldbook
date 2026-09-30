@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Retain one installed workspace shell across reading, Team and Administration, with shared demo frame geometry and unsaved-form navigation protection.
+
 - The installed application now lives at the repository root; the optional browser-local demo lives in `demo/`. Default commands run the installed app, with explicit demo commands and deployment app-identity checks. Existing installations must coordinate their Vercel root settings with this source change.
 
 

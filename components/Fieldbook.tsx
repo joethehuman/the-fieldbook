@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { reconcileDemoPublication } from "@/lib/demo-publication";
-import { AppBar } from "./patterns/app-bar";
+import { WorkspaceFrame } from "./patterns/workspace-frame";
 import { DocumentTree } from "./patterns/document-tree";
 import { DocsEmpty } from "./patterns/docs-empty";
 import type { ReadingState } from "@/lib/reading";
@@ -21,11 +21,8 @@ import {
 } from "./patterns/desktop-sidebar";
 import { useDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { brandingFromSettings } from "@/lib/branding";
-import { brandThemeStyle } from "@/lib/brand-theme";
-import { BrandThemeSync } from "./patterns/brand-theme-sync";
 import { CurriculumPage } from "./CurriculumPage";
 import { Badge } from "@/components/ui/badge";
-import { SkipLink } from "./patterns/skip-link";
 import { AccountMenu } from "./patterns/account-menu";
 import { SearchField } from "./patterns/search-field";
 import { NavigationButton } from "./patterns/navigation-button";
@@ -537,187 +534,172 @@ export default function Fieldbook({
             ? "Team progress"
             : "Administration";
   return (
-    <div
-      className={`app ${collapsed ? "sidebar-collapsed" : ""}`}
-      style={brandThemeStyle(branding.accent)}
-    >
-      <BrandThemeSync accent={branding.accent} />
-      <SkipLink
-        href="#main-content"
-        onClick={(event) => {
-          event.preventDefault();
-          document.getElementById("main-content")?.focus();
-        }}
-      >
-        Skip to content
-      </SkipLink>
-      <aside
-        id="main-sidebar"
-        className={`sidebar ${menu ? "open" : ""} ${navigationPending ? "navigation-pending" : ""}`}
-      >
-        <SidebarHeading
-          name={data.settings?.name}
-          collapsed={collapsed}
-          onToggle={() => setCollapsed(!collapsed)}
-          onClose={() => {
-            setMenu(false);
-            menuTrigger.current?.focus();
-          }}
-          closeRef={menuClose}
-        />
-        <nav className="primary-navigation" aria-label="Primary">
-          {(
-            [
-              { key: "briefs", title: "Updates", icon: Newspaper },
-              { key: "learn", title: "Courses", icon: GraduationCap },
-              { key: "docs", title: "Docs", icon: BookOpen },
-            ] as const
-          ).map((n) => (
-            <NavigationButton
-              variant="ghost"
-              className={`${sidebarPrimaryLinkClassName} ${view === n.key ? "active" : ""}`}
-              key={n.key}
-              aria-label={n.title}
-              title={collapsed ? n.title : undefined}
-              onClick={() => void navigate(n.key)}
-              onPointerEnter={() => {
-                if (runtime && initialAdmin)
-                  router.prefetch(`/${sectionPaths[n.key]}`);
-              }}
-              onFocus={() => {
-                if (runtime && initialAdmin)
-                  router.prefetch(`/${sectionPaths[n.key]}`);
-              }}
-              onTouchStart={() => {
-                if (runtime && initialAdmin)
-                  router.prefetch(`/${sectionPaths[n.key]}`);
-              }}
-            >
-              <n.icon size={19} />
-              <span className="sidebar-nav-text">{n.title}</span>
-              {n.key === "learn" && (
-                <span className="nav-count">{assigned.length - completed}</span>
-              )}
-            </NavigationButton>
-          ))}
-        </nav>
-        {view === "docs" && (
-          <DocumentTree
-            docs={
-              initialReading && data === initialReading.data
-                ? initialReading.documents || docs
-                : docs
-            }
-            order={branding.docCategoryOrder}
-            sections={branding.docSections}
-            selected={selected || firstDoc?.id || null}
-            href={(id) =>
-              runtime
-                ? contentPath("doc", id)
-                : `#docs/${encodeURIComponent(id)}`
-            }
-            onOpen={(id) => navigate("docs", id)}
-            storageKey={
-              runtime
-                ? "fieldbook.documents.production"
-                : "fieldbook.documents.demo"
-            }
+    <WorkspaceFrame
+      accent={branding.accent}
+      collapsed={collapsed}
+      menu={menu}
+      pending={navigationPending}
+      admin={view === "admin" && user.role === "admin"}
+      onDismiss={() => setMenu(false)}
+      sidebar={
+        <>
+          <SidebarHeading
+            name={data.settings?.name}
+            collapsed={collapsed}
+            onToggle={() => setCollapsed(!collapsed)}
+            onClose={() => {
+              setMenu(false);
+              menuTrigger.current?.focus();
+            }}
+            closeRef={menuClose}
           />
-        )}
-        <div className="sidebar-bottom">
-          <AccountMenu
-            initials={initials(user.name)}
-            name={runtime && uid === "guest" ? "Guest" : user.name}
-            email={uid === "guest" ? undefined : user.email}
-            guest={uid === "guest"}
-            description={
-              runtime && uid === "guest"
-                ? undefined
-                : user.role === "admin"
-                  ? "Administrator"
-                  : user.role === "manager"
-                    ? "Sales Director"
-                    : runtime
-                      ? "Learner"
-                      : "Account Executive"
-            }
-            onManageOrganization={
-              user.role === "admin" ? () => navigate("admin") : undefined
-            }
-            onTeamProgress={
-              user.role === "manager" ||
-              (data.teams || []).some((t) => t.managerId === user.id)
-                ? () => navigate("team")
-                : undefined
-            }
-            onTeamProgressIntent={() => {
-              if (runtime && initialAdmin) router.prefetch("/team");
-            }}
-            onSignOut={runtime && uid !== "guest" ? logout : undefined}
-            onSignIn={runtime && uid === "guest" ? logout : undefined}
-            onSwitchDemoProfile={!runtime ? logout : undefined}
-            privacyHref={policyHref}
-            onPrivacyOpen={() => setMenu(false)}
-            onAboutDemo={
-              !runtime
-                ? (trigger) => {
-                    demoTrigger.current = trigger.current;
-                    setMenu(false);
-                    setShowDemo(true);
+          <nav className="primary-navigation" aria-label="Primary">
+            {(
+              [
+                { key: "briefs", title: "Updates", icon: Newspaper },
+                { key: "learn", title: "Courses", icon: GraduationCap },
+                { key: "docs", title: "Docs", icon: BookOpen },
+              ] as const
+            ).map((n) => (
+              <NavigationButton
+                variant="ghost"
+                className={`${sidebarPrimaryLinkClassName} ${view === n.key ? "active" : ""}`}
+                key={n.key}
+                aria-label={n.title}
+                title={collapsed ? n.title : undefined}
+                onClick={() => void navigate(n.key)}
+                onPointerEnter={() => {
+                  if (runtime && initialAdmin)
+                    router.prefetch(`/${sectionPaths[n.key]}`);
+                }}
+                onFocus={() => {
+                  if (runtime && initialAdmin)
+                    router.prefetch(`/${sectionPaths[n.key]}`);
+                }}
+                onTouchStart={() => {
+                  if (runtime && initialAdmin)
+                    router.prefetch(`/${sectionPaths[n.key]}`);
+                }}
+              >
+                <n.icon size={19} />
+                <span className="sidebar-nav-text">{n.title}</span>
+                {n.key === "learn" && (
+                  <span className="nav-count">
+                    {assigned.length - completed}
+                  </span>
+                )}
+              </NavigationButton>
+            ))}
+          </nav>
+          {view === "docs" && (
+            <DocumentTree
+              docs={
+                initialReading && data === initialReading.data
+                  ? initialReading.documents || docs
+                  : docs
+              }
+              order={branding.docCategoryOrder}
+              sections={branding.docSections}
+              selected={selected || firstDoc?.id || null}
+              href={(id) =>
+                runtime
+                  ? contentPath("doc", id)
+                  : `#docs/${encodeURIComponent(id)}`
+              }
+              onOpen={(id) => navigate("docs", id)}
+              storageKey={
+                runtime
+                  ? "fieldbook.documents.production"
+                  : "fieldbook.documents.demo"
+              }
+            />
+          )}
+          <div className="sidebar-bottom">
+            <AccountMenu
+              initials={initials(user.name)}
+              name={runtime && uid === "guest" ? "Guest" : user.name}
+              email={uid === "guest" ? undefined : user.email}
+              guest={uid === "guest"}
+              description={
+                runtime && uid === "guest"
+                  ? undefined
+                  : user.role === "admin"
+                    ? "Administrator"
+                    : user.role === "manager"
+                      ? "Sales Director"
+                      : runtime
+                        ? "Learner"
+                        : "Account Executive"
+              }
+              onManageOrganization={
+                user.role === "admin" ? () => navigate("admin") : undefined
+              }
+              onTeamProgress={
+                user.role === "manager" ||
+                (data.teams || []).some((t) => t.managerId === user.id)
+                  ? () => navigate("team")
+                  : undefined
+              }
+              onTeamProgressIntent={() => {
+                if (runtime && initialAdmin) router.prefetch("/team");
+              }}
+              onSignOut={runtime && uid !== "guest" ? logout : undefined}
+              onSignIn={runtime && uid === "guest" ? logout : undefined}
+              onSwitchDemoProfile={!runtime ? logout : undefined}
+              privacyHref={policyHref}
+              onPrivacyOpen={() => setMenu(false)}
+              onAboutDemo={
+                !runtime
+                  ? (trigger) => {
+                      demoTrigger.current = trigger.current;
+                      setMenu(false);
+                      setShowDemo(true);
+                    }
+                  : undefined
+              }
+              onFeedbackOpen={() => setMenu(false)}
+              onFeedbackClose={() => {
+                if (window.matchMedia("(max-width: 767px)").matches)
+                  menuTrigger.current?.focus();
+              }}
+              onFeedback={async (rating, comment) => {
+                if (runtime) {
+                  const response = await fetch("/api/feedback", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ rating, comment }),
+                  });
+                  if (!response.ok) {
+                    const result = await response.json().catch(() => ({}));
+                    throw new Error(
+                      result.error || "Could not save feedback. Try again.",
+                    );
                   }
-                : undefined
-            }
-            onFeedbackOpen={() => setMenu(false)}
-            onFeedbackClose={() => {
-              if (window.matchMedia("(max-width: 767px)").matches)
-                menuTrigger.current?.focus();
-            }}
-            onFeedback={async (rating, comment) => {
-              if (runtime) {
-                const response = await fetch("/api/feedback", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ rating, comment }),
-                });
-                if (!response.ok) {
-                  const result = await response.json().catch(() => ({}));
-                  throw new Error(
-                    result.error || "Could not save feedback. Try again.",
+                } else {
+                  await persist(
+                    {
+                      ...data,
+                      feedback: [
+                        ...(data.feedback || []),
+                        {
+                          id: crypto.randomUUID(),
+                          userId: user.id,
+                          rating,
+                          comment,
+                          updatedAt: new Date().toISOString(),
+                        },
+                      ],
+                    },
+                    { locallyHandled: true },
                   );
                 }
-              } else {
-                await persist(
-                  {
-                    ...data,
-                    feedback: [
-                      ...(data.feedback || []),
-                      {
-                        id: crypto.randomUUID(),
-                        userId: user.id,
-                        rating,
-                        comment,
-                        updatedAt: new Date().toISOString(),
-                      },
-                    ],
-                  },
-                  { locallyHandled: true },
-                );
-              }
-            }}
-          />
-        </div>
-      </aside>
-      {menu && (
-        <Button
-          variant="ghost"
-          className="fixed inset-0 z-20 h-full w-full rounded-none bg-overlay p-0 hover:bg-overlay md:hidden"
-          aria-label="Dismiss navigation"
-          tabIndex={-1}
-          onClick={() => setMenu(false)}
-        />
-      )}
-      <div className="main-shell">
-        <AppBar pending={navigationPending}>
+              }}
+            />
+          </div>
+        </>
+      }
+      header={
+        <>
           <Button
             variant="ghost"
             size="icon"
@@ -860,313 +842,306 @@ export default function Fieldbook({
               }}
             />
           </SearchPanel>
-        </AppBar>
-        {error && (
+        </>
+      }
+      alert={
+        error && (
           <Alert variant="destructive" role="alert">
             {error}
           </Alert>
-        )}
-        <main
-          id="main-content"
-          className={
-            "main-content" +
-            (view === "admin" && user.role === "admin" ? " admin-content" : "")
-          }
-          tabIndex={-1}
-        >
-          {view === "admin" && user.role === "admin" ? (
-            <ReportAvailability.Provider value={reportIssue}>
-              <Admin
-                data={data}
-                user={user}
-                onChange={persist}
-                onBulk={async (action) => {
-                  if (runtime?.admin) {
-                    const result = await runtime.admin.bulk(action);
-                    setData(result.data);
-                    return result.results;
-                  }
-                  const result = applyDemoBulk(data, user, action);
-                  saveWorkspace(result.data);
-                  setData(result.data);
-                  return result.results;
-                }}
-                onOpenTab={
-                  runtime?.admin
-                    ? async (next) => {
-                        const scope =
-                          next === "feedback"
-                            ? "feedback"
-                            : next === "content" || next.startsWith("settings-")
-                              ? "content"
-                              : "governance";
-                        setData(await runtime.admin!.prepare(scope));
-                      }
-                    : undefined
-                }
-                onEdit={
-                  runtime?.admin
-                    ? async (id) => {
-                        const result = await runtime.admin!.edit(id);
-                        setData(result.data);
-                        return result.item;
-                      }
-                    : undefined
-                }
-                onUnpublish={
-                  runtime?.admin
-                    ? async (id) => {
-                        setData(await runtime.admin!.unpublish(id));
-                      }
-                    : undefined
-                }
-                onLearning={
-                  runtime
-                    ? async (action) => {
-                        setReportIssue("Updating report…");
-                        try {
-                          setData(await runtime.manageLearning(action));
-                          setReportIssue(undefined);
-                        } catch (e) {
-                          setReportIssue(
-                            "Reload the report before exporting after a failed change.",
-                          );
-                          throw e;
-                        }
-                      }
-                    : undefined
-                }
-                production={!!runtime}
-                onUpload={runtime?.upload}
-                registerNavigationGuard={(guard) => {
-                  navigationGuard.current = guard;
-                }}
-                onReload={async () => {
-                  const latest = runtime
-                    ? runtime.refresh
-                      ? await runtime.refresh()
-                      : (await runtime.load()).data
-                    : loadWorkspace();
-                  setData(latest);
-                  setReportIssue(undefined);
-                  setError("");
-                  return latest;
-                }}
-              />
-            </ReportAvailability.Provider>
-          ) : view === "admin" && runtime ? (
-            <EmptyState>
-              <h2>Administration requires an authorized account.</h2>
-              <p>
-                Sign in with your administrator account to manage this
-                Fieldbook.
-              </p>
-              <Button variant="default" onClick={runtime.signIn}>
-                Sign in with Google
-              </Button>
-            </EmptyState>
-          ) : view === "team" ? (
-            <>
-              <PageHeading title="Team progress" />
-              <ReportAvailability.Provider value={reportIssue}>
-                <TeamProgress data={data} user={user} />
-              </ReportAvailability.Provider>
-            </>
-          ) : curriculum ? (
-            <CurriculumPage
-              curriculum={curriculum}
-              settings={data.settings}
-              courses={courses}
-              progress={progress}
-              onBack={() => navigate("learn")}
-              onOpen={(id) => navigate("learn", id, curriculum.id)}
-            />
-          ) : selected && !item ? (
-            <Empty
-              title="This content isn’t available"
-              description="It may be a draft or have been removed."
-            />
-          ) : initialReading && data === initialReading.data ? (
-            children
-          ) : item?.kind === "course" ? (
-            <Course
-              key={item.id + item.version + (targetLesson || "")}
-              course={item}
-              initialLessonId={targetLesson || undefined}
-              curriculumTitle={
-                data.curricula?.find((entry) => entry.id === courseOrigin)?.name
-              }
-              progress={data.progress[user.id] || []}
-              onBack={() =>
-                navigate(
-                  "learn",
-                  courseOrigin ? `curriculum:${courseOrigin}` : undefined,
-                )
-              }
-              backLabel={
-                courseOrigin ? "Back to curriculum" : "Back to courses"
-              }
-              guest={!!runtime && user.id === "guest"}
-              onSignIn={runtime?.signIn}
-              feedback={
-                runtime && user.id === "guest" ? (
-                  <ReaderFeedback
-                    key={item.id}
-                    contentId={item.id}
-                    expanded={!item.questions.length}
-                  />
-                ) : (
-                  <Feedback
-                    key={item.id + user.id}
-                    content={item}
-                    user={user}
-                    data={data}
-                    onChange={persist}
-                    expanded={!item.questions.length}
-                  />
-                )
-              }
-              onDemoProgress={
-                runtime
-                  ? undefined
-                  : (lessonId, answers, complete) => {
-                      persist(
-                        updateProgress(
-                          data,
-                          user.id,
-                          item,
-                          lessonId,
-                          answers,
-                          complete,
-                        ),
-                      );
-                      return answers
-                        ? gradeQuiz(item, answers).passed
-                        : undefined;
-                    }
-              }
-              onProgress={
-                runtime
-                  ? async (lessonId, answers, complete) => {
-                      const r = await runtime.progress(
-                        item,
-                        data.progress[user.id] || [],
-                        lessonId,
-                        answers,
-                        complete,
-                      );
-                      setData((prev) =>
-                        prev
-                          ? {
-                              ...prev,
-                              progress: {
-                                ...prev.progress,
-                                [user.id]: r.progress,
-                              },
-                            }
-                          : prev,
-                      );
-                      return r.attemptPassed;
-                    }
-                  : undefined
-              }
-            />
-          ) : item ? (
-            <Article
-              key={item.id}
-              documents={docs}
-              sectionOrder={branding.docCategoryOrder}
-              sections={branding.docSections}
-              demo={!runtime}
-              onDocument={(id) => navigate("docs", id)}
-              item={item}
-              back={
-                item.kind === "doc" ? null : (
-                  <Button variant="link" onClick={() => navigate("briefs")}>
-                    ← Back to updates
-                  </Button>
-                )
-              }
+        )
+      }
+      overlays={
+        <>
+          <Dialog open={showDemo} onOpenChange={setShowDemo}>
+            <DialogContent
+              className="demo-dialog"
+              onCloseAutoFocus={(event) => {
+                event.preventDefault();
+                if (window.matchMedia("(max-width: 767px)").matches)
+                  menuTrigger.current?.focus();
+                else demoTrigger.current?.focus();
+              }}
             >
-              {runtime && user.id === "guest" ? (
-                <ReaderFeedback key={item.id} contentId={item.id} />
-              ) : (
-                <Feedback
-                  key={item.id + user.id}
-                  content={item}
-                  user={user}
-                  data={data}
-                  onChange={persist}
-                />
-              )}
-            </Article>
-          ) : view === "learn" ? (
-            <Learning
-              key={user.id}
-              courses={courses}
-              curricula={data.curricula || []}
-              user={user}
-              groups={learningGroups}
-              assigned={assigned}
-              settings={data.settings}
-              progress={progress}
-              onOpen={(id) => navigate("learn", id)}
-              onCurriculum={(id) => navigate("learn", `curriculum:${id}`)}
-              guest={uid === "guest"}
-            />
-          ) : view === "docs" ? (
-            <DocsEmpty />
-          ) : (
-            <>
-              <PageHeading title="Updates" />
-              <Updates
-                content={visible}
-                settings={data.settings}
-                user={user}
-                groups={learningGroups}
-                onOpen={(id) => navigate("briefs", id)}
-              />
-            </>
-          )}
-        </main>
-      </div>
-      <Dialog open={showDemo} onOpenChange={setShowDemo}>
-        <DialogContent
-          className="demo-dialog"
-          onCloseAutoFocus={(event) => {
-            event.preventDefault();
-            if (window.matchMedia("(max-width: 767px)").matches)
-              menuTrigger.current?.focus();
-            else demoTrigger.current?.focus();
-          }}
-        >
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-3 right-3"
-            onClick={() => setShowDemo(false)}
-            aria-label="Close"
-          >
-            <X />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-3 right-3"
+                onClick={() => setShowDemo(false)}
+                aria-label="Close"
+              >
+                <X />
+              </Button>
+              <DialogTitle>About this demo</DialogTitle>
+              <DialogDescription>
+                Changes stay in this browser and are not synced. Demo profiles
+                are not secure accounts. Use sample content only.
+              </DialogDescription>
+              <DialogFooter>
+                <Button variant="outline" onClick={exportData}>
+                  <Download size={16} />
+                  Export demo data
+                </Button>
+                <Button variant="outline" onClick={reset}>
+                  <RotateCcw size={16} />
+                  Reset sample data
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      }
+    >
+      {view === "admin" && user.role === "admin" ? (
+        <ReportAvailability.Provider value={reportIssue}>
+          <Admin
+            data={data}
+            user={user}
+            onChange={persist}
+            onBulk={async (action) => {
+              if (runtime?.admin) {
+                const result = await runtime.admin.bulk(action);
+                setData(result.data);
+                return result.results;
+              }
+              const result = applyDemoBulk(data, user, action);
+              saveWorkspace(result.data);
+              setData(result.data);
+              return result.results;
+            }}
+            onOpenTab={
+              runtime?.admin
+                ? async (next) => {
+                    const scope =
+                      next === "feedback"
+                        ? "feedback"
+                        : next === "content" || next.startsWith("settings-")
+                          ? "content"
+                          : "governance";
+                    setData(await runtime.admin!.prepare(scope));
+                  }
+                : undefined
+            }
+            onEdit={
+              runtime?.admin
+                ? async (id) => {
+                    const result = await runtime.admin!.edit(id);
+                    setData(result.data);
+                    return result.item;
+                  }
+                : undefined
+            }
+            onUnpublish={
+              runtime?.admin
+                ? async (id) => {
+                    setData(await runtime.admin!.unpublish(id));
+                  }
+                : undefined
+            }
+            onLearning={
+              runtime
+                ? async (action) => {
+                    setReportIssue("Updating report…");
+                    try {
+                      setData(await runtime.manageLearning(action));
+                      setReportIssue(undefined);
+                    } catch (e) {
+                      setReportIssue(
+                        "Reload the report before exporting after a failed change.",
+                      );
+                      throw e;
+                    }
+                  }
+                : undefined
+            }
+            production={!!runtime}
+            onUpload={runtime?.upload}
+            registerNavigationGuard={(guard) => {
+              navigationGuard.current = guard;
+            }}
+            onReload={async () => {
+              const latest = runtime
+                ? runtime.refresh
+                  ? await runtime.refresh()
+                  : (await runtime.load()).data
+                : loadWorkspace();
+              setData(latest);
+              setReportIssue(undefined);
+              setError("");
+              return latest;
+            }}
+          />
+        </ReportAvailability.Provider>
+      ) : view === "admin" && runtime ? (
+        <EmptyState>
+          <h2>Administration requires an authorized account.</h2>
+          <p>
+            Sign in with your administrator account to manage this Fieldbook.
+          </p>
+          <Button variant="default" onClick={runtime.signIn}>
+            Sign in with Google
           </Button>
-          <DialogTitle>About this demo</DialogTitle>
-          <DialogDescription>
-            Changes stay in this browser and are not synced. Demo profiles are
-            not secure accounts. Use sample content only.
-          </DialogDescription>
-          <DialogFooter>
-            <Button variant="outline" onClick={exportData}>
-              <Download size={16} />
-              Export demo data
-            </Button>
-            <Button variant="outline" onClick={reset}>
-              <RotateCcw size={16} />
-              Reset sample data
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        </EmptyState>
+      ) : view === "team" ? (
+        <>
+          <PageHeading title="Team progress" />
+          <ReportAvailability.Provider value={reportIssue}>
+            <TeamProgress data={data} user={user} />
+          </ReportAvailability.Provider>
+        </>
+      ) : curriculum ? (
+        <CurriculumPage
+          curriculum={curriculum}
+          settings={data.settings}
+          courses={courses}
+          progress={progress}
+          onBack={() => navigate("learn")}
+          onOpen={(id) => navigate("learn", id, curriculum.id)}
+        />
+      ) : selected && !item ? (
+        <Empty
+          title="This content isn’t available"
+          description="It may be a draft or have been removed."
+        />
+      ) : initialReading && data === initialReading.data ? (
+        children
+      ) : item?.kind === "course" ? (
+        <Course
+          key={item.id + item.version + (targetLesson || "")}
+          course={item}
+          initialLessonId={targetLesson || undefined}
+          curriculumTitle={
+            data.curricula?.find((entry) => entry.id === courseOrigin)?.name
+          }
+          progress={data.progress[user.id] || []}
+          onBack={() =>
+            navigate(
+              "learn",
+              courseOrigin ? `curriculum:${courseOrigin}` : undefined,
+            )
+          }
+          backLabel={courseOrigin ? "Back to curriculum" : "Back to courses"}
+          guest={!!runtime && user.id === "guest"}
+          onSignIn={runtime?.signIn}
+          feedback={
+            runtime && user.id === "guest" ? (
+              <ReaderFeedback
+                key={item.id}
+                contentId={item.id}
+                expanded={!item.questions.length}
+              />
+            ) : (
+              <Feedback
+                key={item.id + user.id}
+                content={item}
+                user={user}
+                data={data}
+                onChange={persist}
+                expanded={!item.questions.length}
+              />
+            )
+          }
+          onDemoProgress={
+            runtime
+              ? undefined
+              : (lessonId, answers, complete) => {
+                  persist(
+                    updateProgress(
+                      data,
+                      user.id,
+                      item,
+                      lessonId,
+                      answers,
+                      complete,
+                    ),
+                  );
+                  return answers ? gradeQuiz(item, answers).passed : undefined;
+                }
+          }
+          onProgress={
+            runtime
+              ? async (lessonId, answers, complete) => {
+                  const r = await runtime.progress(
+                    item,
+                    data.progress[user.id] || [],
+                    lessonId,
+                    answers,
+                    complete,
+                  );
+                  setData((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          progress: {
+                            ...prev.progress,
+                            [user.id]: r.progress,
+                          },
+                        }
+                      : prev,
+                  );
+                  return r.attemptPassed;
+                }
+              : undefined
+          }
+        />
+      ) : item ? (
+        <Article
+          key={item.id}
+          documents={docs}
+          sectionOrder={branding.docCategoryOrder}
+          sections={branding.docSections}
+          demo={!runtime}
+          onDocument={(id) => navigate("docs", id)}
+          item={item}
+          back={
+            item.kind === "doc" ? null : (
+              <Button variant="link" onClick={() => navigate("briefs")}>
+                ← Back to updates
+              </Button>
+            )
+          }
+        >
+          {runtime && user.id === "guest" ? (
+            <ReaderFeedback key={item.id} contentId={item.id} />
+          ) : (
+            <Feedback
+              key={item.id + user.id}
+              content={item}
+              user={user}
+              data={data}
+              onChange={persist}
+            />
+          )}
+        </Article>
+      ) : view === "learn" ? (
+        <Learning
+          key={user.id}
+          courses={courses}
+          curricula={data.curricula || []}
+          user={user}
+          groups={learningGroups}
+          assigned={assigned}
+          settings={data.settings}
+          progress={progress}
+          onOpen={(id) => navigate("learn", id)}
+          onCurriculum={(id) => navigate("learn", `curriculum:${id}`)}
+          guest={uid === "guest"}
+        />
+      ) : view === "docs" ? (
+        <DocsEmpty />
+      ) : (
+        <>
+          <PageHeading title="Updates" />
+          <Updates
+            content={visible}
+            settings={data.settings}
+            user={user}
+            groups={learningGroups}
+            onOpen={(id) => navigate("briefs", id)}
+          />
+        </>
+      )}
+    </WorkspaceFrame>
   );
 }
 function initials(name: string) {

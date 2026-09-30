@@ -56,9 +56,9 @@ export default function SiteSettingsPanel({
     (!dirty ||
       (await confirm("Leave this page? Unsaved changes will be discarded.")));
   useEffect(() => {
-    registerNavigationGuard?.(() => guard.current());
+    registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
     return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard]);
+  }, [registerNavigationGuard, dirty, busy]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty || busy) {

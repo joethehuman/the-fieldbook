@@ -66,6 +66,7 @@ export function AccountMenu({
   onFeedbackClose?: () => void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   return (
     <div className="@container">
@@ -73,7 +74,10 @@ export function AccountMenu({
         data-slot="account-button"
         className="grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)_2.25rem] items-center gap-3 border-t border-border px-2 py-4 text-left @max-[13rem]:grid-cols-[minmax(0,1fr)_auto]"
       >
-        <InitialsAvatar initials={initials} className="sidebar-account-avatar" />
+        <InitialsAvatar
+          initials={initials}
+          className="sidebar-account-avatar"
+        />
         <span className="sidebar-account-identity min-w-0 @max-[13rem]:col-span-full">
           <span className="block break-words text-sm font-semibold leading-snug">
             {name}
@@ -84,7 +88,13 @@ export function AccountMenu({
             </span>
           )}
         </span>
-        <DropdownMenu onOpenChange={(open) => open && onMenuOpen?.()}>
+        <DropdownMenu
+          open={menuOpen}
+          onOpenChange={(open) => {
+            setMenuOpen(open);
+            if (open) onMenuOpen?.();
+          }}
+        >
           <DropdownMenuTrigger asChild>
             <Button
               ref={trigger}
@@ -151,7 +161,11 @@ export function AccountMenu({
             {privacyHref && (
               <DropdownMenuItem asChild>
                 {privacyHref.startsWith("/") ? (
-                  <Link href={privacyHref} onClick={onPrivacyOpen}>
+                  <Link
+                    href={privacyHref}
+                    onClickCapture={() => setMenuOpen(false)}
+                    onClick={onPrivacyOpen}
+                  >
                     Privacy policy{" "}
                     <BookOpen className="ml-auto size-4" aria-hidden="true" />
                   </Link>
