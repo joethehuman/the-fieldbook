@@ -132,8 +132,11 @@ export function freshWorkspace(): Workspace {
       {
         id: "sales",
         name: "Account executives",
-        requiredCourseIds: ["course-4", "course-10", "course-11", "course-12"],
-        learningItems: [{ kind: "curriculum", id: "sales-foundations" }],
+        requiredCourseIds: ["course-4", "course-11", "course-12", "course-10"],
+        learningItems: [
+          { kind: "curriculum", id: "sales-foundations" },
+          { kind: "course", id: "course-10" },
+        ],
         teamIds: [],
       },
     ],
@@ -149,6 +152,100 @@ export function freshWorkspace(): Workspace {
       ],
       "demo-rep-5": [completedCourse("course-12")],
     },
+  };
+}
+/** Repair only the original Hoolibook sample group's conflicting course selection. */
+function repairHooliSecurityAssignment(data: Workspace): Workspace {
+  const group = data.groups.find((item) => item.id === "sales");
+  const curriculum = data.curricula?.find(
+    (item) => item.id === "sales-foundations",
+  );
+  const security = data.content.find((item) => item.id === "course-10");
+  const expectedCurriculum = ["course-4", "course-11", "course-12"];
+  const originalSelection = ["course-4", "course-10", "course-11", "course-12"];
+  const matching = (ids: string[] | undefined, expected: string[]) =>
+    !!ids &&
+    ids.length === expected.length &&
+    ids.every((id, index) => id === expected[index]);
+  const hasOriginalSelection = matching(
+    group?.requiredCourseIds,
+    originalSelection,
+  );
+  const hasReducedSelection = matching(
+    group?.requiredCourseIds,
+    expectedCurriculum,
+  );
+  if (
+    group?.name !== "Account executives" ||
+    !matching(curriculum?.courseIds, expectedCurriculum) ||
+    (!hasOriginalSelection && !hasReducedSelection) ||
+    group.learningItems?.length !== 1 ||
+    group.learningItems?.[0]?.kind !== "curriculum" ||
+    group.learningItems?.[0]?.id !== "sales-foundations" ||
+    security?.title !== "Security Basics: Don’t Paste That Here" ||
+    security.version !== 1 ||
+    security.status !== "published" ||
+    !data.publishedContent?.some(
+      (item) =>
+        item.id === security.id &&
+        item.version === security.version &&
+        item.status === "published",
+    )
+  )
+    return data;
+
+  // The original selection is an unsaved seed. After it is dropped, repair
+  // only when a selectable demo profile started the course. Another sample
+  // rep starts with completion, so checking every progress record is too broad.
+  if (
+    hasReducedSelection &&
+    !DEMO_PROFILE_IDS.some((id) =>
+      data.progress[id]?.some(
+        (record) =>
+          record.content_id === security.id &&
+          record.version === security.version,
+      ),
+    )
+  )
+    return data;
+
+  const restore = (items: Content[]) =>
+    items.map((item) =>
+      item.id === security.id
+        ? {
+            ...item,
+            groups: [...new Set([...item.groups, group.id])],
+            assignments: item.assignments?.some(
+              (rule) => rule.groupId === group.id,
+            )
+              ? item.assignments
+              : [
+                  ...(item.assignments || []),
+                  {
+                    groupId: group.id,
+                    assignedAt: item.createdAt || item.updatedAt,
+                    due: { type: "none" as const },
+                  },
+                ],
+          }
+        : item,
+    );
+  return {
+    ...data,
+    groups: data.groups.map((item) =>
+      item.id === group.id
+        ? {
+            ...item,
+            requiredCourseIds: [...expectedCurriculum, security.id],
+            learningItems: [
+              ...item.learningItems!,
+              { kind: "course" as const, id: security.id },
+            ],
+          }
+        : item,
+    ),
+    content: restore(data.content),
+    publishedContent: data.publishedContent && restore(data.publishedContent),
   };
 }
 export function loadWorkspace(): Workspace {
@@ -180,7 +277,7 @@ export function loadWorkspace(): Workspace {
     if (renamed?.previous.includes(user.name)) user.name = renamed.name;
   }
   const upgraded = withPublishedSnapshots(data);
-  const current = expireDemoDeleted(upgraded);
+  const current = expireDemoDeleted(repairHooliSecurityAssignment(upgraded));
   if (current !== upgraded) saveWorkspace(current);
   return current;
 }
