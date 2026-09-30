@@ -1,10 +1,8 @@
 "use client";
-import Link from "next/link";
 import { reconcileDemoPublication } from "@/lib/demo-publication";
 import { WorkspaceFrame } from "./patterns/workspace-frame";
 import { DocumentTree } from "./patterns/document-tree";
 import { DocsEmpty } from "./patterns/docs-empty";
-import type { ReadingState } from "@/lib/reading";
 import { Article } from "./patterns/reading";
 import { gradeQuiz } from "@/lib/course-quiz";
 import { Course } from "./Course";
@@ -13,7 +11,6 @@ import { ReportAvailability } from "./patterns/csv-export";
 import { SearchPanel } from "./patterns/search-panel";
 import { ContentSearch } from "./ContentSearch";
 import { InitialsAvatar } from "./ui/initials-avatar";
-import { RequestError } from "@/lib/workspace-save";
 import { BrandedAccount } from "./patterns/branded-account";
 import {
   SidebarHeading,
@@ -40,13 +37,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
-import {
-  useEffect,
-  useRef,
-  useState,
-  useTransition,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BookOpen,
   GraduationCap,
@@ -60,25 +51,13 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { applyDemoBulk } from "@/lib/bulk-actions";
-import type { FieldbookRuntime } from "@/lib/runtime";
-import {
-  sectionPaths,
-  resolveSection,
-  contentPath,
-  homePath,
-} from "@/lib/navigation";
+import { sectionPaths, resolveSection, homePath } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import Learning from "./Learning";
 import Feedback from "./Feedback";
-import { ReaderFeedback } from "./reader/ReaderFeedback";
 import { TeamProgress } from "./Teams";
-import {
-  assignedCourses,
-  isComplete,
-  type Content,
-  type User,
-} from "@/lib/types";
+import { assignedCourses, isComplete, type Content } from "@/lib/types";
 import {
   freshWorkspace,
   loadWorkspace,
@@ -89,26 +68,10 @@ import {
   type Workspace,
 } from "@/lib/store";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import { SaveRecoveryError } from "@/lib/save-recovery";
 import type { NavigationGuard } from "@/lib/navigation-guard";
 const Admin = dynamic(() => import("./Admin"));
 type View = "learn" | "docs" | "briefs" | "admin" | "team";
-export default function Fieldbook({
-  runtime,
-  initialReading,
-  initialAdmin,
-  children,
-  onLoaded,
-}: {
-  runtime?: FieldbookRuntime;
-  initialReading?: ReadingState;
-  initialAdmin?: { data: Workspace; user: User };
-  children?: ReactNode;
-  onLoaded?: (user: User | null) => void;
-} = {}) {
-  const router = useRouter();
-  const [navigationPending, startNavigation] = useTransition();
+export default function Fieldbook() {
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
@@ -125,27 +88,14 @@ export default function Fieldbook({
       checkingNavigation.current = false;
     }
   }
-  const [data, setData] = useState<Workspace | null>(
-      initialAdmin?.data || initialReading?.data || null,
-    ),
-    [uid, setUid] = useState<string | null>(
-      initialAdmin?.user.id ||
-        (initialReading ? initialReading.data.users[0]?.id || "guest" : null),
-    ),
-    [view, setView] = useState<View>(
-      initialAdmin ? "admin" : initialReading?.section || "learn",
-    ),
-    [courseOrigin, setCourseOrigin] = useState<string | undefined>(
-      initialReading?.curriculum,
-    ),
-    [selected, setSelected] = useState<string | null>(
-      initialReading?.id || null,
-    ),
+  const [data, setData] = useState<Workspace | null>(null),
+    [uid, setUid] = useState<string | null>(null),
+    [view, setView] = useState<View>("learn"),
+    [courseOrigin, setCourseOrigin] = useState<string | undefined>(),
+    [selected, setSelected] = useState<string | null>(null),
     [search, setSearch] = useState(""),
     [searchOpen, setSearchOpen] = useState(false),
-    [targetLesson, setTargetLesson] = useState<string | undefined>(
-      initialReading?.lesson,
-    ),
+    [targetLesson, setTargetLesson] = useState<string | undefined>(),
     [error, setError] = useState(""),
     [reportIssue, setReportIssue] = useState<string | undefined>(),
     [menu, setMenu] = useState(false),
@@ -156,42 +106,6 @@ export default function Fieldbook({
       : undefined,
   );
   useEffect(() => {
-    if (initialAdmin) {
-      onLoaded?.(initialAdmin.user);
-      return;
-    }
-    if (runtime) {
-      runtime
-        .load()
-        .then(({ data, user }) => {
-          if (initialReading) {
-            const rendered = initialReading.data.publishedContent?.[0];
-            const latest = data.publishedContent?.find(
-              (item) => item.id === initialReading.id,
-            );
-            // Keep body and metadata on the same published revision, including
-            // publication changes while the interactive workspace is loading.
-            if (
-              !latest ||
-              latest.publishedRevision !== rendered?.publishedRevision
-            ) {
-              window.location.reload();
-              return;
-            }
-          }
-          setData(data);
-          setUid(user?.id || "guest");
-          onLoaded?.(user);
-        })
-        .catch((e) => {
-          if (e instanceof RequestError && e.status === 401) {
-            runtime.signIn();
-            return;
-          }
-          setError(e.message);
-        });
-      return;
-    }
     try {
       const workspace = loadWorkspace();
       setData(workspace);
@@ -235,12 +149,7 @@ export default function Fieldbook({
           return;
         }
         acceptedUrl.current = destination;
-        let [v, id] = window.location.hash.slice(1).split("?")[0].split("/");
-        if (runtime) {
-          const parts = window.location.pathname.split("/");
-          v = parts[1] || "courses";
-          id = parts[2];
-        }
+        const [v, id] = window.location.hash.slice(1).split("?")[0].split("/");
         setTargetLesson(
           new URLSearchParams(window.location.search).get("lesson") ||
             undefined,
@@ -280,25 +189,7 @@ export default function Fieldbook({
     if (!(await canLeave())) return;
     if (v === "docs" && !id) setCollapsed(false);
     if (v !== "docs" || id) setMenu(false);
-    const destinationId = !runtime && v === "docs" && !id ? firstDoc?.id : id;
-    if (
-      runtime &&
-      (initialReading ||
-        initialAdmin ||
-        (id &&
-          !id.startsWith("curriculum:") &&
-          ["learn", "docs", "briefs"].includes(v)))
-    ) {
-      const path = id?.startsWith("curriculum:")
-        ? `curricula/${encodeURIComponent(id.slice(11))}`
-        : sectionPaths[v] + (id ? `/${encodeURIComponent(id)}` : "");
-      const query = new URLSearchParams();
-      if (lesson) query.set("lesson", lesson);
-      if (origin) query.set("curriculum", origin);
-      const destination = `/${path}${query.size ? `?${query}` : ""}`;
-      startNavigation(() => router.push(destination));
-      return;
-    }
+    const destinationId = v === "docs" && !id ? firstDoc?.id : id;
     setView(v);
     setSelected(destinationId || null);
     setCourseOrigin(origin);
@@ -318,9 +209,7 @@ export default function Fieldbook({
     window.history.pushState(
       null,
       "",
-      runtime
-        ? `/${path}${query}`
-        : `${window.location.pathname}${query}#${path}`,
+      `${window.location.pathname}${query}#${path}`,
     );
     acceptedUrl.current = window.location.href;
     document.getElementById("main-content")?.scrollTo({ top: 0 });
@@ -331,22 +220,6 @@ export default function Fieldbook({
   ) {
     setError("");
     setReportIssue("Updating report…");
-    if (runtime && data) {
-      try {
-        setData(await runtime.save(data, next));
-        setReportIssue(undefined);
-        setError("");
-      } catch (e) {
-        setReportIssue(
-          "Reload the report before exporting after a failed change.",
-        );
-        if (e instanceof SaveRecoveryError && e.snapshot) setData(e.snapshot);
-        if (!options?.locallyHandled)
-          setError(navigationGuard.current ? "" : (e as Error).message);
-        throw e;
-      }
-      return;
-    }
     try {
       const reconciled = reconcileLearning(
         data || next,
@@ -376,11 +249,6 @@ export default function Fieldbook({
   }
   async function logout() {
     if (!(await canLeave())) return;
-    if (runtime) {
-      if (uid === "guest") runtime.signIn();
-      else void runtime.signOut();
-      return;
-    }
     sessionStorage.removeItem(SESSION);
     setUid(null);
   }
@@ -422,29 +290,16 @@ export default function Fieldbook({
               <span />
             </div>
           )}
-          {error &&
-            (runtime ? (
-              <>
-                <Button variant="default" onClick={() => runtime.signIn()}>
-                  Sign in
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={() => window.location.reload()}
-                >
-                  Try again
-                </Button>
-              </>
-            ) : (
-              <Button variant="ghost" onClick={reset}>
-                Reset demo
-              </Button>
-            ))}
+          {error && (
+            <Button variant="ghost" onClick={reset}>
+              Reset demo
+            </Button>
+          )}
         </div>
       </div>
     );
   const demoGuest =
-    !runtime && uid === "guest" && data.settings?.access !== "private"
+    uid === "guest" && data.settings?.access !== "private"
       ? guestRecommendations({
           ...data,
           content: data.publishedContent || data.content,
@@ -538,7 +393,7 @@ export default function Fieldbook({
       accent={branding.accent}
       collapsed={collapsed}
       menu={menu}
-      pending={navigationPending}
+      pending={false}
       admin={view === "admin" && user.role === "admin"}
       onDismiss={() => setMenu(false)}
       sidebar={
@@ -568,18 +423,6 @@ export default function Fieldbook({
                 aria-label={n.title}
                 title={collapsed ? n.title : undefined}
                 onClick={() => void navigate(n.key)}
-                onPointerEnter={() => {
-                  if (runtime && initialAdmin)
-                    router.prefetch(`/${sectionPaths[n.key]}`);
-                }}
-                onFocus={() => {
-                  if (runtime && initialAdmin)
-                    router.prefetch(`/${sectionPaths[n.key]}`);
-                }}
-                onTouchStart={() => {
-                  if (runtime && initialAdmin)
-                    router.prefetch(`/${sectionPaths[n.key]}`);
-                }}
               >
                 <n.icon size={19} />
                 <span className="sidebar-nav-text">{n.title}</span>
@@ -593,43 +436,27 @@ export default function Fieldbook({
           </nav>
           {view === "docs" && (
             <DocumentTree
-              docs={
-                initialReading && data === initialReading.data
-                  ? initialReading.documents || docs
-                  : docs
-              }
+              docs={docs}
               order={branding.docCategoryOrder}
               sections={branding.docSections}
               selected={selected || firstDoc?.id || null}
-              href={(id) =>
-                runtime
-                  ? contentPath("doc", id)
-                  : `#docs/${encodeURIComponent(id)}`
-              }
+              href={(id) => `#docs/${encodeURIComponent(id)}`}
               onOpen={(id) => navigate("docs", id)}
-              storageKey={
-                runtime
-                  ? "fieldbook.documents.production"
-                  : "fieldbook.documents.demo"
-              }
+              storageKey="fieldbook.documents.demo"
             />
           )}
           <div className="sidebar-bottom">
             <AccountMenu
               initials={initials(user.name)}
-              name={runtime && uid === "guest" ? "Guest" : user.name}
+              name={user.name}
               email={uid === "guest" ? undefined : user.email}
               guest={uid === "guest"}
               description={
-                runtime && uid === "guest"
-                  ? undefined
-                  : user.role === "admin"
-                    ? "Administrator"
-                    : user.role === "manager"
-                      ? "Sales Director"
-                      : runtime
-                        ? "Learner"
-                        : "Account Executive"
+                user.role === "admin"
+                  ? "Administrator"
+                  : user.role === "manager"
+                    ? "Sales Director"
+                    : "Account Executive"
               }
               onManageOrganization={
                 user.role === "admin" ? () => navigate("admin") : undefined
@@ -640,59 +467,36 @@ export default function Fieldbook({
                   ? () => navigate("team")
                   : undefined
               }
-              onTeamProgressIntent={() => {
-                if (runtime && initialAdmin) router.prefetch("/team");
-              }}
-              onSignOut={runtime && uid !== "guest" ? logout : undefined}
-              onSignIn={runtime && uid === "guest" ? logout : undefined}
-              onSwitchDemoProfile={!runtime ? logout : undefined}
+              onSwitchDemoProfile={logout}
               privacyHref={policyHref}
               onPrivacyOpen={() => setMenu(false)}
-              onAboutDemo={
-                !runtime
-                  ? (trigger) => {
-                      demoTrigger.current = trigger.current;
-                      setMenu(false);
-                      setShowDemo(true);
-                    }
-                  : undefined
-              }
+              onAboutDemo={(trigger) => {
+                demoTrigger.current = trigger.current;
+                setMenu(false);
+                setShowDemo(true);
+              }}
               onFeedbackOpen={() => setMenu(false)}
               onFeedbackClose={() => {
                 if (window.matchMedia("(max-width: 767px)").matches)
                   menuTrigger.current?.focus();
               }}
               onFeedback={async (rating, comment) => {
-                if (runtime) {
-                  const response = await fetch("/api/feedback", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ rating, comment }),
-                  });
-                  if (!response.ok) {
-                    const result = await response.json().catch(() => ({}));
-                    throw new Error(
-                      result.error || "Could not save feedback. Try again.",
-                    );
-                  }
-                } else {
-                  await persist(
-                    {
-                      ...data,
-                      feedback: [
-                        ...(data.feedback || []),
-                        {
-                          id: crypto.randomUUID(),
-                          userId: user.id,
-                          rating,
-                          comment,
-                          updatedAt: new Date().toISOString(),
-                        },
-                      ],
-                    },
-                    { locallyHandled: true },
-                  );
-                }
+                await persist(
+                  {
+                    ...data,
+                    feedback: [
+                      ...(data.feedback || []),
+                      {
+                        id: crypto.randomUUID(),
+                        userId: user.id,
+                        rating,
+                        comment,
+                        updatedAt: new Date().toISOString(),
+                      },
+                    ],
+                  },
+                  { locallyHandled: true },
+                );
               }}
             />
           </div>
@@ -714,7 +518,7 @@ export default function Fieldbook({
           <nav className="breadcrumb" aria-label="Breadcrumb">
             <Button asChild variant="link">
               <a
-                href={runtime ? landingPath : `#${landingPath.slice(1)}`}
+                href={`#${landingPath.slice(1)}`}
                 onClick={(event) => {
                   if (
                     event.metaKey ||
@@ -733,9 +537,7 @@ export default function Fieldbook({
             <ChevronRight size={14} />
             <Button asChild variant="link">
               <a
-                href={
-                  runtime ? `/${sectionPaths[view]}` : `#${sectionPaths[view]}`
-                }
+                href={`#${sectionPaths[view]}`}
                 onClick={(event) => {
                   if (
                     event.metaKey ||
@@ -822,13 +624,7 @@ export default function Fieldbook({
             <ContentSearch
               query={search}
               content={data.publishedContent || data.content}
-              runtime={runtime}
               onOpen={async (r) => {
-                if (runtime) {
-                  if (await canLeave())
-                    startNavigation(() => router.push(r.href));
-                  return;
-                }
                 await navigate(
                   r.kind === "course"
                     ? "learn"
@@ -899,72 +695,16 @@ export default function Fieldbook({
             user={user}
             onChange={persist}
             onBulk={async (action) => {
-              if (runtime?.admin) {
-                const result = await runtime.admin.bulk(action);
-                setData(result.data);
-                return result.results;
-              }
               const result = applyDemoBulk(data, user, action);
               saveWorkspace(result.data);
               setData(result.data);
               return result.results;
             }}
-            onOpenTab={
-              runtime?.admin
-                ? async (next) => {
-                    const scope =
-                      next === "feedback"
-                        ? "feedback"
-                        : next === "content" || next.startsWith("settings-")
-                          ? "content"
-                          : "governance";
-                    setData(await runtime.admin!.prepare(scope));
-                  }
-                : undefined
-            }
-            onEdit={
-              runtime?.admin
-                ? async (id) => {
-                    const result = await runtime.admin!.edit(id);
-                    setData(result.data);
-                    return result.item;
-                  }
-                : undefined
-            }
-            onUnpublish={
-              runtime?.admin
-                ? async (id) => {
-                    setData(await runtime.admin!.unpublish(id));
-                  }
-                : undefined
-            }
-            onLearning={
-              runtime
-                ? async (action) => {
-                    setReportIssue("Updating report…");
-                    try {
-                      setData(await runtime.manageLearning(action));
-                      setReportIssue(undefined);
-                    } catch (e) {
-                      setReportIssue(
-                        "Reload the report before exporting after a failed change.",
-                      );
-                      throw e;
-                    }
-                  }
-                : undefined
-            }
-            production={!!runtime}
-            onUpload={runtime?.upload}
             registerNavigationGuard={(guard) => {
               navigationGuard.current = guard;
             }}
             onReload={async () => {
-              const latest = runtime
-                ? runtime.refresh
-                  ? await runtime.refresh()
-                  : (await runtime.load()).data
-                : loadWorkspace();
+              const latest = loadWorkspace();
               setData(latest);
               setReportIssue(undefined);
               setError("");
@@ -972,16 +712,6 @@ export default function Fieldbook({
             }}
           />
         </ReportAvailability.Provider>
-      ) : view === "admin" && runtime ? (
-        <EmptyState>
-          <h2>Administration requires an authorized account.</h2>
-          <p>
-            Sign in with your administrator account to manage this Fieldbook.
-          </p>
-          <Button variant="default" onClick={runtime.signIn}>
-            Sign in with Google
-          </Button>
-        </EmptyState>
       ) : view === "team" ? (
         <>
           <PageHeading title="Team progress" />
@@ -1003,8 +733,6 @@ export default function Fieldbook({
           title="This content isn’t available"
           description="It may be a draft or have been removed."
         />
-      ) : initialReading && data === initialReading.data ? (
-        children
       ) : item?.kind === "course" ? (
         <Course
           key={item.id + item.version + (targetLesson || "")}
@@ -1021,68 +749,22 @@ export default function Fieldbook({
             )
           }
           backLabel={courseOrigin ? "Back to curriculum" : "Back to courses"}
-          guest={!!runtime && user.id === "guest"}
-          onSignIn={runtime?.signIn}
           feedback={
-            runtime && user.id === "guest" ? (
-              <ReaderFeedback
-                key={item.id}
-                contentId={item.id}
-                expanded={!item.questions.length}
-              />
-            ) : (
-              <Feedback
-                key={item.id + user.id}
-                content={item}
-                user={user}
-                data={data}
-                onChange={persist}
-                expanded={!item.questions.length}
-              />
-            )
+            <Feedback
+              key={item.id + user.id}
+              content={item}
+              user={user}
+              data={data}
+              onChange={persist}
+              expanded={!item.questions.length}
+            />
           }
-          onDemoProgress={
-            runtime
-              ? undefined
-              : (lessonId, answers, complete) => {
-                  persist(
-                    updateProgress(
-                      data,
-                      user.id,
-                      item,
-                      lessonId,
-                      answers,
-                      complete,
-                    ),
-                  );
-                  return answers ? gradeQuiz(item, answers).passed : undefined;
-                }
-          }
-          onProgress={
-            runtime
-              ? async (lessonId, answers, complete) => {
-                  const r = await runtime.progress(
-                    item,
-                    data.progress[user.id] || [],
-                    lessonId,
-                    answers,
-                    complete,
-                  );
-                  setData((prev) =>
-                    prev
-                      ? {
-                          ...prev,
-                          progress: {
-                            ...prev.progress,
-                            [user.id]: r.progress,
-                          },
-                        }
-                      : prev,
-                  );
-                  return r.attemptPassed;
-                }
-              : undefined
-          }
+          onDemoProgress={(lessonId, answers, complete) => {
+            persist(
+              updateProgress(data, user.id, item, lessonId, answers, complete),
+            );
+            return answers ? gradeQuiz(item, answers).passed : undefined;
+          }}
         />
       ) : item ? (
         <Article
@@ -1090,7 +772,7 @@ export default function Fieldbook({
           documents={docs}
           sectionOrder={branding.docCategoryOrder}
           sections={branding.docSections}
-          demo={!runtime}
+          demo
           onDocument={(id) => navigate("docs", id)}
           item={item}
           back={
@@ -1101,17 +783,13 @@ export default function Fieldbook({
             )
           }
         >
-          {runtime && user.id === "guest" ? (
-            <ReaderFeedback key={item.id} contentId={item.id} />
-          ) : (
-            <Feedback
-              key={item.id + user.id}
-              content={item}
-              user={user}
-              data={data}
-              onChange={persist}
-            />
-          )}
+          <Feedback
+            key={item.id + user.id}
+            content={item}
+            user={user}
+            data={data}
+            onChange={persist}
+          />
         </Article>
       ) : view === "learn" ? (
         <Learning

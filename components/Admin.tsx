@@ -226,7 +226,6 @@ type Props = {
     options?: { locallyHandled?: boolean },
   ) => void | Promise<void>;
   production?: boolean;
-  historyManaged?: boolean;
   onLearning?: LearningHandler;
   onUpload?: UploadMedia;
   registerNavigationGuard?: RegisterNavigationGuard;
@@ -242,7 +241,6 @@ export default function Admin({
   onUnpublish,
   onChange,
   production = false,
-  historyManaged = false,
   onUpload,
   onLearning,
   registerNavigationGuard,
@@ -537,7 +535,6 @@ export default function Admin({
         onCancel={() => setEditing(null)}
         onUpload={onUpload}
         production={production}
-        historyManaged={historyManaged}
         onLearning={manageLearning}
         onLearningMany={manageLearningMany}
         onWorkspaceChange={onChange}
@@ -1371,7 +1368,6 @@ export function Editor({
   onCancel,
   onUpload,
   production = false,
-  historyManaged = false,
   registerNavigationGuard,
   onReload,
 }: {
@@ -1379,7 +1375,6 @@ export function Editor({
   registerNavigationGuard?: RegisterNavigationGuard;
   onReload?: () => Promise<Workspace>;
   production?: boolean;
-  historyManaged?: boolean;
   content: Content;
   data: Workspace;
   onSave: (c: Content) => Content | void | Promise<Content | void>;
@@ -1418,7 +1413,6 @@ export function Editor({
   const original = useRef(content);
   const pendingUploads = useRef(0);
   const savingNow = useRef(false);
-  const historyGuardArmed = useRef(false);
   const [recovering, setRecovering] = useState(false);
   const busy = saving || uploadCount > 0 || recovering;
   const dirty =
@@ -1449,31 +1443,6 @@ export function Editor({
     window.addEventListener("beforeunload", beforeUnload);
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy]);
-  useEffect(() => {
-    if (!production || historyManaged) return;
-    if (!dirty && !busy) {
-      historyGuardArmed.current = false;
-      return;
-    }
-    if (!historyGuardArmed.current) {
-      historyGuardArmed.current = true;
-      window.history.pushState(window.history.state, "", window.location.href);
-    }
-    const onBack = () => {
-      if (!historyGuardArmed.current) return;
-      // Back first reaches the identical Admin URL, keeping the editor mounted
-      // while the async discard dialog runs. Restore the guard entry at once.
-      window.history.pushState(window.history.state, "", window.location.href);
-      void guard.current().then((approved) => {
-        if (approved) {
-          historyGuardArmed.current = false;
-          window.history.go(-2);
-        }
-      });
-    };
-    window.addEventListener("popstate", onBack);
-    return () => window.removeEventListener("popstate", onBack);
-  }, [production, historyManaged, dirty, busy]);
   const upload: UploadMedia | undefined = onUpload
     ? async (file) => {
         pendingUploads.current++;

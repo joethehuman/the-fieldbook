@@ -1,12 +1,27 @@
 import { createBrowserClient } from "@supabase/ssr";
 import { request, createWorkspaceSaver, RequestError } from "./workspace-save";
-import type { FieldbookRuntime } from "./runtime";
+import type { UploadMedia } from "@/components/MarkdownEditor";
+import type { BulkRequest, BulkResult } from "./bulk-actions";
+import type { LearningAction } from "./learning";
 import type { Workspace } from "./store";
-import type { User } from "./types";
-export type AdminRuntime = Pick<
-  FieldbookRuntime,
-  "load" | "save" | "refresh" | "manageLearning" | "upload"
-> & { admin: NonNullable<FieldbookRuntime["admin"]> };
+import type { Content, User } from "./types";
+export type AdminRuntime = {
+  save: (before: Workspace, after: Workspace) => Promise<Workspace>;
+  refresh: () => Promise<Workspace>;
+  manageLearning: (action: LearningAction) => Promise<Workspace>;
+  upload: UploadMedia;
+  admin: {
+    bulk: (
+      action: BulkRequest,
+    ) => Promise<{ data: Workspace; results: BulkResult[] }>;
+    prefetch: () => void;
+    prepare: (
+      scope: "content" | "governance" | "feedback",
+    ) => Promise<Workspace>;
+    edit: (id: string) => Promise<{ data: Workspace; item: Content }>;
+    unpublish: (id: string) => Promise<Workspace>;
+  };
+};
 async function upload(file: File) {
   const sign = await request("/api/upload", {
     name: file.name,
@@ -88,7 +103,6 @@ export function createAdminRuntime(initial: {
   const saver = createWorkspaceSaver(request, fresh);
   return {
     upload,
-    load: async () => ({ data: await fresh(), user: initial.user }),
     save: async (before, after) => {
       const created = after.content.find(
         (item) => !before.content.some((previous) => previous.id === item.id),

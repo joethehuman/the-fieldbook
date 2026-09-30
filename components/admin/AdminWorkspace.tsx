@@ -56,21 +56,18 @@ export function AdminWorkspace({
   ) {
     setError("");
     setReportIssue("Updating report…");
-    if (runtime && data) {
-      try {
-        setData(await runtime.save(data, next));
-        setReportIssue(undefined);
-        setError("");
-      } catch (e) {
-        setReportIssue(
-          "Reload the report before exporting after a failed change.",
-        );
-        if (e instanceof SaveRecoveryError && e.snapshot) setData(e.snapshot);
-        if (!options?.locallyHandled)
-          setError(navigationGuard.current ? "" : (e as Error).message);
-        throw e;
-      }
-      return;
+    try {
+      setData(await runtime.save(data, next));
+      setReportIssue(undefined);
+      setError("");
+    } catch (e) {
+      setReportIssue(
+        "Reload the report before exporting after a failed change.",
+      );
+      if (e instanceof SaveRecoveryError && e.snapshot) setData(e.snapshot);
+      if (!options?.locallyHandled)
+        setError(navigationGuard.current ? "" : (e as Error).message);
+      throw e;
     }
   }
   return (
@@ -86,68 +83,44 @@ export function AdminWorkspace({
           user={user}
           onChange={persist}
           onBulk={async (action) => {
-            if (runtime?.admin) {
-              const result = await runtime.admin.bulk(action);
-              setData(result.data);
-              return result.results;
-            }
-            throw new Error("Administrator runtime unavailable");
+            const result = await runtime.admin.bulk(action);
+            setData(result.data);
+            return result.results;
           }}
-          onOpenTab={
-            runtime?.admin
-              ? async (next) => {
-                  const scope =
-                    next === "feedback"
-                      ? "feedback"
-                      : next === "content" || next.startsWith("settings-")
-                        ? "content"
-                        : "governance";
-                  setData(await runtime.admin!.prepare(scope));
-                }
-              : undefined
-          }
-          onEdit={
-            runtime?.admin
-              ? async (id) => {
-                  const result = await runtime.admin!.edit(id);
-                  setData(result.data);
-                  return result.item;
-                }
-              : undefined
-          }
-          onUnpublish={
-            runtime?.admin
-              ? async (id) => {
-                  setData(await runtime.admin!.unpublish(id));
-                }
-              : undefined
-          }
-          onLearning={
-            runtime
-              ? async (action) => {
-                  setReportIssue("Updating report…");
-                  try {
-                    setData(await runtime.manageLearning(action));
-                    setReportIssue(undefined);
-                  } catch (e) {
-                    setReportIssue(
-                      "Reload the report before exporting after a failed change.",
-                    );
-                    throw e;
-                  }
-                }
-              : undefined
-          }
-          production={!!runtime}
-          historyManaged
-          onUpload={runtime?.upload}
+          onOpenTab={async (next) => {
+            const scope =
+              next === "feedback"
+                ? "feedback"
+                : next === "content" || next.startsWith("settings-")
+                  ? "content"
+                  : "governance";
+            setData(await runtime.admin.prepare(scope));
+          }}
+          onEdit={async (id) => {
+            const result = await runtime.admin.edit(id);
+            setData(result.data);
+            return result.item;
+          }}
+          onUnpublish={async (id) => {
+            setData(await runtime.admin.unpublish(id));
+          }}
+          onLearning={async (action) => {
+            setReportIssue("Updating report…");
+            try {
+              setData(await runtime.manageLearning(action));
+              setReportIssue(undefined);
+            } catch (e) {
+              setReportIssue(
+                "Reload the report before exporting after a failed change.",
+              );
+              throw e;
+            }
+          }}
+          production
+          onUpload={runtime.upload}
           registerNavigationGuard={registerNavigationGuard}
           onReload={async () => {
-            const latest = runtime
-              ? runtime.refresh
-                ? await runtime.refresh()
-                : (await runtime.load()).data
-              : initial.data;
+            const latest = await runtime.refresh();
             setData(latest);
             setReportIssue(undefined);
             setError("");
