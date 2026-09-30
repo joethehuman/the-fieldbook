@@ -1903,13 +1903,13 @@ export function Editor({
       }}
     >
       <div ref={heading} className="editor-heading">
-        <div className="editor-heading-copy">
-          <h1 className="sr-only">{c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"} editor</h1>
-          <DetailNavigation disabled={busy} items={[{
-            label: "Back to content",
-            onSelect: async () => { if (await guard.current()) onCancel(); },
-          }]} current={c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"} />
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+        <h1 className="sr-only">{c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"} editor</h1>
+        <DetailNavigation disabled={busy} items={[{
+          label: "Back to content",
+          onSelect: async () => { if (await guard.current()) onCancel(); },
+        }]} />
+        <div className="editor-heading-actions">
+          <div className="editor-save-status">
             <PublicationStatus published={!!c.publishedRevision} hasUnpublishedChanges={!!c.publishedRevision && publicationChanged} />
             <span role="status">
               {saving || busy ? uploadCount ? "Uploading media…" : "Saving…"
@@ -1917,16 +1917,10 @@ export function Editor({
                 : dirty ? "Saving…" : savedMessage || (existing ? "Saved" : "Not saved yet")}
             </span>
           </div>
-        </div>
-        <div className="editor-publication-action">
           <Button type="button" disabled={busy || publishing || queue.current!.blocked || !publicationChanged || requirements.length > 0}
-            aria-describedby={requirements.length ? "editor-readiness" : undefined}
             onClick={(event) => void submit(event, "published")}>
             {!publicationChanged ? "Published" : c.publishedRevision ? "Publish changes" : "Publish"}
           </Button>
-          {requirements.length > 0 && <p id="editor-readiness" className="text-caption text-muted-foreground" role="status">
-            {requirements.length} {requirements.length === 1 ? "item" : "items"} needed before publishing
-          </p>}
         </div>
       </div>
       {error && (

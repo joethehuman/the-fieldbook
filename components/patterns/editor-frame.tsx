@@ -113,7 +113,7 @@ export function EditorFrame({
             outline: wide.current ? current.outline : false,
             details: !current.details,
           }))}>
-          Details{requirementsCount > 0 && <span className="text-muted-foreground">· {requirementsCount} required</span>}
+          Details{requirementsCount > 0 && <span className="text-muted-foreground" role="status">· {requirementsCount} required</span>}
           {panels.details ? <PanelRightClose aria-hidden="true" /> : <PanelRightOpen aria-hidden="true" />}
         </Button>
       </div>
