@@ -500,7 +500,7 @@ export default function Admin({
       title: "",
       summary: "",
       body: "",
-      category: kind === "course" ? "New category" : "",
+      category: "",
       folder: "",
       status: "draft",
       version: 1,
@@ -1669,7 +1669,7 @@ export function Editor({
   type Requirement = { id: string; message: string; field?: string; step?: string; questionId?: string; target?: "title" | "body" };
   const requirements: Requirement[] = [];
   if (!c.title.trim()) requirements.push({ id: "title", message: "Add a title", field: "editor-title" });
-  if (!c.summary.trim()) requirements.push({ id: "summary", message: "Add a short description", field: "editor-summary" });
+  if (!c.summary.trim()) requirements.push({ id: "summary", message: "Add a short description", field: "writing-summary" });
   if (!c.category.trim() || (c.kind === "doc" && !sectionForDoc(c, docSections)))
     requirements.push({ id: "organization", message: c.kind === "doc" ? "Choose a Docs section" : "Choose a category", field: "writing-organization" });
   if (c.kind !== "doc") {
@@ -1739,6 +1739,13 @@ export function Editor({
           </li>)}
         </ul> : <p className="text-copy text-muted-foreground">{publicationChanged ? "Ready to publish." : "Published version is current."}</p>}
         <FieldDescription>Drafts save automatically. Publish when ready for readers.</FieldDescription>
+      </EditorDetailsGroup>
+      <EditorDetailsGroup id="writing-summary" title="Short description">
+        <FormField label="Short description" visuallyHiddenLabel>
+          <Textarea id="editor-summary" size="compact" rows={3} maxLength={300} value={c.summary}
+            onChange={(event) => set("summary", event.target.value)}
+            placeholder={c.kind === "course" ? "What will people learn?" : "What will people find here?"} />
+        </FormField>
       </EditorDetailsGroup>
       <EditorDetailsGroup id="writing-organization" title={c.kind === "doc" ? "Docs section" : "Category"}>
         {c.kind === "doc" ? (
@@ -1956,11 +1963,6 @@ export function Editor({
             <Input id="editor-title" variant="title" maxLength={160} value={c.title}
               onChange={(event) => set("title", event.target.value)}
               placeholder={`Untitled ${c.kind === "doc" ? "doc" : c.kind === "brief" ? "update" : "course"}`} />
-          </FormField>
-          <FormField label="Short description">
-            <Textarea id="editor-summary" size="compact" rows={2} maxLength={300} value={c.summary}
-              onChange={(event) => set("summary", event.target.value)}
-              placeholder={c.kind === "course" ? "What will people learn?" : "What will people find here?"} />
           </FormField>
         </section>
         {c.kind === "course" ? (

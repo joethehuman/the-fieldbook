@@ -168,6 +168,9 @@
     scrollbar-gutter: stable both-edges;
     outline: none;
   }
+  .main-content:has(> .editor) {
+    padding-block-start: 0;
+  }
   .admin-layout {
     display: grid;
     flex: 1 1 auto;
@@ -232,7 +235,6 @@
     display: grid;
     gap: var(--space-4);
     min-width: 0;
-    margin-block-start: calc(-1 * var(--workspace-inset-block));
   }
   .editor-heading {
     display: flex;

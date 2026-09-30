@@ -137,6 +137,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   </>;
   return <EditorFrame
     outline={outline}
+    outlineContext={selectedLesson ? `Lesson ${course.lessons.indexOf(selectedLesson) + 1} of ${course.lessons.length}` : selected === "quiz" ? "Quiz" : undefined}
     details={details}
     requirementsCount={requirementsCount}
     revealDetails={revealDetails}
@@ -146,7 +147,6 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   >
     <div className="course-builder-panel" ref={panel} tabIndex={-1} role="region" aria-label="Course lessons and quiz">
       {selectedLesson ? <div className="grid min-w-0 gap-5" key={selectedLesson.id}>
-        <p className="text-caption text-muted-foreground">Lesson {course.lessons.indexOf(selectedLesson) + 1} of {course.lessons.length}</p>
         <Input variant="title" aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value }))} />
         <WritingEditor label="Lesson content" value={selectedLesson.body} onChange={(body) => editLesson((lesson) => ({ ...lesson, body }))} onUpload={onUpload} disabled={disabled} />
       </div> : selected === "quiz" && course.questions.length ? <div className="grid gap-5">

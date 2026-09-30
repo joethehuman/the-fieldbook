@@ -10,6 +10,7 @@ export type DetailsReveal = { request: number; field?: string };
 /** One writing canvas with optional in-page navigation and content details. */
 export function EditorFrame({
   outline,
+  outlineContext,
   details,
   requirementsCount = 0,
   revealDetails,
@@ -19,6 +20,7 @@ export function EditorFrame({
   children,
 }: {
   outline?: ReactNode;
+  outlineContext?: string;
   details: ReactNode;
   requirementsCount?: number;
   revealDetails?: DetailsReveal;
@@ -103,7 +105,7 @@ export function EditorFrame({
               details: wide.current ? current.details : false,
             }))}>
             {panels.outline ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}
-            Outline
+            Outline{outlineContext && <span className="text-muted-foreground">· {outlineContext}</span>}
           </Button>
         )}
         <Button ref={detailsToggle} type="button" variant="ghost" size="sm" className="ml-auto"
