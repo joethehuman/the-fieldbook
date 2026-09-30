@@ -120,7 +120,7 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   await page
     .getByRole("button", { name: "Manage Customer success", exact: true })
     .click();
-  await action(page, "Move team");
+  await page.getByRole("button", { name: "Move team", exact: true }).click();
   await expect(
     page.getByRole("radio", { name: /Regional customer success/ }),
   ).toHaveCount(0);

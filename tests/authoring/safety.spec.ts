@@ -7,6 +7,7 @@ async function setup(
   production: boolean,
   kind: "doc" | "course" = "doc",
   blankCourse = false,
+  assignedCourse = false,
 ) {
   const state = freshWorkspace();
   state.content = state.content.filter((c) => c.kind === kind).slice(0, 1);
@@ -19,6 +20,23 @@ async function setup(
     state.content[0].requirePassing = false;
   }
   state.publishedContent = [];
+  if (assignedCourse) {
+    const course = state.content[0];
+    course.status = "published";
+    course.publishedRevision = 1;
+    course.groups = [state.groups[0].id];
+    state.groups[0].requiredCourseIds = [course.id];
+    state.groups[0].learningItems = [{ kind: "course", id: course.id }];
+    course.assignments = [
+      {
+        groupId: state.groups[0].id,
+        assignedAt: course.createdAt || course.updatedAt,
+        due: { type: "none" },
+      },
+    ];
+    course.lessons[0].videoUrl = "https://example.com/legacy.mp4";
+    state.publishedContent = [structuredClone(course)];
+  }
   const control = {
     failSave: false,
     loseResponse: false,
@@ -439,7 +457,7 @@ for (const mode of ["refresh", "lost-response", "conflict"] as const)
     expect(control.saves).toBe(1);
   });
 
-for (const media of ["inline-video", "lesson-video", "card-art"] as const)
+for (const media of ["inline-video", "card-art"] as const)
   test(`course ${media} cannot be removed or saved while uploading`, async ({
     page,
   }, info) => {
@@ -453,12 +471,17 @@ for (const media of ["inline-video", "lesson-video", "card-art"] as const)
       mimeType: media === "card-art" ? "image/png" : "video/mp4",
       buffer: Buffer.from("synthetic"),
     };
+    if (media === "card-art") {
+      const settings = page.getByRole("button", {
+        name: "Content settings",
+        exact: true,
+      });
+      if (await settings.isVisible()) await settings.click();
+    }
     const input =
       media === "card-art"
         ? page.getByLabel("Upload card artwork", { exact: true })
-        : media === "lesson-video"
-          ? page.getByLabel(/Upload opening video/).first()
-          : page.locator('.writing-editor input[type="file"]').first();
+        : page.locator('.writing-editor input[type="file"]').first();
     await input.setInputFiles(file);
     await expect.poll(() => control.uploaded).toBe(true);
     await expect(
@@ -483,11 +506,7 @@ for (const media of ["inline-video", "lesson-video", "card-art"] as const)
     await expect(page.locator(".admin-layout")).toBeVisible();
     const saved = state.content[0];
     expect(
-      media === "card-art"
-        ? saved.cardArt?.imageUrl
-        : media === "lesson-video"
-          ? saved.lessons[0].videoUrl
-          : saved.lessons[0].body,
+      media === "card-art" ? saved.cardArt?.imageUrl : saved.lessons[0].body,
     ).toContain("/api/media/");
   });
 
@@ -553,8 +572,14 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
     const outline = await page
       .getByRole("navigation", { name: "Edit course step" })
       .boundingBox();
-    expect(details!.x).toBeGreaterThan(outline!.x);
+    expect(details!.y + details!.height).toBeLessThanOrEqual(outline!.y);
   }
+  await expect(
+    page.getByLabel("Opening video URL", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel("Upload opening video", { exact: true }),
+  ).toHaveCount(0);
   await page.screenshot({
     path: info.outputPath("course-builder-layout.png"),
     fullPage: true,
@@ -1131,4 +1156,51 @@ test("slash insertion stays beside a blank line after lesson prose", async ({
   await expect(
     page.getByRole("textbox", { name: "Lesson content Markdown" }),
   ).toHaveValue(/First line[\s\S]*> A callout here/);
+});
+
+test("an assigned course retains learning state and legacy media when its inline lesson is edited", async ({
+  page,
+}, info) => {
+  const production = info.project.name.startsWith("production");
+  const { state } = await setup(page, production, "course", false, true);
+  const before = structuredClone(state);
+  await expect(
+    page.getByLabel("Opening video URL", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByLabel("Upload opening video", { exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await page
+    .getByRole("textbox", { name: "Lesson content Markdown", exact: true })
+    .fill(
+      before.content[0].lessons[0].body + "\n\nA small wording correction.",
+    );
+  const settings = page.getByRole("button", {
+    name: "Content settings",
+    exact: true,
+  });
+  if (await settings.isVisible()) await settings.click();
+  await page.getByRole("combobox", { name: "Status", exact: true }).click();
+  await page.getByRole("option", { name: "Draft", exact: true }).click();
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.locator(".admin-layout")).toBeVisible();
+  const after = production
+    ? state
+    : await page.evaluate(() =>
+        JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
+      );
+  expect(after.content[0].assignments).toEqual(before.content[0].assignments);
+  expect(after.content[0].groups).toEqual(before.content[0].groups);
+  expect(after.content[0].version).toBe(before.content[0].version);
+  expect(after.content[0].publishedRevision).toBe(
+    before.content[0].publishedRevision,
+  );
+  expect(after.content[0].lessons[0].videoUrl).toBe(
+    before.content[0].lessons[0].videoUrl,
+  );
+  expect(after.content[0].lessons[0].body).toContain(
+    "A small wording correction.",
+  );
+  expect(after.progress).toEqual(before.progress);
 });

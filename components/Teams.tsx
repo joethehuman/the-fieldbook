@@ -1,4 +1,5 @@
 "use client";
+import { DetailNavigation } from "./patterns/detail-navigation";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
 import { CsvExport } from "./patterns/csv-export";
@@ -34,6 +35,7 @@ import { reportTeamIds, type User } from "@/lib/types";
 import { teamPath } from "@/lib/team-hierarchy";
 export { TeamsAdmin } from "./TeamManagement";
 export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
+  const overview = useRevealTarget<HTMLHeadingElement>();
   const assignments = useRevealTarget<HTMLElement>();
   const teams = data.teams || [];
   const allowed = reportTeamIds(user, teams);
@@ -52,7 +54,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
     );
   return (
     <>
-      <SectionHeader title={<h2>People & completion</h2>}>
+      <SectionHeader variant="page" title={<h2 {...overview.targetProps}>People & completion</h2>}>
         <CsvExport
           filename="team-progress"
           report={() => teamProgressCsv(rows)}
@@ -168,7 +170,14 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
               className="grid gap-4"
               key={u.id}
             >
-              <SectionHeader title={<h2>{u.name}’s assignments</h2>}>
+              <DetailNavigation
+                items={[{ label: "Back to people & completion", onSelect: () => {
+                  setPerson("");
+                  overview.reveal();
+                } }]}
+                current={u.name}
+              />
+              <SectionHeader title={<h3>{u.name}’s assignments</h3>}>
                 <CsvExport
                   filename={`${u.name}-assignments`}
                   report={() => courseProgressCsv(courses, "team")}

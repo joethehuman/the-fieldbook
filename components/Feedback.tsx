@@ -1,4 +1,5 @@
 "use client";
+import { DetailNavigation } from "./patterns/detail-navigation";
 import { Card, CardContent, CardFooter } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { useRevealTarget } from "./patterns/use-reveal-target";
@@ -70,7 +71,7 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
     [rating, setRating] = useState("all"),
     [query, setQuery] = useState(""),
     [sort, setSort] = useState("newest");
-  const scope = useRevealTarget<HTMLHeadingElement>();
+  const scope = useRevealTarget<HTMLHeadingElement>({ context: true });
   const selectedItem = data.content.find((c) => c.id === item);
   function viewItem(id: string) {
     setKind("all");
@@ -83,21 +84,25 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
   const positive = records.filter((f) => f.rating === "up").length;
   return (
     <>
-      <SectionHeader
-        title={
-          <h2 {...scope.targetProps}>
-            {selectedItem ? `Feedback for ${selectedItem.title}` : "Feedback"}
-          </h2>
-        }
-        description="See what readers and learners are telling you."
-      >
+      <div data-reveal-context className="grid gap-4">
         {item !== "all" && (
-          <Button variant="outline" onClick={() => viewItem("all")}>
-            All feedback
-          </Button>
+          <DetailNavigation
+            items={[{ label: "All feedback", onSelect: () => viewItem("all") }]}
+            current={selectedItem?.title}
+          />
         )}
-        <CsvExport filename="feedback" report={() => feedbackCsv(records)} />
-      </SectionHeader>
+        <SectionHeader
+          variant="page"
+          title={
+            <h2 {...scope.targetProps}>
+              {selectedItem ? `Feedback for ${selectedItem.title}` : "Feedback"}
+            </h2>
+          }
+          description="See what readers and learners are telling you."
+        >
+          <CsvExport filename="feedback" report={() => feedbackCsv(records)} />
+        </SectionHeader>
+      </div>
       <FilterOptions
         label="Feedback rating"
         variant="underline"

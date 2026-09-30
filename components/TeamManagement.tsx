@@ -1,11 +1,12 @@
 "use client";
+import { DetailNavigation } from "./patterns/detail-navigation";
 
 import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
 import { Checkbox } from "./ui/choice";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import { ancestorIds, canParent, type Team, type User } from "@/lib/types";
@@ -21,7 +22,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -417,6 +417,7 @@ export function TeamsAdmin({
       {!team ? (
         <>
           <SectionHeader
+            variant="page"
             title={<h2>Teams</h2>}
             description="Organize reporting teams, managers and membership."
           />
@@ -529,26 +530,18 @@ export function TeamsAdmin({
         </>
       ) : (
         <>
-          <ActionGroup>
-            <Button
-              variant="link"
-              disabled={busy}
-              onClick={() => void openTeam("")}
-            >
-              <ArrowLeft size={16} />
-              Back to teams
-            </Button>
-            {team.parentId && (
-              <Button
-                variant="link"
-                disabled={busy}
-                onClick={() => void openTeam(team.parentId!)}
-              >
-                Parent: {teamName(team.parentId)}
-              </Button>
-            )}
-          </ActionGroup>
+          <DetailNavigation
+            disabled={busy}
+            items={[
+              { label: "Back to teams", onSelect: () => openTeam("") },
+              ...(team.parentId
+                ? [{ label: `Parent: ${teamName(team.parentId)}`, onSelect: () => openTeam(team.parentId!) }]
+                : []),
+            ]}
+            current={team.name}
+          />
           <SectionHeader
+            variant="page"
             title={<h2>{team.name}</h2>}
             description={`Manager: ${data.users.find((u) => u.id === team.managerId)?.name || "Unassigned"}`}
           >
@@ -559,6 +552,13 @@ export function TeamsAdmin({
                 onClick={() => void editTeam(team)}
               >
                 Edit team details
+              </Button>
+              <Button
+                variant="outline"
+                disabled={busy}
+                onClick={() => void startMove("out", team.id)}
+              >
+                Move team
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -572,12 +572,6 @@ export function TeamsAdmin({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onSelect={() => void startMove("out", team.id)}
-                  >
-                    Move team
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => void deleteTeam(team)}>
                     Delete empty team
                   </DropdownMenuItem>

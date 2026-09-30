@@ -340,3 +340,10 @@ The installed application's `(workspace)` layout retains one frame, search contr
 The browser-history guard protects adjacent Back with an owned same-URL entry, preserves router history state and skips its retired duplicate on tested Back/Forward return paths. It does not intercept arbitrary multi-entry history traversal. Immediately after a save, Forward may still make a redundant same-URL Admin stop before any Back; that stop leaves the saved form intact. This mechanism does not promise exact native-history parity.
 
 This refactor keeps the existing Next.js/React versions and dynamic SSR/cache behavior. Partial prerendering is not enabled; measure navigation before considering that separate change.
+
+
+## Administration page and editor context
+
+Use `SectionHeader variant="page"` for each administration collection and detail heading; reserve the default variant for subsections. `DetailNavigation` presents return and parent destinations above deep pages. The owning feature retains navigation guards and domain behavior. When a heading must receive focus while its context stays visible, use `useRevealTarget({ context: true })` and a `data-reveal-context` wrapper around navigation and heading. Keep common actions visible; rare destructive team actions retain their menu.
+
+Editors share title/description fields, explicit saved/publication facts and the existing save/publication controls. The writing canvas owns the main column; settings collapse according to available workspace width and can be opened from the editor header. Course steps sit above the full-width lesson editor rather than occupying another writing column. New course videos are inserted inline through WritingEditor; legacy primary-video controls are removed. Use the shared compact Textarea size for short descriptions. Toolbar formatting, lists and history actions wrap in related groups. Markdown and Preview retain a comfortable canvas, and the Insert menu scrolls its own keyboard selection.

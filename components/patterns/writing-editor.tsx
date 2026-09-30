@@ -85,11 +85,11 @@ export function WritingEditor({
           value={props.value}
           disabled={props.disabled}
           onChange={(event) => props.onChange(event.target.value)}
-          className="font-mono"
+          className="min-h-96 font-mono leading-relaxed"
         />
       ) : mode === "preview" ? (
         <div
-          className="markdown rounded-lg border border-border p-6"
+          className="markdown min-h-96 rounded-lg border border-border bg-background p-4 sm:p-6 [&>:first-child]:mt-0"
           aria-label="Draft preview"
         >
           {props.value ? (

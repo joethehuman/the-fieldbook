@@ -1,4 +1,5 @@
 "use client";
+import { DetailNavigation } from "./patterns/detail-navigation";
 import { BulkActions } from "./patterns/bulk-actions";
 import { SelectableRows } from "./patterns/selectable-rows";
 import { groupLearningCommands } from "./bulk-relationships";
@@ -227,6 +228,7 @@ export default function LearningGroups({
       {!group ? (
         <>
           <SectionHeader
+            variant="page"
             title={<h2>Learning groups</h2>}
             description={
               <>
@@ -299,20 +301,33 @@ export default function LearningGroups({
         </>
       ) : (
         <>
-          <Button
-            variant="link"
-            onClick={() => {
-              setSelected("");
-              destination.reveal();
-              setQuery("");
-            }}
-          >
-            ← All learning groups
-          </Button>
+          <DetailNavigation
+            disabled={busy}
+            items={[
+              { label: "All learning groups", onSelect: () => {
+                setSelected("");
+                destination.reveal();
+                setQuery("");
+                setMoveParent(null);
+              } },
+              ...(group.parentId ? [{
+                label: `Parent: ${groupPath(group.parentId, data.groups)}`,
+                onSelect: () => {
+                  setSelected(group.parentId!);
+                  destination.reveal();
+                  setQuery("");
+                  setNotice("");
+                  setMoveParent(null);
+                },
+              }] : []),
+            ]}
+            current={group.name}
+          />
           <SectionHeader
+            variant="page"
             title={<h2>{group.name}</h2>}
             description={
-              <>{groupPath(group.id, data.groups)} · Members receive this group’s courses and Updates in For you.</>
+              <>Members receive this group’s courses and Updates in For you.</>
             }
           >
             <ActionGroup>

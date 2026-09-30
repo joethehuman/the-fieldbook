@@ -1,4 +1,5 @@
 "use client";
+import { DetailNavigation } from "./patterns/detail-navigation";
 import { BulkActions } from "./patterns/bulk-actions";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { Checkbox } from "./ui/choice";
@@ -84,6 +85,13 @@ export default function Curricula({
         (i) => i.kind === "curriculum" && i.id === id,
       ),
     );
+  async function closeEditor() {
+    if (await guard.current()) {
+      setEditing(null);
+      destination.reveal();
+      setNotice("");
+    }
+  }
   async function save() {
     if (!editing) return;
     const name = editing.name.trim();
@@ -182,12 +190,23 @@ export default function Curricula({
           }}
         >
           <FieldGroup disabled={busy}>
-            <h2>
-              {all.some((c) => c.id === editing.id)
-                ? "Edit curriculum"
-                : "New curriculum"}
-            </h2>
-            <p>A playlist of courses, in the order you recommend.</p>
+            <DetailNavigation
+              disabled={busy}
+              items={[{ label: "Back to curricula", onSelect: closeEditor }]}
+              current={editing.name || "New curriculum"}
+            />
+            <SectionHeader
+              variant="page"
+              title={<h2>{all.some((c) => c.id === editing.id) ? "Edit curriculum" : "New curriculum"}</h2>}
+              description="A playlist of courses, in the order you recommend."
+            >
+              <Button type="button" variant="outline" onClick={closeEditor}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={busy}>
+                {busy ? "Saving…" : "Save curriculum"}
+              </Button>
+            </SectionHeader>
             <FormField label="Name">
               <Input
                 required
@@ -316,29 +335,12 @@ export default function Curricula({
                 curriculum to draft.
               </Note>
             )}
-            <ActionGroup>
-              <Button type="submit" loading={busy}>
-                {busy ? "Saving…" : "Save curriculum"}
-              </Button>
-              <Button
-                variant="outline"
-                type="button"
-                onClick={async () => {
-                  if (await guard.current()) {
-                    setEditing(null);
-                    destination.reveal();
-                    setNotice("");
-                  }
-                }}
-              >
-                Cancel
-              </Button>
-            </ActionGroup>
           </FieldGroup>
         </form>
       ) : (
         <>
           <SectionHeader
+            variant="page"
             title={<h2>Curricula</h2>}
             description={
               <>Create reusable playlists, then add them to learning groups.</>

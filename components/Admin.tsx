@@ -1,4 +1,6 @@
 "use client";
+import { DetailNavigation } from "./patterns/detail-navigation";
+import { Badge } from "./ui/badge";
 import { Pagination } from "./patterns/pagination";
 import { contentRelationshipCommands } from "./bulk-relationships";
 import type { BulkHandler } from "@/lib/bulk-actions";
@@ -669,6 +671,7 @@ export default function Admin({
             tab,
           ) && (
             <SectionHeader
+              variant="page"
               title={
                 <h2>
                   {
@@ -748,16 +751,18 @@ export default function Admin({
                   </Button>
                 </ActionGroup>
               </CollectionToolbar>
-              <FilterBar search={
-                <FormField label="Search content" visuallyHiddenLabel>
-                  <Input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search content by title, summary, or folder"
-                  />
-                </FormField>
-              }>
+              <FilterBar
+                search={
+                  <FormField label="Search content" visuallyHiddenLabel>
+                    <Input
+                      type="search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search content by title, summary, or folder"
+                    />
+                  </FormField>
+                }
+              >
                 {filter !== "doc" && (
                   <FormField label="Category">
                     <SelectField
@@ -851,7 +856,11 @@ export default function Admin({
                       <TableHead>
                         {selection.canSelect && (
                           <SelectRows
-                            label={contentRows.length > contentPage.length ? `Select page (${contentPage.length})` : `Select all ${contentRows.length}`}
+                            label={
+                              contentRows.length > contentPage.length
+                                ? `Select page (${contentPage.length})`
+                                : `Select all ${contentRows.length}`
+                            }
                             ids={contentPage.map((row) => row.id)}
                             value={selection.selected}
                             onChange={selection.setSelected}
@@ -1056,16 +1065,18 @@ export default function Admin({
                   </Button>
                 )}
               </Toolbar>
-              <FilterBar search={
-                <FormField label="Search profiles" visuallyHiddenLabel>
-                  <Input
-                    type="search"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Search profiles by name or email"
-                  />
-                </FormField>
-              }>
+              <FilterBar
+                search={
+                  <FormField label="Search profiles" visuallyHiddenLabel>
+                    <Input
+                      type="search"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      placeholder="Search profiles by name or email"
+                    />
+                  </FormField>
+                }
+              >
                 <FormField label="Role">
                   <SelectField
                     value={peopleRole}
@@ -1110,15 +1121,15 @@ export default function Admin({
                   </SelectField>
                 </FormField>
                 <FormField label="Reporting team">
-                <SelectField value={peopleTeam} onValueChange={setPeopleTeam}>
-                  <option value="all">All teams</option>
-                  <option value="none">No team</option>
-                  {(data.teams || []).map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {teamPath(t.id, data.teams || [])}
-                    </option>
-                  ))}
-                </SelectField>
+                  <SelectField value={peopleTeam} onValueChange={setPeopleTeam}>
+                    <option value="all">All teams</option>
+                    <option value="none">No team</option>
+                    {(data.teams || []).map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {teamPath(t.id, data.teams || [])}
+                      </option>
+                    ))}
+                  </SelectField>
                 </FormField>
               </FilterBar>
               <PeopleBulkActions
@@ -1142,7 +1153,11 @@ export default function Admin({
                       <TableHead>
                         {selection.canSelect && (
                           <SelectRows
-                            label={peopleRows.length > peoplePage.length ? `Select page (${peoplePage.length})` : `Select all ${peopleRows.length}`}
+                            label={
+                              peopleRows.length > peoplePage.length
+                                ? `Select page (${peoplePage.length})`
+                                : `Select all ${peopleRows.length}`
+                            }
                             ids={peoplePage.map((row) => row.id)}
                             value={selection.selected}
                             onChange={selection.setSelected}
@@ -1389,8 +1404,10 @@ export function Editor({
   ) => void | Promise<void>;
 }) {
   const form = useRef<HTMLFormElement>(null);
+  const heading = useRef<HTMLDivElement>(null);
   const [savedMessage, setSavedMessage] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsTarget = useRevealTarget();
   const [c, setC] = useState<Content>(() => ({
       ...content,
       assignments:
@@ -1417,6 +1434,22 @@ export function Editor({
   const busy = saving || uploadCount > 0 || recovering;
   const dirty =
     JSON.stringify(c) !== JSON.stringify(baseline.current) || refresh;
+  useEffect(() => {
+    const target = heading.current;
+    if (!target) return;
+    const viewport = target.closest<HTMLElement>(".main-content");
+    const measure = () => {
+      const height = Math.ceil(target.getBoundingClientRect().height);
+      const sticky = height <= (viewport?.clientHeight || window.innerHeight) / 2;
+      form.current?.style.setProperty("--editor-header-height", `${sticky ? height : 0}px`);
+      target.dataset.sticky = String(sticky);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(target);
+    if (viewport) observer.observe(viewport);
+    return () => observer.disconnect();
+  }, [editorTab]);
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (pendingUploads.current || savingNow.current || recovering) {
@@ -1430,7 +1463,9 @@ export function Editor({
     );
   };
   useEffect(() => {
-    registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
+    registerNavigationGuard?.(() => guard.current(), {
+      protected: dirty || busy,
+    });
     return () => registerNavigationGuard?.(null);
   }, [registerNavigationGuard, dirty, busy]);
   useEffect(() => {
@@ -1670,11 +1705,14 @@ export function Editor({
       onSubmit={submit}
       onInvalidCapture={(event) => {
         const control = event.target as HTMLInputElement;
-        if (c.kind !== "course" && !control.getClientRects().length) {
+        if (!control.getClientRects().length) {
           event.preventDefault();
           setSettingsOpen(true);
           requestAnimationFrame(() => {
             control.focus();
+            control
+              .closest('[data-slot="field"]')
+              ?.scrollIntoView({ block: "start" });
             control.reportValidity();
           });
         }
@@ -1690,38 +1728,52 @@ export function Editor({
         }
       }}
     >
-      <Button
-        variant="link"
-        type="button"
+      <DetailNavigation
         disabled={busy}
-        onClick={async () => {
-          if (await guard.current()) onCancel();
-        }}
-      >
-        <ArrowLeft size={16} />
-        Back to content
-      </Button>
-      <div className="editor-heading">
-        <div>
-          <span className="eyebrow">
-            {existing ? "EDIT" : "CREATE"}{" "}
-            {c.kind === "doc"
-              ? "DOC"
-              : c.kind === "brief"
-                ? "UPDATE"
-                : "COURSE"}
-          </span>
-          <h1>{existing ? c.title : "Something worth sharing."}</h1>
+        items={[
+          {
+            label: "Back to content",
+            onSelect: async () => {
+              if (await guard.current()) onCancel();
+            },
+          },
+        ]}
+        current={
+          c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"
+        }
+      />
+      <div ref={heading} className="editor-heading">
+        <div className="editor-heading-copy">
+          <h1>
+            {existing
+              ? c.title
+              : `New ${c.kind === "doc" ? "doc" : c.kind === "brief" ? "update" : "course"}`}
+          </h1>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <Badge
+              variant={
+                data.content.find((item) => item.id === c.id)?.publishedRevision
+                  ? "success"
+                  : "default"
+              }
+            >
+              {data.content.find((item) => item.id === c.id)?.publishedRevision
+                ? "Published"
+                : "Draft"}
+            </Badge>
+            <span role="status">
+              {busy
+                ? uploadCount
+                  ? "Uploading media…"
+                  : "Saving…"
+                : dirty
+                  ? "Unsaved changes"
+                  : savedMessage ||
+                    (existing ? "All changes saved" : "Not saved yet")}
+            </span>
+          </div>
         </div>
         <ActionGroup>
-          {c.kind !== "course" && (
-            <span role="status" className="text-copy text-muted-foreground">
-              {dirty
-                ? "Unsaved changes"
-                : savedMessage ||
-                  (existing ? "All changes saved" : "Not saved yet")}
-            </span>
-          )}
           <Button
             type="submit"
             variant={c.kind === "course" ? "default" : "outline"}
@@ -1747,6 +1799,20 @@ export function Editor({
                 : "Publish"}
             </Button>
           )}
+          <Button
+            type="button"
+            variant="outline"
+            className="hidden @max-[64rem]/workspace:inline-flex"
+            disabled={busy}
+            aria-expanded={settingsOpen}
+            aria-controls="content-settings"
+            onClick={() => {
+              setSettingsOpen(true);
+              settingsTarget.reveal();
+            }}
+          >
+            <Settings size={16} /> Settings
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -1803,10 +1869,14 @@ export function Editor({
         disabled={busy}
         className={`editor-layout${c.kind === "course" ? " course-editor-layout" : ""}`}
       >
-        {c.kind === "course" && (
+        <section className="editor-main">
           <section
-            className="course-editor-metadata"
-            aria-label="Course introduction"
+            className="editor-introduction"
+            aria-label={
+              c.kind === "course"
+                ? "Course introduction"
+                : "Content introduction"
+            }
           >
             <FormField label="Title">
               <Input
@@ -1820,39 +1890,19 @@ export function Editor({
             <FormField label="Short description">
               <Textarea
                 required
-                rows={3}
+                size="compact"
+                rows={2}
                 maxLength={300}
                 value={c.summary}
                 onChange={(e) => set("summary", e.target.value)}
-                placeholder="What will people learn?"
+                placeholder={
+                  c.kind === "course"
+                    ? "What will people learn?"
+                    : "What will people find here?"
+                }
               />
             </FormField>
           </section>
-        )}
-        <section className="editor-main">
-          {c.kind !== "course" && (
-            <>
-              <FormField label="Title">
-                <Input
-                  required
-                  maxLength={160}
-                  value={c.title}
-                  onChange={(e) => set("title", e.target.value)}
-                  placeholder="Give it a clear, useful title"
-                />
-              </FormField>
-              <FormField label="Short description">
-                <Textarea
-                  required
-                  rows={2}
-                  maxLength={300}
-                  value={c.summary}
-                  onChange={(e) => set("summary", e.target.value)}
-                  placeholder="What will people find here?"
-                />
-              </FormField>
-            </>
-          )}
           {c.kind !== "course" ? (
             <WritingEditor
               label={c.kind === "doc" ? "Doc content" : "Update content"}
@@ -1867,11 +1917,15 @@ export function Editor({
               onChange={(updater) => setC(updater)}
               onUpload={upload}
               disabled={busy}
-              onError={setError}
             />
           )}
         </section>
-        <aside className="editor-settings">
+        <aside
+          {...settingsTarget.targetProps}
+          id="content-settings"
+          aria-label="Content settings"
+          className="editor-settings"
+        >
           <Collapsible
             open={settingsOpen}
             onOpenChange={setSettingsOpen}
@@ -1881,19 +1935,12 @@ export function Editor({
               <Button
                 type="button"
                 variant="outline"
-                className={c.kind === "course" ? "hidden" : "lg:hidden"}
+                className="hidden @max-[64rem]/workspace:inline-flex"
               >
                 Content settings <ChevronDown />
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent
-              forceMount
-              className={
-                c.kind === "course"
-                  ? "grid gap-6"
-                  : "hidden data-[state=open]:grid lg:grid gap-6"
-              }
-            >
+            <CollapsibleContent forceMount className="editor-settings-content">
               {c.kind !== "course" ? (
                 <SettingsSection
                   id="writing-publication"
@@ -1921,8 +1968,11 @@ export function Editor({
                   </p>
                 </SettingsSection>
               ) : (
-                <section className="editor-setting-section">
-                  <h3>Publishing</h3>
+                <SettingsSection
+                  id="course-publication"
+                  title={<h3>Publishing</h3>}
+                  guidance="Save draft keeps your work private. Select Published and Save & publish when you are ready for readers."
+                >
                   {production && (
                     <p className="muted">
                       Saving a draft keeps the current public version online.
@@ -1939,7 +1989,7 @@ export function Editor({
                       <option value="published">Published</option>
                     </SelectField>
                   </FormField>
-                </section>
+                </SettingsSection>
               )}
               <SettingsSection
                 id="writing-organization"
@@ -1977,7 +2027,9 @@ export function Editor({
                       onClick={() => setCreatingSection((open) => !open)}
                     >
                       <Plus aria-hidden="true" />
-                      {creatingSection ? "Close section form" : "Create section"}
+                      {creatingSection
+                        ? "Close section form"
+                        : "Create section"}
                     </Button>
                     {creatingSection && (
                       <DocSectionCreate

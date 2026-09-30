@@ -4,6 +4,10 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Unify administration page headings, deep navigation, quieter filters and tables, and visible team/curriculum actions. Align content editor headers, saved/publication state and responsive settings; give course lessons a wider writing canvas.
+- Refine the shared writing toolbar and Insert menu; keep keyboard-selected commands visible, prevent inline slashes opening block insertion, and dismiss the menu with Tab while preserving typed text.
+- Remove legacy course opening-video URL and upload controls. Add new lesson videos through the inline writing editor.
+
 - Retain one installed workspace shell across reading, Team and Administration, with shared demo frame geometry and unsaved-form navigation protection.
 
 - The installed application now lives at the repository root; the optional browser-local demo lives in `demo/`. Default commands run the installed app, with explicit demo commands and deployment app-identity checks. Existing installations must coordinate their Vercel root settings with this source change.

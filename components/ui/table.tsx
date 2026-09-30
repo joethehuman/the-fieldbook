@@ -13,7 +13,7 @@ export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   return (
     <thead
       className={cn(
-        "border-b border-border bg-surface text-sm text-muted-foreground",
+        "border-b border-border bg-muted/40 text-xs text-muted-foreground",
         className,
       )}
       {...props}
@@ -61,7 +61,7 @@ export function TableCell({
   return (
     <td
       className={cn(
-        "px-4 py-3 align-middle [&_small]:mt-1 [&_small]:block [&_small]:text-muted-foreground",
+        "px-4 py-4 align-middle [&_strong]:font-medium [&_small]:mt-1 [&_small]:block [&_small]:text-xs [&_small]:text-muted-foreground",
         align === "right" && "text-right tabular-nums",
         className,
       )}

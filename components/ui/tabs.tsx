@@ -16,7 +16,7 @@ export function TabsList({
       className={cn(
         "group/tabs",
         variant === "sidebar"
-          ? "grid gap-6"
+          ? "grid gap-8"
           : "inline-flex max-w-full flex-wrap gap-4 border-b border-border text-muted-foreground",
         className,
       )}

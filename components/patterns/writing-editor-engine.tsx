@@ -50,6 +50,7 @@ import {
   CAN_UNDO_COMMAND,
   CAN_REDO_COMMAND,
   COMMAND_PRIORITY_EDITOR,
+  SKIP_DOM_SELECTION_TAG,
 } from "lexical";
 import {
   Bold,
@@ -60,6 +61,13 @@ import {
   Undo,
   Redo,
   Plus,
+  Heading2,
+  Quote,
+  Table,
+  Code,
+  CodeXml,
+  Image as ImageIcon,
+  Video,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Tooltip } from "../ui/tooltip";
@@ -159,68 +167,92 @@ function WritingToolbar({
     editor.focus();
     run();
   }
-  const actions = [
-    {
-      label: "Undo",
-      icon: Undo,
-      run: () => editor?.dispatchCommand(UNDO_COMMAND, undefined),
-      unavailable: !canUndo,
-    },
-    {
-      label: "Redo",
-      icon: Redo,
-      run: () => editor?.dispatchCommand(REDO_COMMAND, undefined),
-      unavailable: !canRedo,
-    },
-    {
-      label: "Bold",
-      icon: Bold,
-      run: () => applyFormat("bold"),
-      pressed: !!(format & 1),
-    },
-    {
-      label: "Italic",
-      icon: Italic,
-      run: () => applyFormat("italic"),
-      pressed: !!(format & 2),
-    },
-    {
-      label: "Bulleted list",
-      icon: List,
-      run: () => applyList(list === "bullet" ? "" : "bullet"),
-      pressed: list === "bullet",
-    },
-    {
-      label: "Numbered list",
-      icon: ListOrdered,
-      run: () => applyList(list === "number" ? "" : "number"),
-      pressed: list === "number",
-    },
-    { label: "Link", icon: Link, run: () => link() },
+  const actionGroups: {
+    label: string;
+    icon: typeof Bold;
+    run: () => void;
+    pressed?: boolean;
+    unavailable?: boolean;
+  }[][] = [
+    [
+      {
+        label: "Bold",
+        icon: Bold,
+        run: () => applyFormat("bold"),
+        pressed: !!(format & 1),
+      },
+      {
+        label: "Italic",
+        icon: Italic,
+        run: () => applyFormat("italic"),
+        pressed: !!(format & 2),
+      },
+      { label: "Link", icon: Link, run: () => link() },
+    ],
+    [
+      {
+        label: "Bulleted list",
+        icon: List,
+        run: () => applyList(list === "bullet" ? "" : "bullet"),
+        pressed: list === "bullet",
+      },
+      {
+        label: "Numbered list",
+        icon: ListOrdered,
+        run: () => applyList(list === "number" ? "" : "number"),
+        pressed: list === "number",
+      },
+    ],
+    [
+      {
+        label: "Undo",
+        icon: Undo,
+        run: () => editor?.dispatchCommand(UNDO_COMMAND, undefined),
+        unavailable: !canUndo,
+      },
+      {
+        label: "Redo",
+        icon: Redo,
+        run: () => editor?.dispatchCommand(REDO_COMMAND, undefined),
+        unavailable: !canRedo,
+      },
+    ],
   ];
   return (
     <div className="writing-toolbar">
       <div className="writing-toolbar-controls" role="group" aria-label="Formatting">
         <BlockTypeSelect />
-        {actions.map(({ label, icon: Icon, run, unavailable, pressed }) => (
-          <Tooltip key={label} content={label}>
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              aria-label={label}
-              aria-pressed={pressed}
-              className={pressed ? "bg-accent" : undefined}
-              disabled={disabled || unavailable}
-              onPointerDown={() => editor?.getEditorState().read(() => {
-                pointerSelection.current = $getSelection()?.clone() || null;
-              })}
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={(event) => preserveSelection(run, event.detail > 0 && label !== "Undo" && label !== "Redo")}
-            >
-              <Icon />
-            </Button>
-          </Tooltip>
+        {actionGroups.map((group) => (
+          <div className="writing-toolbar-group" key={group[0].label}>
+            {group.map(({ label, icon: Icon, run, unavailable, pressed }) => (
+              <Tooltip key={label} content={label}>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  aria-label={label}
+                  aria-pressed={pressed}
+                  className={pressed ? "bg-accent" : undefined}
+                  disabled={disabled || unavailable}
+                  onPointerDown={() =>
+                    editor?.getEditorState().read(() => {
+                      pointerSelection.current =
+                        $getSelection()?.clone() || null;
+                    })
+                  }
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={(event) =>
+                    preserveSelection(
+                      run,
+                      event.detail > 0 && label !== "Undo" && label !== "Redo",
+                    )
+                  }
+                >
+                  <Icon />
+                </Button>
+              </Tooltip>
+            ))}
+          </div>
         ))}
         <Button type="button" size="sm" variant="outline" disabled={disabled}
           aria-haspopup="menu"
@@ -282,6 +314,22 @@ export default function WritingEditorEngine({
     slashMenu.current.style.maxHeight = `${slashPosition.maxHeight}px`;
     if (slashFromToolbar && focusInsertItem.current) slashMenu.current.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
   }, [slashOpen, slashPosition, slashFromToolbar]);
+  useLayoutEffect(() => {
+    if (!slashOpen || slashFromToolbar) return;
+    const options = slashMenu.current?.querySelector<HTMLElement>(
+      ".writing-slash-options",
+    );
+    const selected = options?.querySelector<HTMLElement>(
+      '[aria-current="true"]',
+    );
+    if (!options || !selected) return;
+    const container = options.getBoundingClientRect();
+    const item = selected.getBoundingClientRect();
+    // Only scroll the options, never the writing canvas or its parent panel.
+    if (item.top < container.top) options.scrollTop -= container.top - item.top;
+    else if (item.bottom > container.bottom)
+      options.scrollTop += item.bottom - container.bottom;
+  }, [slashOpen, slashFromToolbar, slashIndex, slashQuery]);
   useLayoutEffect(() => {
     if (!mediaChooser || !mediaMenu.current) return;
     mediaMenu.current.style.top = `${mediaPosition.top}px`;
@@ -413,23 +461,33 @@ export default function WritingEditorEngine({
     }, { discrete: true });
     lexical.focus();
   }
-  function keepSlashAsText(query = slashQuery) {
+  function keepSlashAsText(query = slashQuery, restoreCaret = true) {
     const text = `/${query}`;
     const lexical = lexicalEditor.current;
     let index = -1;
     lexical?.getEditorState().read(() => {
       const selection = $getSelection();
-      if ($isRangeSelection(selection)) index = selection.anchor.getNode().getTopLevelElementOrThrow().getIndexWithinParent();
+      if ($isRangeSelection(selection))
+        index = selection.anchor
+          .getNode()
+          .getTopLevelElementOrThrow()
+          .getIndexWithinParent();
     });
     setSlashOpen(false);
-    lexical?.update(() => {
-      const selection = $getSelection();
-      if ($isRangeSelection(selection)) selection.insertText(text);
-    });
-    if (lexical && index >= 0) requestAnimationFrame(() => lexical.update(() => {
-      const block = $getRoot().getChildAtIndex(index);
-      if ($isElementNode(block)) block.selectEnd();
-    }));
+    lexical?.update(
+      () => {
+        const selection = $getSelection();
+        if ($isRangeSelection(selection)) selection.insertText(text);
+      },
+      { tag: restoreCaret ? undefined : SKIP_DOM_SELECTION_TAG },
+    );
+    if (restoreCaret && lexical && index >= 0)
+      requestAnimationFrame(() =>
+        lexical.update(() => {
+          const block = $getRoot().getChildAtIndex(index);
+          if ($isElementNode(block)) block.selectEnd();
+        }),
+      );
   }
   function rememberSelection() {
     mediaSelection.current = null;
@@ -472,16 +530,16 @@ export default function WritingEditorEngine({
     });
   }
   const slashCommands = [
-    { name: "Heading", terms: "title heading", run: () => chooseBlock("heading") },
-    { name: "Bulleted list", terms: "bullets list", run: () => chooseBlock("bullet") },
-    { name: "Numbered list", terms: "numbers list", run: () => chooseBlock("number") },
-    { name: "Callout", terms: "quote callout", run: () => chooseBlock("quote") },
-    { name: "Table", terms: "table grid rows columns", run: insertTableAtCaret },
-    { name: "Code block", terms: "code block", run: () => { setSlashOpen(false); blockActions.current?.codeBlock(); } },
-    { name: "Inline code", terms: "code inline text", run: () => { setSlashOpen(false); blockActions.current?.inlineCode(); } },
-    { name: "Image", terms: "image photo", run: () => openMedia("image") },
-    { name: "Upload video", terms: "video upload file", run: () => openMedia("video") },
-    { name: "Embed video link", terms: "video embed link", run: () => openMedia("video", "link") },
+    { name: "Heading", icon: Heading2, terms: "title heading", run: () => chooseBlock("heading") },
+    { name: "Bulleted list", icon: List, terms: "bullets list", run: () => chooseBlock("bullet") },
+    { name: "Numbered list", icon: ListOrdered, terms: "numbers list", run: () => chooseBlock("number") },
+    { name: "Callout", icon: Quote, terms: "quote callout", run: () => chooseBlock("quote") },
+    { name: "Table", icon: Table, terms: "table grid rows columns", run: insertTableAtCaret },
+    { name: "Code block", icon: CodeXml, terms: "code block", run: () => { setSlashOpen(false); blockActions.current?.codeBlock(); } },
+    { name: "Inline code", icon: Code, terms: "code inline text", run: () => { setSlashOpen(false); blockActions.current?.inlineCode(); } },
+    { name: "Image", icon: ImageIcon, terms: "image photo", run: () => openMedia("image") },
+    { name: "Upload video", icon: Video, terms: "video upload file", run: () => openMedia("video") },
+    { name: "Embed video link", icon: Link, terms: "video embed link", run: () => openMedia("video", "link") },
   ];
   const commandsFor = (query: string) => slashCommands.filter(({ name, terms }) => `${name} ${terms}`.toLowerCase().includes(query.trim().toLowerCase()));
   const matchingCommands = commandsFor(slashQuery);
@@ -640,6 +698,11 @@ export default function WritingEditorEngine({
       }
       if (slashOpen && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
         if (event.key === "Escape") { event.preventDefault(); closeInsertMenu(); return; }
+        if (event.key === "Tab") {
+          event.stopPropagation();
+          keepSlashAsText(slashQuery, false);
+          return;
+        }
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
           if (matchingCommands.length) setSlashIndex((index) => (index + (event.key === "ArrowDown" ? 1 : -1) + matchingCommands.length) % matchingCommands.length);
@@ -657,8 +720,20 @@ export default function WritingEditorEngine({
       }
       if (event.key === "/" && !disabled && !busy && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
         const selection = window.getSelection();
-        const before = selection?.anchorNode?.textContent?.slice(0, selection.anchorOffset) || "";
-        if (!before.trim()) { event.preventDefault(); openSlash(); }
+        const anchor = selection?.anchorNode;
+        const element = anchor instanceof Element ? anchor : anchor?.parentElement;
+        const paragraph = element?.closest(
+          ".writing-content > p, .writing-content > h1, .writing-content > h2, .writing-content > h3, .writing-content > h4, .writing-content > h5, .writing-content > h6, .writing-content > blockquote, .writing-content li",
+        );
+        if (selection?.isCollapsed && selection.rangeCount && paragraph) {
+          const before = selection.getRangeAt(0).cloneRange();
+          before.selectNodeContents(paragraph);
+          before.setEnd(selection.anchorNode!, selection.anchorOffset);
+          if (!before.toString().trim()) {
+            event.preventDefault();
+            openSlash();
+          }
+        }
       }
       if (event.key === "Escape") { setSlashOpen(false); closeMedia(); }
     }}>
@@ -679,7 +754,7 @@ export default function WritingEditorEngine({
         }
       }}>
         <div ref={slashFade.ref} className="writing-slash-options scroll-fade" data-scroll-fade-before={slashFade.edges.before} data-scroll-fade-after={slashFade.edges.after} onScroll={slashFade.measure}>
-          {matchingCommands.map((command, index) => <Button key={command.name} type="button" size="sm" variant="ghost" role="menuitem" aria-current={!slashFromToolbar && index === slashIndex ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setSlashIndex(index)} onClick={() => runInsertCommand(command.run)}>{command.name}</Button>)}
+          {matchingCommands.map(({ icon: Icon, ...command }, index) => <Button key={command.name} type="button" size="sm" variant="ghost" role="menuitem" aria-current={!slashFromToolbar && index === slashIndex ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onPointerMove={() => setSlashIndex(index)} onClick={() => runInsertCommand(command.run)}><Icon aria-hidden="true" />{command.name}</Button>)}
         </div>
         <div className="writing-slash-footer"><Button type="button" size="sm" variant="ghost" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={closeInsertMenu}><span>Close menu</span><kbd>esc</kbd></Button></div>
       </div>, document.body)}

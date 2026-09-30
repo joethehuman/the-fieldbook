@@ -3,7 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 
 /** Request from an explicit navigation action, after accepting any leave guard. */
-export function useRevealTarget<T extends HTMLElement = HTMLDivElement>() {
+export function useRevealTarget<T extends HTMLElement = HTMLDivElement>({
+  context = false,
+}: { context?: boolean } = {}) {
   const ref = useRef<T>(null);
   const [request, setRequest] = useState<{ focus: boolean } | null>(null);
   useEffect(() => {
@@ -13,7 +15,10 @@ export function useRevealTarget<T extends HTMLElement = HTMLDivElement>() {
       const target = ref.current;
       if (!target) return;
       if (request.focus) target.focus({ preventScroll: true });
-      target.scrollIntoView({
+      const scrollTarget = context
+        ? target.closest<HTMLElement>("[data-reveal-context]") || target
+        : target;
+      scrollTarget.scrollIntoView({
         block: "start",
         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
           ? "instant"
@@ -21,7 +26,7 @@ export function useRevealTarget<T extends HTMLElement = HTMLDivElement>() {
       });
     });
     return () => cancelAnimationFrame(frame);
-  }, [request]);
+  }, [request, context]);
   return {
     targetProps: { ref, tabIndex: -1, "data-reveal-target": true as const },
     reveal: (focus = true) => setRequest({ focus }),

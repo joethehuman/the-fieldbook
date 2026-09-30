@@ -524,3 +524,209 @@ for (const kind of ["Doc", "Update"]) {
     });
   });
 }
+
+test("slash commands stay visible and normal inline slashes remain text", async ({
+  page,
+}, info) => {
+  await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "First **bold** ending",
+  );
+  const editor = page.getByRole("textbox", {
+    name: "Doc content",
+    exact: true,
+  });
+  await expect(editor.locator("strong")).toBeVisible();
+  // Place the caret at the start of a nested text node, in the middle of prose.
+  await editor.locator("strong").evaluate((node) => {
+    (node.closest("[contenteditable]") as HTMLElement).focus();
+    const range = document.createRange();
+    range.setStart(node.firstChild!, 0);
+    range.collapse(true);
+    const selection = window.getSelection()!;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  });
+  await page.keyboard.press("/");
+  await expect(page.getByRole("menu", { name: /Insert content/ })).toHaveCount(
+    0,
+  );
+  await expect(editor).toHaveText("First /bold ending");
+
+  await editor.press("ControlOrMeta+End");
+  await editor.press("Enter");
+  await page.keyboard.press("/");
+  const menu = page.getByRole("menu", { name: /Insert content/ });
+  await expect(menu).toBeVisible();
+  const oldScroll = await page
+    .locator(".main-content")
+    .evaluate((node) => node.scrollTop);
+  for (let index = 0; index < 9; index++)
+    await page.keyboard.press("ArrowDown");
+  const last = menu.getByRole("menuitem", {
+    name: "Embed video link",
+    exact: true,
+  });
+  await expect(last).toHaveAttribute("aria-current", "true");
+  const options = await menu.locator(".writing-slash-options").boundingBox();
+  const selected = await last.boundingBox();
+  expect(selected!.y).toBeGreaterThanOrEqual(options!.y - 1);
+  expect(selected!.y + selected!.height).toBeLessThanOrEqual(
+    options!.y + options!.height + 1,
+  );
+  expect(
+    await page.locator(".main-content").evaluate((node) => node.scrollTop),
+  ).toBe(oldScroll);
+  await page.screenshot({
+    path: info.outputPath("writing-command-keyboard.png"),
+  });
+  await page.keyboard.type("hea");
+  await page.keyboard.press("Tab");
+  await expect(menu).toHaveCount(0);
+  await expect(editor).not.toBeFocused();
+  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await expect(
+    page.getByRole("textbox", { name: "Doc content Markdown" }),
+  ).toHaveValue(/\/hea/);
+});
+
+test("pasting into an inserted list preserves nested lists through a draft save", async ({
+  page,
+}, info) => {
+  const { read } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "- Parent point\n  - Nested point\n\nAfter the list",
+  );
+  const editor = page.getByRole("textbox", {
+    name: "Doc content",
+    exact: true,
+  });
+  await expect(editor.locator("ul ul li")).toContainText("Nested point");
+  await editor
+    .locator(":scope > p")
+    .last()
+    .evaluate((node) => {
+      (node.closest("[contenteditable]") as HTMLElement).focus();
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      range.collapse(false);
+      const selection = window.getSelection()!;
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/number");
+  await page.keyboard.press("Enter");
+  await editor.evaluate((node) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", "Pasted customer context");
+    node.dispatchEvent(
+      new ClipboardEvent("paste", {
+        clipboardData: data,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  });
+  await expect(editor.locator("ol li")).toHaveText("Pasted customer context");
+  await expect(editor.locator("ul ul li")).toContainText("Nested point");
+  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  const saved = (await read()).content[0].body;
+  expect(saved).toContain("Nested point");
+  expect(saved).toMatch(/1\. Pasted customer context/);
+  await page
+    .getByRole("button", { name: "Preview draft", exact: true })
+    .click();
+  const preview = page.getByLabel("Draft preview", { exact: true });
+  await expect(preview.locator("ul ul li")).toHaveText("Nested point");
+  await expect(preview.locator("ol li")).toHaveText("Pasted customer context");
+});
+
+test("settings reveal clears the sticky header and enlarged text leaves the canvas reachable", async ({
+  page,
+}, info) => {
+  await setup(page, info.project.name.startsWith("production"));
+  await page
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill(
+      "Customer launch readiness and practical product guidance for enterprise teams",
+    );
+  const settings = page.getByRole("button", { name: "Settings", exact: true });
+  if (await settings.isVisible()) {
+    await settings.click();
+    const panel = page.getByRole("complementary", {
+      name: "Content settings",
+      exact: true,
+    });
+    await expect(panel).toBeFocused();
+    await expect
+      .poll(() =>
+        panel.evaluate(
+          (node) =>
+            node.getBoundingClientRect().top >=
+            document.querySelector(".editor-heading")!.getBoundingClientRect()
+              .bottom,
+        ),
+      )
+      .toBe(true);
+  }
+  await page
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill(
+      "Customer launch readiness and practical product guidance for everyone working with enterprise customers and the teams responsible for successful customer outcomes",
+    );
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  const writing = page.getByRole("textbox", {
+    name: "Doc content",
+    exact: true,
+  });
+  await writing.scrollIntoViewIfNeeded();
+  await expect
+    .poll(() =>
+      writing.evaluate((node) => {
+        const canvas = node.getBoundingClientRect();
+        const header = document
+          .querySelector(".editor-heading")!
+          .getBoundingClientRect();
+        const main = document
+          .querySelector(".main-content")!
+          .getBoundingClientRect();
+        return (
+          canvas.top < main.bottom &&
+          canvas.bottom > main.top &&
+          (header.bottom <= canvas.top || header.top >= canvas.bottom)
+        );
+      }),
+    )
+    .toBe(true);
+  await writing.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type(" Reachable canvas.");
+  await expect(writing).toContainText("Reachable canvas.");
+  const formatting = page.getByRole("group", { name: "Formatting", exact: true });
+  await expect.poll(() => formatting.evaluate((node) => {
+    const boundary = node.closest(".writing-editor")!.getBoundingClientRect();
+    return [...node.querySelectorAll("button")].filter((button) => {
+      const box = button.getBoundingClientRect();
+      return box.width > 0 && (box.left < boundary.left || box.right > boundary.right);
+    }).map((button) => button.getAttribute("aria-label") || button.textContent);
+  })).toEqual([]);
+  if (await settings.isVisible()) {
+    await settings.click();
+    const panel = page.getByRole("complementary", { name: "Content settings", exact: true });
+    await expect(panel).toBeFocused();
+    await expect.poll(() => panel.evaluate((node) => {
+      const box = node.getBoundingClientRect();
+      const main = document.querySelector(".main-content")!.getBoundingClientRect();
+      return box.top >= main.top && box.top < main.bottom;
+    })).toBe(true);
+  }
+  await page.screenshot({
+    path: info.outputPath("editor-large-text-reachable.png"),
+  });
+});

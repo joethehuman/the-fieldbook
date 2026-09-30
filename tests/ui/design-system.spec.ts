@@ -162,9 +162,9 @@ test("learning groups: shared controls, save and reload", async ({
   await createDialog.getByRole("button", { name: "Create group" }).click();
   await expect(createDialog).not.toBeVisible();
   // Creation opens the detail view.
-  await expect(page.locator(".learning-admin")).toContainText(
-    "Account executives / Sales design test",
-  );
+  await expect(page.getByRole("heading", { name: "Sales design test", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Navigation context" })
+    .getByRole("button", { name: "Parent: Account executives", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add child group" }).click();
   await expect(
     createDialog.getByRole("combobox", { name: "Parent group" }),
