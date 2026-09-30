@@ -111,6 +111,7 @@ export default function ComponentCatalog() {
           is available only in the demo application.
         </p>
         <a href="/">Back to Fieldbook</a>
+        <a href="/ui/workspace">Workspace frame example</a>
       </PageHeader>
       <ControlExamples />
       <section className="grid gap-4" aria-label="Admin collection filters">

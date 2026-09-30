@@ -98,7 +98,7 @@ test("admin entry and section changes avoid the full workspace", async ({
   if (await menu.isVisible()) await menu.click();
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("button", { name: /Courses/ })
+    .getByRole("link", { name: /Courses/ })
     .click();
   await expect(page).toHaveURL(/\/courses$/);
   expect(documentNavigations).toBe(1);
@@ -223,6 +223,15 @@ test("confirmed editor navigation responds while its destination is loading", as
       path: "/",
     },
   ]);
+  // Hold the destination before the shared shell can prefetch it.
+  let release!: () => void;
+  const destination = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(/\/docs\?_rsc=/, async (route) => {
+    await destination;
+    await route.continue();
+  });
   await page.goto("/admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
   const picker = page.getByRole("combobox", { name: "Administration section" });
@@ -234,20 +243,12 @@ test("confirmed editor navigation responds while its destination is loading", as
     .getByRole("textbox", { name: "Installation name" })
     .fill("Unsaved name");
 
-  let release!: () => void;
-  const destination = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route(/\/docs\?_rsc=/, async (route) => {
-    await destination;
-    await route.continue();
-  });
   const menu = page.getByRole("button", { name: "Open navigation" });
   if (await menu.isVisible()) await menu.click();
   const topbar = await page.locator(".topbar").boundingBox();
   await page
     .getByRole("navigation", { name: "Primary" })
-    .getByRole("button", { name: "Docs", exact: true })
+    .getByRole("link", { name: "Docs", exact: true })
     .click();
   const confirmation = page.getByRole("alertdialog", {
     name: "Confirm action",

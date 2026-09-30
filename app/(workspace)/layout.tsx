@@ -1,14 +1,13 @@
 import { ReaderShell } from "@/components/reader/ReaderShell";
 import {
-  readerContext,
+  readerShellContext,
   readerCourseItem,
   readerCurriculum,
   readerItem,
-  readerTeamContext,
   readerUpdateItem,
 } from "@server/reader";
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +23,9 @@ export default async function Layout({
   if (
     parts.length < 1 ||
     parts.length > 2 ||
-    !["docs", "updates", "courses", "curricula", "team"].includes(section)
+    !["docs", "updates", "courses", "curricula", "team", "admin"].includes(
+      section,
+    )
   )
     notFound();
 
@@ -38,37 +39,8 @@ export default async function Layout({
     else if (section === "curricula") await readerCurriculum(id);
     else notFound();
   }
-  if (section === "team")
-    return (
-      <ReaderShell context={await readerTeamContext()}>{children}</ReaderShell>
-    );
-  const {
-    user,
-    branding,
-    docs,
-    docCategoryOrder,
-    docSections,
-    forYou,
-    otherUpdates,
-    courseTitles,
-    curriculumTitles,
-  } = await readerContext(`/${section}`);
   return (
-    <ReaderShell
-      context={{
-        user,
-        branding,
-        docs,
-        docCategoryOrder,
-        docSections,
-        updateTitles: [...forYou, ...otherUpdates].map(({ id, title }) => ({
-          id,
-          title,
-        })),
-        courseTitles,
-        curriculumTitles,
-      }}
-    >
+    <ReaderShell context={await readerShellContext(`/${section}`)}>
       {children}
     </ReaderShell>
   );

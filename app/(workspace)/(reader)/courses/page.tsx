@@ -1,3 +1,4 @@
+import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { readerContext, readerCourses } from "@server/reader";
 import { ReaderCourses } from "@/components/reader/ReaderCourses";
 
@@ -13,5 +14,9 @@ export async function generateMetadata() {
 }
 
 export default async function Page() {
-  return <ReaderCourses data={await readerCourses()} />;
+  return (
+    <WorkspacePage section="/courses">
+      <ReaderCourses data={await readerCourses()} />
+    </WorkspacePage>
+  );
 }

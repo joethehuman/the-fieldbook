@@ -81,7 +81,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   if ((page.viewportSize()?.width ?? 1000) < 768) await menu.click();
   await page
     .getByRole("navigation")
-    .getByRole("button", { name: "Docs", exact: true })
+    .getByRole(production ? "link" : "button", { name: "Docs", exact: true })
     .click();
   const confirmation = page.getByRole("alertdialog", {
     name: "Confirm action",
