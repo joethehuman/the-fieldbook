@@ -7,7 +7,7 @@ import { SettingsSection } from "./patterns/settings-section";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
-import MarkdownEditor from "./MarkdownEditor";
+import { WritingEditor } from "./patterns/writing-editor";
 import { defaultPrivacy, type SiteSettings } from "@/lib/settings";
 export default function PrivacySettingsPanel({
   settings,
@@ -52,7 +52,7 @@ export default function PrivacySettingsPanel({
           <Button
             type="button"
             variant="outline"
-            disabled={!valid}
+            disabled={busy || !valid}
             loading={busy}
             aria-describedby={!valid ? "privacy-publish-help" : undefined}
             onClick={async () => {
@@ -129,7 +129,8 @@ export default function PrivacySettingsPanel({
           />
         </FormField>
       ) : (
-        <MarkdownEditor
+        <WritingEditor
+          disabled={busy}
           label="Privacy policy draft"
           value={draft.body}
           onChange={(body) => edit({ body })}

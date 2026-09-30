@@ -11,6 +11,7 @@ export function SelectableRows({
   onChange,
   label,
   scope = "",
+  empty,
 }: {
   rows: {
     id: string;
@@ -22,6 +23,7 @@ export function SelectableRows({
   onChange: (ids: string[]) => void;
   label: string;
   scope?: string;
+  empty?: ReactNode;
 }) {
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [scope]);
@@ -111,7 +113,7 @@ export function SelectableRows({
           </li>
         ))}
       </ul>
-      {!rows.length && <p>No items in this list.</p>}
+      {!rows.length && (empty ?? <p>No items in this list.</p>)}
       {rows.length > 25 && (
         <Pagination
           label={label}

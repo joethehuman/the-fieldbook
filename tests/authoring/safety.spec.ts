@@ -1,4 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { waitForDraftSaved, openContentSettings } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
@@ -142,6 +144,25 @@ async function setup(
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   return { state, control };
 }
+async function failDraftWrites(page: Page, production: boolean, control: { failSave: boolean }) {
+  control.failSave = true;
+  if (!production) await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "fieldbook.workspace.v1") throw new Error("Storage is full");
+      return setItem.call(this, key, value);
+    };
+  });
+}
+
+async function openCourseOutline(page: Page) {
+  const drawer = page.getByRole("button", { name: /^Outline ·/ });
+  if (await drawer.isVisible()) await drawer.click();
+  const reopen = page.getByRole("button", { name: "Show outline", exact: true });
+  if (await reopen.isVisible()) await reopen.click();
+  return page.getByRole("navigation", { name: "Edit course step" });
+}
+
 async function openNav(page: Page) {
   const menu = page.getByRole("button", { name: "Open navigation" });
   if ((page.viewportSize()?.width ?? 1000) < 768) {
@@ -152,10 +173,12 @@ async function openNav(page: Page) {
   }
 }
 
-test("search preserves dirty edits; canceled navigation and reload keep them until explicit discard", async ({
+test("failed autosave preserves edits through search, canceled navigation and reload until explicit leave", async ({
   page,
 }, info) => {
-  await setup(page, info.project.name.startsWith("production"));
+  const production = info.project.name.startsWith("production");
+  const { control } = await setup(page, production);
+  await failDraftWrites(page, production, control);
   await page.getByLabel("Title", { exact: true }).fill("Keep these edits");
   await page.getByRole("button", { name: "Back to content" }).click();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -213,11 +236,11 @@ test("search preserves dirty edits; canceled navigation and reload keep them unt
   await expect(page.locator(".admin-layout")).toBeVisible();
 });
 
-test("browser back can be canceled without unmounting the editor", async ({
+test("browser back preserves an unsaved failed draft when leaving is canceled", async ({
   page,
 }, info) => {
   const production = info.project.name.startsWith("production");
-  await setup(page, production);
+  const { control } = await setup(page, production);
   await page.getByRole("button", { name: "Back to content" }).click();
   await openNav(page);
   // This fixture resets published Docs between cases; use a collection route.
@@ -233,6 +256,7 @@ test("browser back can be canceled without unmounting the editor", async ({
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("menuitem", { name: "Manage organization" }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await failDraftWrites(page, production, control);
   await page.getByLabel("Title", { exact: true }).fill("History protected");
   await page.evaluate(() => history.back());
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -252,28 +276,24 @@ test("failed save preserves downloadable text and does not show success", async 
 }, info) => {
   const production = info.project.name.startsWith("production");
   const { control } = await setup(page, production);
-  control.failSave = true;
-  if (!production)
-    await page.evaluate(() => {
-      Storage.prototype.setItem = () => {
-        throw new Error("full");
-      };
-    });
+  await failDraftWrites(page, production, control);
   await page.getByLabel("Title", { exact: true }).fill("Recover my draft");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+s");
   await expect(
     page.locator("form.editor").getByRole("alert").first(),
   ).toContainText(
-    production ? "0 of 1 changes confirmed saved" : "browser could not save",
+    production ? "Database unavailable" : "Storage is full",
   );
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Recover my draft",
   );
+  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Save failed");
+  await expect(page.locator('[data-slot="toast"]')).toHaveCount(0);
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download draft" }).click();
-  expect((await download).suggestedFilename()).toBe(
-    "fieldbook-unsaved-draft.json",
-  );
+  const downloaded = await download;
+  expect(downloaded.suggestedFilename()).toBe("fieldbook-unsaved-draft.json");
+  expect(JSON.parse(await readFile((await downloaded.path())!, "utf8")).title).toBe("Recover my draft");
 });
 
 test("failed learning-group save shows one concise inline error", async ({
@@ -350,6 +370,8 @@ for (const failure of [false, true])
     await page
       .getByRole("textbox", { name: "Doc content", exact: true })
       .fill("Keep the original body");
+    await waitForDraftSaved(page);
+    const savesBeforeUpload = control.saves;
     await page.locator('.writing-editor input[type="file"]').setInputFiles({
       name: "example.png",
       mimeType: "image/png",
@@ -357,7 +379,7 @@ for (const failure of [false, true])
     });
     await expect.poll(() => control.uploaded).toBe(true);
     await expect(
-      page.getByRole("button", { name: "Save draft", exact: true }),
+      page.locator(".editor-heading").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
     ).toBeDisabled();
     await expect(
       page.getByRole("button", { name: "Back to content" }),
@@ -370,7 +392,7 @@ for (const failure of [false, true])
           new Event("submit", { bubbles: true, cancelable: true }),
         ),
       );
-    expect(control.saves).toBe(0);
+    expect(control.saves).toBe(savesBeforeUpload);
     await openNav(page);
     await page
       .getByRole("navigation")
@@ -386,7 +408,7 @@ for (const failure of [false, true])
     ).toHaveText("Keep the original body");
     control.releaseUpload();
     await expect(
-      page.getByRole("button", { name: "Save draft", exact: true }),
+      page.locator(".editor-heading").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
     ).toBeEnabled();
     if (failure)
       await expect(
@@ -406,18 +428,12 @@ for (const failure of [false, true])
       path: info.outputPath("upload-result.png"),
       fullPage: true,
     });
-    await page.getByRole("button", { name: "Save draft", exact: true }).click();
-    await expect(
-      page
-        .locator("form.editor")
-        .getByRole("status")
-        .filter({ hasText: "Draft saved" }),
-    ).toBeVisible();
+    await waitForDraftSaved(page);
     expect(state.content[0].body).toContain("Keep the original body");
     expect(state.content[0].body.includes("/api/media/")).toBe(!failure);
   });
 
-for (const mode of ["refresh", "lost-response", "conflict"] as const)
+for (const mode of ["recovery-unavailable", "lost-response", "conflict"] as const)
   test(`${mode}: recover the saved copy without silently resending`, async ({
     page,
   }, info) => {
@@ -426,24 +442,26 @@ for (const mode of ["refresh", "lost-response", "conflict"] as const)
       "Server failure case",
     );
     const { control } = await setup(page, true);
-    await page.getByLabel("Title", { exact: true }).fill("My local edit");
-    control.failRefresh = mode === "refresh";
+    control.failSave = mode === "recovery-unavailable";
+    control.failRefresh = mode === "recovery-unavailable";
     control.loseResponse = mode === "lost-response";
     control.conflict = mode === "conflict";
-    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await page.getByLabel("Title", { exact: true }).fill("My local edit");
+    await page.keyboard.press("ControlOrMeta+s");
     await expect(
       page.locator("form.editor").getByRole("alert").first(),
     ).toContainText(
-      mode === "refresh"
-        ? "Changes saved, but"
+      mode === "recovery-unavailable"
+        ? "The latest saved state is unavailable"
         : mode === "lost-response"
           ? "may have been saved"
-          : "rejected change was not saved",
+          : "This change was not saved",
     );
     await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
       "My local edit",
     );
     control.failRefresh = false;
+    control.failSave = false;
     await page.getByRole("button", { name: "Review saved copy" }).click();
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
@@ -452,7 +470,7 @@ for (const mode of ["refresh", "lost-response", "conflict"] as const)
     await page.getByRole("button", { name: "Review saved copy" }).click();
     await page.getByRole("button", { name: "Confirm", exact: true }).click();
     await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
-      mode === "conflict" ? "Another author's change" : "My local edit",
+      mode === "conflict" ? "Another author's change" : mode === "recovery-unavailable" ? "Safety fixture" : "My local edit",
     );
     expect(control.saves).toBe(1);
   });
@@ -472,11 +490,7 @@ for (const media of ["inline-video", "card-art"] as const)
       buffer: Buffer.from("synthetic"),
     };
     if (media === "card-art") {
-      const settings = page.getByRole("button", {
-        name: "Content settings",
-        exact: true,
-      });
-      if (await settings.isVisible()) await settings.click();
+      await openContentSettings(page);
     }
     const input =
       media === "card-art"
@@ -485,10 +499,10 @@ for (const media of ["inline-video", "card-art"] as const)
     await input.setInputFiles(file);
     await expect.poll(() => control.uploaded).toBe(true);
     await expect(
-      page.getByRole("button", { name: "Remove lesson", exact: true }),
+      page.locator('[aria-label="Lesson actions"]'),
     ).toBeDisabled();
     await expect(
-      page.getByRole("button", { name: "Save draft", exact: true }),
+      page.locator(".editor-heading").getByRole("button", { name: /Publish|Review requirements/, includeHidden: true }),
     ).toBeDisabled();
     await page
       .locator("form.editor")
@@ -499,11 +513,11 @@ for (const media of ["inline-video", "card-art"] as const)
       );
     expect(control.saves).toBe(0);
     control.releaseUpload();
-    await expect(
-      page.getByRole("button", { name: "Save draft", exact: true }),
-    ).toBeEnabled();
-    await page.getByRole("button", { name: "Save draft", exact: true }).click();
-    await expect(page.locator(".admin-layout")).toBeVisible();
+    await expect.poll(() => media === "card-art"
+      ? state.content[0].cardArt?.imageUrl || ""
+      : state.content[0].lessons[0].body).toContain("/api/media/");
+    if (media === "card-art") await page.keyboard.press("Escape");
+    await expect(page.locator("form.editor")).toBeVisible();
     const saved = state.content[0];
     expect(
       media === "card-art" ? saved.cardArt?.imageUrl : saved.lessons[0].body,
@@ -515,14 +529,14 @@ test("session expiration during recovery cannot replace the editor with a guest 
 }, info) => {
   test.skip(!info.project.name.startsWith("production"), "Server session case");
   const { control } = await setup(page, true);
+  control.failSave = true;
+  control.sessionLost = true;
   await page
     .getByLabel("Title", { exact: true })
     .fill("Keep this after expiry");
-  control.failSave = true;
-  control.sessionLost = true;
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await page.keyboard.press("ControlOrMeta+s");
   await expect(page.locator("form.editor").getByRole("alert")).toContainText(
-    "could not be refreshed",
+    "The latest saved state is unavailable",
   );
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep this after expiry",
@@ -536,15 +550,15 @@ test("session expiration during recovery cannot replace the editor with a guest 
   );
 });
 
-test("draft saves and publication share one transient confirmation", async ({
+test("autosave stays quiet and explicit publication shows one transient confirmation", async ({
   page,
 }, info) => {
   const production = info.project.name.startsWith("production");
   await setup(page, production);
   await page.getByLabel("Title", { exact: true }).fill("Notification fixture");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
+  await waitForDraftSaved(page);
   const toast = page.locator('[data-slot="toast"]');
-  await expect(toast).toContainText("Doc draft saved");
+  await expect(toast).toHaveCount(0);
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(toast).toHaveCount(1);
   await expect(toast).toContainText("Doc published");
@@ -567,7 +581,7 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   await expect(
     metadata.getByRole("textbox", { name: "Title", exact: true }),
   ).toBeVisible();
-  if ((page.viewportSize()?.width || 0) >= 1024) {
+  if (await page.getByRole("navigation", { name: "Edit course step" }).isVisible()) {
     const details = await metadata.boundingBox();
     const outline = await page
       .getByRole("navigation", { name: "Edit course step" })
@@ -584,6 +598,7 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
     path: info.outputPath("course-builder-layout.png"),
     fullPage: true,
   });
+  await openCourseOutline(page);
   await page.getByRole("button", { name: "Add lesson" }).click();
   await page.getByLabel("Lesson title").fill("Second lesson");
   await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
@@ -686,6 +701,7 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   await expect(
     page.getByRole("textbox", { name: "Lesson content Markdown" }),
   ).toHaveValue(/## A heading here/);
+  await openCourseOutline(page);
   await page.getByRole("button", { name: "Add quiz" }).click();
   await expect(
     page.getByRole("heading", { name: "Quiz", exact: true }),
@@ -703,15 +719,8 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
     .check();
   await page.getByRole("button", { name: "Add question" }).click();
   await expect(page.getByRole("heading", { name: "Question 2" })).toBeVisible();
-  if ((page.viewportSize()?.width || 0) < 1120) {
-    await page.getByRole("combobox", { name: "Edit course step" }).click();
-    await page.getByRole("option", { name: /Second lesson/ }).click();
-  } else {
-    await page
-      .getByRole("navigation", { name: "Edit course step" })
-      .getByRole("button", { name: /Second lesson/ })
-      .click();
-  }
+  const outline = await openCourseOutline(page);
+  await outline.getByRole("button", { name: /Second lesson/ }).click();
   await expect(page.getByRole("heading", { name: "Lesson 2" })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Quiz", exact: true }),
@@ -1176,15 +1185,11 @@ test("an assigned course retains learning state and legacy media when its inline
     .fill(
       before.content[0].lessons[0].body + "\n\nA small wording correction.",
     );
-  const settings = page.getByRole("button", {
-    name: "Content settings",
-    exact: true,
-  });
-  if (await settings.isVisible()) await settings.click();
-  await page.getByRole("combobox", { name: "Status", exact: true }).click();
-  await page.getByRole("option", { name: "Draft", exact: true }).click();
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect.poll(async () => production
+    ? state.content[0].lessons[0].body
+    : page.evaluate(() => JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!).content[0].lessons[0].body))
+    .toContain("A small wording correction.");
+  await expect(page.locator("form.editor")).toBeVisible();
   const after = production
     ? state
     : await page.evaluate(() =>

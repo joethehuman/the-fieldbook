@@ -17,6 +17,8 @@ export type Question = {
 export type Content = {
   revision?: number;
   publishedRevision?: number | null;
+  /** Admin-only comparison; never include in reader payloads. */
+  publishedSignature?: string;
   id: string;
   kind: "doc" | "brief" | "course";
   title: string;

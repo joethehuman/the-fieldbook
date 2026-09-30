@@ -16,7 +16,7 @@ import {
   teamPath,
   teamDeletionBlockers,
 } from "@/lib/team-hierarchy";
-import { HierarchyList } from "./patterns/hierarchy-list";
+import { HierarchyList, hierarchyMatches } from "./patterns/hierarchy-list";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -50,7 +50,8 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { useToast } from "./ui/toast";
 import { DataTable } from "./patterns/data-table";
 import { FormField } from "./patterns/form-field";
-import { FilterBar, SectionHeader, EmptyState } from "./patterns/layout";
+import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
+import { SectionHeader, EmptyState } from "./patterns/layout";
 import { SettingsSection } from "./patterns/settings-section";
 import { Pagination } from "./patterns/pagination";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
@@ -73,10 +74,12 @@ export function TeamsAdmin({
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const teams = data.teams || [];
+  const [hierarchyQuery, setHierarchyQuery] = useState("");
   const [selected, setSelected] = useState("");
   const [tab, setTab] = useState("members");
   const [query, setQuery] = useState("");
   const [includeSubteams, setIncludeSubteams] = useState(false);
+  const [memberSort, setMemberSort] = useState("name");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Team | null>(null);
   const baseline = useRef<Team | null>(null);
@@ -334,16 +337,23 @@ export function TeamsAdmin({
     .filter((u) =>
       `${u.name} ${u.email}`.toLowerCase().includes(query.trim().toLowerCase()),
     )
-    .sort(byName);
+    .sort((a, b) => memberSort === "reverse" ? byName(b, a) : byName(a, b));
   const children = teams.filter((t) => t.parentId === selected).sort(byName);
   const rosterSelection = useBulkSelection(
     selected + tab + query + includeSubteams,
     members.map((u) => u.id),
     members.filter((u) => u.teamId === team?.id).map((u) => u.id),
   );
+  const hierarchyItems = [...teams].sort(byName).map((item) => ({
+              id: item.id,
+              parentId: item.parentId,
+              label: item.name,
+              description: `Manager: ${data.users.find((user) => user.id === item.managerId)?.name || "Unassigned"}`,
+              meta: `${data.users.filter((user) => user.teamId === item.id).length} direct members · ${teams.filter((child) => child.parentId === item.id).length} subteams`,
+            }));
   const teamSelection = useBulkSelection(
-    selected,
-    teams.map((t) => t.id),
+    selected + hierarchyQuery,
+    hierarchyMatches(hierarchyItems, hierarchyQuery).map((item) => item.id),
   );
   const currentPage = Math.min(
     page,
@@ -423,6 +433,8 @@ export function TeamsAdmin({
           />
 
           <HierarchyList
+            query={hierarchyQuery}
+            onQueryChange={setHierarchyQuery}
             searchAction={
               <Button
                 type="button"
@@ -519,13 +531,7 @@ export function TeamsAdmin({
             label="Teams"
             disabled={busy}
             onOpen={(id) => void openTeam(id)}
-            items={[...teams].sort(byName).map((item) => ({
-              id: item.id,
-              parentId: item.parentId,
-              label: item.name,
-              description: `Manager: ${data.users.find((user) => user.id === item.managerId)?.name || "Unassigned"}`,
-              meta: `${data.users.filter((user) => user.teamId === item.id).length} direct members · ${teams.filter((child) => child.parentId === item.id).length} subteams`,
-            }))}
+            items={hierarchyItems}
           />
         </>
       ) : (
@@ -807,7 +813,11 @@ export function TeamsAdmin({
                     disabled={busy}
                   />
                 </SectionHeader>
-                <FilterBar search={
+                <CollectionControls sortLabel={memberSort === "name" ? "Name A–Z" : "Name Z–A"}
+                  sort={<FormField label="Sort team members"><SelectField value={memberSort} onValueChange={(value) => { setMemberSort(value); setPage(1); }}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>}
+                  onClear={() => { setQuery(""); setIncludeSubteams(false); setPage(1); }}
+                  filters={[...(query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => { setQuery(""); setPage(1); } }] : []), ...(includeSubteams ? [{ id: "scope", label: "Includes subteams", onRemove: () => { setIncludeSubteams(false); setPage(1); } }] : [])]}
+                  search={
                   <FormField label="Find a member" visuallyHiddenLabel>
                     <Input
                       type="search"
@@ -832,7 +842,7 @@ export function TeamsAdmin({
                       <option value="all">Include subteams</option>
                     </SelectField>
                   </FormField>
-                </FilterBar>
+                </CollectionControls>
                 <BulkActions
                   singleItemActions={false}
                   collectionSize={rosterSelection.collectionSize}
@@ -988,11 +998,7 @@ export function TeamsAdmin({
                     </DataTable>
                   </TableContainer>
                 ) : (
-                  <EmptyState>
-                    {query
-                      ? "No members match your search."
-                      : "No members in this view. Add existing people or include subteams."}
-                  </EmptyState>
+                  <CollectionEmpty count={0} total={direct.length + (includeSubteams ? descendantMembers.length : 0)} noun="members" onClear={() => { setQuery(""); setPage(1); }} />
                 )}
                 {members.filter((u) => u.teamId === team.id).length >
                   PAGE_SIZE && (
@@ -1012,6 +1018,7 @@ export function TeamsAdmin({
                 )}
                 <Pagination
                   label="Team members"
+                  showCount={false}
                   page={currentPage}
                   pageSize={PAGE_SIZE}
                   total={members.length}

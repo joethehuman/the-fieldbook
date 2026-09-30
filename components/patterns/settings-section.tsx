@@ -19,6 +19,7 @@ export function SettingsSection({
   className,
   children,
   disabled,
+  measure = "form",
   ...props
 }: Omit<ComponentProps<typeof Card>, "title"> & {
   title: ReactNode;
@@ -26,6 +27,7 @@ export function SettingsSection({
   guidance?: ReactNode;
   actions?: ReactNode;
   disabled?: boolean;
+  measure?: "form" | "full";
 }) {
   const headingId = props.id ? `${props.id}-heading` : undefined;
   const guidanceId = props.id && guidance ? `${props.id}-guidance` : undefined;
@@ -43,6 +45,7 @@ export function SettingsSection({
       </CardHeader>
       <CardContent>
         <FieldGroup
+          className={measure === "form" ? "w-full max-w-(--form-width)" : undefined}
           disabled={disabled}
           aria-labelledby={headingId}
           aria-describedby={guidanceId}

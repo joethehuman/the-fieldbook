@@ -12,7 +12,12 @@ import { GroupPicker } from "./patterns/group-picker";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { OnboardingFields } from "./OnboardingFields";
-import { useState } from "react";
+import { equalJson } from "@/lib/equal-json";
+import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { FieldGroup } from "./ui/field";
+import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
+import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import { teamPath } from "@/lib/team-hierarchy";
@@ -20,7 +25,9 @@ type Pending = NonNullable<Workspace["pendingUsers"]>[number];
 export function PendingPeople({
   data,
   onChange,
+  registerNavigationGuard,
 }: {
+  registerNavigationGuard?: RegisterNavigationGuard;
   data: Workspace;
   onChange: (data: Workspace) => void | Promise<void>;
 }) {
@@ -28,14 +35,33 @@ export function PendingPeople({
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState("name");
+  const { confirm } = useInteractionDialog();
+  const baseline = useRef<Pending | null>(null);
+  const saving = useRef(false);
+  const dirty = !!editing && !equalJson(editing, baseline.current);
+  const guard = useRef(async () => true);
+  guard.current = async () => !saving.current && (!dirty || await confirm("Discard unsaved pending account changes?"));
+  async function openEditor(person: Pending) { if (await guard.current()) { baseline.current = structuredClone(person); setEditing(person); setError(""); } }
+  async function closeEditor() { if (await guard.current()) { setEditing(null); setError(""); } }
+  useEffect(() => {
+    if (!editing) return;
+    registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
+    const beforeUnload = (event: BeforeUnloadEvent) => { if (dirty || saving.current) { event.preventDefault(); event.returnValue = ""; } };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => { registerNavigationGuard?.(null); window.removeEventListener("beforeunload", beforeUnload); };
+  }, [!!editing, dirty, busy, registerNavigationGuard]);
   const rows = (data.pendingUsers || []).filter((p) =>
     (p.name + " " + p.email).toLowerCase().includes(query.toLowerCase()),
-  );
+  ).sort((a, b) => (sort === "reverse" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)) || a.email.localeCompare(b.email));
   const selection = useBulkSelection(
     "pending" + query,
     rows.map((p) => p.email),
   );
   async function save(person: Pending, revoke = false) {
+    if (saving.current) return;
+    if (!baseline.current?.email && (data.pendingUsers || []).some((p) => p.email.toLowerCase() === person.email)) { setError("A pending account already uses that email."); return; }
+    saving.current = true;
     setBusy(true);
     setError("");
     try {
@@ -44,17 +70,19 @@ export function PendingPeople({
       );
       await onChange({
         ...data,
-        pendingUsers: revoke ? pendingUsers : [...pendingUsers, person],
+        pendingUsers: revoke ? pendingUsers : (data.pendingUsers || []).some((p) => p.email === person.email) ? (data.pendingUsers || []).map((p) => p.email === person.email ? person : p) : [...pendingUsers, person],
       });
       setEditing(null);
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
   return (
     <SettingsSection
+      measure="full"
       id="pending-accounts"
       title={<h2>Pending accounts</h2>}
       guidance="Pre-register a Google email. The person claims this account on verified sign-in, including when registration is closed. No email is sent."
@@ -62,7 +90,7 @@ export function PendingPeople({
       <Button
         disabled={busy}
         onClick={() =>
-          setEditing({
+          openEditor({
             email: "",
             name: "",
             role: "learner",
@@ -77,14 +105,14 @@ export function PendingPeople({
         <Plus aria-hidden="true" />
         Pre-register account
       </Button>
-      {error && <p role="alert">{error}</p>}
-      <FormField label="Find a pending account">
+      {!editing && error && <p role="alert">{error}</p>}
+      <CollectionControls search={      <FormField label="Find a pending account">
         <Input
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
-      </FormField>
+      </FormField>} sortLabel={sort === "name" ? "Name A–Z" : "Name Z–A"} sort={<FormField label="Sort pending accounts"><SelectField value={sort} onValueChange={setSort}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>} filters={query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []} onClear={() => setQuery("")} />
       <BulkActions
         collectionSize={selection.collectionSize}
         selected={selection.actionIds}
@@ -96,17 +124,18 @@ export function PendingPeople({
         label="Pending accounts"
         selected={selection.selected}
         onChange={selection.setSelected}
-        scope={query}
+        scope={query + sort}
+        empty={<CollectionEmpty count={rows.length} total={data.pendingUsers?.length || 0} noun="pending accounts" onClear={() => setQuery("")} />}
         rows={rows.map((p) => ({
           id: p.email,
           label: p.name,
           detail: (
             <>
-              {p.email} · {p.role}{" "}
+              {p.email} · {p.role === "admin" ? "Administrator" : p.role === "manager" ? "Manager" : "Learner"}{" "}
               <Button
                 type="button"
                 variant="link"
-                onClick={() => setEditing(p)}
+                onClick={() => void openEditor(p)}
               >
                 Edit {p.name}
               </Button>
@@ -125,6 +154,9 @@ export function PendingPeople({
             });
           }}
         >
+          <FieldGroup disabled={busy}>
+          {error && <p role="alert">{error}</p>}
+          {dirty && <p role="status" className="text-caption text-muted-foreground">Unsaved changes</p>}
           <FormField label="Name">
             <Input
               required
@@ -195,11 +227,12 @@ export function PendingPeople({
               variant="link"
               type="button"
               disabled={busy}
-              onClick={() => setEditing(null)}
+              onClick={closeEditor}
             >
               Cancel
             </Button>
           </ActionGroup>
+          </FieldGroup>
         </form>
       )}
     </SettingsSection>

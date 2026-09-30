@@ -2,9 +2,9 @@
 
 ## Save, leave and recover
 
-Content changes are saved only when you choose **Save draft** or **Save & publish**. Uploading a file does not save its content reference. Keep the editor open until the upload finishes, then save. While an upload or save is pending, editing, saving and in-app navigation are blocked so the returned reference cannot land in a removed lesson or closed editor. Failed uploads keep the existing text or media reference; choose the file again to retry.
+Edited Docs, Updates and Courses automatically save as drafts. Wait for **Saved** beside the title before closing the browser. **Publish** and **Publish changes** explicitly update the published copy; an unchanged published item shows a disabled **Published** button. Uploading a file does not itself save its content reference. Keep the editor open until the upload completes and its reference is saved. Pending uploads block saving and navigation so a returned reference cannot land in a closed editor. Draft saving keeps writing available and preserves edits made while a response is slow. Failed uploads keep the existing text or media reference; choose the file again to retry.
 
-Leaving edited content asks whether to discard it. **Cancel** keeps the editor and its changes. Save first if you want to keep them. Browser reload/close uses the browser's own unsaved-change warning; browsers may suppress that warning, and it cannot protect against crashes or forced closure. There is no automatic draft backup.
+Leaving the editor waits for pending draft saves. If saving fails, the leave confirmation lets you cancel and retain the work or download it before leaving. Browser reload/close uses the browser's own unsaved-change warning; browsers may suppress that warning, and it cannot protect against crashes or forced closure before a save finishes. Untouched new editors do not create records.
 
 If saving fails, the editor stays open. **Download draft** saves the current content as a JSON recovery copy on your device; it can contain private draft text and quiz answers. It does not download the media files or publish anything. Use the copy to compare and manually reapply edits; there is no draft-import button.
 

@@ -76,9 +76,11 @@ export default function SiteSettingsPanel({
   );
   const [nameError, setNameError] = useState("");
   const saveAction = (
-    <Button type="submit" loading={busy}>
-      {busy ? "Saving…" : "Save settings"}
-    </Button>
+    <ActionGroup>
+      {dirty && <span role="status" className="text-caption text-muted-foreground">Unsaved changes</span>}
+      {dirty && <Button type="button" variant="outline" disabled={busy} onClick={() => { setSettings(savedSettings.current); setNotice(""); }}>Discard changes</Button>}
+      <Button type="submit" loading={busy}>{busy ? "Saving…" : "Save settings"}</Button>
+    </ActionGroup>
   );
   return (
     <form
@@ -107,6 +109,7 @@ export default function SiteSettingsPanel({
       {section === "identity" && (
         <SettingsGroup
           tabIndex={-1}
+          disabled={busy}
           id="settings-identity"
           actions={saveAction}
           title={<h3>Installation branding</h3>}
@@ -213,14 +216,12 @@ export default function SiteSettingsPanel({
       )}
       {section === "docs" && (
         <SettingsGroup
+          measure="full"
           id="settings-docs"
           title={<h3>Document sections</h3>}
           description="Organize top-level sections and their subsections. Documents can sit at either level."
           guidance="Expand a section to see its subsections. Reorder within a level, or use Move to… to change a section’s parent. Move documents and subsections before deleting a section. Empty sections remain available in the editor; readers see sections with published documents."
-          actions={<ActionGroup>
-            {dirty && <Button type="button" variant="outline" disabled={busy} onClick={() => { setSettings(savedSettings.current); setNotice("Changes discarded."); }}>Discard changes</Button>}
-            {saveAction}
-          </ActionGroup>}
+          actions={saveAction}
         >
           <DocSectionsSettings
             sections={docSections}

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { waitForDraftSaved, openContentSettings, closeContentSettings } from "./editor-helpers";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -88,9 +89,11 @@ async function setup(
       state.revision = (state.revision || 1) + 1;
       return route.fulfill({ json: { revision: state.revision } });
     });
-    await page.route("**/api/content", async (route) => {
-      if (route.request().method() === "GET")
-        return route.fulfill({ json: state.content[0] });
+    await page.route("**/api/content*", async (route) => {
+      if (route.request().method() === "GET") {
+        const id = new URL(route.request().url()).searchParams.get("id");
+        return route.fulfill({ json: state.content.find((item) => item.id === id) || state.content[0] });
+      }
       writes++;
       const request = route.request().postDataJSON();
       const current = state.content.find(
@@ -150,13 +153,13 @@ async function setup(
   return { read, writes: () => writes };
 }
 
-test("visual Markdown round trip, explicit draft saves, republish and unpublish", async ({
+test("visual Markdown round trip, autosaved drafts, republish and unpublish", async ({
   page,
 }, info) => {
   const production = info.project.name.startsWith("production");
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  const { read } = await setup(page, production);
+  const { read, writes } = await setup(page, production);
   const editor = page.getByRole("textbox", {
     name: "Doc content",
     exact: true,
@@ -169,13 +172,12 @@ test("visual Markdown round trip, explicit draft saves, republish and unpublish"
     "src",
     "/api/media/example.mp4",
   );
-  // Mounting the visual editor must not turn normalization into unsaved changes.
-  await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
-    0,
-  );
+  // Opening and normalizing content must never create a draft revision.
+  await page.waitForTimeout(1100);
+  expect(writes()).toBe(0);
+  expect((await read()).content[0].revision).toBe(1);
   await page.getByLabel("Title", { exact: true }).fill("Private title");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await waitForDraftSaved(page);
   expect((await read()).content[0].body).toBe(original);
   expect((await read()).publishedContent![0].title).toBe("Writing fixture");
   // A second save verifies revision and dirty-baseline handling without reopening.
@@ -184,11 +186,7 @@ test("visual Markdown round trip, explicit draft saves, republish and unpublish"
   await editor.press("Enter");
   await editor.pressSequentially("A private addition.");
   await expect(editor).toContainText("A private addition.");
-  await expect(
-    page.getByText("Unsaved changes", { exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await waitForDraftSaved(page);
   const draft = (await read()).content[0].body;
   expect(draft).toContain("A private addition.");
   expect(
@@ -249,13 +247,13 @@ test("formatting controls, keyboard save, source fallback and responsive setting
   await page.getByRole("button", { name: "Redo", exact: true }).click();
   await expect(editor.locator("strong")).toHaveText("Make this bold");
   await editor.press("ControlOrMeta+s");
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await waitForDraftSaved(page);
   expect((await read()).publishedContent![0].body).toBe("A short update");
-  const settings = page.getByRole("button", { name: "Content settings" });
-  if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
+  await openContentSettings(page);
   await expect(
     page.getByRole("heading", { name: "For you", exact: true }),
   ).toBeVisible();
+  await closeContentSettings(page);
   await page.getByRole("button", { name: "Markdown", exact: true }).click();
   const unsupported = "Keep this footnote[^1].\n\n[^1]: An important detail.\n";
   await page
@@ -268,8 +266,7 @@ test("formatting controls, keyboard save, source fallback and responsive setting
   await expect(
     page.getByRole("textbox", { name: "Update content Markdown" }),
   ).toHaveValue(unsupported);
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await waitForDraftSaved(page);
   expect((await read()).content[0].body).toBe(unsupported);
   await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
   expect(
@@ -322,8 +319,7 @@ test("contextual headings, links and table cells serialize as reader-compatible 
   const table = editor.getByRole("table");
   await table.getByRole("textbox").first().fill("Topic");
   await table.getByRole("textbox").nth(3).fill("Useful detail");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await waitForDraftSaved(page);
   const body = (await read()).content[0].body;
   expect(body).toContain("## Write clearly");
   expect(body).toContain("[Reference](https://example.com/reference)");
@@ -349,8 +345,7 @@ test("Update category filters, creates, normalizes and survives draft saves", as
     "Category example",
     "brief",
   );
-  const settings = page.getByRole("button", { name: "Content settings" });
-  if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
+  await openContentSettings(page);
   const input = page.getByRole("combobox", { name: "Category", exact: true });
   const existing = await input.inputValue();
   await input.fill(existing.toLowerCase());
@@ -367,8 +362,7 @@ test("Update category filters, creates, normalizes and survives draft saves", as
     .getByRole("option", { name: "Add “Customer stories”", exact: true })
     .click();
   await expect(input).toHaveValue("Customer stories");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await waitForDraftSaved(page);
   expect((await read()).content[0].category).toBe("Customer stories");
   expect((await read()).publishedContent![0].category).toBe(existing);
   await page
@@ -405,8 +399,7 @@ for (const kind of ["Doc", "Update"]) {
       "Existing content",
       kind === "Doc" ? "doc" : "brief",
     );
-    const settings = page.getByRole("button", { name: "Content settings" });
-    if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
+    await openContentSettings(page);
     if (kind === "Doc") {
       await expect(
         page.getByRole("button", {
@@ -420,6 +413,7 @@ for (const kind of ["Doc", "Update"]) {
         page.getByRole("combobox", { name: "Category", exact: true }),
       ).not.toHaveValue("");
     }
+    await closeContentSettings(page);
     await page
       .getByRole("button", { name: "Back to content", exact: true })
       .click();
@@ -428,11 +422,11 @@ for (const kind of ["Doc", "Update"]) {
     await page
       .getByLabel("Short description", { exact: true })
       .fill("A useful introduction.");
-    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await waitForDraftSaved(page);
+    expect((await read()).content.find((item) => item.title === `New ${kind}`)?.category).toBe("");
+    await page.getByRole("button", { name: "Review requirements", exact: true }).click();
+    await expect(page.getByRole("dialog", { name: "Content settings" })).toBeVisible();
     if (kind === "Doc") {
-      await expect(
-        page.getByText("Choose a Docs section before saving."),
-      ).toBeVisible();
       const search = page.getByRole("searchbox", { name: "Search sections" });
       await expect(search).toBeVisible();
       await search.fill("Start here");
@@ -481,8 +475,7 @@ for (const kind of ["Doc", "Update"]) {
         })
         .click();
     }
-    await page.getByRole("button", { name: "Save draft", exact: true }).click();
-    await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+    await waitForDraftSaved(page);
     const saved = (await read()).content.find(
       (item) => item.title === `New ${kind}`,
     );
@@ -493,6 +486,7 @@ for (const kind of ["Doc", "Update"]) {
       expect(saved?.sectionId).toBeTruthy();
       expect(saved?.folder).toBe("New organization name");
     }
+    await closeContentSettings(page);
     await page
       .getByRole("button", { name: "Back to content", exact: true })
       .click();
@@ -504,7 +498,7 @@ for (const kind of ["Doc", "Update"]) {
     await expect(
       page.getByRole("textbox", { name: "Title", exact: true }),
     ).toHaveValue(`New ${kind}`);
-    if ((page.viewportSize()?.width ?? 1000) < 768) await settings.click();
+    await openContentSettings(page);
     if (kind === "Doc") {
       await expect(
         page.getByRole("button", {
@@ -632,8 +626,7 @@ test("pasting into an inserted list preserves nested lists through a draft save"
   });
   await expect(editor.locator("ol li")).toHaveText("Pasted customer context");
   await expect(editor.locator("ul ul li")).toContainText("Nested point");
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await waitForDraftSaved(page);
   const saved = (await read()).content[0].body;
   expect(saved).toContain("Nested point");
   expect(saved).toMatch(/1\. Pasted customer context/);
@@ -645,7 +638,7 @@ test("pasting into an inserted list preserves nested lists through a draft save"
   await expect(preview.locator("ol li")).toHaveText("Pasted customer context");
 });
 
-test("settings reveal clears the sticky header and enlarged text leaves the canvas reachable", async ({
+test("settings drawer traps/restores focus and enlarged text leaves the canvas reachable", async ({
   page,
 }, info) => {
   await setup(page, info.project.name.startsWith("production"));
@@ -655,24 +648,13 @@ test("settings reveal clears the sticky header and enlarged text leaves the canv
       "Customer launch readiness and practical product guidance for enterprise teams",
     );
   const settings = page.getByRole("button", { name: "Settings", exact: true });
-  if (await settings.isVisible()) {
-    await settings.click();
-    const panel = page.getByRole("complementary", {
-      name: "Content settings",
-      exact: true,
-    });
-    await expect(panel).toBeFocused();
-    await expect
-      .poll(() =>
-        panel.evaluate(
-          (node) =>
-            node.getBoundingClientRect().top >=
-            document.querySelector(".editor-heading")!.getBoundingClientRect()
-              .bottom,
-        ),
-      )
-      .toBe(true);
-  }
+  const panel = await openContentSettings(page);
+  await expect.poll(() => panel.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+  for (let index = 0; index < 15; index++) await page.keyboard.press("Tab");
+  await expect.poll(() => panel.evaluate((node) => node.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(panel).toBeHidden();
+  await expect(settings).toBeFocused();
   await page
     .getByRole("textbox", { name: "Title", exact: true })
     .fill(
@@ -716,16 +698,11 @@ test("settings reveal clears the sticky header and enlarged text leaves the canv
       return box.width > 0 && (box.left < boundary.left || box.right > boundary.right);
     }).map((button) => button.getAttribute("aria-label") || button.textContent);
   })).toEqual([]);
-  if (await settings.isVisible()) {
-    await settings.click();
-    const panel = page.getByRole("complementary", { name: "Content settings", exact: true });
-    await expect(panel).toBeFocused();
-    await expect.poll(() => panel.evaluate((node) => {
-      const box = node.getBoundingClientRect();
-      const main = document.querySelector(".main-content")!.getBoundingClientRect();
-      return box.top >= main.top && box.top < main.bottom;
-    })).toBe(true);
-  }
+  await openContentSettings(page);
+  await expect.poll(() => panel.evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    return box.top >= 0 && box.left >= 0 && box.right <= innerWidth + 1 && box.bottom <= innerHeight + 1;
+  })).toBe(true);
   await page.screenshot({
     path: info.outputPath("editor-large-text-reachable.png"),
   });

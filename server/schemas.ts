@@ -101,14 +101,43 @@ export const contentBaseSchema = z.object({
   revision: z.number().int().min(0).optional(),
   publishedRevision: z.number().int().nullable().optional(),
 });
-export const contentSchema = contentBaseSchema.superRefine((c, ctx) => {
+function uniqueContentIds(
+  c: z.infer<typeof contentBaseSchema>,
+  ctx: z.RefinementCtx,
+) {
   for (const nodes of [c.lessons, c.questions])
     if (new Set(nodes.map((n) => n.id)).size !== nodes.length)
       ctx.addIssue({
         code: "custom",
         message: "Lesson and question IDs must be unique.",
       });
-});
+}
+export const contentSchema = contentBaseSchema.superRefine(uniqueContentIds);
+/** Drafts allow unfinished editorial values, retaining structural and media boundaries.
+ * MCP's advertised complete-content schema stays unchanged; publication always uses it.
+ */
+export const contentDraftSchema = contentBaseSchema
+  .extend({
+    title: text(160),
+    category: text(80),
+    cardArt: z
+      .object({
+        source: z.enum(["generated", "upload"]),
+        shortTitle: text(160),
+        version: z.union([z.literal(1), z.literal(2)]),
+        seed: z.number().int().min(0).max(4294967295),
+        imageUrl: cardImageReference.optional(),
+      })
+      .optional(),
+    questions: z
+      .array(
+        contentBaseSchema.shape.questions.element.extend({
+          correctOptionIds: z.array(text(100)).max(4).optional(),
+        }),
+      )
+      .max(100),
+  })
+  .superRefine(uniqueContentIds);
 const privacyDocumentSchema = z.object({
   mode: z.enum(["hosted", "external"]),
   operatorName: text(160),
