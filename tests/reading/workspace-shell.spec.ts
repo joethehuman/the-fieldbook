@@ -344,16 +344,13 @@ test("header progress slides in before a fixed-width bounce and respects reduced
 test("content navigation keeps its page without progress and Admin entry retains progress", async ({
   page,
 }, info) => {
-  await page.goto("/docs");
-  await expect(
-    page.getByRole("heading", { name: doc.title, exact: true }),
-  ).toBeVisible();
-  for (const destination of [
-    "/updates",
-    "/courses",
-    "/docs",
-    `/docs/${docId}`,
-    "/admin",
+  // Hold the destination before a fresh source load, including production prefetches.
+  for (const [source, destination] of [
+    ["/docs", "/updates"],
+    ["/updates", "/courses"],
+    ["/courses", "/docs"],
+    ["/docs", `/docs/${docId}`],
+    ["/docs", "/admin"],
   ]) {
     let release!: () => void;
     let waiting = false;
@@ -368,6 +365,7 @@ test("content navigation keeps its page without progress and Admin entry retains
       }
       await route.continue();
     });
+    await page.goto(source);
     const previousContent = page.locator("#main-content > *").first();
     await expect(previousContent).toBeVisible();
     const previousBody = await previousContent.elementHandle();
