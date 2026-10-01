@@ -9,6 +9,7 @@ The goal is a choice of complete stacks for a fresh installation. A future Digit
 | Area | Fieldbook owns | Current implementation |
 | --- | --- | --- |
 | Hosting | Trusted canonical origin, preview isolation and app identity | `server/deployment.ts`, `server/providers/vercel/deployment.ts`; ordinary Node configuration in `server/providers/node/deployment.ts` |
+| Telemetry | Optional host integration and operator opt-outs | `server/telemetry.tsx`; official Vercel SDK components in `server/providers/vercel/telemetry.tsx` |
 | Persistence | Content validation, permissions, publication, quiz grading and reporting calculations | `server/ports/data.ts`, composed in `server/data.ts`; Supabase queries and complete reads under `server/providers/supabase/` |
 | Identity | Registration policy, active people, roles, MCP grants and same-origin checks | `server/identity.ts`, plain types in `server/ports/identity.ts`; Supabase browser sessions and OAuth operations in its adapter |
 | Private files | Upload limits, ownership, readiness, reference protection and access checks | `server/ports/storage.ts`, composed in `server/storage.ts`; Supabase Storage behind signed upload/read instructions |
@@ -63,4 +64,8 @@ Moving an existing installation between stacks is separate and currently unsuppo
 
 ## Platform features
 
-Add optional platform features at their owning boundary and document activation, credentials and removal. Vercel Analytics, Speed Insights and AI Gateway are not installed by this foundation. A future integration should leave ordinary content, identity and persistence services usable with the feature disabled and give operators the normal platform configuration they need.
+Vercel Web Analytics and Speed Insights use their official Next.js SDKs, composed by `server/telemetry.tsx` from both root layouts. Host selection happens on the server; a non-Vercel host renders neither integration. The small Vercel client component owns the vendor imports and uses normal SDK behavior without custom events or URL filtering. See the [Vercel recipe](../deployment/vercel/README.md#analytics-and-speed-insights) for activation and independent opt-outs.
+
+For another host's analytics, add its implementation under `server/providers/{host}/` and select it in `server/telemetry.tsx`. Keep SDK imports out of layouts and product components; extend `pnpm check:providers` to cover the new SDK. Document setup and verify script loading, route tracking and disabled behavior for that recipe. Analytics are optional: ordinary content, identity and persistence services must remain usable without them.
+
+Add other optional platform features at their owning boundary and document activation, credentials and removal. AI Gateway is not installed or activated.

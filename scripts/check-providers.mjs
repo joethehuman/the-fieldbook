@@ -9,6 +9,7 @@ const composition = new Set([
   "server/storage.ts",
   "server/media-data.ts",
   "server/deployment.ts",
+  "server/telemetry.tsx",
   "server/env.ts",
   "server/db.ts",
   "server/read-all.ts",
@@ -26,7 +27,7 @@ function inspect(directory) {
     const name = relative(root, path).replaceAll("\\", "/");
     if (name.startsWith("server/providers/")) continue;
     const source = readFileSync(path, "utf8");
-    if (/["']@supabase\//.test(source))
+    if (/["'](?:@supabase\/|@vercel\/(?:analytics|speed-insights))/.test(source))
       violations.push(`${name}: provider SDK import`);
     if (/\bdb\s*\(/.test(source))
       violations.push(`${name}: provider query client`);
@@ -37,7 +38,7 @@ function inspect(directory) {
       violations.push(`${name}: bypasses the service composition boundary`);
   }
 }
-for (const directory of ["app", "server", "lib", "components"])
+for (const directory of ["app", "demo/app", "server", "lib", "components"])
   inspect(resolve(root, directory));
 const proxy = readFileSync(resolve(root, "proxy.ts"), "utf8");
 if (/["']@supabase\//.test(proxy))
