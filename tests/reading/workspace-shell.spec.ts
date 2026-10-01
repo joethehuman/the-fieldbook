@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { freshWorkspace } from "../../lib/store";
 const backend = "http://127.0.0.1:3130";
 const docId = "00000000-0000-4000-8000-000000000041";
 const owner = "00000000-0000-4000-8000-000000000010";
@@ -306,10 +307,46 @@ test("content navigation keeps its page without progress and Admin entry retains
 test("demo initial entry and profile selection use the account page without a full-screen loader", async ({
   page,
   request,
+  browser,
 }, info) => {
   const html = await (await request.get("http://127.0.0.1:3132")).text();
   expect(html).toContain("Choose a demo profile");
+  for (const label of [
+    "Hoolibook",
+    "Alex Edwards",
+    "Sara Downy",
+    "Oliver Anderson",
+  ])
+    expect(html).toContain(label);
   expect(html).not.toContain("Just a sec");
+  const staticContext = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: page.viewportSize()!,
+  });
+  const staticPage = await staticContext.newPage();
+  let initialBounds;
+  try {
+    await staticPage.goto("http://127.0.0.1:3132");
+    await staticPage.evaluate(() => document.fonts.ready);
+    const profiles = staticPage.locator(".profile-list button");
+    await expect(profiles).toHaveCount(3);
+    for (const profile of await profiles.all()) {
+      await expect(profile).toBeVisible();
+      await expect(profile).toHaveAttribute("aria-disabled", "true");
+    }
+    initialBounds = await staticPage.locator("main").boundingBox();
+    await staticPage.screenshot({
+      path: info.outputPath("demo-before-hydration.png"),
+    });
+  } finally {
+    await staticContext.close();
+  }
+  const hydrationErrors: string[] = [];
+  page.on("pageerror", (error) => hydrationErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydrat/i.test(message.text()))
+      hydrationErrors.push(message.text());
+  });
   await page.addInitScript(() => {
     (window as any).sawFullScreenLoader = false;
     const observe = () => {
@@ -325,6 +362,15 @@ test("demo initial entry and profile selection use the account page without a fu
   await expect(
     page.getByRole("heading", { name: "Choose a demo profile", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Alex Edwards/ }),
+  ).toHaveAttribute("aria-disabled", "false");
+  await page.evaluate(() => document.fonts.ready);
+  const readyBounds = await page.locator("main").boundingBox();
+  for (const dimension of ["x", "y", "width", "height"] as const)
+    expect(
+      Math.abs(readyBounds![dimension] - initialBounds![dimension]),
+    ).toBeLessThan(1);
   await page.screenshot({
     path: info.outputPath("demo-profile-selection.png"),
   });
@@ -354,6 +400,14 @@ test("demo initial entry and profile selection use the account page without a fu
       .getByRole("alert")
       .filter({ hasText: "Saved demo data could not be opened" }),
   ).toBeVisible();
+  const inactiveProfile = page.getByRole("button", { name: /Alex Edwards/ });
+  await expect(inactiveProfile).toHaveAttribute("aria-disabled", "true");
+  await inactiveProfile.evaluate((button) =>
+    (button as HTMLButtonElement).click(),
+  );
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("fieldbook.profile.v1")),
+  ).toBeNull();
   await page.getByRole("button", { name: "Reset demo", exact: true }).click();
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(
@@ -362,6 +416,44 @@ test("demo initial entry and profile selection use the account page without a fu
   expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
     false,
   );
+  expect(hydrationErrors).toEqual([]);
+});
+
+test("demo saved picker preserves custom branding, names and inactive profiles", async ({
+  page,
+}) => {
+  const workspace = freshWorkspace();
+  workspace.settings!.name = "Saved demo workspace";
+  workspace.users.find((user) => user.id === "demo-learner")!.name =
+    "Saved learner";
+  workspace.users.find((user) => user.id === "demo-admin")!.active = false;
+  await page.addInitScript((saved) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(saved));
+  }, workspace);
+  await page.goto("http://127.0.0.1:3132");
+  const learner = page.getByRole("button", { name: /Saved learner/ });
+  await expect(learner).toHaveAttribute("aria-disabled", "false");
+  await expect(
+    page.getByText("Saved demo workspace", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".profile-list button")).toHaveCount(2);
+  await expect(
+    page.getByRole("button", { name: /Oliver Anderson/ }),
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!);
+      return [
+        saved.settings.name,
+        saved.users.find((user: { id: string }) => user.id === "demo-learner")
+          .name,
+      ];
+    }),
+  ).toEqual(["Saved demo workspace", "Saved learner"]);
+  await learner.click();
+  await expect(page.locator(".app")).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".app")).toBeVisible();
 });
 
 test("dirty Admin navigation and search results require approval before pending or editor removal", async ({

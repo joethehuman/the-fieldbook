@@ -70,6 +70,8 @@ import {
 import dynamic from "next/dynamic";
 import type { NavigationGuard } from "@/lib/navigation-guard";
 const Admin = dynamic(() => import("./Admin"));
+// Presentation defaults only; browser storage still owns the active workspace.
+const { settings: demoPickerSettings, users: demoPickerUsers } = freshWorkspace();
 type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook() {
   const { confirm } = useInteractionDialog();
@@ -286,7 +288,10 @@ export default function Fieldbook() {
       : undefined;
   const user =
     demoGuest?.user || data?.users.find((u) => u.id === uid && u.active);
-  const branding = { ...defaultSettings, ...data?.settings };
+  const branding = {
+    ...defaultSettings,
+    ...(data ? data.settings : demoPickerSettings),
+  };
   const landingPath = homePath(branding);
   const landingView = resolveSection(landingPath.slice(1)) || "learn";
   const policyHref = privacyHref(branding);
@@ -306,7 +311,7 @@ export default function Fieldbook() {
           </>
         )}
         <div className="profile-list">
-          {(data?.users || [])
+          {(data?.users || demoPickerUsers)
             .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
             .sort(
               (a, b) =>
@@ -316,7 +321,8 @@ export default function Fieldbook() {
               <NavigationButton
                 variant="ghost"
                 key={u.id}
-                onClick={() => login(u.id)}
+                aria-disabled={!data}
+                onClick={data ? () => login(u.id) : undefined}
               >
                 <InitialsAvatar initials={initials(u.name)} />
                 <span>

@@ -34,7 +34,7 @@ These checks do not establish hosted Google OAuth, production provider behavior,
 
 ## Docs reading navigation
 
-Navigation within and between Docs, Updates and Courses (including curricula) keeps the current page visible while the next page resolves, without header progress. Entering Administration from those screens retains the header progress bar; other existing shell transitions keep their progress behavior. The demo uses its existing profile-selection page while browser storage initializes, with storage errors and Reset demo on that same page. It does not show a full-screen startup loader.
+Navigation within and between Docs, Updates and Courses (including curricula) keeps the current page visible while the next page resolves, without header progress. Entering Administration from those screens retains the header progress bar; other existing shell transitions keep their progress behavior. The demo initially renders its complete default profile-selection page, including Hoolibook identity and all three profiles. Selection becomes available after browser storage loads; saved profile names and branding then replace the defaults, or a saved active profile resumes the workspace. Storage errors and Reset demo remain on that same page. It does not show a full-screen startup loader or add an animation or loading delay.
 
 Docs use left-aligned section/folder navigation with the current document highlighted. On desktop the document tree scrolls independently of application navigation and account controls. Tab-local scroll/disclosure preferences are optional and do not change document order or access. Short screens and larger text retain an outer-sidebar scrolling fallback.
 
