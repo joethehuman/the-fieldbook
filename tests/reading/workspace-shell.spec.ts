@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { freshWorkspace } from "../../lib/store";
 const backend = "http://127.0.0.1:3130";
 const docId = "00000000-0000-4000-8000-000000000041";
 const owner = "00000000-0000-4000-8000-000000000010";
@@ -230,6 +231,421 @@ test("approved cold navigation shows pending while preserving the old body and m
   await expect(
     page.getByRole("status", { name: "Opening page", exact: true }),
   ).toHaveCount(0);
+});
+
+test("header progress slides in before a fixed-width bounce and respects reduced motion", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/updates**", async (route) => {
+    if (route.request().resourceType() === "fetch") await held;
+    await route.continue();
+  });
+  try {
+    await page.goto("/admin");
+    await expect(page.locator(".admin-layout")).toBeVisible();
+    await openNavigation(page);
+    await page.getByRole("link", { name: "Updates", exact: true }).click();
+    const progress = page.getByRole("status", {
+      name: "Opening page",
+      exact: true,
+    });
+    await expect(progress).toBeVisible();
+    const segment = progress.locator("span");
+    const geometry = await segment.evaluate((node) => {
+      const animations = node.getAnimations() as CSSAnimation[];
+      const entrance = animations.find(
+        (animation) => animation.animationName === "loading-enter",
+      )!;
+      const sweep = animations.find(
+        (animation) => animation.animationName === "loading-sweep",
+      )!;
+      animations.forEach((animation) => animation.pause());
+      const bounds = () => {
+        const { x, width } = node.getBoundingClientRect();
+        return { x, width };
+      };
+      sweep.currentTime = 0;
+      entrance.currentTime = 0;
+      const hidden = bounds();
+      entrance.currentTime = 100;
+      const entering = bounds();
+      entrance.currentTime = 200;
+      sweep.currentTime = 200;
+      const revealed = bounds();
+      sweep.currentTime = 1400;
+      const far = bounds();
+      sweep.currentTime = 2000;
+      const returning = bounds();
+      sweep.currentTime = 2600;
+      const back = bounds();
+      const { x, width } = node.parentElement!.getBoundingClientRect();
+      entrance.currentTime = 100;
+      sweep.currentTime = 0;
+      return {
+        header: { x, width },
+        hidden,
+        entering,
+        revealed,
+        far,
+        returning,
+        back,
+      };
+    });
+    expect(
+      Math.abs(geometry.hidden.x + geometry.hidden.width - geometry.header.x),
+    ).toBeLessThan(1);
+    expect(geometry.entering.x).toBeGreaterThan(geometry.hidden.x);
+    expect(geometry.entering.x).toBeLessThan(geometry.header.x);
+    expect(Math.abs(geometry.revealed.x - geometry.header.x)).toBeLessThan(1);
+    expect(geometry.far.x).toBeGreaterThan(geometry.revealed.x);
+    expect(geometry.returning.x).toBeLessThan(geometry.far.x);
+    expect(geometry.returning.x).toBeGreaterThan(geometry.back.x);
+    expect(Math.abs(geometry.back.x - geometry.revealed.x)).toBeLessThan(1);
+    for (const stage of [
+      geometry.entering,
+      geometry.revealed,
+      geometry.far,
+      geometry.returning,
+      geometry.back,
+    ])
+      expect(Math.abs(stage.width - geometry.hidden.width)).toBeLessThan(1);
+    await page.screenshot({
+      path: info.outputPath("header-progress-entering.png"),
+    });
+    await segment.evaluate((node) => {
+      for (const animation of node.getAnimations() as CSSAnimation[])
+        animation.currentTime =
+          animation.animationName === "loading-enter" ? 200 : 800;
+    });
+    await page.screenshot({
+      path: info.outputPath("header-progress-bouncing.png"),
+    });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect(
+      await segment.evaluate((node) => getComputedStyle(node).animationName),
+    ).toBe("none");
+    expect(
+      await segment.evaluate((node) => node.getBoundingClientRect().width),
+    ).toBeCloseTo(geometry.header.width, 0);
+    await expect(page.locator(".admin-layout")).toBeVisible();
+    release();
+    await expect(page).toHaveURL(/\/updates$/);
+    await expect(progress).toHaveCount(0);
+  } finally {
+    release();
+  }
+});
+
+test("content navigation keeps its page without progress and Admin entry retains progress", async ({
+  page,
+}, info) => {
+  // Hold the destination before a fresh source load, including production prefetches.
+  for (const [source, destination] of [
+    ["/docs", "/updates"],
+    ["/updates", "/courses"],
+    ["/courses", "/docs"],
+    ["/docs", `/docs/${docId}`],
+    ["/docs", "/admin"],
+  ]) {
+    let release!: () => void;
+    let waiting = false;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const pattern = `**${destination}?*`;
+    await page.route(pattern, async (route) => {
+      if (route.request().resourceType() === "fetch") {
+        waiting = true;
+        await held;
+      }
+      await route.continue();
+    });
+    await page.goto(source);
+    const previousContent = page.locator("#main-content > *").first();
+    await expect(previousContent).toBeVisible();
+    const previousBody = await previousContent.elementHandle();
+    try {
+      if (destination === "/admin") await account(page, "Manage organization");
+      else {
+        await openNavigation(page);
+        await page.locator(`.sidebar a[href="${destination}"]`).first().click();
+      }
+      await expect.poll(() => waiting).toBe(true);
+      expect(
+        await previousBody!.evaluate((element) => element.isConnected),
+      ).toBe(true);
+      await expect(previousContent).toBeVisible();
+      const progress = page.getByRole("status", {
+        name: "Opening page",
+        exact: true,
+      });
+      if (destination === "/admin") {
+        await expect(progress).toBeVisible();
+        await page.screenshot({
+          path: info.outputPath("content-to-admin-pending.png"),
+        });
+      } else {
+        await expect(progress).toHaveCount(0);
+        await expect(page.locator(".sidebar")).not.toHaveClass(
+          /navigation-pending/,
+        );
+        if (destination === "/courses")
+          await page.screenshot({
+            path: info.outputPath("content-to-content-pending.png"),
+          });
+      }
+    } finally {
+      release();
+    }
+    await expect(page).toHaveURL(new RegExp(`${destination}$`));
+    await expect(
+      page.getByRole("status", { name: "Opening page", exact: true }),
+    ).toHaveCount(0);
+    await page.unroute(pattern);
+  }
+});
+
+test("demo initial entry and profile selection use the account page without a full-screen loader", async ({
+  page,
+  request,
+  browser,
+}, info) => {
+  const html = await (await request.get("http://127.0.0.1:3132")).text();
+  expect(html).toContain("Choose a demo profile");
+  for (const label of [
+    "Hoolibook",
+    "Alex Edwards",
+    "Sara Downy",
+    "Oliver Anderson",
+  ])
+    expect(html).toContain(label);
+  expect(html).not.toContain("Just a sec");
+  const staticContext = await browser.newContext({
+    javaScriptEnabled: false,
+    viewport: page.viewportSize()!,
+  });
+  const staticPage = await staticContext.newPage();
+  try {
+    await staticPage.goto("http://127.0.0.1:3132");
+    await staticPage.evaluate(() => document.fonts.ready);
+    const profiles = staticPage.locator(".profile-list button");
+    await expect(profiles).toHaveCount(3);
+    for (const profile of await profiles.all()) {
+      await expect(profile).toBeVisible();
+      await expect(profile).toHaveAttribute("aria-disabled", "true");
+    }
+    await staticPage.screenshot({
+      path: info.outputPath("demo-before-hydration.png"),
+    });
+  } finally {
+    await staticContext.close();
+  }
+  const hydrationErrors: string[] = [];
+  page.on("pageerror", (error) => hydrationErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error" && /hydrat/i.test(message.text()))
+      hydrationErrors.push(message.text());
+  });
+  await page.addInitScript(() => {
+    (window as any).sawFullScreenLoader = false;
+    const observe = () => {
+      if (document.querySelector(".loading, .loading-bar"))
+        (window as any).sawFullScreenLoader = true;
+    };
+    new MutationObserver(observe).observe(document, {
+      childList: true,
+      subtree: true,
+    });
+  });
+  await page.goto("http://127.0.0.1:3132");
+  await expect(
+    page.getByRole("heading", { name: "Choose a demo profile", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Alex Edwards/ }),
+  ).toHaveAttribute("aria-disabled", "false");
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({
+    path: info.outputPath("demo-profile-selection.png"),
+  });
+  await page.getByRole("button", { name: /Alex Edwards/ }).click();
+  await expect(page.locator(".app")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
+    false,
+  );
+  await page.reload();
+  await expect(page.locator(".app")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
+    false,
+  );
+  await page.evaluate(() => {
+    sessionStorage.removeItem("fieldbook.profile.v1");
+    localStorage.setItem(
+      "fieldbook.workspace.v1",
+      JSON.stringify({ schema: 0 }),
+    );
+  });
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Choose a demo profile", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Saved demo data could not be opened" }),
+  ).toBeVisible();
+  const inactiveProfile = page.getByRole("button", { name: /Alex Edwards/ });
+  await expect(inactiveProfile).toHaveAttribute("aria-disabled", "true");
+  await inactiveProfile.evaluate((button) =>
+    (button as HTMLButtonElement).click(),
+  );
+  expect(
+    await page.evaluate(() => sessionStorage.getItem("fieldbook.profile.v1")),
+  ).toBeNull();
+  await page.getByRole("button", { name: "Reset demo", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: /Alex Edwards/ }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
+    false,
+  );
+  expect(hydrationErrors).toEqual([]);
+});
+
+test("demo picker keeps its first painted layout through hydration and late font delivery", async ({
+  page,
+}, info) => {
+  await page.addInitScript(() => {
+    const snapshots: number[][][] = [];
+    (window as any).pickerPaints = snapshots;
+    const selectors =
+      "main, .logo, [data-slot=badge], h1, .profile-list, .profile-list button, .profile-list strong, .profile-list small, .profile-list svg, .demo-note";
+    const sample = () => {
+      if (
+        document.querySelector(".profile-list") &&
+        performance.getEntriesByName("first-contentful-paint").length
+      ) {
+        const geometry = Array.from(
+          document.querySelectorAll(selectors),
+          (node) => {
+            const { x, y, width, height } = node.getBoundingClientRect();
+            return [x, y, width, height];
+          },
+        );
+        if (JSON.stringify(geometry) !== JSON.stringify(snapshots.at(-1)))
+          snapshots.push(geometry);
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  let releaseFont!: () => void;
+  const fontGate = new Promise<void>((resolve) => {
+    releaseFont = resolve;
+  });
+  let releaseScripts!: () => void;
+  const scriptGate = new Promise<void>((resolve) => {
+    releaseScripts = resolve;
+  });
+  const heldFonts: string[] = [];
+  await page.route("**/_next/static/media/*.woff2", async (route) => {
+    heldFonts.push(route.request().url());
+    await fontGate;
+    await route.continue();
+  });
+  await page.route("**/_next/static/chunks/**", async (route) => {
+    await scriptGate;
+    await route.continue();
+  });
+  try {
+    await page.goto("http://127.0.0.1:3132", { waitUntil: "commit" });
+    await page.waitForFunction(() => (window as any).pickerPaints.length > 0);
+    await expect(page.locator(".profile-list button")).toHaveCount(3);
+    await expect(
+      page.getByRole("button", { name: /Alex Edwards/ }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(heldFonts.length).toBeGreaterThan(0);
+    // Playwright screenshots normally await fonts.ready; do not hide the state under test.
+    process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
+    await page.screenshot({
+      path: info.outputPath("demo-first-paint-font-pending.png"),
+    });
+    releaseScripts();
+    await expect(
+      page.getByRole("button", { name: /Alex Edwards/ }),
+    ).toHaveAttribute("aria-disabled", "false");
+    releaseFont();
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({
+      path: info.outputPath("demo-late-font-stable.png"),
+    });
+    const paints = await page.evaluate(() => (window as any).pickerPaints);
+    expect(paints).toHaveLength(1);
+    await info.attach("first-paint-geometry", {
+      body: JSON.stringify(paints),
+      contentType: "application/json",
+    });
+    await page.unroute("**/_next/static/media/*.woff2");
+    await page.unroute("**/_next/static/chunks/**");
+    await page.reload();
+    await page.evaluate(() => document.fonts.ready);
+    await expect(
+      page.getByRole("button", { name: /Alex Edwards/ }),
+    ).toHaveAttribute("aria-disabled", "false");
+    await page.screenshot({ path: info.outputPath("demo-font-available.png") });
+    expect(
+      await page.evaluate(() => (window as any).pickerPaints),
+    ).toHaveLength(1);
+    await page.getByRole("button", { name: /Alex Edwards/ }).click();
+    await expect(page.locator(".app")).toBeVisible();
+  } finally {
+    releaseScripts();
+    releaseFont();
+    delete process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY;
+  }
+});
+
+test("demo saved picker preserves custom branding, names and inactive profiles", async ({
+  page,
+}) => {
+  const workspace = freshWorkspace();
+  workspace.settings!.name = "Saved demo workspace";
+  workspace.users.find((user) => user.id === "demo-learner")!.name =
+    "Saved learner";
+  workspace.users.find((user) => user.id === "demo-admin")!.active = false;
+  await page.addInitScript((saved) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(saved));
+  }, workspace);
+  await page.goto("http://127.0.0.1:3132");
+  const learner = page.getByRole("button", { name: /Saved learner/ });
+  await expect(learner).toHaveAttribute("aria-disabled", "false");
+  await expect(
+    page.getByText("Saved demo workspace", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".profile-list button")).toHaveCount(2);
+  await expect(
+    page.getByRole("button", { name: /Oliver Anderson/ }),
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!);
+      return [
+        saved.settings.name,
+        saved.users.find((user: { id: string }) => user.id === "demo-learner")
+          .name,
+      ];
+    }),
+  ).toEqual(["Saved demo workspace", "Saved learner"]);
+  await learner.click();
+  await expect(page.locator(".app")).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".app")).toBeVisible();
 });
 
 test("dirty Admin navigation and search results require approval before pending or editor removal", async ({

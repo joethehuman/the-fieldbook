@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Hide header progress during navigation within Docs, Updates and Courses (including curricula), retaining it for entry into Administration and other existing shell transitions. The progress segment slides in from the header’s left edge before its existing fixed-width bounce; triggering and navigation timing are unchanged. Replace the demo’s full-screen startup loader with its complete default profile-selection page, including Hoolibook identity and all three profile rows before browser storage loads. Selection becomes available after storage loads; saved profiles and storage-error recovery remain intact. Keep the demo’s preloaded Geist font from swapping in after first paint, avoiding a change in text wrapping and account-card height.
+
 - Remove the desktop sidebar keyboard shortcut and hover tip while retaining the accessible toggle button.
 
 - Handle command-menu Escape dismissal from the canvas or menu, preserving slash text and returning focus. Handle empty/root selections safely and add normal horizontal padding to Outline and Details buttons.

@@ -70,6 +70,8 @@ import {
 import dynamic from "next/dynamic";
 import type { NavigationGuard } from "@/lib/navigation-guard";
 const Admin = dynamic(() => import("./Admin"));
+// Presentation defaults only; browser storage still owns the active workspace.
+const { settings: demoPickerSettings, users: demoPickerUsers } = freshWorkspace();
 type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook() {
   const { confirm } = useInteractionDialog();
@@ -277,48 +279,39 @@ export default function Fieldbook() {
     a.click();
     URL.revokeObjectURL(url);
   }
-  if (!data)
-    return (
-      <div
-        className={error ? "loading loading-error" : "loading"}
-        role={error ? "alert" : "status"}
-      >
-        <div className="loading-content">
-          <h2>{error || "Just a sec…"}</h2>
-          {!error && (
-            <div className="loading-bar" aria-hidden="true">
-              <span />
-            </div>
-          )}
-          {error && (
-            <Button variant="ghost" onClick={reset}>
-              Reset demo
-            </Button>
-          )}
-        </div>
-      </div>
-    );
   const demoGuest =
-    uid === "guest" && data.settings?.access !== "private"
+    data && uid === "guest" && data.settings?.access !== "private"
       ? guestRecommendations({
           ...data,
           content: data.publishedContent || data.content,
         })
       : undefined;
   const user =
-    demoGuest?.user || data.users.find((u) => u.id === uid && u.active);
-  const learningGroups = demoGuest?.groups || data.groups;
-  const branding = { ...defaultSettings, ...data.settings };
+    demoGuest?.user || data?.users.find((u) => u.id === uid && u.active);
+  const branding = {
+    ...defaultSettings,
+    ...(data ? data.settings : demoPickerSettings),
+  };
   const landingPath = homePath(branding);
   const landingView = resolveSection(landingPath.slice(1)) || "learn";
   const policyHref = privacyHref(branding);
-  if (!user)
+  if (!data || !user)
     return (
       <BrandedAccount branding={brandingFromSettings(branding)}>
         <Badge variant="default">INTERACTIVE DEMO</Badge>
         <h1>Choose a demo profile</h1>
+        {!data && error && (
+          <>
+            <Alert variant="destructive" role="alert">
+              {error}
+            </Alert>
+            <Button variant="ghost" onClick={reset}>
+              Reset demo
+            </Button>
+          </>
+        )}
         <div className="profile-list">
-          {data.users
+          {(data?.users || demoPickerUsers)
             .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
             .sort(
               (a, b) =>
@@ -328,7 +321,8 @@ export default function Fieldbook() {
               <NavigationButton
                 variant="ghost"
                 key={u.id}
-                onClick={() => login(u.id)}
+                aria-disabled={!data}
+                onClick={data ? () => login(u.id) : undefined}
               >
                 <InitialsAvatar initials={initials(u.name)} />
                 <span>
@@ -353,6 +347,7 @@ export default function Fieldbook() {
         </div>
       </BrandedAccount>
     );
+  const learningGroups = demoGuest?.groups || data.groups;
   const visible = (
     demoGuest?.content ||
     data.publishedContent ||
