@@ -3,6 +3,8 @@ import { learningUiFixture } from "../fixtures/learning-ui";
 import {
   courseSidebarGap,
   expectDesktopOutlineMinimum,
+  expectContentSizedCourseSidebar,
+  exercisePreviousLessons,
 } from "../fixtures/course-layout";
 import {
   expectShortLessonFits,
@@ -330,12 +332,17 @@ for (const lessonCount of [3, 12]) {
       info.project.name !== "desktop",
       "Narrow course outlines use natural stacked height.",
     );
-    await page.setViewportSize({ width: 1440, height: 400 });
+    await page.setViewportSize({ width: 1440, height: 1200 });
     await openCourse(page, "required", {
       shortLessons: true,
       startAtFirstLesson: true,
       lessonCount,
     });
+    await expectContentSizedCourseSidebar(page);
+    await page.screenshot({
+      path: info.outputPath(`content-sized-outline-${lessonCount}.png`),
+    });
+    await page.setViewportSize({ width: 1440, height: 400 });
     await expectDesktopOutlineMinimum(page, lessonCount);
     await page.screenshot({
       path: info.outputPath(`short-outline-${lessonCount}.png`),
@@ -351,6 +358,24 @@ for (const lessonCount of [3, 12]) {
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "";
     });
+  });
+}
+
+for (const mode of ["required", "optional", "no-quiz"] as const) {
+  test(`previous lesson navigation preserves ${mode} progress`, async ({
+    page,
+  }, info) => {
+    await openCourse(page, mode, {
+      shortLessons: true,
+      startAtFirstLesson: true,
+    });
+    await exercisePreviousLessons(
+      page,
+      "The big idea",
+      "Put it into practice",
+      mode !== "no-quiz",
+      (name) => info.outputPath(name),
+    );
   });
 }
 

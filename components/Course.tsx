@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Minus, Plus } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Minus, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { Alert } from "./ui/alert";
@@ -48,9 +48,11 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const [image, setImage] = useState<{ src: string; alt: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const activeCard = useRef<HTMLElement>(null);
+  const sidebarPanel = useRef<HTMLElement>(null);
   const mounted = useRef(false);
   const didResume = useRef(false);
   const lesson = course.lessons[step];
+  const previousLesson = course.lessons[step - 1];
   // Keep the opening image button mounted while the viewer changes so focus can return.
   const lessonContent = useMemo(() => lesson ? <Markdown linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown> : null, [lesson]);
   const allDone = course.lessons.every((item) => p?.lessons.includes(item.id));
@@ -59,6 +61,30 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const question = course.questions[questionIndex];
   const score = latestAttempt?.answers?.filter((answer) => answer.correct).length;
   const multi = (index: number) => course.questions[index].multiple ?? correctOptionIds(course.questions[index]).length > 1;
+  useLayoutEffect(() => {
+    const panel = sidebarPanel.current;
+    const details = panel?.querySelector<HTMLElement>(".course-detail-heading");
+    const exit = panel?.querySelector<HTMLElement>(".course-sidebar-exit");
+    if (!panel || !details || !exit) return;
+    // Only the outline has a minimum. Measure the surrounding content so a
+    // short viewport cannot clip it, without making the card fill a tall one.
+    const measure = () => {
+      const style = getComputedStyle(panel);
+      const chrome = details.getBoundingClientRect().height + exit.getBoundingClientRect().height
+        + 2 * parseFloat(style.rowGap)
+        + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+        + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+      const value = `${chrome}px`;
+      if (panel.style.getPropertyValue("--course-sidebar-chrome-height") !== value)
+        panel.style.setProperty("--course-sidebar-chrome-height", value);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(panel);
+    observer.observe(details);
+    observer.observe(exit);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     if (!guest || initialLessonId || !p || didResume.current) return;
     didResume.current = true;
@@ -83,6 +109,13 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   function selectLesson(index: number, href?: string) {
     if (href) window.history.replaceState(window.history.state, "", href);
     setStep(index);
+  }
+  function previous() {
+    if (!previousLesson || busy) return;
+    const href = lessonBaseHref
+      ? `${lessonBaseHref}${lessonBaseHref.includes("?") ? "&" : "?"}lesson=${encodeURIComponent(previousLesson.id)}`
+      : undefined;
+    selectLesson(step - 1, href);
   }
   async function next() {
     setBusy(true); setSaveError("");
@@ -119,7 +152,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   return <div className="course-detail course-player">
     <div className="lesson-layout">
       <aside className="course-sidebar">
-        <Card className="course-sidebar-panel">
+        <Card ref={sidebarPanel} className="course-sidebar-panel">
           <div className="course-detail-heading">
             <span className="eyebrow">{curriculumTitle || course.category}</span>
             <h1>{course.title}</h1>
@@ -156,9 +189,6 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             <div className="markdown">{lessonContent}</div>
             {p?.lessons.includes(lesson.id) && <Badge variant="success"><CheckCircle2 size={16} /> Lesson completed</Badge>}
           </section>
-          <nav className="course-continue" aria-label="Continue course"><Button variant="ghost" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={next} loading={busy}>
-            <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish course"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Course complete"}</span></span><ChevronRight aria-hidden="true" size={16} />
-          </Button></nav>
         </> : <section ref={activeCard} className={`${course.questions.length ? "course-quiz" : "course-finish-card"} grid gap-6`}>
           {course.questions.length ? showResults ? <>
             <span className="eyebrow">Quiz results</span>
@@ -230,6 +260,14 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             </>}
           </>}
         </section>}
+        {(lesson || previousLesson) && <nav className="course-continue reading-pagination" aria-label="Continue course">
+          {previousLesson && <Button variant="ghost" data-direction="previous" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={previous} disabled={busy}>
+            <ChevronLeft aria-hidden="true" size={16} /><span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">Previous lesson</span><span className="[overflow-wrap:anywhere]">{previousLesson.title}</span></span>
+          </Button>}
+          {lesson && <Button variant="ghost" data-direction="next" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={next} loading={busy}>
+            <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish course"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Course complete"}</span></span><ChevronRight aria-hidden="true" size={16} />
+          </Button>}
+        </nav>}
       </div>
     </div>
     <ImageViewer image={image} onClose={() => setImage(null)} />

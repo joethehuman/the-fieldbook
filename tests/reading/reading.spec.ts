@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import type { Content } from "../../lib/types";
-import { courseSidebarGap, expectDesktopOutlineMinimum } from "../fixtures/course-layout";
+import { courseSidebarGap, expectDesktopOutlineMinimum, expectContentSizedCourseSidebar, exercisePreviousLessons } from "../fixtures/course-layout";
 import { expectShortLessonFits, exerciseImageViewer, readerImageAlt, readerImageUrl, serveReaderImage } from "../fixtures/reader-layout";
 const backend = "http://127.0.0.1:3130";
 const ids = [
@@ -96,10 +96,13 @@ test("installed course sidebar preserves header spacing across lessons and quiz"
 test("installed desktop course outline retains its minimum and independent scroll on short screens", async ({ page, request }, info) => {
   test.skip(info.project.name !== "desktop", "Narrow course outlines use natural stacked height.");
   for (const lessonCount of [3, 12]) {
-    await page.setViewportSize({ width: 1440, height: 400 });
+    await page.setViewportSize({ width: 1440, height: 1200 });
     const course = { ...items[2], lessons: Array.from({ length: lessonCount }, (_, index) => ({ ...items[2].lessons[0], id: `layout-lesson-${index}`, title: `Lesson ${index + 1}` })) };
     await fixture(request, { documents: documents([items[0], items[1], course]) });
     await page.goto(`/courses/${ids[2]}?lesson=layout-lesson-0`);
+    await expectContentSizedCourseSidebar(page);
+    await page.screenshot({ path: info.outputPath(`content-sized-installed-outline-${lessonCount}.png`) });
+    await page.setViewportSize({ width: 1440, height: 400 });
     await expectDesktopOutlineMinimum(page, lessonCount);
     await page.screenshot({ path: info.outputPath(`short-installed-outline-${lessonCount}.png`) });
     await page.setViewportSize({ width: 2560, height: 900 });
@@ -109,6 +112,15 @@ test("installed desktop course outline retains its minimum and independent scrol
     await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
   }
 });
+
+for (const hasQuiz of [true, false]) {
+  test(`installed previous lesson navigation preserves ${hasQuiz ? "quiz" : "no-quiz"} progress`, async ({ page, request }, info) => {
+    const course = { ...items[2], questions: hasQuiz ? items[2].questions : [] };
+    await fixture(request, { documents: documents([items[0], items[1], course]) });
+    await page.goto(`/courses/${ids[2]}?lesson=first`);
+    await exercisePreviousLessons(page, "First lesson", "Second lesson", hasQuiz, name => info.outputPath(name));
+  });
+}
 
 test("short installed lessons fit without empty reader scroll and keep Next reachable", async ({ page }, info) => {
   if (info.project.name === "phone") await page.setViewportSize({ width: 375, height: 900 });

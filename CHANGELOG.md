@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Let short course lessons use their natural height, keep the desktop course panel aligned across lesson/quiz changes, and preserve enough independently scrolling outline space for three lessons plus a quiz on short screens. Place the main scrollbar at the workspace edge while keeping content centered, and use lighter, thinner shared scrollbars. Expand lesson images into a screen-fitting viewer with a visible Close button, Escape/outside dismissal and focus return.
+- Let short course lessons and the details card use their natural content height, keep the desktop course panel aligned across lesson/quiz changes, and preserve enough independently scrolling outline space for three lessons plus a quiz on short screens. Restore Previous lesson navigation without changing saved completion, including returning from quiz/finish screens. Place the main scrollbar at the workspace edge while keeping content centered, and use lighter, thinner shared scrollbars. Expand lesson images into a screen-fitting viewer with a visible Close button, Escape/outside dismissal and focus return.
 
 - Editor web links accept bare domains such as example.com, formatting tools retain the active editor ring, link popups follow their text, command highlights respond immediately to mouse and keyboard, and Outline/Details panels slide open and closed with reduced-motion support.
 
