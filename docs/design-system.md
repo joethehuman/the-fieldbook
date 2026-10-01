@@ -51,7 +51,7 @@ Acceptance checks must exercise state changes, not just initial screenshots: lon
 
 ## Theme and layout rules
 
-The workspace owns the full-width main scroll surface; its inline padding centers content within `--page-width`. Keep short course readers at their natural content height and allow longer lessons to scroll. Shared scrollbars use a thin neutral thumb and a transparent track, retaining stable gutters and native forced-color treatment.
+The workspace owns the full-width main scroll surface; its inline padding centers content within `--page-width`. Keep short course readers at their natural content height and allow longer lessons to scroll. The desktop course panel uses the workspace's existing top inset for sticky alignment, keeping its position stable across lessons and quizzes. Its independently scrolling outline retains `--course-outline-min-height` (16rem), enough for three single-line lessons plus a quiz; the whole panel remains reachable through workspace scrolling when its minimum exceeds a short viewport. Narrow layouts stack the panel above the lesson at its natural height. Shared scrollbars use a thin neutral thumb and a transparent track, retaining stable gutters and native forced-color treatment.
 
 Use `ImageViewer` for expanded reading images. The shared `DialogContent` media size fills the available viewport within the page-width limit and reserves a header for the title and Close action. The image fits the remaining area without cropping. Preserve Escape, outside dismissal, focus trapping and return to the opening control; ordinary dialogs keep their default size. Landscape and portrait examples live at `/ui#image-viewer` in the demo.
 

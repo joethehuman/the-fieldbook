@@ -948,9 +948,11 @@
 
 @layer components {
   .course-player .lesson-layout { grid-template-columns: minmax(15rem, 1fr) minmax(0, 2fr); gap: var(--space-8); }
-  .course-sidebar { position: sticky; top: var(--anchor-offset); min-width: 0; align-self: start; }
-  .course-sidebar-panel { display: flex; flex-direction: column; gap: var(--space-4); max-height: calc(100dvh - var(--anchor-offset) - var(--space-6)); min-height: 0; overflow: hidden; }
-  .course-sidebar .lesson-nav { position: static; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; flex: 0 1 auto; border-top: 1px solid var(--border); padding-top: var(--space-4); padding-right: var(--space-2); }
+  /* The main scroller's block padding already supplies the sticky top inset. */
+  .course-sidebar { position: sticky; top: 0; min-width: 0; align-self: start; }
+  .course-sidebar-panel { display: grid; grid-template-rows: auto minmax(var(--course-outline-min-height), 1fr) auto; gap: var(--space-4); height: calc(100dvh - var(--app-bar-height, 4rem) - 2 * var(--workspace-inset-block)); min-height: min-content; overflow: hidden; }
+  /* Size containment keeps long outlines out of the panel's intrinsic minimum. */
+  .course-sidebar .lesson-nav { position: static; contain: size; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; border-top: 1px solid var(--border); padding-block: var(--space-4) var(--space-1); padding-right: var(--space-2); }
   .course-sidebar .lesson-nav h2 { font-size: 1rem; font-weight: 600; margin-block: var(--space-2); }
   .course-sidebar .lesson-nav [data-slot="navigation-button"] { text-align: left; align-items: center; }
   .course-sidebar-exit { display: flex; flex: none; border-top: 1px solid var(--border); padding-top: var(--space-3); }
@@ -988,8 +990,8 @@
   @media (width < 70rem) {
     .course-player .lesson-layout { grid-template-columns: minmax(0, 1fr); }
     .course-sidebar { position: static; }
-    .course-sidebar-panel { max-height: none; overflow: visible; }
-    .course-sidebar .lesson-nav { grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; flex: none; }
+    .course-sidebar-panel { grid-template-rows: auto auto auto; height: auto; min-height: 0; overflow: visible; }
+    .course-sidebar .lesson-nav { contain: none; grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; }
     .course-lesson, .course-quiz, .course-finish-card { padding-top: 0; scroll-margin-block-start: 0; }
     .course-about details { display: block; }
     .course-desktop-summary { display: none; }

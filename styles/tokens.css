@@ -54,6 +54,7 @@
   --radius: 0.5rem;
   --sidebar-width: 16rem;
   --outline-width: 13rem;
+  --course-outline-min-height: 16rem;
   --anchor-offset: var(--space-6);
   --reading-width: 44rem;
   --form-width: 48rem;

@@ -1,6 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { learningUiFixture } from "../fixtures/learning-ui";
 import {
+  courseSidebarGap,
+  expectDesktopOutlineMinimum,
+} from "../fixtures/course-layout";
+import {
   expectShortLessonFits,
   exerciseImageViewer,
   readerImageAlt,
@@ -16,11 +20,13 @@ async function openCourse(
     startAtFirstLesson = false,
     shortLessons = false,
     lessonImage = false,
+    lessonCount,
   }: {
     longFirstLesson?: boolean;
     startAtFirstLesson?: boolean;
     shortLessons?: boolean;
     lessonImage?: boolean;
+    lessonCount?: number;
   } = {},
 ) {
   const data = learningUiFixture();
@@ -36,6 +42,12 @@ async function openCourse(
     course.lessons[0].body = `![${readerImageAlt}](${readerImageUrl})`;
     course.lessons[0].videoUrl = undefined;
   }
+  if (lessonCount)
+    course.lessons = Array.from({ length: lessonCount }, (_, index) => ({
+      ...course.lessons[index % course.lessons.length],
+      id: `layout-lesson-${index}`,
+      title: `Lesson ${index + 1}`,
+    }));
   if (longFirstLesson) {
     course.lessons[0].body +=
       "\n\n" + "A fuller explanation of the lesson.\n\n".repeat(80);
@@ -251,7 +263,7 @@ test("last no-quiz lesson completes and opens expanded feedback", async ({
     .toBeLessThan(2);
 });
 
-test("course sidebar preserves outline alignment across natural-height lessons and the quiz", async ({
+test("course sidebar preserves header spacing across natural-height lessons and the quiz", async ({
   page,
 }, info) => {
   test.skip(
@@ -266,6 +278,7 @@ test("course sidebar preserves outline alignment across natural-height lessons a
   });
   const back = page.getByRole("button", { name: "← Exit course" });
   const outlineTop = await outlineOffset(page);
+  const gap = await courseSidebarGap(page);
   await page.screenshot({ path: info.outputPath("lesson-1-layout.png") });
   await page.getByRole("button", { name: /^Next lesson/ }).click();
   await expect(
@@ -273,12 +286,21 @@ test("course sidebar preserves outline alignment across natural-height lessons a
   ).toBeVisible();
   await cardInView(page, ".course-lesson");
   await expect
+    .poll(async () => Math.abs((await courseSidebarGap(page)) - gap))
+    .toBeLessThan(2);
+  await expect(
+    page.getByRole("heading", { name: "Put it into practice" }),
+  ).toBeFocused();
+  await expect
     .poll(async () => Math.abs((await outlineOffset(page)) - outlineTop))
     .toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("lesson-2-layout.png") });
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await expect(page.getByText("Question 1 of 2")).toBeVisible();
   await cardInView(page, ".course-quiz");
+  await expect
+    .poll(async () => Math.abs((await courseSidebarGap(page)) - gap))
+    .toBeLessThan(2);
   await expect
     .poll(async () => Math.abs((await outlineOffset(page)) - outlineTop))
     .toBeLessThan(2);
@@ -293,9 +315,44 @@ test("course sidebar preserves outline alignment across natural-height lessons a
   ).toBeVisible();
   await cardInView(page, ".course-lesson");
   await expect
+    .poll(async () => Math.abs((await courseSidebarGap(page)) - gap))
+    .toBeLessThan(2);
+  await expect
     .poll(async () => Math.abs((await outlineOffset(page)) - outlineTop))
     .toBeLessThan(2);
 });
+
+for (const lessonCount of [3, 12]) {
+  test(`desktop course outline with ${lessonCount} lessons retains its minimum and independent scroll on short screens`, async ({
+    page,
+  }, info) => {
+    test.skip(
+      info.project.name !== "desktop",
+      "Narrow course outlines use natural stacked height.",
+    );
+    await page.setViewportSize({ width: 1440, height: 400 });
+    await openCourse(page, "required", {
+      shortLessons: true,
+      startAtFirstLesson: true,
+      lessonCount,
+    });
+    await expectDesktopOutlineMinimum(page, lessonCount);
+    await page.screenshot({
+      path: info.outputPath(`short-outline-${lessonCount}.png`),
+    });
+    await page.setViewportSize({ width: 2560, height: 900 });
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "200%";
+    });
+    await expectDesktopOutlineMinimum(page, lessonCount);
+    await page.screenshot({
+      path: info.outputPath(`enlarged-outline-${lessonCount}.png`),
+    });
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "";
+    });
+  });
+}
 
 test("next question's submit button starts disabled without showing its enabled color", async ({
   page,

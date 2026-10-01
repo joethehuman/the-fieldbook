@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import type { Content } from "../../lib/types";
+import { courseSidebarGap, expectDesktopOutlineMinimum } from "../fixtures/course-layout";
 import { expectShortLessonFits, exerciseImageViewer, readerImageAlt, readerImageUrl, serveReaderImage } from "../fixtures/reader-layout";
 const backend = "http://127.0.0.1:3130";
 const ids = [
@@ -70,6 +71,44 @@ async function fixture(request: any, extra = {}) {
   });
 }
 test.beforeEach(async ({ request }) => fixture(request));
+
+test("installed course sidebar preserves header spacing across lessons and quiz", async ({ page, request }, info) => {
+  test.skip(info.project.name !== "desktop", "The course panel stacks on narrow screens.");
+  await page.setViewportSize({ width: 1440, height: 934 });
+  const course = { ...items[2], lessons: items[2].lessons.map((lesson, index) => ({ ...lesson, body: index === 0 ? "A fuller lesson explanation.\n\n".repeat(80) : lesson.body })) };
+  await fixture(request, { documents: documents([items[0], items[1], course]) });
+  await page.goto(`/courses/${ids[2]}?lesson=first`);
+  const gap = await courseSidebarGap(page);
+  await page.screenshot({ path: info.outputPath("installed-lesson-1-spacing.png") });
+  await page.getByRole("button", { name: /^Next lesson/ }).click();
+  await expect(page.getByRole("heading", { name: "Second lesson", exact: true })).toBeFocused();
+  await expect.poll(async () => Math.abs((await courseSidebarGap(page)) - gap)).toBeLessThan(2);
+  await page.screenshot({ path: info.outputPath("installed-lesson-2-spacing.png") });
+  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await expect(page.getByRole("heading", { name: "Check your knowledge" })).toBeFocused();
+  await expect.poll(async () => Math.abs((await courseSidebarGap(page)) - gap)).toBeLessThan(2);
+  await page.screenshot({ path: info.outputPath("installed-quiz-spacing.png") });
+  await page.getByRole("navigation", { name: "In this course" }).getByRole("link", { name: /First lesson/ }).click();
+  await expect(page.getByRole("heading", { name: "First lesson", exact: true })).toBeFocused();
+  await expect.poll(async () => Math.abs((await courseSidebarGap(page)) - gap)).toBeLessThan(2);
+});
+
+test("installed desktop course outline retains its minimum and independent scroll on short screens", async ({ page, request }, info) => {
+  test.skip(info.project.name !== "desktop", "Narrow course outlines use natural stacked height.");
+  for (const lessonCount of [3, 12]) {
+    await page.setViewportSize({ width: 1440, height: 400 });
+    const course = { ...items[2], lessons: Array.from({ length: lessonCount }, (_, index) => ({ ...items[2].lessons[0], id: `layout-lesson-${index}`, title: `Lesson ${index + 1}` })) };
+    await fixture(request, { documents: documents([items[0], items[1], course]) });
+    await page.goto(`/courses/${ids[2]}?lesson=layout-lesson-0`);
+    await expectDesktopOutlineMinimum(page, lessonCount);
+    await page.screenshot({ path: info.outputPath(`short-installed-outline-${lessonCount}.png`) });
+    await page.setViewportSize({ width: 2560, height: 900 });
+    await page.evaluate(() => { document.documentElement.style.fontSize = "200%"; });
+    await expectDesktopOutlineMinimum(page, lessonCount);
+    await page.screenshot({ path: info.outputPath(`enlarged-installed-outline-${lessonCount}.png`) });
+    await page.evaluate(() => { document.documentElement.style.fontSize = ""; });
+  }
+});
 
 test("short installed lessons fit without empty reader scroll and keep Next reachable", async ({ page }, info) => {
   if (info.project.name === "phone") await page.setViewportSize({ width: 375, height: 900 });
