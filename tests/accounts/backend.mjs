@@ -63,6 +63,7 @@ const user = () => ({
 const profile = () =>
   configuredUsers.find((entry) => entry.id === user().id) || {
     ...user(),
+    auth_user_id: user().id,
     name: "Synthetic Admin",
     role,
     active: role !== "inactive",
@@ -296,12 +297,22 @@ createServer(async (req, res) => {
     else configuredProgress[index] = saved;
     return send(res, saved);
   }
-  if (url.pathname === "/rest/v1/fb_profiles")
-    return url.searchParams.has("id")
-      ? send(res, profile())
-      : send(res, configuredUsers.length ? configuredUsers : [profile()], 200, {
-          "Content-Range": `0-${Math.max(0, configuredUsers.length - 1)}/${configuredUsers.length || 1}`,
-        });
+  if (url.pathname === "/rest/v1/fb_profiles") {
+    const people = configuredUsers.length ? configuredUsers : [profile()];
+    const personId = url.searchParams.get("id")?.slice(3);
+    const subject = url.searchParams.get("auth_user_id")?.slice(3);
+    if (personId || subject)
+      return send(
+        res,
+        people.find((p) =>
+          personId
+            ? p.id === personId
+            : (p.auth_user_id === undefined ? p.id : p.auth_user_id) ===
+              subject,
+        ) || null,
+      );
+    return send(res, people);
+  }
   if (url.pathname === "/rest/v1/rpc/fb_admin_people_snapshot") {
     const { p_actor, p_user } = JSON.parse(body || "{}");
     const users = (configuredUsers.length ? configuredUsers : [profile()]).filter((p) => !p.deleted_at);

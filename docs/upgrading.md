@@ -66,6 +66,14 @@ Your content and settings remain in your own Supabase project. An upgrade must p
 
 Keep the previous deployment available. Reverting to old code is safe only when it is compatible with the current database. If it is not, stop writes and follow a tested database/media restore or forward-fix plan. Restoring an older backup can lose changes made since that backup. Do not assume Vercel rollback reverses a migration.
 
+## Stable roster and hire-date upgrade
+
+`20261001222227_roster_people.sql` requires all earlier migrations, including `admin_people_reads`. It evolves `fb_profiles` into a roster with an optional unique `auth_user_id`, preserving existing person IDs and attaching their current Auth IDs. Progress, feedback and MCP grants reference the person. Legacy preregistrations become roster people with new stable IDs; the redundant `fb_pending_profiles` table is removed. Team/group relationships, documents and existing learning history are preserved. Recorded legacy onboarding starts retain the current onboarding window as their applied baseline; hire dates are left unknown. Review conflicting normalized emails and orphan person references before applying: the transaction rejects conflicts rather than merging accounts.
+
+This is a coordinated code/database upgrade. Back up, rehearse in isolation, stop old application and cleanup-worker writes, apply the migration, then deploy the matching code and resume the worker. Do not run older application or worker versions against newly activated roster identities. Code-only rollback is unsupported after this migration; use a tested restore with writes stopped or a forward fix. Auth changes after the backup need their own recovery review.
+
+Verify existing sign-in and owner access, first activation of a preregistered manager, descendant reporting scope, unchanged progress/feedback/grants, inactive-account rejection, restore and permanent deletion for both signed-in and preregistered people. The People stage must expire using its applied window even when due dates are off. No new environment variables are required. The migration does not enable CSV import, change team-link subtree behavior or freeze catch-up deadlines.
+
 ## References
 
 - [Vercel Git deployments and production branches](https://vercel.com/docs/git)

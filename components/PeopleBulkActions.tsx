@@ -29,7 +29,14 @@ export function peopleCommands(
         : operation === "team"
           ? { ...u, teamId: ids[0] === "none" ? undefined : ids[0] }
           : operation === "date"
-            ? { ...u, onboardingStart: ids[0] }
+            ? {
+                ...u,
+                hireDate: ids[0],
+                onboardingDays:
+                  "onboardingDays" in u
+                    ? (u.onboardingDays ?? data.settings?.onboardingDays ?? 90)
+                    : (data.settings?.onboardingDays ?? 90),
+              }
             : operation === "active" || operation === "inactive"
               ? { ...u, active: operation === "active" }
               : {
@@ -98,9 +105,9 @@ export function peopleCommands(
       : []),
     {
       id: "date",
-      label: "Set onboarding start date",
+      label: "Set hire date",
       description:
-        "Recalculate onboarding targets from this date. Existing course completion history is preserved.",
+        "Start each person's onboarding clock from this hire date using their applied window. Existing completion history is preserved.",
       field: "date",
       apply: (ids) => apply("date", ids),
     },

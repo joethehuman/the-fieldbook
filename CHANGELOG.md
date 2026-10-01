@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Preregistered people now appear in the normal roster and can be team members or managers before signing in. Verified first sign-in attaches their login without resetting their stable ID or history. Hire dates start onboarding, with an applied window and automatic New/Existing stage separate from login status. Apply `20261001222227_roster_people.sql` in a coordinated code/database upgrade; see the roster upgrade guidance.
+
 - Editor web links accept bare domains such as example.com, formatting tools retain the active editor ring, link popups follow their text, command highlights respond immediately to mouse and keyboard, and Outline/Details panels slide open and closed with reduced-motion support.
 
 - Add Organization Settings → External links for up to three ordered account-menu links. Share them with all signed-in users and public guests, with external-link arrows and new-tab destinations. Keep standalone account pages unchanged; no new migration is required.

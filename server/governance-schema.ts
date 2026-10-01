@@ -41,6 +41,7 @@ export const governanceSchema = z
           groups: z.array(id).max(100),
           teamId: id.optional(),
           onboardingStart: z.iso.date().optional(),
+          hireDate: z.iso.date().optional(),
         }),
       )
       .max(10000),
@@ -128,5 +129,6 @@ export const pendingSchema = z.object({
   groups: z.array(id).max(100),
   teamId: id.optional(),
   onboardingStart: z.iso.date().optional(),
+  hireDate: z.iso.date().optional(),
   revoke: z.boolean().optional(),
 });

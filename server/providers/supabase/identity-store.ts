@@ -11,7 +11,7 @@ export async function findProfileBySubject(
   subject: string,
   activeOnly = false,
 ): Promise<ProfileRecord | null> {
-  let query = db().from("fb_profiles").select("*").eq("id", subject);
+  let query = db().from("fb_profiles").select("*").eq("auth_user_id", subject);
   if (activeOnly) query = query.eq("active", true);
   const { data, error } = await query.maybeSingle();
   check(error);
@@ -37,14 +37,29 @@ export async function hasConnectionGrantForSubject(
   subject: string,
   clientId: string,
 ): Promise<boolean> {
+  const person = await findProfileBySubject(subject, true);
+  if (!person) return false;
   const { data, error } = await db()
     .from("fb_mcp_grants")
     .select("enabled")
-    .eq("user_id", subject)
+    .eq("user_id", person.id)
     .eq("client_id", clientId)
     .maybeSingle();
   check(error);
   return Boolean(data?.enabled);
+}
+
+/** Lifecycle operations resolve the provider link without making a new identity. */
+export async function loginSubjectForPerson(
+  personId: string,
+): Promise<string | null> {
+  const { data, error } = await db()
+    .from("fb_profiles")
+    .select("auth_user_id")
+    .eq("id", personId)
+    .maybeSingle();
+  check(error);
+  return data?.auth_user_id || null;
 }
 
 export async function connectionGrants(

@@ -23,6 +23,7 @@ const config = {
 };
 const person = {
   id: subject,
+  auth_user_id: subject as string | null,
   email: "member@example.test",
   name: "Member",
   role: "admin",
@@ -60,7 +61,7 @@ test("verified identities retain Fieldbook's fresh profile and verified-email ch
       const url = location(input);
       if (url.pathname === "/auth/v1/user") return Response.json(user);
       assert.equal(url.pathname, "/rest/v1/fb_profiles");
-      assert.equal(url.searchParams.get("id"), `eq.${subject}`);
+      assert.equal(url.searchParams.get("auth_user_id"), `eq.${subject}`);
       reads++;
       return Response.json(profile);
     };
@@ -126,9 +127,15 @@ test("identity absence remains distinct from provider failure", async () => {
 test("identity locking and deletion preserve provider operations and retry failures", async () => {
   await fixture(async () => {
     const operations: { method: string; body: unknown }[] = [];
+    const personId = "22222222-2222-4222-8222-222222222222";
+    let linked = true;
     let deleting = false;
     let failed = false;
     globalThis.fetch = async (input, init) => {
+      if (location(input).pathname === "/rest/v1/fb_profiles") {
+        assert.equal(location(input).searchParams.get("id"), `eq.${personId}`);
+        return Response.json({ auth_user_id: linked ? subject : null });
+      }
       assert.equal(location(input).pathname, `/auth/v1/admin/users/${subject}`);
       operations.push({
         method: init?.method || "GET",
@@ -146,18 +153,28 @@ test("identity locking and deletion preserve provider operations and retry failu
         );
       return Response.json(authUser);
     };
-    await lockIdentity(subject);
-    await unlockIdentity(subject);
+    linked = false;
+    await lockIdentity(personId);
+    await unlockIdentity(personId);
+    await deleteIdentity(personId);
+    assert.equal(
+      operations.length,
+      0,
+      "preregistered people need no Auth write",
+    );
+    linked = true;
+    await lockIdentity(personId);
+    await unlockIdentity(personId);
     assert.deepEqual(
       operations.slice(0, 2).map((operation) => operation.body),
       [{ ban_duration: "876600h" }, { ban_duration: "none" }],
     );
     deleting = true;
-    await deleteIdentity(subject);
+    await deleteIdentity(personId);
     assert.equal(operations.at(-1)?.method, "DELETE");
     failed = true;
-    await assert.rejects(deleteIdentity(subject));
-    await assert.rejects(lockIdentity(subject));
+    await assert.rejects(deleteIdentity(personId));
+    await assert.rejects(lockIdentity(personId));
   });
 });
 
@@ -184,7 +201,8 @@ test("MCP checks signed resource identity, current grant and profile before tran
         .setProtectedHeader({ alg: "ES256", kid: "identity-test" })
         .sign(privateKey);
     let enabled = true;
-    let profile = { ...person };
+    const personId = "22222222-2222-4222-8222-222222222222";
+    let profile = { ...person, id: personId };
     let allowed = true;
     let databaseReads = 0;
     globalThis.fetch = async (input) => {
@@ -193,11 +211,12 @@ test("MCP checks signed resource identity, current grant and profile before tran
         return Response.json({ keys: [jwk] });
       databaseReads++;
       if (url.pathname === "/rest/v1/fb_mcp_grants") {
-        assert.equal(url.searchParams.get("user_id"), `eq.${subject}`);
+        assert.equal(url.searchParams.get("user_id"), `eq.${personId}`);
         assert.equal(url.searchParams.get("client_id"), "eq.client-one");
         return Response.json({ enabled });
       }
       if (url.pathname === "/rest/v1/fb_profiles") {
+        assert.equal(url.searchParams.get("auth_user_id"), `eq.${subject}`);
         assert.equal(url.searchParams.get("active"), "eq.true");
         return Response.json(profile.active ? profile : null);
       }
@@ -237,11 +256,11 @@ test("MCP checks signed resource identity, current grant and profile before tran
     enabled = false;
     assert.equal((await mcp(request(valid))).status, 403);
     enabled = true;
-    profile = { ...person, role: "learner" };
+    profile = { ...person, id: personId, role: "learner" };
     assert.equal((await mcp(request(valid))).status, 403);
-    profile = { ...person, active: false };
-    assert.equal((await mcp(request(valid))).status, 401);
-    profile = { ...person };
+    profile = { ...person, id: personId, active: false };
+    assert.equal((await mcp(request(valid))).status, 403);
+    profile = { ...person, id: personId };
     allowed = false;
     assert.equal((await mcp(request(valid))).status, 429);
     allowed = true;

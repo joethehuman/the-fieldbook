@@ -81,6 +81,7 @@ test("catch-up starts at the later membership or group requirement date, using t
   ];
   const u = {
     ...d.users[0],
+    hireDate: undefined,
     onboardingStart: undefined,
     groups: ["startup"],
     groupJoinedAt: { startup: "2026-09-10T12:00:00Z" },
