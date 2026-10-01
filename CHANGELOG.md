@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Hide header progress during navigation within Docs, Updates and Courses (including curricula), retaining it for entry into Administration and other existing shell transitions. Replace the demo’s full-screen startup loader with its existing profile-selection page, including storage-error recovery.
+
 - Remove the desktop sidebar keyboard shortcut and hover tip while retaining the accessible toggle button.
 
 - Handle command-menu Escape dismissal from the canvas or menu, preserving slash text and returning focus. Handle empty/root selections safely and add normal horizontal padding to Outline and Details buttons.

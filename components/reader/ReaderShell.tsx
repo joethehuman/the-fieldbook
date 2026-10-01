@@ -79,6 +79,7 @@ export function ReaderShell({
   const pathname = usePathname();
   const router = useRouter();
   const [navigationPending, startNavigation] = useTransition();
+  const [showNavigationProgress, setShowNavigationProgress] = useState(true);
   useEffect(() => {
     if (!navigationPending) finishNavigation();
   }, [navigationPending, pathname, finishNavigation]);
@@ -173,6 +174,12 @@ export function ReaderShell({
     }
     if (href === "/docs") setCollapsed(false);
     else close();
+    setShowNavigationProgress(
+      !(
+        ["docs", "updates", "courses", "curricula"].includes(section) &&
+        /^\/(docs|updates|courses|curricula)(\/|$)/.test(href)
+      ),
+    );
     startNavigation(async () => {
       if (await beforeNavigation()) startNavigation(() => router.push(href));
     });
@@ -198,7 +205,7 @@ export function ReaderShell({
         accent={context.branding.accent}
         collapsed={collapsed}
         menu={menu}
-        pending={navigationPending}
+        pending={navigationPending && showNavigationProgress}
         admin={section === "admin"}
         alert={
           accountError && (

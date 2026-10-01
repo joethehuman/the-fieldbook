@@ -34,6 +34,8 @@ These checks do not establish hosted Google OAuth, production provider behavior,
 
 ## Docs reading navigation
 
+Navigation within and between Docs, Updates and Courses (including curricula) keeps the current page visible while the next page resolves, without header progress. Entering Administration from those screens retains the header progress bar; other existing shell transitions keep their progress behavior. The demo uses its existing profile-selection page while browser storage initializes, with storage errors and Reset demo on that same page. It does not show a full-screen startup loader.
+
 Docs use left-aligned section/folder navigation with the current document highlighted. On desktop the document tree scrolls independently of application navigation and account controls. Tab-local scroll/disclosure preferences are optional and do not change document order or access. Short screens and larger text retain an outer-sidebar scrolling fallback.
 
 `/docs` opens the first published document in sidebar order, including a subsection document when the first section has no direct documents. The route shows a simple empty state when no documents are published. Individual Docs pages use the sidebar and previous/next links for navigation, without a back-to-index link.

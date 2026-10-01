@@ -232,6 +232,138 @@ test("approved cold navigation shows pending while preserving the old body and m
   ).toHaveCount(0);
 });
 
+test("content navigation keeps its page without progress and Admin entry retains progress", async ({
+  page,
+}, info) => {
+  await page.goto("/docs");
+  await expect(
+    page.getByRole("heading", { name: doc.title, exact: true }),
+  ).toBeVisible();
+  for (const destination of [
+    "/updates",
+    "/courses",
+    "/docs",
+    `/docs/${docId}`,
+    "/admin",
+  ]) {
+    let release!: () => void;
+    let waiting = false;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const pattern = `**${destination}?*`;
+    await page.route(pattern, async (route) => {
+      if (route.request().resourceType() === "fetch") {
+        waiting = true;
+        await held;
+      }
+      await route.continue();
+    });
+    const previousContent = page.locator("#main-content > *").first();
+    await expect(previousContent).toBeVisible();
+    const previousBody = await previousContent.elementHandle();
+    try {
+      if (destination === "/admin") await account(page, "Manage organization");
+      else {
+        await openNavigation(page);
+        await page.locator(`.sidebar a[href="${destination}"]`).first().click();
+      }
+      await expect.poll(() => waiting).toBe(true);
+      expect(
+        await previousBody!.evaluate((element) => element.isConnected),
+      ).toBe(true);
+      await expect(previousContent).toBeVisible();
+      const progress = page.getByRole("status", {
+        name: "Opening page",
+        exact: true,
+      });
+      if (destination === "/admin") {
+        await expect(progress).toBeVisible();
+        await page.screenshot({
+          path: info.outputPath("content-to-admin-pending.png"),
+        });
+      } else {
+        await expect(progress).toHaveCount(0);
+        await expect(page.locator(".sidebar")).not.toHaveClass(
+          /navigation-pending/,
+        );
+        if (destination === "/courses")
+          await page.screenshot({
+            path: info.outputPath("content-to-content-pending.png"),
+          });
+      }
+    } finally {
+      release();
+    }
+    await expect(page).toHaveURL(new RegExp(`${destination}$`));
+    await expect(
+      page.getByRole("status", { name: "Opening page", exact: true }),
+    ).toHaveCount(0);
+    await page.unroute(pattern);
+  }
+});
+
+test("demo initial entry and profile selection use the account page without a full-screen loader", async ({
+  page,
+  request,
+}, info) => {
+  const html = await (await request.get("http://127.0.0.1:3132")).text();
+  expect(html).toContain("Choose a demo profile");
+  expect(html).not.toContain("Just a sec");
+  await page.addInitScript(() => {
+    (window as any).sawFullScreenLoader = false;
+    const observe = () => {
+      if (document.querySelector(".loading, .loading-bar"))
+        (window as any).sawFullScreenLoader = true;
+    };
+    new MutationObserver(observe).observe(document, {
+      childList: true,
+      subtree: true,
+    });
+  });
+  await page.goto("http://127.0.0.1:3132");
+  await expect(
+    page.getByRole("heading", { name: "Choose a demo profile", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("demo-profile-selection.png"),
+  });
+  await page.getByRole("button", { name: /Alex Edwards/ }).click();
+  await expect(page.locator(".app")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
+    false,
+  );
+  await page.reload();
+  await expect(page.locator(".app")).toBeVisible();
+  expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
+    false,
+  );
+  await page.evaluate(() => {
+    sessionStorage.removeItem("fieldbook.profile.v1");
+    localStorage.setItem(
+      "fieldbook.workspace.v1",
+      JSON.stringify({ schema: 0 }),
+    );
+  });
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Choose a demo profile", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .getByRole("alert")
+      .filter({ hasText: "Saved demo data could not be opened" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Reset demo", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: /Alex Edwards/ }),
+  ).toBeVisible();
+  expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
+    false,
+  );
+});
+
 test("dirty Admin navigation and search results require approval before pending or editor removal", async ({
   page,
 }) => {
