@@ -2,6 +2,7 @@
   "name": "fieldbook",
   "version": "0.1.0",
   "private": true,
+  "license": "Elastic-2.0",
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
     "build": "node scripts/build-marker.mjs installed && next build --webpack",

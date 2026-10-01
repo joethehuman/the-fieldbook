@@ -11,7 +11,7 @@ An external corporate policy must cover this deployment. Google brand verificati
 ## Starter outline — replace every placeholder and review before publication
 
 - Operator and contact: [organization/person], [contact email], [site/domain].
-- Scope: identify this installation, not all deployments of the open-source software.
+- Scope: identify this installation, not all deployments of the source-available software licensed under ELv2.
 - Data: identity from the configured sign-in provider; learning progress and quiz outcome history; feedback; uploads and content history; operational logs; connection grants.
 - Purposes: authentication, learning continuity, content delivery, administration, security, and support. Explain additional purposes actually used by your organization.
 - Access and recipients: administrators, infrastructure providers, approved AI connections, and external media providers. Describe employee reporting where applicable.

@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- License Fieldbook under the Elastic License 2.0 (ELv2), add license metadata to both application packages, and describe the project as source available under ELv2. Preserve third-party licenses; the repository remains private and no release is published.
+
 - Add official Vercel Web Analytics and Speed Insights to the installed app and optional demo. Enable their normal SDK behavior on Vercel, with independent opt-outs, and keep them inactive on other hosts. Document project activation and the telemetry boundary for contributors.
 
 - Put current hosting, identity, persistence and private-media operations behind explicit service boundaries. Preserve the Vercel/Supabase/Google installation and existing data/permissions, and document how contributors can add a verified hosting recipe or service implementation. Add standard Node host configuration and provider-boundary checks; complete alternate-stack recipes remain contributor work, and existing-installation transfer is separate.
@@ -132,7 +134,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 - Remove the unnecessary guest option from the demo profile picker; signed-out visitor recommendations remain available in public installations.
 
-- Tighten built-in copy on learner, visitor and manager pages while keeping progress, safety and recovery information. Let the longer feedback prompt wrap beside its rating controls. Set the default footer tagline to "The Fieldbook | A Lightweight, Opinionated, Open-Source LMS".
+- Tighten built-in copy on learner, visitor and manager pages while keeping progress, safety and recovery information. Let the longer feedback prompt wrap beside its rating controls. Set the then-default footer tagline to describe Fieldbook; that footer has since been removed.
 
 - Use a shared searchable, creatable dropdown for categories, channels and Doc sections. New Docs and Updates start with an empty section/category prompt.
 

@@ -1,6 +1,6 @@
 # The Fieldbook
 
-A lightweight, opinionated learning and knowledge management platform built with Next.js.
+A lightweight, opinionated learning and knowledge management platform built with Next.js. Source available under the [Elastic License 2.0 (ELv2)](LICENSE).
 
 Fieldbook brings three kinds of content together:
 
@@ -10,7 +10,7 @@ Fieldbook brings three kinds of content together:
 
 Run your own installation, maintain content in the built-in admin panel, and optionally connect an AI client to edit content through MCP. Each installation has its own accounts, data, domain, and configuration. No separate CMS is required.
 
-> **Before the first release:** this project is still being prepared for publication. There are no published releases and no open-source license yet. The `0.1.0` values in the code are development placeholders, not a released version. Do not treat the current branch as a stable release.
+> **Before the first release:** this project is still being prepared for publication. The code is licensed under ELv2; the repository remains private while the first public release is prepared. There are no published releases. The `0.1.0` values in the code are development placeholders, not a released version. Do not treat the current branch as a stable release.
 
 ## Supported setup
 
@@ -122,4 +122,6 @@ For interface changes, also run `pnpm check:ui` and `pnpm test:ui` after install
 
 ## Project status and license
 
-This is a small independent project. A license must be chosen before open-source publication; no reuse rights are granted by an absent license. Bug reports should include the version and reproduction steps, without credentials or learner data. A private vulnerability-reporting channel must be established before release. There is no promised release schedule, long-term-support branch, or feature roadmap.
+Fieldbook is source available under the [Elastic License 2.0 (ELv2)](LICENSE). You may use, modify and redistribute the software subject to its terms, including for your own internal installation. ELv2 restricts providing substantial Fieldbook functionality to others as a hosted or managed service, circumventing license-key functionality, and removing or obscuring license, copyright or other notices. See [licensing](docs/licensing.md) for scope and third-party notices.
+
+This is a small independent project. Bug reports should include the version and reproduction steps, without credentials or learner data. A private vulnerability-reporting channel must be established before release. There is no promised release schedule, long-term-support branch, or feature roadmap.
