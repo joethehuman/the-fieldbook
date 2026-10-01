@@ -10,7 +10,6 @@ import {
 } from "@server/auth";
 import { env } from "@server/env";
 import { invalidatePublishedReader } from "@server/reader-cache";
-export const runtime = "nodejs";
 export const maxDuration = 30;
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 async function handle(req: Request) {
