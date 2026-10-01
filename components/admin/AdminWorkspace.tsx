@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/alert";
 import { useWorkspaceShell } from "@/components/reader/WorkspaceContext";
 import type { ReaderShellContext } from "@/lib/reader-types";
 import { brandingFromSettings } from "@/lib/branding";
+import { mergeSavedContent } from "@/lib/content-save";
 const Admin = dynamic(() => import("@/components/Admin"));
 export function AdminWorkspace({
   initial,
@@ -82,6 +83,21 @@ export function AdminWorkspace({
           data={data}
           user={user}
           onChange={persist}
+          onSaveContent={async (content, intent) => {
+            try {
+              const saved = await runtime.saveContent(content, intent);
+              setData((current) => mergeSavedContent(current, saved));
+              setReportIssue(undefined);
+              return saved;
+            } catch (failure) {
+              if (failure instanceof SaveRecoveryError && failure.snapshot)
+                setData(failure.snapshot);
+              setReportIssue(
+                "Reload the report before exporting after a failed change.",
+              );
+              throw failure;
+            }
+          }}
           onBulk={async (action) => {
             const result = await runtime.admin.bulk(action);
             setData(result.data);

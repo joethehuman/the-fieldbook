@@ -3,7 +3,8 @@ import { cache } from "react";
 import type { Content, User } from "@/lib/types";
 import { db, check } from "./db";
 import { requireAdmin, HttpError } from "./auth";
-import { contentSchema } from "./schemas";
+import { contentSignature } from "@/lib/demo-publication";
+import { contentDraftSchema, contentSchema } from "./schemas";
 import { isArtworkOnlyUpdate } from "@/lib/card-art";
 import { videoSource } from "@/lib/video";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
@@ -19,8 +20,9 @@ import {
 } from "@/lib/docs-navigation";
 
 export function redact(c: Content): Content {
+  const { publishedSignature, ...safeContent } = c;
   return {
-    ...c,
+    ...safeContent,
     groups: [],
     assignments: [],
     questions: c.questions.map((question) => {
@@ -34,6 +36,9 @@ export function document(row: any, draft = false): Content {
     ...(draft ? row.draft : row.published),
     revision: row.revision,
     publishedRevision: row.published_revision,
+    ...(draft && row.published
+      ? { publishedSignature: contentSignature(row.published) }
+      : {}),
   };
 }
 export const readConfig = cache(async () => {
@@ -76,13 +81,17 @@ export async function saveContent(
   unpublish = false,
 ) {
   requireAdmin(user);
-  const parsed = contentSchema.safeParse(input);
+  const parsed = (publish ? contentSchema : contentDraftSchema).safeParse(
+    input,
+  );
   if (!parsed.success)
     throw new HttpError(
       400,
       parsed.error.issues.map((i) => i.message).join(" "),
     );
   const c = parsed.data;
+  if (publish && !c.summary.trim())
+    throw new HttpError(400, "Add a short description before publishing.");
   if (c.kind === "doc") {
     const conflict = legacySectionConflict([c]);
     if (conflict) throw new HttpError(400, conflict);
@@ -217,22 +226,41 @@ export async function saveContent(
     check(mediaError);
     if (new Set(media?.map((m) => m.id)).size !== new Set(mediaIds).size)
       throw new HttpError(400, "One or more media uploads are not ready.");
-    for (const imageUrl of [c.coverImageUrl, c.cardArt?.imageUrl].filter(Boolean)) {
+    for (const imageUrl of [c.coverImageUrl, c.cardArt?.imageUrl].filter(
+      Boolean,
+    )) {
       const imageId = imageUrl!.split("/").pop()!.split(".")[0];
       const image = media?.find((m) => m.id === imageId);
-      if (!image || !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(image.mime))
-        throw new HttpError(400, "Choose a ready image upload for card artwork.");
+      if (
+        !image ||
+        !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(
+          image.mime,
+        )
+      )
+        throw new HttpError(
+          400,
+          "Choose a ready image upload for card artwork.",
+        );
     }
   }
   const now = new Date().toISOString();
-  const artOnlyUpdate = publish && old?.published && isArtworkOnlyUpdate(c as Content, old.published as Content);
+  const artOnlyUpdate =
+    publish &&
+    old?.published &&
+    isArtworkOnlyUpdate(c as Content, old.published as Content);
   const { revision, publishedRevision, ...clean } = c;
   const draft = {
     ...clean,
     status: publish ? "published" : "draft",
     createdAt: old?.draft.createdAt || now,
     updatedAt: now,
-    ...(c.kind === "brief" ? { feedAt: artOnlyUpdate ? old.published.feedAt || old.published.updatedAt : now } : {}),
+    ...(c.kind === "brief"
+      ? {
+          feedAt: artOnlyUpdate
+            ? old.published.feedAt || old.published.updatedAt
+            : now,
+        }
+      : {}),
   };
   const { data: saved, error: saveError } = await db().rpc("fb_save_document", {
     p_id: c.id,

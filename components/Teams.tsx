@@ -1,4 +1,6 @@
 "use client";
+import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
+import { DetailNavigation } from "./patterns/detail-navigation";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
 import { CsvExport } from "./patterns/csv-export";
@@ -21,7 +23,6 @@ import {
 import { Input } from "@/components/ui/input";
 
 import {
-  FilterBar,
   EmptyState,
   SectionHeader,
 } from "@/components/patterns/layout";
@@ -34,13 +35,16 @@ import { reportTeamIds, type User } from "@/lib/types";
 import { teamPath } from "@/lib/team-hierarchy";
 export { TeamsAdmin } from "./TeamManagement";
 export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
+  const overview = useRevealTarget<HTMLHeadingElement>();
   const assignments = useRevealTarget<HTMLElement>();
   const teams = data.teams || [];
   const allowed = reportTeamIds(user, teams);
   const [teamId, setTeamId] = useState("all"),
     [query, setQuery] = useState(""),
     [person, setPerson] = useState("");
-  const rows = teamProgressRows(data, user, teamId, query);
+  const [sort, setSort] = useState("name");
+  const clearFilters = () => { setTeamId("all"); setQuery(""); setPerson(""); };
+  const rows = teamProgressRows(data, user, teamId, query).sort((a, b) => (sort === "reverse" ? b.u.name.localeCompare(a.u.name) : a.u.name.localeCompare(b.u.name)) || a.u.id.localeCompare(b.u.id));
   const users = rows.map((r) => r.u);
   const total = rows.reduce((n, r) => n + r.assigned.length, 0),
     done = rows.reduce((n, r) => n + r.completed, 0);
@@ -52,13 +56,16 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
     );
   return (
     <>
-      <SectionHeader title={<h2>People & completion</h2>}>
+      <SectionHeader variant="page" title={<h2 {...overview.targetProps}>People & completion</h2>}>
         <CsvExport
           filename="team-progress"
           report={() => teamProgressCsv(rows)}
         />
       </SectionHeader>
-      <FilterBar search={
+      <CollectionControls sortLabel={sort === "name" ? "Name A–Z" : "Name Z–A"}
+        sort={<FormField label="Sort team members"><SelectField value={sort} onValueChange={setSort}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>}
+        filters={[...(query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => { setQuery(""); setPerson(""); } }] : []), ...(teamId !== "all" ? [{ id: "team", label: teamPath(teamId, teams), onRemove: () => { setTeamId("all"); setPerson(""); } }] : [])]}
+        onClear={clearFilters} search={
         <FormField label="Find a team member" visuallyHiddenLabel>
           <Input
             type="search"
@@ -91,7 +98,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
               ))}
           </SelectField>
         </FormField>
-      </FilterBar>
+      </CollectionControls>
       <p className="muted">
         Includes subteams. Completion uses the latest published course versions.
       </p>
@@ -106,7 +113,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             : "No assignments"}
         </span>
       </div>
-      <TableContainer>
+      {!!rows.length && <TableContainer>
         <DataTable layout="progress">
           <TableHeader>
             <TableRow>
@@ -151,10 +158,8 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             ))}
           </TableBody>
         </DataTable>
-      </TableContainer>
-      {!users.length && (
-        <EmptyState>No team members match this view.</EmptyState>
-      )}
+      </TableContainer>}
+      <CollectionEmpty count={users.length} total={teamProgressRows(data, user, "all", "").length} noun="team members" onClear={clearFilters} />
       {rows
         .filter((r) => r.u.id === person)
         .map(({ u, assigned }) => {
@@ -168,7 +173,14 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
               className="grid gap-4"
               key={u.id}
             >
-              <SectionHeader title={<h2>{u.name}’s assignments</h2>}>
+              <DetailNavigation
+                items={[{ label: "Back to people & completion", onSelect: () => {
+                  setPerson("");
+                  overview.reveal();
+                } }]}
+                current={u.name}
+              />
+              <SectionHeader title={<h3>{u.name}’s assignments</h3>}>
                 <CsvExport
                   filename={`${u.name}-assignments`}
                   report={() => courseProgressCsv(courses, "team")}

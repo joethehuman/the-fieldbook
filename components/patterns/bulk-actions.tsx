@@ -143,9 +143,12 @@ export function BulkActions({
         >
           {menu}
         </BulkSelectionBar>
-      ) : singleItemActions && collectionSize === 1 && selected.length === 1 ? (
-        <ActionGroup>{menu}</ActionGroup>
-      ) : null}
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p role="status" className="text-copy text-muted-foreground">{collectionSize} {noun}</p>
+          {singleItemActions && collectionSize === 1 && selected.length === 1 && <ActionGroup>{menu}</ActionGroup>}
+        </div>
+      )}
       {resultNotice && (
         <Alert variant="destructive">
           <p>{resultNotice.message}</p>

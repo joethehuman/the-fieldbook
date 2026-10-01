@@ -1,17 +1,17 @@
 "use client";
+import { DetailNavigation } from "./patterns/detail-navigation";
 import { Card, CardContent, CardFooter } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
+import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
 import { FilterOptions } from "./patterns/filter-options";
 import { ContentFeedback } from "./patterns/content-feedback";
 import { CsvExport } from "./patterns/csv-export";
 import { feedbackRows, feedbackCsv } from "@/lib/reporting";
 import { Input } from "@/components/ui/input";
 import {
-  FilterBar,
   SectionHeader,
-  EmptyState,
 } from "@/components/patterns/layout";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
@@ -70,7 +70,7 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
     [rating, setRating] = useState("all"),
     [query, setQuery] = useState(""),
     [sort, setSort] = useState("newest");
-  const scope = useRevealTarget<HTMLHeadingElement>();
+  const scope = useRevealTarget<HTMLHeadingElement>({ context: true });
   const selectedItem = data.content.find((c) => c.id === item);
   function viewItem(id: string) {
     setKind("all");
@@ -79,37 +79,48 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
     setItem(id);
     scope.reveal();
   }
+  const clearFilters = () => { setQuery(""); setRating("all"); setItem("all"); setKind("all"); };
   const records = feedbackRows(data, kind, item, rating, query, sort);
   const positive = records.filter((f) => f.rating === "up").length;
   return (
     <>
-      <SectionHeader
-        title={
-          <h2 {...scope.targetProps}>
-            {selectedItem ? `Feedback for ${selectedItem.title}` : "Feedback"}
-          </h2>
-        }
-        description="See what readers and learners are telling you."
-      >
+      <div data-reveal-context className="grid gap-4">
         {item !== "all" && (
-          <Button variant="outline" onClick={() => viewItem("all")}>
-            All feedback
-          </Button>
+          <DetailNavigation
+            items={[{ label: "All feedback", onSelect: () => viewItem("all") }]}
+            current={selectedItem?.title}
+          />
         )}
-        <CsvExport filename="feedback" report={() => feedbackCsv(records)} />
-      </SectionHeader>
-      <FilterOptions
-        label="Feedback rating"
-        variant="underline"
-        value={rating}
-        onValueChange={setRating}
-        options={[
-          { value: "all", label: "All ratings" },
-          { value: "up", label: "Useful" },
-          { value: "down", label: "Not useful" },
+        <SectionHeader
+          variant="page"
+          title={
+            <h2 {...scope.targetProps}>
+              {selectedItem ? `Feedback for ${selectedItem.title}` : "Feedback"}
+            </h2>
+          }
+          description="See what readers and learners are telling you."
+        >
+          <CsvExport filename="feedback" report={() => feedbackCsv(records)} />
+        </SectionHeader>
+      </div>
+      <FilterOptions label="Feedback type" variant="underline" value={kind} onValueChange={(value) => { setKind(value); setItem("all"); }} options={[
+        { value: "all", label: "All" }, { value: "doc", label: "Docs" }, { value: "brief", label: "Updates" }, { value: "course", label: "Courses" }, { value: "general", label: "General" },
+      ]} />
+      <CollectionControls
+        sortLabel={sort === "newest" ? "Newest first" : "Oldest first"}
+        sort={        <FormField label="Sort feedback">
+          <SelectField value={sort} onValueChange={(value) => setSort(value)}>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+          </SelectField>
+        </FormField>}
+        onClear={clearFilters}
+        filters={[
+          ...(query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []),
+          ...(rating !== "all" ? [{ id: "rating", label: rating === "up" ? "Useful" : "Not useful", onRemove: () => setRating("all") }] : []),
+          ...(item !== "all" ? [{ id: "item", label: selectedItem?.title || "Selected item", onRemove: () => setItem("all") }] : []),
         ]}
-      />
-      <FilterBar search={
+        search={
         <FormField label="Search feedback" visuallyHiddenLabel>
           <Input
             type="search"
@@ -119,19 +130,9 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
           />
         </FormField>
       }>
-        <FormField label="Content type">
-          <SelectField
-            value={kind}
-            onValueChange={(value) => {
-              setKind(value);
-              setItem("all");
-            }}
-          >
-            <option value="all">All types</option>
-            <option value="general">General</option>
-            <option value="doc">Docs</option>
-            <option value="brief">Updates</option>
-            <option value="course">Courses</option>
+        <FormField label="Feedback rating">
+          <SelectField value={rating} onValueChange={setRating}>
+            <option value="all">All ratings</option><option value="up">Useful</option><option value="down">Not useful</option>
           </SelectField>
         </FormField>
         <FormField label="Content item">
@@ -139,6 +140,7 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
             <option value="all">All feedback</option>
             {data.content
               .filter((c) => kind === "all" || c.kind === kind)
+              .sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id))
               .map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.title}
@@ -146,13 +148,8 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
               ))}
           </SelectField>
         </FormField>
-        <FormField label="Sort feedback">
-          <SelectField value={sort} onValueChange={(value) => setSort(value)}>
-            <option value="newest">Newest first</option>
-            <option value="oldest">Oldest first</option>
-          </SelectField>
-        </FormField>
-      </FilterBar>
+
+      </CollectionControls>
       <div className="report-summary">
         <strong>
           {records.length} {records.length === 1 ? "rating" : "ratings"}
@@ -198,9 +195,7 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
           </Card>
         ))}
       </div>
-      {!records.length && (
-        <EmptyState>No feedback matches these filters.</EmptyState>
-      )}
+      <CollectionEmpty count={records.length} total={feedbackRows(data, "all", "all", "all", "", "newest").length} noun="feedback entries" onClear={clearFilters} />
     </>
   );
 }

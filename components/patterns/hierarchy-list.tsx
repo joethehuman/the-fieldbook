@@ -10,8 +10,9 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
+import { CollectionControls, CollectionEmpty } from "./collection-controls";
+import { SelectField } from "../ui/select";
 import { FormField } from "./form-field";
-import { EmptyState } from "./layout";
 
 export type HierarchyItem = {
   id: string;
@@ -20,6 +21,9 @@ export type HierarchyItem = {
   description?: string;
   meta?: ReactNode;
 };
+export const hierarchyMatches = (items: HierarchyItem[], query: string) => items.filter((item) =>
+  `${item.label} ${item.description || ""}`.toLowerCase().includes(query.trim().toLowerCase()),
+);
 /** Nested disclosure list, not an ARIA tree: normal Tab/Enter navigation applies. */
 export function HierarchyList({
   items,
@@ -30,6 +34,8 @@ export function HierarchyList({
   onSelectionChange,
   selectionActions,
   searchAction,
+  query: controlledQuery,
+  onQueryChange,
 }: {
   items: HierarchyItem[];
   label: string;
@@ -39,14 +45,17 @@ export function HierarchyList({
   onSelectionChange?: (ids: string[]) => void;
   selectionActions?: ReactNode;
   searchAction?: ReactNode;
+  query?: string;
+  onQueryChange?: (query: string) => void;
 }) {
-  const [query, setQuery] = useState("");
+  const [localQuery, setLocalQuery] = useState("");
+  const query = controlledQuery ?? localQuery;
+  const setQuery = onQueryChange ?? setLocalQuery;
+  const [sort, setSort] = useState("name");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const search = query.trim().toLowerCase();
   const byId = new Map(items.map((item) => [item.id, item]));
-  const matches = items.filter((item) =>
-    `${item.label} ${item.description || ""}`.toLowerCase().includes(search),
-  );
+  const matches = hierarchyMatches(items, query);
   const visible = new Set<string>();
   for (const match of matches) {
     let item: HierarchyItem | undefined = match;
@@ -58,7 +67,8 @@ export function HierarchyList({
     }
   }
   function rows(parentId?: string, ancestors = new Set<string>()): ReactNode {
-    return items
+    return [...items]
+      .sort((a, b) => (sort === "reverse" ? -1 : 1) * a.label.localeCompare(b.label) || a.id.localeCompare(b.id))
       .filter(
         (item) =>
           (parentId
@@ -89,6 +99,7 @@ export function HierarchyList({
             <li>
               <div className="flex min-w-0 items-center gap-2 border-b border-border px-3 py-3 last:border-b-0">
                 {canBulkSelect(matches.length) &&
+                  matches.some((match) => match.id === item.id) &&
                   selected &&
                   onSelectionChange && (
                     <Checkbox
@@ -163,27 +174,19 @@ export function HierarchyList({
   }
   return (
     <div className="grid min-w-0 gap-4">
-      <div className="flex flex-wrap items-start gap-3">
-        <FormField
-          className="min-w-0 basis-64 flex-1"
-          label={`Find ${label.toLowerCase()}`}
-          visuallyHiddenLabel={!!searchAction}
-          description={`Search includes matching ${label.toLowerCase()} and their parents. Expand a row to explore its branch.`}
-        >
-          <Input
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              onSelectionChange?.([]);
-            }}
-            placeholder={`Find ${label.toLowerCase()}`}
-          />
-        </FormField>
-        {searchAction}
-      </div>
-      {(canBulkSelect(matches.length) || items.length === 1) &&
-        selectionActions}
+      <CollectionControls
+        search={<FormField label={`Find ${label.toLowerCase()}`} visuallyHiddenLabel>
+          <Input type="search" value={query} onChange={(event) => { setQuery(event.target.value); onSelectionChange?.([]); }} placeholder={`Find ${label.toLowerCase()}`} />
+        </FormField>}
+        sortLabel={sort === "reverse" ? "Name Z–A" : "Name A–Z"}
+        sort={<FormField label={`Sort ${label.toLowerCase()}`}><SelectField value={sort} onValueChange={setSort}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>}
+        filters={query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => { setQuery(""); onSelectionChange?.([]); } }] : []}
+        onClear={() => { setQuery(""); onSelectionChange?.([]); }}
+        actions={searchAction}
+      />
+      <p className="text-copy text-muted-foreground">Search includes matching {label.toLowerCase()} and their parents. Expand a row to explore its branch.</p>
+      {!selectionActions && <p className="text-copy text-muted-foreground" role="status">{matches.length} results</p>}
+      {selectionActions}
       {canBulkSelect(matches.length) && selected && onSelectionChange && (
         <div className="flex items-center gap-3">
           <SelectRows
@@ -204,11 +207,7 @@ export function HierarchyList({
           {rows()}
         </ul>
       ) : (
-        <EmptyState>
-          {items.length
-            ? `No ${label.toLowerCase()} match your search.`
-            : `No ${label.toLowerCase()} yet.`}
-        </EmptyState>
+        <CollectionEmpty count={0} total={items.length} noun={label.toLowerCase()} onClear={() => { setQuery(""); onSelectionChange?.([]); }} />
       )}
     </div>
   );

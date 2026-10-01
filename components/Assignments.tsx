@@ -6,8 +6,12 @@ import { CsvExport } from "./patterns/csv-export";
 import { courseProgressRow, courseProgressCsv } from "@/lib/reporting";
 import { DataTable } from "./patterns/data-table";
 import { Input } from "@/components/ui/input";
+import {
+  CollectionControls,
+  CollectionEmpty,
+} from "./patterns/collection-controls";
 
-import { SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { SectionHeader } from "@/components/patterns/layout";
 import { ActionGroup } from "@/components/ui/action-group";
 import {
   TableContainer,
@@ -20,7 +24,7 @@ import {
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import { groupPath } from "@/lib/group-hierarchy";
@@ -64,6 +68,10 @@ export function Assignments({
   const groupId = scope.groupId || selected,
     group = data.groups.find((g) => g.id === groupId),
     person = data.users.find((u) => u.id === scope.userId);
+  useEffect(() => {
+    setQuery("");
+    setDetail(null);
+  }, [groupId, scope.userId, scope.courseId]);
   const courses = (data.publishedContent ?? data.content).filter(
     (c) => c.kind === "course" && c.status === "published",
   );
@@ -399,19 +407,22 @@ export function Assignments({
         ) : (
           <>
             {data.settings?.onboardingDays ?? 90} days for new users ·{" "}
-            {data.settings?.catchUpDays ?? 30} days to catch up with new assigned
-            courses. Manage these windows in Settings.
+            {data.settings?.catchUpDays ?? 30} days to catch up with new
+            assigned courses. Manage these windows in Settings.
           </>
         )}
       </p>
       {notice && <Alert variant="destructive">{notice}</Alert>}
-      <FormField label="Find a course">
-        <Input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search assigned courses"
-        />
-      </FormField>
+      <CollectionControls
+        search={
+          <Input
+            aria-label="Find a course"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search assigned courses"
+          />
+        }
+      />
       <TableContainer>
         <DataTable layout="courses">
           <TableHeader>
@@ -512,11 +523,15 @@ export function Assignments({
             })}
           </TableBody>
         </DataTable>
-        {!rows.length && (
-          <EmptyState>
-            No assigned courses yet. The full library remains available.
-          </EmptyState>
-        )}
+        <CollectionEmpty
+          count={rows.length}
+          total={
+            ordered.filter((c) => !scope.courseId || c.id === scope.courseId)
+              .length
+          }
+          noun="assigned courses"
+          onClear={() => setQuery("")}
+        />
       </TableContainer>
       {detail && rows.some(({ c }) => c.id === detail) && (
         <section className="assignment-detail">

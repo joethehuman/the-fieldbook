@@ -694,6 +694,29 @@ export default function Fieldbook() {
             data={data}
             user={user}
             onChange={persist}
+            onSaveContent={async (content, intent) => {
+              try {
+                const before = loadWorkspace();
+                const previous = before.content.find((item) => item.id === content.id);
+                if ((previous?.revision || 0) !== (content.revision || 0))
+                  throw new Error("This content changed in another tab. Reload and review the saved copy before saving again.");
+                const stamp = new Date().toISOString();
+                const next = reconcileLearning(before, reconcileDemoPublication(before, {
+                  ...before,
+                  content: [...before.content.filter((item) => item.id !== content.id), {
+                    ...content, status: intent, updatedAt: stamp,
+                    createdAt: previous?.createdAt || previous?.updatedAt || content.createdAt || stamp,
+                  }],
+                }));
+                saveWorkspace(next);
+                setData(next);
+                setReportIssue(undefined);
+                return next.content.find((item) => item.id === content.id)!;
+              } catch (failure) {
+                setReportIssue("Reload the report before exporting after a failed change.");
+                throw failure instanceof Error ? failure : new Error("Your browser could not save this change. Your edits remain open.");
+              }
+            }}
             onBulk={async (action) => {
               const result = applyDemoBulk(data, user, action);
               saveWorkspace(result.data);

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { contentSchema, settingsSchema } from "../../server/schemas";
 import { saveContent, document } from "../../server/content";
 import { defaultSettings } from "../../lib/settings";
+import { requiresPassing } from "../../lib/course-quiz";
 import { seedContent } from "../../lib/seed";
 
 const imageId = "00000000-0000-4000-8000-000000000010";
@@ -119,6 +120,53 @@ test("cover saves require admin, ready image media and a current revision; draft
       true,
     );
     assert.equal(document(row).coverImageUrl, "");
+    const liveBeforeIncomplete = document(row);
+    const incomplete = {
+      ...course,
+      title: "",
+      category: "",
+      summary: "",
+      assignments: [],
+      questions: [
+        {
+          id: "unfinished",
+          prompt: "",
+          options: ["", ""],
+          correctOptionIds: [],
+        },
+      ],
+    };
+    const unfinished = await saveContent(admin, incomplete, 4, false);
+    assert.equal(unfinished.title, "");
+    assert.deepEqual(unfinished.questions[0].correctOptionIds, []);
+    assert.deepEqual(document(row), { ...liveBeforeIncomplete, revision: 5 });
+    await assert.rejects(() => saveContent(admin, incomplete, 5, true));
+    assert.equal(row.revision, 5);
+    const changedRule = {
+      ...course,
+      coverImageUrl: "",
+      assignments: [],
+      requirePassing: !requiresPassing(document(row)),
+    };
+    const stagedRule = await saveContent(admin, changedRule, 5, false);
+    assert.equal(stagedRule.version, course.version);
+    assert.equal(document(row).version, course.version);
+    assert.notEqual(
+      requiresPassing(stagedRule),
+      requiresPassing(document(row)),
+    );
+    await assert.rejects(
+      () => saveContent(admin, changedRule, 6, true),
+      /new course version/,
+    );
+    const publishedVersion = await saveContent(
+      admin,
+      { ...changedRule, version: course.version + 1 },
+      6,
+      true,
+    );
+    assert.equal(publishedVersion.version, course.version + 1);
+    assert.equal(document(row).version, course.version + 1);
   } finally {
     globalThis.fetch = originalFetch;
     process.env = oldEnv;

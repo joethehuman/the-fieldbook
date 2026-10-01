@@ -54,6 +54,9 @@
   --anchor-offset: var(--space-6);
   --reading-width: 44rem;
   --form-width: 48rem;
+  --editor-title-width: 54rem;
+  --editor-writing-width: 64rem;
+  --editor-writing-focus-width: 56rem;
   --page-width: 90rem;
   --space-1: 0.25rem;
   --space-2: 0.5rem;

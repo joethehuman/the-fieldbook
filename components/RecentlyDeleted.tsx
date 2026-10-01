@@ -1,7 +1,7 @@
 "use client";
 import { Pagination } from "./patterns/pagination";
 import { FormField } from "./patterns/form-field";
-import { Toolbar } from "./patterns/layout";
+import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
 import { Input } from "./ui/input";
 import { SelectField } from "./ui/select";
 import { Button } from "./ui/button";
@@ -33,6 +33,7 @@ export function RecentlyDeleted({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
+  const clearFilters = () => { setFilter("all"); setQuery(""); setPage(1); };
   const displayData = {
     ...data,
     deletedItems: data.deletedItems?.map((d) => ({
@@ -93,8 +94,7 @@ export function RecentlyDeleted({
           { value: "user", label: "Users" },
         ]}
       />
-      <Toolbar className="items-start">
-        <FormField className="min-w-[14rem] flex-1" label="Search recently deleted" visuallyHiddenLabel>
+      <CollectionControls search={        <FormField className="min-w-[14rem] flex-1" label="Search recently deleted" visuallyHiddenLabel>
           <Input
             type="search"
             value={query}
@@ -105,14 +105,14 @@ export function RecentlyDeleted({
             placeholder="Search recently deleted"
           />
         </FormField>
-        <FormField className="w-full sm:w-64" label="Sort deleted items" visuallyHiddenLabel>
-          <SelectField value={sort} onValueChange={setSort}>
+} sort={        <FormField className="w-full sm:w-64" label="Sort deleted items" visuallyHiddenLabel>
+          <SelectField value={sort} onValueChange={(value) => { setSort(value); setPage(1); }}>
             <option value="newest">Recently deleted first</option>
             <option value="deadline">Permanent deletion soonest</option>
             <option value="name">Name A–Z</option>
           </SelectField>
         </FormField>
-      </Toolbar>
+} sortLabel={sort === "name" ? "Name A–Z" : sort === "deadline" ? "Permanent deletion soonest" : "Recently deleted first"} onClear={clearFilters} filters={query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => { setQuery(""); setPage(1); } }] : []} />
       <AdminBulkActions
         data={displayData}
         range={
@@ -141,7 +141,7 @@ export function RecentlyDeleted({
           return results;
         }}
       />
-      <TableContainer>
+      {!!rows.length && <TableContainer>
         <DataTable layout="deleted">
           <TableHeader>
             <TableRow>
@@ -212,7 +212,7 @@ export function RecentlyDeleted({
             ))}
           </TableBody>
         </DataTable>
-      </TableContainer>
+      </TableContainer>}
       {rows.length > 25 && (
         <Button
           type="button"
@@ -232,12 +232,13 @@ export function RecentlyDeleted({
       )}
       <Pagination
         label="Recently deleted"
+        showCount={false}
         page={currentPage}
         pageSize={25}
         total={rows.length}
         onPageChange={setPage}
       />
-      {!rows.length && <p>No recently deleted items.</p>}
+      <CollectionEmpty count={rows.length} total={data.deletedItems?.length || 0} noun="recently deleted items" onClear={clearFilters} />
     </div>
   );
 }

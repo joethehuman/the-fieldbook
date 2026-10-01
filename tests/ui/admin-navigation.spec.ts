@@ -107,8 +107,12 @@ test("admin destinations reveal details and keep filters and fieldset footers co
     await page.setViewportSize({ width: 1280, height: 1000 });
   }
   await section(page, "Feedback");
-  const rating = page.getByRole("group", { name: "Feedback rating" });
-  await rating.getByRole("button", { name: "Useful", exact: true }).click();
+  const filters = page.getByRole("button", { name: /^Filters/ });
+  await filters.click();
+  const rating = page.getByRole("combobox", { name: "Feedback rating", exact: true });
+  await rating.click();
+  await page.getByRole("option", { name: "Useful", exact: true }).click();
+  await page.keyboard.press("Escape");
   await expect(page.locator("article")).toHaveCount(1);
   await page
     .getByRole("button", { name: "View all feedback for this item" })
@@ -119,45 +123,20 @@ test("admin destinations reveal details and keep filters and fieldset footers co
   });
   await revealed(heading);
   await expect(heading).toBeFocused();
-  await expect(rating.getByRole("button", { name: "All ratings" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Remove Useful filter", exact: true })).toHaveCount(0);
   await expect(page.locator("article")).toHaveCount(2);
   await expect(
     page.getByRole("button", { name: "View all feedback for this item" }),
   ).toHaveCount(0);
-  if (info.project.name === "desktop") {
-    const controls = page.locator(
-      '[data-slot="filter-bar"] [role="combobox"], [data-slot="filter-bar"] input',
-    );
-    const bounds = await controls.evaluateAll((nodes) =>
-      nodes.map((node) => {
-        const { top, left, right } = node.getBoundingClientRect();
-        const bar = node
-          .closest('[data-slot="filter-bar"]')!
-          .getBoundingClientRect();
-        return { top, left, right, barLeft: bar.left, barRight: bar.right };
-      }),
-    );
-    const rowTops: number[] = [];
-    for (const { top } of bounds) {
-      if (!rowTops.some((rowTop) => Math.abs(rowTop - top) < 2)) {
-        rowTops.push(top);
-      }
-    }
-    expect(rowTops.length).toBeGreaterThan(1);
-    expect(rowTops.length).toBeLessThan(bounds.length);
-    for (const bound of bounds) {
-      expect(bound.left).toBeGreaterThanOrEqual(bound.barLeft);
-      expect(bound.right).toBeLessThanOrEqual(bound.barRight);
-    }
-    for (const rowTop of rowTops) {
-      const row = bounds
-        .filter(({ top }) => Math.abs(top - rowTop) < 2)
-        .sort((a, b) => a.left - b.left);
-      for (let index = 1; index < row.length; index += 1) {
-        expect(row[index - 1].right).toBeLessThanOrEqual(row[index].left);
-      }
-    }
-  }
+  await filters.click();
+  await expect(rating).toContainText("All ratings");
+  const filterPanel = page.getByRole("dialog", { name: "Collection filters", exact: true });
+  await expect(filterPanel).toBeVisible();
+  const bounds = await filterPanel.boundingBox();
+  expect(bounds!.x).toBeGreaterThanOrEqual(0);
+  expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(page.viewportSize()!.width + 1);
+  await page.keyboard.press("Escape");
+
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth + 1,

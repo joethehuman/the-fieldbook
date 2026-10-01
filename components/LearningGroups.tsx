@@ -1,4 +1,5 @@
 "use client";
+import { DetailNavigation } from "./patterns/detail-navigation";
 import { BulkActions } from "./patterns/bulk-actions";
 import { SelectableRows } from "./patterns/selectable-rows";
 import { groupLearningCommands } from "./bulk-relationships";
@@ -13,7 +14,8 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { Input } from "@/components/ui/input";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
-import { FilterBar, SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
+import { SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { Alert } from "@/components/ui/alert";
 import { ActionGroup } from "@/components/ui/action-group";
 import { useState } from "react";
@@ -36,7 +38,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import type { LearningHandler } from "./Assignments";
 import { SaveRecoveryError } from "@/lib/save-recovery";
-import { HierarchyList } from "./patterns/hierarchy-list";
+import { HierarchyList, hierarchyMatches } from "./patterns/hierarchy-list";
 import { groupMembershipSources, groupMoveImpact, groupPath, moveGroup } from "@/lib/group-hierarchy";
 import { teamPath } from "@/lib/team-hierarchy";
 
@@ -62,11 +64,13 @@ export default function LearningGroups({
   const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
+  const [hierarchyQuery, setHierarchyQuery] = useState("");
   const [selected, setSelected] = useState(initialGroup || "");
   const [tab, setTab] = useState("learning");
   const [query, setQuery] = useState("");
+  const [memberSort, setMemberSort] = useState("name");
   const [updateSort, setUpdateSort] =
-    useState<GroupBrowseSort>("updated-newest");
+    useState<GroupBrowseSort>("created-newest");
   const [name, setName] = useState("");
   const [createParent, setCreateParent] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -162,13 +166,13 @@ export default function LearningGroups({
     name.toLowerCase().includes(query.trim().toLowerCase());
   const linkedTeams = (data.teams || []).filter((t) =>
     group?.teamIds?.includes(t.id),
-  );
+  ).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
   const groupMembers = data.users.filter(
     (u) =>
       group &&
       effectiveGroups(u, data.groups).has(group.id) &&
       matches(u.name + " " + u.email),
-  );
+  ).sort((a, b) => (memberSort === "reverse" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id));
   const groupUpdates = sortGroupBrowseItems(
     published
       .filter(
@@ -197,9 +201,16 @@ export default function LearningGroups({
     selected + tab + query,
     groupUpdates.map((c) => c.id),
   );
+  const hierarchyItems = [...data.groups].sort((a, b) => a.name.localeCompare(b.name)).map((g) => ({
+              id: g.id,
+              parentId: g.parentId,
+              label: g.name,
+              description: groupPath(g.id, data.groups),
+              meta: `${data.users.filter((u) => u.active && effectiveGroups(u, data.groups).has(g.id)).length} active people · ${data.groups.filter((child) => child.parentId === g.id).length} child groups · ${expandLearning(groupItems(g, content), curricula).filter((id) => published.some((c) => c.id === id)).length} direct assigned courses`,
+            }));
   const overviewSelection = useBulkSelection(
-    selected,
-    data.groups.map((g) => g.id),
+    selected + hierarchyQuery,
+    hierarchyMatches(hierarchyItems, hierarchyQuery).map((item) => item.id),
   );
   const parentGroups = group ? [...data.groups]
     .filter((g) => g.id !== group.id && canParent(group.id, g.id, data.groups))
@@ -208,7 +219,7 @@ export default function LearningGroups({
     try { return groupMoveImpact(data, group.id, moveParent || undefined); }
     catch { return null; }
   })() : null;
-  const childGroups = group ? data.groups.filter((g) => g.parentId === group.id) : [];
+  const childGroups = group ? data.groups.filter((g) => g.parentId === group.id).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)) : [];
   const inheritedGroups = group ? [...data.groups].filter((g) => g.id !== group.id && canParent(g.id, group.id, data.groups) === false) : [];
   function closeCreate() {
     if (busy) return;
@@ -227,6 +238,7 @@ export default function LearningGroups({
       {!group ? (
         <>
           <SectionHeader
+            variant="page"
             title={<h2>Learning groups</h2>}
             description={
               <>
@@ -235,7 +247,11 @@ export default function LearningGroups({
               </>
             }
           ></SectionHeader>
-          <BulkActions
+          <HierarchyList
+            query={hierarchyQuery}
+            onQueryChange={setHierarchyQuery}
+            selectionActions={
+<BulkActions
             singleItemActions={false}
             collectionSize={overviewSelection.collectionSize}
             selected={overviewSelection.actionIds}
@@ -276,7 +292,7 @@ export default function LearningGroups({
               },
             }])}
           />
-          <HierarchyList
+            }
             label="Learning groups"
             searchAction={
               <Button type="button" disabled={busy} onClick={() => { setCreateParent(""); setNotice(""); setCreateOpen(true); }}>
@@ -284,13 +300,7 @@ export default function LearningGroups({
                 Create group
               </Button>
             }
-            items={[...data.groups].sort((a, b) => a.name.localeCompare(b.name)).map((g) => ({
-              id: g.id,
-              parentId: g.parentId,
-              label: g.name,
-              description: groupPath(g.id, data.groups),
-              meta: `${data.users.filter((u) => u.active && effectiveGroups(u, data.groups).has(g.id)).length} active people · ${data.groups.filter((child) => child.parentId === g.id).length} child groups · ${expandLearning(groupItems(g, content), curricula).filter((id) => published.some((c) => c.id === id)).length} direct assigned courses`,
-            }))}
+            items={hierarchyItems}
             selected={overviewSelection.selected}
             onSelectionChange={overviewSelection.setSelected}
             disabled={busy}
@@ -299,20 +309,33 @@ export default function LearningGroups({
         </>
       ) : (
         <>
-          <Button
-            variant="link"
-            onClick={() => {
-              setSelected("");
-              destination.reveal();
-              setQuery("");
-            }}
-          >
-            ← All learning groups
-          </Button>
+          <DetailNavigation
+            disabled={busy}
+            items={[
+              { label: "All learning groups", onSelect: () => {
+                setSelected("");
+                destination.reveal();
+                setQuery("");
+                setMoveParent(null);
+              } },
+              ...(group.parentId ? [{
+                label: `Parent: ${groupPath(group.parentId, data.groups)}`,
+                onSelect: () => {
+                  setSelected(group.parentId!);
+                  destination.reveal();
+                  setQuery("");
+                  setNotice("");
+                  setMoveParent(null);
+                },
+              }] : []),
+            ]}
+            current={group.name}
+          />
           <SectionHeader
+            variant="page"
             title={<h2>{group.name}</h2>}
             description={
-              <>{groupPath(group.id, data.groups)} · Members receive this group’s courses and Updates in For you.</>
+              <>Members receive this group’s courses and Updates in For you.</>
             }
           >
             <ActionGroup>
@@ -387,7 +410,7 @@ export default function LearningGroups({
           <div className="grid gap-2">
             <div className="flex items-center gap-2"><Button type="button" variant="ghost" size="icon" aria-label={`${childrenOpen ? "Collapse" : "Expand"} child groups`} aria-expanded={childrenOpen} onClick={() => setChildrenOpen((value) => !value)}><ChevronRight className={childrenOpen ? "rotate-90" : ""} aria-hidden="true" /></Button><h3>Child groups · {childGroups.length}</h3></div>
             {childrenOpen && (childGroups.length ? childGroups.map((child) => (
-              <Button key={child.id} variant="link" className="justify-start" onClick={() => { setSelected(child.id); setMoveParent(null); destination.reveal(); }}>
+              <Button key={child.id} variant="link" className="justify-start" onClick={() => { setSelected(child.id); setMoveParent(null); setQuery(""); setNotice(""); destination.reveal(); }}>
                 {groupPath(child.id, data.groups)}
               </Button>
             )) : <p className="text-copy text-muted-foreground">No child groups.</p>)}
@@ -509,14 +532,14 @@ export default function LearningGroups({
                         actionLabel="Add people"
                       />
                     </ActionGroup>
-                    <FormField label="Find a member">
+                    <CollectionControls sortLabel={memberSort === "name" ? "Name A–Z" : "Name Z–A"} sort={<FormField label="Sort group members"><SelectField value={memberSort} onValueChange={setMemberSort}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>} search={                    <FormField label="Find a member">
                       <Input
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="Search name or email"
                       />
-                    </FormField>
+                    </FormField>} filters={query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []} onClear={() => setQuery("")} />
                     <BulkActions
                       collectionSize={peopleSelection.collectionSize}
                       selected={peopleSelection.actionIds}
@@ -550,7 +573,8 @@ export default function LearningGroups({
                     />
                     <SelectableRows
                       label="Group members"
-                      scope={query}
+                      empty={<CollectionEmpty count={groupMembers.length} total={data.users.filter((u) => effectiveGroups(u, data.groups).has(group.id)).length} noun="group members" onClear={() => setQuery("")} />}
+                      scope={query + memberSort}
                       selected={peopleSelection.selected}
                       onChange={peopleSelection.setSelected}
                       rows={groupMembers.map((u) => ({
@@ -724,17 +748,9 @@ export default function LearningGroups({
                       }}
                       actionLabel="Add Updates"
                     />
-                    <FilterBar search={
-                      <FormField label="Find an update" visuallyHiddenLabel>
-                        <Input
-                          type="search"
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                          placeholder="Find an update"
-                        />
-                      </FormField>
-                    }>
-                      <FormField label="Sort updates for this group">
+                    <CollectionControls
+                      sortLabel={updateSort === "title" ? "Title A–Z" : updateSort === "created-newest" ? "Created newest first" : updateSort === "created-oldest" ? "Created oldest first" : updateSort === "updated-newest" ? "Updated newest first" : "Updated oldest first"}
+                      sort={                      <FormField label="Sort updates for this group">
                       <SelectField
                         value={updateSort}
                         onValueChange={(v) =>
@@ -755,8 +771,18 @@ export default function LearningGroups({
                         </option>
                         <option value="title">Title A–Z</option>
                       </SelectField>
+                      </FormField>} filters={query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []} onClear={() => setQuery("")} search={
+                      <FormField label="Find an update" visuallyHiddenLabel>
+                        <Input
+                          type="search"
+                          value={query}
+                          onChange={(e) => setQuery(e.target.value)}
+                          placeholder="Find an update"
+                        />
                       </FormField>
-                    </FilterBar>
+                    }>
+
+                    </CollectionControls>
                     <BulkActions
                       collectionSize={updateSelection.collectionSize}
                       selected={updateSelection.actionIds}
@@ -784,7 +810,8 @@ export default function LearningGroups({
                     />
                     <SelectableRows
                       label="Updates for this group"
-                      scope={query}
+                      empty={<CollectionEmpty count={groupUpdates.length} total={published.filter((c) => c.kind === "brief" && c.groups.includes(group.id)).length} noun="updates" onClear={() => setQuery("")} />}
+                      scope={query + updateSort}
                       selected={updateSelection.selected}
                       onChange={updateSelection.setSelected}
                       rows={groupUpdates.map((c) => ({

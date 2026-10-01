@@ -28,23 +28,30 @@ export function SectionHeader({
   description,
   children,
   className,
+  variant = "section",
   ...props
 }: Omit<ComponentProps<"div">, "title"> & {
   title: ReactNode;
   description?: ReactNode;
+  variant?: "section" | "page";
 }) {
   return (
     <div
       data-slot="section-header"
+      data-variant={variant}
       className={cn(
         "flex min-w-0 flex-wrap items-start justify-between gap-4",
+        variant === "page" && "border-b border-border pb-5",
         className,
       )}
       {...props}
     >
       <div
         data-slot="section-heading"
-        className="grid min-w-0 flex-1 basis-64 gap-2 [overflow-wrap:anywhere] [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:font-semibold"
+        className={cn(
+          "grid min-w-0 flex-1 basis-64 gap-2 [overflow-wrap:anywhere] [&_h2]:text-xl [&_h2]:font-semibold [&_h3]:font-semibold",
+          variant === "page" && "[&_h2]:text-2xl [&_h2]:tracking-tight",
+        )}
       >
         {title}
         {description && (
@@ -135,9 +142,9 @@ export function FilterBar({
     <div
       data-slot="filter-bar"
       className={cn(
-        "min-w-0 gap-4 rounded-lg border border-border bg-muted/40 p-4",
+        "min-w-0 gap-3 rounded-lg border border-border bg-background p-3 sm:p-4",
         search
-          ? "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 [&>[data-slot=field]]:min-w-0"
+          ? "grid grid-cols-1 @min-[22rem]/workspace:grid-cols-2 @min-[56rem]/workspace:grid-cols-3 [&>[data-slot=field]]:min-w-0"
           : "flex flex-wrap items-start [&>[data-slot=field]]:min-w-40 [&>[data-slot=field]]:flex-1",
         className,
       )}
@@ -204,9 +211,10 @@ export function SplitPanel({
       className={cn(
         "grid min-w-0 gap-6",
         align === "stretch" ? "items-stretch" : "items-start",
-        split && (splitAt === "tablet"
-          ? "min-[820px]:grid-cols-[13rem_minmax(0,1fr)] lg:grid-cols-[18rem_minmax(0,1fr)]"
-          : "xl:grid-cols-[18rem_minmax(0,1fr)]"),
+        split &&
+          (splitAt === "tablet"
+            ? "min-[820px]:grid-cols-[13rem_minmax(0,1fr)] lg:grid-cols-[18rem_minmax(0,1fr)]"
+            : "xl:grid-cols-[18rem_minmax(0,1fr)]"),
       )}
     >
       {children}

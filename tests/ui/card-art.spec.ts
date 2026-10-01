@@ -57,13 +57,10 @@ test("Identity palette and Update Shuffle save the chosen design", async ({
   expect(after).not.toBe(before);
   await page.getByRole("button", { name: "Save settings" }).click();
   await section(page, "Content");
-  await page
-    .getByRole("group", { name: "Content type" })
-    .getByRole("button", { name: "Updates", exact: true })
-    .click();
+  await page.getByRole("group", { name: "Content type" }).getByRole("button", { name: "Updates", exact: true }).click();
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
-  const settingsToggle = page.getByRole("button", { name: "Content settings" });
-  if (await settingsToggle.isVisible()) await settingsToggle.click();
+  const settingsToggle = page.getByRole("button", { name: /^Details/ });
+  if (await settingsToggle.getAttribute("aria-expanded") !== "true") await settingsToggle.click();
   const editor = page.getByRole("region", { name: "Card artwork editor" });
   await expect(editor).toBeVisible();
   const title = editor.getByRole("textbox", { name: "Short title" });
@@ -84,8 +81,7 @@ test("Identity palette and Update Shuffle save the chosen design", async ({
     );
   }
   expect(seen.size).toBe(25);
-  await page.getByRole("button", { name: "Save draft", exact: true }).click();
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Saved");
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("fieldbook.workspace.v1") || "{}"),
   );

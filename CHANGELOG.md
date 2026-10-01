@@ -4,6 +4,31 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Handle command-menu Escape dismissal from the canvas or menu, preserving slash text and returning focus. Handle empty/root selections safely and add normal horizontal padding to Outline and Details buttons.
+
+- Smoothly reveal publication requirements within their owning scroll area, with field context and sticky-header clearance. Long course outlines reveal the selected lesson without taking field focus.
+
+- Use shared underline tabs for Write, Markdown and Preview draft in the editor toolbar.
+
+- Remove hover tooltips from selected-text formatting icons and Commands while retaining their accessible labels.
+
+- Keep the blank visual editor at the same height and its muted hint at the first line when focus moves in or out. Use one rounded focus frame around the toolbar and canvas across writing views. Stop that frame beneath the lesson controls, then scroll its responsive body while Write content keeps growing automatically. Retain native page/body scroll handoff, top-only fades and independent Details/Outline scrolling. Preserve Markdown recovery focus after a failed Write retry.
+
+- Simplify the shared visual toolbar to Undo, Redo and Commands, sticky beneath the editor heading beside the view controls. Use Normal Text and Heading 1–4 in the block/slash menu; show a separate selected-text formatting panel with block styles, Bold, Italic, Link and Inline code. Preserve selected text while applying commands, reject stale targets and avoid changing adjacent list items when returning to Normal Text. Remove retired toolbar controls/state/styles and keep the blank-line caret before its placeholder hint.
+
+- Limit the writing text width with both editor panels closed, with extra side padding when the app sidebar is also collapsed, while keeping the toolbar full width, and center the lesson-title field with balanced space beside Outline and Details, using smaller type than the course title. Focus the artwork Short title input directly from its publishing requirement.
+
+- Keep editor save text before the publication pill so the pill stays beside Publish. Add conditional top/bottom scroll fades to Outline and Details, with a top-only fade where writing content passes beneath the sticky controls.
+
+- Lift the lesson title into the Outline/Details row and use a muted Untitled lesson placeholder for new lessons. Put Write, Markdown and Preview draft in the shared gray toolbar; remove visible content labels and repeated slash hints. Keep view switching available during visual-editor loading and preserve its focus across mode changes.
+
+- Use shared compact Filters and Sort controls, active filter chips, accurate empty/search counts and decorative separators between table text actions across administration. Content defaults to newest created first; Teams precedes Learning groups and Recently deleted comes last. Feedback uses content-type tabs with rating in Filters. Keep person details inside the admin frame and guard unsaved profile dismissal.
+- Automatically save edited Docs, Updates and Courses drafts with visible save status and revision recovery. Publish remains explicit; its button shows Publish changes for edited live content and disabled Published when work matches the live copy. Incomplete work can remain a draft without weakening publication validation; no database migration is required.
+- Use one shared editor frame with persistent Outline and Details toggles and inline panels at every width. Courses start with Outline open; keep lesson structure controls inline beside the selected lesson and remove the extra lesson card. Preserve a visible writing surface when switching; scroll back before replacing a scrolled lesson and retain a stable short-lesson canvas, with reduced-motion support. New courses start with an unselected category. Details owns the short description, metadata, a publishing checklist and draft recovery; Outline shows the current lesson position beside its toggle. Keep Back to content, save status and Publish in a compact header; show required counts only on Details. Remove the workspace hairlines, remove the editor viewport’s top inset and align the sticky bars without a gap, round title focus, give content/lesson titles the same preferred width, align editor controls with the left content edge, and let the writing canvas fill the space between panels. Remove the duplicate outline controls, editor drawers and header overflow menu. Align outer admin settings cards with the frame while retaining readable inner form widths.
+- Unify administration page headings, deep navigation, quieter filters and tables, and visible team/curriculum actions. Align content editor headers, saved/publication state and responsive settings; give course lessons a wider writing canvas.
+- Refine the shared writing toolbar and Commands menu; keep keyboard-selected commands visible, prevent inline slashes opening block insertion, and preserve pending slash text when Escape, Tab, pointer dismissal or scrolling closes the menu. Handle command Enter without inserting an extra paragraph or resetting the caret after typing begins.
+- Remove legacy course opening-video URL and upload controls. Add new lesson videos through the inline writing editor.
+
 - Retain one installed workspace shell across reading, Team and Administration, with shared demo frame geometry and unsaved-form navigation protection.
 
 - The installed application now lives at the repository root; the optional browser-local demo lives in `demo/`. Default commands run the installed app, with explicit demo commands and deployment app-identity checks. Existing installations must coordinate their Vercel root settings with this source change.
@@ -17,7 +42,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 - Keep Bulk actions and result-range labels in place as selection changes. Show selected counts after persistent range text and put Clear selection before the anchored menu across tables and pickers.
 
-- Show Docs sections, learning groups and teams as expandable hierarchies. Move branches with destination and effect review, show membership sources and full paths, and keep Docs reordering consistent with its drag preview. Create learning groups in a dialog; place Teams and Curricula creation beside their search fields. Use underline filters for Content types, Feedback ratings and Recently deleted item types; put admin filter searches on a full-width top row with labeled dropdowns below. Use filled, plus-marked Add and Create actions across administration. Simplify Docs section actions and make branch drops explicit. Shared selection rows center checkboxes and radios, show page/all-result scope, and keep Select all and Bulk actions fixed while selection counts and Clear selection appear. Docs changes still need Save settings.
+- Show Docs sections, learning groups and teams as expandable hierarchies. Move branches with destination and effect review, show membership sources and full paths, and keep Docs reordering consistent with its drag preview. Create learning groups in a dialog; place Teams and Curricula creation beside their search fields. Use visible type filters for Content, Feedback and Recently deleted; keep search visible and group related filter fields inside named Filters controls. Use filled, plus-marked Add and Create actions across administration. Simplify Docs section actions and make branch drops explicit. Shared selection rows center checkboxes and radios, show page/all-result scope, and keep Select all and Bulk actions fixed while selection counts and Clear selection appear. Docs changes still need Save settings.
 
 - Start Docs sidebar subsections closed and show their labels at regular weight, using only the chevron to identify expandable rows.
 

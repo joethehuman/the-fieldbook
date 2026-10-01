@@ -4,7 +4,22 @@ import { isArtworkOnlyUpdate } from "./card-art";
 
 /** Compare author-controlled content, not persistence bookkeeping. */
 export function contentSignature(item: Content) {
-  const { revision, publishedRevision, updatedAt, status, ...content } = item;
+  const {
+    revision,
+    publishedRevision,
+    publishedSignature,
+    updatedAt,
+    createdAt,
+    feedAt,
+    status,
+    assignments,
+    groups,
+    ...editorial
+  } = item;
+  const content = {
+    ...editorial,
+    ...(item.kind === "course" ? {} : { groups }),
+  };
   return JSON.stringify(content, function (key, value) {
     if (value && typeof value === "object" && !Array.isArray(value))
       return Object.fromEntries(
@@ -16,9 +31,9 @@ export function contentSignature(item: Content) {
 
 export function hasUnpublishedEdits(item: Content, live?: Content) {
   if (!item.publishedRevision) return false;
-  // Published course snapshots intentionally omit quiz answers.
-  if (item.kind === "course" || !live)
-    return item.publishedRevision !== item.revision;
+  if (item.publishedSignature !== undefined)
+    return contentSignature(item) !== item.publishedSignature;
+  if (!live) return item.publishedRevision !== item.revision;
   return contentSignature(item) !== contentSignature(live);
 }
 
@@ -53,7 +68,14 @@ export function reconcileDemoPublication(
     const live = published.find((entry) => entry.id === item.id);
     const saved = {
       ...item,
-      ...(item.status === "published" && item.kind === "brief" ? { feedAt: live && isArtworkOnlyUpdate(item, live) ? live.feedAt || live.updatedAt : item.updatedAt } : {}),
+      ...(item.status === "published" && item.kind === "brief"
+        ? {
+            feedAt:
+              live && isArtworkOnlyUpdate(item, live)
+                ? live.feedAt || live.updatedAt
+                : item.updatedAt,
+          }
+        : {}),
       revision,
       publishedRevision:
         item.status === "published" ||

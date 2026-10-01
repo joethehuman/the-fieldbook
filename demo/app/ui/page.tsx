@@ -1,4 +1,7 @@
 "use client";
+import { EditorFrame, EditorDetailsGroup } from "@/components/patterns/editor-frame";
+import { NavigationButton } from "@/components/patterns/navigation-button";
+import { DetailNavigation } from "@/components/patterns/detail-navigation";
 import { BulkExamples } from "./bulk-examples";
 import { WritingExamples } from "./writing-examples";
 import { LibraryExamples } from "./library-examples";
@@ -35,8 +38,11 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/patterns/search-field";
 import { FilterOptions } from "@/components/patterns/filter-options";
+import {
+  CollectionControls,
+  CollectionEmpty,
+} from "@/components/patterns/collection-controls";
 import { FormField } from "@/components/patterns/form-field";
-import { FilterBar } from "@/components/patterns/layout";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
@@ -89,13 +95,21 @@ const choices = (
 export default function ComponentCatalog() {
   const notify = useToast();
   const { prompt } = useInteractionDialog();
+  const [catalogLesson, setCatalogLesson] = useState("welcome");
+  const [catalogTitle, setCatalogTitle] = useState("Welcome to Fieldbook");
+  const [catalogBody, setCatalogBody] = useState("Write a short introduction to your course.");
+  const [catalogPlacement, setCatalogPlacement] = useState("essentials");
+  const [canvasRequest, setCanvasRequest] = useState(0);
   const [emptyReport, setEmptyReport] = useState(false);
   const [group, setGroup] = useState("company");
   const [dialog, setDialog] = useState(false);
   const [catalogFilter, setCatalogFilter] = useState("all");
   const [catalogCategory, setCatalogCategory] = useState("all");
   const [catalogStatus, setCatalogStatus] = useState("all");
-  const [catalogSort, setCatalogSort] = useState("title");
+  const [catalogSort, setCatalogSort] = useState("newest");
+  const [collectionQuery, setCollectionQuery] = useState("");
+  const [collectionStatus, setCollectionStatus] = useState("all");
+  const [collectionSort, setCollectionSort] = useState("newest");
   const [items, setItems] = useState([
     "Company essentials",
     "Customer conversations",
@@ -115,7 +129,10 @@ export default function ComponentCatalog() {
       </PageHeader>
       <ControlExamples />
       <section className="grid gap-4" aria-label="Admin collection filters">
-        <SectionHeader title={<h2>Admin collection filters</h2>} description="A short primary filter sits above full-width search and labeled dropdowns." />
+        <SectionHeader
+          title={<h2>Admin collection filters</h2>}
+          description="Type tabs and search stay visible; related fields use named Filters and Sort controls."
+        />
         <FilterOptions
           label="Example content type"
           variant="underline"
@@ -127,14 +144,110 @@ export default function ComponentCatalog() {
             { value: "brief", label: "Updates" },
           ]}
         />
-        <FilterBar search={<FormField label="Search content" visuallyHiddenLabel><Input type="search" placeholder="Search content by title" /></FormField>}>
-          <FormField label="Category"><SelectField value={catalogCategory} onValueChange={setCatalogCategory}><option value="all">All categories</option><option value="sales">Sales</option></SelectField></FormField>
-          <FormField label="Publication status"><SelectField value={catalogStatus} onValueChange={setCatalogStatus}><option value="all">All statuses</option><option value="published">Published</option></SelectField></FormField>
-          <FormField label="Sort content"><SelectField value={catalogSort} onValueChange={setCatalogSort}><option value="title">Title A–Z</option><option value="updated">Recently updated</option></SelectField></FormField>
-        </FilterBar>
+        <CollectionControls
+          search={
+            <FormField label="Search content" visuallyHiddenLabel>
+              <Input type="search" placeholder="Search content by title" />
+            </FormField>
+          }
+          sortLabel={catalogSort === "newest" ? "Newest created" : "Title A–Z"}
+          sort={
+            <FormField label="Sort content">
+              <SelectField value={catalogSort} onValueChange={setCatalogSort}>
+                <option value="newest">Newest created</option>
+                <option value="title">Title A–Z</option>
+              </SelectField>
+            </FormField>
+          }
+          filters={[
+            ...(catalogCategory === "all" ? [] : [{ id: "category", label: "Sales", onRemove: () => setCatalogCategory("all") }]),
+            ...(catalogStatus === "all" ? [] : [{ id: "status", label: "Published", onRemove: () => setCatalogStatus("all") }]),
+          ]}
+          onClear={() => { setCatalogCategory("all"); setCatalogStatus("all"); }}
+        >
+          <FormField label="Category">
+            <SelectField value={catalogCategory} onValueChange={setCatalogCategory}>
+              <option value="all">All categories</option>
+              <option value="sales">Sales</option>
+            </SelectField>
+          </FormField>
+          <FormField label="Publication status">
+            <SelectField value={catalogStatus} onValueChange={setCatalogStatus}>
+              <option value="all">All statuses</option>
+              <option value="published">Published</option>
+            </SelectField>
+          </FormField>
+        </CollectionControls>
+      </section>
+      <section
+        aria-label="Admin page and navigation context"
+        className="grid gap-4"
+      >
+        <DetailNavigation
+          items={[
+            {
+              label: "Back to teams",
+              onSelect: () => notify("Returned to teams"),
+            },
+            {
+              label: "Parent: Sales",
+              onSelect: () => notify("Opened parent team"),
+            },
+          ]}
+          current="Pacific accounts"
+        />
+        <SectionHeader
+          variant="page"
+          title={<h2>Pacific accounts</h2>}
+          description="A consistent heading, return path and visible actions for a detail page."
+        >
+          <Button variant="outline" onClick={() => notify("Edit team details")}>
+            Edit team details
+          </Button>
+          <Button variant="outline" onClick={() => notify("Move team")}>
+            Move team
+          </Button>
+        </SectionHeader>
+        <FormField label="Short description">
+          <Textarea
+            size="compact"
+            rows={2}
+            placeholder="A concise description"
+          />
+        </FormField>
       </section>
       <BulkExamples />
       <LibraryExamples />
+      <section className="grid gap-4" aria-label="Content editor frame">
+        <SectionHeader title={<h2>Content editor frame</h2>}
+          description="Persistent Outline and Details controls reveal in-page panels. The writing canvas stays mounted when either panel changes." />
+        <EditorFrame revealCanvas={canvasRequest}
+          outlineContext={catalogLesson === "welcome" ? "Lesson 1 of 2" : "Lesson 2 of 2"}
+          heading={<Input variant="lesson-title" aria-label="Example lesson title" placeholder="Untitled lesson" value={catalogTitle} onChange={(event) => setCatalogTitle(event.target.value)} />}
+          outline={<nav className="grid gap-1" aria-label="Example course outline">
+            {[{ id: "welcome", label: "Welcome" }, { id: "practice", label: "Practice" }].map((lesson) => (
+              <NavigationButton key={lesson.id} type="button" aria-current={catalogLesson === lesson.id ? "step" : undefined}
+                className={catalogLesson === lesson.id ? "selected" : undefined}
+                onClick={() => { setCatalogLesson(lesson.id); setCanvasRequest((request) => request + 1); }}>
+                {lesson.label}
+              </NavigationButton>
+            ))}
+          </nav>}
+          details={<EditorDetailsGroup id="catalog-editor-details" title="Content details">
+            <FormField label="Category">
+              <SelectField value={catalogPlacement} onValueChange={setCatalogPlacement}>
+                <option value="essentials">Essentials</option><option value="practice">Practice</option>
+              </SelectField>
+            </FormField>
+            <FieldDescription>Publication and saving belong to the editor’s owner.</FieldDescription>
+          </EditorDetailsGroup>}>
+          <div className="grid gap-4">
+            <FormField label="Example draft text">
+              <Textarea rows={6} value={catalogBody} onChange={(event) => setCatalogBody(event.target.value)} />
+            </FormField>
+          </div>
+        </EditorFrame>
+      </section>
       <WritingExamples />
       <section className="grid gap-4" aria-label="Generated card artwork">
         <SectionHeader
@@ -512,6 +625,62 @@ export default function ComponentCatalog() {
           <CollectionToolbar filters={<Badge>All content</Badge>}>
             <Button>Create content</Button>
           </CollectionToolbar>
+          <CollectionControls
+            search={
+              <Input
+                aria-label="Search collection examples"
+                placeholder="Search content"
+                value={collectionQuery}
+                onChange={(event) => setCollectionQuery(event.target.value)}
+              />
+            }
+            sortLabel={
+              collectionSort === "newest" ? "Newest created" : "Title A–Z"
+            }
+            sort={
+              <FormField label="Sort content">
+                <SelectField
+                  value={collectionSort}
+                  onValueChange={setCollectionSort}
+                >
+                  <option value="newest">Newest created</option>
+                  <option value="title">Title A–Z</option>
+                </SelectField>
+              </FormField>
+            }
+            filters={
+              collectionStatus === "all"
+                ? []
+                : [
+                    {
+                      id: "status",
+                      label: "Draft",
+                      onRemove: () => setCollectionStatus("all"),
+                    },
+                  ]
+            }
+            onClear={() => setCollectionStatus("all")}
+          >
+            <FormField label="Publication">
+              <SelectField
+                value={collectionStatus}
+                onValueChange={setCollectionStatus}
+              >
+                <option value="all">All statuses</option>
+                <option value="draft">Draft</option>
+              </SelectField>
+            </FormField>
+          </CollectionControls>
+          <CollectionEmpty
+            count={collectionQuery ? 0 : 1}
+            total={1}
+            noun="content items"
+            onClear={() => setCollectionQuery("")}
+          />
+          <ActionGroup variant="text">
+            <Button variant="link">Edit example</Button>
+            <Button variant="link">Unpublish example</Button>
+          </ActionGroup>
           <div className="grid min-w-0 gap-6 sm:grid-cols-2">
             <Tabs defaultValue="assignment" orientation="vertical">
               <TabsList

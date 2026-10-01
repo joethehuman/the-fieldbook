@@ -1,4 +1,6 @@
 "use client";
+import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
+import { DetailNavigation } from "./patterns/detail-navigation";
 import { BulkActions } from "./patterns/bulk-actions";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { Checkbox } from "./ui/choice";
@@ -11,7 +13,7 @@ import { useToast } from "./ui/toast";
 import { SelectField } from "./ui/select";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { SectionHeader, EmptyState, Toolbar } from "@/components/patterns/layout";
+import { SectionHeader } from "@/components/patterns/layout";
 import { ActionGroup } from "@/components/ui/action-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -48,6 +50,9 @@ export default function Curricula({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState("name");
+  const [status, setStatus] = useState("all");
+  const clearFilters = () => { setQuery(""); setStatus("all"); };
   const { confirm } = useInteractionDialog();
   const savedCurriculum = useRef<Curriculum | null>(null);
   const dirty = !!editing && !equalJson(editing, savedCurriculum.current);
@@ -71,10 +76,10 @@ export default function Curricula({
   const all = data.curricula || [];
   const search = query.trim().toLowerCase();
   const visibleCurricula = all.filter((curriculum) =>
-    `${curriculum.name} ${curriculum.description}`.toLowerCase().includes(search),
-  );
+    (status === "all" || curriculum.status === status) && `${curriculum.name} ${curriculum.description}`.toLowerCase().includes(search),
+  ).sort((a, b) => (sort === "reverse" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id));
   const selection = useBulkSelection(
-    editing?.id || `curricula:${search}`,
+    editing?.id || `curricula:${search}:${status}`,
     editing ? editing.courseIds : visibleCurricula.map((c) => c.id),
   );
   const content = data.publishedContent || data.content;
@@ -84,6 +89,13 @@ export default function Curricula({
         (i) => i.kind === "curriculum" && i.id === id,
       ),
     );
+  async function closeEditor() {
+    if (await guard.current()) {
+      setEditing(null);
+      destination.reveal();
+      setNotice("");
+    }
+  }
   async function save() {
     if (!editing) return;
     const name = editing.name.trim();
@@ -117,18 +129,10 @@ export default function Curricula({
     try {
       await onChange({
         ...data,
-        curricula: [
-          ...all.filter((c) => c.id !== editing.id),
-          {
-            ...editing,
-            name,
-            cardArt:
-              editing.cardArt ||
-              (all.some((c) => c.id === editing.id)
-                ? undefined
-                : resolvedCardArt(editing.id, name)),
-          },
-        ],
+        curricula: (() => {
+          const updated = { ...editing, name, cardArt: editing.cardArt || (all.some((c) => c.id === editing.id) ? undefined : resolvedCardArt(editing.id, name)) };
+          return all.some((c) => c.id === editing.id) ? all.map((c) => c.id === editing.id ? updated : c) : [...all, updated];
+        })(),
       });
       setEditing(null);
       destination.reveal();
@@ -182,12 +186,23 @@ export default function Curricula({
           }}
         >
           <FieldGroup disabled={busy}>
-            <h2>
-              {all.some((c) => c.id === editing.id)
-                ? "Edit curriculum"
-                : "New curriculum"}
-            </h2>
-            <p>A playlist of courses, in the order you recommend.</p>
+            <DetailNavigation
+              disabled={busy}
+              items={[{ label: "Back to curricula", onSelect: closeEditor }]}
+              current={editing.name || "New curriculum"}
+            />
+            <SectionHeader
+              variant="page"
+              title={<h2>{all.some((c) => c.id === editing.id) ? "Edit curriculum" : "New curriculum"}</h2>}
+              description="A playlist of courses, in the order you recommend."
+            >
+              <Button type="button" variant="outline" onClick={closeEditor}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={busy}>
+                {busy ? "Saving…" : "Save curriculum"}
+              </Button>
+            </SectionHeader>
             <FormField label="Name">
               <Input
                 required
@@ -316,36 +331,18 @@ export default function Curricula({
                 curriculum to draft.
               </Note>
             )}
-            <ActionGroup>
-              <Button type="submit" loading={busy}>
-                {busy ? "Saving…" : "Save curriculum"}
-              </Button>
-              <Button
-                variant="outline"
-                type="button"
-                onClick={async () => {
-                  if (await guard.current()) {
-                    setEditing(null);
-                    destination.reveal();
-                    setNotice("");
-                  }
-                }}
-              >
-                Cancel
-              </Button>
-            </ActionGroup>
           </FieldGroup>
         </form>
       ) : (
         <>
           <SectionHeader
+            variant="page"
             title={<h2>Curricula</h2>}
             description={
               <>Create reusable playlists, then add them to learning groups.</>
             }
           />
-          <Toolbar className="items-start">
-            <FormField className="min-w-0 basis-64 flex-1" label="Find curricula" visuallyHiddenLabel>
+          <CollectionControls search={            <FormField className="min-w-0 basis-64 flex-1" label="Find curricula" visuallyHiddenLabel>
               <Input
                 type="search"
                 value={query}
@@ -353,7 +350,7 @@ export default function Curricula({
                 placeholder="Find curricula"
               />
             </FormField>
-            <Button
+} actions={            <Button
               type="button"
               onClick={() => {
                 const draft: Curriculum = {
@@ -372,7 +369,12 @@ export default function Curricula({
               <Plus aria-hidden="true" />
               Create curriculum
             </Button>
-          </Toolbar>
+}
+            sortLabel={sort === "name" ? "Name A–Z" : "Name Z–A"}
+            sort={<FormField label="Sort curricula"><SelectField value={sort} onValueChange={setSort}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>}
+            filters={[...(query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []), ...(status !== "all" ? [{ id: "status", label: status === "published" ? "Published" : "Draft", onRemove: () => setStatus("all") }] : [])]}
+            onClear={clearFilters}
+          ><FormField label="Status"><SelectField value={status} onValueChange={setStatus}><option value="all">All statuses</option><option value="published">Published</option><option value="draft">Draft</option></SelectField></FormField></CollectionControls>
           <BulkActions
             singleItemActions={false}
             collectionSize={selection.collectionSize}
@@ -442,7 +444,7 @@ export default function Curricula({
                   <Badge
                     variant={c.status === "published" ? "success" : "default"}
                   >
-                    {c.status}
+                    {c.status === "published" ? "Published" : "Draft"}
                   </Badge>
                   <div className="flex items-center gap-3">
                     {selection.canSelect && (
@@ -488,15 +490,7 @@ export default function Curricula({
               </Card>
             ))}
           </div>
-          {!all.length && (
-            <EmptyState>
-              No curricula yet. Create a playlist for onboarding or an ongoing
-              learning program.
-            </EmptyState>
-          )}
-          {!!all.length && !visibleCurricula.length && (
-            <EmptyState>No curricula match your search.</EmptyState>
-          )}
+          <CollectionEmpty count={visibleCurricula.length} total={all.length} noun="curricula" onClear={clearFilters} />
         </>
       )}
     </section>

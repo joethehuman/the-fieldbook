@@ -162,9 +162,9 @@ test("learning groups: shared controls, save and reload", async ({
   await createDialog.getByRole("button", { name: "Create group" }).click();
   await expect(createDialog).not.toBeVisible();
   // Creation opens the detail view.
-  await expect(page.locator(".learning-admin")).toContainText(
-    "Account executives / Sales design test",
-  );
+  await expect(page.getByRole("heading", { name: "Sales design test", exact: true })).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Navigation context" })
+    .getByRole("button", { name: "Parent: Account executives", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Add child group" }).click();
   await expect(
     createDialog.getByRole("combobox", { name: "Parent group" }),
@@ -850,6 +850,7 @@ test("new user guidance belongs to the grey fieldset footer and labels its selec
 }, info) => {
   await admin(page);
   await adminSection(page, "Demo profiles");
+  await page.getByRole("button", { name: "New user defaults", exact: true }).click();
   const section = page.getByRole("region", { name: "New users", exact: true });
   const select = section.getByRole("combobox");
   await expect(select).toHaveAccessibleDescription(
@@ -869,6 +870,7 @@ test("new user guidance belongs to the grey fieldset footer and labels its selec
   ).toBeVisible();
   await page.reload();
   await adminSection(page, "Demo profiles");
+  await page.getByRole("button", { name: "New user defaults", exact: true }).click();
   await expect(select).toContainText("New user — onboarding window");
   await snapshotReview(page, info, "new-users-footer");
 });

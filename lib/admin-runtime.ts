@@ -5,8 +5,12 @@ import type { BulkRequest, BulkResult } from "./bulk-actions";
 import type { LearningAction } from "./learning";
 import type { Workspace } from "./store";
 import type { Content, User } from "./types";
+import type { SaveIntent } from "./draft-save-queue";
+import { mergeSavedContent } from "./content-save";
+import { SaveRecoveryError } from "./save-recovery";
 export type AdminRuntime = {
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
+  saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
   refresh: () => Promise<Workspace>;
   manageLearning: (action: LearningAction) => Promise<Workspace>;
   upload: UploadMedia;
@@ -56,6 +60,22 @@ export function createAdminRuntime(initial: {
     Promise<Workspace>
   >();
   let cacheVersion = 0;
+  let contentRecoveryRequired = false;
+  let contentSaveInFlight = false;
+  let mutationTail = Promise.resolve();
+  async function mutate<T>(operation: () => Promise<T>): Promise<T> {
+    const previous = mutationTail;
+    let finish!: () => void;
+    mutationTail = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    await previous;
+    try {
+      return await operation();
+    } finally {
+      finish();
+    }
+  }
   function clearCached() {
     cacheVersion++;
     cached.clear();
@@ -74,7 +94,11 @@ export function createAdminRuntime(initial: {
         401,
       );
     let data = state.data as Workspace;
-    if (openItem && target === "content") {
+    if (
+      openItem &&
+      target === "content" &&
+      data.content.some((entry) => entry.id === openItem)
+    ) {
       const item = await request(
         `/api/content?id=${encodeURIComponent(openItem)}&draft=true`,
       );
@@ -103,59 +127,134 @@ export function createAdminRuntime(initial: {
   const saver = createWorkspaceSaver(request, fresh);
   return {
     upload,
-    save: async (before, after) => {
-      const created = after.content.find(
-        (item) => !before.content.some((previous) => previous.id === item.id),
-      );
-      if (created) openItem = created.id;
-      if (
-        scope === "content" &&
-        ["groups", "curricula", "teams", "users", "pendingUsers"].some(
-          (key) =>
-            JSON.stringify(before[key as keyof Workspace]) !==
-            JSON.stringify(after[key as keyof Workspace]),
-        )
-      ) {
-        const complete = await fresh("governance");
-        if (complete.governanceRevision !== before.governanceRevision)
-          throw new Error(
-            "Organization data changed. Refresh before applying these changes.",
+    saveContent: (content, intent) =>
+      mutate(async () => {
+        if (contentSaveInFlight)
+          throw new Error("Wait for the current save to finish.");
+        if (contentRecoveryRequired)
+          throw new SaveRecoveryError(
+            "Refresh and review the saved copy before saving again. Your edits remain open.",
           );
-        const prior = before;
-        before = {
-          ...before,
-          users: complete.users,
-          teams: complete.teams,
-          pendingUsers: complete.pendingUsers,
-        };
-        after = {
-          ...after,
-          users:
-            JSON.stringify(prior.users) === JSON.stringify(after.users)
-              ? complete.users
-              : after.users,
-          teams:
-            JSON.stringify(prior.teams) === JSON.stringify(after.teams)
-              ? complete.teams
-              : after.teams,
-          pendingUsers:
-            JSON.stringify(prior.pendingUsers) ===
-            JSON.stringify(after.pendingUsers)
-              ? complete.pendingUsers
-              : after.pendingUsers,
-        };
-      }
-      const saved = await saver(before, after);
-      clearCached();
-      cached.set(scope, saved);
-      return saved;
-    },
-    refresh: async () => {
-      const latest = await saver.refresh();
-      clearCached();
-      cached.set(scope, latest);
-      return latest;
-    },
+        contentSaveInFlight = true;
+        openItem = content.id;
+        try {
+          const { publishedSignature, ...draft } = content;
+          const saved = (await request("/api/content", {
+            content: draft,
+            expected: content.revision || 0,
+            publish: intent === "published",
+          })) as Content;
+          const updated = mergeSavedContent(
+            cached.get("content") || initial.data,
+            saved,
+          );
+          clearCached();
+          cached.set("content", updated);
+          return saved;
+        } catch (error) {
+          contentRecoveryRequired = true;
+          clearCached();
+          let snapshot: Workspace | undefined;
+          // A new draft may not exist when the request was rejected. Read the
+          // collection first, rather than letting that missing item hide recovery.
+          openItem = null;
+          try {
+            snapshot = await fresh("content");
+          } catch {
+            /* retain local text */
+          }
+          openItem = content.id;
+          const rejected =
+            error instanceof RequestError &&
+            error.status >= 400 &&
+            error.status < 500;
+          throw new SaveRecoveryError(
+            (error instanceof RequestError
+              ? error.message
+              : "The connection failed.") +
+              " " +
+              (rejected
+                ? "This change was not saved. "
+                : "This change may have been saved. ") +
+              (snapshot
+                ? "The latest saved state is available. "
+                : "The latest saved state is unavailable. ") +
+              "Refresh and review before retrying. Your edits remain open.",
+            snapshot,
+          );
+        } finally {
+          contentSaveInFlight = false;
+        }
+      }),
+    save: (before, after) =>
+      mutate(async () => {
+        if (contentRecoveryRequired)
+          throw new SaveRecoveryError(
+            "Refresh and review the saved copy before applying more changes. Your edits remain open.",
+          );
+        const created = after.content.find(
+          (item) => !before.content.some((previous) => previous.id === item.id),
+        );
+        if (created) openItem = created.id;
+        if (
+          scope === "content" &&
+          ["groups", "curricula", "teams", "users", "pendingUsers"].some(
+            (key) =>
+              JSON.stringify(before[key as keyof Workspace]) !==
+              JSON.stringify(after[key as keyof Workspace]),
+          )
+        ) {
+          const complete = await fresh("governance");
+          if (complete.governanceRevision !== before.governanceRevision)
+            throw new Error(
+              "Organization data changed. Refresh before applying these changes.",
+            );
+          const prior = before;
+          before = {
+            ...before,
+            users: complete.users,
+            teams: complete.teams,
+            pendingUsers: complete.pendingUsers,
+          };
+          after = {
+            ...after,
+            users:
+              JSON.stringify(prior.users) === JSON.stringify(after.users)
+                ? complete.users
+                : after.users,
+            teams:
+              JSON.stringify(prior.teams) === JSON.stringify(after.teams)
+                ? complete.teams
+                : after.teams,
+            pendingUsers:
+              JSON.stringify(prior.pendingUsers) ===
+              JSON.stringify(after.pendingUsers)
+                ? complete.pendingUsers
+                : after.pendingUsers,
+          };
+        }
+        let saved: Workspace;
+        try {
+          saved = await saver(before, after);
+        } catch (error) {
+          if (error instanceof SaveRecoveryError)
+            contentRecoveryRequired = true;
+          throw error;
+        }
+        clearCached();
+        cached.set(scope, saved);
+        return saved;
+      }),
+    refresh: () =>
+      mutate(async () => {
+        if (contentSaveInFlight)
+          throw new Error("Wait for the current save to finish.");
+        const latest = await saver.refresh();
+        contentRecoveryRequired = false;
+        clearCached();
+        cached.set(scope, latest);
+        return latest;
+      }),
     manageLearning: async (action) => {
       await request("/api/assignments", action);
       clearCached();
