@@ -1071,7 +1071,10 @@ test("installed tablet keeps the frame and settled Admin and reader geometry", a
   });
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   await expect(
-    page.getByRole("combobox", { name: "Block type", exact: true }),
+    page.getByRole("button", { name: /^Commands:/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Doc content", exact: true }),
   ).toBeVisible();
   await page.screenshot({
     path: info.outputPath("installed-tablet-editor.png"),
