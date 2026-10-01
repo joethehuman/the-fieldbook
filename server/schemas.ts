@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { validateDocSections } from "@/lib/docs-navigation";
 import { cardPalettePresets, graphemeCount } from "@/lib/card-art";
+import {
+  externalLinkUrlError,
+  maxExternalLinks,
+  maxExternalLinkLabelLength,
+  maxExternalLinkUrlLength,
+} from "@/lib/external-links";
 const text = (max: number) => z.string().max(max);
 export const cardImageReference = z
   .string()
@@ -164,6 +170,27 @@ const publishedPrivacySchema = privacyDocumentSchema.refine(
 );
 export const settingsSchema = z
   .object({
+    externalLinks: z
+      .array(
+        z.object({
+          id: z.uuid(),
+          label: z.string().trim().min(1).max(maxExternalLinkLabelLength),
+          url: z
+            .string()
+            .trim()
+            .max(maxExternalLinkUrlLength)
+            .refine(
+              (url) => !externalLinkUrlError(url),
+              "Use a full http:// or https:// URL without spaces or sign-in details.",
+            ),
+        }),
+      )
+      .max(maxExternalLinks, "Add no more than three external links.")
+      .refine(
+        (links) => new Set(links.map((link) => link.id)).size === links.length,
+        "External links must have unique IDs.",
+      )
+      .default([]),
     homePage: z.enum(["updates", "courses", "docs"]).default("courses"),
     guestGroupId: text(80).min(1).nullable().optional(),
     docCategoryOrder: z

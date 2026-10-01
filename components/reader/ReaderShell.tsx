@@ -370,6 +370,7 @@ export function ReaderShell({
                 onManageOrganizationIntent={() => router.prefetch("/admin")}
                 onTeamProgressIntent={() => router.prefetch("/team")}
                 onSignOut={context.user ? signOut : undefined}
+                externalLinks={context.branding.externalLinks}
                 privacyHref={
                   section === "privacy" ? null : context.branding.privacyUrl
                 }

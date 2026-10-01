@@ -706,12 +706,14 @@ export default function ComponentCatalog() {
                 onManageOrganization={() => {}}
                 onTeamProgress={() => {}}
                 onSignOut={() => {}}
+                externalLinks={[{ id: "00000000-0000-4000-8000-000000000001", label: "Product documentation", url: "https://example.test/docs" }]}
                 onFeedback={async () => {}}
               />
               <AccountMenu
                 initials="G"
                 name="Guest"
                 guest
+                externalLinks={[{ id: "00000000-0000-4000-8000-000000000001", label: "Product documentation", url: "https://example.test/docs" }]}
                 onSignIn={() => {}}
                 onFeedback={async () => {}}
               />

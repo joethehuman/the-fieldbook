@@ -22,6 +22,12 @@ Google remains the authentication provider. Local return paths are validated, re
 
 Consent pages still display the connecting client, signed-in identity, requested permissions and allow/deny choices. Connection management keeps its existing administrator restriction and revoke behavior. Branding does not modify consent or provider-side OAuth branding; configure Google's name/logo separately in its console.
 
+## Account-menu links
+
+In **Organization Settings → External links**, add up to three links with a label (up to 40 characters) and a full HTTP or HTTPS URL. Use the up/down controls to choose their order, remove unwanted links, then **Save settings**. For example, an installation can link to its product documentation or another learning platform.
+
+The account menu shows a separate **Links** section with an external-link arrow beside each label. Links open in a new tab. Every signed-in role sees the same links; guests see them when public browsing is allowed. An empty list hides the section. Private signed-out visitors must sign in to reach the workspace; external links do not appear on standalone sign-in, consent or connection pages. Existing installations start with no external links, and no database migration is required.
+
 ## What is visible before login
 
 The server projects only the installation name, accent color, home-page choice, welcome description, published policy mode/URL and public/private access mode for account rendering. It does not send registration rules, learning configuration, revisions, people, private content or policy drafts to account pages.

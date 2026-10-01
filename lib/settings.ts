@@ -1,4 +1,5 @@
 import { defaultBrandAccent } from "./brand-theme";
+import { accountMenuLinks, type ExternalLink } from "./external-links";
 
 export type PrivacyDocument = {
   mode: "hosted" | "external";
@@ -27,6 +28,7 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
+  externalLinks?: ExternalLink[];
   homePage?: "updates" | "courses" | "docs";
   guestGroupId?: string | null;
   docCategoryOrder?: string[];
@@ -44,6 +46,7 @@ export type SiteSettings = {
   registration: "open" | "closed";
 };
 export const defaultSettings: SiteSettings = {
+  externalLinks: [],
   homePage: "courses",
   guestGroupId: null,
   newUserStage: "existing",
@@ -87,6 +90,7 @@ export function publicSettings(
   }
   return {
     ...visible,
+    externalLinks: accountMenuLinks(settings.externalLinks),
     docCategoryOrder: settings.docCategoryOrder?.filter((name) =>
       docs.some((doc) => doc.category === name),
     ),

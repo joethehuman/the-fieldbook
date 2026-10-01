@@ -178,6 +178,12 @@ const adminSections = [
         icon: Settings,
       },
       {
+        id: "settings-links",
+        name: "External links",
+        description: "Add up to three links to everyone’s account menu.",
+        icon: Settings,
+      },
+      {
         id: "settings-docs",
         name: "Docs navigation",
         description: "Choose the section order for Docs.",
