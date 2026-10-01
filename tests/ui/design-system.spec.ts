@@ -177,7 +177,7 @@ test("learning groups: shared controls, save and reload", async ({
     page.getByRole("heading", { name: "Updates for this group" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("combobox", { name: "Sort updates for this group" }),
+    page.getByRole("button", { name: "Sort: Created newest first" }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Members", exact: true }).click();
   await noOverflow(page);
@@ -525,9 +525,11 @@ test("manager reporting uses shared filters and scoped people", async ({
     sessionStorage.setItem("fieldbook.profile.v1", "demo-manager"),
   );
   await page.goto("/#team");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
   await expect(
     page.getByRole("combobox", { name: "Reporting team", exact: true }),
   ).toBeVisible();
+  await page.keyboard.press("Escape");
   await expect(page.getByRole("cell", { name: /Alex Edwards/ })).toBeVisible();
   const personCell = page.getByRole("cell", { name: /Alex Edwards/ });
   const nameBox = await personCell.locator("strong").boundingBox();
@@ -679,6 +681,7 @@ test("report columns stay fixed across teams, long values and empty results", as
   await page.reload();
   await adminSection(page, "Progress");
   const table = page.locator("table[data-layout=progress]");
+  await expect(table).toBeVisible();
   const measure = () =>
     table.getByRole("columnheader").evaluateAll((nodes) =>
       nodes.map((n) => {
@@ -697,15 +700,21 @@ test("report columns stay fixed across teams, long values and empty results", as
     "Empty team",
     "Entire organization",
   ]) {
+    await page.getByRole("button", { name: /^Filters/ }).click();
     await picker.click();
     await page.getByRole("option", { name: team, exact: true }).click();
+    await page.keyboard.press("Escape");
+    if (team === "Empty team") {
+      await expect(table).toHaveCount(0);
+      await expect(page.getByText("No team members match these filters.", { exact: true })).toBeVisible();
+      await noOverflow(page);
+      continue;
+    }
     const columns = await measure();
     columns.forEach((column, i) => {
       expect(Math.abs(column.x - baseline[i].x)).toBeLessThan(1);
       expect(Math.abs(column.width - baseline[i].width)).toBeLessThan(1);
     });
-    if (team === "Empty team")
-      await expect(table.locator("tbody tr")).toHaveCount(0);
     await noOverflow(page);
   }
   await snapshotReview(page, testInfo, "stable-report");

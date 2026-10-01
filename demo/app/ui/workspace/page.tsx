@@ -10,19 +10,18 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { AccountMenu } from "@/components/patterns/account-menu";
+import { ContentPending } from "@/components/patterns/content-pending";
 
 export default function Page() {
   const notify = useToast();
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState(false);
-  const [pending, setPending] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
     <WorkspaceFrame
       accent="#333333"
       collapsed={collapsed}
       menu={menu}
-      pending={pending}
       onDismiss={() => setMenu(false)}
       sidebar={
         <>
@@ -81,9 +80,10 @@ export default function Page() {
           The installed app and browser demo share this frame. The sidebar and
           page own their scrolling; the header stays in flow.
         </p>
-        <Button variant="outline" onClick={() => setPending(!pending)}>
-          {pending ? "Hide pending indicator" : "Show pending indicator"}
-        </Button>
+        <Card>
+          <h2>Local content placeholder</h2>
+          <ContentPending label="Loading example content" />
+        </Card>
         {Array.from({ length: 12 }, (_, index) => (
           <Card key={index}>
             <h2>Example section {index + 1}</h2>

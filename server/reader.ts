@@ -1,4 +1,5 @@
 import "server-only";
+import { adminEntry } from "./admin-entry";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { profile, readerActor as verifiedReaderActor } from "./auth";
@@ -559,7 +560,8 @@ export function readerMetadata(
 
 // Narrow presentation DTO, memoized within the current server request only.
 export const readerShellContext = cache(async (destination: string) => {
-  if (destination === "/team" || destination === "/admin")
+  if (destination === "/admin") return (await adminEntry()).shell;
+  if (destination === "/team")
     return readerWorkspaceContext(destination);
   const context = await readerContext(destination);
   return {

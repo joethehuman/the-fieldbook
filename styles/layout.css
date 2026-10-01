@@ -93,26 +93,6 @@
     border-bottom: 1px solid var(--border);
     padding: var(--space-3) var(--space-6);
   }
-  .app-bar-progress {
-    position: absolute;
-    inset: auto 0 -1px;
-    height: 2px;
-    overflow: hidden;
-    pointer-events: none;
-  }
-  .app-bar-progress span {
-    display: block;
-    width: 34%;
-    height: 100%;
-    background: var(--primary);
-    animation: loading-sweep 1.2s ease-in-out infinite alternate;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .app-bar-progress span {
-      animation: none;
-      width: 100%;
-    }
-  }
   .topbar > [data-slot="search-root"] {
     margin-left: auto;
     flex: 0 1 auto;
@@ -720,55 +700,6 @@
   [data-reveal-target] {
     scroll-margin-block-start: var(--anchor-offset);
   }
-  .loading {
-    display: flex;
-    min-height: 100dvh;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-12);
-    text-align: center;
-  }
-  .loading-content {
-    display: grid;
-    width: min(100%, 22.5rem);
-    gap: var(--space-4);
-  }
-  .loading-content h2 {
-    font-weight: var(--weight-medium);
-  }
-  .loading-bar {
-    height: 2px;
-    overflow: hidden;
-    border-radius: var(--radius-control);
-    background: var(--muted);
-  }
-  .loading-bar span {
-    display: block;
-    width: 34%;
-    height: 100%;
-    border-radius: inherit;
-    background: var(--foreground);
-    animation: loading-sweep 1.8s ease-in-out infinite alternate;
-  }
-  .loading-error .loading-content {
-    justify-items: center;
-  }
-  @keyframes loading-sweep {
-    to {
-      transform: translateX(194%);
-    }
-  }
-  @media (max-width: 640px) {
-    .loading {
-      padding: var(--space-6);
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .loading-bar span {
-      animation: none;
-      transform: translateX(95%);
-    }
-  }
   .profile-list {
     display: grid;
     gap: var(--space-3);
@@ -841,22 +772,6 @@
     .sidebar.open {
       visibility: visible;
       transform: translateX(0);
-    }
-    .sidebar.open.navigation-pending::after {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 34%;
-      height: 2px;
-      background: var(--primary);
-      animation: loading-sweep 1.2s ease-in-out infinite alternate;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .sidebar.open.navigation-pending::after {
-        animation: none;
-        width: 100%;
-      }
     }
     .main-shell {
       margin-left: 0;

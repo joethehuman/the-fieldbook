@@ -15,9 +15,6 @@ export default function ProductionApp({
     [initialAdmin],
   );
   useEffect(() => {
-    runtime.admin.prefetch();
-  }, [runtime]);
-  useEffect(() => {
     const restore = (event: PageTransitionEvent) => {
       if (event.persisted) window.location.reload();
     };
