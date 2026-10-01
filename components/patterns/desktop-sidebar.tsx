@@ -3,7 +3,6 @@
 import { type Ref } from "react";
 import { PanelLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip } from "@/components/ui/tooltip";
 import { InstallationIdentity } from "./installation-identity";
 
 export const sidebarPrimaryLinkClassName =
@@ -25,21 +24,18 @@ export function SidebarHeading({
   return (
     <div className="sidebar-heading">
       <InstallationIdentity name={name} />
-      <Tooltip content="Toggle sidebar  ⇧⌘S">
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="sidebar-toggle max-md:hidden transition-[transform,background-color,color] duration-[180ms]"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-keyshortcuts="Meta+Shift+S"
-          aria-controls="main-sidebar"
-          aria-expanded={!collapsed}
-          onClick={onToggle}
-        >
-          <PanelLeft aria-hidden="true" />
-        </Button>
-      </Tooltip>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="sidebar-toggle max-md:hidden transition-[transform,background-color,color] duration-[180ms]"
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        aria-controls="main-sidebar"
+        aria-expanded={!collapsed}
+        onClick={onToggle}
+      >
+        <PanelLeft aria-hidden="true" />
+      </Button>
       <Button
         ref={closeRef}
         type="button"

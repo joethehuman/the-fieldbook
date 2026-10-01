@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Remove the desktop sidebar keyboard shortcut and hover tip while retaining the accessible toggle button.
+
 - Handle command-menu Escape dismissal from the canvas or menu, preserving slash text and returning focus. Handle empty/root selections safely and add normal horizontal padding to Outline and Details buttons.
 
 - Smoothly reveal publication requirements within their owning scroll area, with field context and sticky-header clearance. Long course outlines reveal the selected lesson without taking field focus.
@@ -48,7 +50,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 - Rename Assignment window to Due dates and let administrators turn course due dates off while retaining the saved windows. Learners then see recommended language on Courses, with no due or overdue targets; group-selected progress remains intact.
 
-- Let desktop readers collapse the shared sidebar to an aligned icon rail with a toggle or ⇧⌘S. The navigation reveals without reflowing and keeps its open or closed state across pages; opening a course collapses it, while choosing Docs reopens its navigation.
+- Let desktop readers collapse the shared sidebar to an aligned icon rail with a toggle. The navigation reveals without reflowing and keeps its open or closed state across pages; opening a course collapses it, while choosing Docs reopens its navigation.
 
 - Add shared generated card artwork for Updates, Courses and Curricula, with 30 compositions, random Shuffle choices that avoid recent repeats, custom images, and Identity palette controls. Previously saved artwork keeps its original design. [Artwork guide](docs/card-artwork.md).
 
