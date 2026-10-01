@@ -233,6 +233,114 @@ test("approved cold navigation shows pending while preserving the old body and m
   ).toHaveCount(0);
 });
 
+test("header progress slides in before a fixed-width bounce and respects reduced motion", async ({
+  page,
+}, info) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/updates**", async (route) => {
+    if (route.request().resourceType() === "fetch") await held;
+    await route.continue();
+  });
+  try {
+    await page.goto("/admin");
+    await expect(page.locator(".admin-layout")).toBeVisible();
+    await openNavigation(page);
+    await page.getByRole("link", { name: "Updates", exact: true }).click();
+    const progress = page.getByRole("status", {
+      name: "Opening page",
+      exact: true,
+    });
+    await expect(progress).toBeVisible();
+    const segment = progress.locator("span");
+    const geometry = await segment.evaluate((node) => {
+      const animations = node.getAnimations() as CSSAnimation[];
+      const entrance = animations.find(
+        (animation) => animation.animationName === "loading-enter",
+      )!;
+      const sweep = animations.find(
+        (animation) => animation.animationName === "loading-sweep",
+      )!;
+      animations.forEach((animation) => animation.pause());
+      const bounds = () => {
+        const { x, width } = node.getBoundingClientRect();
+        return { x, width };
+      };
+      sweep.currentTime = 0;
+      entrance.currentTime = 0;
+      const hidden = bounds();
+      entrance.currentTime = 100;
+      const entering = bounds();
+      entrance.currentTime = 200;
+      sweep.currentTime = 200;
+      const revealed = bounds();
+      sweep.currentTime = 1400;
+      const far = bounds();
+      sweep.currentTime = 2000;
+      const returning = bounds();
+      sweep.currentTime = 2600;
+      const back = bounds();
+      const { x, width } = node.parentElement!.getBoundingClientRect();
+      entrance.currentTime = 100;
+      sweep.currentTime = 0;
+      return {
+        header: { x, width },
+        hidden,
+        entering,
+        revealed,
+        far,
+        returning,
+        back,
+      };
+    });
+    expect(
+      Math.abs(geometry.hidden.x + geometry.hidden.width - geometry.header.x),
+    ).toBeLessThan(1);
+    expect(geometry.entering.x).toBeGreaterThan(geometry.hidden.x);
+    expect(geometry.entering.x).toBeLessThan(geometry.header.x);
+    expect(Math.abs(geometry.revealed.x - geometry.header.x)).toBeLessThan(1);
+    expect(geometry.far.x).toBeGreaterThan(geometry.revealed.x);
+    expect(geometry.returning.x).toBeLessThan(geometry.far.x);
+    expect(geometry.returning.x).toBeGreaterThan(geometry.back.x);
+    expect(Math.abs(geometry.back.x - geometry.revealed.x)).toBeLessThan(1);
+    for (const stage of [
+      geometry.entering,
+      geometry.revealed,
+      geometry.far,
+      geometry.returning,
+      geometry.back,
+    ])
+      expect(Math.abs(stage.width - geometry.hidden.width)).toBeLessThan(1);
+    await page.screenshot({
+      path: info.outputPath("header-progress-entering.png"),
+    });
+    await segment.evaluate((node) => {
+      for (const animation of node.getAnimations() as CSSAnimation[])
+        animation.currentTime =
+          animation.animationName === "loading-enter" ? 200 : 800;
+    });
+    await page.screenshot({
+      path: info.outputPath("header-progress-bouncing.png"),
+    });
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    expect(
+      await segment.evaluate((node) => getComputedStyle(node).animationName),
+    ).toBe("none");
+    expect(
+      await segment.evaluate((node) => node.getBoundingClientRect().width),
+    ).toBeCloseTo(geometry.header.width, 0);
+    await expect(page.locator(".admin-layout")).toBeVisible();
+    release();
+    await expect(page).toHaveURL(/\/updates$/);
+    await expect(progress).toHaveCount(0);
+  } finally {
+    release();
+  }
+});
+
 test("content navigation keeps its page without progress and Admin entry retains progress", async ({
   page,
 }, info) => {

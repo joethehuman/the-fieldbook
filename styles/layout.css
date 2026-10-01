@@ -105,7 +105,8 @@
     width: 34%;
     height: 100%;
     background: var(--primary);
-    animation: loading-sweep 1.2s ease-in-out infinite alternate;
+    animation: loading-enter 200ms ease-out both,
+      loading-sweep 1.2s ease-in-out 200ms infinite alternate;
   }
   @media (prefers-reduced-motion: reduce) {
     .app-bar-progress span {
@@ -720,7 +721,18 @@
   [data-reveal-target] {
     scroll-margin-block-start: var(--anchor-offset);
   }
+  @keyframes loading-enter {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
   @keyframes loading-sweep {
+    from {
+      transform: translateX(0);
+    }
     to {
       transform: translateX(194%);
     }
@@ -806,7 +818,8 @@
       width: 34%;
       height: 2px;
       background: var(--primary);
-      animation: loading-sweep 1.2s ease-in-out infinite alternate;
+      animation: loading-enter 200ms ease-out both,
+        loading-sweep 1.2s ease-in-out 200ms infinite alternate;
     }
     @media (prefers-reduced-motion: reduce) {
       .sidebar.open.navigation-pending::after {
