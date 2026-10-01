@@ -1,6 +1,8 @@
 # Contributing
 
-Fieldbook is preparing for its first public release. Until a license is selected, this repository is not yet a licensed open-source project.
+Fieldbook is source available under the [Elastic License 2.0 (ELv2)](LICENSE). The repository remains private while the first public release is prepared. See [licensing](docs/licensing.md) for the permitted uses, restrictions and third-party notices.
+
+Submit contributions under ELv2 unless the maintainer agrees otherwise. Only contribute material you have the right to license, and preserve applicable third-party notices.
 
 Keep contributions small and describe the user problem, resulting behavior, and verification. Discuss major architecture changes before implementing them. Fixes should preserve the demo/production distinction and the separation between shared code and installation data.
 

@@ -2,6 +2,7 @@
   "name": "fieldbook-demo",
   "version": "0.1.0",
   "private": true,
+  "license": "Elastic-2.0",
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
     "build": "node ../scripts/build-marker.mjs demo && next build --webpack",
