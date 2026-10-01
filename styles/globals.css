@@ -52,6 +52,7 @@
     color: var(--foreground);
     font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
     font-size: var(--type-copy);
+    font-weight: var(--weight-copy);
     line-height: var(--type-copy-leading);
   }
   button,
@@ -78,21 +79,26 @@
   }
   h1 {
     font-size: var(--type-page);
-    font-weight: 600;
+    font-weight: var(--weight-heading);
     letter-spacing: -0.03em;
     line-height: var(--type-page-leading);
     overflow-wrap: anywhere;
   }
   h2 {
     font-size: 1.25rem;
-    font-weight: 600;
+    font-weight: var(--weight-heading);
     letter-spacing: -0.02em;
     line-height: 1.4;
   }
-  h3 {
+  h3,
+  h4 {
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: var(--weight-heading);
     line-height: 1.5;
+  }
+  strong,
+  b {
+    font-weight: var(--weight-emphasis);
   }
   a {
     color: var(--link);
