@@ -24,6 +24,8 @@ Start with your own deployment repository at a chosen release; follow [versions 
 8. **Complete the deletion worker setup before using Delete.** The migration installs its schedule but leaves its destination unset. In this installation's Supabase project, set `fb_cleanup_config.endpoint` to the deployed app's direct canonical HTTPS address, then verify an authenticated request and the scheduled job. Follow [deletion worker setup and checks](bulk-actions.md#install-or-upgrade-the-cleanup-worker). A redirecting address can lose the worker's Authorization header. Keep each preview backend pointed only at its own preview app; do not reuse production credentials or point it at this installation.
 9. Create real content in `/admin`. Start with one draft article, one update, and one course; publish only after checking the previews. No demo data is seeded into this database.
 
+The included Vercel Analytics and Speed Insights SDKs turn on for Vercel deployments. Enable Web Analytics in your own project and deploy after activation; standard Speed Insights uses the deployed SDK. See [activation, verification and opt-outs](../deployment/vercel/README.md#analytics-and-speed-insights).
+
 Use a separate backend for previews that need real writes, or leave them unconfigured. Never connect an untrusted preview to the production database. An unconfigured production app fails to load data; it does not fall back to demo profiles.
 
 Vercel does not run the SQL migrations automatically. Keep a private record of applied migrations and read the [upgrade guide](upgrading.md) before changing versions.

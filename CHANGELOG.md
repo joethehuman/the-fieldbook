@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Add official Vercel Web Analytics and Speed Insights to the installed app and optional demo. Enable their normal SDK behavior on Vercel, with independent opt-outs, and keep them inactive on other hosts. Document project activation and the telemetry boundary for contributors.
+
 - Put current hosting, identity, persistence and private-media operations behind explicit service boundaries. Preserve the Vercel/Supabase/Google installation and existing data/permissions, and document how contributors can add a verified hosting recipe or service implementation. Add standard Node host configuration and provider-boundary checks; complete alternate-stack recipes remain contributor work, and existing-installation transfer is separate.
 
 - Make Manage organization and the Administration breadcrumb return Admin sections and editors to Content, and My team’s progress and the Team progress breadcrumb return member details to the manager overview. Selecting an already open landing screen closes the account menu without starting navigation. Preserve unsaved-work Cancel/Confirm and guard privacy-policy navigation from editors.

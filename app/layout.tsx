@@ -3,6 +3,7 @@ import { ToastProvider } from "../components/ui/toast";
 import { InteractionDialogProvider } from "../components/ui/interaction-dialog";
 import { DesktopSidebarProvider } from "../components/patterns/desktop-sidebar-state";
 import { GeistSans } from "geist/font/sans";
+import { Telemetry } from "../server/telemetry";
 import "../styles/globals.css";
 import type { Metadata } from "next";
 export const metadata: Metadata = {
@@ -20,6 +21,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </ToastProvider>
           </TooltipProvider>
         </DesktopSidebarProvider>
+        <Telemetry />
       </body>
     </html>
   );

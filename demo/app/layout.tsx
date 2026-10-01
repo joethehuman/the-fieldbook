@@ -4,6 +4,7 @@ import { InteractionDialogProvider } from "../../components/ui/interaction-dialo
 import { DesktopSidebarProvider } from "../../components/patterns/desktop-sidebar-state";
 import localFont from "next/font/local";
 import type { Metadata } from "next";
+import { Telemetry } from "../../server/telemetry";
 import "../../styles/globals.css";
 
 // Keep the first paint's font when the preloaded Geist asset arrives late.
@@ -33,6 +34,7 @@ export default function RootLayout({
             </ToastProvider>
           </TooltipProvider>
         </DesktopSidebarProvider>
+        <Telemetry />
       </body>
     </html>
   );
