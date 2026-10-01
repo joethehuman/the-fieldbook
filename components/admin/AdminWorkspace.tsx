@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import type { AdminRuntime } from "@/lib/admin-runtime";
 import type { Workspace } from "@/lib/store";
 import type { User } from "@/lib/types";
-import type { NavigationGuard } from "@/lib/navigation-guard";
+import type { LandingNavigation, NavigationGuard } from "@/lib/navigation-guard";
 import { SaveRecoveryError } from "@/lib/save-recovery";
 import { ReportAvailability } from "@/components/patterns/csv-export";
 import { Alert } from "@/components/ui/alert";
@@ -25,8 +25,16 @@ export function AdminWorkspace({
   const [error, setError] = useState("");
   const [reportIssue, setReportIssue] = useState<string | undefined>();
   const navigationGuard = useRef<NavigationGuard | null>(null);
-  const { updateContext, registerNavigationGuard: registerShellGuard } =
-    useWorkspaceShell();
+  const {
+    updateContext,
+    registerNavigationGuard: registerShellGuard,
+    registerLandingNavigation: registerShellLanding,
+  } = useWorkspaceShell();
+  const registerLandingNavigation = useCallback(
+    (navigation: LandingNavigation | null) =>
+      registerShellLanding("admin", navigation),
+    [registerShellLanding],
+  );
   const registerNavigationGuard = useCallback(
     (guard: NavigationGuard | null, options?: { protected: boolean }) => {
       navigationGuard.current = guard;
@@ -135,6 +143,7 @@ export function AdminWorkspace({
           production
           onUpload={runtime.upload}
           registerNavigationGuard={registerNavigationGuard}
+          registerLandingNavigation={registerLandingNavigation}
           onReload={async () => {
             const latest = await runtime.refresh();
             setData(latest);

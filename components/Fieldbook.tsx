@@ -68,12 +68,14 @@ import {
   type Workspace,
 } from "@/lib/store";
 import dynamic from "next/dynamic";
-import type { NavigationGuard } from "@/lib/navigation-guard";
+import type { LandingNavigation, NavigationGuard } from "@/lib/navigation-guard";
 const Admin = dynamic(() => import("./Admin"));
 // Presentation defaults only; browser storage still owns the active workspace.
 const { settings: demoPickerSettings, users: demoPickerUsers } = freshWorkspace();
 type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook() {
+  const adminLanding = useRef<LandingNavigation | null>(null);
+  const teamLanding = useRef<LandingNavigation | null>(null);
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
@@ -188,7 +190,24 @@ export default function Fieldbook() {
     origin?: string,
     lesson?: string,
   ) {
+    const landing =
+      v === view && !id
+        ? v === "admin"
+          ? adminLanding.current
+          : v === "team"
+            ? teamLanding.current
+            : null
+        : null;
+    if (landing?.isCurrent) {
+      setMenu(false);
+      return;
+    }
     if (!(await canLeave())) return;
+    if (landing) {
+      setMenu(false);
+      await landing.open();
+      return;
+    }
     if (v === "docs" && !id) setCollapsed(false);
     if (v !== "docs" || id) setMenu(false);
     const destinationId = v === "docs" && !id ? firstDoc?.id : id;
@@ -464,7 +483,16 @@ export default function Fieldbook() {
               }
               onSwitchDemoProfile={logout}
               privacyHref={policyHref}
-              onPrivacyOpen={() => setMenu(false)}
+              onPrivacyOpen={(event) => {
+                if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                event.preventDefault();
+                void (async () => {
+                  if (await canLeave()) {
+                    setMenu(false);
+                    window.location.assign(policyHref!);
+                  }
+                })();
+              }}
               onAboutDemo={(trigger) => {
                 demoTrigger.current = trigger.current;
                 setMenu(false);
@@ -721,6 +749,9 @@ export default function Fieldbook() {
             registerNavigationGuard={(guard) => {
               navigationGuard.current = guard;
             }}
+            registerLandingNavigation={(navigation) => {
+              adminLanding.current = navigation;
+            }}
             onReload={async () => {
               const latest = loadWorkspace();
               setData(latest);
@@ -734,7 +765,13 @@ export default function Fieldbook() {
         <>
           <PageHeading title="Team progress" />
           <ReportAvailability.Provider value={reportIssue}>
-            <TeamProgress data={data} user={user} />
+            <TeamProgress
+              data={data}
+              user={user}
+              registerLandingNavigation={(navigation) => {
+                teamLanding.current = navigation;
+              }}
+            />
           </ReportAvailability.Provider>
         </>
       ) : curriculum ? (

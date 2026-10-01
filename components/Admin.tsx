@@ -75,6 +75,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   NavigationGuard,
   RegisterNavigationGuard,
+  RegisterLandingNavigation,
 } from "@/lib/navigation-guard";
 import { ActionGroup } from "./ui/action-group";
 import { GroupPicker } from "./patterns/group-picker";
@@ -231,6 +232,7 @@ type Props = {
   onLearning?: LearningHandler;
   onUpload?: UploadMedia;
   registerNavigationGuard?: RegisterNavigationGuard;
+  registerLandingNavigation?: RegisterLandingNavigation;
   onReload?: () => Promise<Workspace>;
 };
 const id = () => crypto.randomUUID();
@@ -247,6 +249,7 @@ export default function Admin({
   onUpload,
   onLearning,
   registerNavigationGuard,
+  registerLandingNavigation,
   onReload,
 }: Props) {
   const notify = useToast();
@@ -586,6 +589,19 @@ export default function Admin({
       setPersonBusy(false);
     }
   }
+  useEffect(() => {
+    registerLandingNavigation?.({
+      isCurrent: tab === "content" && !editing && !detailScope && !person,
+      // The shell has already accepted the editor/settings/profile guard.
+      open: async () => {
+        if (await changeAdminTab("content", true)) {
+          setEditing(null);
+          setPerson(null);
+        }
+      },
+    });
+    return () => registerLandingNavigation?.(null);
+  });
   if (editing)
     return (
       <Editor
@@ -614,10 +630,13 @@ export default function Admin({
     </div>
   );
 
-  async function changeAdminTab(next: string) {
-    if ((next === tab && !detailScope) || (adminGuard.current && !(await adminGuard.current())))
-      return;
-    if (openingTab) return;
+  async function changeAdminTab(next: string, approved = false) {
+    if (
+      (next === tab && !detailScope && !editing && !person) ||
+      (!approved && adminGuard.current && !(await adminGuard.current()))
+    )
+      return false;
+    if (openingTab || openingItem) return false;
     if (onOpenTab) {
       setOpeningTab(next);
       try {
@@ -625,7 +644,7 @@ export default function Admin({
       } catch (error) {
         setNotice((error as Error).message);
         setOpeningTab(null);
-        return;
+        return false;
       }
       setOpeningTab(null);
     }
@@ -634,6 +653,7 @@ export default function Admin({
     adminPanel.reveal(false);
     setNotice("");
     setQuery("");
+    return true;
   }
   return (
     <div className="admin-workspace" aria-busy={!!openingTab}>
@@ -652,7 +672,9 @@ export default function Admin({
         <ResponsiveTabsNavigation
           label="Administration section"
           value={tab}
-          onValueChange={changeAdminTab}
+          onValueChange={async (next) => {
+            await changeAdminTab(next);
+          }}
           options={adminSections
             .flatMap((section) => section.items)
             .map((item) => ({

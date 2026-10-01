@@ -29,12 +29,21 @@ import {
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { completionPercent } from "@/lib/learning";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { RegisterLandingNavigation } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
 import { reportTeamIds, type User } from "@/lib/types";
 import { teamPath } from "@/lib/team-hierarchy";
 export { TeamsAdmin } from "./TeamManagement";
-export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
+export function TeamProgress({
+  data,
+  user,
+  registerLandingNavigation,
+}: {
+  data: Workspace;
+  user: User;
+  registerLandingNavigation?: RegisterLandingNavigation;
+}) {
   const overview = useRevealTarget<HTMLHeadingElement>();
   const assignments = useRevealTarget<HTMLElement>();
   const teams = data.teams || [];
@@ -43,6 +52,16 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
     [query, setQuery] = useState(""),
     [person, setPerson] = useState("");
   const [sort, setSort] = useState("name");
+  useEffect(() => {
+    registerLandingNavigation?.({
+      isCurrent: !person,
+      open: () => {
+        setPerson("");
+        overview.reveal();
+      },
+    });
+    return () => registerLandingNavigation?.(null);
+  });
   const clearFilters = () => { setTeamId("all"); setQuery(""); setPerson(""); };
   const rows = teamProgressRows(data, user, teamId, query).sort((a, b) => (sort === "reverse" ? b.u.name.localeCompare(a.u.name) : a.u.name.localeCompare(b.u.name)) || a.u.id.localeCompare(b.u.id));
   const users = rows.map((r) => r.u);

@@ -163,12 +163,54 @@ async function openCourseOutline(page: Page) {
 
 async function openNav(page: Page) {
   const menu = page.getByRole("button", { name: "Open navigation" });
-  if ((page.viewportSize()?.width ?? 1000) < 768) {
+  if (
+    (page.viewportSize()?.width ?? 1000) < 768 &&
+    (await menu.getAttribute("aria-expanded")) !== "true"
+  ) {
     await menu.click();
     await expect(
       page.getByRole("button", { name: "Close navigation" }),
     ).toBeVisible();
   }
+}
+
+for (const entry of ["account menu", "breadcrumb"] as const) {
+  test(`Administration ${entry} preserves a failed draft on Cancel and returns to Content on Confirm`, async ({ page }, info) => {
+    test.skip(entry === "breadcrumb" && (page.viewportSize()?.width || 0) < 768, "Breadcrumbs are hidden on phone layouts");
+    const production = info.project.name.startsWith("production");
+    const { control } = await setup(page, production);
+    await failDraftWrites(page, production, control);
+    const title = page.getByLabel("Title", { exact: true });
+    await title.fill("Keep this exact editor");
+    const original = await title.elementHandle();
+    const select = async () => {
+      if (entry === "breadcrumb")
+        await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Administration", exact: true }).click();
+      else {
+        await openNav(page);
+        await page.getByRole("button", { name: "Account menu", exact: true }).click();
+        await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
+      }
+    };
+    await select();
+    await expect(page.getByRole("alertdialog")).toBeVisible();
+    await expect(page.getByRole("status", { name: "Opening page", exact: true })).toHaveCount(0);
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(title).toHaveValue("Keep this exact editor");
+    expect(await original!.evaluate((node) => node.isConnected)).toBe(true);
+    await expect(page.locator(".admin-layout")).toHaveCount(0);
+    await expect(page.getByRole("combobox", { name: "Administration section", exact: true })).toHaveCount(0);
+    await expect(page).toHaveURL(production ? /\/admin$/ : /#admin$/);
+    await page.screenshot({ animations: "disabled", path: info.outputPath(`${entry}-cancel-editor.png`) });
+    await select();
+    await page.getByRole("button", { name: "Confirm", exact: true }).click();
+    await expect(page.locator(".admin-layout")).toBeVisible();
+    await expect(title).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Edit", exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    await expect(page.getByRole("status", { name: "Opening page", exact: true })).toHaveCount(0);
+    await page.screenshot({ animations: "disabled", path: info.outputPath(`${entry}-confirmed-content.png`) });
+  });
 }
 
 test("failed autosave preserves edits through search, canceled navigation and reload until explicit leave", async ({
