@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock, Minus, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -10,7 +10,7 @@ import { Card } from "./ui/card";
 import { Radio, Checkbox } from "./ui/choice";
 import { Field, FieldGroup } from "./ui/field";
 import { ActionGroup } from "./ui/action-group";
-import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
+import { ImageViewer } from "./patterns/image-viewer";
 import { NavigationButton } from "./patterns/navigation-button";
 import { CourseVideo } from "./patterns/course-video";
 import Markdown from "./Markdown";
@@ -51,6 +51,8 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const mounted = useRef(false);
   const didResume = useRef(false);
   const lesson = course.lessons[step];
+  // Keep the opening image button mounted while the viewer changes so focus can return.
+  const lessonContent = useMemo(() => lesson ? <Markdown linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown> : null, [lesson]);
   const allDone = course.lessons.every((item) => p?.lessons.includes(item.id));
   const complete = isComplete(course, progress);
   const latestAttempt = p?.attempts?.at(-1);
@@ -151,7 +153,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             <span className="eyebrow">Lesson {step + 1} of {course.lessons.length}</span>
             <h2 ref={heading} tabIndex={-1}>{lesson.title}</h2>
             {lesson.videoUrl && <CourseVideo key={lesson.videoUrl} url={lesson.videoUrl} title={`${lesson.title} video`} posterUrl={course.coverImageUrl} />}
-            <div className="markdown"><Markdown linkContext="course" onImageOpen={(src, alt) => setImage({ src, alt })}>{lesson.body}</Markdown></div>
+            <div className="markdown">{lessonContent}</div>
             {p?.lessons.includes(lesson.id) && <Badge variant="success"><CheckCircle2 size={16} /> Lesson completed</Badge>}
           </section>
           <nav className="course-continue" aria-label="Continue course"><Button variant="ghost" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={next} loading={busy}>
@@ -230,9 +232,6 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
         </section>}
       </div>
     </div>
-    <Dialog open={!!image} onOpenChange={(open) => { if (!open) setImage(null); }}>
-      <DialogContent className="course-image-dialog"><DialogTitle>{image?.alt || "Course image"}</DialogTitle>
-        {image && <img src={image.src} alt={image.alt} />}</DialogContent>
-    </Dialog>
+    <ImageViewer image={image} onClose={() => setImage(null)} />
   </div>;
 }

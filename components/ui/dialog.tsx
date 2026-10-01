@@ -3,6 +3,7 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
 export const Dialog = DialogPrimitive.Root;
+export const DialogClose = DialogPrimitive.Close;
 export function DialogTitle({
   className,
   ...props
@@ -30,16 +31,27 @@ export const dialogContentClass =
   "fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-xl outline-none";
 export function DialogContent({
   className,
+  size = "default",
   onOpenAutoFocus,
   onCloseAutoFocus,
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  size?: "default" | "media";
+}) {
   const returnFocus = React.useRef<HTMLElement | null>(null);
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay className={dialogOverlayClass} />
+      <DialogPrimitive.Overlay
+        data-slot="dialog-overlay"
+        className={dialogOverlayClass}
+      />
       <DialogPrimitive.Content
-        className={cn(dialogContentClass, className)}
+        className={cn(
+          dialogContentClass,
+          size === "media" &&
+            "h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
+          className,
+        )}
         {...props}
         onOpenAutoFocus={(event) => {
           returnFocus.current =

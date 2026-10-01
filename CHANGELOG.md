@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Let short course lessons use their natural height, place the main scrollbar at the workspace edge while keeping content centered, and use lighter, thinner shared scrollbars. Expand lesson images into a screen-fitting viewer with a visible Close button, Escape/outside dismissal and focus return.
+
 - Editor web links accept bare domains such as example.com, formatting tools retain the active editor ring, link popups follow their text, command highlights respond immediately to mouse and keyboard, and Outline/Details panels slide open and closed with reduced-motion support.
 
 - Add Organization Settings → External links for up to three ordered account-menu links. Share them with all signed-in users and public guests, with external-link arrows and new-tab destinations. Keep standalone account pages unchanged; no new migration is required.

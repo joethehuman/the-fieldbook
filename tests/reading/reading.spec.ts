@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import type { Content } from "../../lib/types";
+import { expectShortLessonFits, exerciseImageViewer, readerImageAlt, readerImageUrl, serveReaderImage } from "../fixtures/reader-layout";
 const backend = "http://127.0.0.1:3130";
 const ids = [
   "00000000-0000-4000-8000-000000000021",
@@ -69,6 +70,35 @@ async function fixture(request: any, extra = {}) {
   });
 }
 test.beforeEach(async ({ request }) => fixture(request));
+
+test("short installed lessons fit without empty reader scroll and keep Next reachable", async ({ page }, info) => {
+  if (info.project.name === "phone") await page.setViewportSize({ width: 375, height: 900 });
+  await page.goto(`/courses/${ids[2]}?lesson=first`);
+  await expectShortLessonFits(page);
+  await page.screenshot({ path: info.outputPath("short-installed-lesson-fits.png") });
+  await page.getByRole("button", { name: /^Next lesson/ }).click();
+  await expect(page.getByRole("heading", { name: "Second lesson", exact: true })).toBeVisible();
+  if (info.project.name === "desktop") {
+    await page.setViewportSize({ width: 2560, height: 720 });
+    const geometry = await page.locator(".main-content").evaluate((main) => {
+      const box = main.getBoundingClientRect();
+      const content = main.firstElementChild!.getBoundingClientRect();
+      return { right: box.right, center: (box.left + box.right) / 2, contentCenter: (content.left + content.right) / 2, contentWidth: content.width };
+    });
+    expect(geometry.right).toBe(2560);
+    expect(Math.abs(geometry.center - geometry.contentCenter)).toBeLessThan(2);
+    expect(geometry.contentWidth).toBeLessThanOrEqual(1440);
+    await page.screenshot({ path: info.outputPath("wide-installed-workspace.png") });
+  }
+});
+
+test("installed lesson image expands with Close, keyboard dismissal and focus return", async ({ page, request }, info) => {
+  await serveReaderImage(page);
+  const course = { ...items[2], lessons: items[2].lessons.map((lesson, index) => ({ ...lesson, body: index === 0 ? `![${readerImageAlt}](${readerImageUrl})` : lesson.body })) };
+  await fixture(request, { documents: documents([items[0], items[1], course]) });
+  await page.goto(`/courses/${ids[2]}?lesson=first`);
+  await exerciseImageViewer(page, (name) => info.outputPath(name));
+});
 
 test("authored hyperlinks follow article and course tab rules", async ({
   page,
@@ -1307,7 +1337,7 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
   ).toBeNull();
 });
 
-test("long lesson transitions reveal the entire next card from its top edge", async ({ page, request }, info) => {
+test("long lesson transitions reveal next lesson tops and keep short quizzes in view", async ({ page, request }, info) => {
   const longBody = Array.from({ length: 24 }, (_, index) => `Paragraph ${index + 1}. A useful point for this lesson.`).join("\n\n");
   const course = {
     ...items[2],
@@ -1330,8 +1360,12 @@ test("long lesson transitions reveal the entire next card from its top edge", as
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("course-quiz-navigation.png") });
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
-  await expect.poll(() => distanceFromScrollTop(".course-quiz")).toBeLessThan(70);
-  await expect.poll(() => distanceFromScrollTop(".course-quiz")).toBeGreaterThanOrEqual(0);
+  await expect.poll(async () => {
+    const card = (await page.locator(".course-quiz").boundingBox())!;
+    const viewport = (await page.locator(".main-content").boundingBox())!;
+    const offset = card.y - viewport.y;
+    return offset >= 0 && (offset < 70 || card.y + card.height <= viewport.y + viewport.height);
+  }).toBe(true);
   await page.screenshot({ path: info.outputPath("long-course-quiz-start.png") });
 });
 

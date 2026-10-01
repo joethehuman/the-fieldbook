@@ -24,6 +24,9 @@
   --warning: #8b5908;
   --border: #e6e6e6;
   --input: #d4d4d4;
+  --scrollbar-thumb: #c8c8c8;
+  --scrollbar-thumb-hover: #a3a3a3;
+  --scrollbar-size: 0.5rem;
   --ring: var(--link);
   --selected: color-mix(in srgb, var(--brand) 12%, var(--background));
   --selected-foreground: var(--link);

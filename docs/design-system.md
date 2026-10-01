@@ -51,6 +51,10 @@ Acceptance checks must exercise state changes, not just initial screenshots: lon
 
 ## Theme and layout rules
 
+The workspace owns the full-width main scroll surface; its inline padding centers content within `--page-width`. Keep short course readers at their natural content height and allow longer lessons to scroll. Shared scrollbars use a thin neutral thumb and a transparent track, retaining stable gutters and native forced-color treatment.
+
+Use `ImageViewer` for expanded reading images. The shared `DialogContent` media size fills the available viewport within the page-width limit and reserves a header for the title and Close action. The image fits the remaining area without cropping. Preserve Escape, outside dismissal, focus trapping and return to the opening control; ordinary dialogs keep their default size. Landscape and portrait examples live at `/ui#image-viewer` in the demo.
+
 Keep the light, neutral visual direction. Primary actions are neutral; organization branding uses `--brand`, separate from shadcn's semantic `--accent` surface. The saved brand color also supplies readable `--link`, `--ring` and selected-feedback colors, including portaled dialogs; neutral menu surfaces remain unchanged. Popovers and dialogs use the same root theme; popovers sit above ordinary dialogs, and confirmation overlays sit above both.
 
 Use semantic utilities such as `bg-background`, `text-muted-foreground` and `border-border`. Literal interface colors belong only in tokens. Decorative artwork is the explicit exception. Inline styling is limited to runtime values: validated branding and progress values owned by their primitives.

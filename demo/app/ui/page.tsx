@@ -6,6 +6,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { DetailNavigation } from "@/components/patterns/detail-navigation";
 import { BulkExamples } from "./bulk-examples";
 import { WritingExamples } from "./writing-examples";
+import { ImageViewerExamples } from "./image-viewer-examples";
 import { LibraryExamples } from "./library-examples";
 import { ControlExamples } from "./control-examples";
 import { DocumentTree } from "@/components/patterns/document-tree";
@@ -252,6 +253,7 @@ export default function ComponentCatalog() {
         </EditorFrame>
       </section>
       <WritingExamples />
+      <ImageViewerExamples />
       <section className="grid gap-4" aria-label="Generated card artwork">
         <SectionHeader
           title={<h2>Generated card artwork</h2>}

@@ -1,5 +1,12 @@
 import { test, expect, type Page } from "@playwright/test";
 import { learningUiFixture } from "../fixtures/learning-ui";
+import {
+  expectShortLessonFits,
+  exerciseImageViewer,
+  readerImageAlt,
+  readerImageUrl,
+  serveReaderImage,
+} from "../fixtures/reader-layout";
 
 async function openCourse(
   page: Page,
@@ -7,14 +14,28 @@ async function openCourse(
   {
     longFirstLesson = false,
     startAtFirstLesson = false,
+    shortLessons = false,
+    lessonImage = false,
   }: {
     longFirstLesson?: boolean;
     startAtFirstLesson?: boolean;
+    shortLessons?: boolean;
+    lessonImage?: boolean;
   } = {},
 ) {
   const data = learningUiFixture();
   const course = data.content.find((item) => item.id === "course-2")!;
   course.requirePassing = mode === "required";
+  if (shortLessons)
+    course.lessons = course.lessons.map((lesson) => ({
+      ...lesson,
+      body: "A concise explanation.",
+      videoUrl: undefined,
+    }));
+  if (lessonImage) {
+    course.lessons[0].body = `![${readerImageAlt}](${readerImageUrl})`;
+    course.lessons[0].videoUrl = undefined;
+  }
   if (longFirstLesson) {
     course.lessons[0].body +=
       "\n\n" + "A fuller explanation of the lesson.\n\n".repeat(80);
@@ -29,14 +50,51 @@ async function openCourse(
   if (!startAtFirstLesson)
     await page.getByRole("button", { name: /^Next lesson/ }).click();
 }
-async function cardAtTop(page: Page, selector: string) {
+
+test("short lessons fit without empty reader scroll and keep Next reachable", async ({
+  page,
+}, info) => {
+  // Leave enough room for the stacked course outline as well as the short lesson.
+  if (info.project.name === "phone")
+    await page.setViewportSize({ width: 375, height: 900 });
+  await openCourse(page, "no-quiz", {
+    shortLessons: true,
+    startAtFirstLesson: true,
+  });
+  await expectShortLessonFits(page);
+  await page.screenshot({ path: info.outputPath("short-lesson-fits.png") });
+  await page.getByRole("button", { name: /^Next lesson/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Put it into practice" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Finish course", exact: true }),
+  ).toBeVisible();
+});
+
+test("lesson image expands with Close, keyboard dismissal and focus return", async ({
+  page,
+}, info) => {
+  await serveReaderImage(page);
+  await openCourse(page, "no-quiz", {
+    lessonImage: true,
+    startAtFirstLesson: true,
+  });
+  await exerciseImageViewer(page, (name) => info.outputPath(name));
+});
+async function cardInView(page: Page, selector: string) {
   await expect
     .poll(async () => {
       const card = await page.locator(selector).boundingBox();
       const viewport = await page.locator(".main-content").boundingBox();
-      return card!.y - viewport!.y;
+      const offset = card!.y - viewport!.y;
+      return (
+        offset >= 0 &&
+        (offset < 70 ||
+          card!.y + card!.height <= viewport!.y + viewport!.height)
+      );
     })
-    .toBeLessThan(70);
+    .toBe(true);
 }
 async function outlineOffset(page: Page) {
   return page.evaluate(() => {
@@ -67,7 +125,7 @@ test("required quiz shows one question at a time, grades, and retries", async ({
   await expect(
     page.getByRole("heading", { name: "1 of 2 correct" }),
   ).toBeVisible();
-  await cardAtTop(page, ".course-quiz");
+  await cardInView(page, ".course-quiz");
   await page.getByText("Review answers").click();
   await expect(
     page.locator('[data-slot="badge"]', { hasText: "Incorrect" }),
@@ -132,7 +190,7 @@ test("optional quiz completes after a missed answer and still offers retry", asy
   await expect(
     page.getByRole("region", { name: "Content feedback" }),
   ).toBeVisible();
-  await cardAtTop(page, ".course-quiz");
+  await cardInView(page, ".course-quiz");
   await page.getByText("Review answers").click();
   await expect(
     page.locator('[data-slot="badge"]', { hasText: "Incorrect" }),
@@ -169,7 +227,7 @@ test("last no-quiz lesson completes and opens expanded feedback", async ({
   await expect(
     page.getByRole("textbox", { name: "Your feedback (optional)" }),
   ).toBeVisible();
-  await cardAtTop(page, ".course-finish-card");
+  await cardInView(page, ".course-finish-card");
   await page.screenshot({ path: info.outputPath("no-quiz-finish.png") });
   await page.getByRole("button", { name: "Useful", exact: true }).click();
   await page
@@ -193,7 +251,7 @@ test("last no-quiz lesson completes and opens expanded feedback", async ({
     .toBeLessThan(2);
 });
 
-test("course sidebar keeps its position across long and short lessons and the quiz", async ({
+test("course sidebar preserves outline alignment across natural-height lessons and the quiz", async ({
   page,
 }, info) => {
   test.skip(
@@ -207,23 +265,24 @@ test("course sidebar keeps its position across long and short lessons and the qu
     startAtFirstLesson: true,
   });
   const back = page.getByRole("button", { name: "← Exit course" });
-  const lessonTop = (await back.boundingBox())!.y;
+  const outlineTop = await outlineOffset(page);
   await page.screenshot({ path: info.outputPath("lesson-1-layout.png") });
   await page.getByRole("button", { name: /^Next lesson/ }).click();
   await expect(
     page.getByRole("heading", { name: "Put it into practice" }),
   ).toBeVisible();
-  await cardAtTop(page, ".course-lesson");
+  await cardInView(page, ".course-lesson");
   await expect
-    .poll(async () => Math.abs((await back.boundingBox())!.y - lessonTop))
+    .poll(async () => Math.abs((await outlineOffset(page)) - outlineTop))
     .toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("lesson-2-layout.png") });
   await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
   await expect(page.getByText("Question 1 of 2")).toBeVisible();
-  await cardAtTop(page, ".course-quiz");
+  await cardInView(page, ".course-quiz");
   await expect
-    .poll(async () => Math.abs((await back.boundingBox())!.y - lessonTop))
+    .poll(async () => Math.abs((await outlineOffset(page)) - outlineTop))
     .toBeLessThan(2);
+  await expect(back).toBeInViewport({ ratio: 1 });
   await page.screenshot({ path: info.outputPath("quiz-layout.png") });
   await page
     .getByRole("navigation", { name: "In this course" })
@@ -232,9 +291,9 @@ test("course sidebar keeps its position across long and short lessons and the qu
   await expect(
     page.getByRole("heading", { name: "The big idea" }),
   ).toBeVisible();
-  await cardAtTop(page, ".course-lesson");
+  await cardInView(page, ".course-lesson");
   await expect
-    .poll(async () => Math.abs((await back.boundingBox())!.y - lessonTop))
+    .poll(async () => Math.abs((await outlineOffset(page)) - outlineTop))
     .toBeLessThan(2);
 });
 
