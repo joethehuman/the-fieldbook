@@ -71,6 +71,7 @@ import {
 } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
+import { learningStage, onboardingClockTarget } from "@/lib/learning";
 import { PendingPeople } from "./PendingPeople";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -110,7 +111,6 @@ import { type UploadMedia } from "./MarkdownEditor";
 import { CourseBuilder } from "./CourseBuilder";
 import { requiresPassing, validQuestion } from "@/lib/course-quiz";
 import SiteSettingsPanel from "./SiteSettingsPanel";
-import { SettingsSection } from "./patterns/settings-section";
 import { FeedbackAdmin } from "./Feedback";
 import { TeamsAdmin, TeamProgress } from "./Teams";
 import { videoSource } from "@/lib/video";
@@ -570,6 +570,9 @@ export default function Admin({
     const previous = data.users.find((u) => u.id === person.id);
     const savedPerson = {
       ...person,
+      onboardingDays: person.hireDate || person.onboardingStart
+        ? person.onboardingDays ?? data.settings?.onboardingDays ?? 90
+        : undefined,
       groupJoinedAt: Object.fromEntries(
         person.groups.map((g) => [
           g,
@@ -764,10 +767,7 @@ export default function Admin({
                         name: "",
                         email: "",
                         role: "learner",
-                        onboardingStart:
-                          data.settings?.newUserStage === "newhire"
-                            ? new Date().toISOString().slice(0, 10)
-                            : undefined,
+                        hireDate: undefined,
                         groups: [],
                         active: true,
                       })
@@ -1096,51 +1096,11 @@ export default function Admin({
             </>
           ) : tab === "people" ? (
             <>
-              <Collapsible>
-                <CollapsibleTrigger asChild><Button type="button" variant="outline">New user defaults</Button></CollapsibleTrigger>
-                <CollapsibleContent className="pt-3">
-              <SettingsSection
-                id="new-users"
-                title={<h2>New users</h2>}
-                guidance="Changes save immediately. Applies to newly added users and new self-registrations. You can override the stage and start date for each person. Group membership still determines assigned courses."
-              >
-                <FormField label="Default onboarding stage for new users">
-                  <SelectField
-                    aria-describedby="new-users-guidance"
-                    value={data.settings?.newUserStage || "existing"}
-                    onValueChange={async (value) => {
-                      try {
-                        await onChange({
-                          ...data,
-                          settings: {
-                            ...defaultSettings,
-                            ...data.settings,
-                            newUserStage: value as "existing" | "newhire",
-                          },
-                        });
-                        setNotice("");
-                        notify("Default saved. Existing people are unchanged.");
-                      } catch (error) {
-                        setNotice((error as Error).message);
-                      }
-                    }}
-                  >
-                    <option value="existing">
-                      Existing user — stay current
-                    </option>
-                    <option value="newhire">
-                      New user — onboarding window
-                    </option>
-                  </SelectField>
-                </FormField>
-              </SettingsSection>
-                </CollapsibleContent>
-              </Collapsible>
               {production && <PendingPeople data={data} onChange={onChange} registerNavigationGuard={registerAdminGuard} />}
               <Toolbar>
                 <p className="muted">
                   {production
-                    ? "Manage signed-in accounts. Deactivation preserves course history. Clear managed teams before removing a manager’s access."
+                    ? "Manage everyone, including people who have not signed in. Deactivation preserves course history. Clear managed teams before removing a manager’s access."
                     : "Sample profiles for trying role-based assignments. No accounts or emails are created."}
                 </p>
 
@@ -1288,6 +1248,8 @@ export default function Admin({
                         </TableCell>
                         <TableCell>
                           {u.active ? "Active" : "Inactive"}
+                          <div className="text-caption text-muted-foreground">{learningStage(u, data.settings)}</div>
+                          {u.registered === false && <small>Not signed in</small>}
                         </TableCell>
                         <TableCell>
                           <ActionGroup variant="text">
@@ -1391,7 +1353,9 @@ export default function Admin({
               </DialogTitle>
               <DialogDescription>
                 {production
-                  ? "Changes apply to this verified account. Login email is read-only."
+                  ? person.registered === false
+                    ? "This preregistered person can activate their account with verified Google sign-in. Email is read-only."
+                    : "Changes apply to this verified account. Login email is read-only."
                   : "Use fictional details. This does not create a secure account."}
               </DialogDescription>
               {personError && <Alert variant="destructive">{personError}</Alert>}
@@ -1418,11 +1382,17 @@ export default function Admin({
                 />
               </FormField>
               <OnboardingFields
-                value={person.onboardingStart}
-                onChange={(onboardingStart) =>
-                  setPerson({ ...person, onboardingStart })
-                }
+                user={person}
+                settings={data.settings}
+                onChange={(hireDate) => setPerson({ ...person, hireDate })}
               />
+              {person.hireDate !== personBaseline.current?.hireDate && (
+                <FieldDescription>
+                  Onboarding end: {personBaseline.current ? onboardingClockTarget(personBaseline.current, data.settings) || "No clock" : "No clock"}
+                  {" → "}{onboardingClockTarget(person, data.settings) || "No clock"}.
+                  Save applies this clock change; course completion history is preserved.
+                </FieldDescription>
+              )}
               <FormField label="Access">
                 <SelectField
                   disabled={person.id === user.id}

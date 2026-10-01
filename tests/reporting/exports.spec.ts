@@ -707,58 +707,17 @@ test("app bar stays visible over long administration reports", async ({
   await page.screenshot({ path: info.outputPath("bar-report-search.png") });
 });
 
-test("People fieldset footers preserve default-stage saving in both applications", async ({
-  page,
-}, info) => {
+test("People connects hire-date guidance and preregistration to the shared roster", async ({ page }, info) => {
   const { data, production } = await setup(page, info);
-  if (production)
-    await page.route("**/api/settings", async (route) => {
-      data.settings = route.request().postDataJSON().settings;
-      await route.fulfill({ json: { saved: true } });
-    });
   await section(page, production ? "People" : "Demo profiles");
-  await page
-    .getByRole("button", { name: "New user defaults", exact: true })
-    .click();
-  const group = page.getByRole("region", { name: "New users", exact: true });
-  await expect(group.getByRole("combobox")).toHaveAccessibleDescription(
-    /Applies to newly added users/,
-  );
-  await expect(group.locator('[data-slot="card-footer"]')).toHaveCSS(
-    "background-color",
-    "rgb(250, 250, 250)",
-  );
-  await select(
-    page,
-    "Default onboarding stage for new users",
-    "New user — onboarding window",
-  );
-  await expect(
-    page.getByRole("status").filter({ hasText: "Default saved" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "New user defaults", exact: true })).toHaveCount(0);
   if (production) {
-    const pending = page.getByRole("region", {
-      name: "Pending accounts",
-      exact: true,
-    });
-    await expect(pending.locator('[data-slot="card-footer"]')).toContainText(
-      "No email is sent.",
-    );
+    const add = page.getByRole("region", { name: "Add people", exact: true });
+    await expect(add.locator('[data-slot="card-footer"]')).toContainText("No email is sent.");
+    await expect(add.getByRole("button", { name: "Pre-register person" })).toBeVisible();
   }
-  await screenshot(page, info, "people-fieldset-footers");
-  if (production) {
-    await page.request.patch(
-      "http://127.0.0.1:3130/rest/v1/fb_config?revision=eq.1",
-      { data: { settings: data.settings, revision: 2 } },
-    );
-    await page.goto("/admin");
-  } else await page.reload();
-  await expect(page.locator(".admin-layout")).toBeVisible();
-  await section(page, production ? "People" : "Demo profiles");
-  await page
-    .getByRole("button", { name: "New user defaults", exact: true })
-    .click();
-  await expect(group.getByRole("combobox")).toContainText(
-    "New user — onboarding window",
-  );
+  await page.getByRole("row").filter({ hasText: data.users[0].email }).getByRole("button", { name: "Edit", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel("Hire date", { exact: true })).toHaveAccessibleDescription(/First sign-in does not start it/);
+  await screenshot(page, info, "people-hire-date-guidance");
 });

@@ -70,6 +70,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await pages.getByRole("button", { name: "Next", exact: true }).click();
   await expect(members).toContainText("Person 025");
   await expect(members).toContainText("Inactive");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
   await page.getByRole("combobox", { name: "Membership scope" }).click();
   await page
     .getByRole("option", { name: "Include subteams", exact: true })

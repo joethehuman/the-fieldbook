@@ -82,12 +82,12 @@ export const configurationData: Pick<
   async ensureOnboardingSetup() {
     const { error } = await db()
       .from("fb_profiles")
-      .select("onboarding_start")
+      .select("auth_user_id,hire_date,onboarding_start,onboarding_days")
       .limit(0);
     if (error)
       throw new HttpError(
         503,
-        "Preview setup is incomplete. Onboarding changes are not available yet.",
+        "Roster setup is incomplete. Apply the roster-people migration before saving.",
       );
   },
 };

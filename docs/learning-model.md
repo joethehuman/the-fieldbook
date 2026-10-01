@@ -35,11 +35,13 @@ Fieldbook does not enforce completion, grant rewards, lock prerequisites, or tri
 
 ## Completion windows
 
-Organization Settings → Due dates has an on/off control, an onboarding window (90 days by default) and a catch-up window (30 days by default). Existing installations keep due dates on unless an administrator turns them off. Off keeps both saved window values and group selections but removes target/overdue status; the window fields remain visible and disabled. An onboarding start date identifies a new user's window when due dates are on; an existing user has none. Windows provide timing context, not access restrictions or expiration of assignments.
+Organization Settings → Due dates has an on/off control, an onboarding window (90 days by default) and a catch-up window (30 days by default). Existing installations keep due dates on unless an administrator turns them off. Off keeps both saved window values and group selections but removes target/overdue status; the window fields remain visible and disabled. Windows provide timing context, not access restrictions or expiration of assignments.
+
+The hire date starts onboarding, using the onboarding window applied when that person's clock is first set. People shows **New user** through the end date and **Existing user** from the following UTC day. This stage is calculated independently of sign-in, access role and the due-date toggle. A person without a recorded hire/legacy clock date is Existing; first sign-in never invents a hire date. Historical onboarding starts remain recorded and serve as the baseline until an administrator supplies a confirmed hire date. Editing the hire date shows the changed onboarding end before saving and preserves completion history.
 
 An assignment starts at the later of its group assignment date and the person's effective membership date. Use the earliest continuing assignment when multiple group sources apply. The target is the later of assignment start plus catch-up days and onboarding start plus onboarding days. Dates use UTC. A September 20 assignment gets an October 20 target with a 30-day catch-up window; a later November 30 onboarding target takes precedence.
 
-When due dates are on, changing the organization windows recalculates targets. A new course version starts a new catch-up window and requires completion of that version to count toward the percentage. Ordinary content corrections and playlist reordering do not restart windows. Overdue learning stays assigned and accessible.
+Changing the onboarding default affects clocks first set afterward; existing applied onboarding windows remain fixed. Catch-up targets still use the current catch-up setting in this version; persisted per-course deadlines and a reviewed recalculation action are not yet available. A new course version starts a new catch-up window and requires completion of that version to count toward the percentage. Ordinary content corrections and playlist reordering do not restart windows. Overdue learning stays assigned and accessible after the person becomes Existing.
 
 ## Changes and history
 

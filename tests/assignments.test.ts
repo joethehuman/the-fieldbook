@@ -181,6 +181,7 @@ test("overlapping parent and child group requirements count once; individual rul
   const data = freshWorkspace();
   const user = {
     ...data.users[0],
+    hireDate: undefined,
     onboardingStart: undefined,
     groups: ["startup"],
     groupJoinedAt: { startup: "2026-09-20T00:00:00Z" },
@@ -226,10 +227,12 @@ test("overlapping parent and child group requirements count once; individual rul
   );
 });
 
-test("completion targets use the later onboarding or catch-up window and respond to settings changes", () => {
+test("completion targets preserve the applied onboarding window and use the later catch-up window", () => {
   const data = freshWorkspace();
   const user = {
     ...data.users[0],
+    hireDate: undefined,
+    onboardingDays: 90,
     onboardingStart: "2026-09-01",
     groups: ["sales"],
     groupJoinedAt: { sales: "2026-09-20T00:00:00Z" },
@@ -259,7 +262,7 @@ test("completion targets use the later onboarding or catch-up window and respond
       ...defaultSettings,
       onboardingDays: 30,
     }),
-    "2026-10-20",
+    "2026-11-30",
   );
   const newlyRequired = {
     ...course,
@@ -271,7 +274,7 @@ test("completion targets use the later onboarding or catch-up window and respond
   const withoutDueDates = { ...defaultSettings, dueDatesEnabled: false };
   assert.equal(learningTarget(course, user, data.groups, withoutDueDates), undefined);
   assert.equal(onboardingTarget(user, withoutDueDates), undefined);
-  const state = learningState([course], user, data.groups, [], withoutDueDates);
+  const state = learningState([course], existingUser, data.groups, [], withoutDueDates);
   assert.equal(state.required.length, 1);
   assert.equal(state.remaining.length, 1);
   assert.deepEqual(state.overdue, []);

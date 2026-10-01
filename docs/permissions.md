@@ -18,7 +18,7 @@ CSV exports use the same authorized report data and do not broaden server scope.
 
 A person has one optional reporting team. Learning-group membership is separate and can come from individual membership, parent groups or live links to teams. See [groups and curricula](learning-groups.md).
 
-Administrators can pre-register a Google email without sending an invitation email. Verified sign-in claims that pending account even when general registration is closed. Existing sign-in emails cannot be changed through people administration. Account deactivation is distinct from deletion; hard account deletion is not exposed. Self-demotion/deactivation and removing the last active administrator are rejected.
+Administrators can pre-register a Google email without sending an invitation email. The person appears immediately in the People roster and team member/manager selectors, with a stable ID and separate **Not signed in** status. Verified first sign-in attaches the login to that person even when general registration is closed, preserving memberships, hire/clock dates and progress. A preregistered manager has no reporting access until that sign-in. Existing authenticated identities are never merged by email. Login emails cannot be changed through people administration. Account deactivation is distinct from deletion; hard account deletion is not exposed. Self-demotion/deactivation and removing the last active signed-in administrator are rejected.
 
 ## Enforcement and contributor guidance
 
@@ -37,7 +37,7 @@ On public installations, visitors can rate and comment on published content. A r
 
 ## Managing the reporting hierarchy
 
-Administrators use **Teams** to search and expand the hierarchy, then open a team’s **Members** or **Subteams** view. Each person has one optional direct team; including subteams shows each person once. Pending accounts are managed in People. Team membership does not grant management access.
+Administrators use **Teams** to search and expand the hierarchy, then open a team’s **Members** or **Subteams** view. Each person has one optional direct team; including subteams shows each person once. Preregistered people use the same roster and team controls. Team membership does not grant management access.
 
 **Create subteam** creates a new team. **Move existing team here** selects an existing branch. **Team actions → Move team** chooses a different parent or **Top-level team** to detach the branch. The review shows old/new paths, the number of teams and registered people involved, and the active managers who actually gain or lose scope. Overlapping management roots are accounted for; administrators retain organization-wide access. Self/descendant moves are rejected.
 
