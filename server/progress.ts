@@ -1,6 +1,6 @@
 import "server-only";
-import type { User, Content } from "@/lib/types";
-import { db, check } from "./db";
+import type { User } from "@/lib/types";
+import { data as dataStore } from "./data";
 import { canRead } from "./content";
 import { HttpError } from "./auth";
 import { progressSchema } from "./schemas";
@@ -12,13 +12,7 @@ export async function recordProgress(user: User | null, input: unknown) {
   const parsed = progressSchema.safeParse(input);
   if (!parsed.success) throw new HttpError(400, "Invalid progress request.");
   const a = parsed.data;
-  const { data, error } = await db()
-    .from("fb_documents")
-    .select("published")
-    .eq("id", a.contentId)
-    .maybeSingle();
-  check(error);
-  const c = data?.published as Content | undefined;
+  const c = await dataStore().readPublishedCourse(a.contentId);
   if (!c || c.kind !== "course") throw new HttpError(404, "Course not found.");
   if (c.version !== a.version)
     throw new HttpError(
@@ -32,14 +26,7 @@ export async function recordProgress(user: User | null, input: unknown) {
   let priorCompleted = false;
   let priorAttempts: NonNullable<Progress["attempts"]> = [];
   if (user) {
-    const { data: p, error: e } = await db()
-      .from("fb_progress")
-      .select("lessons,passed,attempts")
-      .eq("user_id", user.id)
-      .eq("content_id", c.id)
-      .eq("version", c.version)
-      .maybeSingle();
-    check(e);
+    const p = await dataStore().readCourseProgress(user.id, c.id, c.version);
     prior = p?.lessons || [];
     priorCompleted = !!p?.passed;
     priorAttempts = p?.attempts || [];
@@ -56,31 +43,47 @@ export async function recordProgress(user: User | null, input: unknown) {
     );
   let attempt: NonNullable<Progress["attempts"]>[number] | undefined;
   if (attempted) {
-    if (!c.questions.length) throw new HttpError(400, "This course has no quiz.");
+    if (!c.questions.length)
+      throw new HttpError(400, "This course has no quiz.");
     let graded: ReturnType<typeof gradeQuiz>;
-    try { graded = gradeQuiz(c, selections!); }
-    catch (error) { throw new HttpError(400, (error as Error).message); }
+    try {
+      graded = gradeQuiz(c, selections!);
+    } catch (error) {
+      throw new HttpError(400, (error as Error).message);
+    }
     attempt = {
-      at: new Date().toISOString(), version: c.version,
-      passed: graded.passed, answers: graded.answers,
+      at: new Date().toISOString(),
+      version: c.version,
+      passed: graded.passed,
+      answers: graded.answers,
     };
   }
-  const unlocked = quizUnlocked(c, [...priorAttempts, ...(attempt ? [attempt] : [])]);
+  const unlocked = quizUnlocked(c, [
+    ...priorAttempts,
+    ...(attempt ? [attempt] : []),
+  ]);
   if (a.complete && (!allDone || (!unlocked && !attempt)))
-    throw new HttpError(400, "Finish the lessons and quiz before completing this course.");
+    throw new HttpError(
+      400,
+      "Finish the lessons and quiz before completing this course.",
+    );
   // A failed required attempt is recorded and returned to the learner, without completion.
   const completed = priorCompleted || (!!a.complete && unlocked);
   if (!user)
-    return { lessons, passed: completed, attemptPassed: attempt?.passed,
-      attempt, attempts: attempt ? [attempt] : [] };
-  const { data: p, error: e } = await db().rpc("fb_record_progress", {
-    p_user: user.id,
-    p_content: c.id,
-    p_version: c.version,
-    p_lessons: lessons,
-    p_passed: completed,
-    p_attempt: attempt || null,
-  });
-  check(e);
+    return {
+      lessons,
+      passed: completed,
+      attemptPassed: attempt?.passed,
+      attempt,
+      attempts: attempt ? [attempt] : [],
+    };
+  const p = await dataStore().mergeProgress(
+    user.id,
+    c.id,
+    c.version,
+    lessons,
+    completed,
+    attempt || null,
+  );
   return { ...p, attemptPassed: attempt?.passed, attempt };
 }

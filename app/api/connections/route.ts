@@ -4,18 +4,17 @@ import {
   sameOrigin,
   errorResponse,
   HttpError,
-  authClient,
 } from "@server/auth";
-import { db, check } from "@server/db";
+import {
+  connectionGrants,
+  disableConnectionGrant,
+  revokeAuthorization,
+} from "@server/identity";
 export async function GET() {
   try {
     const user = await actor();
     requireAdmin(user);
-    const { data, error } = await db()
-      .from("fb_mcp_grants")
-      .select("client_id,client_name,enabled,granted_at")
-      .eq("user_id", user.id);
-    check(error);
+    const data = await connectionGrants(user.id);
     return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return errorResponse(e, "api/connections");
@@ -29,16 +28,9 @@ export async function POST(req: Request) {
     const { clientId } = await req.json();
     if (typeof clientId !== "string")
       throw new HttpError(400, "Invalid client.");
-    const { error } = await db()
-      .from("fb_mcp_grants")
-      .update({ enabled: false })
-      .eq("user_id", user.id)
-      .eq("client_id", clientId);
-    check(error);
-    const { error: revokeError } = await (
-      await authClient()
-    ).auth.oauth.revokeGrant({ clientId });
-    if (revokeError)
+    await disableConnectionGrant(user.id, clientId);
+    const revoked = await revokeAuthorization(clientId);
+    if (!revoked)
       throw new HttpError(
         502,
         "Fieldbook access is disabled, but the identity provider could not revoke its saved consent. Retry before reconnecting this client.",

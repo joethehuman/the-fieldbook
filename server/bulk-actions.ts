@@ -1,7 +1,9 @@
 import "server-only";
 import { bulkSchema } from "./bulk-schema";
-import { db, check } from "./db";
-import { env } from "./env";
+import { data } from "./data";
+import { cleanupData } from "./cleanup-data";
+import { lockIdentity, unlockIdentity } from "./identity";
+import { installation } from "./installation";
 import { HttpError, requireAdmin } from "./auth";
 import { document, saveContent } from "./content";
 import { adminSnapshot } from "./admin-snapshot";
@@ -23,34 +25,29 @@ export async function bulkAction(
   if (request.entity === "user" && request.operation === "delete") {
     if (!request.governanceExpected)
       throw new HttpError(400, "Reload the People list before deleting users.");
-    const { data, error } = await db().rpc("fb_delete_users", {
-      p_actor: user.id,
-      p_expected: request.governanceExpected,
-      p_ids: request.items.map((i) => i.id),
-      p_owner: env().owner,
+    const results = await cleanupData().deleteUsers({
+      actor: user.id,
+      expected: request.governanceExpected,
+      ids: request.items.map((i) => i.id),
+      owner: installation().owner,
     });
-    check(error);
     // Fresh profile checks already deny existing tokens; ban also prevents new Auth sessions.
-    for (const result of data as BulkResult[])
+    for (const result of results)
       if (result.status === "changed") {
-        const { error: banError } = await db().auth.admin.updateUserById(
+        let locked = false;
+        try {
+          await lockIdentity(result.id);
+          locked = true;
+        } catch {
+          // The fresh inactive profile already denies access. The worker retries.
+        }
+        await cleanupData().recordIdentityLock(
           result.id,
-          {
-            ban_duration: "876600h",
-          },
+          locked,
+          locked ? null : "Account inactive. Auth session lock will retry.",
         );
-        const { error: lockError } = await db()
-          .from("fb_deleted_items")
-          .update(
-            banError
-              ? { error: "Account inactive. Auth session lock will retry." }
-              : { auth_locked: true, error: null },
-          )
-          .eq("entity", "user")
-          .eq("id", result.id);
-        check(lockError);
       }
-    return data;
+    return results;
   }
   const workspace = ["category", "section"].includes(request.operation)
     ? await adminSnapshot(user, "content")
@@ -83,45 +80,29 @@ export async function bulkAction(
     try {
       if (request.operation === "restore") {
         if (request.entity === "user") {
-          const { data: deleted, error: deletedError } = await db()
-            .from("fb_deleted_items")
-            .select("auth_locked,purging,purge_after")
-            .eq("entity", "user")
-            .eq("id", target.id)
-            .maybeSingle();
-          check(deletedError);
+          const deleted = await cleanupData().recoveryState(target.id);
           if (
-            !deleted?.auth_locked ||
+            !deleted?.authLocked ||
             deleted.purging ||
-            Date.parse(deleted.purge_after) <= Date.now()
+            Date.parse(deleted.purgeAfter) <= Date.now()
           )
             throw new HttpError(
               400,
               "This account is not ready to restore, or its recovery window has ended.",
             );
-          const { error: unbanError } = await db().auth.admin.updateUserById(
-            target.id,
-            { ban_duration: "none" },
-          );
-          if (unbanError) throw unbanError;
+          await unlockIdentity(target.id);
         }
-        const { data, error } = await db().rpc("fb_restore_deleted", {
-          p_actor: user.id,
-          p_entity: request.entity,
-          p_id: target.id,
-          p_expected: target.expected,
+        const status = await cleanupData().restore({
+          actor: user.id,
+          entity: request.entity,
+          id: target.id,
+          expected: target.expected,
         });
-        if (error) throw error;
-        results.push({ id: target.id, status: data });
+        results.push({ id: target.id, status });
         // Restored users remain inactive; every application entry point checks the fresh profile.
         continue;
       }
-      const { data: row, error } = await db()
-        .from("fb_documents")
-        .select("*")
-        .eq("id", target.id)
-        .maybeSingle();
-      check(error);
+      const row = await data().findDocument(target.id);
       if (!row) throw new HttpError(404, "Content not found.");
       if (request.operation === "publish") {
         if (row.deleted_at)
@@ -152,24 +133,18 @@ export async function bulkAction(
               request.value || "",
             )
           : {};
-        const { data, error: writeError } = await db().rpc("fb_bulk_content", {
-          p_actor: user.id,
-          p_id: target.id,
-          p_expected: target.expected,
-          p_operation: workspace ? "metadata" : request.operation,
-          p_patch: patch,
-          p_settings_expected: workspace?.revision ?? null,
+        const status = await cleanupData().mutateContent({
+          actor: user.id,
+          id: target.id,
+          expected: target.expected,
+          operation: workspace ? "metadata" : request.operation,
+          patch,
+          settingsExpected: workspace?.revision ?? null,
         });
-        if (writeError) throw writeError;
-        results.push({ id: target.id, status: data });
+        results.push({ id: target.id, status });
       }
     } catch (error) {
-      const known =
-        error instanceof HttpError ||
-        (error &&
-          typeof error === "object" &&
-          "code" in error &&
-          error.code === "P0001");
+      const known = error instanceof HttpError;
       results.push({
         id: target.id,
         status: "failed",

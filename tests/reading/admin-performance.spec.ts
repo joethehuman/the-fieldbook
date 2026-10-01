@@ -87,11 +87,17 @@ test("admin entry and section changes avoid the full workspace", async ({
   await page.getByRole("button", { name: "Edit" }).first().click();
   await expect(page.getByText(draft.body)).toBeVisible();
   expect(workspaceReads).toBe(0);
+  const saved = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === "/api/content" &&
+      response.request().method() === "POST" &&
+      response.status() === 200,
+  );
   await page
     .getByRole("textbox", { name: "Title" })
     .fill("Revised administration article");
-  await page.getByRole("button", { name: "Save draft" }).click();
-  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
+  await saved;
+  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Saved");
   expect(workspaceReads).toBe(0);
   await page.getByRole("button", { name: "Back to content" }).click();
   const menu = page.getByRole("button", { name: "Open navigation" });

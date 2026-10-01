@@ -25,7 +25,7 @@ The documented production setup is **Vercel + hosted Supabase + Google sign-in**
 | AI content management (optional) | Supabase OAuth server and a registered MCP client; ChatGPT has been exercised end to end |
 | Domain (optional) | Your custom domain, or one canonical Vercel address |
 
-**Can I use another database?** Not through configuration alone. The application uses Supabase's database API, Auth, Storage, OAuth server, and token hook. A plain PostgreSQL database, Neon, or another auth/storage provider is not a drop-in replacement. Those substitutions require code changes and are currently outside this project's documented support scope. Other hosts and self-hosted Supabase are not verified installation paths.
+**Can I use another host or service?** Hosting, persistence, identity and private media have explicit service boundaries, currently implemented for Vercel and Supabase. Contributors can add a host recipe while retaining Supabase and Google, or implement a backing-service adapter with its required schema/setup work. PostgreSQL is required; a plain database, Neon or another identity/storage provider is not a drop-in replacement. Other hosts and self-hosted Supabase have no verified installation recipe yet. See [hosting and service providers](docs/providers.md), including full-stack fresh-install contribution requirements.
 
 Provider accounts, quotas, pricing, and backups are the operator's responsibility. Free plans are not an application guarantee of free operation. There is no support SLA or commitment to additional providers.
 
@@ -70,6 +70,7 @@ The production application includes:
 ## Documentation
 
 - [Install on Vercel and Supabase](docs/installation.md)
+- [Hosting recipes and service providers](docs/providers.md)
 - [Connect your own MCP client](docs/mcp-setup.md)
 - [Configure or change your domain](docs/domains.md)
 - [Set up published-content search](docs/search.md)
@@ -114,6 +115,8 @@ For interface changes, also run `pnpm check:ui` and `pnpm test:ui` after install
 - `demo/`: static, browser-local demo
 - `components/`, `lib/`: shared interface and learning models
 - `supabase/migrations/`: database and storage setup
+- `server/ports/`, `server/providers/`: service contracts and current implementations
+- `deployment/`: hosting recipes and contributor configuration
 - `tests/`, `tests/server/`: behavior and server checks
 - `docs/`: installation, operation, and release guides
 

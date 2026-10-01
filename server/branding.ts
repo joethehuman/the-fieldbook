@@ -1,18 +1,11 @@
 import "server-only";
-import { db, check } from "./db";
+import { data as dataStore } from "./data";
 import { brandingFromSettings } from "@/lib/branding";
 import { defaultPrivacy, emptyPrivacyDocument } from "@/lib/settings";
 import { ServiceError } from "./errors";
 // Deliberate projection: no drafts, registration rules, learning settings or revisions.
 export async function publicBranding() {
-  const { data, error } = await db()
-    .from("fb_config")
-    .select(
-      "name:settings->>name,accent:settings->>accent,homePage:settings->>homePage,welcomeDescription:settings->>welcomeDescription,access:settings->>access,policyMode:settings->privacy->published->>mode,policyUrl:settings->privacy->published->>url",
-    )
-    .eq("id", true)
-    .single();
-  check(error);
+  const data = await dataStore().readPublicBranding();
   if (!data)
     throw new ServiceError(
       "Workspace configuration is missing.",

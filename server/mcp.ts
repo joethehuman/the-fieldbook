@@ -5,8 +5,8 @@ import { type User } from "@/lib/types";
 import { contentReport } from "./reports";
 import { getContent, saveContent } from "./content";
 import { contentSchema, contentBaseSchema } from "./schemas";
-import { db, check } from "./db";
-import { env } from "./env";
+import { data as dataStore } from "./data";
+import { installation } from "./installation";
 import { contentPath } from "@/lib/navigation";
 
 const read = {
@@ -44,13 +44,7 @@ export function createMcp(
       annotations: read,
     },
     async ({ query }) => {
-      const { data, error } = await db()
-        .from("fb_documents")
-        .select("*")
-        .is("deleted_at", null)
-        .order("updated_at", { ascending: false })
-        .limit(500);
-      check(error);
+      const data = await dataStore().listRecentMcpDocuments();
       return result({
         results: (data || [])
           .filter((r) =>
@@ -63,7 +57,7 @@ export function createMcp(
           .map((r) => ({
             id: r.id,
             title: r.draft.title,
-            url: `${env().origin}${r.published ? contentPath(r.draft.kind, r.id) : "/admin"}`,
+            url: `${installation().origin}${r.published ? contentPath(r.draft.kind, r.id) : "/admin"}`,
             revision: r.revision,
             status: r.draft.status,
           })),
@@ -84,7 +78,7 @@ export function createMcp(
         id,
         title: c.title,
         text: JSON.stringify(c),
-        url: `${env().origin}${c.publishedRevision ? contentPath(c.kind, c.id) : "/admin"}`,
+        url: `${installation().origin}${c.publishedRevision ? contentPath(c.kind, c.id) : "/admin"}`,
         metadata: { revision: c.revision },
       });
     },
@@ -206,13 +200,7 @@ export function createMcp(
       annotations: read,
     },
     async () => {
-      const { data, error } = await db()
-        .from("fb_media")
-        .select("id,path,filename,mime,bytes")
-        .eq("ready", true)
-        .order("created_at", { ascending: false })
-        .limit(100);
-      check(error);
+      const data = await dataStore().listReadyMcpMedia();
       return result({
         media: (data || []).map((m) => ({
           name: m.filename,

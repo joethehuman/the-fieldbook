@@ -692,32 +692,35 @@ test("server navigation is published-only, updates across publication and works 
   await context.close();
 });
 
-test("a cold Doc click keeps the article visible and shows header progress", async ({
+test("a cold Doc click keeps the article visible without header progress", async ({
   page,
   request,
 }, info) => {
   const items = docs.slice(0, 3);
   await fixture(request, items);
-  await page.goto("/docs");
-  await expect(page.locator("article h1")).toHaveText(items[0].title);
-  if (info.project.name === "phone")
-    await page.getByRole("button", { name: "Open navigation" }).click();
   let release!: () => void;
+  let waiting = false;
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
   await page.route(`**/docs/${items[2].id}?_rsc=*`, async (route) => {
+    waiting = true;
     await held;
     await route.continue();
   });
+  await page.goto("/docs");
+  await expect(page.locator("article h1")).toHaveText(items[0].title);
+  if (info.project.name === "phone")
+    await page.getByRole("button", { name: "Open navigation" }).click();
   try {
     await page
       .getByRole("navigation", { name: "Documents", exact: true })
       .getByRole("link", { name: items[2].title })
       .click();
+    await expect.poll(() => waiting).toBe(true);
     await expect(
       page.getByRole("status", { name: "Opening page" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(page.locator("article h1")).toHaveText(items[0].title);
   } finally {
     release();

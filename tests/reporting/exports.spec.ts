@@ -261,7 +261,9 @@ test("progress filters, keyboard download, member details and empty report", asy
 }, info) => {
   await setup(page, info);
   await section(page, "Progress");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
   await select(page, "Reporting team", "Sales team");
+  await page.keyboard.press("Escape");
   await page
     .getByRole("searchbox", { name: "Find a team member" })
     .fill("zoe@example.test");
@@ -351,7 +353,11 @@ test("feedback filters and sorting preserve text, formula protection and timesta
 }, info) => {
   await setup(page, info);
   await section(page, "Feedback");
+  await page
+    .getByRole("button", { name: "Sort: Newest first", exact: true })
+    .click();
   await select(page, "Sort feedback", "Oldest first");
+  await page.keyboard.press("Escape");
   const result = await download(
     page,
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -369,9 +375,11 @@ test("feedback filters and sorting preserve text, formula protection and timesta
   expect(result.rows[2][5]).toBe("'=1+2");
   expect(result.rows[3][5]).toBe('Zoë, "hello"\n東京');
   expect(result.rows[3][6]).toBe("2026-09-21T17:30:00.000Z");
-  await select(page, "Content type", "Courses");
-  await page.getByRole("group", { name: "Feedback rating" })
-    .getByRole("button", { name: "Useful", exact: true }).click();
+  await page.getByRole("group", { name: "Feedback type", exact: true })
+    .getByRole("button", { name: "Courses", exact: true }).click();
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await select(page, "Feedback rating", "Useful");
+  await page.keyboard.press("Escape");
   await page.getByRole("searchbox", { name: "Search feedback" }).fill("東京");
   const filtered = await download(
     page,
@@ -450,12 +458,15 @@ test("large reports download every row in displayed order", async ({
     "large",
   );
   expect(result.rows).toHaveLength(1206);
-  expect(result.rows.slice(1).map((row) => row[0])).toEqual(
-    Array.from({ length: 1205 }, (_, i) => `Large person ${i}`),
+  const displayed = page.locator('table[data-layout="progress"] tbody tr');
+  await expect(displayed).toHaveCount(1205);
+  const exportedNames = result.rows.slice(1).map((row) => row[0]);
+  expect(exportedNames).toEqual(
+    await displayed.locator("td:first-child strong").allTextContents(),
   );
-  await expect(
-    page.locator('table[data-layout="progress"] tbody tr'),
-  ).toHaveCount(1205);
+  expect(new Set(exportedNames)).toEqual(
+    new Set(Array.from({ length: 1205 }, (_, i) => `Large person ${i}`)),
+  );
 });
 
 test("download preparation failure is visible, retryable and creates no file", async ({
@@ -686,6 +697,9 @@ test("People fieldset footers preserve default-stage saving in both applications
       await route.fulfill({ json: { saved: true } });
     });
   await section(page, production ? "People" : "Demo profiles");
+  await page
+    .getByRole("button", { name: "New user defaults", exact: true })
+    .click();
   const group = page.getByRole("region", { name: "New users", exact: true });
   await expect(group.getByRole("combobox")).toHaveAccessibleDescription(
     /Applies to newly added users/,
@@ -721,6 +735,9 @@ test("People fieldset footers preserve default-stage saving in both applications
   } else await page.reload();
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, production ? "People" : "Demo profiles");
+  await page
+    .getByRole("button", { name: "New user defaults", exact: true })
+    .click();
   await expect(group.getByRole("combobox")).toContainText(
     "New user — onboarding window",
   );

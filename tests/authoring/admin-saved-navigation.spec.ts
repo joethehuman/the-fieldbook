@@ -1,7 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
-import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
+import {
+  authoringUser,
+  setupAuthoringProvider,
+  syncAuthoringProvider,
+} from "./provider-fixture";
 
 async function section(page: Page, name: string) {
   const picker = page.getByRole("combobox", {
@@ -22,6 +26,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   const production = info.project.name.startsWith("production");
   const data = freshWorkspace();
   let rejectSettings = false;
+  let settingsRequests = 0;
   data.settings = {
     ...defaultSettings,
     ...data.settings,
@@ -38,6 +43,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
       }),
     );
     await page.route("**/api/settings", (route) => {
+      settingsRequests += 1;
       if (rejectSettings)
         return route.fulfill({
           status: 503,
@@ -111,9 +117,44 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
     );
     await confirmation.getByRole("button", { name: "Cancel" }).click();
     rejectSettings = false;
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await expect(page.locator(".settings-panel")).toContainText(
+      "Refresh and review the saved copy before applying more changes",
+    );
+    expect(settingsRequests).toBe(2);
+    await expect(name).toHaveValue("Unsaved installation name");
+
+    // Failed writes require a fresh saved copy before another mutation.
+    await syncAuthoringProvider(page, data);
+    await page.getByRole("button", { name: "Discard changes" }).click();
+    await expect(
+      page.getByRole("status").filter({ hasText: "Unsaved changes" }),
+    ).toHaveCount(0);
+    await expect
+      .poll(() =>
+        page.evaluate(() => history.state?.__fieldbookNavigation?.kind),
+      )
+      .toBe("base");
+    await page.reload();
+    await expect(page.locator(".admin-layout")).toBeVisible();
+    await section(page, "Identity");
+    await name.fill("Unsaved installation name");
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/settings" &&
+          response.request().method() === "POST" &&
+          response.status() === 200,
+      ),
+      page.getByRole("button", { name: "Save settings" }).click(),
+    ]);
+  } else {
+    await page.getByRole("button", { name: "Save settings" }).click();
   }
-  await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Unsaved changes" }),
+  ).toHaveCount(0);
   await section(page, "Docs navigation");
   await expect(confirmation).toHaveCount(0);
 

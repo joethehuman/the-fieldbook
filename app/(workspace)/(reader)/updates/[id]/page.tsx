@@ -6,7 +6,7 @@ import {
   readerMetadata,
   readerDetailShellContext,
 } from "@server/reader";
-import { siteOrigins } from "@server/env";
+import { siteOrigins } from "@server/installation";
 type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props) {
   const { id } = await params;

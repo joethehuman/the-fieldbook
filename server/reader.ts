@@ -9,8 +9,7 @@ import {
   readConfig,
   redact,
 } from "./content";
-import { db, check } from "./db";
-import { readAll } from "./read-all";
+import { data as dataStore } from "./data";
 import { HttpError } from "./errors";
 import { brandingFromSettings } from "@/lib/branding";
 import {
@@ -19,12 +18,13 @@ import {
   type Curriculum,
   type Progress,
   type User,
+  type Group,
 } from "@/lib/types";
 import { guest, guestRecommendations } from "@/lib/guest-recommendations";
 import { orderedDocCategories, type DocLink } from "@/lib/docs-navigation";
 import { publicSettings } from "@/lib/settings";
 import type { Metadata } from "next";
-import { env } from "./env";
+import { installation } from "./installation";
 import { contentPath } from "@/lib/navigation";
 import { headers } from "next/headers";
 import { unstable_cache } from "next/cache";
@@ -70,34 +70,13 @@ async function returnPath(fallback: string) {
 const readerActor = cache(verifiedReaderActor);
 const publishedIndex = unstable_cache(
   async (_installation: string, _governanceRevision: number) =>
-    readAll((from, to) =>
-      db()
-        .from("fb_documents")
-        .select(
-          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,sectionOrder:published->sectionOrder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,feedAt:published->>feedAt,cardArt:published->cardArt,groups:published->groups",
-          { count: "exact" },
-        )
-        .not("published", "is", null)
-        .order("id")
-        .range(from, to),
-    ),
+    dataStore().listPublishedReaderIndex(),
   ["fieldbook-reader-index-v1"],
   { tags: [publishedReaderTag], revalidate: 300 },
 );
 const publishedCourseIndex = unstable_cache(
   async (_installation: string, _governanceRevision: number) =>
-    readAll((from, to) =>
-      db()
-        .from("fb_documents")
-        .select(
-          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,cardArt:published->cardArt,groups:published->groups,assignments:published->assignments,coverImageUrl:published->>coverImageUrl,duration:published->>duration,version:published->>version,lessons:published->lessons,questions:published->questions",
-          { count: "exact" },
-        )
-        .not("published", "is", null)
-        .eq("published->>kind", "course")
-        .order("id")
-        .range(from, to),
-    ),
+    dataStore().listPublishedCourseIndex(),
   ["fieldbook-course-index-v1"],
   { tags: [publishedReaderTag], revalidate: 300 },
 );
@@ -136,7 +115,10 @@ function readerAccount(
 }
 export const readerContext = cache(async (destination: string) => {
   const { user, config } = await readerAccess(destination);
-  const rows = await publishedIndex(env().url, config.governance_revision);
+  const rows = await publishedIndex(
+    dataStore().cacheNamespace(),
+    config.governance_revision,
+  );
   const published = rows.filter(
     (row) => row.status === "published" && ["doc", "brief"].includes(row.kind),
   ) as unknown as IndexRow[];
@@ -254,12 +236,13 @@ export const readerTeam = cache(async () => {
   if (!user || !user.active || !["admin", "manager"].includes(user.role))
     return { data: empty, user };
 
-  const [result, rows] = await Promise.all([
-    db().rpc("fb_governance_snapshot", { p_actor: user.id }),
-    publishedCourseIndex(env().url, config.governance_revision),
+  const [governance, rows] = await Promise.all([
+    dataStore().readGovernanceSnapshot(user.id),
+    publishedCourseIndex(
+      dataStore().cacheNamespace(),
+      config.governance_revision,
+    ),
   ]);
-  check(result.error);
-  const governance = result.data;
   const current = (governance?.users || []).find(
     (entry: { id: string }) => entry.id === user.id,
   );
@@ -363,19 +346,11 @@ function courseSummary(row: CourseRow): Content {
 export const readerCourses = cache(async () => {
   const { user, config } = await readerAccess("/courses");
   const [rows, progressRows] = await Promise.all([
-    publishedCourseIndex(env().url, config.governance_revision),
-    user
-      ? readAll((from, to) =>
-          db()
-            .from("fb_progress")
-            .select("content_id,version,lessons,passed,attempts", {
-              count: "exact",
-            })
-            .eq("user_id", user.id)
-            .order("content_id")
-            .range(from, to),
-        )
-      : Promise.resolve([]),
+    publishedCourseIndex(
+      dataStore().cacheNamespace(),
+      config.governance_revision,
+    ),
+    user ? dataStore().listUserProgress(user.id) : Promise.resolve([]),
   ]);
   const courses = rows
     .filter((row) => row.kind === "course" && row.status === "published")
@@ -402,10 +377,7 @@ export const readerCourses = cache(async () => {
   const memberships = effectiveGroups(user, config.groups || []);
   const groups = (config.groups || [])
     .filter((group: { id: string }) => memberships.has(group.id))
-    .map(
-      ({ teamIds: _teamIds, ...group }: { teamIds?: string[]; id: string }) =>
-        group,
-    );
+    .map(({ teamIds: _teamIds, ...group }: Group) => group);
   const groupIds = new Set(groups.map((group: { id: string }) => group.id));
   const visibleCourses = courses.map((course) => ({
     ...course,
@@ -421,7 +393,7 @@ export const readerCourses = cache(async () => {
     user,
     courses: visibleCourses,
     groups,
-    curricula: curricula.map((item: { courseIds: string[] }) => ({
+    curricula: curricula.map((item: Curriculum) => ({
       ...item,
       courseIds: item.courseIds.filter((id) => ids.has(id)),
     })),
@@ -447,12 +419,7 @@ export const readerCurriculum = cache(async (id: string) => {
 
 const cachedBody = unstable_cache(
   async (_installation: string, _governanceRevision: number, id: string) => {
-    const { data, error } = await db()
-      .from("fb_documents")
-      .select("id,published,published_revision")
-      .eq("id", id)
-      .maybeSingle();
-    check(error);
+    const data = await dataStore().readPublishedBody(id);
     if (!data?.published) return null;
     const item = redact(document(data));
     return item.status === "published" ? item : null;
@@ -464,7 +431,11 @@ const publishedBody = cache(
   async (kind: "doc" | "brief" | "course", id: string) => {
     if (!validId.test(id)) notFound();
     const config = await readConfig();
-    const item = await cachedBody(env().url, config.governance_revision, id);
+    const item = await cachedBody(
+      dataStore().cacheNamespace(),
+      config.governance_revision,
+      id,
+    );
     if (!item) notFound();
     if (item.kind !== kind || item.status !== "published") notFound();
     return item;
@@ -515,15 +486,7 @@ export const readerCourseItem = cache(async (id: string) => {
 export const readerCourseProgress = cache(async (id: string) => {
   const { user } = await readerAccess("/courses");
   if (!user) return [] as Progress[];
-  const { data, error } = await db()
-    .from("fb_progress")
-    .select("content_id,version,lessons,passed,attempts")
-    .eq("user_id", user.id)
-    .eq("content_id", id)
-    .order("version", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  check(error);
+  const data = await dataStore().readLatestCourseProgress(user.id, id);
   return data ? [data as Progress] : [];
 });
 
@@ -535,7 +498,7 @@ export function readerMetadata(
   const description =
     item.summary.trim() || `${item.title} — ${context.branding.name}`;
   return {
-    metadataBase: new URL(env().origin),
+    metadataBase: new URL(installation().origin),
     title,
     description,
     alternates: { canonical: contentPath(item.kind, item.id) },

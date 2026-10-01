@@ -10,6 +10,7 @@
     "build:production": "pnpm build",
     "dev:production": "pnpm dev",
     "check:ui": "node scripts/check-ui.mjs",
+    "check:providers": "node scripts/check-providers.mjs",
     "test:ui": "playwright test",
     "test:authoring": "playwright test -c playwright.authoring.config.ts",
     "test:accounts": "playwright test -c playwright.accounts.config.ts",

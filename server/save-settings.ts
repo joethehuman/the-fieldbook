@@ -1,14 +1,13 @@
 import "server-only";
-import type { User } from "@/lib/types";
+import type { User, Content } from "@/lib/types";
 import { requireAdmin, HttpError } from "./auth";
-import { db, check } from "./db";
+import { data as dataStore } from "./data";
 import { settingsSchema } from "./schemas";
 import {
   availableDocSections,
   legacySectionConflict,
   sectionForDoc,
 } from "@/lib/docs-navigation";
-import { readAll } from "./read-all";
 import type { DocLink } from "@/lib/docs-navigation";
 export async function saveSettings(
   user: User | null,
@@ -23,12 +22,7 @@ export async function saveSettings(
     );
   if (!Number.isInteger(a.expected) || a.expected < 1)
     throw new HttpError(400, "A settings revision is required.");
-  const { data: config, error: configError } = await db()
-    .from("fb_config")
-    .select("settings,groups,governance_revision")
-    .eq("id", true)
-    .single();
-  check(configError);
+  const config = await dataStore().readSettingsContext();
   if (!config) throw new HttpError(503, "Settings are unavailable. Try again.");
   const selected = parsed.data.guestGroupId;
   if (selected && selected !== config.settings.guestGroupId) {
@@ -42,16 +36,10 @@ export async function saveSettings(
     JSON.stringify(parsed.data.docSections) !==
     JSON.stringify(config.settings.docSections)
   ) {
-    const rows = await readAll((from, to) =>
-      db()
-        .from("fb_documents")
-        .select("id,draft,published", { count: "exact" })
-        .order("id")
-        .range(from, to),
-    );
+    const rows = await dataStore().listDocumentPlacements();
     const docs: DocLink[] = rows.flatMap((row) =>
       [row.draft, row.published]
-        .filter((item) => item?.kind === "doc")
+        .filter((item): item is Content => item?.kind === "doc")
         .map((item) => ({
           id: row.id,
           title: item.title,
@@ -100,15 +88,11 @@ export async function saveSettings(
         );
     }
   }
-  const { data, error } = await db()
-    .from("fb_config")
-    .update({ settings: parsed.data, revision: a.expected + 1 })
-    .eq("id", true)
-    .eq("revision", a.expected)
-    .eq("governance_revision", config.governance_revision)
-    .select("revision")
-    .maybeSingle();
-  check(error);
+  const data = await dataStore().updateSettings(
+    parsed.data,
+    a.expected,
+    config.governance_revision,
+  );
   if (!data)
     throw new HttpError(409, "Settings changed. Reload before saving.");
   return data;

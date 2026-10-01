@@ -1,6 +1,5 @@
 import "server-only";
-import { db, check } from "./db";
-import { readAll } from "./read-all";
+import { data as dataStore } from "./data";
 import { document, readConfig } from "./content";
 import { profile, requireAdmin } from "./auth";
 import type { Workspace } from "@/lib/store";
@@ -9,17 +8,7 @@ import type { Content, User } from "@/lib/types";
 export type AdminScope = "content" | "governance" | "feedback";
 
 const contentIndex = async (): Promise<Content[]> => {
-  const rows = await readAll((from, to) =>
-    db()
-      .from("fb_documents")
-      .select(
-        "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,sectionOrder:draft->sectionOrder,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,feedAt:draft->>feedAt,cardArt:draft->cardArt,groups:draft->groups,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
-        { count: "exact" },
-      )
-      .is("deleted_at", null)
-      .order("id")
-      .range(from, to),
-  );
+  const rows = await dataStore().listDraftIndex();
   return rows.map((row) => ({
     id: row.id,
     title: row.title || "",
@@ -75,22 +64,9 @@ export async function adminSnapshot(
     progress: {},
     feedback: [],
   };
-  const deleted = await readAll((from, to) =>
-    db()
-      .from("fb_deleted_items")
-      .select(
-        "entity,id,name,kind,revision,deleted_at,purge_after,deleted_by,purging,error",
-        { count: "exact" },
-      )
-      .order("id")
-      .order("entity")
-      .range(from, to),
-  );
+  const deleted = await dataStore().listDeletedItems();
   const actors = [...new Set(deleted.map((d) => d.deleted_by))];
-  const { data: names, error: namesError } = actors.length
-    ? await db().from("fb_profiles").select("id,name").in("id", actors)
-    : { data: [], error: null };
-  check(namesError);
+  const names = await dataStore().readProfileNames(actors);
   data.deletedItems = deleted.map((d) => ({
     id: d.id,
     entity: d.entity,
@@ -104,12 +80,7 @@ export async function adminSnapshot(
     purging: d.purging,
     error: d.error || undefined,
   }));
-  const { data: cleanup, error: cleanupError } = await db()
-    .from("fb_cleanup_config")
-    .select("endpoint,last_run")
-    .eq("id", true)
-    .single();
-  check(cleanupError);
+  const cleanup = await dataStore().readCleanupStatus();
   data.cleanupStatus = {
     configured: !!cleanup?.endpoint,
     lastRun: cleanup?.last_run || undefined,
@@ -118,20 +89,8 @@ export async function adminSnapshot(
 
   if (scope === "feedback") {
     const [ratings, people] = await Promise.all([
-      readAll((from, to) =>
-        db()
-          .from("fb_feedback")
-          .select("*", { count: "exact" })
-          .order("id")
-          .range(from, to),
-      ),
-      readAll((from, to) =>
-        db()
-          .from("fb_profiles")
-          .select("*", { count: "exact" })
-          .order("id")
-          .range(from, to),
-      ),
+      dataStore().listFeedback(),
+      dataStore().listProfiles(),
     ]);
     data.users = people.filter((p) => !p.deleted_at).map(profile);
     data.feedback = ratings.map((row) => ({
@@ -146,22 +105,10 @@ export async function adminSnapshot(
     return data;
   }
 
-  const [governanceResult, courseRows] = await Promise.all([
-    db().rpc("fb_governance_snapshot", { p_actor: user.id }),
-    readAll((from, to) =>
-      db()
-        .from("fb_documents")
-        .select("id,draft,published,revision,published_revision,updated_at", {
-          count: "exact",
-        })
-        .is("deleted_at", null)
-        .eq("draft->>kind", "course")
-        .order("id")
-        .range(from, to),
-    ),
+  const [governance, courseRows] = await Promise.all([
+    dataStore().readGovernanceSnapshot(user.id),
+    dataStore().listDraftCourses(),
   ]);
-  check(governanceResult.error);
-  const governance = governanceResult.data;
   const current = governance.users.find((entry: any) => entry.id === user.id);
   if (!current || !current.active || current.role !== "admin")
     throw new Error("Account access changed. Reload and sign in again.");
