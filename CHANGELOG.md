@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Editor web links accept bare domains such as example.com, formatting tools retain the active editor ring, link popups follow their text, command highlights respond immediately to mouse and keyboard, and Outline/Details panels slide open and closed with reduced-motion support.
+
 - Add Organization Settings → External links for up to three ordered account-menu links. Share them with all signed-in users and public guests, with external-link arrows and new-tab destinations. Keep standalone account pages unchanged; no new migration is required.
 
 - License Fieldbook under the Elastic License 2.0 (ELv2), add license metadata to both application packages, and describe the project as source available under ELv2. Preserve third-party licenses; the repository remains private and no release is published.

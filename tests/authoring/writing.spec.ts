@@ -32,6 +32,134 @@ const hello = "world";
 
 [Product walkthrough](/api/media/example.mp4)
 `;
+
+test("link popups follow text through scrolling and panel changes, and bare domains save with HTTPS", async ({ page }, info) => {
+  const { read } = await setup(page, info.project.name.startsWith("production"),
+    "Before the link.\n\nRead [the guide](google.com) for context.\n\n[Local reference](guide.md), [heading](#next) and [older web link](example.org).\n\n" + Array.from({ length: 30 }, (_, index) => `Paragraph ${index}: More useful context.`).join("\n\n"));
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  const link = editor.getByRole("link", { name: "the guide", exact: true });
+  await link.click();
+  const popup = page.getByRole("dialog").filter({ has: page.getByTestId("link-dialog-preview") });
+  const nearLink = async () => {
+    const anchor = await link.boundingBox(); const box = await popup.boundingBox();
+    if (!anchor || !box) return false;
+    const verticalGap = Math.min(Math.abs(box.y - anchor.y - anchor.height), Math.abs(box.y + box.height - anchor.y));
+    return verticalGap <= 32 && box.x <= anchor.x + anchor.width && box.x + box.width >= anchor.x;
+  };
+  await expect.poll(nearLink).toBe(true);
+  await expect(page.getByTestId("link-dialog-preview")).toHaveAttribute("href", "https://google.com");
+  const before = await link.boundingBox();
+  await editor.evaluate((node) => { node.closest(".writing-scroll-area")!.scrollTop += 12; });
+  await expect.poll(async () => (await link.boundingBox())!.y).toBeLessThan(before!.y);
+  await expect.poll(nearLink).toBe(true);
+  if (!info.project.name.endsWith("phone")) {
+    await page.getByRole("button", { name: /^Details/ }).evaluate((node) => (node as HTMLElement).click());
+    await expect.poll(nearLink).toBe(true);
+  }
+  await popup.getByRole("button", { name: "Edit link URL", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit link", exact: true });
+  await edit.getByRole("textbox", { name: "URL", exact: true }).fill("example.com/guide?next=yes#next");
+  await edit.getByRole("button", { name: "Set URL", exact: true }).click();
+  await expect(link).toHaveAttribute("href", "https://example.com/guide?next=yes#next");
+  await waitForDraftSaved(page);
+  expect((await read()).content[0].body).toContain("[the guide](https://example.com/guide?next=yes#next)");
+  await page.screenshot({ path: info.outputPath("ui1-link-popup.png") });
+  await popup.getByRole("button", { name: "Edit link URL", exact: true }).click();
+  await edit.getByRole("textbox", { name: "URL", exact: true }).fill("cancelled.example.com");
+  await edit.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(link).toHaveAttribute("href", "https://example.com/guide?next=yes#next");
+  await page.getByRole("textbox", { name: "Title", exact: true }).click();
+  await page.getByRole("tab", { name: "Preview draft", exact: true }).click();
+  const preview = page.getByLabel("Draft preview", { exact: true });
+  await expect(preview.getByRole("link", { name: /^the guide/ })).toHaveAttribute("target", "_blank");
+  await expect(preview.getByRole("link", { name: "Local reference", exact: true })).toHaveAttribute("href", "guide.md");
+  await expect(preview.getByRole("link", { name: "heading", exact: true })).toHaveAttribute("href", "#next");
+  await expect(preview.getByRole("link", { name: /^older web link/ })).toHaveAttribute("href", "https://example.org");
+});
+
+test("formatting dropdown focus keeps the owning writing ring and outside focus clears it", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "Keep this selection intact");
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  const ring = () => editor.evaluate((node) => getComputedStyle(node.closest(".writing-surface")!).outlineStyle);
+  await editor.click();
+  const activeRing = await ring();
+  expect(activeRing).toBe("solid");
+  await editor.press("ControlOrMeta+A");
+  const tools = page.getByRole("dialog", { name: "Format selected text", exact: true });
+  await tools.getByRole("button", { name: "Normal Text", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Heading 2", exact: true }).focus();
+  await expect.poll(ring).toBe(activeRing);
+  await page.screenshot({ path: info.outputPath("ui1-formatting-focus.png") });
+  await page.keyboard.press("Enter");
+  await expect(editor.locator("h2")).toHaveText("Keep this selection intact");
+  await page.getByRole("textbox", { name: "Title", exact: true }).click();
+  await expect(tools).toBeHidden();
+  await expect.poll(ring).not.toBe(activeRing);
+});
+
+test("command hover has one immediate highlight and keyboard navigation reveals its selection", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "");
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await editor.click();
+  await page.keyboard.type("/");
+  const options = page.locator(".writing-slash-options");
+  const items = options.getByRole("menuitem");
+  const third = items.nth(2);
+  const scrollBefore = await options.evaluate((node) => node.scrollTop);
+  await third.hover();
+  await expect(third).toHaveAttribute("aria-current", "true");
+  expect(await options.evaluate((node) => node.scrollTop)).toBe(scrollBefore);
+  const highlights = () => options.evaluate((node) => {
+    const accent = getComputedStyle(node).getPropertyValue("--accent").trim();
+    const probe = document.createElement("span"); probe.style.backgroundColor = accent; node.append(probe);
+    const color = getComputedStyle(probe).backgroundColor; probe.remove();
+    return [...node.querySelectorAll("[role=menuitem]")].filter((item) => getComputedStyle(item).backgroundColor === color).length;
+  });
+  expect(await highlights()).toBe(1);
+  expect(await third.evaluate((node) => getComputedStyle(node).transitionDuration)).toBe("0s");
+  await page.keyboard.press("ArrowDown");
+  await expect(items.nth(3)).toHaveAttribute("aria-current", "true");
+  expect(await highlights()).toBe(1);
+  for (let index = 0; index < 8; index++) await page.keyboard.press("ArrowDown");
+  await expect.poll(() => options.evaluate((node) => {
+    const current = node.querySelector('[aria-current="true"]')!.getBoundingClientRect();
+    const box = node.getBoundingClientRect(); return current.top >= box.top - 1 && current.bottom <= box.bottom + 1;
+  })).toBe(true);
+  await page.screenshot({ path: info.outputPath("ui1-command-menu.png") });
+  await page.keyboard.press("Escape");
+  await expect(options).toBeHidden();
+  await expect(editor).toBeFocused();
+});
+
+test("Details keeps its contents during motion, hides closed controls and honors reduced motion", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"));
+  const toggle = page.getByRole("button", { name: /^Details/ });
+  const slot = page.locator('.editor-frame-panel[data-side="details"]');
+  await openContentSettings(page);
+  const panel = page.getByRole("complementary", { name: "Content details", exact: true });
+  const field = panel.getByRole("textbox", { name: "Short description", exact: true });
+  await field.fill("Keep panel state across toggles");
+  await expect.poll(() => slot.evaluate((node) => getComputedStyle(node).visibility)).toBe("visible");
+  const motion = await toggle.evaluate(async (node) => {
+    const panel = document.querySelector('.editor-frame-panel[data-side="details"]')!;
+    const content = panel.querySelector("aside")!;
+    (node as HTMLElement).click();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    return { attached: content.isConnected, hidden: panel.getAttribute("aria-hidden"), inert: (panel as HTMLElement).inert, transition: getComputedStyle(content).transitionDuration };
+  });
+  expect(motion).toEqual({ attached: true, hidden: "true", inert: true, transition: "0.22s, 0.22s" });
+  await expect(slot).toHaveCount(0);
+  await expect(panel).toHaveCount(0);
+  await openContentSettings(page);
+  await expect(field).toHaveValue("Keep panel state across toggles");
+  await field.focus(); await page.keyboard.press("Escape");
+  await expect(toggle).toBeFocused();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await toggle.click();
+  expect(await slot.locator("aside").evaluate((node) => getComputedStyle(node).transitionDuration)).toBe("0s");
+  await toggle.click();
+  await expect(slot).toHaveCount(0);
+});
 async function setup(
   page: Page,
   production: boolean,

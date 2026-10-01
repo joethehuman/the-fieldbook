@@ -74,7 +74,8 @@
   position: sticky;
   top: var(--editor-writing-top);
 }
-.writing-surface:focus-within {
+.writing-surface:focus-within,
+.writing-surface[data-editor-interacting="true"] {
   border-color: var(--ring);
   outline: 2px solid var(--ring);
   outline-offset: 2px;
@@ -117,10 +118,15 @@
   min-width: 0;
   justify-content: flex-start;
   text-align: left;
+  transition: none;
 }
-.writing-slash-menu [role="menuitem"]:hover,
-.writing-slash-menu [role="menuitem"]:focus,
-.writing-slash-options [aria-current="true"] {
+.writing-slash-options [role="menuitem"]:hover,
+.writing-slash-options [role="menuitem"]:focus {
+  background: transparent;
+}
+.writing-slash-footer [role="menuitem"]:hover,
+.writing-slash-footer [role="menuitem"]:focus,
+.writing-slash-options [role="menuitem"][aria-current="true"] {
   background: var(--accent);
 }
 .writing-slash-menu [role="menuitem"]:focus {

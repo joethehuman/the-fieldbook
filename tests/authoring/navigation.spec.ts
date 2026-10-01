@@ -34,6 +34,46 @@ async function withinOwner(target: Locator, owner: Locator) {
   expect(control!.y + control!.height).toBeLessThanOrEqual(panel!.y + panel!.height - 12);
 }
 
+test("Outline and Details slide in both directions without remounting the lesson", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"));
+  const lesson = page.getByRole("textbox", { name: "Lesson title", exact: true });
+  await lesson.evaluate((node) => { (node as HTMLElement).dataset.ui1MountProbe = "retained"; });
+  const phone = info.project.name.endsWith("phone");
+  for (const side of ["outline", "details"]) {
+    const toggle = page.getByRole("button", { name: side === "outline" ? /^Outline/ : /^Details/ });
+    const slot = page.locator(`.editor-frame-panel[data-side="${side}"]`);
+    if (await toggle.getAttribute("aria-expanded") === "true") await toggle.click();
+    await expect(slot).toHaveCount(0);
+    const opening = await toggle.evaluate(async (node, { side, phone }) => {
+      (node as HTMLElement).click();
+      const sizes: number[] = [];
+      for (let frame = 0; frame < 18; frame++) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const box = document.querySelector(`.editor-frame-panel[data-side="${side}"]`)!.getBoundingClientRect();
+        sizes.push(phone ? box.height : box.width);
+      }
+      return sizes;
+    }, { side, phone });
+    expect(Math.max(...opening) - opening[0]).toBeGreaterThan(4);
+    await expect(lesson).toHaveAttribute("data-ui1-mount-probe", "retained");
+    await page.screenshot({ path: info.outputPath(`ui1-${side}-open.png`) });
+    const closing = await toggle.evaluate(async (node, { side, phone }) => {
+      (node as HTMLElement).click();
+      const sizes: number[] = [];
+      for (let frame = 0; frame < 18; frame++) {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+        const box = document.querySelector(`.editor-frame-panel[data-side="${side}"]`)?.getBoundingClientRect();
+        sizes.push(box ? phone ? box.height : box.width : 0);
+      }
+      return sizes;
+    }, { side, phone });
+    expect(closing[0]).toBeGreaterThan(0);
+    expect(closing.some((size) => size > 0 && size < closing[0] - 2)).toBe(true);
+    await expect(slot).toHaveCount(0);
+    await expect(lesson).toHaveAttribute("data-ui1-mount-probe", "retained");
+  }
+});
+
 test("requirements smoothly reveal artwork within Details and course title within the main page", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"));
   const details = await openContentSettings(page);
