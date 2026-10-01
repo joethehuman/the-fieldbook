@@ -11,12 +11,14 @@ export function ResponsiveTabsNavigation({
   value,
   onValueChange,
   options,
+  pendingValue,
   children,
 }: {
   label: string;
   value: string;
   onValueChange: (value: string) => void | Promise<void>;
   options: { id: string; name: string }[];
+  pendingValue?: string | null;
   children: ReactNode;
 }) {
   const fade = useScrollFade<HTMLDivElement>();
@@ -31,6 +33,14 @@ export function ResponsiveTabsNavigation({
             </option>
           ))}
         </SelectField>
+        <span
+          className="min-h-5 text-label text-muted-foreground"
+          role="status"
+        >
+          {pendingValue
+            ? `Opening ${options.find((option) => option.id === pendingValue)?.name || "section"}…`
+            : ""}
+        </span>
       </Field>
       <div
         className="hidden min-h-0 @min-[48rem]/workspace:grid"

@@ -1,6 +1,8 @@
 "use client";
 import { EditorFrame, EditorDetailsGroup } from "@/components/patterns/editor-frame";
 import { NavigationButton } from "@/components/patterns/navigation-button";
+import { ResponsiveTabsNavigation } from "@/components/patterns/responsive-tabs-navigation";
+import { Spinner } from "@/components/ui/spinner";
 import { DetailNavigation } from "@/components/patterns/detail-navigation";
 import { BulkExamples } from "./bulk-examples";
 import { WritingExamples } from "./writing-examples";
@@ -95,6 +97,7 @@ const choices = (
 export default function ComponentCatalog() {
   const notify = useToast();
   const { prompt } = useInteractionDialog();
+  const [navigationPending, setNavigationPending] = useState(false);
   const [catalogLesson, setCatalogLesson] = useState("welcome");
   const [catalogTitle, setCatalogTitle] = useState("Welcome to Fieldbook");
   const [catalogBody, setCatalogBody] = useState("Write a short introduction to your course.");
@@ -545,6 +548,18 @@ export default function ComponentCatalog() {
               Existing user
             </Field>
           </FieldGroup>
+        </Stack>
+      </Card>
+      <Card>
+        <Stack>
+          <SectionHeader title={<h2>Pending section navigation</h2>} description="The current panel stays visible while a section opens." />
+          <Button variant="outline" onClick={() => setNavigationPending((value) => !value)}>Toggle pending section</Button>
+          <Tabs value="content" orientation="vertical">
+            <ResponsiveTabsNavigation label="Example section" value="content" onValueChange={() => {}} options={[{ id: "content", name: "Content" }, { id: "people", name: "People" }]} pendingValue={navigationPending ? "people" : null}>
+              <TabsTrigger value="content">Content</TabsTrigger>
+              <TabsTrigger value="people">{navigationPending && <Spinner />}People</TabsTrigger>
+            </ResponsiveTabsNavigation>
+          </Tabs>
         </Stack>
       </Card>
       <Card>

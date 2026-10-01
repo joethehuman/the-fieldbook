@@ -235,3 +235,60 @@ test("demo autosaves preserve assigned-course windows, published lessons and pro
   );
   assert.deepEqual(versionPublish.progress, before.progress);
 });
+
+test("lightweight prefetch shares reads, failed navigation retains the active scope, and person histories cannot be reused for a different account", async () => {
+  const initial = fixture();
+  const savedFetch = globalThis.fetch;
+  const paths: string[] = [];
+  let fail = true;
+  globalThis.fetch = async (input) => {
+    const path = String(input);
+    paths.push(path);
+    if (path.includes("scope=people") && fail)
+      return new Response(JSON.stringify({ error: "List unavailable" }), {
+        status: 503,
+      });
+    if (path.includes("userId=third"))
+      return new Response(JSON.stringify({ error: "History unavailable" }), {
+        status: 503,
+      });
+    const personId = new URL(path, "https://example.test").searchParams.get(
+      "userId",
+    );
+    return response({
+      data: { ...initial.data, progress: personId ? { [personId]: [] } : {} },
+      user: initial.user,
+    });
+  };
+  try {
+    const runtime = createAdminRuntime(initial);
+    await assert.rejects(runtime.admin.prepare("people"), /List unavailable/);
+    await runtime.refresh();
+    assert.equal(paths.at(-1), "/api/admin/snapshot?scope=content");
+    fail = false;
+    runtime.admin.prefetch();
+    await runtime.admin.prepare("people");
+    assert.equal(
+      paths.filter((path) => path.includes("scope=people")).length,
+      2,
+    );
+    assert.ok(!paths.some((path) => path.includes("scope=governance")));
+    const first = await runtime.admin.prepare("person", "first");
+    const second = await runtime.admin.prepare("person", "second");
+    assert.deepEqual(Object.keys(first.progress), ["first"]);
+    assert.deepEqual(Object.keys(second.progress), ["second"]);
+    await runtime.refresh();
+    assert.ok(paths.at(-1)?.includes("scope=person&userId=second"));
+    await assert.rejects(
+      runtime.admin.prepare("person", "third"),
+      /History unavailable/,
+    );
+    await runtime.refresh();
+    assert.ok(paths.at(-1)?.includes("scope=person&userId=second"));
+    await runtime.admin.prepare("people");
+    await runtime.refresh();
+    assert.equal(paths.at(-1), "/api/admin/snapshot?scope=people");
+  } finally {
+    globalThis.fetch = savedFetch;
+  }
+});

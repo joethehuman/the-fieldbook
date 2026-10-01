@@ -5,7 +5,8 @@ import { profile, requireAdmin } from "./auth";
 import type { Workspace } from "@/lib/store";
 import type { Content, User } from "@/lib/types";
 
-export type AdminScope = "content" | "governance" | "feedback";
+import type { AdminScope } from "@/lib/admin-scope";
+export type { AdminScope } from "@/lib/admin-scope";
 
 const contentIndex = async (): Promise<Content[]> => {
   const rows = await dataStore().listDraftIndex();
@@ -40,9 +41,38 @@ const contentIndex = async (): Promise<Content[]> => {
 export async function adminSnapshot(
   user: User,
   scope: AdminScope,
+  userId?: string,
 ): Promise<Workspace> {
   requireAdmin(user);
-  const [config, content] = await Promise.all([readConfig(), contentIndex()]);
+  const store = dataStore();
+  const reports = scope === "governance" || scope === "person";
+  // Start independent reads together after the request-time administrator check.
+  // Housekeeping cannot delay or fail an unrelated account/content list.
+  const [config, content, governance, courseRows, feedback, maintenance] =
+    await Promise.all([
+      readConfig(),
+      contentIndex(),
+      scope === "people" || scope === "person"
+        ? store.readAdminPeopleSnapshot(user.id, userId)
+        : scope === "governance"
+          ? store.readGovernanceSnapshot(user.id)
+          : null,
+      reports ? store.listDraftCourses() : [],
+      scope === "feedback"
+        ? Promise.all([store.listFeedback(), store.listProfiles()])
+        : null,
+      scope === "maintenance"
+        ? Promise.all([
+            store.listDeletedItems().then(async (deleted) => ({
+              deleted,
+              names: await store.readProfileNames([
+                ...new Set(deleted.map((d) => d.deleted_by)),
+              ]),
+            })),
+            store.readCleanupStatus(),
+          ])
+        : null,
+    ]);
   const data: Workspace = {
     schema: 1,
     settings: config.settings,
@@ -64,34 +94,29 @@ export async function adminSnapshot(
     progress: {},
     feedback: [],
   };
-  const deleted = await dataStore().listDeletedItems();
-  const actors = [...new Set(deleted.map((d) => d.deleted_by))];
-  const names = await dataStore().readProfileNames(actors);
-  data.deletedItems = deleted.map((d) => ({
-    id: d.id,
-    entity: d.entity,
-    name: d.name,
-    kind: d.kind,
-    revision: d.revision,
-    deletedAt: d.deleted_at,
-    purgeAfter: d.purge_after,
-    deletedBy:
-      names?.find((p) => p.id === d.deleted_by)?.name || "Former administrator",
-    purging: d.purging,
-    error: d.error || undefined,
-  }));
-  const cleanup = await dataStore().readCleanupStatus();
-  data.cleanupStatus = {
-    configured: !!cleanup?.endpoint,
-    lastRun: cleanup?.last_run || undefined,
-  };
-  if (scope === "content") return data;
-
-  if (scope === "feedback") {
-    const [ratings, people] = await Promise.all([
-      dataStore().listFeedback(),
-      dataStore().listProfiles(),
-    ]);
+  if (maintenance) {
+    const [{ deleted, names }, cleanup] = maintenance;
+    data.deletedItems = deleted.map((d) => ({
+      id: d.id,
+      entity: d.entity,
+      name: d.name,
+      kind: d.kind,
+      revision: d.revision,
+      deletedAt: d.deleted_at,
+      purgeAfter: d.purge_after,
+      deletedBy:
+        names.find((p) => p.id === d.deleted_by)?.name ||
+        "Former administrator",
+      purging: d.purging,
+      error: d.error || undefined,
+    }));
+    data.cleanupStatus = {
+      configured: !!cleanup?.endpoint,
+      lastRun: cleanup?.last_run || undefined,
+    };
+  }
+  if (feedback) {
+    const [ratings, people] = feedback;
     data.users = people.filter((p) => !p.deleted_at).map(profile);
     data.feedback = ratings.map((row) => ({
       id: row.id,
@@ -102,18 +127,14 @@ export async function adminSnapshot(
       comment: row.comment,
       updatedAt: row.updated_at,
     }));
-    return data;
   }
-
-  const [governance, courseRows] = await Promise.all([
-    dataStore().readGovernanceSnapshot(user.id),
-    dataStore().listDraftCourses(),
-  ]);
+  if (!governance) return data;
   const current = governance.users.find((entry: any) => entry.id === user.id);
   if (!current || !current.active || current.role !== "admin")
     throw new Error("Account access changed. Reload and sign in again.");
   data.users = governance.users.map(profile);
   data.groups = governance.groups;
+  if (governance.curricula) data.curricula = governance.curricula;
   data.teams = governance.teams;
   data.governanceRevision = governance.revision;
   data.pendingUsers = governance.pending.map((entry: any) => ({
@@ -133,6 +154,11 @@ export async function adminSnapshot(
       attempts: progress.attempts,
       revision: progress.revision,
     });
+  if (!reports) return data;
+  if (scope === "person" && !data.users.some((person) => person.id === userId))
+    throw new Error(
+      "This person is no longer available. Refresh the People list.",
+    );
   const courses = new Map(courseRows.map((row) => [row.id, row]));
   data.content = content.map((item) => {
     const row = courses.get(item.id);

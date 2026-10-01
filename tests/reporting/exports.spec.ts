@@ -146,14 +146,30 @@ async function setup(
   const user = data.users.find((u) => u.id === `demo-${role}`)!;
   if (production) {
     const actorId = "00000000-0000-4000-8000-000000000010";
-    const oldId = user.id;
-    user.id = actorId;
+    const ids = new Map(
+      data.users.map((entry, n) => [
+        entry.id,
+        entry === user
+          ? actorId
+          : `00000000-0000-4000-8000-${String(n + 100).padStart(12, "0")}`,
+      ]),
+    );
+    for (const entry of data.users) entry.id = ids.get(entry.id)!;
     for (const team of data.teams || [])
-      if (team.managerId === oldId) team.managerId = actorId;
-    if (data.progress[oldId]) {
-      data.progress[actorId] = data.progress[oldId];
-      delete data.progress[oldId];
-    }
+      if (team.managerId)
+        team.managerId = ids.get(team.managerId) || team.managerId;
+    data.progress = Object.fromEntries(
+      Object.entries(data.progress).map(([id, rows]) => [
+        ids.get(id) || id,
+        rows,
+      ]),
+    );
+    for (const item of data.content)
+      for (const assignment of item.assignments || [])
+        if (assignment.userId)
+          assignment.userId = ids.get(assignment.userId) || assignment.userId;
+    for (const rating of data.feedback || [])
+      rating.userId = ids.get(rating.userId) || rating.userId;
     await page.request.post("http://127.0.0.1:3130/fixture", {
       data: {
         settings: data.settings,
@@ -375,8 +391,10 @@ test("feedback filters and sorting preserve text, formula protection and timesta
   expect(result.rows[2][5]).toBe("'=1+2");
   expect(result.rows[3][5]).toBe('Zoë, "hello"\n東京');
   expect(result.rows[3][6]).toBe("2026-09-21T17:30:00.000Z");
-  await page.getByRole("group", { name: "Feedback type", exact: true })
-    .getByRole("button", { name: "Courses", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Feedback type", exact: true })
+    .getByRole("button", { name: "Courses", exact: true })
+    .click();
   await page.getByRole("button", { name: "Filters", exact: true }).click();
   await select(page, "Feedback rating", "Useful");
   await page.keyboard.press("Escape");
@@ -524,10 +542,10 @@ test("unavailable or pending admin report never offers export", async ({
     });
   });
   await setup(page, info);
-  await expect.poll(() => !!release).toBe(true);
   const navigation = page.locator('[data-slot="admin-navigation"]');
   const top = (await navigation.boundingBox())?.y;
   await section(page, "Progress");
+  await expect.poll(() => !!release).toBe(true);
   await expect(page.locator(".admin-workspace")).toHaveAttribute(
     "aria-busy",
     "true",
@@ -545,27 +563,29 @@ test("unavailable or pending admin report never offers export", async ({
   await screenshot(page, info, "unavailable");
 });
 
-test("admin warms first-visit report sections without duplicate reads", async ({
+test("admin warms lightweight lists and loads full reporting inputs on demand without duplicate reads", async ({
   page,
 }, info) => {
   test.skip(
     !info.project.name.startsWith("production"),
     "Server-only data path",
   );
-  const reads = { governance: 0, feedback: 0 };
+  const reads = { people: 0, governance: 0, feedback: 0 };
   await page.route("**/api/admin/snapshot?**", async (route) => {
     const scope = new URL(route.request().url()).searchParams.get("scope");
-    if (scope === "governance" || scope === "feedback") reads[scope]++;
+    if (scope === "people" || scope === "governance" || scope === "feedback")
+      reads[scope]++;
     await route.continue();
   });
   await setup(page, info);
-  await expect.poll(() => reads.governance).toBe(1);
+  await expect.poll(() => reads.people).toBe(1);
+  expect(reads.governance).toBe(0);
   await expect.poll(() => reads.feedback).toBe(1);
   await section(page, "Progress");
   await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
   await section(page, "Feedback");
   await expect(page.getByRole("heading", { name: "Feedback" })).toBeVisible();
-  expect(reads).toEqual({ governance: 1, feedback: 1 });
+  expect(reads).toEqual({ people: 1, governance: 1, feedback: 1 });
   await expect(page.getByText("Opening section…")).toHaveCount(0);
 });
 

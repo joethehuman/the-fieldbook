@@ -71,6 +71,16 @@ const profile = () =>
     effective_group_joined_at: {},
   };
 const send = (res, data, status = 200, headers = {}) => {
+  // Match PostgREST pagination so large synthetic lists exercise complete reads.
+  if (Array.isArray(data) && res.req.url.startsWith("/rest/v1/")) {
+    const params = new URL(res.req.url, "http://127.0.0.1:3130").searchParams;
+    const offset = Number(params.get("offset") || 0);
+    const limit = params.has("limit") ? Number(params.get("limit")) : data.length;
+    const total = data.length;
+    data = data.slice(offset, offset + limit);
+    headers = { ...headers, "Content-Range": total === 0 ? "*/0" : `${offset}-${offset + data.length - 1}/${total}` };
+  }
+
   res.writeHead(status, {
     "Content-Type": "application/json",
     "X-Supabase-Api-Version": "2024-01-01",
@@ -292,6 +302,16 @@ createServer(async (req, res) => {
       : send(res, configuredUsers.length ? configuredUsers : [profile()], 200, {
           "Content-Range": `0-${Math.max(0, configuredUsers.length - 1)}/${configuredUsers.length || 1}`,
         });
+  if (url.pathname === "/rest/v1/rpc/fb_admin_people_snapshot") {
+    const { p_actor, p_user } = JSON.parse(body || "{}");
+    const users = (configuredUsers.length ? configuredUsers : [profile()]).filter((p) => !p.deleted_at);
+    if (!users.some((p) => p.id === p_actor && p.role === "admin" && p.active))
+      return send(res, { message: "Administrator access is required" }, 403);
+    return send(res, {
+      users, progress: p_user ? configuredProgress.filter((p) => p.user_id === p_user) : [],
+      groups: configuredGroups, teams: configuredTeams, curricula: configuredCurricula, pending: [], revision: fixtureGeneration,
+    });
+  }
   if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot")
     return send(res, {
       users: configuredUsers.length ? configuredUsers : [profile()],
