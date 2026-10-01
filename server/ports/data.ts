@@ -69,6 +69,7 @@ export type PendingProfileRecord = Pick<
   "name" | "email" | "role" | "groups" | "team_id" | "onboarding_start"
 >;
 export type GovernanceRecord = {
+  curricula?: Curriculum[];
   revision: number;
   users: ProfileRecord[];
   groups: Group[];
@@ -186,6 +187,11 @@ export interface DataStore {
     }[]
   >;
   readGovernanceSnapshot(actorId: string): Promise<GovernanceRecord>;
+  /** Complete account list, with progress restricted to a requested person. */
+  readAdminPeopleSnapshot(
+    actorId: string,
+    userId?: string,
+  ): Promise<GovernanceRecord>;
   listDeletedItems(): Promise<DeletedItemRecord[]>;
   readCleanupStatus(): Promise<{
     endpoint: string | null;

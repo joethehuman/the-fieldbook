@@ -120,12 +120,19 @@ export function AdminWorkspace({
           }}
           onOpenTab={async (next) => {
             const scope =
-              next === "feedback"
-                ? "feedback"
-                : next === "content" || next.startsWith("settings-")
-                  ? "content"
-                  : "governance";
+              next === "people" || next === "teams"
+                ? "people"
+                : next === "deleted"
+                  ? "maintenance"
+                  : next === "feedback"
+                    ? "feedback"
+                    : next === "content" || next.startsWith("settings-")
+                      ? "content"
+                      : "governance";
             setData(await runtime.admin.prepare(scope));
+          }}
+          onOpenPersonProgress={async (id) => {
+            setData(await runtime.admin.prepare("person", id));
           }}
           onEdit={async (id) => {
             const result = await runtime.admin.edit(id);

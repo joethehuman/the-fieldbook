@@ -14,6 +14,7 @@ import { HttpError } from "../../../errors";
 export const learningData: Pick<
   DataStore,
   | "readGovernanceSnapshot"
+  | "readAdminPeopleSnapshot"
   | "listProfiles"
   | "readProfileNames"
   | "findOwnerProfile"
@@ -27,6 +28,14 @@ export const learningData: Pick<
   | "listDeletedItems"
   | "readCleanupStatus"
 > = {
+  async readAdminPeopleSnapshot(actorId, userId) {
+    const { data, error } = await db().rpc("fb_admin_people_snapshot", {
+      p_actor: actorId,
+      p_user: userId || null,
+    });
+    check(error);
+    return data as GovernanceRecord;
+  },
   async readGovernanceSnapshot(actorId) {
     const { data, error } = await db().rpc("fb_governance_snapshot", {
       p_actor: actorId,

@@ -5,6 +5,8 @@ No versions have been released. Package and MCP version strings do not constitut
 ## Unreleased
 
 - Add Organization Settings → External links for up to three ordered account-menu links. Share them with all signed-in users and public guests, with external-link arrows and new-tab destinations. Keep standalone account pages unchanged; no new migration is required.
+- Administration acknowledges section changes immediately, keeps People and Teams reads independent of course history, and loads a selected person's progress on demand. Recently deleted housekeeping no longer delays other sections. Apply the additive `admin_people_reads` migration before deploying this version.
+
 
 - License Fieldbook under the Elastic License 2.0 (ELv2), add license metadata to both application packages, and describe the project as source available under ELv2. Preserve third-party licenses; the repository remains private and no release is published.
 

@@ -97,7 +97,9 @@ test("admin entry and section changes avoid the full workspace", async ({
     .getByRole("textbox", { name: "Title" })
     .fill("Revised administration article");
   await saved;
-  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Saved");
+  await expect(page.locator(".editor-heading [role=status]")).toHaveText(
+    "Saved",
+  );
   expect(workspaceReads).toBe(0);
   await page.getByRole("button", { name: "Back to content" }).click();
   const menu = page.getByRole("button", { name: "Open navigation" });
@@ -271,4 +273,166 @@ test("confirmed editor navigation responds while its destination is loading", as
     release();
   }
   await expect(page).toHaveURL(/\/docs(?:\/|$)/);
+});
+
+test("large People list acknowledges pending reads and preserves search and selection through person history failures", async ({
+  page,
+  request,
+}, info) => {
+  const personId = "00000000-0000-4000-8000-000000000599";
+  const users = Array.from({ length: 600 }, (_, n) => ({
+    id:
+      n === 0
+        ? "00000000-0000-4000-8000-000000000010"
+        : `00000000-0000-4000-8000-${String(n + 1000).padStart(12, "0")}`,
+    name: `Person ${String(n).padStart(4, "0")}`,
+    email: `person${n}@example.test`,
+    role: n ? "learner" : "admin",
+    active: true,
+    groups: [] as string[],
+  }));
+  users[599].id = personId;
+  users[599].groups = ["required"];
+  const course = {
+    ...freshWorkspace().content.find((item) => item.kind === "course")!,
+    id,
+    version: 1,
+    title: "Assigned synthetic course",
+    status: "published",
+    assignments: [
+      {
+        groupId: "required",
+        assignedAt: "2026-09-24T00:00:00Z",
+        due: { type: "none" },
+      },
+    ],
+  };
+  const progress = users.map((user) => ({
+    user_id: user.id,
+    content_id: id,
+    version: 1,
+    lessons: [],
+    passed: false,
+    attempts: [],
+    revision: 1,
+  }));
+  await request.post(`${backend}/fixture`, {
+    data: {
+      users,
+      progress,
+      groups: [{ id: "required", name: "Required learning", parentId: null }],
+      documents: [
+        {
+          id,
+          draft: course,
+          published: course,
+          revision: 1,
+          published_revision: 1,
+          updated_at: "2026-09-24T00:00:00Z",
+        },
+      ],
+      settings: { access: "private", logoUrl: "" },
+    },
+  });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/admin/snapshot?scope=people", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  await page.goto("/admin");
+  await expect(page.locator(".admin-layout")).toBeVisible();
+  const picker = page.getByRole("combobox", { name: "Administration section" });
+  const openPeople = async () => {
+    if (await picker.isVisible()) {
+      await picker.click();
+      await page.getByRole("option", { name: "People", exact: true }).click();
+    } else await page.getByRole("tab", { name: "People", exact: true }).click();
+  };
+  const before = await page.locator(".topbar").boundingBox();
+  await openPeople();
+  await expect(page.locator(".admin-workspace")).toHaveAttribute(
+    "aria-busy",
+    "true",
+  );
+  if (await picker.isVisible())
+    await expect(
+      page.getByRole("status").filter({ hasText: "Opening People" }),
+    ).toBeVisible();
+  else
+    await expect(
+      page
+        .getByRole("tab", { name: /People/ })
+        .locator('svg[class*="animate-spin"]'),
+    ).toBeVisible();
+  expect(await page.locator(".topbar").boundingBox()).toEqual(before);
+  await page.screenshot({ path: info.outputPath("people-pending.png") });
+  release();
+  const search = page.getByRole("searchbox", { name: "Search profiles" });
+  await expect(search).toBeVisible();
+  await expect(page.locator("tbody tr")).toHaveCount(25);
+  await search.fill("person59");
+  const row = page.locator("tbody tr").filter({ hasText: "Person 0599" });
+  await expect(row).toHaveCount(1);
+  const checkbox = row.getByRole("checkbox", { name: "Select Person 0599" });
+  await checkbox.click();
+  let failPerson = true;
+  await page.route(
+    "**/api/admin/snapshot?scope=person&userId=*",
+    async (route) => {
+      if (failPerson)
+        await route.fulfill({
+          status: 503,
+          json: { error: "Synthetic history failure. Retry." },
+        });
+      else await route.continue();
+    },
+  );
+  await row.getByRole("button", { name: "Courses & progress" }).click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Synthetic history failure" }),
+  ).toBeVisible();
+  await expect(search).toHaveValue("person59");
+  await expect(checkbox).toBeChecked();
+  failPerson = false;
+  const response = page.waitForResponse(
+    (response) =>
+      response.url().includes("scope=person&") && response.status() === 200,
+  );
+  await row.getByRole("button", { name: "Courses & progress" }).click();
+  const state = await (await response).json();
+  expect(Object.keys(state.data.progress)).toEqual([personId]);
+  expect(state.data.progress[personId]).toHaveLength(1);
+  await expect(
+    page.getByRole("heading", { name: "Courses & progress", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Assigned synthetic course").first(),
+  ).toBeVisible();
+  await expect(page.getByText("No assigned courses yet.")).toHaveCount(0);
+  await page.getByRole("heading", { name: "Courses & progress", exact: true }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("person-progress.png") });
+  await page.getByRole("button", { name: "Back to people" }).click();
+  await expect(search).toHaveValue("person59");
+  await expect(checkbox).toBeChecked();
 });

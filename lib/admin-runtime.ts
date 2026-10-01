@@ -1,3 +1,4 @@
+import type { AdminScope } from "./admin-scope";
 import { request, createWorkspaceSaver, RequestError } from "./workspace-save";
 import type { UploadMedia } from "@/components/MarkdownEditor";
 import type { BulkRequest, BulkResult } from "./bulk-actions";
@@ -18,9 +19,7 @@ export type AdminRuntime = {
       action: BulkRequest,
     ) => Promise<{ data: Workspace; results: BulkResult[] }>;
     prefetch: () => void;
-    prepare: (
-      scope: "content" | "governance" | "feedback",
-    ) => Promise<Workspace>;
+    prepare: (scope: AdminScope, userId?: string) => Promise<Workspace>;
     edit: (id: string) => Promise<{ data: Workspace; item: Content }>;
     unpublish: (id: string) => Promise<Workspace>;
   };
@@ -48,15 +47,11 @@ export function createAdminRuntime(initial: {
   data: Workspace;
   user: User;
 }): AdminRuntime {
-  let scope: "content" | "governance" | "feedback" = "content";
+  let scope: AdminScope = "content";
+  let personId: string | undefined;
   let openItem: string | null = null;
-  const cached = new Map<"content" | "governance" | "feedback", Workspace>([
-    ["content", initial.data],
-  ]);
-  const pending = new Map<
-    "content" | "governance" | "feedback",
-    Promise<Workspace>
-  >();
+  const cached = new Map<AdminScope, Workspace>([["content", initial.data]]);
+  const pending = new Map<AdminScope, Promise<Workspace>>();
   let cacheVersion = 0;
   let contentRecoveryRequired = false;
   let contentSaveInFlight = false;
@@ -81,7 +76,9 @@ export function createAdminRuntime(initial: {
   }
   async function fresh(target = scope): Promise<Workspace> {
     const version = cacheVersion;
-    const state = await request(`/api/admin/snapshot?scope=${target}`);
+    const state = await request(
+      `/api/admin/snapshot?scope=${target}${target === "person" ? `&userId=${encodeURIComponent(personId || "")}` : ""}`,
+    );
     if (
       !state.user ||
       state.user.id !== initial.user.id ||
@@ -111,7 +108,7 @@ export function createAdminRuntime(initial: {
     cached.set(target, data);
     return data;
   }
-  function prepared(target: "content" | "governance" | "feedback") {
+  function prepared(target: AdminScope) {
     const available = cached.get(target);
     if (available) return Promise.resolve(available);
     const running = pending.get(target);
@@ -202,7 +199,7 @@ export function createAdminRuntime(initial: {
               JSON.stringify(after[key as keyof Workspace]),
           )
         ) {
-          const complete = await fresh("governance");
+          const complete = await fresh("people");
           if (complete.governanceRevision !== before.governanceRevision)
             throw new Error(
               "Organization data changed. Refresh before applying these changes.",
@@ -292,14 +289,29 @@ export function createAdminRuntime(initial: {
         return { data: latest, results };
       },
       prefetch: () => {
-        // Warm the two first-visit sections after Content has painted. A tab
+        // Warm the lightweight first-visit sections after Content has painted. A tab
         // click shares the same in-flight read instead of starting another.
-        void Promise.allSettled([prepared("governance"), prepared("feedback")]);
+        void Promise.allSettled([prepared("people"), prepared("feedback")]);
       },
-      prepare: async (next) => {
-        scope = next;
-        openItem = null;
-        return prepared(next);
+      prepare: async (next, userId) => {
+        const previousPerson = personId;
+        const changingPerson = next === "person" && personId !== userId;
+        if (changingPerson) {
+          clearCached();
+          personId = userId;
+        }
+        try {
+          const data = await prepared(next);
+          scope = next;
+          openItem = null;
+          return data;
+        } catch (error) {
+          if (changingPerson) {
+            personId = previousPerson;
+            clearCached();
+          }
+          throw error;
+        }
       },
       edit: async (id) => {
         const item = await request(

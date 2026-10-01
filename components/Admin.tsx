@@ -1,6 +1,7 @@
 "use client";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { Badge } from "./ui/badge";
+import { Spinner } from "./ui/spinner";
 import { Pagination } from "./patterns/pagination";
 import { contentRelationshipCommands } from "./bulk-relationships";
 import type { BulkHandler } from "@/lib/bulk-actions";
@@ -227,6 +228,7 @@ type Props = {
   data: Workspace;
   user: User;
   onOpenTab?: (tab: string) => Promise<void>;
+  onOpenPersonProgress?: (id: string) => Promise<void>;
   onEdit?: (id: string) => Promise<Content>;
   onSaveContent?: (content: Content, intent: SaveIntent) => Promise<Content>;
   onUnpublish?: (id: string) => Promise<void>;
@@ -247,6 +249,7 @@ export default function Admin({
   data,
   user,
   onOpenTab,
+  onOpenPersonProgress,
   onEdit,
   onSaveContent,
   onUnpublish,
@@ -628,10 +631,19 @@ export default function Admin({
   const detailPerson = data.users.find((u) => u.id === detailScope?.userId);
   const detailView = detailScope && (
     <div className="grid gap-4">
-      <DetailNavigation items={[{ label: detailScope.userId ? "Back to people" : "Back to learning groups", onSelect: () => { setDetailScope(null); adminPanel.reveal(); } }]} current={detailPerson?.name} />
+      <DetailNavigation items={[{ label: detailScope.userId ? "Back to people" : "Back to learning groups", onSelect: async () => {
+        if (openingTab || openingItem) return;
+        if (detailScope.userId && onOpenTab) {
+          setOpeningTab("people");
+          try { await onOpenTab("people"); }
+          catch (error) { setNotice((error as Error).message); return; }
+          finally { setOpeningTab(null); }
+        }
+        setDetailScope(null); adminPanel.reveal();
+      } }]} current={detailPerson?.name} />
       {detailScope.groupId ? <LearningGroups data={data} onChange={onChange} onLearning={manageLearning} onLearningMany={manageLearningMany} initialGroup={detailScope.groupId} /> : <>
         <SectionHeader variant="page" title={<h2>{detailPerson?.name}</h2>} description={detailPerson?.email} />
-        <Assignments key={detailScope.userId} data={data} scope={detailScope} onAction={manageLearning} onChange={onChange} onOpenGroup={(groupId) => setDetailScope({ groupId })} />
+        <Assignments key={detailScope.userId} data={data} scope={detailScope} onAction={manageLearning} onChange={onChange} onOpenGroup={async (groupId) => { if (await changeAdminTab("groups")) setDetailScope({ groupId }); }} />
       </>}
     </div>
   );
@@ -662,7 +674,7 @@ export default function Admin({
     return true;
   }
   return (
-    <div className="admin-workspace" aria-busy={!!openingTab}>
+    <div className="admin-workspace" aria-busy={!!openingTab || !!openingItem}>
       <h1 className="sr-only">Administration</h1>
       {openingTab && (
         <span className="sr-only" role="status">
@@ -678,6 +690,7 @@ export default function Admin({
         <ResponsiveTabsNavigation
           label="Administration section"
           value={tab}
+          pendingValue={openingTab}
           onValueChange={async (next) => {
             await changeAdminTab(next);
           }}
@@ -700,10 +713,11 @@ export default function Admin({
                   key={item.id}
                   className={tab === item.id ? "selected" : ""}
                 >
-                  <item.icon size={16} />
+                  {openingTab === item.id ? <Spinner /> : <item.icon size={16} />}
                   {item.id === "people" && !production
                     ? "Demo profiles"
                     : item.name}
+                  {openingTab === item.id && <span className="sr-only">Opening…</span>}
                 </TabsTrigger>
               ))}
             </div>
@@ -1285,7 +1299,21 @@ export default function Admin({
                             </Button>
                             <Button
                               variant="link"
-                              onClick={() => { setDetailScope({ userId: u.id }); adminPanel.reveal(); }}
+                              loading={openingItem === u.id}
+                              disabled={!!openingTab || !!openingItem}
+                              onClick={async () => {
+                                setOpeningItem(u.id);
+                                try {
+                                  await onOpenPersonProgress?.(u.id);
+                                  setDetailScope({ userId: u.id });
+                                  setNotice("");
+                                  adminPanel.reveal();
+                                } catch (error) {
+                                  setNotice((error as Error).message);
+                                } finally {
+                                  setOpeningItem(null);
+                                }
+                              }}
                             >
                               Courses & progress
                             </Button>
