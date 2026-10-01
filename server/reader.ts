@@ -23,6 +23,7 @@ import {
 import { guest, guestRecommendations } from "@/lib/guest-recommendations";
 import { orderedDocCategories, type DocLink } from "@/lib/docs-navigation";
 import { publicSettings } from "@/lib/settings";
+import { accountMenuLinks } from "@/lib/external-links";
 import type { Metadata } from "next";
 import { installation } from "./installation";
 import { contentPath } from "@/lib/navigation";
@@ -96,7 +97,10 @@ const readerAccess = cache(async (destination: string) => {
   return { user, config };
 });
 function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
-  return brandingFromSettings(config.settings);
+  return {
+    ...brandingFromSettings(config.settings),
+    externalLinks: accountMenuLinks(config.settings.externalLinks),
+  };
 }
 function readerAccount(
   user: User | null,

@@ -4,13 +4,17 @@ import dynamic from "next/dynamic";
 import type { AdminRuntime } from "@/lib/admin-runtime";
 import type { Workspace } from "@/lib/store";
 import type { User } from "@/lib/types";
-import type { LandingNavigation, NavigationGuard } from "@/lib/navigation-guard";
+import type {
+  LandingNavigation,
+  NavigationGuard,
+} from "@/lib/navigation-guard";
 import { SaveRecoveryError } from "@/lib/save-recovery";
 import { ReportAvailability } from "@/components/patterns/csv-export";
 import { Alert } from "@/components/ui/alert";
 import { useWorkspaceShell } from "@/components/reader/WorkspaceContext";
 import type { ReaderShellContext } from "@/lib/reader-types";
 import { brandingFromSettings } from "@/lib/branding";
+import { accountMenuLinks } from "@/lib/external-links";
 import { mergeSavedContent } from "@/lib/content-save";
 const Admin = dynamic(() => import("@/components/Admin"));
 export function AdminWorkspace({
@@ -53,7 +57,10 @@ export function AdminWorkspace({
           initial.shell.user?.managesTeam ||
           (data.teams || []).some((team) => team.managerId === user.id),
       },
-      branding: brandingFromSettings(data.settings || {}),
+      branding: {
+        ...brandingFromSettings(data.settings || {}),
+        externalLinks: accountMenuLinks(data.settings?.externalLinks),
+      },
       docs: [],
       docCategoryOrder: [],
       docSections: [],

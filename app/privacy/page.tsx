@@ -7,6 +7,7 @@ import { readConfig } from "@server/content";
 import { brandingFromSettings } from "@/lib/branding";
 import { ReaderShell } from "@/components/reader/ReaderShell";
 import { homePath } from "@/lib/navigation";
+import { accountMenuLinks } from "@/lib/external-links";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Privacy policy" };
 export default async function PrivacyPage() {
@@ -36,6 +37,10 @@ export default async function PrivacyPage() {
           name: branding.name,
           accent: settings.accent,
           privacyUrl: branding.privacyUrl,
+          externalLinks:
+            user || settings.access === "public"
+              ? accountMenuLinks(settings.externalLinks)
+              : [],
         },
         docs: [],
         docCategoryOrder: [],

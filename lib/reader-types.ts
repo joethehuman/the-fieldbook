@@ -22,6 +22,7 @@ export type ReaderShellContext = {
     name: string;
     accent: string;
     privacyUrl: string | null;
+    externalLinks?: SiteSettings["externalLinks"];
   };
   docs: DocLink[];
   docCategoryOrder: string[];

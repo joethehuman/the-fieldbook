@@ -16,6 +16,11 @@ import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { CardPaletteSettings } from "./CardPaletteSettings";
+import { ExternalLinksSettings } from "./ExternalLinksSettings";
+import {
+  externalLinkLabelError,
+  externalLinkUrlError,
+} from "@/lib/external-links";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { groupPath } from "@/lib/group-hierarchy";
 import { defaultSettings, privacyHref } from "@/lib/settings";
@@ -23,7 +28,7 @@ import { equalJson } from "@/lib/equal-json";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
 export type SettingsSection =
-  "identity" | "docs" | "courses" | "access" | "privacy" | "mcp";
+  "identity" | "links" | "docs" | "courses" | "access" | "privacy" | "mcp";
 export default function SiteSettingsPanel({
   data,
   onChange,
@@ -75,6 +80,7 @@ export default function SiteSettingsPanel({
     settings.docSections,
   );
   const [nameError, setNameError] = useState("");
+  const [linkErrors, setLinkErrors] = useState(false);
   const saveAction = (
     <ActionGroup>
       {dirty && <span role="status" className="text-caption text-muted-foreground">Unsaved changes</span>}
@@ -88,13 +94,41 @@ export default function SiteSettingsPanel({
       onSubmit={async (e) => {
         e.preventDefault();
         if (busy) return;
+        if (section === "links") {
+          const invalid = settings.externalLinks?.find(
+            (link) =>
+              externalLinkLabelError(link.label) ||
+              externalLinkUrlError(link.url),
+          );
+          if (invalid) {
+            setLinkErrors(true);
+            const field = externalLinkLabelError(invalid.label)
+              ? "label"
+              : "url";
+            document
+              .getElementById(`external-link-${invalid.id}-${field}`)
+              ?.focus();
+            return;
+          }
+        }
         setBusy(true);
         setNotice("");
         try {
           const next =
             section === "docs"
               ? { ...settings, docSections, docCategoryOrder: [] }
-              : settings;
+              : section === "links"
+                ? {
+                    ...settings,
+                    externalLinks: (settings.externalLinks || []).map(
+                      (link) => ({
+                        ...link,
+                        label: link.label.trim(),
+                        url: link.url.trim(),
+                      }),
+                    ),
+                  }
+                : settings;
           await onChange({ ...data, settings: next });
           savedSettings.current = next;
           setSettings(next);
@@ -212,6 +246,25 @@ export default function SiteSettingsPanel({
             </div>
           </FieldGroup>
           <CardPaletteSettings settings={settings} onChange={(cardPalette) => setSettings({ ...settings, cardPalette })} />
+        </SettingsGroup>
+      )}
+      {section === "links" && (
+        <SettingsGroup
+          id="settings-links"
+          tabIndex={-1}
+          disabled={busy}
+          title={<h3>Account menu links</h3>}
+          guidance="The same links are visible to everyone in your workspace, including guests when browsing is public. Save settings to apply changes."
+          actions={saveAction}
+        >
+          <ExternalLinksSettings
+            links={settings.externalLinks || []}
+            disabled={busy}
+            showErrors={linkErrors}
+            onChange={(externalLinks) =>
+              setSettings({ ...settings, externalLinks })
+            }
+          />
         </SettingsGroup>
       )}
       {section === "docs" && (

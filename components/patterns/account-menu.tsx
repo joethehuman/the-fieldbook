@@ -9,6 +9,7 @@ import {
 import Link from "next/link";
 import {
   ArrowLeftRight,
+  ArrowUpRight,
   BookOpen,
   GraduationCap,
   Info,
@@ -24,10 +25,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
 import { GeneralFeedbackDialog } from "./general-feedback-dialog";
+import { accountMenuLinks, type ExternalLink } from "@/lib/external-links";
 
 export function AccountMenu({
   initials,
@@ -44,6 +48,7 @@ export function AccountMenu({
   onSignIn,
   onSwitchDemoProfile,
   privacyHref,
+  externalLinks,
   onPrivacyOpen,
   onAboutDemo,
   onFeedback,
@@ -64,6 +69,7 @@ export function AccountMenu({
   onSignIn?: () => void;
   onSwitchDemoProfile?: () => void;
   privacyHref?: string | null;
+  externalLinks?: ExternalLink[];
   onPrivacyOpen?: MouseEventHandler<HTMLAnchorElement>;
   onAboutDemo?: (trigger: RefObject<HTMLButtonElement | null>) => void;
   onFeedback: (rating: "up" | "down", comment: string) => Promise<void>;
@@ -73,6 +79,7 @@ export function AccountMenu({
   const trigger = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const links = accountMenuLinks(externalLinks);
   return (
     <div className="@container">
       <div
@@ -195,6 +202,30 @@ export function AccountMenu({
                 About this demo{" "}
                 <Info className="ml-auto size-4" aria-hidden="true" />
               </DropdownMenuItem>
+            )}
+            {links.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuGroup aria-label="Links">
+                  <DropdownMenuLabel>Links</DropdownMenuLabel>
+                  {links.map((link) => (
+                    <DropdownMenuItem key={link.id} asChild>
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <span className="min-w-0">{link.label}</span>
+                        <ArrowUpRight
+                          className="ml-auto size-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span className="sr-only"> (opens in a new tab)</span>
+                      </a>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuGroup>
+              </>
             )}
             {(onSignOut || onSignIn) && <DropdownMenuSeparator />}
             {onSignOut && (

@@ -483,6 +483,7 @@ export default function Fieldbook() {
               }
               onSwitchDemoProfile={logout}
               privacyHref={policyHref}
+              externalLinks={branding.externalLinks}
               onPrivacyOpen={(event) => {
                 if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
                 event.preventDefault();
