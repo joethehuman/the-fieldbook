@@ -1,7 +1,6 @@
 import "server-only";
 import type { User } from "@/lib/types";
 import {
-  contentDate,
   makeResult,
   searchWords,
   type SearchFilter,
@@ -10,7 +9,7 @@ import {
 } from "@/lib/search";
 import { canRead } from "./content";
 import { HttpError } from "./auth";
-import { db, check } from "./db";
+import { data as dataStore } from "./data";
 export async function retrievePublished(
   query: string,
   filter: string,
@@ -26,24 +25,7 @@ export async function retrievePublished(
   )
     throw new HttpError(400, "Use up to 160 characters and 12 words.");
   if (!searchWords(query).length) return [];
-  const { data, error } = await db().rpc("fb_search", {
-    p_query: query,
-    p_kind: filter,
-    p_limit: 31,
-  });
-  check(error);
-  return (data || []).map((r: any) => ({
-    contentId: r.content_id,
-    passageId: r.passage_id,
-    kind: r.kind,
-    title: r.title,
-    lessonId: r.lesson_id,
-    lessonTitle: r.lesson_title,
-    text: r.source_text,
-    matchedTerms: r.matched_terms,
-    publishedRevision: r.published_revision,
-    contentDate: contentDate(r.content_date),
-  }));
+  return dataStore().searchPublished(query, filter);
 }
 export async function searchPublished(
   query: string,

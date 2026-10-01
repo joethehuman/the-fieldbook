@@ -4,7 +4,7 @@ import { ReaderFeedback } from "@/components/reader/ReaderFeedback";
 import { DocsEmpty } from "@/components/patterns/docs-empty";
 import { orderedDocs } from "@/lib/docs-navigation";
 import { readerContext, readerItem, readerMetadata } from "@server/reader";
-import { siteOrigins } from "@server/env";
+import { siteOrigins } from "@server/installation";
 export async function generateMetadata() {
   const context = await readerContext("/docs");
   const first = orderedDocs(

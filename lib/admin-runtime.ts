@@ -1,4 +1,3 @@
-import { createBrowserClient } from "@supabase/ssr";
 import { request, createWorkspaceSaver, RequestError } from "./workspace-save";
 import type { UploadMedia } from "@/components/MarkdownEditor";
 import type { BulkRequest, BulkResult } from "./bulk-actions";
@@ -32,18 +31,17 @@ async function upload(file: File) {
     size: file.size,
     type: file.type,
   });
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-  );
-  const { error } = await supabase.storage
-    .from("fieldbook-media")
-    .uploadToSignedUrl(sign.path, sign.token, file, {
-      contentType: file.type,
-      upsert: false,
+  try {
+    const response = await fetch(sign.upload.url, {
+      method: sign.upload.method,
+      headers: sign.upload.headers,
+      body: file,
+      credentials: "omit",
     });
-  if (error)
+    if (!response.ok) throw new Error("Upload rejected");
+  } catch {
     throw new Error("Upload failed. Check the file size and your connection.");
+  }
   return (await request("/api/upload", { complete: sign.id })).url;
 }
 export function createAdminRuntime(initial: {

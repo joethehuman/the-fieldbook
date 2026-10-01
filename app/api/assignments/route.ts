@@ -6,7 +6,7 @@ import {
   HttpError,
   errorResponse,
 } from "@server/auth";
-import { db } from "@server/db";
+import { data as dataStore } from "@server/data";
 const schema = z
   .object({
     operation: z.enum([
@@ -56,15 +56,10 @@ export async function POST(req: Request) {
         400,
         parsed.error.issues.map((i) => i.message).join(" "),
       );
-    const { data, error } = await db().rpc("fb_manage_learning", {
-      p_actor: user.id,
-      p_data: { ...parsed.data, due: { type: "none" } },
+    const data = await dataStore().manageLearning(user.id, {
+      ...parsed.data,
+      due: { type: "none" },
     });
-    if (error)
-      throw new HttpError(
-        error.message.includes("changed") ? 409 : 400,
-        error.message,
-      );
     return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return errorResponse(e, "api/assignments");

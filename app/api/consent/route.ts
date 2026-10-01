@@ -1,22 +1,25 @@
 import {
   actor,
-  authClient,
   requireAdmin,
   sameOrigin,
   errorResponse,
   HttpError,
 } from "@server/auth";
-import { db, check } from "@server/db";
-import { env } from "@server/env";
+import {
+  authorizationDetails,
+  enableConnectionGrant,
+  setMcpResource,
+  decideAuthorization,
+} from "@server/identity";
+import { installation } from "@server/installation";
 export async function GET(req: Request) {
   try {
     const user = await actor();
     requireAdmin(user);
     const id = new URL(req.url).searchParams.get("id");
     if (!id) throw new HttpError(400, "Authorization ID is missing.");
-    const client = await authClient(),
-      { data, error } = await client.auth.oauth.getAuthorizationDetails(id);
-    if (error)
+    const data = await authorizationDetails(id);
+    if (!data)
       throw new HttpError(
         400,
         "This authorization request expired. Reconnect from your AI client.",
@@ -31,45 +34,28 @@ export async function POST(req: Request) {
     sameOrigin(req);
     const user = await actor();
     requireAdmin(user);
-    const { id, allow } = await req.json(),
-      client = await authClient();
+    const { id, allow } = await req.json();
     if (typeof id !== "string")
       throw new HttpError(400, "Invalid authorization request.");
-    const { data: details, error } =
-      await client.auth.oauth.getAuthorizationDetails(id);
-    if (error || !details)
+    const details = await authorizationDetails(id);
+    if (!details)
       throw new HttpError(400, "This authorization request expired.");
     if ("redirect_url" in details) return Response.json(details);
     if (allow === true) {
-      const { error: e } = await db()
-        .from("fb_mcp_grants")
-        .upsert({
-          user_id: user.id,
-          client_id: details.client.id,
-          client_name: details.client.name,
-          enabled: true,
-          granted_at: new Date().toISOString(),
-        });
-      check(e);
-      const { error: configError } = await db()
-        .from("fb_oauth_config")
-        .upsert({ id: true, resource: `${env().origin}/api/mcp` });
-      check(configError);
+      await enableConnectionGrant(
+        user.id,
+        details.client.id,
+        details.client.name,
+      );
+      await setMcpResource(`${installation().origin}/api/mcp`);
     }
-    const result =
-      allow === true
-        ? await client.auth.oauth.approveAuthorization(id, {
-            skipBrowserRedirect: true,
-          })
-        : await client.auth.oauth.denyAuthorization(id, {
-            skipBrowserRedirect: true,
-          });
-    if (result.error)
+    const result = await decideAuthorization(id, allow === true);
+    if (!result)
       throw new HttpError(
         400,
         "The authorization request could not be completed.",
       );
-    return Response.json(result.data);
+    return Response.json(result);
   } catch (e) {
     return errorResponse(e, "api/consent");
   }

@@ -752,22 +752,19 @@ test("shared settings library and connection states work in the server app", asy
   ).toHaveAccessibleDescription(
     "Provide an email address, an HTTPS contact page, or both.",
   );
-  const bold = page.getByRole("button", { name: "Bold", exact: true });
-  const heading = page.getByRole("combobox", { name: "Heading level" });
-  await heading.scrollIntoViewIfNeeded();
-  // Let native scroll notifications finish before opening a focus tooltip:
-  // Radix intentionally dismisses tooltips when an ancestor scrolls.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-  await heading.focus();
-  await page.keyboard.press("Tab");
-  await expect(bold).toBeFocused();
-  await expect(page.getByRole("tooltip")).toHaveText("Bold");
+  const commands = page.getByRole("button", { name: /^Commands:/ });
+  await commands.scrollIntoViewIfNeeded();
+  await commands.focus();
+  await expect(commands).toBeFocused();
+  await page.keyboard.press("Enter");
+  const menu = page.getByRole("menu", { name: /^Insert content/ });
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(menu.getByRole("menuitem", { name: "Heading 1", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(commands).toBeFocused();
   await bounds(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({

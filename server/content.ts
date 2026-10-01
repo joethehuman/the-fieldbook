@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import type { Content, User } from "@/lib/types";
-import { db, check } from "./db";
+import { data as dataStore } from "./data";
 import { requireAdmin, HttpError } from "./auth";
 import { contentSignature } from "@/lib/demo-publication";
 import { contentDraftSchema, contentSchema } from "./schemas";
@@ -42,9 +42,7 @@ export function document(row: any, draft = false): Content {
   };
 }
 export const readConfig = cache(async () => {
-  const { data, error } = await db().from("fb_config").select("*").single();
-  check(error);
-  return data;
+  return dataStore().readConfiguration();
 });
 export function assertCanRead(
   user: User | null,
@@ -61,12 +59,7 @@ export const canRead = cache(async (user: User | null) => {
 export async function getContent(id: string, user: User | null, draft = false) {
   await canRead(user);
   if (draft) requireAdmin(user);
-  const { data, error } = await db()
-    .from("fb_documents")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  check(error);
+  const data = await dataStore().findDocument(id);
   if (!data || data.deleted_at || (!draft && !data.published))
     throw new HttpError(404, "Content not found.");
   const c = document(data, draft);
@@ -95,12 +88,7 @@ export async function saveContent(
   if (c.kind === "doc") {
     const conflict = legacySectionConflict([c]);
     if (conflict) throw new HttpError(400, conflict);
-    const { data: config, error: settingsError } = await db()
-      .from("fb_config")
-      .select("settings")
-      .eq("id", true)
-      .single();
-    check(settingsError);
+    const config = await dataStore().readSettings();
     if (!config)
       throw new HttpError(503, "Settings are unavailable. Try again.");
     if (c.sectionId) {
@@ -140,12 +128,7 @@ export async function saveContent(
       400,
       "Assigned courses use learning groups and organization windows.",
     );
-  const { data: old, error } = await db()
-    .from("fb_documents")
-    .select("*")
-    .eq("id", c.id)
-    .maybeSingle();
-  check(error);
+  const old = await dataStore().findDocument(c.id);
   if (old?.deleted_at)
     throw new HttpError(400, "Restore this item before editing it.");
   if (c.kind === "course" && c.requirePassing === undefined && !old?.published)
@@ -218,12 +201,7 @@ export async function saveContent(
     ),
   ].map((m) => m[1]);
   if (mediaIds.length) {
-    const { data: media, error: mediaError } = await db()
-      .from("fb_media")
-      .select("id,mime")
-      .in("id", mediaIds)
-      .eq("ready", true);
-    check(mediaError);
+    const media = await dataStore().findReadyMedia(mediaIds);
     if (new Set(media?.map((m) => m.id)).size !== new Set(mediaIds).size)
       throw new HttpError(400, "One or more media uploads are not ready.");
     for (const imageUrl of [c.coverImageUrl, c.cardArt?.imageUrl].filter(
@@ -251,31 +229,25 @@ export async function saveContent(
   const { revision, publishedRevision, ...clean } = c;
   const draft = {
     ...clean,
-    status: publish ? "published" : "draft",
+    status: publish ? ("published" as const) : ("draft" as const),
     createdAt: old?.draft.createdAt || now,
     updatedAt: now,
     ...(c.kind === "brief"
       ? {
           feedAt: artOnlyUpdate
-            ? old.published.feedAt || old.published.updatedAt
+            ? old.published!.feedAt || old.published!.updatedAt
             : now,
         }
       : {}),
   };
-  const { data: saved, error: saveError } = await db().rpc("fb_save_document", {
-    p_id: c.id,
-    p_expected: expected,
-    p_draft: draft,
-    p_publish: publish,
-    p_unpublish: unpublish,
-    p_actor: user.id,
-    p_source: source,
+  const saved = await dataStore().saveDocument({
+    id: c.id,
+    expected,
+    draft,
+    publish,
+    unpublish,
+    actorId: user.id,
+    source,
   });
-  if (saveError?.code === "P0001")
-    throw new HttpError(
-      saveError.message.includes("Revision conflict") ? 409 : 400,
-      saveError.message,
-    );
-  check(saveError);
   return document(saved, true);
 }

@@ -1,10 +1,6 @@
-import {
-  actor,
-  sameOrigin,
-  errorResponse,
-  HttpError,
-} from "@server/auth";
-import { db, check } from "@server/db";
+import { actor, sameOrigin, errorResponse, HttpError } from "@server/auth";
+import { data as dataStore } from "@server/data";
+import { clientAddress } from "@server/deployment";
 import { canRead, getContent } from "@server/content";
 import { createHash, randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
@@ -23,16 +19,11 @@ export async function GET(req: NextRequest) {
     const id = z.uuid().parse(new URL(req.url).searchParams.get("contentId"));
     await getContent(id, user);
     const token = user ? null : guestToken(req);
-    const query = db()
-      .from("fb_feedback")
-      .select("rating,comment")
-      .eq("content_id", id);
-    const { data, error } = user
-      ? await query.eq("user_id", user.id).maybeSingle()
+    const data = user
+      ? await dataStore().readSavedFeedback(id, { userId: user.id })
       : token
-        ? await query.eq("guest_key", hash(token)).maybeSingle()
-        : { data: null, error: null };
-    check(error);
+        ? await dataStore().readSavedFeedback(id, { guestKey: hash(token) })
+        : null;
     return Response.json(
       { saved: data || null },
       { headers: { "Cache-Control": "private, no-store", Vary: "Cookie" } },
@@ -57,15 +48,12 @@ export async function POST(req: NextRequest) {
       ? null
       : existingToken || randomBytes(32).toString("hex");
     if (token) {
-      const source =
-        req.headers.get("x-vercel-forwarded-for")?.split(",")[0]?.trim() ||
-        token;
-      const { data: allowed, error } = await db().rpc("fb_allow_request", {
-        p_key: `guest-feedback:${hash(source)}`,
-        p_limit: 30,
-        p_seconds: 3600,
-      });
-      check(error);
+      const source = clientAddress(req) || token;
+      const allowed = await dataStore().consumeRateLimit(
+        `guest-feedback:${hash(source)}`,
+        30,
+        3600,
+      );
       if (!allowed)
         throw new HttpError(429, "Please wait before sending more feedback.");
     }
@@ -79,32 +67,10 @@ export async function POST(req: NextRequest) {
       comment: a.comment,
       updated_at: new Date().toISOString(),
     };
-    const { error } = !c
-      ? await db()
-          .from("fb_feedback")
-          .insert({
-            ...record,
-            user_id: user?.id ?? null,
-            guest_key: token ? hash(token) : null,
-          })
-      : user
-        ? await db()
-            .from("fb_feedback")
-            .upsert(
-              { ...record, user_id: user.id },
-              {
-                onConflict: "user_id,content_id",
-              },
-            )
-        : await db()
-            .from("fb_feedback")
-            .upsert(
-              { ...record, user_id: null, guest_key: hash(token!) },
-              {
-                onConflict: "guest_key,content_id",
-              },
-            );
-    check(error);
+    await dataStore().saveFeedback(
+      record,
+      user ? { userId: user.id } : { guestKey: hash(token!) },
+    );
     const response = NextResponse.json(
       { saved: true },
       { headers: { "Cache-Control": "no-store" } },

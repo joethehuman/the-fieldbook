@@ -126,14 +126,21 @@ async function setup(
       return route.fulfill({
         json: {
           id: "00000000-0000-4000-8000-000000000010",
-          path: "synthetic/image.png",
-          token: "synthetic",
+          upload: {
+            url: "https://test.supabase.co/storage/v1/object/upload/sign/fieldbook-media/synthetic/image.png?token=synthetic",
+            method: "PUT",
+            headers: { "Content-Type": control.mediaType, "x-upsert": "false" },
+          },
         },
       });
     });
-    await page.route("https://test.supabase.co/**", (route) =>
-      route.fulfill({ json: { Key: "synthetic/image.png" } }),
-    );
+    await page.route("https://test.supabase.co/**", (route) => {
+      expect(route.request().method()).toBe("PUT");
+      expect(route.request().headers()["content-type"]).toBe(control.mediaType);
+      expect(route.request().headers()["x-upsert"]).toBe("false");
+      expect(route.request().postDataBuffer()?.length).toBeGreaterThan(0);
+      return route.fulfill({ json: { Key: "synthetic/image.png" } });
+    });
   } else {
     await page.addInitScript((data) => {
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));

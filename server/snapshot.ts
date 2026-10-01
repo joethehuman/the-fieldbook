@@ -1,7 +1,6 @@
 import "server-only";
 import { publicSettings } from "@/lib/settings";
-import { db, check } from "./db";
-import { readAll } from "./read-all";
+import { data as dataStore } from "./data";
 import { profile } from "./auth";
 import { canRead, document, redact } from "./content";
 import type { User } from "@/lib/types";
@@ -17,11 +16,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
     feedback: NonNullable<Workspace["feedback"]> = [],
     governance: any = { groups: [], teams: [], pending: [] };
   if (user) {
-    const result = await db().rpc("fb_governance_snapshot", {
-      p_actor: user.id,
-    });
-    check(result.error);
-    governance = result.data;
+    governance = await dataStore().readGovernanceSnapshot(user.id);
     if (!governance.users.some((u: any) => u.id === user.id))
       throw new Error("Account access changed. Reload and sign in again.");
     users = governance.users.map(profile);
@@ -35,11 +30,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
         attempts: p.attempts,
         revision: p.revision,
       });
-    const ratings = await readAll((from, to) => {
-      let query = db().from("fb_feedback").select("*", { count: "exact" });
-      if (!admin) query = query.eq("user_id", user.id);
-      return query.order("id").range(from, to);
-    });
+    const ratings = await dataStore().listFeedback(admin ? undefined : user.id);
     feedback = ratings.map((r) => ({
       id: r.id,
       userId: r.user_id || "guest",
@@ -50,20 +41,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
       updatedAt: r.updated_at,
     }));
   }
-  const documents = await readAll((from, to) => {
-    const query = admin
-      ? db()
-          .from("fb_documents")
-          .select("*", { count: "exact" })
-          .is("deleted_at", null)
-      : db()
-          .from("fb_documents")
-          .select("id,published,revision,published_revision,updated_at", {
-            count: "exact",
-          })
-          .not("published", "is", null);
-    return query.order("id").range(from, to);
-  });
+  const documents = await dataStore().listWorkspaceDocuments(admin);
   // Keep catalog presentation order, with a deterministic tie-breaker.
   documents.sort(
     (a, b) =>

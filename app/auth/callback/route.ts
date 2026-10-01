@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
-import { authClient, actor, HttpError } from "@server/auth";
-import { env } from "@server/env";
+import { actor, HttpError } from "@server/auth";
+import { exchangeSignInCode, signOutIdentity } from "@server/identity";
+import { installation } from "@server/installation";
 import { safeNext } from "@server/redirect";
 import { SIGN_IN_RETURN_COOKIE } from "@server/sign-in";
 import { signInFailure } from "@server/sign-in-failure";
@@ -13,28 +14,15 @@ export async function GET(req: Request) {
   );
   let origin = url.origin;
   try {
-    origin = env().origin;
-    const client = await authClient();
+    origin = installation().origin;
     const code = url.searchParams.get("code");
     if (!code) return signInFailure(origin, next);
-    const { error } = await client.auth.exchangeCodeForSession(code);
-    if (error) {
-      if (
-        [
-          "flow_state_not_found",
-          "flow_state_expired",
-          "bad_code_verifier",
-        ].includes(error.code || "")
-      )
-        return signInFailure(origin, next);
-      throw error;
-    }
+    if (!(await exchangeSignInCode(code))) return signInFailure(origin, next);
     try {
       const user = await actor();
       if (!user) return signInFailure(origin, next);
     } catch (e) {
-      if (e instanceof HttpError && e.status === 403)
-        await client.auth.signOut();
+      if (e instanceof HttpError && e.status === 403) await signOutIdentity();
       throw e;
     }
     jar.delete(SIGN_IN_RETURN_COOKIE);
