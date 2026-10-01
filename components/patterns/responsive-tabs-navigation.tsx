@@ -24,7 +24,7 @@ export function ResponsiveTabsNavigation({
     <div data-slot="admin-navigation" className="min-w-0">
       <Field className="@min-[48rem]/workspace:hidden">
         {label}
-        <SelectField value={value} onValueChange={onValueChange}>
+        <SelectField value={value} displayValue={options.find((option) => option.id === value)?.name} onValueChange={onValueChange}>
           {options.map((option) => (
             <option key={option.id} value={option.id}>
               {option.name}

@@ -118,7 +118,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
     if (request.url().includes("/api/workspace")) workspaceReads++;
   });
   await page.goto("/admin");
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   await page.evaluate(() => {
     (window as any).shellReferences = [
       document.querySelector(".app"),
@@ -158,7 +158,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
     page.locator('.sidebar a[href="/docs/' + docId + '"]'),
   ).toHaveCount(1);
   await account(page, "Manage organization");
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   expect(
     await page.evaluate(() => {
       const current = [
@@ -193,7 +193,7 @@ test("Admin, Team and reader keep one frame, search controller and account with 
   expect((await page.request.get("/admin")).status()).toBe(404);
 });
 
-test("approved cold navigation shows pending while preserving the old body and modified anchors remain native", async ({
+test("approved cold navigation retains content without a global indicator while preserving the old body and modified anchors remain native", async ({
   page,
 }) => {
   let release!: () => void;
@@ -205,7 +205,7 @@ test("approved cold navigation shows pending while preserving the old body and m
     await route.continue();
   });
   await page.goto("/admin");
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   await openNavigation(page);
   const docs = page.getByRole("link", { name: "Docs", exact: true }).first();
   expect(
@@ -223,8 +223,8 @@ test("approved cold navigation shows pending while preserving the old body and m
   await page.getByRole("link", { name: "Updates", exact: true }).click();
   await expect(
     page.getByRole("status", { name: "Opening page", exact: true }),
-  ).toBeVisible();
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  ).toHaveCount(0);
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   release();
   await expect(page).toHaveURL(/\/updates$/);
   await expect(
@@ -232,7 +232,7 @@ test("approved cold navigation shows pending while preserving the old body and m
   ).toHaveCount(0);
 });
 
-test("dirty Admin navigation and search results require approval before pending or editor removal", async ({
+test("dirty Admin navigation and search results require approval before editor removal", async ({
   page,
 }) => {
   await page.goto("/admin");
@@ -410,7 +410,7 @@ test("dirty Identity settings protect Back and allow Forward to return to a clea
 }) => {
   await page.goto("/docs");
   await account(page, "Manage organization");
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
@@ -432,7 +432,7 @@ test("dirty Identity settings protect Back and allow Forward to return to a clea
   await expect(page).toHaveURL(/\/docs$/);
   await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/admin$/);
@@ -441,7 +441,7 @@ test("dirty Identity settings protect Back and allow Forward to return to a clea
 });
 
 async function adminSection(page: Page, name: string) {
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
     exact: true,
@@ -483,7 +483,7 @@ test("approved dirty link removes its sentinel before Back twice and Forward", a
   await expect(page).toHaveURL(/\/docs$/);
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/docs$/);
@@ -575,7 +575,7 @@ test("failed logout preserves the signed-in page and offers a retry", async ({
   page,
 }) => {
   await page.goto("/admin");
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   await page.route("**/auth/logout", (route) =>
     route.fulfill({ status: 503, json: { error: "Unavailable" } }),
   );
@@ -586,7 +586,7 @@ test("failed logout preserves the signed-in page and offers a retry", async ({
       .filter({ hasText: "Could not sign out. Try again." }),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
 });
 
 test("saved settings keep a single Admin stop through Back and repeated Forward", async ({
@@ -624,7 +624,7 @@ test("saved settings keep a single Admin stop through Back and repeated Forward"
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/admin$/);
   await page.evaluate(() => history.back());
@@ -640,7 +640,7 @@ test("installed tablet keeps the frame and settled Admin and reader geometry", a
   );
   await page.setViewportSize({ width: 1024, height: 900 });
   await page.goto("/admin");
-  await expect(page.locator(".admin-layout")).toBeVisible();
+  await expect(page.locator(".admin-layout:visible")).toBeVisible();
   await expect(
     page.getByRole("columnheader", { name: "Content", exact: true }),
   ).toBeVisible();
@@ -655,7 +655,7 @@ test("installed tablet keeps the frame and settled Admin and reader geometry", a
   });
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   await expect(
-    page.getByRole("combobox", { name: "Block type", exact: true }),
+    page.getByRole("button", { name: /Commands: insert blocks or format selected text/ }),
   ).toBeVisible();
   await page.screenshot({
     path: info.outputPath("installed-tablet-editor.png"),

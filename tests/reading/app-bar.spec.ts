@@ -126,6 +126,13 @@ for (const app of ["demo", "production"]) {
 test("demo opens on profile choice before the first selection", async ({
   page,
 }) => {
+  await page.addInitScript(() => {
+    (window as any).globalLoadingFlashes = [];
+    new MutationObserver(() => {
+      if (document.querySelector(".app-bar-progress, .loading-bar, .navigation-pending") || document.body?.innerText.includes("Just a sec"))
+        (window as any).globalLoadingFlashes.push(true);
+    }).observe(document, { childList: true, subtree: true, attributes: true });
+  });
   await page.goto("http://localhost:3132/");
   await expect(
     page.getByRole("heading", { name: "Choose a demo profile" }),
@@ -149,6 +156,7 @@ test("demo opens on profile choice before the first selection", async ({
   await expect(
     page.getByRole("menuitem", { name: "About this demo" }),
   ).toBeVisible();
+  expect(await page.evaluate(() => (window as any).globalLoadingFlashes)).toEqual([]);
 });
 
 test("demo account menu opens its published privacy policy", async ({ page }) => {

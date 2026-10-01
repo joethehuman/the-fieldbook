@@ -4,10 +4,8 @@ import { useLayoutEffect, useRef, type ReactNode } from "react";
 /** Remains in flow; only its measured height is shared with scroll destinations. */
 export function AppBar({
   children,
-  pending = false,
 }: {
   children: ReactNode;
-  pending?: boolean;
 }) {
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
@@ -30,15 +28,6 @@ export function AppBar({
   return (
     <header ref={ref} className="topbar">
       {children}
-      {pending && (
-        <div
-          className="app-bar-progress"
-          role="status"
-          aria-label="Opening page"
-        >
-          <span aria-hidden="true" />
-        </div>
-      )}
     </header>
   );
 }

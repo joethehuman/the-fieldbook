@@ -10,6 +10,7 @@ import {
 } from "react";
 import Link from "next/link";
 import type { NavigationGuard } from "@/lib/navigation-guard";
+import type { ContentNavigation } from "@/lib/navigation-guard";
 import { useNavigationHistory } from "./use-navigation-history";
 import { WorkspaceContext } from "./WorkspaceContext";
 import { usePathname, useRouter } from "next/navigation";
@@ -47,6 +48,10 @@ export function ReaderShell({
   const [accountError, setAccountError] = useState<string | null>(null);
   const [context, updateContext] = useState(initialContext);
   const guard = useRef<NavigationGuard | null>(null);
+  const contentNavigation = useRef<ContentNavigation | null>(null);
+  const registerContentNavigation = useCallback((next: ContentNavigation | null) => {
+    contentNavigation.current = next;
+  }, []);
   const checking = useRef(false);
   const [protectedState, setProtectedState] = useState(false);
   const registerNavigationGuard = useCallback(
@@ -57,8 +62,8 @@ export function ReaderShell({
     [],
   );
   const shell = useMemo(
-    () => ({ updateContext, registerNavigationGuard }),
-    [registerNavigationGuard],
+    () => ({ updateContext, registerNavigationGuard, registerContentNavigation }),
+    [registerNavigationGuard, registerContentNavigation],
   );
   async function canLeave() {
     if (checking.current) return false;
@@ -157,6 +162,14 @@ export function ReaderShell({
     { href: "/docs", title: "Docs", icon: BookOpen },
   ];
   async function navigate(href: string) {
+    if (href === "/admin" && pathname === "/admin") {
+      if (await (contentNavigation.current?.() ?? true)) close();
+      return;
+    }
+    if (href === window.location.pathname + window.location.search + window.location.hash) {
+      close();
+      return;
+    }
     const previousFocus = document.activeElement;
     if (!(await canLeave())) {
       if (previousFocus && !previousFocus.isConnected) {
@@ -198,7 +211,6 @@ export function ReaderShell({
         accent={context.branding.accent}
         collapsed={collapsed}
         menu={menu}
-        pending={navigationPending}
         admin={section === "admin"}
         alert={
           accountError && (
@@ -329,11 +341,11 @@ export function ReaderShell({
                     : undefined
                 }
                 onMenuOpen={() => {
-                  if (context.user?.role === "admin") router.prefetch("/admin");
+                  if (context.user?.role === "admin" && section !== "admin") router.prefetch("/admin");
                   else if (context.user?.role === "manager")
                     router.prefetch("/team");
                 }}
-                onManageOrganizationIntent={() => router.prefetch("/admin")}
+                onManageOrganizationIntent={() => { if (section !== "admin") router.prefetch("/admin"); }}
                 onTeamProgressIntent={() => router.prefetch("/team")}
                 onSignOut={context.user ? signOut : undefined}
                 privacyHref={

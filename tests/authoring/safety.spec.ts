@@ -598,6 +598,8 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
   });
   await openCourseOutline(page);
   await page.getByRole("button", { name: "Add lesson" }).click();
+  // The builder scrolls the outgoing lesson before selecting the new canvas.
+  await expect(page.getByLabel("Lesson title", { exact: true })).toHaveValue("");
   await page.getByLabel("Lesson title").fill("Second lesson");
   await expect(page.getByLabel("Lesson title", { exact: true })).toHaveValue("Second lesson");
   const writing = page.getByRole("textbox", { name: "Lesson content" });

@@ -2,10 +2,12 @@
 import { createContext, useContext, useLayoutEffect } from "react";
 import type { ReaderShellContext } from "@/lib/reader-types";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
+import type { RegisterContentNavigation } from "@/lib/navigation-guard";
 
 export const WorkspaceContext = createContext<{
   updateContext: (context: ReaderShellContext) => void;
   registerNavigationGuard: RegisterNavigationGuard;
+  registerContentNavigation: RegisterContentNavigation;
 } | null>(null);
 export function useWorkspaceShell() {
   const context = useContext(WorkspaceContext);
