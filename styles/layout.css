@@ -151,6 +151,7 @@
   }
   .main-content {
     --workspace-inset-block: var(--space-8);
+    --workspace-inset-inline: var(--space-6);
     container: workspace / inline-size;
     display: grid;
     flex: 1 1 auto;
@@ -159,10 +160,9 @@
     min-width: 0;
     min-height: 0;
     width: 100%;
-    max-width: var(--page-width);
     gap: var(--space-8);
-    margin-inline: auto;
-    padding: var(--space-8) var(--space-6);
+    padding-block: var(--workspace-inset-block);
+    padding-inline: max(var(--workspace-inset-inline), calc((100% - var(--page-width)) / 2 + var(--workspace-inset-inline)));
     overflow-y: auto;
     overscroll-behavior: none;
     scroll-padding-block-start: var(--anchor-offset);
@@ -860,7 +860,7 @@
     }
     .main-content {
       --workspace-inset-block: var(--space-6);
-      padding: var(--space-6) var(--space-4);
+      --workspace-inset-inline: var(--space-4);
     }
     .topbar {
       padding-inline: var(--space-4);
@@ -948,9 +948,11 @@
 
 @layer components {
   .course-player .lesson-layout { grid-template-columns: minmax(15rem, 1fr) minmax(0, 2fr); gap: var(--space-8); }
-  .course-sidebar { position: sticky; top: var(--anchor-offset); min-width: 0; align-self: start; }
-  .course-sidebar-panel { display: flex; flex-direction: column; gap: var(--space-4); max-height: calc(100dvh - var(--anchor-offset) - var(--space-6)); min-height: 0; overflow: hidden; }
-  .course-sidebar .lesson-nav { position: static; min-height: 0; overflow-y: auto; overscroll-behavior: contain; align-content: start; flex: 0 1 auto; border-top: 1px solid var(--border); padding-top: var(--space-4); padding-right: var(--space-2); }
+  /* The main scroller's block padding already supplies the sticky top inset. */
+  .course-sidebar { position: sticky; top: 0; min-width: 0; align-self: start; }
+  /* Before measurement (including without JS), the card retains natural height. */
+  .course-sidebar-panel { display: flex; flex-direction: column; gap: var(--space-4); max-height: max(calc(var(--course-sidebar-chrome-height) + var(--course-outline-min-height)), calc(100dvh - var(--app-bar-height, 4rem) - 2 * var(--workspace-inset-block))); min-height: 0; overflow: hidden; }
+  .course-sidebar .lesson-nav { position: static; flex: 0 1 auto; min-height: var(--course-outline-min-height); overflow-y: auto; overscroll-behavior: contain; align-content: start; border-top: 1px solid var(--border); padding-block: var(--space-4) var(--space-1); padding-right: var(--space-2); }
   .course-sidebar .lesson-nav h2 { font-size: 1rem; font-weight: 600; margin-block: var(--space-2); }
   .course-sidebar .lesson-nav [data-slot="navigation-button"] { text-align: left; align-items: center; }
   .course-sidebar-exit { display: flex; flex: none; border-top: 1px solid var(--border); padding-top: var(--space-3); }
@@ -968,11 +970,10 @@
   .course-about-minus, .course-about details[open] .course-about-plus { display: none; }
   .course-about details[open] .course-about-minus { display: block; }
   .course-about-content { display: grid; gap: var(--space-4); padding-top: var(--space-3); }
-  .course-reader { display: grid; align-content: start; width: min(100%, var(--reading-width)); min-width: 0; min-height: 100dvh; gap: var(--space-4); }
+  .course-reader { display: grid; align-content: start; width: min(100%, var(--reading-width)); min-width: 0; min-height: 0; gap: var(--space-4); }
   .course-lesson, .course-quiz, .course-finish-card { min-width: 0; padding-top: var(--space-6); }
   .course-lesson, .course-quiz, .course-finish-card { scroll-margin-block-start: var(--anchor-offset); }
-  .course-continue { display: flex; justify-content: flex-end; border-top: 1px solid var(--border); margin-top: var(--space-12); padding-top: var(--space-4); }
-  .course-continue [data-slot="button"] { max-width: 100%; text-align: right; }
+  .course-continue.reading-pagination { margin-top: var(--space-12); padding-top: var(--space-4); }
   .course-video { display: grid; gap: var(--space-3); min-width: 0; position: relative; }
   .course-video-loading { position: absolute; z-index: 1; top: var(--space-4); left: var(--space-4); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--background); color: var(--foreground); font-size: .875rem; pointer-events: none; }
   .course-video video, .course-video iframe { display: block; width: 100%; max-height: 70dvh; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius); background: var(--foreground); }
@@ -983,15 +984,13 @@
   .course-video-speed [data-slot="select-trigger"] { min-width: 5rem; }
   .course-image-open { display: inline-block; max-width: 100%; cursor: zoom-in; border-radius: var(--radius-control); outline-offset: 3px; }
   .course-image-open:focus-visible { outline: 2px solid var(--ring); }
-  .course-image-dialog { max-width: min(92vw, 90rem); }
-  .course-image-dialog img { max-width: 100%; max-height: 80dvh; object-fit: contain; justify-self: center; }
   .course-builder-steps { display: grid; gap: var(--space-1); min-width: 0; }
   .course-builder-panel { display: grid; align-content: start; gap: var(--space-4); min-width: 0; min-height: max(0px, calc(var(--editor-viewport-height, 0px) - var(--editor-header-height, 0px) - var(--editor-controls-height, 3rem) - var(--space-4))); }
   @media (width < 70rem) {
     .course-player .lesson-layout { grid-template-columns: minmax(0, 1fr); }
     .course-sidebar { position: static; }
-    .course-sidebar-panel { max-height: none; overflow: visible; }
-    .course-sidebar .lesson-nav { grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; flex: none; }
+    .course-sidebar-panel { max-height: none; min-height: 0; overflow: visible; }
+    .course-sidebar .lesson-nav { flex: none; min-height: 0; grid-template-columns: minmax(0, 1fr); max-height: none; overflow: visible; }
     .course-lesson, .course-quiz, .course-finish-card { padding-top: 0; scroll-margin-block-start: 0; }
     .course-about details { display: block; }
     .course-desktop-summary { display: none; }

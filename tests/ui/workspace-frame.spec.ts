@@ -1,4 +1,49 @@
 import { test, expect } from "@playwright/test";
+
+test("wide workspace scrolls at the edge while content stays centered", async ({
+  page,
+}, info) => {
+  test.skip(info.project.name !== "desktop", "Wide workspace geometry.");
+  await page.setViewportSize({ width: 2560, height: 720 });
+  await page.goto("/ui/workspace");
+  for (const collapsed of [false, true]) {
+    if (collapsed)
+      await page
+        .getByRole("button", { name: "Collapse sidebar", exact: true })
+        .click();
+    const geometry = await page.locator(".main-content").evaluate((main) => {
+      const box = main.getBoundingClientRect();
+      const content = main.firstElementChild!.getBoundingClientRect();
+      return {
+        right: box.right,
+        center: (box.left + box.right) / 2,
+        contentCenter: (content.left + content.right) / 2,
+        contentWidth: content.width,
+        scrollable: main.scrollHeight > main.clientHeight,
+      };
+    });
+    expect(geometry.right).toBe(2560);
+    expect(Math.abs(geometry.center - geometry.contentCenter)).toBeLessThan(2);
+    expect(geometry.contentWidth).toBeLessThanOrEqual(1440);
+    expect(geometry.scrollable).toBe(true);
+    await page.locator(".main-content").focus();
+    await page.keyboard.press("End");
+    await expect
+      .poll(() =>
+        page
+          .locator(".main-content")
+          .evaluate(
+            (main) => main.scrollHeight - main.clientHeight - main.scrollTop,
+          ),
+      )
+      .toBeLessThan(2);
+    await page.screenshot({
+      path: info.outputPath(
+        `workspace-edge-${collapsed ? "collapsed" : "open"}.png`,
+      ),
+    });
+  }
+});
 test("workspace frame catalog shares responsive scrolling, pending and navigation controls", async ({
   page,
 }, info) => {

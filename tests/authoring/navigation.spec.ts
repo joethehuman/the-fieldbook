@@ -75,9 +75,14 @@ test("Outline and Details slide in both directions without remounting the lesson
 });
 
 test("requirements smoothly reveal artwork within Details and course title within the main page", async ({ page }, info) => {
+  if (info.project.name.endsWith("desktop")) await page.setViewportSize({ width: 2560, height: 720 });
   await setup(page, info.project.name.startsWith("production"));
   const details = await openContentSettings(page);
   const main = page.locator(".main-content");
+  if (info.project.name.endsWith("desktop")) {
+    expect((await main.boundingBox())!.x + (await main.boundingBox())!.width).toBe(2560);
+    expect((await page.locator(".editor").boundingBox())!.width).toBeLessThanOrEqual(1440);
+  }
   // Stacked phone panels also have a local Details scroller; show the readiness list first.
   await details.getByRole("button", { name: "Give artwork a short title of up to 40 characters", exact: true }).scrollIntoViewIfNeeded();
   await details.evaluate((node) => {
