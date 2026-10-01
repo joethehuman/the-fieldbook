@@ -1,11 +1,18 @@
 "use client";
 import { createContext, useContext, useLayoutEffect } from "react";
 import type { ReaderShellContext } from "@/lib/reader-types";
-import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
+import type {
+  LandingNavigation,
+  RegisterNavigationGuard,
+} from "@/lib/navigation-guard";
 
 export const WorkspaceContext = createContext<{
   updateContext: (context: ReaderShellContext) => void;
   registerNavigationGuard: RegisterNavigationGuard;
+  registerLandingNavigation: (
+    section: "admin" | "team",
+    navigation: LandingNavigation | null,
+  ) => void;
 } | null>(null);
 export function useWorkspaceShell() {
   const context = useContext(WorkspaceContext);

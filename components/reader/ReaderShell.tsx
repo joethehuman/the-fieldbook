@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import Link from "next/link";
-import type { NavigationGuard } from "@/lib/navigation-guard";
+import type { LandingNavigation, NavigationGuard } from "@/lib/navigation-guard";
 import { useNavigationHistory } from "./use-navigation-history";
 import { WorkspaceContext } from "./WorkspaceContext";
 import { usePathname, useRouter } from "next/navigation";
@@ -47,6 +47,16 @@ export function ReaderShell({
   const [accountError, setAccountError] = useState<string | null>(null);
   const [context, updateContext] = useState(initialContext);
   const guard = useRef<NavigationGuard | null>(null);
+  const landings = useRef<Partial<Record<"admin" | "team", LandingNavigation>>>(
+    {},
+  );
+  const registerLandingNavigation = useCallback(
+    (section: "admin" | "team", navigation: LandingNavigation | null) => {
+      if (navigation) landings.current[section] = navigation;
+      else delete landings.current[section];
+    },
+    [],
+  );
   const checking = useRef(false);
   const [protectedState, setProtectedState] = useState(false);
   const registerNavigationGuard = useCallback(
@@ -57,8 +67,8 @@ export function ReaderShell({
     [],
   );
   const shell = useMemo(
-    () => ({ updateContext, registerNavigationGuard }),
-    [registerNavigationGuard],
+    () => ({ updateContext, registerNavigationGuard, registerLandingNavigation }),
+    [registerNavigationGuard, registerLandingNavigation],
   );
   async function canLeave() {
     if (checking.current) return false;
@@ -158,6 +168,18 @@ export function ReaderShell({
     { href: "/docs", title: "Docs", icon: BookOpen },
   ];
   async function navigate(href: string) {
+    const sameUrl =
+      new URL(href, window.location.href).href === window.location.href;
+    const landing =
+      href === "/admin"
+        ? landings.current.admin
+        : href === "/team"
+          ? landings.current.team
+          : undefined;
+    if (sameUrl && (!landing || landing.isCurrent)) {
+      close();
+      return;
+    }
     const previousFocus = document.activeElement;
     if (!(await canLeave())) {
       if (previousFocus && !previousFocus.isConnected) {
@@ -170,6 +192,11 @@ export function ReaderShell({
             )
             ?.focus();
       }
+      return;
+    }
+    if (sameUrl && landing) {
+      close();
+      await landing.open();
       return;
     }
     if (href === "/docs") setCollapsed(false);
@@ -346,7 +373,17 @@ export function ReaderShell({
                 privacyHref={
                   section === "privacy" ? null : context.branding.privacyUrl
                 }
-                onPrivacyOpen={close}
+                onPrivacyOpen={(event) => {
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  if (context.branding.privacyUrl?.startsWith("/")) return;
+                  event.preventDefault();
+                  void (async () => {
+                    if (await canLeave()) {
+                      close();
+                      window.location.assign(context.branding.privacyUrl!);
+                    }
+                  })();
+                }}
                 onSignIn={
                   !context.user
                     ? () => window.location.assign("/auth/sign-in")

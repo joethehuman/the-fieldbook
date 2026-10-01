@@ -1,6 +1,6 @@
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { PageHeader } from "@/components/patterns/layout";
-import { TeamProgress } from "@/components/Teams";
+import { TeamWorkspace } from "@/components/reader/TeamWorkspace";
 import { readerTeam, readerTeamContext } from "@server/reader";
 
 export async function generateMetadata() {
@@ -19,7 +19,7 @@ export default async function Page() {
         <PageHeader>
           <h1>Team progress</h1>
         </PageHeader>
-        <TeamProgress
+        <TeamWorkspace
           data={data}
           user={
             user || {

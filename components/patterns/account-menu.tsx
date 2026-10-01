@@ -1,6 +1,11 @@
 "use client";
 
-import { useRef, useState, type RefObject } from "react";
+import {
+  useRef,
+  useState,
+  type RefObject,
+  type MouseEventHandler,
+} from "react";
 import Link from "next/link";
 import {
   ArrowLeftRight,
@@ -59,7 +64,7 @@ export function AccountMenu({
   onSignIn?: () => void;
   onSwitchDemoProfile?: () => void;
   privacyHref?: string | null;
-  onPrivacyOpen?: () => void;
+  onPrivacyOpen?: MouseEventHandler<HTMLAnchorElement>;
   onAboutDemo?: (trigger: RefObject<HTMLButtonElement | null>) => void;
   onFeedback: (rating: "up" | "down", comment: string) => Promise<void>;
   onFeedbackOpen?: () => void;
@@ -163,14 +168,22 @@ export function AccountMenu({
                 {privacyHref.startsWith("/") ? (
                   <Link
                     href={privacyHref}
-                    onClickCapture={() => setMenuOpen(false)}
-                    onClick={onPrivacyOpen}
+                    onClickCapture={(event) => {
+                      onPrivacyOpen?.(event);
+                      setMenuOpen(false);
+                    }}
                   >
                     Privacy policy{" "}
                     <BookOpen className="ml-auto size-4" aria-hidden="true" />
                   </Link>
                 ) : (
-                  <a href={privacyHref} onClick={onPrivacyOpen}>
+                  <a
+                    href={privacyHref}
+                    onClickCapture={(event) => {
+                      onPrivacyOpen?.(event);
+                      setMenuOpen(false);
+                    }}
+                  >
                     Privacy policy{" "}
                     <BookOpen className="ml-auto size-4" aria-hidden="true" />
                   </a>
