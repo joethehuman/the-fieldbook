@@ -3,6 +3,7 @@ import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { reconcileLearning } from "../../lib/learning-groups";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
+import { openContentSettings } from "./editor-helpers";
 
 async function setup(
   page: Page,
@@ -110,12 +111,9 @@ test("Docs, Updates and Courses quietly save incomplete drafts, revert to Publis
       await current.getByLabel("Title", { exact: true }).fill("");
       await expect.poll(async () => (await read()).title).toBe("");
       expect((await read(true)).title).toBe(before.title);
-      await expect(
-        current.getByRole("button", {
-          name: "Review requirements",
-          exact: true,
-        }),
-      ).toBeEnabled();
+      await expect(current.getByRole("button", { name: "Publish changes", exact: true })).toBeDisabled();
+      const details = await openContentSettings(current);
+      await expect(details.getByRole("button", { name: "Add a title", exact: true })).toBeEnabled();
       await current.getByLabel("Title", { exact: true }).fill(before.title);
       await expect(
         current.getByRole("button", { name: "Published", exact: true }),
@@ -171,7 +169,7 @@ test("typing survives a slow draft response and Publish serializes the newest co
   await page.getByLabel("Title", { exact: true }).fill("First request title");
   await expect.poll(() => requests.length).toBe(1);
   await page.getByLabel("Title", { exact: true }).fill("Newest local title");
-  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
   const writing = page.getByRole("textbox", {
     name: "Doc content Markdown",
     exact: true,
@@ -203,13 +201,13 @@ test("an assigned course stages a new version through autosaves and consumes it 
 }, info) => {
   const installed = info.project.name.startsWith("production");
   const { read, before, data } = await setup(page, installed, "course");
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Details/ }).click();
   const version = page.getByRole("checkbox", {
     name: "Publish a new version and start a new completion window",
   });
   await version.check();
-  await page.getByRole("button", { name: "Close content settings" }).click();
-  await page.getByRole("button", { name: "Markdown", exact: true }).click();
+  await page.getByRole("button", { name: /^Details/ }).click();
+  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
   await page
     .getByRole("textbox", { name: "Lesson content Markdown", exact: true })
     .fill("A small inline lesson correction.");
@@ -219,16 +217,16 @@ test("an assigned course stages a new version through autosaves and consumes it 
   expect((await read()).version).toBe(before.version);
   expect((await read()).assignments).toEqual(before.assignments);
   expect((await read(true)).lessons[0].body).toBe(before.lessons[0].body);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Details/ }).click();
   await expect(version).toBeChecked();
-  await page.getByRole("button", { name: "Close content settings" }).click();
+  await page.getByRole("button", { name: /^Details/ }).click();
   await page
     .getByRole("button", { name: "Publish changes", exact: true })
     .click();
   await expect
     .poll(async () => (await read(true)).version)
     .toBe(before.version + 1);
-  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await page.getByRole("button", { name: /^Details/ }).click();
   await expect(version).not.toBeChecked();
   if (!installed)
     expect(

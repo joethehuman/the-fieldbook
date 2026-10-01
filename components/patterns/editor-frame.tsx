@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
+import { useScrollFade } from "./use-scroll-fade";
+import { revealEditorTarget } from "./reveal-editor-target";
 
 export type DetailsReveal = { request: number; field?: string };
 
@@ -33,6 +35,7 @@ export function EditorFrame({
 }) {
   const frame = useRef<HTMLElement>(null);
   const controls = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLDivElement>(null);
   const wide = useRef(false);
   const narrow = useRef(false);
   const outlineToggle = useRef<HTMLButtonElement>(null);
@@ -40,6 +43,23 @@ export function EditorFrame({
   const outlineId = useId();
   const detailsId = useId();
   const [panels, setPanels] = useState({ outline: !!outline, details: false });
+  const outlineFade = useScrollFade<HTMLElement>(panels.outline && !!outline);
+  const detailsFade = useScrollFade<HTMLElement>(panels.details);
+  const [canvasScrolled, setCanvasScrolled] = useState(false);
+  const measureCanvasFade = useCallback(() => {
+    const surface = canvas.current;
+    const boundary = controls.current;
+    setCanvasScrolled(!!surface && !!boundary && surface.getBoundingClientRect().top < boundary.getBoundingClientRect().bottom - 2);
+    const target = frame.current;
+    const viewport = target?.closest<HTMLElement>(".main-content");
+    if (target && viewport && surface && boundary) {
+      const style = getComputedStyle(target);
+      const stop = viewport.getBoundingClientRect().top + viewport.clientTop
+        + (parseFloat(style.getPropertyValue("--editor-header-height")) || 0)
+        + boundary.getBoundingClientRect().height + (parseFloat(style.rowGap) || 0);
+      target.dataset.writingPinned = String(surface.getBoundingClientRect().top <= stop + 1);
+    }
+  }, []);
 
   useEffect(() => {
     const target = frame.current;
@@ -48,10 +68,16 @@ export function EditorFrame({
     const measure = () => {
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
       const width = target.getBoundingClientRect().width;
-      target.style.setProperty("--editor-controls-height", `${controls.current?.getBoundingClientRect().height || 48}px`);
+      const controlsHeight = controls.current?.getBoundingClientRect().height || 48;
+      const headerHeight = parseFloat(getComputedStyle(target).getPropertyValue("--editor-header-height")) || 0;
+      const bottomInset = viewport ? parseFloat(getComputedStyle(viewport).paddingBottom) || 0 : 0;
+      const available = (viewport?.clientHeight || window.innerHeight) - headerHeight - controlsHeight - rem * 0.75 - bottomInset;
+      target.style.setProperty("--editor-controls-height", `${controlsHeight}px`);
       if (viewport) target.style.setProperty("--editor-viewport-height", `${viewport.clientHeight}px`);
+      target.dataset.writingScroll = available >= 12 * rem ? "contained" : "page";
       wide.current = width >= 78 * rem;
       narrow.current = width < 48 * rem;
+      measureCanvasFade();
       if (!wide.current)
         setPanels((current) => current.outline && current.details
           ? { outline: true, details: false } : current);
@@ -60,22 +86,33 @@ export function EditorFrame({
     const observer = new ResizeObserver(measure);
     observer.observe(target);
     if (controls.current) observer.observe(controls.current);
+    if (canvas.current) observer.observe(canvas.current);
     if (viewport) observer.observe(viewport);
-    return () => observer.disconnect();
-  }, []);
+    viewport?.addEventListener("scroll", measureCanvasFade, { passive: true });
+    return () => {
+      observer.disconnect();
+      viewport?.removeEventListener("scroll", measureCanvasFade);
+    };
+  }, [measureCanvasFade]);
 
   useEffect(() => {
     if (!revealDetails) return;
     setPanels((current) => ({ outline: wide.current && current.outline, details: true }));
+    let cancelReveal: (() => void) | undefined;
     const request = requestAnimationFrame(() => {
       const section = revealDetails.field
         ? document.getElementById(revealDetails.field)
         : document.getElementById(detailsId);
-      const target = section?.querySelector<HTMLElement>('input, button, textarea, [tabindex="0"]');
-      (target || section)?.focus({ preventScroll: true });
-      section?.scrollIntoView({ block: "nearest" });
+      const target = section?.matches('input, button, textarea, [tabindex="0"]') ? section
+        : section?.querySelector<HTMLElement>('input, button, textarea, [tabindex="0"]');
+      const control = target || section;
+      if (control) cancelReveal = revealEditorTarget(control, {
+        container: document.getElementById(detailsId),
+        context: section && section !== control ? section
+          : control.closest<HTMLElement>('[data-slot="field"]') || control,
+      });
     });
-    return () => cancelAnimationFrame(request);
+    return () => { cancelAnimationFrame(request); cancelReveal?.(); };
   }, [revealDetails, detailsId]);
 
   useLayoutEffect(() => {
@@ -89,20 +126,36 @@ export function EditorFrame({
   useEffect(() => {
     if (!revealOutline) return;
     setPanels((current) => ({ outline: true, details: wide.current && current.details }));
+    let cancelReveal: (() => void) | undefined;
     const request = requestAnimationFrame(() => {
       const section = document.getElementById(outlineId);
-      section?.querySelector<HTMLElement>('button:not(:disabled)')?.focus({ preventScroll: true });
-      section?.scrollIntoView({ block: "nearest" });
+      const target = section?.querySelector<HTMLElement>('button:not(:disabled)');
+      if (target && section) cancelReveal = revealEditorTarget(target, { container: section });
     });
-    return () => cancelAnimationFrame(request);
+    return () => { cancelAnimationFrame(request); cancelReveal?.(); };
   }, [revealOutline, outlineId]);
+
+  useEffect(() => {
+    if (!panels.outline) return;
+    let cancelReveal: (() => void) | undefined;
+    const request = requestAnimationFrame(() => {
+      const section = document.getElementById(outlineId);
+      const selected = section?.querySelector<HTMLElement>('[aria-current="step"]');
+      if (selected && section) cancelReveal = revealEditorTarget(selected, {
+        container: section,
+        context: selected.closest<HTMLElement>(".course-builder-steps > div") || selected,
+        focus: false,
+      });
+    });
+    return () => { cancelAnimationFrame(request); cancelReveal?.(); };
+  }, [panels.outline, outlineContext, outlineId, revealCanvas]);
 
   const open = panels.outline ? panels.details ? "both" : "outline" : panels.details ? "details" : "none";
   return (
     <section ref={frame} className="editor-frame" data-panels={open} aria-label="Writing workspace">
-      <div ref={controls} className="editor-frame-controls" data-heading={heading ? "true" : undefined}>
+      <div ref={controls} className="editor-frame-controls" data-heading={heading ? "true" : undefined} data-canvas-scrolled={canvasScrolled}>
         {outline && (
-          <Button ref={outlineToggle} type="button" variant="ghost" size="sm" className="px-0"
+          <Button ref={outlineToggle} type="button" variant="ghost" size="sm"
             disabled={disabled}
             aria-controls={outlineId} aria-expanded={panels.outline}
             onClick={() => setPanels((current) => ({
@@ -114,7 +167,7 @@ export function EditorFrame({
           </Button>
         )}
         {heading && <div className="editor-frame-heading">{heading}</div>}
-        <Button ref={detailsToggle} type="button" variant="ghost" size="sm" className="ml-auto px-0"
+        <Button ref={detailsToggle} type="button" variant="ghost" size="sm" className="ml-auto"
           disabled={disabled}
           aria-controls={detailsId} aria-expanded={panels.details}
           onClick={() => setPanels((current) => ({
@@ -127,7 +180,9 @@ export function EditorFrame({
       </div>
       <div className="editor-frame-body">
         {panels.outline && outline && (
-          <aside id={outlineId} className="editor-frame-outline" aria-label="Course outline"
+          <aside ref={outlineFade.ref} id={outlineId} className="editor-frame-outline scroll-fade" aria-label="Course outline"
+            data-scroll-fade-before={outlineFade.edges.before} data-scroll-fade-after={outlineFade.edges.after}
+            onScroll={outlineFade.measure}
             onKeyDown={(event) => {
               if (disabled || event.key !== "Escape" || event.defaultPrevented) return;
               event.preventDefault();
@@ -138,7 +193,9 @@ export function EditorFrame({
           </aside>
         )}
         {panels.details && (
-          <aside id={detailsId} className="editor-frame-details" aria-label="Content details" tabIndex={-1}
+          <aside ref={detailsFade.ref} id={detailsId} className="editor-frame-details scroll-fade" aria-label="Content details" tabIndex={-1}
+            data-scroll-fade-before={detailsFade.edges.before} data-scroll-fade-after={detailsFade.edges.after}
+            onScroll={detailsFade.measure}
             onKeyDown={(event) => {
               if (disabled || event.key !== "Escape" || event.defaultPrevented) return;
               event.preventDefault();
@@ -148,7 +205,7 @@ export function EditorFrame({
             {details}
           </aside>
         )}
-        <div key="canvas" className="editor-frame-canvas">{children}</div>
+        <div key="canvas" ref={canvas} className="editor-frame-canvas">{children}</div>
       </div>
     </section>
   );

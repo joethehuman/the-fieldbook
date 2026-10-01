@@ -6,6 +6,7 @@ import { correctOptionIds, optionIds, requiresPassing } from "@/lib/course-quiz"
 import type { UploadMedia } from "./MarkdownEditor";
 import { WritingEditor } from "./patterns/writing-editor";
 import { EditorFrame, type DetailsReveal } from "./patterns/editor-frame";
+import { revealEditorTarget } from "./patterns/reveal-editor-target";
 import { SectionHeader } from "./patterns/layout";
 import { FormField } from "./patterns/form-field";
 import { NavigationButton } from "./patterns/navigation-button";
@@ -62,6 +63,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     }
     setSelected(revealStep.id);
     setCanvasRequest((request) => request + 1);
+    let cancelReveal: (() => void) | undefined;
     const frame = requestAnimationFrame(() => {
       const scope = revealStep.questionId
         ? panel.current?.querySelector<HTMLElement>(`[data-question-id="${CSS.escape(revealStep.questionId)}"]`)
@@ -69,12 +71,11 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
       const target = revealStep.target === "body"
         ? (scope?.querySelector<HTMLElement>('[contenteditable="true"], textarea[aria-label="Lesson content Markdown"]') || scope?.querySelector<HTMLElement>('[aria-label="Editor view"] button'))
         : revealStep.id !== "quiz" ? lessonTitle.current : scope?.querySelector<HTMLElement>("input");
-      (target || panel.current)?.focus({ preventScroll: true });
-      if (target && target === lessonTitle.current) target.scrollIntoView({ block: "nearest" });
-      else (target?.closest('[data-slot="field"]') || panel.current)?.scrollIntoView({ block: "start" });
+      const control = target || panel.current;
+      if (control) cancelReveal = revealEditorTarget(control);
     });
     navigationFrame.current = frame;
-    return () => cancelAnimationFrame(frame);
+    return () => { cancelAnimationFrame(frame); cancelReveal?.(); };
   }, [revealStep]);
   useEffect(() => {
     const navigation = pendingNavigation.current;
@@ -189,7 +190,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   return <EditorFrame
     outline={outline}
     outlineContext={selectedLesson ? `Lesson ${course.lessons.indexOf(selectedLesson) + 1} of ${course.lessons.length}` : selected === "quiz" ? "Quiz" : undefined}
-    heading={selectedLesson && <Input key={selectedLesson.id} ref={lessonTitle} variant="title" aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value }))} />}
+    heading={selectedLesson && <Input key={selectedLesson.id} ref={lessonTitle} variant="lesson-title" aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value }))} />}
     details={details}
     requirementsCount={requirementsCount}
     revealDetails={revealDetails}

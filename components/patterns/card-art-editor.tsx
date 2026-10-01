@@ -31,6 +31,7 @@ export function CardArtEditor({
   disabled,
   onBusyChange,
   saveMode = "manual",
+  shortTitleId,
 }: {
   id: string;
   title: string;
@@ -44,6 +45,7 @@ export function CardArtEditor({
   disabled?: boolean;
   onBusyChange?: (busy: boolean) => void;
   saveMode?: "manual" | "automatic";
+  shortTitleId?: string;
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const shuffleHistory = useRef<{ id: string; seeds: number[] }>({
@@ -99,6 +101,7 @@ export function CardArtEditor({
         description={`Can differ from the full title. Up to 40 characters, shown within two lines on generated artwork (${graphemeCount(current.shortTitle)}/40).`}
       >
         <Input
+          id={shortTitleId}
           value={current.shortTitle}
           disabled={disabled || uploading}
           required={generated}

@@ -33,8 +33,51 @@
   min-width: 0;
   max-width: 100%;
 }
-.writing-editor {
-  overflow: hidden;
+.writing-surface {
+  display: flex;
+  flex-direction: column;
+  max-height: var(--editor-writing-height, none);
+  overflow: clip;
+}
+.writing-editor .mdxeditor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.writing-viewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: auto;
+  scroll-padding-block: var(--space-6);
+  scrollbar-gutter: stable;
+}
+.writing-source-panel {
+  display: flex;
+  overflow: clip;
+}
+.writing-source {
+  flex: 1 1 auto;
+  min-height: 0;
+  resize: none;
+  scroll-padding-block: var(--space-6);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  overscroll-behavior-y: auto;
+}
+.editor-frame[data-writing-scroll="contained"][data-writing-pinned="false"] .writing-scroll-area {
+  overflow-y: hidden;
+}
+.editor-frame[data-writing-scroll="page"] .writing-surface { max-height: none; }
+.editor-frame[data-writing-scroll="page"] :is(.mdxeditor-toolbar, .writing-view-header) {
+  position: sticky;
+  top: var(--editor-writing-top);
+}
+.writing-surface:focus-within {
+  border-color: var(--ring);
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 .writing-editor,
 .writing-editor .mdxeditor,
@@ -62,6 +105,12 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-top: var(--space-1);
+}
+.writing-slash-group-label {
+  padding: var(--space-2) var(--space-3);
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 .writing-slash-menu [role="menuitem"] {
   width: 100%;
@@ -95,12 +144,23 @@
   font: inherit;
   font-size: 0.75rem;
 }
-.writing-editor .mdxeditor-toolbar {
-  position: static;
+.writing-editor .mdxeditor-toolbar,
+.writing-view-header {
+  position: relative;
+  flex: 0 0 auto;
+  z-index: 10;
+}
+.editor-frame:has(.writing-editor, .writing-view-header)
+  .editor-frame-controls::after {
+  display: none;
+}
+.writing-editor .mdxeditor-toolbar,
+.writing-view-header {
   border-bottom: 1px solid var(--border);
-  border-radius: var(--radius) var(--radius) 0 0;
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
   background: var(--muted);
   padding: var(--space-2);
+  overflow: visible;
 }
 .writing-toolbar {
   display: flex;
@@ -125,33 +185,49 @@
   gap: var(--space-1);
 }
 .writing-editor .writing-content {
-  min-height: 24rem;
   padding: var(--space-6);
+  padding-inline: var(--editor-content-padding, var(--space-6));
   outline: none;
+}
+.writing-editor .writing-content[contenteditable] {
+  min-height: 24rem;
 }
 .writing-editor .writing-content > :first-child {
   margin-top: 0;
 }
-.writing-editor:focus-within .writing-content:not([contenteditable]),
+.writing-editor .mdxeditor-root-contenteditable > .writing-content:not([contenteditable]) {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  min-height: 0;
+  color: var(--muted-foreground);
+  opacity: 0.65;
+  pointer-events: none;
+}
+.writing-editor:has(.writing-content[contenteditable]:focus-within)
+  .writing-content:not([contenteditable]),
 .writing-editor:has(.writing-media-line)
   .writing-content:not([contenteditable]) {
   display: none;
 }
-.writing-editor
-  .writing-content:focus-within
-  > p:last-child:empty:not(
+.writing-editor .writing-content:focus-within
+  > p:last-child:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
     .writing-pending-list,
     .writing-media-line
-  )::before,
-.writing-editor
-  .writing-content:focus-within
-  > p:last-child:has(> br:only-child):not(
+  ) {
+  position: relative;
+}
+.writing-editor .writing-content:focus-within
+  > p:last-child:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
     .writing-pending-list,
     .writing-media-line
   )::before {
   content: "Type / for commands…";
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 0;
   color: var(--muted-foreground);
   opacity: 0.65;
   pointer-events: none;
@@ -219,12 +295,10 @@
   display: grid;
   gap: var(--space-2);
 }
-.writing-editor .writing-content:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--ring);
-}
 .writing-editor .mdxeditor-root-contenteditable {
+  position: relative;
   min-width: 0;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 .writing-editor .writing-content [data-lexical-decorator="true"]:has(table) {
   display: block;
@@ -352,25 +426,19 @@
     opacity: 0.7;
   }
 }
-.writing-editor [data-toolbar-item][role="combobox"] {
-  margin: 0;
-  width: 9rem;
-  min-width: min(9rem, 100%);
-  max-width: 100%;
-  min-height: 2.25rem;
-}
 .mdxeditor-popup-container {
   z-index: 60;
 }
 @media (max-width: 600px) {
-  .writing-toolbar [data-slot="button"] {
+  .writing-toolbar [data-slot="button"],
+  .writing-toolbar [role="tab"],
+  .writing-view-header [role="tab"],
+  [data-writing-selection-menu] [data-slot="button"] {
     min-width: 2.75rem;
-    min-height: 2.75rem;
-  }
-  .writing-editor [data-toolbar-item][role="combobox"] {
     min-height: 2.75rem;
   }
   .writing-editor .writing-content {
     padding: var(--space-4);
+    padding-inline: var(--editor-content-padding, var(--space-4));
   }
 }

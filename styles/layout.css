@@ -255,7 +255,9 @@
   .editor-content { gap: var(--space-4); }
   .editor-introduction { display: grid; width: 100%; gap: var(--space-3); padding-block: var(--space-2); }
   .editor-introduction [data-slot="input"], .editor-introduction [data-slot="textarea"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }
-  .editor-frame { display: grid; min-width: 0; gap: var(--space-3); container: editor / inline-size; overflow-anchor: none; }
+  .editor-frame { --editor-panel-width: calc(18rem + var(--space-6)); --editor-writing-top: calc(var(--editor-header-height, 0px) + var(--editor-controls-height, 3rem) + var(--space-3)); --editor-writing-height: max(0px, calc(var(--editor-viewport-height, 100dvh) - var(--editor-writing-top) - var(--workspace-inset-block))); display: grid; min-width: 0; gap: var(--space-3); container: editor / inline-size; overflow-anchor: none; }
+  .editor-frame[data-panels="none"] { --editor-content-padding: max(var(--space-6), calc((100% - var(--editor-writing-width)) / 2)); }
+  .app.sidebar-collapsed .editor-frame[data-panels="none"] { --editor-writing-width: var(--editor-writing-focus-width); }
   .editor-frame-controls {
     display: flex;
     flex-wrap: wrap;
@@ -268,18 +270,23 @@
     z-index: 15;
     background: var(--background);
   }
+  .editor-frame-controls[data-canvas-scrolled="true"]::after {
+    content: "";
+    position: absolute;
+    inset-block-start: 100%;
+    inset-inline-start: var(--editor-outline-width, 0px);
+    inset-inline-end: var(--editor-details-width, 0px);
+    height: var(--space-4);
+    pointer-events: none;
+    background: linear-gradient(to bottom, var(--background), transparent);
+  }
   .editor-frame-controls[data-heading="true"] {
     display: grid;
-    grid-template-columns: minmax(max-content, var(--editor-outline-width, 0px)) minmax(0, 1fr) minmax(max-content, var(--editor-details-width, 0px));
+    grid-template-columns: minmax(max-content, var(--editor-panel-width)) minmax(0, 1fr) minmax(max-content, var(--editor-panel-width));
     column-gap: 0;
-    transition: grid-template-columns 180ms ease;
   }
   .editor-frame-controls[data-heading="true"] > :first-child { justify-self: start; }
-  .editor-frame-heading { min-width: 0; padding-inline: var(--space-2); }
-  .editor-frame[data-panels="outline"] .editor-frame-heading,
-  .editor-frame[data-panels="both"] .editor-frame-heading { padding-inline-start: 0; }
-  .editor-frame[data-panels="details"] .editor-frame-heading,
-  .editor-frame[data-panels="both"] .editor-frame-heading { padding-inline-end: 0; }
+  .editor-frame-heading { min-width: 0; width: 100%; max-width: var(--editor-title-width); margin-inline: auto; justify-self: center; }
   .editor-frame-body {
     display: grid;
     min-width: 0;
@@ -288,9 +295,23 @@
     grid-template-columns: var(--editor-outline-width, 0px) minmax(0, 1fr) var(--editor-details-width, 0px);
     transition: grid-template-columns 180ms ease;
   }
-  .editor-frame[data-panels="outline"], .editor-frame[data-panels="both"] { --editor-outline-width: calc(18rem + var(--space-6)); }
-  .editor-frame[data-panels="details"], .editor-frame[data-panels="both"] { --editor-details-width: calc(18rem + var(--space-6)); }
+  .editor-frame[data-panels="outline"], .editor-frame[data-panels="both"] { --editor-outline-width: var(--editor-panel-width); }
+  .editor-frame[data-panels="details"], .editor-frame[data-panels="both"] { --editor-details-width: var(--editor-panel-width); }
   .editor-frame-canvas { grid-area: canvas; min-width: 0; width: 100%; }
+  .editor-frame-canvas:has(.writing-surface) {
+    position: sticky;
+    top: var(--editor-writing-top);
+    min-height: var(--editor-writing-height);
+  }
+  .course-builder-panel:has(.writing-surface) {
+    min-height: var(--editor-writing-height);
+    scroll-margin-block-start: var(--editor-writing-top);
+  }
+  .editor-frame[data-writing-scroll="page"] .editor-frame-canvas:has(.writing-surface) {
+    position: static;
+    min-height: 0;
+  }
+  .editor-frame[data-writing-scroll="page"] .course-builder-panel:has(.writing-surface) { min-height: 0; }
   .editor-frame-outline, .editor-frame-details {
     display: grid;
     min-width: 0;
@@ -313,13 +334,16 @@
   .editor-details-group { display: grid; gap: var(--space-3); padding-block-end: var(--space-4); border-bottom: 1px solid var(--border); }
   @keyframes editor-panel-reveal { from { opacity: 0; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) {
-    .editor-frame-body, .editor-frame-controls[data-heading="true"] { transition: none; }
+    .editor-frame-body { transition: none; }
     .editor-frame-outline, .editor-frame-details { animation: none; }
   }
-  @container editor (width < 48rem) {
+  @container editor (width < 60rem) {
     .editor-frame-controls[data-heading="true"] { display: flex; column-gap: var(--space-2); }
     .editor-frame-controls[data-heading="true"] > :last-child { order: 2; }
-    .editor-frame[data-panels] .editor-frame-heading { order: 3; flex-basis: 100%; padding-inline: 0; }
+    .editor-frame-heading { order: 3; flex-basis: 100%; }
+  }
+  @container editor (width < 48rem) {
+    .editor-frame-controls[data-canvas-scrolled="true"]::after { inset-inline: 0; }
     .editor-frame[data-panels] > .editor-frame-body { display: flex; flex-direction: column; gap: var(--space-4); }
     .editor-frame-outline, .editor-frame-details { position: static; width: 100%; max-height: 60dvh; padding-inline: var(--space-1); }
     .editor-frame-canvas { width: 100%; }

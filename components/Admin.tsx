@@ -13,6 +13,7 @@ import { DocSectionPicker } from "./DocSectionPicker";
 import DocSectionCreate from "./DocSectionCreate";
 import { WritingEditor } from "./patterns/writing-editor";
 import { EditorFrame, EditorDetailsGroup, type DetailsReveal } from "./patterns/editor-frame";
+import { revealEditorTarget } from "./patterns/reveal-editor-target";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
 import { contentSignature, hasUnpublishedEdits } from "@/lib/demo-publication";
@@ -1675,7 +1676,7 @@ export function Editor({
   if (c.kind !== "doc") {
     const art = resolvedCardArt(c.id, c.title, c.cardArt, c.coverImageUrl);
     if ((art.source === "generated" && !art.shortTitle.trim()) || graphemeCount(art.shortTitle.trim()) > 40)
-      requirements.push({ id: "art-title", message: "Give artwork a short title of up to 40 characters", field: "content-artwork" });
+      requirements.push({ id: "art-title", message: "Give artwork a short title of up to 40 characters", field: "content-artwork-title" });
     if (art.source === "upload" && !art.imageUrl)
       requirements.push({ id: "art-image", message: "Upload a card image", field: "content-artwork" });
   }
@@ -1699,8 +1700,7 @@ export function Editor({
       setRevealStep({ id: item.step, request: Date.now(), target: item.target, questionId: item.questionId });
     } else if (item.field?.startsWith("editor-")) {
       const field = document.getElementById(item.field);
-      field?.focus({ preventScroll: true });
-      field?.scrollIntoView({ block: "nearest" });
+      if (field) revealEditorTarget(field);
     } else {
       setDetailsReveal((current) => ({ request: (current?.request || 0) + 1, field: item.field }));
     }
@@ -1840,6 +1840,7 @@ export function Editor({
       </EditorDetailsGroup>}
       {c.kind !== "doc" && <div id="content-artwork" className="editor-details-group">
         <CardArtEditor id={c.id} title={c.title} kind={c.kind} category={c.category} art={c.cardArt}
+          shortTitleId="content-artwork-title"
           legacyCover={c.coverImageUrl} settings={data.settings} onUpload={upload} disabled={busy} saveMode="automatic"
           onChange={(cardArt) => setC((current) => ({ ...current, cardArt,
             ...(current.kind === "course" && cardArt.source === "upload" && cardArt.imageUrl ? { coverImageUrl: cardArt.imageUrl } : {}),
@@ -1917,12 +1918,12 @@ export function Editor({
         }]} />
         <div className="editor-heading-actions">
           <div className="editor-save-status">
-            <PublicationStatus published={!!c.publishedRevision} hasUnpublishedChanges={!!c.publishedRevision && publicationChanged} />
             <span role="status">
               {saving || busy ? uploadCount ? "Uploading media…" : "Saving…"
                 : queue.current!.blocked ? "Save failed"
                 : dirty ? "Saving…" : savedMessage || (existing ? "Saved" : "Not saved yet")}
             </span>
+            <PublicationStatus published={!!c.publishedRevision} hasUnpublishedChanges={!!c.publishedRevision && publicationChanged} />
           </div>
           <Button type="button" disabled={busy || publishing || queue.current!.blocked || !publicationChanged || requirements.length > 0}
             onClick={(event) => void submit(event, "published")}>

@@ -850,6 +850,7 @@ test("new user guidance belongs to the grey fieldset footer and labels its selec
 }, info) => {
   await admin(page);
   await adminSection(page, "Demo profiles");
+  await page.getByRole("button", { name: "New user defaults", exact: true }).click();
   const section = page.getByRole("region", { name: "New users", exact: true });
   const select = section.getByRole("combobox");
   await expect(select).toHaveAccessibleDescription(
@@ -869,6 +870,7 @@ test("new user guidance belongs to the grey fieldset footer and labels its selec
   ).toBeVisible();
   await page.reload();
   await adminSection(page, "Demo profiles");
+  await page.getByRole("button", { name: "New user defaults", exact: true }).click();
   await expect(select).toContainText("New user — onboarding window");
   await snapshotReview(page, info, "new-users-footer");
 });

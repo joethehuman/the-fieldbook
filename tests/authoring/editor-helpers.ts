@@ -6,15 +6,15 @@ export async function waitForDraftSaved(page: Page) {
 }
 
 export async function openContentSettings(page: Page) {
-  const settings = page.getByRole("dialog", { name: "Content settings", exact: true });
-  if (!(await settings.isVisible()))
-    await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(settings).toBeVisible();
-  return settings;
+  const details = page.getByRole("complementary", { name: "Content details", exact: true });
+  const toggle = page.getByRole("button", { name: /^Details/ });
+  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+  await expect(details).toBeVisible();
+  return details;
 }
 
 export async function closeContentSettings(page: Page) {
-  const settings = page.getByRole("dialog", { name: "Content settings", exact: true });
-  if (await settings.isVisible())
-    await settings.getByRole("button", { name: "Close content settings", exact: true }).click();
+  const toggle = page.getByRole("button", { name: /^Details/ });
+  if (await toggle.getAttribute("aria-expanded") === "true") await toggle.click();
+  await expect(page.getByRole("complementary", { name: "Content details", exact: true })).toHaveCount(0);
 }
