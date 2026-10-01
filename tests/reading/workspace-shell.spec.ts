@@ -324,7 +324,6 @@ test("demo initial entry and profile selection use the account page without a fu
     viewport: page.viewportSize()!,
   });
   const staticPage = await staticContext.newPage();
-  let initialBounds;
   try {
     await staticPage.goto("http://127.0.0.1:3132");
     await staticPage.evaluate(() => document.fonts.ready);
@@ -334,7 +333,6 @@ test("demo initial entry and profile selection use the account page without a fu
       await expect(profile).toBeVisible();
       await expect(profile).toHaveAttribute("aria-disabled", "true");
     }
-    initialBounds = await staticPage.locator("main").boundingBox();
     await staticPage.screenshot({
       path: info.outputPath("demo-before-hydration.png"),
     });
@@ -366,11 +364,6 @@ test("demo initial entry and profile selection use the account page without a fu
     page.getByRole("button", { name: /Alex Edwards/ }),
   ).toHaveAttribute("aria-disabled", "false");
   await page.evaluate(() => document.fonts.ready);
-  const readyBounds = await page.locator("main").boundingBox();
-  for (const dimension of ["x", "y", "width", "height"] as const)
-    expect(
-      Math.abs(readyBounds![dimension] - initialBounds![dimension]),
-    ).toBeLessThan(1);
   await page.screenshot({
     path: info.outputPath("demo-profile-selection.png"),
   });
@@ -417,6 +410,99 @@ test("demo initial entry and profile selection use the account page without a fu
     false,
   );
   expect(hydrationErrors).toEqual([]);
+});
+
+test("demo picker keeps its first painted layout through hydration and late font delivery", async ({
+  page,
+}, info) => {
+  await page.addInitScript(() => {
+    const snapshots: number[][][] = [];
+    (window as any).pickerPaints = snapshots;
+    const selectors =
+      "main, .logo, [data-slot=badge], h1, .profile-list, .profile-list button, .profile-list strong, .profile-list small, .profile-list svg, .demo-note";
+    const sample = () => {
+      if (
+        document.querySelector(".profile-list") &&
+        performance.getEntriesByName("first-contentful-paint").length
+      ) {
+        const geometry = Array.from(
+          document.querySelectorAll(selectors),
+          (node) => {
+            const { x, y, width, height } = node.getBoundingClientRect();
+            return [x, y, width, height];
+          },
+        );
+        if (JSON.stringify(geometry) !== JSON.stringify(snapshots.at(-1)))
+          snapshots.push(geometry);
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  });
+  let releaseFont!: () => void;
+  const fontGate = new Promise<void>((resolve) => {
+    releaseFont = resolve;
+  });
+  let releaseScripts!: () => void;
+  const scriptGate = new Promise<void>((resolve) => {
+    releaseScripts = resolve;
+  });
+  const heldFonts: string[] = [];
+  await page.route("**/_next/static/media/*.woff2", async (route) => {
+    heldFonts.push(route.request().url());
+    await fontGate;
+    await route.continue();
+  });
+  await page.route("**/_next/static/chunks/**", async (route) => {
+    await scriptGate;
+    await route.continue();
+  });
+  try {
+    await page.goto("http://127.0.0.1:3132", { waitUntil: "commit" });
+    await page.waitForFunction(() => (window as any).pickerPaints.length > 0);
+    await expect(page.locator(".profile-list button")).toHaveCount(3);
+    await expect(
+      page.getByRole("button", { name: /Alex Edwards/ }),
+    ).toHaveAttribute("aria-disabled", "true");
+    expect(heldFonts.length).toBeGreaterThan(0);
+    // Playwright screenshots normally await fonts.ready; do not hide the state under test.
+    process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY = "1";
+    await page.screenshot({
+      path: info.outputPath("demo-first-paint-font-pending.png"),
+    });
+    releaseScripts();
+    await expect(
+      page.getByRole("button", { name: /Alex Edwards/ }),
+    ).toHaveAttribute("aria-disabled", "false");
+    releaseFont();
+    await page.evaluate(() => document.fonts.ready);
+    await page.screenshot({
+      path: info.outputPath("demo-late-font-stable.png"),
+    });
+    const paints = await page.evaluate(() => (window as any).pickerPaints);
+    expect(paints).toHaveLength(1);
+    await info.attach("first-paint-geometry", {
+      body: JSON.stringify(paints),
+      contentType: "application/json",
+    });
+    await page.unroute("**/_next/static/media/*.woff2");
+    await page.unroute("**/_next/static/chunks/**");
+    await page.reload();
+    await page.evaluate(() => document.fonts.ready);
+    await expect(
+      page.getByRole("button", { name: /Alex Edwards/ }),
+    ).toHaveAttribute("aria-disabled", "false");
+    await page.screenshot({ path: info.outputPath("demo-font-available.png") });
+    expect(
+      await page.evaluate(() => (window as any).pickerPaints),
+    ).toHaveLength(1);
+    await page.getByRole("button", { name: /Alex Edwards/ }).click();
+    await expect(page.locator(".app")).toBeVisible();
+  } finally {
+    releaseScripts();
+    releaseFont();
+    delete process.env.PW_TEST_SCREENSHOT_NO_FONTS_READY;
+  }
 });
 
 test("demo saved picker preserves custom branding, names and inactive profiles", async ({
