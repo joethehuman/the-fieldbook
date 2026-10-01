@@ -257,7 +257,9 @@ test("provider failure stays recoverable, cancellation preserves return, unsafe 
   request,
 }) => {
   await request.post(backend, { data: { fail: true } });
-  await page.goto("/docs/guide");
+  const unavailable = await page.goto("/docs/guide");
+  expect(unavailable?.status()).toBe(503);
+  expect(unavailable?.headers()["cache-control"]).toContain("no-store");
   await expect(page.getByText(/Reference:/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Try again" })).toBeVisible();
   await page.goto("/sign-in");

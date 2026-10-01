@@ -1,5 +1,7 @@
+import { connection } from "next/server";
 import { env } from "@server/env";
 export async function GET() {
+  await connection();
   const { origin, url } = env();
   return Response.json(
     {

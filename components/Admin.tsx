@@ -31,7 +31,8 @@ import { teamPath } from "@/lib/team-hierarchy";
 import { availableDocSections, sectionForDoc } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { AdminSectionPending } from "./admin/AdminSectionPending";
+import { Suspense, lazy, startTransition, useCallback, useEffect, useRef, useState } from "react";
 import type { NavigationGuard, RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { RegisterContentNavigation } from "@/lib/navigation-guard";
 import { ActionGroup } from "./ui/action-group";
@@ -45,20 +46,24 @@ import { SettingsSection } from "./patterns/settings-section";
 import type { Workspace } from "@/lib/store";
 import { effectiveGroups, type Content, type User } from "@/lib/types";
 import type { LearningHandler } from "./Assignments";
-import dynamic from "next/dynamic";
 import { AdminNavigation, adminSections } from "./admin/AdminNavigation";
-import { ContentPending } from "./patterns/content-pending";
-const Editor = dynamic(() => import("./admin/ContentEditor"), { loading: () => <ContentPending label="Opening editor" /> });
-const RecentlyDeleted = dynamic(() => import("./RecentlyDeleted").then(module => module.RecentlyDeleted), { loading: () => <ContentPending label="Loading section" /> });
-const LearningGroups = dynamic(() => import("./LearningGroups"), { loading: () => <ContentPending label="Loading section" /> });
-const Curricula = dynamic(() => import("./Curricula"), { loading: () => <ContentPending label="Loading section" /> });
-const SiteSettingsPanel = dynamic(() => import("./SiteSettingsPanel"), { loading: () => <ContentPending label="Loading section" /> });
-const PendingPeople = dynamic(() => import("./PendingPeople").then(module => module.PendingPeople), { loading: () => <ContentPending label="Loading section" /> });
-const Assignments = dynamic(() => import("./Assignments").then(module => module.Assignments), { loading: () => <ContentPending label="Loading section" /> });
-const FeedbackAdmin = dynamic(() => import("./Feedback").then(module => module.FeedbackAdmin), { loading: () => <ContentPending label="Loading section" /> });
-const TeamsAdmin = dynamic(() => import("./Teams").then(module => module.TeamsAdmin), { loading: () => <ContentPending label="Loading section" /> });
-const TeamProgress = dynamic(() => import("./Teams").then(module => module.TeamProgress), { loading: () => <ContentPending label="Loading section" /> });
+import { contentColumns } from "./patterns/panel-pending";
+import { AdminContentControls } from "./admin/AdminContentControls";
+import { useAdminContentShell } from "./admin/AdminContentShell";
+import { prepareAdminCode } from "./admin/section-code";
+const SiteSettingsPanel = lazy(() => import("./SiteSettingsPanel"));
+const Editor = lazy(() => import("./admin/ContentEditor"));
+const RecentlyDeleted = lazy(() => import("./RecentlyDeleted").then(module => ({ default: module.RecentlyDeleted })));
+const LearningGroups = lazy(() => import("./LearningGroups"));
+const Curricula = lazy(() => import("./Curricula"));
+const PendingPeople = lazy(() => import("./PendingPeople").then(module => ({ default: module.PendingPeople })));
+const Assignments = lazy(() => import("./Assignments").then(module => ({ default: module.Assignments })));
+const FeedbackAdmin = lazy(() => import("./Feedback").then(module => ({ default: module.FeedbackAdmin })));
+const TeamsAdmin = lazy(() => import("./TeamManagement").then(module => ({ default: module.TeamsAdmin })));
+const TeamProgress = lazy(() => import("./Teams").then(module => ({ default: module.TeamProgress })));
 type Props = {
+  initialTab?: string;
+  routeManaged?: boolean;
   onBulk: BulkHandler;
   data: Workspace;
   user: User;
@@ -78,7 +83,9 @@ type Props = {
   onReload?: () => Promise<Workspace>;
 };
 const id = () => crypto.randomUUID();
-export default function Admin({
+function AdminContent({
+  initialTab = "content",
+  routeManaged = false,
   onBulk,
   data,
   user,
@@ -112,16 +119,16 @@ export default function Admin({
     },
     [registerNavigationGuard],
   );
-  const [tab, setTab] = useState("content"),
+  const [tab, setTab] = useState(initialTab),
     [openingTab, setOpeningTab] = useState<string | null>(null),
     [openingItem, setOpeningItem] = useState<string | null>(null),
     [editing, setEditing] = useState<Content | null>(null),
     [person, setPerson] = useState<User | null>(null),
     [notice, setNotice] = useState(""),
-    [filter, setFilter] = useState("all"),
-    [query, setQuery] = useState(""),
-    [category, setCategory] = useState("all"),
-    [contentSort, setContentSort] = useState("created"),
+    [localFilter, localSetFilter] = useState("all"),
+    [localQuery, localSetQuery] = useState(""),
+    [localCategory, localSetCategory] = useState("all"),
+    [localContentSort, localSetContentSort] = useState("created"),
     [peopleSort, setPeopleSort] = useState("title"),
     [peopleRole, setPeopleRole] = useState("all"),
     [peopleGroup, setPeopleGroup] = useState("all"),
@@ -131,9 +138,17 @@ export default function Admin({
       groupId?: string;
       userId?: string;
     } | null>(null);
-  const [contentStatus, setContentStatus] = useState("all"),
-    [contentSection, setContentSection] = useState("all"),
+  const [localContentStatus, localSetContentStatus] = useState("all"),
+    [localContentSection, localSetContentSection] = useState("all"),
     [page, setPage] = useState(1);
+  const contentShell = useAdminContentShell();
+  const controls = routeManaged && initialTab === "content" ? contentShell : null;
+  const filter = controls?.filter ?? localFilter, setFilter = controls?.setFilter ?? localSetFilter;
+  const query = controls?.query ?? localQuery, setQuery = controls?.setQuery ?? localSetQuery;
+  const category = controls?.category ?? localCategory, setCategory = controls?.setCategory ?? localSetCategory;
+  const contentSection = controls?.contentSection ?? localContentSection, setContentSection = controls?.setContentSection ?? localSetContentSection;
+  const contentSort = controls?.contentSort ?? localContentSort, setContentSort = controls?.setContentSort ?? localSetContentSort;
+  const contentStatus = controls?.contentStatus ?? localContentStatus, setContentStatus = controls?.setContentStatus ?? localSetContentStatus;
   const [personBusy, setPersonBusy] = useState(false);
   const [personError, setPersonError] = useState("");
   const personBaseline = useRef<User | null>(null);
@@ -368,7 +383,7 @@ export default function Admin({
   }
 
   function create(kind: Content["kind"]) {
-    setEditing({
+    startTransition(() => setEditing({
       id: id(),
       kind,
       title: "",
@@ -387,8 +402,13 @@ export default function Admin({
         kind === "course" ? [{ id: id(), title: "", body: "" }] : [],
       questions: [],
       ...(kind === "course" ? { requirePassing: false } : {}),
-    });
+    }));
   }
+  useEffect(() => {
+    if (!controls) return;
+    controls.connect(data, create, !!editing);
+    return () => controls.connect(null, null, false);
+  }, [data, editing, controls?.connect]);
   async function save(c: Content, intent: SaveIntent = "draft") {
     if (onSaveContent) return onSaveContent(c, intent);
     const old = data.content.find((x) => x.id === c.id);
@@ -482,7 +502,7 @@ export default function Admin({
       <DetailNavigation items={[{ label: detailScope.userId ? "Back to people" : "Back to learning groups", onSelect: () => { setDetailScope(null); adminPanel.reveal(); } }]} current={detailPerson?.name} />
       {detailScope.groupId ? <LearningGroups data={data} onChange={onChange} onLearning={manageLearning} onLearningMany={manageLearningMany} initialGroup={detailScope.groupId} /> : <>
         <SectionHeader variant="page" title={<h2>{detailPerson?.name}</h2>} description={detailPerson?.email} />
-        <Assignments key={detailScope.userId} data={data} scope={detailScope} onAction={manageLearning} onChange={onChange} onOpenGroup={(groupId) => setDetailScope({ groupId })} />
+        <Assignments key={detailScope.userId} data={data} scope={detailScope} onAction={manageLearning} onChange={onChange} onOpenGroup={(groupId) => startTransition(() => setDetailScope({ groupId }))} />
       </>}
     </div>
   );
@@ -494,7 +514,7 @@ export default function Admin({
     if (onOpenTab) {
       setOpeningTab(next);
       try {
-        await onOpenTab(next);
+        await Promise.all([prepareAdminCode(next), onOpenTab(next)]);
       } catch (error) {
         setNotice((error as Error).message);
         setOpeningTab(null);
@@ -502,36 +522,38 @@ export default function Admin({
       }
       setOpeningTab(null);
     }
-    setTab(next);
-    setDetailScope(null);
+    startTransition(() => {
+      setTab(next);
+      setDetailScope(null);
+      setNotice("");
+      setQuery("");
+    });
     adminPanel.reveal(false);
-    setNotice("");
-    setQuery("");
   }
   return (
     <div className="admin-workspace" aria-busy={!!openingTab}>
-      <h1 className="sr-only">Administration</h1>
+      {!routeManaged && <h1 className="sr-only">Administration</h1>}
       {openingTab && (
         <span className="sr-only" role="status">
           Loading administration data
         </span>
       )}
       <Tabs
-        className="admin-layout"
+        className={routeManaged ? "contents" : "admin-layout"}
         orientation="vertical"
         value={tab}
         onValueChange={changeAdminTab}
       >
-<AdminNavigation tab={tab} production={production} onValueChange={changeAdminTab} />
+{!routeManaged && <AdminNavigation tab={tab} production={production} onIntent={(next) => { void prepareAdminCode(next).catch(() => {}); }} onValueChange={changeAdminTab} />}
         <TabsContent
           {...adminPanel.targetProps}
           tabIndex={0}
           value={tab}
-          className="admin-panel mt-0"
+          className={routeManaged ? "mt-0" : "admin-panel mt-0"}
           key={tab}
         >
           <>
-          {!detailScope && !["groups", "curricula", "progress", "feedback", "teams"].includes(
+          {!(routeManaged && tab === "content") && !detailScope && !["groups", "curricula", "progress", "feedback", "teams"].includes(
             tab,
           ) && (
             <SectionHeader
@@ -603,128 +625,7 @@ export default function Admin({
             />
           ) : tab === "content" ? (
             <>
-              <CollectionToolbar
-                filters={
-                  <FilterOptions
-                    label="Content type"
-                    variant="underline"
-                    value={filter}
-                    onValueChange={(value) => {
-                      setFilter(value);
-                      setContentSection("all");
-                      setCategory("all");
-                    }}
-                    options={[
-                      { value: "all", label: "All content" },
-                      { value: "doc", label: "Docs" },
-                      { value: "brief", label: "Updates" },
-                      { value: "course", label: "Courses" },
-                    ]}
-                  />
-                }
-              >
-                <ActionGroup>
-                  <Button onClick={() => create("doc")}>
-                    <Plus size={15} />
-                    Doc
-                  </Button>
-                  <Button onClick={() => create("brief")}>
-                    <Plus size={15} />
-                    Update
-                  </Button>
-                  <Button variant="default" onClick={() => create("course")}>
-                    <Plus size={15} />
-                    Course
-                  </Button>
-                </ActionGroup>
-              </CollectionToolbar>
-              <CollectionControls
-                filters={contentFilters}
-                onClear={clearContentFilters}
-                sortLabel={contentSort === "created" ? "Newest created" : contentSort === "title" ? "Title A–Z" : contentSort === "updated" ? "Recently updated" : "Oldest update first"}
-                sort={
-                <FormField label="Sort content">
-                  <SelectField
-                    value={contentSort}
-                    onValueChange={setContentSort}
-                  >
-                    <option value="created">Newest created</option>
-                    <option value="title">Title A–Z</option>
-                    <option value="updated">Recently updated</option>
-                    <option value="oldest">Oldest update first</option>
-                  </SelectField>
-                </FormField>
-                }
-                search={
-                  <FormField label="Search content" visuallyHiddenLabel>
-                    <Input
-                      type="search"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      placeholder="Search content by title, summary, or folder"
-                    />
-                  </FormField>
-                }
-              >
-                {filter !== "doc" && (
-                  <FormField label="Category">
-                    <SelectField
-                      value={category}
-                      onValueChange={(value) => setCategory(value)}
-                    >
-                      <option value="all">All categories</option>
-                      {[
-                        ...new Set(
-                          data.content
-                            .filter(
-                              (c) => filter === "all" || c.kind === filter,
-                            )
-                            .map((c) => c.category),
-                        ),
-                      ]
-                        .sort()
-                        .map((t) => (
-                          <option key={t} value={t}>
-                            {t}
-                          </option>
-                        ))}
-                    </SelectField>
-                  </FormField>
-                )}
-                <FormField label="Publication status">
-                  <SelectField
-                    value={contentStatus}
-                    onValueChange={setContentStatus}
-                  >
-                    <option value="all">All statuses</option>
-                    <option value="published">Published</option>
-                    <option value="draft">Draft only</option>
-                  </SelectField>
-                </FormField>
-                {filter === "doc" && (
-                  <FormField label="Docs section">
-                    <SelectField
-                      value={contentSection}
-                      onValueChange={setContentSection}
-                    >
-                      <option value="all">All sections</option>
-                      {availableDocSections(
-                        data.content.filter((c) => c.kind === "doc"),
-                        data.settings?.docCategoryOrder,
-                        data.settings?.docSections,
-                      ).map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.parentId
-                            ? `${data.settings?.docSections?.find((p) => p.id === s.parentId)?.name || s.legacyCategory} / `
-                            : ""}
-                          {s.name}
-                        </option>
-                      ))}
-                    </SelectField>
-                  </FormField>
-                )}
-
-              </CollectionControls>
+              {!routeManaged && <AdminContentControls filter={filter} query={query} category={category} contentSection={contentSection} contentSort={contentSort} contentStatus={contentStatus} setFilter={setFilter} setQuery={setQuery} setCategory={setCategory} setContentSection={setContentSection} setContentSort={setContentSort} setContentStatus={setContentStatus} data={data} create={create} contentFilters={contentFilters} clearContentFilters={clearContentFilters} />}
               <AdminBulkActions
                 data={data}
                 collectionSize={selection.collectionSize}
@@ -761,10 +662,10 @@ export default function Admin({
                           />
                         )}
                       </TableHead>
-                      <TableHead>Content</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Version</TableHead>
+                      <TableHead>{contentColumns[1]}</TableHead>
+                      <TableHead>{contentColumns[2]}</TableHead>
+                      <TableHead>{contentColumns[3]}</TableHead>
+                      <TableHead>{contentColumns[4]}</TableHead>
                       <TableHead>
                         <span className="sr-only">Actions</span>
                       </TableHead>
@@ -819,12 +720,13 @@ export default function Admin({
                               disabled={openingItem === c.id}
                               onClick={async () => {
                                 if (!onEdit) {
-                                  setEditing(structuredClone(c));
+                                  startTransition(() => setEditing(structuredClone(c)));
                                   return;
                                 }
                                 setOpeningItem(c.id);
                                 try {
-                                  setEditing(await onEdit(c.id));
+                                  const [item] = await Promise.all([onEdit(c.id), prepareAdminCode("editor")]);
+                                  startTransition(() => setEditing(item));
                                   setNotice("");
                                 } catch (error) {
                                   setNotice((error as Error).message);
@@ -1099,7 +1001,9 @@ export default function Admin({
                             </Button>
                             <Button
                               variant="link"
-                              onClick={() => { setDetailScope({ userId: u.id }); adminPanel.reveal(); }}
+                              onPointerEnter={() => { void prepareAdminCode("assignments").catch(() => {}); }}
+                              onFocus={() => { void prepareAdminCode("assignments").catch(() => {}); }}
+                              onClick={() => { startTransition(() => setDetailScope({ userId: u.id })); adminPanel.reveal(); }}
                             >
                               Courses & progress
                             </Button>
@@ -1266,4 +1170,10 @@ export default function Admin({
       </Dialog>
     </div>
   );
+}
+
+// A section/editor code load keeps the current usable panel on screen.
+// Transitions reveal the destination when it is ready, without a loading visual.
+export default function Admin(props: Props) {
+  return <Suspense fallback={<AdminSectionPending tab={props.initialTab ?? "content"} />}><AdminContent {...props} /></Suspense>;
 }

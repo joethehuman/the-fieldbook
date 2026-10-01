@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import {
   actor,
   requireAdmin,
@@ -8,6 +9,7 @@ import {
 } from "@server/auth";
 import { db, check } from "@server/db";
 export async function GET() {
+  await connection();
   try {
     const user = await actor();
     requireAdmin(user);

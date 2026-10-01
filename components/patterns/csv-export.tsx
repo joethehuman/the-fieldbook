@@ -17,10 +17,12 @@ export function CsvExport({
   report,
   filename,
   disabledReason,
+  disabled = false,
 }: {
   report: () => CsvReport;
   filename: string;
   disabledReason?: string;
+  disabled?: boolean;
 }) {
   const unavailable = useContext(ReportAvailability) || disabledReason;
   const [busy, setBusy] = useState(false);
@@ -37,7 +39,7 @@ export function CsvExport({
   }, []);
   const id = useId();
   async function exportReport() {
-    if (locked.current || unavailable) return;
+    if (locked.current || unavailable || disabled) return;
     locked.current = true;
     setBusy(true);
     setError("");
@@ -61,7 +63,7 @@ export function CsvExport({
       <Button
         type="button"
         variant="outline"
-        disabled={busy || !!unavailable}
+        disabled={disabled || busy || !!unavailable}
         aria-busy={busy}
         aria-describedby={unavailable || error ? id : undefined}
         onClick={() => void exportReport()}

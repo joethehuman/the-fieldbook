@@ -95,7 +95,7 @@ test("authored hyperlinks follow article and course tab rules", async ({
 
   for (const section of ["docs", "updates"]) {
     await page.goto(`/${section}/${ids[section === "docs" ? 0 : 1]}`);
-    const article = page.locator("article");
+    const article = page.locator("article:visible");
     await expect(
       article.getByRole("link", { name: "reference" }),
     ).not.toHaveAttribute("target", "_blank");
@@ -105,7 +105,7 @@ test("authored hyperlinks follow article and course tab rules", async ({
   }
 
   await page.goto(`/courses/${ids[2]}?lesson=first`);
-  const reference = page.locator(".course-reader").getByRole("link", {
+  const reference = page.locator(".course-reader:visible").getByRole("link", {
     name: /reference.*opens in a new tab/,
   });
   await expect(reference).toHaveAttribute("target", "_blank");
@@ -139,7 +139,7 @@ test("reader feedback, next navigation and long Docs menu align visibly", async 
   const next = page.locator('.document-pagination [data-direction="next"]');
   await expect(next).toHaveCSS("text-align", "right");
   await expect(next).toHaveCSS("justify-content", "flex-end");
-  const article = await page.locator("article").boundingBox();
+  const article = await page.locator("article:visible").boundingBox();
   const previousBox = await previous.boundingBox();
   const nextBox = await next.boundingBox();
   expect(Math.abs(previousBox!.x - article!.x)).toBeLessThan(2);
@@ -166,7 +166,7 @@ test("reader feedback, next navigation and long Docs menu align visibly", async 
   await expect(tree).toHaveAttribute("data-scroll-fade-before", "true");
   await expect(tree).toHaveAttribute("data-scroll-fade-after", "false");
   await page.setViewportSize({ width: 390, height: 844 });
-  const narrowArticle = await page.locator("article").boundingBox();
+  const narrowArticle = await page.locator("article:visible").boundingBox();
   const narrowPrevious = await previous.boundingBox();
   const narrowNext = await next.boundingBox();
   expect(Math.abs(narrowPrevious!.x - narrowArticle!.x)).toBeLessThan(2);
@@ -238,12 +238,21 @@ test("current section URLs are canonical and retired names do not open the app",
   }
 });
 
-test("guest team report stays empty without a workspace or catalog read", async ({
+test("direct Team requests redirect guests and reject learners without reading or revealing reports", async ({
   page,
   request,
 }) => {
-  const response = await request.get("/team");
-  expect(response.status()).toBe(200);
+  const response = await request.get("/team", { maxRedirects: 0 });
+  expect(response.status()).toBe(307);
+  const destination = new URL(
+    response.headers().location,
+    "http://localhost:3131",
+  );
+  expect(destination.pathname).toBe("/auth/sign-in");
+  expect(destination.searchParams.get("next")).toBe("/team");
+  expect(response.headers()["cache-control"]).toContain("no-store");
+  expect(response.headers().vary).toContain("Cookie");
+  expect(await response.text()).not.toContain("Team progress");
   const reads = await (await request.get(`${backend}/reads`)).json();
   expect(reads.reads).toBe(0);
   let workspaceReads = 0;
@@ -251,13 +260,50 @@ test("guest team report stays empty without a workspace or catalog read", async 
     if (entry.url().includes("/api/workspace")) workspaceReads++;
   });
   await page.goto("/team");
-  await expect(
-    page.getByText("Reporting requires an administrator or manager account."),
-  ).toBeVisible();
-  expect(workspaceReads).toBe(0);
-  await fixture(request, { settings: { access: "private" } });
-  await page.goto("/team");
   await expect(page).toHaveURL(/\/sign-in(?:\?|$)/);
+  await expect(
+    page.getByRole("heading", { name: "Team progress", exact: true }),
+  ).toHaveCount(0);
+  expect(workspaceReads).toBe(0);
+  // End the guest visit before replacing the shared provider fixture. The
+  // public sign-in page's browsing Link may otherwise prefetch during denial.
+  await page.goto("about:blank");
+  await fixture(request, { settings: { access: "private" }, role: "learner" });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value:
+        "base64-" +
+        Buffer.from(
+          JSON.stringify({
+            ...token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+          }),
+        ).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+  const denied = await page.request.get("/team", { maxRedirects: 0 });
+  expect(denied.status()).toBe(404);
+  expect(denied.headers()["cache-control"]).toContain("no-store");
+  expect(denied.headers().vary).toContain("Cookie");
+  const deniedBody = await denied.text();
+  expect(deniedBody).not.toContain("Team progress");
+  expect(deniedBody).not.toContain("Synthetic Admin");
+  expect(deniedBody).not.toContain("Published course title");
+  await page.goto("/team");
+  await expect(
+    page.getByRole("heading", { name: "Team progress", exact: true }),
+  ).toHaveCount(0);
+  const deniedReads = await (await request.get(`${backend}/reads`)).json();
+  expect(deniedReads.reads, JSON.stringify(deniedReads)).toBe(0);
+  expect(deniedReads.governanceReads).toBe(0);
+  expect(deniedReads.feedbackReads).toBe(0);
+  expect(workspaceReads).toBe(0);
 });
 
 test("hosted privacy stays in the app shell and returns to Courses without a workspace load", async ({
@@ -301,8 +347,15 @@ test("hosted privacy stays in the app shell and returns to Courses without a wor
   await page.getByRole("menuitem", { name: "Privacy policy" }).click();
   await expect(page).toHaveURL(/\/privacy$/);
   await expect(page.getByText("Our published policy.")).toBeVisible();
-  await expect(page.locator(".sidebar")).toHaveCount(1);
+  if (testInfo.project.name === "phone") {
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  }
+  await expect(page.locator(".sidebar:visible")).toHaveCount(1);
+  await expect(page.getByRole("navigation", { name: "Primary" })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath("privacy-shell.png") });
+  if (testInfo.project.name === "phone") {
+    await page.getByRole("button", { name: "Close navigation" }).click();
+  }
   await page.getByRole("link", { name: "← Acme Learning" }).click();
   await expect(page).toHaveURL(/\/courses$/);
   await expect(
@@ -426,40 +479,29 @@ for (const signedIn of [false, true]) {
     await page.goto("/updates");
     expect(documentNavigations).toBe(1);
     await expect(page.getByRole("heading", { name: "For you" })).toBeVisible();
-    if (signedIn)
-      expect(
-        (await (await request.get(`${backend}/reads`)).json()).authReads,
-      ).toBe(0);
-    await expect
-      .poll(async () => {
-        const { readQueries } = await (
-          await request.get(`${backend}/reads`)
-        ).json();
-        return readQueries.some((query: string) => {
-          const params = new URLSearchParams(query);
-          return (
-            params.get("id") === `eq.${ids[1]}` &&
-            params.get("select")?.includes("published_revision")
-          );
-        });
-      })
-      .toBe(true);
+    const { authReads } = await (await request.get(`${backend}/reads`)).json();
+    // Signed-in navigation verifies admission freshly; guests need no Auth read.
+    if (signedIn) expect(authReads).toBeGreaterThan(0);
+    else expect(authReads).toBe(0);
+    // Reader segments opt out of runtime-content prefetch during scoped PPR
+    // adoption. The clicked request must resolve its own current article body.
     const html = await page.content();
     if (!signedIn) {
       expect(html).not.toContain("Internal group");
       expect(html).not.toContain('"parent"');
     }
     await page.evaluate(() => ((window as any).__readerMarker = "kept"));
-    await page.locator(`a.brief-card[href="/updates/${ids[1]}"]`).click();
+    await page.locator(`a.brief-card[href="/updates/${ids[1]}"]:visible`).click();
+    await expect(page).toHaveURL(new RegExp(`/updates/${ids[1]}$`));
     await expect(
       page.getByRole("heading", { name: items[1].title }),
     ).toBeVisible();
+    await expect(page).toHaveTitle(`${items[1].title} | Acme Learning`);
     expect(await page.evaluate(() => (window as any).__readerMarker)).toBe(
       "kept",
     );
     const updateQueries = (await (await request.get(`${backend}/reads`)).json())
       .readQueries;
-    // The body may have arrived from an eager prefetch before the click.
     const bodyQueries = updateQueries.filter((query: string) =>
       new URLSearchParams(query).get("select")?.includes("published_revision"),
     );
@@ -469,6 +511,12 @@ for (const signedIn of [false, true]) {
         new URLSearchParams(query).get("select")?.includes("title:published"),
       ),
     ).toBe(false);
+    expect(bodyQueries.every((query: string) =>
+      new URLSearchParams(query).get("id")?.startsWith("eq."),
+    )).toBe(true);
+    expect(bodyQueries.some((query: string) =>
+      new URLSearchParams(query).get("id") === `eq.${ids[1]}`,
+    )).toBe(true);
     await page.getByRole("link", { name: /Back to updates/ }).click();
     await expect(page).toHaveURL(/\/updates$/);
     if ((page.viewportSize()?.width || 0) < 768)
@@ -686,7 +734,7 @@ test("Courses share reader navigation and show the signed-in account immediately
   expect(await page.content()).toContain("Synthetic Admin");
   expect(await page.content()).not.toContain("SECRET DRAFT BODY");
   await page.evaluate(() => ((window as any).__readerMarker = "kept"));
-  await page.locator(`a.course-card[href="/courses/${ids[2]}"]`).click();
+  await page.locator(`a.course-card[href="/courses/${ids[2]}"]:visible`).click();
   await expect(
     page.getByRole("heading", { name: items[2].title }),
   ).toBeVisible();
@@ -863,7 +911,7 @@ test("client navigation rechecks publication, item type and installation access"
     await page.unroute(target);
   }
 });
-test("server HTML, metadata, redaction and a compact index plus one body read", async ({
+test("server HTML, metadata and redaction use one admission projection, compact index and body", async ({
   request,
 }) => {
   for (const [index, section] of ["docs", "updates", "courses"].entries()) {
@@ -891,9 +939,28 @@ test("server HTML, metadata, redaction and a compact index plus one body read", 
     expect(html).not.toContain("hidden-group");
     expect(html).not.toContain("Synthetic Admin");
     expect(html).not.toMatch(/\\"answer\\":/);
-    expect((await (await request.get(`${backend}/reads`)).json()).reads).toBe(
-      2,
+    const { reads, readQueries } = await (
+      await request.get(`${backend}/reads`)
+    ).json();
+    const queries = readQueries.map((query: string) => new URLSearchParams(query));
+    const admission = queries.filter((query: URLSearchParams) =>
+      query.get("select") === "id,kind:published->>kind,status:published->>status",
     );
+    const indexes = queries.filter((query: URLSearchParams) =>
+      query.get("select")?.includes("title:published"),
+    );
+    const bodies = queries.filter((query: URLSearchParams) =>
+      query.get("select") === "id,published,published_revision",
+    );
+    // The fresh pre-byte access/existence projection is bounded separately from
+    // reusable published data; metadata and rendering must not duplicate bodies.
+    expect(admission).toHaveLength(1);
+    expect(admission[0].get("id")).toBe(`eq.${ids[index]}`);
+    expect(indexes).toHaveLength(1);
+    expect(indexes[0].has("id")).toBe(false);
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0].get("id")).toBe(`eq.${ids[index]}`);
+    expect(reads).toBe(admission.length + indexes.length + bodies.length);
   }
 });
 test("missing, wrong-kind, unpublished and service failures have real statuses", async ({
@@ -1036,23 +1103,20 @@ test("private HTML and RSC requests redirect without item or draft data", async 
   await fixture(request, { settings: { access: "private", logoUrl: "" } });
   const next = `/courses/${ids[2]}?lesson=second`;
   for (const headers of [{}, { RSC: "1" }] as Record<string, string>[]) {
-    let response = await request.get(next, { maxRedirects: 0, headers });
-    if (response.headers().location?.startsWith(next + "&_rsc"))
-      response = await request.get(response.headers().location, {
-        maxRedirects: 0,
-        headers,
-      });
+    const response = await request.get(next, { maxRedirects: 0, headers });
     const html = await response.text();
-    if ("RSC" in headers) {
-      expect(response.status()).toBe(200);
-      expect(html).toContain("NEXT_REDIRECT");
-      expect(html).toContain(`/auth/sign-in?next=${encodeURIComponent(next)}`);
-    } else {
-      expect(response.status()).toBe(307);
-      expect(response.headers().location).toBe(
-        `/auth/sign-in?next=${encodeURIComponent(next)}`,
-      );
-    }
+    // Admission rejects both request hints before rendering workspace bytes.
+    expect(response.status()).toBe(307);
+    const destination = new URL(response.headers().location, response.url());
+    expect(destination.origin).toBe(new URL(response.url()).origin);
+    expect(destination.pathname + destination.search).toBe(
+      `/auth/sign-in?next=${encodeURIComponent(next)}`,
+    );
+    expect(response.headers()["cache-control"]).toContain("no-store");
+    expect(response.headers().vary).toContain("Cookie");
+    expect(html).not.toContain('id="main-content"');
+    expect(html).not.toContain('aria-label="Search all content"');
+    expect(html).not.toContain("Synthetic Admin");
     for (const item of items) {
       expect(html).not.toContain(item.title);
       expect(html).not.toContain(item.summary);
@@ -1457,7 +1521,7 @@ test("reader does not load workspace and picks up republished content on reload"
 });
 
 async function expectReadingWidth(page: Page) {
-  const geometry = await page.locator("article.article").evaluate((article) => {
+  const geometry = await page.locator("article.article:visible").evaluate((article) => {
     const main = article.closest("main")!;
     const style = getComputedStyle(main);
     const available =
@@ -1525,7 +1589,7 @@ test("short and long articles fill the shared reading width in both apps", async
           await page.goto(`http://localhost:3132/#${section}/${item.id}`);
           await page.reload();
         }
-        await expect(page.locator("article h1")).toHaveText(item.title);
+        await expect(page.locator("article:visible h1")).toHaveText(item.title);
         await expectReadingWidth(page);
         if (length === "short")
           await page.screenshot({

@@ -1,7 +1,8 @@
+import { connection } from "next/server";
 import { actor, errorResponse, HttpError } from "@server/auth";
 import { snapshot } from "@server/snapshot";
-export const dynamic = "force-dynamic";
 export async function GET() {
+  await connection();
   try {
     const user = await actor();
     return Response.json(

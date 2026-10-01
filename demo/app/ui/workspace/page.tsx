@@ -1,4 +1,5 @@
 "use client";
+import { TablePending, FormPending, contentColumns, progressColumns } from "@/components/patterns/panel-pending";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { Menu, BookOpen } from "lucide-react";
@@ -10,7 +11,6 @@ import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { AccountMenu } from "@/components/patterns/account-menu";
-import { ContentPending } from "@/components/patterns/content-pending";
 
 export default function Page() {
   const notify = useToast();
@@ -81,8 +81,11 @@ export default function Page() {
           page own their scrolling; the header stays in flow.
         </p>
         <Card>
-          <h2>Local content placeholder</h2>
-          <ContentPending label="Loading example content" />
+          <h2>Pending content within a stable shell</h2>
+          <p>Real navigation and controls stay in place; only pending data uses these shared, motion-free patterns.</p>
+          <TablePending layout="contentSelection" columns={contentColumns} label="Retrieving content" />
+          <TablePending layout="progress" columns={progressColumns} label="Retrieving team progress" summary />
+          <FormPending label="Retrieving settings" />
         </Card>
         {Array.from({ length: 12 }, (_, index) => (
           <Card key={index}>

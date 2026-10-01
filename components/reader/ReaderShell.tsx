@@ -27,7 +27,6 @@ import {
   sidebarPrimaryLinkClassName,
 } from "@/components/patterns/desktop-sidebar";
 import { useDesktopSidebar } from "@/components/patterns/desktop-sidebar-state";
-import { DocumentTree } from "@/components/patterns/document-tree";
 import { AccountMenu } from "@/components/patterns/account-menu";
 import { NavigationButton } from "@/components/patterns/navigation-button";
 import { Alert } from "@/components/ui/alert";
@@ -35,18 +34,30 @@ import { Button } from "@/components/ui/button";
 import { ReaderSearch } from "./ReaderSearch";
 import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
+import { defaultSettings } from "@/lib/settings";
 import { homePath } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
 
 export function ReaderShell({
   context: initialContext,
   children,
+  documentNavigation,
 }: {
-  context: ReaderShellContext;
+  context?: ReaderShellContext;
   children: ReactNode;
+  documentNavigation?: ReactNode;
 }) {
   const [accountError, setAccountError] = useState<string | null>(null);
-  const [context, updateContext] = useState(initialContext);
+  const [contextReady, setContextReady] = useState(!!initialContext);
+  const [context, setContext] = useState<ReaderShellContext>(initialContext ?? {
+    user: null,
+    branding: { name: "Fieldbook", accent: defaultSettings.accent, privacyUrl: null },
+    docs: [], docCategoryOrder: [], docSections: [],
+  });
+  const updateContext = useCallback((next: ReaderShellContext) => {
+    setContext(next);
+    setContextReady(true);
+  }, []);
   const guard = useRef<NavigationGuard | null>(null);
   const contentNavigation = useRef<ContentNavigation | null>(null);
   const registerContentNavigation = useCallback((next: ContentNavigation | null) => {
@@ -60,10 +71,6 @@ export function ReaderShell({
       setProtectedState(!!next && !!options?.protected);
     },
     [],
-  );
-  const shell = useMemo(
-    () => ({ updateContext, registerNavigationGuard, registerContentNavigation }),
-    [registerNavigationGuard, registerContentNavigation],
   );
   async function canLeave() {
     if (checking.current) return false;
@@ -106,7 +113,7 @@ export function ReaderShell({
     [context.docs, context.docCategoryOrder, context.docSections],
   );
   const selected =
-    pathname === "/docs"
+    section === "admin" || section === "team" ? null : pathname === "/docs"
       ? orderedDocList[0]?.id || null
       : pathname.split("/")[2] || null;
   const { collapsed, setCollapsed } = useDesktopSidebar(
@@ -190,6 +197,10 @@ export function ReaderShell({
       if (await beforeNavigation()) startNavigation(() => router.push(href));
     });
   }
+  const shell = useMemo(
+    () => ({ updateContext, registerNavigationGuard, registerContentNavigation, navigate, presentation: contextReady ? context : null }),
+    [updateContext, registerNavigationGuard, registerContentNavigation, pathname, router, context, contextReady],
+  );
   async function signOut() {
     if (!(await canLeave())) return;
     setAccountError(null);
@@ -289,22 +300,11 @@ export function ReaderShell({
                 </NavigationButton>
               ))}
             </nav>
-            {section === "docs" && (
-              <DocumentTree
-                docs={context.docs}
-                order={context.docCategoryOrder}
-                sections={context.docSections}
-                selected={selected}
-                href={(id) => `/docs/${encodeURIComponent(id)}`}
-                onNavigate={(id) => {
-                  void navigate(`/docs/${encodeURIComponent(id)}`);
-                }}
-                storageKey="fieldbook.documents.production"
-              />
-            )}
+            {documentNavigation}
             <div className="sidebar-bottom">
               <AccountMenu
-                name={context.user?.name || "Guest"}
+                pending={!contextReady}
+                name={contextReady ? context.user?.name || "Guest" : "Account"}
                 email={context.user?.email}
                 guest={!context.user}
                 initials={

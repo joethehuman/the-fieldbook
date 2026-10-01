@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import {
   actor,
   sameOrigin,
@@ -18,6 +19,7 @@ const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 
 export async function GET(req: NextRequest) {
+  await connection();
   try {
     const user = await actor();
     const id = z.uuid().parse(new URL(req.url).searchParams.get("contentId"));

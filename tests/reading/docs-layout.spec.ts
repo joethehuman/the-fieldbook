@@ -93,10 +93,14 @@ for (const app of ["demo", "production"] as const) {
       .getByRole("navigation", { name: "Previous and next documents" })
       .getByRole("link", { name: /Next/ })
       .click();
-    await expect(page.locator("article h1")).toHaveText(arranged[1].title);
+    await expect(page.locator("article:visible h1")).toHaveText(
+      arranged[1].title,
+    );
     await expect(disclosure).not.toHaveAttribute("open");
     await page.goBack();
-    await expect(page.locator("article h1")).toHaveText(arranged[0].title);
+    await expect(page.locator("article:visible h1")).toHaveText(
+      arranged[0].title,
+    );
     await expect(disclosure).not.toHaveAttribute("open");
   });
 
@@ -134,7 +138,7 @@ for (const app of ["demo", "production"] as const) {
     const breadcrumb = page
       .getByRole("navigation", { name: "Breadcrumb" })
       .getByRole("link", { name: "Organization" });
-    const authored = page.locator("article").getByRole("link", {
+    const authored = page.locator("article:visible").getByRole("link", {
       name: "the guide",
     });
     await expect(authored).toBeVisible();
@@ -206,7 +210,9 @@ for (const app of ["demo", "production"] as const) {
       await page.goto("/docs");
       await expect(page).toHaveURL(/\/docs$/);
     }
-    await expect(page.locator("article h1")).toHaveText(arranged[1].title);
+    await expect(page.locator("article:visible h1")).toHaveText(
+      arranged[1].title,
+    );
     await expect(page.getByRole("link", { name: /Back to docs/ })).toHaveCount(
       0,
     );
@@ -246,7 +252,9 @@ for (const app of ["demo", "production"] as const) {
         .getByRole("link", { name: "Docs" })
         .click();
       await expect(page).toHaveURL(/\/docs$/);
-      await expect(page.locator("article h1")).toHaveText(arranged[1].title);
+      await expect(page.locator("article:visible h1")).toHaveText(
+        arranged[1].title,
+      );
       expect(
         await page.evaluate(
           () => performance.getEntriesByType("navigation").length,
@@ -268,7 +276,9 @@ for (const app of ["demo", "production"] as const) {
         },
       });
       await page.reload();
-      await expect(page.locator("article h1")).toHaveText(arranged[0].title);
+      await expect(page.locator("article:visible h1")).toHaveText(
+        arranged[0].title,
+      );
       await expect(
         page.locator(`.document-tree a[href="/docs/${arranged[0].id}"]`),
       ).toHaveAttribute("aria-current", "page");
@@ -296,7 +306,7 @@ for (const app of ["demo", "production"] as const) {
     await expect(
       page.getByRole("heading", { name: "No docs yet" }),
     ).toBeVisible();
-    await expect(page.locator("article")).toHaveCount(0);
+    await expect(page.locator("article:visible")).toHaveCount(0);
     await page.screenshot({
       animations: "disabled",
       path: info.outputPath(`${app}-docs-empty-${info.project.name}.png`),
@@ -328,19 +338,19 @@ for (const app of ["demo", "production"] as const) {
         ? `http://localhost:3132/#docs/${docs[index].id}${heading ? `?heading=${heading}` : ""}`
         : `/docs/${docs[index].id}${heading ? `#${heading}` : ""}`;
     await page.goto(url(39, "heading-overview-2"));
-    await expect(page.locator("article h1")).toHaveText(docs[39].title);
+    await expect(page.locator("article:visible h1")).toHaveText(docs[39].title);
     await expect
       .poll(() =>
         page
-          .locator("#heading-overview-2")
+          .locator("article:visible #heading-overview-2")
           .evaluate((el) => Math.round(el.getBoundingClientRect().top)),
       )
       .toBeGreaterThanOrEqual(0);
     await expect(
       page.locator(
         info.project.name === "phone"
-          ? '.reading-outline-disclosure a[aria-current="location"]'
-          : '.reading-outline-wide a[aria-current="location"]',
+          ? '.reading-outline:visible .reading-outline-disclosure a[aria-current="location"]'
+          : '.reading-outline:visible .reading-outline-wide a[aria-current="location"]',
       ),
     ).toHaveAttribute("href", /heading-overview-2$/);
     await page.screenshot({
@@ -392,11 +402,15 @@ for (const app of ["demo", "production"] as const) {
       await page
         .getByRole("button", { name: "Close navigation", exact: true })
         .click();
-    await page.locator("#main-content").evaluate((el) => el.scrollTo(0, 0));
+    await page
+      .locator("#main-content:visible")
+      .evaluate((el) => el.scrollTo(0, 0));
     const bar = page.locator(".topbar");
     await expect(bar).toHaveCSS("position", "relative");
     await page.screenshot({ path: info.outputPath(`${app}-bar-top.png`) });
-    await page.locator("#main-content").evaluate((el) => el.scrollTo(0, 1400));
+    await page
+      .locator("#main-content:visible")
+      .evaluate((el) => el.scrollTo(0, 1400));
     await expect
       .poll(() => bar.evaluate((el) => el.getBoundingClientRect().top))
       .toBe(0);
@@ -427,7 +441,7 @@ for (const app of ["demo", "production"] as const) {
       path: info.outputPath(`${app}-previous-next.png`),
     });
     await pagination.getByRole("link", { name: /Next/ }).click();
-    await expect(page.locator("article h1")).toHaveText(docs[40].title);
+    await expect(page.locator("article:visible h1")).toHaveText(docs[40].title);
     expect(await tree.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
     await page.screenshot({
       animations: "disabled",
@@ -437,9 +451,11 @@ for (const app of ["demo", "production"] as const) {
       pagination.getByRole("link", { name: /Previous/ }),
     ).toContainText(docs[39].title);
     await page.goBack();
-    await expect(page.locator("article h1")).toHaveText(docs[39].title);
+    await expect(page.locator("article:visible h1")).toHaveText(docs[39].title);
     await page.goto(url(0));
-    const marker = page.locator("#heading-overview > .heading-permalink");
+    const marker = page.locator(
+      "article:visible #heading-overview > .heading-permalink",
+    );
     await page.mouse.move(0, 0);
     await expect(marker).toHaveText("");
     await expect(marker.locator("svg")).toHaveCount(1);
@@ -472,10 +488,12 @@ for (const app of ["demo", "production"] as const) {
     });
     await lastHeading.focus();
     await page.keyboard.press("Enter");
-    await expect(page.locator("#heading-finish")).toBeInViewport();
+    await expect(
+      page.locator("article:visible #heading-finish"),
+    ).toBeInViewport();
     expect(
       await page
-        .locator("#heading-finish")
+        .locator("article:visible #heading-finish")
         .evaluate((el) => el.getBoundingClientRect().top),
     ).toBeGreaterThanOrEqual(
       await bar.evaluate((el) => el.getBoundingClientRect().bottom),
@@ -515,7 +533,7 @@ for (const app of ["demo", "production"] as const) {
           ),
         )
         .toBe(true);
-      await page.locator("article h1").scrollIntoViewIfNeeded();
+      await page.locator("article:visible h1").scrollIntoViewIfNeeded();
       await page.screenshot({
         animations: "disabled",
         path: info.outputPath(`${app}-${width}-${scale}.png`),
@@ -624,7 +642,9 @@ for (const app of ["demo", "production"] as const) {
       "true",
     );
     await tree.getByRole("link", { name: "Reference guide" }).click();
-    await expect(page.locator("article h1")).toHaveText("Reference guide");
+    await expect(page.locator("article:visible h1")).toHaveText(
+      "Reference guide",
+    );
     if (narrow) await expect(sidebar).not.toHaveClass(/open/);
     if (narrow) {
       await page.getByRole("button", { name: "Open navigation" }).click();
@@ -672,14 +692,16 @@ test("server navigation is published-only, updates across publication and works 
   const landing = await request.get("/docs", { maxRedirects: 0 });
   expect(landing.status()).toBe(200);
   await page.goto("http://localhost:3131/docs");
-  await expect(page.locator("article h1")).toHaveText(docs[0].title);
+  await expect(page.locator("article:visible h1")).toHaveText(docs[0].title);
   await expect(
     page.locator(`.document-tree a[href="/docs/${docs[0].id}"]`),
   ).toHaveAttribute("aria-current", "page");
   await page.goto(
     `http://localhost:3131/docs/${docs[39].id}#heading-overview-2`,
   );
-  await expect(page.locator("#heading-overview-2")).toBeInViewport();
+  await expect(
+    page.locator("article:visible #heading-overview-2"),
+  ).toBeInViewport();
   await expect(
     page
       .getByRole("navigation", { name: "Previous and next documents" })
@@ -692,14 +714,14 @@ test("server navigation is published-only, updates across publication and works 
   await context.close();
 });
 
-test("a cold Doc click keeps the article visible and shows header progress", async ({
+test("a cold Doc click retains the visible article without a global indicator", async ({
   page,
   request,
 }, info) => {
   const items = docs.slice(0, 3);
   await fixture(request, items);
   await page.goto("/docs");
-  await expect(page.locator("article h1")).toHaveText(items[0].title);
+  await expect(page.locator("article:visible h1")).toHaveText(items[0].title);
   if (info.project.name === "phone")
     await page.getByRole("button", { name: "Open navigation" }).click();
   let release!: () => void;
@@ -718,9 +740,9 @@ test("a cold Doc click keeps the article visible and shows header progress", asy
     await expect(
       page.getByRole("status", { name: "Opening page" }),
     ).toHaveCount(0);
-    await expect(page.locator("article h1")).toHaveText(items[0].title);
+    await expect(page.locator("article:visible h1")).toHaveText(items[0].title);
   } finally {
     release();
   }
-  await expect(page.locator("article h1")).toHaveText(items[2].title);
+  await expect(page.locator("article:visible h1")).toHaveText(items[2].title);
 });

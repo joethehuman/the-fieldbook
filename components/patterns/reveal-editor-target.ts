@@ -5,11 +5,11 @@ const activeReveals = new WeakMap<HTMLElement, () => void>();
 /** Reveal one field within its owning scroll area, then an offscreen stacked panel if needed. */
 export function revealEditorTarget(target: HTMLElement, {
   container = target.closest<HTMLElement>(".writing-scroll-area, .editor-frame-details, .editor-frame-outline")
-    || target.closest<HTMLElement>(".main-content"),
+    || target.closest<HTMLElement>(".admin-panel, .main-content"),
   context = target.closest<HTMLElement>('[data-slot="field"]') || target,
   focus = true,
 }: { container?: HTMLElement | null; context?: HTMLElement; focus?: boolean } = {}) {
-  const owner = target.closest<HTMLElement>(".main-content") || container;
+  const owner = target.closest<HTMLElement>(".admin-panel, .main-content") || container;
   if (!container || !owner) { if (focus) target.focus({ preventScroll: true }); return () => {}; }
   activeReveals.get(container)?.();
   if (focus) target.focus({ preventScroll: true });
@@ -41,9 +41,10 @@ export function revealEditorTarget(target: HTMLElement, {
     if (writing && target === container) return { visible: container.scrollTop <= 1, destination: 0 };
     const viewport = container.getBoundingClientRect();
     const style = getComputedStyle(target);
-    const header = parseFloat(style.getPropertyValue("--editor-header-height")) || 0;
-    const controls = parseFloat(style.getPropertyValue("--editor-controls-height")) || 0;
-    const toolbar = target.closest(".writing-surface")?.querySelector<HTMLElement>(".mdxeditor-toolbar, .writing-view-header")?.getBoundingClientRect().height || 0;
+    const pageWriting = target.closest<HTMLElement>(".editor-frame")?.dataset.writingScroll === "page";
+    const header = pageWriting ? 0 : parseFloat(style.getPropertyValue("--editor-header-height")) || 0;
+    const controls = pageWriting ? 0 : parseFloat(style.getPropertyValue("--editor-controls-height")) || 0;
+    const toolbar = pageWriting ? 0 : target.closest(".writing-surface")?.querySelector<HTMLElement>(".mdxeditor-toolbar, .writing-view-header")?.getBoundingClientRect().height || 0;
     const inCanvas = !!target.closest(".editor-frame-canvas");
     const inControls = !!target.closest(".editor-frame-controls");
     const inToolbar = !!target.closest(".mdxeditor-toolbar, .writing-view-header");
@@ -97,7 +98,8 @@ export function revealEditorTarget(target: HTMLElement, {
     const parent = owner.getBoundingClientRect();
     const control = parentTarget.getBoundingClientRect();
     const style = getComputedStyle(target);
-    const inset = (parseFloat(style.getPropertyValue("--editor-header-height")) || 0)
+    const pageWriting = target.closest<HTMLElement>(".editor-frame")?.dataset.writingScroll === "page";
+    const inset = pageWriting ? 0 : (parseFloat(style.getPropertyValue("--editor-header-height")) || 0)
       + (parseFloat(style.getPropertyValue("--editor-controls-height")) || 0);
     const canvas = parentTarget.closest<HTMLElement>(".editor-frame-canvas");
     const surfaceTop = canvas ? parseFloat(getComputedStyle(canvas).top) : NaN;

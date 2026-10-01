@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { Article } from "@/components/patterns/reading";
 import { ReaderFeedback } from "@/components/reader/ReaderFeedback";
@@ -6,6 +7,7 @@ import { orderedDocs } from "@/lib/docs-navigation";
 import { readerContext, readerItem, readerMetadata } from "@server/reader";
 import { siteOrigins } from "@server/env";
 export async function generateMetadata() {
+  await connection();
   const context = await readerContext("/docs");
   const first = orderedDocs(
     context.docs,
@@ -26,6 +28,7 @@ export async function generateMetadata() {
   };
 }
 export default async function Page() {
+  await connection();
   const context = await readerContext("/docs");
   const first = orderedDocs(
     context.docs,
@@ -53,3 +56,9 @@ export default async function Page() {
     </WorkspacePage>
   );
 }
+
+// Preserve blocking rendering for this route during scoped PPR adoption.
+export const instant = false;
+
+// Retain fresh request-time reader content during scoped Cache Components adoption.
+export const prefetch = "force-disabled";

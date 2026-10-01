@@ -12,15 +12,50 @@ export const authoringUser: User = {
 };
 
 export async function syncAuthoringProvider(page: Page, data: Workspace) {
+  // Native Admin section requests read the provider, including after mocked saves.
   const published = new Map(
     (data.publishedContent || []).map((item) => [item.id, item]),
   );
   await page.request.post("http://127.0.0.1:3130/fixture", {
     data: {
       settings: data.settings,
+      revision: data.revision,
       governanceRevision: data.governanceRevision,
       groups: data.groups,
       curricula: data.curricula,
+      teams: data.teams,
+      users: data.users.map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        email: entry.email,
+        role: entry.role,
+        active: entry.active,
+        groups: entry.groups,
+        team_id: entry.teamId || null,
+        onboarding_start: entry.onboardingStart || null,
+        group_joined_at: entry.groupJoinedAt || {},
+        effective_group_joined_at: entry.effectiveGroupJoinedAt || {},
+      })),
+      pending: (data.pendingUsers || []).map((entry) => ({
+        email: entry.email,
+        name: entry.name,
+        role: entry.role,
+        groups: entry.groups,
+        team_id: entry.teamId || null,
+        onboarding_start: entry.onboardingStart || null,
+      })),
+      progress: Object.entries(data.progress).flatMap(([id, rows]) =>
+        rows.map((entry) => ({ ...entry, user_id: id })),
+      ),
+      feedback: (data.feedback || []).map((entry) => ({
+        id: entry.id,
+        user_id: entry.userId,
+        content_id: entry.contentId,
+        version: entry.version,
+        rating: entry.rating,
+        comment: entry.comment,
+        updated_at: entry.updatedAt,
+      })),
       documents: data.content.map((item) => ({
         id: item.id,
         draft: item,

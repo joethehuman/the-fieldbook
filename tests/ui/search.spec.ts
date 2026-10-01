@@ -134,7 +134,17 @@ test("search preserves an unsaved editor and guards result navigation", async ({
   await page.goto("/#admin");
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   const title = page.getByRole("textbox", { name: "Title", exact: true });
+  // Navigation first saves a dirty draft. A failed write leaves it unsaved and
+  // makes the leave warning deterministic without freezing save or UI timers.
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "fieldbook.workspace.v1") throw new Error("Storage is full");
+      return setItem.call(this, key, value);
+    };
+  });
   await title.fill("Unsaved work survives search");
+  await expect(page.getByRole("status").filter({ hasText: "Save failed" })).toBeVisible();
   const input = page.getByRole("textbox", { name: "Search all content" });
   await input.fill("Published destination");
   const result = page.getByRole("link", { name: /Published destination/ });

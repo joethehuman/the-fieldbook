@@ -71,8 +71,7 @@
 }
 .editor-frame[data-writing-scroll="page"] .writing-surface { max-height: none; }
 .editor-frame[data-writing-scroll="page"] :is(.mdxeditor-toolbar, .writing-view-header) {
-  position: sticky;
-  top: var(--editor-writing-top);
+  position: static;
 }
 .writing-surface:focus-within {
   border-color: var(--ring);

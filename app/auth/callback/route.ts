@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { cookies } from "next/headers";
 import { authClient, actor, HttpError } from "@server/auth";
 import { env } from "@server/env";
@@ -5,6 +6,7 @@ import { safeNext } from "@server/redirect";
 import { SIGN_IN_RETURN_COOKIE } from "@server/sign-in";
 import { signInFailure } from "@server/sign-in-failure";
 export async function GET(req: Request) {
+  await connection();
   const url = new URL(req.url);
   const jar = await cookies();
   const next = safeNext(

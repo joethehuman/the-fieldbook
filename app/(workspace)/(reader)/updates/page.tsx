@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { IntentLink } from "@/components/patterns/intent-link";
 import { ArrowRight } from "lucide-react";
@@ -12,6 +13,7 @@ import {
 } from "@/components/patterns/layout";
 import { readerContext, type ReaderItem } from "@server/reader";
 export async function generateMetadata() {
+  await connection();
   const { branding } = await readerContext("/updates");
   return {
     title: `Updates | ${branding.name}`,
@@ -76,6 +78,7 @@ function Cards({
   );
 }
 export default async function Page() {
+  await connection();
   const { forYou, otherUpdates, settings } = await readerContext("/updates");
   return (
     <WorkspacePage section="/updates">
@@ -106,3 +109,9 @@ export default async function Page() {
     </WorkspacePage>
   );
 }
+
+// Preserve blocking rendering for this route during scoped PPR adoption.
+export const instant = false;
+
+// Retain fresh request-time reader content during scoped Cache Components adoption.
+export const prefetch = "force-disabled";

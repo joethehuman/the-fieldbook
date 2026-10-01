@@ -2,7 +2,11 @@ import { test, expect, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { waitForDraftSaved, openContentSettings } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
-import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
+import {
+  authoringUser,
+  setupAuthoringProvider,
+  syncAuthoringProvider,
+} from "./provider-fixture";
 
 async function setup(
   page: Page,
@@ -91,6 +95,7 @@ async function setup(
       if (control.conflict) {
         state.content[0].title = "Another author's change";
         state.content[0].revision = 2;
+        await syncAuthoringProvider(page, state);
         return route.fulfill({
           status: 409,
           json: { error: "This item changed since you opened it." },
@@ -101,6 +106,15 @@ async function setup(
         ...body.content,
         revision: (state.content[0].revision || 0) + 1,
       };
+      if (body.publish) {
+        state.content[0].publishedRevision = state.content[0].revision;
+        state.publishedContent = [structuredClone(state.content[0])];
+      }
+      if (body.unpublish) {
+        state.content[0].publishedRevision = undefined;
+        state.publishedContent = [];
+      }
+      await syncAuthoringProvider(page, state);
       if (control.loseResponse) return route.abort();
       return route.fulfill({ json: state.content[0] });
     });
@@ -305,6 +319,7 @@ test("failed learning-group save shows one concise inline error", async ({
   state.content[0].status = "published";
   state.publishedContent = [state.content[0]];
   state.groups = [{ ...state.groups[0], learningItems: [] }];
+  await syncAuthoringProvider(page, state);
   await page.route("**/api/governance", (route) =>
     route.fulfill({
       status: 500,

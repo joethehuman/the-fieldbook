@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 
 const backend = "http://127.0.0.1:3130";
 const id = "00000000-0000-4000-8000-000000000081";
@@ -58,13 +58,14 @@ test("admin entry and section changes avoid the full workspace", async ({
   ]);
   let workspaceReads = 0;
   let sectionReads = 0;
-  const editorChunk = JSON.parse(readFileSync(".next/react-loadable-manifest.json", "utf8"))["components/Admin.tsx -> ./admin/ContentEditor"].files.at(-1);
+  const editorChunks = readdirSync(".next/static/chunks").filter(file => file.endsWith(".js") && readFileSync(`.next/static/chunks/${file}`, "utf8").includes('writing-readiness'));
+  expect(editorChunks.length).toBeGreaterThan(0);
   let editorLoads = 0;
   let documentNavigations = 0;
   page.on("request", (req) => {
     if (req.url().includes("/api/workspace")) workspaceReads++;
     if (req.url().includes("/api/admin/snapshot")) sectionReads++;
-    if (req.url().includes(editorChunk)) editorLoads++;
+    if (editorChunks.some(chunk => req.url().includes(chunk))) editorLoads++;
     if (req.isNavigationRequest()) documentNavigations++;
   });
   const response = await page.goto("/admin");
@@ -101,6 +102,14 @@ test("admin entry and section changes avoid the full workspace", async ({
     .fill("Revised administration article");
   await expect(page.getByText("Saved", { exact: true })).toBeVisible();
   expect(workspaceReads).toBe(0);
+  // A refresh after autosave must keep the runtime's open draft. Collection
+  // projections deliberately omit bodies; recovery must fetch the full item.
+  await page.getByRole("button", { name: /^Details/ }).click();
+  await page.getByRole("button", { name: "Draft recovery", exact: true }).click();
+  await page.getByRole("button", { name: "Review saved copy", exact: true }).click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Revised administration article");
+  await expect(page.getByText(draft.body, { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Back to content" }).click();
   const menu = page.getByRole("button", { name: "Open navigation" });
   if (await menu.isVisible()) await menu.click();

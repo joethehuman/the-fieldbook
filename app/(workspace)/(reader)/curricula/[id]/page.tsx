@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { ReaderCurriculum } from "@/components/reader/ReaderCurriculum";
 import {
@@ -13,6 +14,7 @@ type Props = {
 
 export async function generateMetadata({ params }: Props) {
   const { id } = await params;
+  await connection();
   const { data, curriculum } = await readerCurriculum(id);
   return {
     title: `${curriculum.name} | ${data.settings.name}`,
@@ -22,6 +24,7 @@ export async function generateMetadata({ params }: Props) {
 
 export default async function Page({ params, searchParams }: Props) {
   const { id } = await params;
+  await connection();
   const { from } = await searchParams;
   const { data, curriculum } = await readerCurriculum(id);
   return (
@@ -37,3 +40,9 @@ export default async function Page({ params, searchParams }: Props) {
     </WorkspacePage>
   );
 }
+
+// Preserve blocking rendering for this route during scoped PPR adoption.
+export const instant = false;
+
+// Retain fresh request-time reader content during scoped Cache Components adoption.
+export const prefetch = "force-disabled";

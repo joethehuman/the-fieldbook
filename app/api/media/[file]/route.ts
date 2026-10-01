@@ -1,9 +1,11 @@
+import { connection } from "next/server";
 import { actor, errorResponse } from "@server/auth";
 import { signedMediaUrl } from "@server/media";
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ file: string }> },
 ) {
+  await connection();
   try {
     const { file } = await params;
     const url = await signedMediaUrl(file, await actor());

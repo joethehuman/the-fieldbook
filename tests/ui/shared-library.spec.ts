@@ -200,25 +200,16 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   ).toHaveAccessibleDescription(
     "An HTTPS contact page can keep your email address private.",
   );
-  const bold = page.getByRole("button", { name: "Bold", exact: true });
-  const heading = page.getByRole("combobox", { name: "Heading level" });
-  await heading.scrollIntoViewIfNeeded();
-  // At tablet widths the toolbar wraps. Reveal the destination button too,
-  // so native Tab scrolling does not immediately dismiss its focus tooltip.
-  await bold.scrollIntoViewIfNeeded();
-  // Let native scroll notifications finish before opening a focus tooltip:
-  // Radix intentionally dismisses tooltips when an ancestor scrolls.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-  await heading.focus();
-  await page.keyboard.press("Tab");
-  await expect(bold).toBeFocused();
-  await expect(page.getByRole("tooltip")).toHaveText("Bold");
+  const commands = page.getByRole("button", { name: "Commands: insert blocks or format selected text", exact: true });
+  await commands.scrollIntoViewIfNeeded();
+  await commands.focus();
+  await page.keyboard.press("Enter");
+  const insert = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(insert).toBeVisible();
+  await expect(insert.getByRole("menuitem").first()).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(insert).toHaveCount(0);
+  await expect(commands).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("settings-privacy.png"),

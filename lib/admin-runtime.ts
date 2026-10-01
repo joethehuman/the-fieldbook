@@ -8,7 +8,10 @@ import type { Content, User } from "./types";
 import type { SaveIntent } from "./draft-save-queue";
 import { mergeSavedContent } from "./content-save";
 import { SaveRecoveryError } from "./save-recovery";
+import { equalJson } from "./equal-json";
 export type AdminRuntime = {
+  snapshot: () => Workspace;
+  adoptSnapshot: (data: Workspace) => Workspace;
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
   saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
   refresh: () => Promise<Workspace>;
@@ -25,6 +28,40 @@ export type AdminRuntime = {
     unpublish: (id: string) => Promise<Workspace>;
   };
 };
+export function mergeAdminSnapshot(
+  current: Workspace,
+  incoming: Workspace,
+  openItem: string | null = null,
+) {
+  let data = incoming;
+  if (incoming.revision !== undefined && current.revision !== undefined &&
+      incoming.revision < current.revision) {
+    data = { ...data, settings: current.settings, revision: current.revision };
+  }
+  if (incoming.governanceRevision !== undefined && current.governanceRevision !== undefined &&
+      incoming.governanceRevision < current.governanceRevision) {
+    data = {
+      ...data,
+      governanceRevision: current.governanceRevision,
+      users: current.users,
+      groups: current.groups,
+      teams: current.teams,
+      pendingUsers: current.pendingUsers,
+      curricula: current.curricula,
+    };
+  }
+  // A section RSC refresh contains the compact index. Keep the complete
+  // confirmed open draft when that index has not advanced its revision.
+  const open = openItem && current.content.find((item) => item.id === openItem);
+  const item = open && data.content.find((entry) => entry.id === open.id);
+  if (open && item && item !== open && (item.revision || 0) <= (open.revision || 0)) {
+    data = {
+      ...data,
+      content: data.content.map((entry) => entry.id === open.id ? open : entry),
+    };
+  }
+  return data;
+}
 async function upload(file: File) {
   const sign = await request("/api/upload", {
     name: file.name,
@@ -48,11 +85,13 @@ async function upload(file: File) {
 export function createAdminRuntime(initial: {
   data: Workspace;
   user: User;
+  scope?: "content" | "governance" | "feedback" | "deleted";
 }): AdminRuntime {
-  let scope: "content" | "governance" | "feedback" | "deleted" = "content";
+  let scope: "content" | "governance" | "feedback" | "deleted" = initial.scope ?? "content";
+  let current = initial.data;
   let openItem: string | null = null;
   const cached = new Map<"content" | "governance" | "feedback" | "deleted", Workspace>([
-    ["content", initial.data],
+    [scope, initial.data],
   ]);
   const pending = new Map<
     "content" | "governance" | "feedback" | "deleted",
@@ -79,6 +118,11 @@ export function createAdminRuntime(initial: {
     cacheVersion++;
     cached.clear();
     pending.clear();
+  }
+  function remember(data: Workspace, target = scope) {
+    current = data;
+    cached.set(target, data);
+    return data;
   }
   async function fresh(target = scope): Promise<Workspace> {
     const version = cacheVersion;
@@ -109,8 +153,7 @@ export function createAdminRuntime(initial: {
       };
     }
     if (version !== cacheVersion) return fresh(target);
-    cached.set(target, data);
-    return data;
+    return remember(data, target);
   }
   function prepared(target: "content" | "governance" | "feedback" | "deleted") {
     const available = cached.get(target);
@@ -125,6 +168,13 @@ export function createAdminRuntime(initial: {
   }
   const saver = createWorkspaceSaver(request, fresh);
   return {
+    snapshot: () => current,
+    adoptSnapshot: (data) => {
+      if (current === data) return current;
+      data = mergeAdminSnapshot(current, data, openItem);
+      clearCached();
+      return remember(data);
+    },
     upload,
     saveContent: (content, intent) =>
       mutate(async () => {
@@ -144,11 +194,11 @@ export function createAdminRuntime(initial: {
             publish: intent === "published",
           })) as Content;
           const updated = mergeSavedContent(
-            cached.get("content") || initial.data,
+            cached.get("content") || current,
             saved,
           );
           clearCached();
-          cached.set("content", updated);
+          remember(updated, "content");
           return saved;
         } catch (error) {
           contentRecoveryRequired = true;
@@ -236,12 +286,15 @@ export function createAdminRuntime(initial: {
         try {
           saved = await saver(before, after);
         } catch (error) {
-          if (error instanceof SaveRecoveryError)
+          // Settings/report recovery belongs to the workspace saver. Preserve
+          // the explicit saved-copy gate when an open editor/queued autosave or
+          // a content mutation can depend on the uncertain workspace state.
+          if (error instanceof SaveRecoveryError && (openItem || !equalJson(before.content, after.content)))
             contentRecoveryRequired = true;
           throw error;
         }
         clearCached();
-        cached.set(scope, saved);
+        remember(saved);
         return saved;
       }),
     refresh: () =>
@@ -251,7 +304,7 @@ export function createAdminRuntime(initial: {
         const latest = await saver.refresh();
         contentRecoveryRequired = false;
         clearCached();
-        cached.set(scope, latest);
+        remember(latest);
         return latest;
       }),
     manageLearning: async (action) => {
@@ -262,7 +315,7 @@ export function createAdminRuntime(initial: {
     admin: {
       bulk: async (action) => {
         const results: import("@/lib/bulk-actions").BulkResult[] = [];
-        let latest = cached.get(scope) || initial.data;
+        let latest = cached.get(scope) || current;
         openItem = null;
         for (let start = 0; start < action.items.length; start += 100) {
           const items = action.items.slice(start, start + 100);
@@ -296,7 +349,7 @@ export function createAdminRuntime(initial: {
         const data = await prepared(next);
         scope = next;
         openItem = null;
-        return data;
+        return remember(data, next);
       },
       edit: async (id) => {
         const item = await request(
@@ -304,12 +357,12 @@ export function createAdminRuntime(initial: {
         );
         openItem = id;
         const data = {
-          ...(cached.get(scope) || initial.data),
-          content: (cached.get(scope) || initial.data).content.map((entry) =>
+          ...(cached.get(scope) || current),
+          content: (cached.get(scope) || current).content.map((entry) =>
             entry.id === id ? item : entry,
           ),
         };
-        cached.set(scope, data);
+        remember(data);
         return { data, item };
       },
       unpublish: async (id) => {

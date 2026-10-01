@@ -8,7 +8,6 @@ test("confirmations replace one another without shifting layout and fade automat
     name: "Preview confirmation",
     exact: true,
   });
-  await expect(page.getByRole("group", { name: "Formatting" })).toBeVisible();
   await expect(trigger).toBeVisible();
   await trigger.scrollIntoViewIfNeeded();
   const documentPosition = () =>

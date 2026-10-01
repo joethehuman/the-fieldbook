@@ -83,10 +83,11 @@ async function setup(
         },
       }),
     );
-    await page.route("**/api/settings", (route) => {
+    await page.route("**/api/settings", async (route) => {
       const request = route.request().postDataJSON();
       state.settings = request.settings;
       state.revision = (state.revision || 1) + 1;
+      await syncAuthoringProvider(page, state);
       return route.fulfill({ json: { revision: state.revision } });
     });
     await page.route("**/api/content*", async (route) => {

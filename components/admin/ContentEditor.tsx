@@ -164,7 +164,7 @@ export default function ContentEditor({
   useEffect(() => {
     const target = heading.current;
     if (!target) return;
-    const viewport = target.closest<HTMLElement>(".main-content");
+    const viewport = target.closest<HTMLElement>(".admin-panel, .main-content");
     const measure = () => {
       const height = Math.ceil(target.getBoundingClientRect().height);
       const sticky = height <= (viewport?.clientHeight || window.innerHeight) / 2;

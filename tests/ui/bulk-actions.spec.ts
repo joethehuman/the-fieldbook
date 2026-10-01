@@ -65,7 +65,7 @@ test("content selection, explicit deletion, recovery and clean navigation", asyn
     .getByRole("dialog")
     .getByRole("button", { name: "Apply changes", exact: true })
     .click();
-  await expect(page.getByText("No recently deleted items.")).toBeVisible();
+  await expect(page.getByText("No recently deleted items yet.")).toBeVisible();
   await section(page, "Content");
   const row = page
     .getByRole("row")
@@ -108,7 +108,7 @@ test("all matching selection crosses pages and group pickers wait for Apply", as
   const sample = data.content.find((c) => c.kind === "brief")!;
   data.content = Array.from({ length: 26 }, (_, i) => ({
     ...sample,
-    id: `bulk-${i}`,
+    id: `bulk-${String(i).padStart(2, "0")}`,
     title: `Bulk update ${String(i).padStart(2, "0")}`,
   }));
   await page.addInitScript((workspace) => {
@@ -174,6 +174,7 @@ test("existing categories, mixed types and one People menu", async ({
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   }, data);
   await page.goto("/#admin");
+  await page.getByRole("searchbox", { name: "Search content" }).fill("Category fixture");
   for (const c of updates)
     await page
       .getByRole("checkbox", { name: `Select ${c.title}`, exact: true })

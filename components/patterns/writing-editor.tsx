@@ -109,7 +109,7 @@ export function WritingEditor({
           const target = event.target;
           if (!(target instanceof HTMLElement) || !target.matches('[contenteditable], textarea, [role="tabpanel"]')) return;
           const surface = target.closest<HTMLElement>(".writing-surface");
-          const viewport = surface?.closest<HTMLElement>(".main-content");
+          const viewport = surface?.closest<HTMLElement>(".admin-panel, .main-content");
           if (surface && viewport && getComputedStyle(surface).maxHeight !== "none")
             revealEditorTarget(surface, { container: viewport, focus: false });
         }}>

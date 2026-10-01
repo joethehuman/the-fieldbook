@@ -41,7 +41,9 @@ let documents = [],
   reads = 0,
   authReads = 0;
 let fixtureGeneration = Date.now();
-let adminReadDelayMs = 0;
+let adminReadDelayMs = 0, teamReadDelayMs = 0;
+let adminReadStarts = 0;
+let governanceReads = 0, feedbackReads = 0, governanceUnavailable = false;
 let readQueries = [];
 let settings = initial(),
   configuredGroups = [],
@@ -49,6 +51,7 @@ let settings = initial(),
   configuredProgress = [],
   configuredFeedback = [],
   configuredUsers = [],
+  configuredPending = [],
   configuredTeams = [],
   userGroups = [],
   fail = false,
@@ -87,8 +90,13 @@ createServer(async (req, res) => {
     const change = JSON.parse(body || "{}");
     fixtureGeneration = change.governanceRevision ?? fixtureGeneration + 1;
     adminReadDelayMs = change.adminReadDelayMs || 0;
+    teamReadDelayMs = change.teamReadDelayMs || 0;
+    governanceReads = 0;
+    feedbackReads = 0;
+    governanceUnavailable = !!change.governanceUnavailable;
     documents = change.documents || [];
     reads = 0;
+    adminReadStarts = 0;
     authReads = 0;
     readQueries = [];
     settings = { ...initial(), ...change.settings };
@@ -97,15 +105,22 @@ createServer(async (req, res) => {
     configuredProgress = change.progress || [];
     configuredFeedback = change.feedback || [];
     configuredUsers = change.users || [];
+    configuredPending = change.pending || [];
     configuredTeams = change.teams || [];
     userGroups = change.userGroups || [];
     fail = !!change.fail;
     role = change.role || "admin";
-    revision = 1;
+    revision = change.revision ?? 1;
     return send(res, { ok: true });
   }
   if (url.pathname === "/reads")
-    return send(res, { reads, readQueries, authReads });
+    return send(res, { reads, readQueries, authReads, governanceReads, feedbackReads, adminReadStarts });
+  if (url.pathname === "/controls") {
+    const control = JSON.parse(body || "{}");
+    if ("teamReadDelayMs" in control) teamReadDelayMs = control.teamReadDelayMs;
+    if ("governanceUnavailable" in control) governanceUnavailable = control.governanceUnavailable;
+    return send(res, { ok: true });
+  }
   if (url.pathname === "/health") return send(res, { ok: true });
   if (url.pathname === "/auth/v1/.well-known/jwks.json")
     return send(res, { keys: [jwk] });
@@ -131,6 +146,7 @@ createServer(async (req, res) => {
       return send(res, { revision });
     }
     const select = url.searchParams.get("select") || "*";
+    if (select === "access:settings->>access") return send(res, { access: settings.access });
     if (select.includes("name:settings->>name"))
       return send(res, {
         name: settings.name ?? null,
@@ -162,19 +178,27 @@ createServer(async (req, res) => {
   if (url.pathname.startsWith("/storage/v1/object/sign/"))
     return send(res, { signedURL: "/object/sign/synthetic" });
   if (url.pathname === "/rest/v1/fb_documents") {
-    if (adminReadDelayMs && url.searchParams.get("select")?.startsWith("id,revision,published_revision"))
-      await new Promise(resolve => setTimeout(resolve, adminReadDelayMs));
+    if (url.searchParams.get("select")?.startsWith("id,revision,published_revision")) {
+      adminReadStarts++;
+      if (adminReadDelayMs) await new Promise(resolve => setTimeout(resolve, adminReadDelayMs));
+    }
     reads++;
     readQueries.push(url.search);
     let rows = documents;
     const id = url.searchParams.get("id");
     if (id) rows = rows.filter((row) => row.id === id.slice(3));
+    if (url.searchParams.get("deleted_at") === "is.null")
+      rows = rows.filter(row => !row.deleted_at);
     if (url.searchParams.has("published"))
       rows = rows.filter((row) => row.published);
     if (url.searchParams.get("published->>kind") === "eq.course")
       rows = rows.filter((row) => row.published?.kind === "course");
-    if (url.searchParams.get("draft->>kind") === "eq.course")
-      rows = rows.filter((row) => row.draft?.kind === "course");
+  if (url.searchParams.get("draft->>kind") === "eq.course")
+    rows = rows.filter((row) => row.draft?.kind === "course");
+  if (url.searchParams.get("draft->>kind") === "neq.course")
+    rows = rows.filter((row) => row.draft?.kind !== "course");
+    if (url.searchParams.get("select") === "id,kind:published->>kind,status:published->>status")
+      rows = rows.map(row => ({ id: row.id, kind: row.published?.kind, status: row.published?.status }));
     if ((url.searchParams.get("select") || "").includes("title:draft"))
       rows = rows.map((row) => ({
         id: row.id,
@@ -296,16 +320,22 @@ createServer(async (req, res) => {
       : send(res, configuredUsers.length ? configuredUsers : [profile()], 200, {
           "Content-Range": `0-${Math.max(0, configuredUsers.length - 1)}/${configuredUsers.length || 1}`,
         });
-  if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot")
+  if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot" && teamReadDelayMs)
+    await new Promise(resolve => setTimeout(resolve, teamReadDelayMs));
+  if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot") {
+    governanceReads++;
+    if (governanceUnavailable) return send(res, { message: "Synthetic reporting service unavailable" }, 503);
     return send(res, {
       users: configuredUsers.length ? configuredUsers : [profile()],
       progress: configuredProgress,
       groups: configuredGroups,
       teams: configuredTeams,
-      pending: [],
+      pending: configuredPending,
       revision: fixtureGeneration,
     });
+  }
   if (url.pathname === "/rest/v1/fb_feedback") {
+    if (req.method === "GET") feedbackReads++;
     if (req.method === "POST") {
       const row = JSON.parse(body || "{}");
       if (row.content_id === null) {

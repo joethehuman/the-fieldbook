@@ -129,6 +129,7 @@
     max-width: 100%;
   }
   .main-content {
+    isolation: isolate;
     --workspace-inset-block: var(--space-8);
     container: workspace / inline-size;
     display: grid;
@@ -207,6 +208,9 @@
     overscroll-behavior: none;
     scroll-padding-block-start: var(--anchor-offset);
     scrollbar-gutter: stable;
+  }
+  .admin-panel:has(.editor) {
+    padding-bottom: 0;
   }
   .admin-panel > * + * {
     margin-block-start: var(--space-6);
@@ -292,6 +296,11 @@
     min-height: 0;
   }
   .editor-frame[data-writing-scroll="page"] .course-builder-panel:has(.writing-surface) { min-height: 0; }
+  /* Enlarged text and short panels need room for the writing itself. */
+  .editor:has(.editor-frame[data-writing-scroll="page"]) > .editor-heading,
+  .editor-frame[data-writing-scroll="page"] > .editor-frame-controls {
+    position: static;
+  }
   .editor-frame-outline, .editor-frame-details {
     display: grid;
     min-width: 0;

@@ -69,7 +69,12 @@ async function section(page: Page, name: string) {
   if (await picker.isVisible()) {
     await picker.click();
     await page.getByRole("option", { name, exact: true }).click();
-  } else await page.getByRole("tab", { name, exact: true }).click();
+    await expect(picker).toContainText(name);
+  } else {
+    const tab = page.getByRole("tab", { name, exact: true });
+    await tab.click();
+    await expect(tab).toHaveAttribute("aria-selected", "true");
+  }
 }
 async function select(page: Page, name: string, option: string) {
   await page.getByRole("combobox", { name, exact: true }).click();
@@ -261,7 +266,9 @@ test("progress filters, keyboard download, member details and empty report", asy
 }, info) => {
   await setup(page, info);
   await section(page, "Progress");
+  await page.getByRole("button", { name: /^Filters(?: \(\d+\))?$/ }).click();
   await select(page, "Reporting team", "Sales team");
+  await page.keyboard.press("Escape");
   await page
     .getByRole("searchbox", { name: "Find a team member" })
     .fill("zoe@example.test");
@@ -351,7 +358,11 @@ test("feedback filters and sorting preserve text, formula protection and timesta
 }, info) => {
   await setup(page, info);
   await section(page, "Feedback");
+  await page
+    .getByRole("button", { name: "Sort: Newest first", exact: true })
+    .click();
   await select(page, "Sort feedback", "Oldest first");
+  await page.keyboard.press("Escape");
   const result = await download(
     page,
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -369,9 +380,13 @@ test("feedback filters and sorting preserve text, formula protection and timesta
   expect(result.rows[2][5]).toBe("'=1+2");
   expect(result.rows[3][5]).toBe('Zoë, "hello"\n東京');
   expect(result.rows[3][6]).toBe("2026-09-21T17:30:00.000Z");
-  await select(page, "Content type", "Courses");
-  await page.getByRole("group", { name: "Feedback rating" })
-    .getByRole("button", { name: "Useful", exact: true }).click();
+  await page
+    .getByRole("group", { name: "Feedback type", exact: true })
+    .getByRole("button", { name: "Courses", exact: true })
+    .click();
+  await page.getByRole("button", { name: /^Filters(?: \(\d+\))?$/ }).click();
+  await select(page, "Feedback rating", "Useful");
+  await page.keyboard.press("Escape");
   await page.getByRole("searchbox", { name: "Search feedback" }).fill("東京");
   const filtered = await download(
     page,
@@ -443,6 +458,16 @@ test("large reports download every row in displayed order", async ({
   await page
     .getByRole("searchbox", { name: "Find a team member" })
     .fill("Large person");
+  const displayed = page.locator(
+    'table[data-layout="progress"]:visible tbody tr',
+  );
+  await expect(displayed).toHaveCount(1205);
+  const displayedNames = await displayed
+    .locator("td:first-child strong")
+    .allTextContents();
+  expect(new Set(displayedNames)).toEqual(
+    new Set(Array.from({ length: 1205 }, (_, i) => `Large person ${i}`)),
+  );
   const result = await download(
     page,
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -450,12 +475,7 @@ test("large reports download every row in displayed order", async ({
     "large",
   );
   expect(result.rows).toHaveLength(1206);
-  expect(result.rows.slice(1).map((row) => row[0])).toEqual(
-    Array.from({ length: 1205 }, (_, i) => `Large person ${i}`),
-  );
-  await expect(
-    page.locator('table[data-layout="progress"] tbody tr'),
-  ).toHaveCount(1205);
+  expect(result.rows.slice(1).map((row) => row[0])).toEqual(displayedNames);
 });
 
 test("download preparation failure is visible, retryable and creates no file", async ({
@@ -491,71 +511,81 @@ test("download preparation failure is visible, retryable and creates no file", a
   ).toHaveCount(0);
 });
 
-test("unavailable or pending admin report never offers export", async ({
+test("pending and failed route reports keep Admin navigation and recover locally", async ({
   page,
 }, info) => {
   test.skip(
     !info.project.name.startsWith("production"),
-    "Workspace HTTP loading belongs to production",
+    "Server-only route read",
   );
-  let release!: () => void;
-  await page.route("**/api/admin/snapshot?**", async (route) => {
-    if (!route.request().url().includes("scope=governance"))
-      return route.continue();
-    await new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    await route.fulfill({
-      status: 503,
-      json: {
-        error: "The data could not be read completely. Reload and try again.",
-      },
-    });
-  });
   await setup(page, info);
-  await expect.poll(() => !!release).toBe(true);
+  await expect(
+    page.getByRole("status").filter({ hasText: "Content ready" }),
+  ).toBeVisible();
+  await page.request.post("http://127.0.0.1:3130/controls", {
+    data: { teamReadDelayMs: 1800, governanceUnavailable: true },
+  });
   const navigation = page.locator('[data-slot="admin-navigation"]');
   const top = (await navigation.boundingBox())?.y;
+  await page.evaluate(() => {
+    (window as any).reportNavigation = document.querySelector(
+      '[data-slot="admin-navigation"]',
+    );
+  });
   await section(page, "Progress");
-  await expect(page.locator(".admin-workspace")).toHaveAttribute(
-    "aria-busy",
-    "true",
-  );
+  await expect(
+    page.getByRole("status").filter({ hasText: "Retrieving progress" }),
+  ).toBeVisible();
   expect((await navigation.boundingBox())?.y).toBe(top);
   await expect(page.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
   await screenshot(page, info, "loading");
-  release();
   await expect(
-    page.getByText(
-      "The data could not be read completely. Reload and try again.",
-    ),
+    page.getByRole("heading", { name: "Unable to load this section" }),
   ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as any).reportNavigation ===
+        document.querySelector('[data-slot="admin-navigation"]'),
+    ),
+  ).toBe(true);
   await expect(page.getByRole("button", { name: "Export CSV" })).toHaveCount(0);
   await screenshot(page, info, "unavailable");
+  await page.request.post("http://127.0.0.1:3130/controls", {
+    data: { teamReadDelayMs: 0, governanceUnavailable: false },
+  });
+  await page.getByRole("button", { name: "Try again", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+  ).toBeEnabled();
 });
 
-test("admin warms first-visit report sections without duplicate reads", async ({
+test("Admin defers reporting reads until those routes are used", async ({
   page,
 }, info) => {
   test.skip(
     !info.project.name.startsWith("production"),
     "Server-only data path",
   );
-  const reads = { governance: 0, feedback: 0 };
-  await page.route("**/api/admin/snapshot?**", async (route) => {
-    const scope = new URL(route.request().url()).searchParams.get("scope");
-    if (scope === "governance" || scope === "feedback") reads[scope]++;
-    await route.continue();
-  });
   await setup(page, info);
-  await expect.poll(() => reads.governance).toBe(1);
-  await expect.poll(() => reads.feedback).toBe(1);
+  await expect(
+    page.getByRole("status").filter({ hasText: "Content ready" }),
+  ).toBeVisible();
+  const reads = async () =>
+    await (await page.request.get("http://127.0.0.1:3130/reads")).json();
+  expect(await reads()).toMatchObject({ governanceReads: 0, feedbackReads: 0 });
   await section(page, "Progress");
-  await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export CSV" })).toBeEnabled();
+  expect(await reads()).toMatchObject({ governanceReads: 1, feedbackReads: 0 });
   await section(page, "Feedback");
-  await expect(page.getByRole("heading", { name: "Feedback" })).toBeVisible();
-  expect(reads).toEqual({ governance: 1, feedback: 1 });
-  await expect(page.getByText("Opening section…")).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Feedback", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Export CSV" })).toBeEnabled();
+  expect(await reads()).toMatchObject({ governanceReads: 1, feedbackReads: 1 });
+  await expect(page.getByText("Loading section", { exact: true })).toHaveCount(
+    0,
+  );
 });
 
 test("failed progress update disables exports until the complete report reloads", async ({
@@ -660,6 +690,9 @@ test("app bar stays visible over long administration reports", async ({
   );
   await setup(page, info, "admin", data);
   await section(page, "Progress");
+  await expect(
+    page.locator('table[data-layout="progress"] tbody tr'),
+  ).toHaveCount(data.users.filter((user) => user.active).length);
   await page.screenshot({ path: info.outputPath("bar-report-top.png") });
   const panel = page.getByRole("tabpanel", { name: "Progress" });
   await panel.evaluate((el) => el.scrollTo(0, 1000));
@@ -683,9 +716,18 @@ test("People fieldset footers preserve default-stage saving in both applications
   if (production)
     await page.route("**/api/settings", async (route) => {
       data.settings = route.request().postDataJSON().settings;
-      await route.fulfill({ json: { saved: true } });
+      const previous = data.revision ?? 1;
+      data.revision = previous + 1;
+      await page.request.patch(
+        `http://127.0.0.1:3130/rest/v1/fb_config?revision=eq.${previous}`,
+        { data: { settings: data.settings, revision: data.revision } },
+      );
+      await route.fulfill({ json: { revision: data.revision } });
     });
   await section(page, production ? "People" : "Demo profiles");
+  await page
+    .getByRole("button", { name: "New user defaults", exact: true })
+    .click();
   const group = page.getByRole("region", { name: "New users", exact: true });
   await expect(group.getByRole("combobox")).toHaveAccessibleDescription(
     /Applies to newly added users/,
@@ -713,14 +755,13 @@ test("People fieldset footers preserve default-stage saving in both applications
   }
   await screenshot(page, info, "people-fieldset-footers");
   if (production) {
-    await page.request.patch(
-      "http://127.0.0.1:3130/rest/v1/fb_config?revision=eq.1",
-      { data: { settings: data.settings, revision: 2 } },
-    );
     await page.goto("/admin");
   } else await page.reload();
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, production ? "People" : "Demo profiles");
+  await page
+    .getByRole("button", { name: "New user defaults", exact: true })
+    .click();
   await expect(group.getByRole("combobox")).toContainText(
     "New user — onboarding window",
   );

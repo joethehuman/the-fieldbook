@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import Markdown from "@/components/Markdown";
@@ -7,9 +8,10 @@ import { readConfig } from "@server/content";
 import { brandingFromSettings } from "@/lib/branding";
 import { ReaderShell } from "@/components/reader/ReaderShell";
 import { homePath } from "@/lib/navigation";
-export const dynamic = "force-dynamic";
+export const instant = false;
 export const metadata = { title: "Privacy policy" };
 export default async function PrivacyPage() {
+  await connection();
   const [settings, user] = await Promise.all([
     privacySettings(),
     actor(undefined, true),

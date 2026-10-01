@@ -4,6 +4,10 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Use Next.js partial prerendering for the real Admin navigation, Content controls and manager Team progress controls. Prepare section code on intent and alongside route data; replace large loading bars with shared compact local pending states. Preserve private authorization, editor recovery and route history, and keep different reader items separate under the installed framework’s navigation cache.
+
+- Keep writing reachable in shorter Admin panels and with enlarged text, retain editor menus through incidental caret scrolling, and allow failed settings saves to retry after recovering the saved state. Content edits retain their explicit saved-copy recovery protection.
+
 - Make Manage organization open Administration’s Content screen, including from another admin section or editor, with existing unsaved-work protection and no navigation on the Content screen. Defer unrelated admin data and load editors/reports only when opened. Remove the full-screen loading message and global navigation bars from the installed app and demo; retain the workspace frame with local content placeholders for real waits.
 
 - Remove the desktop sidebar keyboard shortcut and hover tip while retaining the accessible toggle button.

@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { cookies } from "next/headers";
 import { SIGN_IN_RETURN_COOKIE } from "@server/sign-in";
 import { safeNext } from "@server/redirect";
@@ -11,12 +12,13 @@ import { errorResponse } from "@server/errors";
 import { AccountUnavailable } from "../AccountUnavailable";
 import Link from "next/link";
 import { homePath } from "@/lib/navigation";
-export const dynamic = "force-dynamic";
+export const instant = false;
 export default async function SignIn({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string; error?: string; reference?: string }>;
 }) {
+  await connection();
   const q = await searchParams;
   if (q.next !== undefined)
     redirect(`/auth/sign-in?next=${encodeURIComponent(q.next)}`);

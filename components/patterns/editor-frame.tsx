@@ -51,20 +51,27 @@ export function EditorFrame({
     const boundary = controls.current;
     setCanvasScrolled(!!surface && !!boundary && surface.getBoundingClientRect().top < boundary.getBoundingClientRect().bottom - 2);
     const target = frame.current;
-    const viewport = target?.closest<HTMLElement>(".main-content");
+    const viewport = target?.closest<HTMLElement>(".admin-panel, .main-content");
     if (target && viewport && surface && boundary) {
       const style = getComputedStyle(target);
       const stop = viewport.getBoundingClientRect().top + viewport.clientTop
         + (parseFloat(style.getPropertyValue("--editor-header-height")) || 0)
         + boundary.getBoundingClientRect().height + (parseFloat(style.rowGap) || 0);
-      target.dataset.writingPinned = String(surface.getBoundingClientRect().top <= stop + 1);
+      const canvasBox = surface.getBoundingClientRect();
+      const viewportBox = viewport.getBoundingClientRect();
+      const bottomInset = parseFloat(getComputedStyle(viewport).paddingBottom) || 0;
+      // A fully visible writing frame is already ready for contained scrolling,
+      // even if the shorter Admin viewport needs no outer scroll to reach it.
+      const fullyVisible = canvasBox.top >= stop - 1
+        && canvasBox.bottom <= viewportBox.top + viewport.clientTop + viewport.clientHeight - bottomInset + 1;
+      target.dataset.writingPinned = String(canvasBox.top <= stop + 1 || fullyVisible);
     }
   }, []);
 
   useEffect(() => {
     const target = frame.current;
     if (!target) return;
-    const viewport = target.closest<HTMLElement>(".main-content");
+    const viewport = target.closest<HTMLElement>(".admin-panel, .main-content");
     const measure = () => {
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
       const width = target.getBoundingClientRect().width;

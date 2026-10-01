@@ -236,6 +236,7 @@ export default function WritingEditorEngine({
   const slashSelection = useRef<BaseSelection | null>(null);
   const toolbarSelection = useRef<BaseSelection | null>(null);
   const activeLine = useRef<HTMLElement | null>(null);
+  const menuScroll = useRef(new WeakMap<HTMLElement, { top: number; left: number }>());
   const [media, setMedia] = useState<"image" | "video">("image");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -555,7 +556,11 @@ export default function WritingEditorEngine({
     activeLine.current = savedLine || (line instanceof HTMLElement ? line : null);
     const rect = trigger?.getBoundingClientRect() || (rangeRect?.height ? rangeRect : line?.getBoundingClientRect());
     if (!rect) return;
-    const viewport = root.current?.closest(".main-content")?.getBoundingClientRect();
+    positionSlash(rect);
+    setSlashQuery(""); setSlashIndex(0); setSlashOpen(true);
+  }
+  function positionSlash(rect: DOMRect) {
+    const viewport = root.current?.closest(".admin-panel, .main-content")?.getBoundingClientRect();
     const spaceAbove = rect.top - (viewport?.top ?? 0);
     const spaceBelow = (viewport?.bottom ?? window.innerHeight) - rect.bottom;
     const above = spaceBelow < 220 && spaceAbove > spaceBelow;
@@ -566,7 +571,17 @@ export default function WritingEditorEngine({
       above,
       maxHeight: Math.max(160, Math.min(360, (above ? spaceAbove : spaceBelow) - 16)),
     });
-    setSlashQuery(""); setSlashIndex(0); setSlashOpen(true);
+  }
+  function rememberTableScroll(target: EventTarget | null) {
+    if (!(target instanceof Element) || !target.closest("table button")) return;
+    for (let owner = target.parentElement; owner && root.current?.contains(owner); owner = owner.parentElement) {
+      if (owner.matches('.writing-scroll-area, [data-lexical-decorator="true"]'))
+        menuScroll.current.set(owner, { top: owner.scrollTop, left: owner.scrollLeft });
+    }
+  }
+  function dismissForScroll(target: EventTarget | null) {
+    if (slashOpen && !slashFromToolbar && target instanceof Node && !slashMenu.current?.contains(target))
+      keepSlashAsText(slashQuery, false);
   }
   function openCommands(trigger: HTMLButtonElement, fromKeyboard: boolean) {
     if (selectionTools.current?.(fromKeyboard)) {
@@ -627,6 +642,7 @@ export default function WritingEditorEngine({
   ], [onUpload, disabled, busy, viewControls]);
   return (
     <div ref={root} className="writing-editor writing-surface rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {
+      rememberTableScroll(event.target);
       if (event.target instanceof Element && event.target.closest(".writing-toolbar-controls")) {
         toolbarSelection.current = null;
         lexicalEditor.current?.getEditorState().read(() => {
@@ -639,11 +655,26 @@ export default function WritingEditorEngine({
         if (slashFromToolbar) setSlashOpen(false);
         else keepSlashAsText(slashQuery, false);
       }
-    }} onScrollCapture={(event) => {
+    }} onWheelCapture={(event) => dismissForScroll(event.target)}
+    onTouchMoveCapture={(event) => dismissForScroll(event.target)}
+    onScrollCapture={(event) => {
       const scroller = event.target;
       if (!(scroller instanceof HTMLElement)) return;
-      if (scroller.matches(".writing-scroll-area") && slashOpen && !slashFromToolbar) keepSlashAsText(slashQuery, false);
+      if (scroller.matches(".writing-scroll-area") && slashOpen && !slashFromToolbar) {
+        const line = activeLine.current?.getBoundingClientRect();
+        const viewport = scroller.getBoundingClientRect();
+        // Native caret scrolling can finish after the command opens. Keep its
+        // overlay on the visible line; deliberate scrolling dismisses above.
+        if (line && line.bottom > viewport.top + scroller.clientTop
+          && line.top < viewport.top + scroller.clientTop + scroller.clientHeight)
+          positionSlash(line);
+        else keepSlashAsText(slashQuery, false);
+      }
       if (!scroller.matches('.writing-scroll-area, [data-lexical-decorator="true"]')) return;
+      const previous = menuScroll.current.get(scroller);
+      menuScroll.current.set(scroller, { top: scroller.scrollTop, left: scroller.scrollLeft });
+      // A queued scroll event at the opener's existing position is not movement.
+      if (previous?.top === scroller.scrollTop && previous.left === scroller.scrollLeft) return;
       // MDXEditor's row/column menus are portaled outside the scrolling table.
       // Dismiss an open menu as its anchor moves, so it cannot drift across the page.
       scroller.querySelectorAll<HTMLButtonElement>('table button[data-state="open"]').forEach((trigger) => trigger.click());
@@ -679,6 +710,7 @@ export default function WritingEditorEngine({
         } catch { /* upload() keeps the document and shows the error. */ }
       })();
     }} onKeyDownCapture={(event) => {
+      rememberTableScroll(event.target);
       if (pendingList.current && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
         if (event.key === "Escape" || event.key === "Backspace") { clearPendingList(); if (event.key === "Escape") event.preventDefault(); return; }
         if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {

@@ -67,11 +67,9 @@ import {
   DEMO_PROFILE_IDS,
   type Workspace,
 } from "@/lib/store";
-import dynamic from "next/dynamic";
+import Admin from "./Admin";
 import type { NavigationGuard } from "@/lib/navigation-guard";
 import type { ContentNavigation } from "@/lib/navigation-guard";
-import { AdminLoading } from "./admin/AdminLoading";
-const Admin = dynamic(() => import("./Admin"), { loading: () => <AdminLoading production={false} /> });
 type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook() {
   const { confirm } = useInteractionDialog();

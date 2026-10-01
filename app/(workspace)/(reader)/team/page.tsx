@@ -1,38 +1,19 @@
-import { WorkspacePage } from "@/components/reader/WorkspacePage";
+import { cacheLife } from "next/cache";
+import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/patterns/layout";
 import { TeamProgress } from "@/components/Teams";
-import { readerTeam, readerTeamContext } from "@server/reader";
+import { readerTeam } from "@server/reader";
 
-export async function generateMetadata() {
-  const { branding } = await readerTeamContext();
-  return {
-    title: `Team progress | ${branding.name}`,
-    robots: { index: false, follow: false },
-  };
+export const instant = true;
+export const metadata = { title: "Team progress | Fieldbook", robots: { index: false, follow: false } };
+
+export default function Page() {
+  return <><PageHeader><h1>Team progress</h1></PageHeader><TeamProgress snapshotPromise={progress()} /></>;
 }
-
-export default async function Page() {
-  const { data, user } = await readerTeam();
-  return (
-    <WorkspacePage section="/team">
-      <>
-        <PageHeader>
-          <h1>Team progress</h1>
-        </PageHeader>
-        <TeamProgress
-          data={data}
-          user={
-            user || {
-              id: "guest",
-              name: "Guest",
-              email: "",
-              role: "learner",
-              groups: [],
-              active: false,
-            }
-          }
-        />
-      </>
-    </WorkspacePage>
-  );
+async function progress() {
+  "use cache: private";
+  cacheLife({ stale: 30 });
+  const snapshot = await readerTeam();
+  if (!snapshot.user?.active || !["admin", "manager"].includes(snapshot.user.role)) notFound();
+  return snapshot;
 }

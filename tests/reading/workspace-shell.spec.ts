@@ -405,42 +405,46 @@ test("course progress refresh updates shell presentation while keeping its lesso
   await expect(page).toHaveURL(new RegExp(`/courses/${courseId}$`));
 });
 
-test("dirty Identity settings protect Back and allow Forward to return to a clean form", async ({
+test("dirty Identity protects Back and restores a clean form through real section history", async ({
   page,
 }) => {
   await page.goto("/docs");
   await account(page, "Manage organization");
-  await expect(page.locator(".admin-layout:visible")).toBeVisible();
-  const picker = page.getByRole("combobox", {
-    name: "Administration section",
+  await expect(page).toHaveURL(/\/admin$/);
+  await adminSection(page, "Identity");
+  const name = page.getByRole("textbox", {
+    name: "Installation name",
     exact: true,
   });
-  if (await picker.isVisible()) {
-    await picker.click();
-    await page.getByRole("option", { name: "Identity", exact: true }).click();
-  } else await page.getByRole("tab", { name: "Identity", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Installation name", exact: true })
-    .fill("Keep dirty settings");
+  const original = await name.inputValue();
+  await name.fill("Keep dirty settings");
   await page.evaluate(() => history.back());
+  await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Installation name", exact: true }),
-  ).toHaveValue("Keep dirty settings");
+  await expect(page).toHaveURL(/\/admin\/settings-identity$/);
+  await expect(name).toHaveValue("Keep dirty settings");
   await page.evaluate(() => history.back());
+  await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
-  await expect(page).toHaveURL(/\/docs$/);
-  await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.locator(".admin-layout:visible")).toBeVisible();
-  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await expect(
+    page.getByRole("columnheader", { name: "Content", exact: true }),
+  ).toBeVisible();
+  await expect(name).toHaveCount(0);
   await page.evaluate(() => history.forward());
+  await expect(page).toHaveURL(/\/admin\/settings-identity$/);
+  await expect(name).toHaveValue(original);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  // The guard's adjacent sentinel must not become an extra history stop.
+  await page.evaluate(() => history.forward());
+  await expect(page).toHaveURL(/\/admin\/settings-identity$/);
+  await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/admin$/);
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/docs$/);
 });
 
-async function adminSection(page: Page, name: string) {
+async function adminSection(page: Page, name: "Identity" | "Curricula") {
   await expect(page.locator(".admin-layout:visible")).toBeVisible();
   const picker = page.getByRole("combobox", {
     name: "Administration section",
@@ -450,9 +454,13 @@ async function adminSection(page: Page, name: string) {
     await picker.click();
     await page.getByRole("option", { name, exact: true }).click();
   } else await page.getByRole("tab", { name, exact: true }).click();
+  const section = { Identity: "settings-identity", Curricula: "curricula" }[
+    name
+  ];
+  if (section) await expect(page).toHaveURL(new RegExp(`/admin/${section}$`));
 }
 
-test("approved dirty link removes its sentinel before Back twice and Forward", async ({
+test("approved dirty link removes only its sentinel and preserves real section history", async ({
   page,
 }) => {
   await page.goto("/updates");
@@ -482,13 +490,26 @@ test("approved dirty link removes its sentinel before Back twice and Forward", a
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page).toHaveURL(/\/docs$/);
   await page.evaluate(() => history.back());
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/curricula$/);
   await expect(page.locator(".admin-layout:visible")).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Name", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Create curriculum", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(/\/admin$/);
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/docs$/);
   await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/admin$/);
+  await page.evaluate(() => history.forward());
+  await expect(page).toHaveURL(/\/admin\/curricula$/);
+  await expect(
+    page.getByRole("textbox", { name: "Name", exact: true }),
+  ).toHaveCount(0);
   await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/docs$/);
 });
@@ -560,14 +581,16 @@ test("clean to immediate re-dirty during queued cleanup rearms a fresh owned his
   await expect
     .poll(() => page.evaluate(() => history.state?.__fieldbookNavigation?.kind))
     .toBe("sentinel");
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/settings-identity$/);
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   release();
-  await expect(page.locator(".settings-panel")).toContainText(
+  await expect(page.locator(".settings-panel:visible")).toContainText(
     "Synthetic save blocked",
   );
   await page.evaluate(() => history.back());
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(page).toHaveURL(/\/admin$/);
+  await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/docs$/);
 });
 
@@ -589,11 +612,19 @@ test("failed logout preserves the signed-in page and offers a retry", async ({
   await expect(page.locator(".admin-layout:visible")).toBeVisible();
 });
 
-test("saved settings keep a single Admin stop through Back and repeated Forward", async ({
+test("saved settings keep one history stop per real Admin section through Back and Forward", async ({
   page,
   request,
 }) => {
+  const contentReady = page
+    .getByRole("status")
+    .filter({ hasText: /^Content ready$/ });
+  const reference = page.locator("article:visible").getByRole("heading", {
+    name: doc.title,
+    exact: true,
+  });
   await page.goto("/docs");
+  await expect(reference).toBeVisible();
   await account(page, "Manage organization");
   await adminSection(page, "Identity");
   const name = page.getByRole("textbox", {
@@ -605,6 +636,7 @@ test("saved settings keep a single Admin stop through Back and repeated Forward"
     await request.post(`${backend}/fixture`, {
       data: {
         ...fixture,
+        revision: 2,
         settings: { ...fixture.settings, name: "Saved installation" },
       },
     });
@@ -620,15 +652,33 @@ test("saved settings keep a single Admin stop through Back and repeated Forward"
     .poll(() => page.evaluate(() => history.state?.__fieldbookNavigation?.kind))
     .toBe("base");
   await page.evaluate(() => history.back());
+  await expect(page).toHaveURL(/\/admin$/);
+  // A native history URL changes before the App Router commits its panel.
+  await expect(contentReady).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/docs$/);
+  await expect(reference).toBeVisible();
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
   await page.evaluate(() => history.forward());
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.locator(".admin-layout:visible")).toBeVisible();
+  await expect(contentReady).toBeVisible();
   await page.evaluate(() => history.forward());
+  await expect(page).toHaveURL(/\/admin\/settings-identity$/);
+  await expect(name).toBeVisible();
+  await expect(name).toHaveValue("Saved installation");
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await page.evaluate(() => history.forward());
+  await expect(page).toHaveURL(/\/admin\/settings-identity$/);
+  await expect(name).toBeVisible();
+  await expect(name).toHaveValue("Saved installation");
+  await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/admin$/);
+  await expect(contentReady).toBeVisible();
   await page.evaluate(() => history.back());
   await expect(page).toHaveURL(/\/docs$/);
+  await expect(reference).toBeVisible();
 });
 
 test("installed tablet keeps the frame and settled Admin and reader geometry", async ({

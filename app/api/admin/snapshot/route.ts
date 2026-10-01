@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import {
   actor,
   errorResponse,
@@ -6,8 +7,8 @@ import {
 } from "@server/auth";
 import { adminSnapshot, type AdminScope } from "@server/admin-snapshot";
 
-export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
+  await connection();
   try {
     const scope = new URL(req.url).searchParams.get("scope");
     if (scope !== "content" && scope !== "governance" && scope !== "feedback" && scope !== "deleted")

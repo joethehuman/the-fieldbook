@@ -25,6 +25,7 @@ import {
 import { GeneralFeedbackDialog } from "./general-feedback-dialog";
 
 export function AccountMenu({
+  pending = false,
   initials,
   name,
   email,
@@ -45,6 +46,7 @@ export function AccountMenu({
   onFeedbackOpen,
   onFeedbackClose,
 }: {
+  pending?: boolean;
   initials: string;
   name: string;
   email?: string;
@@ -97,6 +99,7 @@ export function AccountMenu({
         >
           <DropdownMenuTrigger asChild>
             <Button
+              disabled={pending}
               ref={trigger}
               type="button"
               variant="ghost"

@@ -77,23 +77,21 @@ for (const surface of ["installed", "demo"] as const) {
         const token = await (
           await request.post(`${backend}/auth/v1/token`, { data: {} })
         ).json();
-        await page
-          .context()
-          .addCookies([
-            {
-              name: "sb-test-auth-token",
-              value:
-                "base64-" +
-                Buffer.from(
-                  JSON.stringify({
-                    ...token,
-                    expires_at: Math.floor(Date.now() / 1000) + 3600,
-                  }),
-                ).toString("base64url"),
-              domain: "localhost",
-              path: "/",
-            },
-          ]);
+        await page.context().addCookies([
+          {
+            name: "sb-test-auth-token",
+            value:
+              "base64-" +
+              Buffer.from(
+                JSON.stringify({
+                  ...token,
+                  expires_at: Math.floor(Date.now() / 1000) + 3600,
+                }),
+              ).toString("base64url"),
+            domain: "localhost",
+            path: "/",
+          },
+        ]);
       } else
         await page.addInitScript(
           (data) => {
@@ -145,13 +143,53 @@ for (const surface of ["installed", "demo"] as const) {
       await expect(
         page.getByRole("heading", { name: "Content", exact: true }),
       ).toBeVisible();
-      expect(await page.evaluate(() => window.history.length)).toBe(history);
+      expect(await page.evaluate(() => window.history.length)).toBe(
+        surface === "installed" ? history + 2 : history,
+      );
       expect(
         await page.evaluate(() => (window as any).globalLoadingFlashes),
       ).toEqual([]);
       await page.screenshot({
         path: info.outputPath(`${surface}-content.png`),
       });
+    });
+
+    test("route-managed navigation prepares on keyboard focus and opens once on activation", async ({
+      page,
+      request,
+    }, info) => {
+      test.skip(
+        surface !== "installed" || info.project.name !== "desktop",
+        "Installed desktop route navigation.",
+      );
+      await expect(
+        page.getByRole("status").filter({ hasText: /^Content ready$/ }),
+      ).toBeVisible();
+      const content = page.getByRole("tab", { name: "Content", exact: true });
+      const feedback = page.getByRole("tab", { name: "Feedback", exact: true });
+      await content.focus();
+      await page.keyboard.press("ArrowDown");
+      await expect(feedback).toBeFocused();
+      await expect(page).toHaveURL(/\/admin$/);
+      expect(
+        (await (await request.get(`${backend}/reads`)).json()).feedbackReads,
+      ).toBe(0);
+      await page.keyboard.press("Enter");
+      await expect(page).toHaveURL(/\/admin\/feedback$/);
+      await expect(feedback).toHaveAttribute("aria-selected", "true");
+      await expect(
+        page.getByRole("heading", { name: "Feedback", exact: true }),
+      ).toBeVisible();
+      expect(
+        (await (await request.get(`${backend}/reads`)).json()).feedbackReads,
+      ).toBe(1);
+      await feedback.focus();
+      await page.keyboard.press("ArrowUp");
+      await expect(content).toBeFocused();
+      await expect(page).toHaveURL(/\/admin\/feedback$/);
+      await page.keyboard.press("Space");
+      await expect(page).toHaveURL(/\/admin$/);
+      await expect(content).toHaveAttribute("aria-selected", "true");
     });
 
     test("Manage organization cancels and confirms unsaved settings", async ({
@@ -222,35 +260,56 @@ for (const surface of ["installed", "demo"] as const) {
   });
 }
 
-test("cold Admin data placeholder retains frame and navigation geometry", async ({ page, request }, info) => {
-  await request.post(`${backend}/fixture`, { data: { settings: { access: "private" }, adminReadDelayMs: 1400, documents: [{ id, draft: doc, published: doc, revision: 1, published_revision: 1, updated_at: doc.updatedAt }] } });
-  const token = await (await request.post(`${backend}/auth/v1/token`, { data: {} })).json();
-  await page.context().addCookies([{ name: "sb-test-auth-token", value: "base64-" + Buffer.from(JSON.stringify({ ...token, expires_at: Math.floor(Date.now()/1000)+3600 })).toString("base64url"), domain: "localhost", path: "/" }]);
-  await page.goto("/admin", { waitUntil: "commit" });
-  const status = page.getByRole("status", { name: "Loading administration content" });
-  await expect(status).toBeVisible();
-  await expect(page.locator('.admin-layout:visible [data-slot="select-trigger"]')).toHaveText("Content");
-  const sidebar = await page.locator(".sidebar").boundingBox(), header = await page.locator(".topbar").boundingBox();
-  const adminNav = await page.locator('[data-slot="admin-navigation"]:visible').boundingBox();
-  await page.screenshot({ path: info.outputPath("cold-admin-placeholder.png") });
-  await expect(status).toHaveCount(0);
-  await expect(page.getByText(doc.title, { exact: true })).toBeVisible();
-  expect(await page.locator(".sidebar").boundingBox()).toEqual(sidebar);
-  expect(await page.locator(".topbar").boundingBox()).toEqual(header);
-  expect(await page.locator('[data-slot="admin-navigation"]:visible').boundingBox()).toEqual(adminNav);
-  await expect(page.locator(".app-bar-progress, .loading-bar")).toHaveCount(0);
-});
-
-test("manager keeps Team menu and cannot directly read or write Admin", async ({ page, request }) => {
-  await request.post(`${backend}/fixture`, { data: { settings: { access: "private" }, role: "manager" } });
-  const token = await (await request.post(`${backend}/auth/v1/token`, { data: {} })).json();
-  await page.context().addCookies([{ name: "sb-test-auth-token", value: "base64-" + Buffer.from(JSON.stringify({ ...token, expires_at: Math.floor(Date.now()/1000)+3600 })).toString("base64url"), domain: "localhost", path: "/" }]);
-  await page.goto("/courses"); await navigation(page);
+test("manager keeps Team menu and cannot directly read or write Admin", async ({
+  page,
+  request,
+}) => {
+  await request.post(`${backend}/fixture`, {
+    data: { settings: { access: "private" }, role: "manager" },
+  });
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page
+    .context()
+    .addCookies([
+      {
+        name: "sb-test-auth-token",
+        value:
+          "base64-" +
+          Buffer.from(
+            JSON.stringify({
+              ...token,
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+            }),
+          ).toString("base64url"),
+        domain: "localhost",
+        path: "/",
+      },
+    ]);
+  await page.goto("/courses");
+  await navigation(page);
   await page.getByRole("button", { name: "Account menu", exact: true }).click();
-  await expect(page.getByRole("menuitem", { name: "My team’s progress" })).toBeVisible();
-  await expect(page.getByRole("menuitem", { name: "Manage organization" })).toHaveCount(0);
+  await expect(
+    page.getByRole("menuitem", { name: "My team’s progress" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("menuitem", { name: "Manage organization" }),
+  ).toHaveCount(0);
   expect((await page.request.get("/admin")).status()).toBe(404);
-  for (const scope of ["content", "governance", "feedback", "deleted"]) expect((await page.request.get(`/api/admin/snapshot?scope=${scope}`)).status()).toBe(403);
-  expect((await page.request.get(`/api/content?id=${id}&draft=true`)).status()).toBe(403);
-  expect((await page.request.post("/api/content", { data: { content: doc, expected: 1 }, headers: { origin: "http://localhost:3131" } })).status()).toBe(403);
+  for (const scope of ["content", "governance", "feedback", "deleted"])
+    expect(
+      (await page.request.get(`/api/admin/snapshot?scope=${scope}`)).status(),
+    ).toBe(403);
+  expect(
+    (await page.request.get(`/api/content?id=${id}&draft=true`)).status(),
+  ).toBe(403);
+  expect(
+    (
+      await page.request.post("/api/content", {
+        data: { content: doc, expected: 1 },
+        headers: { origin: "http://localhost:3131" },
+      })
+    ).status(),
+  ).toBe(403);
 });

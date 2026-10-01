@@ -7,7 +7,7 @@ type Props = Omit<ComponentProps<typeof Link>, "prefetch"> & {
   eager?: boolean;
 };
 
-/** Full-route prefetch only for likely destinations or explicit user intent. */
+/** Prepare the route shell for likely destinations or explicit user intent. */
 export function IntentLink({
   eager = false,
   onMouseEnter,
@@ -19,7 +19,7 @@ export function IntentLink({
   return (
     <Link
       {...props}
-      prefetch={eager || intent}
+      prefetch={eager || intent ? "auto" : false}
       onMouseEnter={(event) => {
         setIntent(true);
         onMouseEnter?.(event);

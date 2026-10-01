@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { notFound } from "next/navigation";
 import {
@@ -21,12 +22,14 @@ type Props = {
 
 export async function generateMetadata({ params }: Props) {
   const { id } = await params;
+  await connection();
   const { item, context } = await readerCourseItem(id);
   return readerMetadata(item, context);
 }
 
 export default async function Page({ params, searchParams }: Props) {
   const { id } = await params;
+  await connection();
   const { lesson, curriculum, from } = await searchParams;
   const { item, context } = await readerCourseItem(id);
   const progress = context.user ? await readerCourseProgress(id) : [];
@@ -58,3 +61,9 @@ export default async function Page({ params, searchParams }: Props) {
     </WorkspacePage>
   );
 }
+
+// Preserve blocking rendering for this route during scoped PPR adoption.
+export const instant = false;
+
+// Retain fresh request-time reader content during scoped Cache Components adoption.
+export const prefetch = "force-disabled";

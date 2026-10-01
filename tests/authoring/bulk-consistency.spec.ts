@@ -1,7 +1,11 @@
 import { test, expect, type Page } from "@playwright/test";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { freshWorkspace } from "../../lib/store";
-import { setupAuthoringProvider, authoringUser } from "./provider-fixture";
+import {
+  setupAuthoringProvider,
+  syncAuthoringProvider,
+  authoringUser,
+} from "./provider-fixture";
 async function section(page: Page, name: string) {
   const picker = page.getByRole("combobox", {
     name: "Administration section",
@@ -45,7 +49,7 @@ test("bulk content group assignment preserves complete organization; pending bat
         },
       });
     });
-    await page.route("**/api/governance", (route) => {
+    await page.route("**/api/governance", async (route) => {
       const body = route.request().postDataJSON();
       revisions.push(body.expected);
       expect(body.expected).toBe(data.governanceRevision);
@@ -61,6 +65,7 @@ test("bulk content group assignment preserves complete organization; pending bat
       }
       writes++;
       data.governanceRevision!++;
+      await syncAuthoringProvider(page, data);
       return route.fulfill({ json: { revision: data.governanceRevision } });
     });
   } else

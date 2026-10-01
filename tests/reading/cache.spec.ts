@@ -44,14 +44,17 @@ test("published reader data is reused, then expired after publish and unpublish"
   const first = await request.get(path);
   expect(first.status()).toBe(200);
   expect(await first.text()).toContain(doc.title);
-  const initialReads = (await (await request.get(`${backend}/reads`)).json())
-    .reads;
-  expect(initialReads).toBe(2);
+  const firstReads = (await (await request.get(`${backend}/reads`)).json()).readQueries as string[];
+  const projection = "id,kind:published->>kind,status:published->>status";
+  const publishedReads = (queries: string[]) => queries.filter(query => new URLSearchParams(query).get("select") !== projection);
+  expect(firstReads.filter(query => new URLSearchParams(query).get("select") === projection)).toHaveLength(1);
+  expect(publishedReads(firstReads)).toHaveLength(2);
   const second = await request.get(path);
   expect(second.status()).toBe(200);
-  expect((await (await request.get(`${backend}/reads`)).json()).reads).toBe(
-    initialReads,
-  );
+  const secondReads = (await (await request.get(`${backend}/reads`)).json()).readQueries as string[];
+  // Admission rechecks the current publication state; only published index/body data is reused.
+  expect(secondReads.filter(query => new URLSearchParams(query).get("select") === projection)).toHaveLength(2);
+  expect(publishedReads(secondReads)).toEqual(publishedReads(firstReads));
 
   const token = await (
     await request.post(`${backend}/auth/v1/token`, { data: {} })

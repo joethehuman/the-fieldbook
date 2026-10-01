@@ -92,7 +92,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     };
     queueFrame(() => {
       const surface = panel.current;
-      const viewport = surface?.closest<HTMLElement>(".main-content");
+      const viewport = surface?.closest<HTMLElement>(".admin-panel, .main-content");
       const position = () => {
         if (!surface || !viewport) return 0;
         const inset = parseFloat(getComputedStyle(surface).scrollMarginBlockStart) || 0;

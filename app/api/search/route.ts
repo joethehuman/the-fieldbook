@@ -1,8 +1,9 @@
+import { connection } from "next/server";
 import { actor, errorResponse } from "@server/auth";
 import { searchPublished } from "@server/search";
 import type { SearchFilter } from "@/lib/search";
-export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
+  await connection();
   try {
     const user = await actor();
     const params = new URL(request.url).searchParams;

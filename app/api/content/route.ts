@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import {
   actor,
   sameOrigin,
@@ -8,6 +9,7 @@ import {
 import { saveContent, getContent } from "@server/content";
 import { invalidatePublishedReader } from "@server/reader-cache";
 export async function GET(req: Request) {
+  await connection();
   try {
     const url = new URL(req.url);
     return Response.json(

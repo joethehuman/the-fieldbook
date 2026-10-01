@@ -1,47 +1,34 @@
+import { Suspense } from "react";
 import { ReaderShell } from "@/components/reader/ReaderShell";
-import {
-  readerShellContext,
-  readerCourseItem,
-  readerCurriculum,
-  readerItem,
-  readerUpdateItem,
-} from "@server/reader";
-import { notFound } from "next/navigation";
+import { WorkspaceContextSync } from "@/components/reader/WorkspaceContext";
+import { readerShellContext } from "@server/reader";
 import { headers } from "next/headers";
 
-export const dynamic = "force-dynamic";
+// Keep workspace prefetch bounded to its real prerendered shell.
+export const prefetch = "partial";
 
-export default async function Layout({
+// Only presentation sync streams here. Page content stays outside this boundary,
+// preserving blocking, JavaScript-free reading and independently guarded pages.
+export default function Layout({
   children,
+  documentNavigation,
 }: {
   children: React.ReactNode;
+  documentNavigation: React.ReactNode;
 }) {
-  const requestHeaders = await headers();
-  const path = requestHeaders.get("x-fieldbook-reader-path") || "";
-  const parts = path.split("/").filter(Boolean);
-  const section = parts[0];
-  if (
-    parts.length < 1 ||
-    parts.length > 2 ||
-    !["docs", "updates", "courses", "curricula", "team", "admin"].includes(
-      section,
-    )
-  )
-    notFound();
-
-  // Direct HTML must resolve before streaming. RSC navigation resolves in the
-  // page, avoiding a second article read in the shared layout.
-  if (parts[1] && requestHeaders.get("rsc") !== "1") {
-    const id = decodeURIComponent(parts[1]);
-    if (section === "docs") await readerItem("doc", id);
-    else if (section === "updates") await readerUpdateItem(id);
-    else if (section === "courses") await readerCourseItem(id);
-    else if (section === "curricula") await readerCurriculum(id);
-    else notFound();
-  }
   return (
-    <ReaderShell context={await readerShellContext(`/${section}`)}>
+    <ReaderShell documentNavigation={documentNavigation}>
+      <Suspense fallback={null}>
+        <Identity />
+      </Suspense>
       {children}
     </ReaderShell>
+  );
+}
+async function Identity() {
+  const path = (await headers()).get("x-fieldbook-reader-path") || "/docs";
+  const section = path.split("/")[1];
+  return (
+    <WorkspaceContextSync context={await readerShellContext(`/${section}`)} />
   );
 }

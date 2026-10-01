@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Admin from "@/components/Admin";
 import type { AdminRuntime } from "@/lib/admin-runtime";
@@ -11,24 +12,34 @@ import { Alert } from "@/components/ui/alert";
 import { useWorkspaceShell } from "@/components/reader/WorkspaceContext";
 import type { ReaderShellContext } from "@/lib/reader-types";
 import { brandingFromSettings } from "@/lib/branding";
-import { mergeSavedContent } from "@/lib/content-save";
 export function AdminWorkspace({
   initial,
+  tab = "content",
   runtime,
+  onConfirmedSnapshot,
 }: {
+  tab?: string;
   initial: { data: Workspace; user: User; shell: ReaderShellContext };
   runtime: AdminRuntime;
+  onConfirmedSnapshot: (data: Workspace) => void;
 }) {
+  const router = useRouter();
+  const protectedWork = useRef(false);
   const [data, setData] = useState(initial.data);
   const user = initial.user;
   const [error, setError] = useState("");
   const [reportIssue, setReportIssue] = useState<string | undefined>();
+  const acceptSnapshot = useCallback((next: Workspace) => {
+    setData(next);
+    onConfirmedSnapshot(next);
+  }, [onConfirmedSnapshot]);
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const { updateContext, registerNavigationGuard: registerShellGuard, registerContentNavigation } =
     useWorkspaceShell();
   const registerNavigationGuard = useCallback(
     (guard: NavigationGuard | null, options?: { protected: boolean }) => {
       navigationGuard.current = guard;
+      protectedWork.current = !!options?.protected;
       registerShellGuard(guard, options);
     },
     [registerShellGuard],
@@ -50,6 +61,11 @@ export function AdminWorkspace({
       docSections: [],
     });
   }, [data.settings, data.teams, user, initial.shell, updateContext]);
+  useEffect(() => {
+    const confirmed = runtime.adoptSnapshot(initial.data);
+    onConfirmedSnapshot(confirmed);
+    if (!protectedWork.current) setData(confirmed);
+  }, [initial.data, runtime, onConfirmedSnapshot]);
   async function persist(
     next: Workspace,
     options?: { locallyHandled?: boolean },
@@ -57,14 +73,15 @@ export function AdminWorkspace({
     setError("");
     setReportIssue("Updating report…");
     try {
-      setData(await runtime.save(data, next));
+      acceptSnapshot(await runtime.save(data, next));
+      router.refresh();
       setReportIssue(undefined);
       setError("");
     } catch (e) {
       setReportIssue(
         "Reload the report before exporting after a failed change.",
       );
-      if (e instanceof SaveRecoveryError && e.snapshot) setData(e.snapshot);
+      if (e instanceof SaveRecoveryError && e.snapshot) acceptSnapshot(e.snapshot);
       if (!options?.locallyHandled)
         setError(navigationGuard.current ? "" : (e as Error).message);
       throw e;
@@ -79,18 +96,21 @@ export function AdminWorkspace({
       )}
       <ReportAvailability.Provider value={reportIssue}>
         <Admin
+          initialTab={tab}
+          routeManaged
           data={data}
           user={user}
           onChange={persist}
           onSaveContent={async (content, intent) => {
             try {
               const saved = await runtime.saveContent(content, intent);
-              setData((current) => mergeSavedContent(current, saved));
+              acceptSnapshot(runtime.snapshot());
+              router.refresh();
               setReportIssue(undefined);
               return saved;
             } catch (failure) {
               if (failure instanceof SaveRecoveryError && failure.snapshot)
-                setData(failure.snapshot);
+                acceptSnapshot(failure.snapshot);
               setReportIssue(
                 "Reload the report before exporting after a failed change.",
               );
@@ -99,7 +119,8 @@ export function AdminWorkspace({
           }}
           onBulk={async (action) => {
             const result = await runtime.admin.bulk(action);
-            setData(result.data);
+            acceptSnapshot(result.data);
+            router.refresh();
             return result.results;
           }}
           onOpenTab={async (next) => {
@@ -109,20 +130,22 @@ export function AdminWorkspace({
                 : next === "content" || next.startsWith("settings-")
                   ? "content"
                   : "governance";
-            setData(await runtime.admin.prepare(scope));
+            acceptSnapshot(await runtime.admin.prepare(scope));
           }}
           onEdit={async (id) => {
             const result = await runtime.admin.edit(id);
-            setData(result.data);
+            acceptSnapshot(result.data);
             return result.item;
           }}
           onUnpublish={async (id) => {
-            setData(await runtime.admin.unpublish(id));
+            acceptSnapshot(await runtime.admin.unpublish(id));
+            router.refresh();
           }}
           onLearning={async (action) => {
             setReportIssue("Updating report…");
             try {
-              setData(await runtime.manageLearning(action));
+              acceptSnapshot(await runtime.manageLearning(action));
+              router.refresh();
               setReportIssue(undefined);
             } catch (e) {
               setReportIssue(
@@ -137,7 +160,7 @@ export function AdminWorkspace({
           registerContentNavigation={registerContentNavigation}
           onReload={async () => {
             const latest = await runtime.refresh();
-            setData(latest);
+            acceptSnapshot(latest);
             setReportIssue(undefined);
             setError("");
             return latest;

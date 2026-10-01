@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { Article, ReadingBack } from "@/components/patterns/reading";
 import { ReaderFeedback } from "@/components/reader/ReaderFeedback";
@@ -10,11 +11,13 @@ import { siteOrigins } from "@server/env";
 type Props = { params: Promise<{ id: string }> };
 export async function generateMetadata({ params }: Props) {
   const { id } = await params;
+  await connection();
   const { item, context } = await readerUpdateItem(id);
   return readerMetadata(item, context);
 }
 export default async function Page({ params }: Props) {
   const { id } = await params;
+  await connection();
   const { item, context } = await readerUpdateItem(id);
   return (
     <WorkspacePage
@@ -31,3 +34,9 @@ export default async function Page({ params }: Props) {
     </WorkspacePage>
   );
 }
+
+// Preserve blocking rendering for this route during scoped PPR adoption.
+export const instant = false;
+
+// Retain fresh request-time reader content during scoped Cache Components adoption.
+export const prefetch = "force-disabled";

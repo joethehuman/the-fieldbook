@@ -1,7 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
-import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
+import {
+  authoringUser,
+  setupAuthoringProvider,
+  syncAuthoringProvider,
+} from "./provider-fixture";
 
 async function section(page: Page, name: string) {
   const picker = page.getByRole("combobox", {
@@ -22,6 +26,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   const production = info.project.name.startsWith("production");
   const data = freshWorkspace();
   let rejectSettings = false;
+  let settingsWrites = 0;
   data.settings = {
     ...defaultSettings,
     ...data.settings,
@@ -37,7 +42,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
         },
       }),
     );
-    await page.route("**/api/settings", (route) => {
+    await page.route("**/api/settings", async (route) => {
       if (rejectSettings)
         return route.fulfill({
           status: 503,
@@ -49,11 +54,14 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
         Object.entries(submitted).sort(([a], [b]) => a.localeCompare(b)),
       ) as typeof data.settings;
       data.revision = (data.revision ?? 1) + 1;
+      await syncAuthoringProvider(page, data);
+      settingsWrites++;
       return route.fulfill({ json: { revision: data.revision } });
     });
-    await page.route("**/api/governance", (route) => {
+    await page.route("**/api/governance", async (route) => {
       data.curricula = route.request().postDataJSON().curricula;
       data.governanceRevision = (data.governanceRevision ?? 1) + 1;
+      await syncAuthoringProvider(page, data);
       return route.fulfill({
         json: { governanceRevision: data.governanceRevision },
       });
@@ -102,7 +110,7 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
   if (production) {
     rejectSettings = true;
     await page.getByRole("button", { name: "Save settings" }).click();
-    await expect(page.locator(".settings-panel")).toContainText(
+    await expect(page.locator(".settings-panel:visible")).toContainText(
       "Save unavailable",
     );
     await section(page, "Docs navigation");
@@ -113,6 +121,24 @@ test("saved admin settings stop warning while unsaved edits still warn", async (
     rejectSettings = false;
   }
   await page.getByRole("button", { name: "Save settings" }).click();
+  if (production) await expect.poll(() => settingsWrites).toBe(2);
+  await expect
+    .poll(async () => {
+      if (production) {
+        const saved = await page.request.get(
+          "http://127.0.0.1:3130/rest/v1/fb_config?select=settings",
+        );
+        return (await saved.json()).settings.name;
+      }
+      return page.evaluate(() =>
+        JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!).settings.name,
+      );
+    })
+    .toBe("Unsaved installation name");
+  await expect(
+    page.locator(".settings-panel:visible")
+      .getByRole("status").filter({ hasText: "Unsaved changes" }),
+  ).toHaveCount(0);
   await expect(page.getByText("Settings saved.")).toBeVisible();
   await section(page, "Docs navigation");
   await expect(confirmation).toHaveCount(0);

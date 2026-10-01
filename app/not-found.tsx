@@ -1,3 +1,4 @@
+import { unavailableCopy } from "@/lib/unavailable";
 import { BrandedAccount } from "@/components/patterns/branded-account";
 import { Button } from "@/components/ui/button";
 import { brandingFromSettings } from "@/lib/branding";
@@ -5,10 +6,10 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <BrandedAccount branding={brandingFromSettings({})}>
-      <h1>This page isn’t available</h1>
-      <p>It may have been removed or is not published.</p>
+      <h1>{unavailableCopy.title}</h1>
+      <p>{unavailableCopy.description}</p>
       <Button asChild>
-        <Link href="/">Back to Fieldbook</Link>
+        <Link href="/">{unavailableCopy.back}</Link>
       </Button>
     </BrandedAccount>
   );

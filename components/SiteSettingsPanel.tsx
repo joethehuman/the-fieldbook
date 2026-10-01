@@ -13,8 +13,8 @@ import { Switch } from "./ui/switch";
 import { DocSectionsSettings } from "./DocSectionsSettings";
 import { ActionGroup } from "./ui/action-group";
 import { Plus } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import PrivacySettingsPanel from "./PrivacySettingsPanel";
+import { lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
+const PrivacySettingsPanel = lazy(() => import("./PrivacySettingsPanel"));
 import { CardPaletteSettings } from "./CardPaletteSettings";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { groupPath } from "@/lib/group-hierarchy";
@@ -24,6 +24,11 @@ import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
 export type SettingsSection =
   "identity" | "docs" | "courses" | "access" | "privacy" | "mcp";
+function settingsFromSnapshot(saved: Workspace["settings"]) {
+  const { logoUrl: _legacyLogoUrl, ...withoutLogo } = (saved || {}) as
+    Partial<typeof defaultSettings> & { logoUrl?: string };
+  return { ...defaultSettings, ...withoutLogo };
+}
 export default function SiteSettingsPanel({
   data,
   onChange,
@@ -39,17 +44,21 @@ export default function SiteSettingsPanel({
 }) {
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
-  const [settings, setSettings] = useState(() => {
-      const saved = (data.settings || {}) as Partial<typeof defaultSettings> & {
-        logoUrl?: string;
-      };
-      const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
-      return { ...defaultSettings, ...withoutLogo };
-    }),
+  const [settings, setSettings] = useState(() => settingsFromSnapshot(data.settings)),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
   const savedSettings = useRef(settings);
+  const receivedSettings = useRef(data.settings);
   const dirty = !equalJson(settings, savedSettings.current);
+  useLayoutEffect(() => {
+    // An acknowledged save can precede its refreshed props. Only a newly
+    // received snapshot may replace a clean form; never replay the old props.
+    if (dirty || busy || receivedSettings.current === data.settings) return;
+    receivedSettings.current = data.settings;
+    const next = settingsFromSnapshot(data.settings);
+    savedSettings.current = next;
+    setSettings(next);
+  }, [data.settings, dirty, busy]);
   const guard = useRef(async () => true);
   guard.current = async () =>
     !busy &&

@@ -4,7 +4,11 @@ import { assertAppKind } from "./scripts/app-kind.mjs";
 assertAppKind("installed");
 const config: NextConfig = {
   output: "standalone",
-  // Resolve access, existence and metadata before committing HTTP status.
+  cacheComponents: true,
+  // Next 16.3.5 can report an empty variation set for request-time reader
+  // segments. Keep full route-param keys so different items never share a panel.
+  experimental: { varyParams: false },
+  // Keep reader metadata blocking. Proxy separately establishes admission/status.
   htmlLimitedBots: /.*/,
   outputFileTracingRoot: path.resolve(__dirname),
   images: { unoptimized: true },

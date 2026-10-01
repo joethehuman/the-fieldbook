@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import {
   actor,
   authClient,
@@ -9,6 +10,7 @@ import {
 import { db, check } from "@server/db";
 import { env } from "@server/env";
 export async function GET(req: Request) {
+  await connection();
   try {
     const user = await actor();
     requireAdmin(user);

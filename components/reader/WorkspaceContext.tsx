@@ -5,6 +5,8 @@ import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { RegisterContentNavigation } from "@/lib/navigation-guard";
 
 export const WorkspaceContext = createContext<{
+  presentation: ReaderShellContext | null;
+  navigate: (href: string) => Promise<void>;
   updateContext: (context: ReaderShellContext) => void;
   registerNavigationGuard: RegisterNavigationGuard;
   registerContentNavigation: RegisterContentNavigation;

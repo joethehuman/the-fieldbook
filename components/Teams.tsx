@@ -1,4 +1,5 @@
 "use client";
+import { TablePending, progressColumns } from "./patterns/panel-pending";
 import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { useRevealTarget } from "./patterns/use-reveal-target";
@@ -29,12 +30,23 @@ import {
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { completionPercent } from "@/lib/learning";
-import { useState } from "react";
+import { Suspense, use, useLayoutEffect, useState } from "react";
 import type { Workspace } from "@/lib/store";
 import { reportTeamIds, type User } from "@/lib/types";
 import { teamPath } from "@/lib/team-hierarchy";
-export { TeamsAdmin } from "./TeamManagement";
-export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
+type TeamSnapshot = { data: Workspace; user: User | null };
+function TeamSnapshotSync({ promise, onReady }: { promise: Promise<TeamSnapshot>; onReady: (snapshot: TeamSnapshot) => void }) {
+  const snapshot = use(promise);
+  useLayoutEffect(() => onReady(snapshot), [snapshot, onReady]);
+  return null;
+}
+export function TeamProgress({ data: initialData, user: initialUser, snapshotPromise }: { data?: Workspace; user?: User; snapshotPromise?: Promise<TeamSnapshot> }) {
+  const [snapshot, setSnapshot] = useState<TeamSnapshot | null>(() => initialData && initialUser ? { data: initialData, user: initialUser } : null);
+  const current = snapshotPromise ? snapshot : initialData && initialUser ? { data: initialData, user: initialUser } : null;
+  const data = current?.data ?? { schema: 1, content: [], users: [], groups: [], teams: [], progress: {} } as Workspace;
+  const user = current?.user ?? { id: "", name: "", email: "", groups: [], active: true, role: "manager" } as User;
+  const ready = !!current;
+
   const overview = useRevealTarget<HTMLHeadingElement>();
   const assignments = useRevealTarget<HTMLElement>();
   const teams = data.teams || [];
@@ -48,7 +60,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
   const users = rows.map((r) => r.u);
   const total = rows.reduce((n, r) => n + r.assigned.length, 0),
     done = rows.reduce((n, r) => n + r.completed, 0);
-  if (!user.active || !["admin", "manager"].includes(user.role))
+  if (ready && (!user.active || !["admin", "manager"].includes(user.role)))
     return (
       <EmptyState>
         Reporting requires an administrator or manager account.
@@ -56,8 +68,10 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
     );
   return (
     <>
+      {snapshotPromise && <Suspense fallback={null}><TeamSnapshotSync promise={snapshotPromise} onReady={setSnapshot} /></Suspense>}
       <SectionHeader variant="page" title={<h2 {...overview.targetProps}>People & completion</h2>}>
         <CsvExport
+          disabled={!ready}
           filename="team-progress"
           report={() => teamProgressCsv(rows)}
         />
@@ -87,7 +101,7 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             }}
           >
             <option value="all">
-              {user.role === "admin" ? "Entire organization" : "All my teams"}
+              {!ready ? "All teams" : user.role === "admin" ? "Entire organization" : "All my teams"}
             </option>
             {teams
               .filter((t) => allowed.has(t.id))
@@ -102,6 +116,9 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
       <p className="muted">
         Includes subteams. Completion uses the latest published course versions.
       </p>
+      <div aria-busy={!ready} className="min-h-64">
+      {ready ? <>
+      <span className="sr-only" role="status">Team progress ready</span>
       <div className="report-summary">
         <strong>{users.length} people</strong>
         <span>
@@ -117,11 +134,11 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
         <DataTable layout="progress">
           <TableHeader>
             <TableRow>
-              <TableHead>Team member</TableHead>
-              <TableHead>Team</TableHead>
-              <TableHead align="right">Assigned</TableHead>
-              <TableHead align="right">Completed</TableHead>
-              <TableHead align="right">Complete</TableHead>
+              <TableHead>{progressColumns[0]}</TableHead>
+              <TableHead>{progressColumns[1]}</TableHead>
+              <TableHead align="right">{progressColumns[2]}</TableHead>
+              <TableHead align="right">{progressColumns[3]}</TableHead>
+              <TableHead align="right">{progressColumns[4]}</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
@@ -204,6 +221,8 @@ export function TeamProgress({ data, user }: { data: Workspace; user: User }) {
             </Card>
           );
         })}
+      </> : <TablePending layout="progress" columns={progressColumns} label="Retrieving team progress" summary />}
+      </div>
     </>
   );
 }
