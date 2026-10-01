@@ -126,13 +126,6 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
   request,
 }, info) => {
   const next = "/docs/guide?source=email#setup";
-  await page.addInitScript(() => {
-    (window as any).globalLoadingFlashes = [];
-    new MutationObserver(() => {
-      if (document.querySelector(".app-bar-progress, .loading-bar, .navigation-pending") || document.body?.innerText.includes("Just a sec"))
-        (window as any).globalLoadingFlashes.push(true);
-    }).observe(document, { childList: true, subtree: true, attributes: true });
-  });
   await page.goto(next);
   await expect(page).toHaveURL("/sign-in");
   await expect(
@@ -167,7 +160,6 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
   await simulateOAuthReturn(page, next);
   await page.getByRole("link", { name: "Continue with Google" }).click();
   await expect(page).toHaveURL(next);
-  expect(await page.evaluate(() => (window as any).globalLoadingFlashes)).toEqual([]);
 });
 test("public browse, alternate brand and long-name fallback", async ({
   page,
@@ -735,7 +727,7 @@ test("shared settings library and connection states work in the server app", asy
 }, info) => {
   await login(page);
   async function section(name: string) {
-    await expect(page.locator(".admin-layout:visible")).toBeVisible();
+    await expect(page.locator(".admin-layout")).toBeVisible();
     const picker = page.getByRole("combobox", {
       name: "Administration section",
     });
@@ -760,17 +752,22 @@ test("shared settings library and connection states work in the server app", asy
   ).toHaveAccessibleDescription(
     "Provide an email address, an HTTPS contact page, or both.",
   );
-  const commands = page.getByRole("button", { name: "Commands: insert blocks or format selected text", exact: true });
-  await commands.scrollIntoViewIfNeeded();
-  await commands.focus();
-  await page.keyboard.press("Enter");
-  const insert = page.getByRole("menu", { name: "Insert content", exact: true });
-  await expect(insert.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();
-  await page.keyboard.press("ArrowDown");
-  await expect(insert.getByRole("menuitem", { name: "Heading 1", exact: true })).toBeFocused();
+  const bold = page.getByRole("button", { name: "Bold", exact: true });
+  const heading = page.getByRole("combobox", { name: "Heading level" });
+  await heading.scrollIntoViewIfNeeded();
+  // Let native scroll notifications finish before opening a focus tooltip:
+  // Radix intentionally dismisses tooltips when an ancestor scrolls.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+  await heading.focus();
+  await page.keyboard.press("Tab");
+  await expect(bold).toBeFocused();
+  await expect(page.getByRole("tooltip")).toHaveText("Bold");
   await page.keyboard.press("Escape");
-  await expect(insert).toHaveCount(0);
-  await expect(commands).toBeFocused();
   await bounds(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({

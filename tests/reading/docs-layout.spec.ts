@@ -717,7 +717,7 @@ test("a cold Doc click keeps the article visible and shows header progress", asy
       .click();
     await expect(
       page.getByRole("status", { name: "Opening page" }),
-    ).toHaveCount(0);
+    ).toBeVisible();
     await expect(page.locator("article h1")).toHaveText(items[0].title);
   } finally {
     release();

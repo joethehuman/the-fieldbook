@@ -41,7 +41,6 @@ let documents = [],
   reads = 0,
   authReads = 0;
 let fixtureGeneration = Date.now();
-let adminReadDelayMs = 0;
 let readQueries = [];
 let settings = initial(),
   configuredGroups = [],
@@ -86,7 +85,6 @@ createServer(async (req, res) => {
   if (url.pathname === "/fixture") {
     const change = JSON.parse(body || "{}");
     fixtureGeneration = change.governanceRevision ?? fixtureGeneration + 1;
-    adminReadDelayMs = change.adminReadDelayMs || 0;
     documents = change.documents || [];
     reads = 0;
     authReads = 0;
@@ -162,8 +160,6 @@ createServer(async (req, res) => {
   if (url.pathname.startsWith("/storage/v1/object/sign/"))
     return send(res, { signedURL: "/object/sign/synthetic" });
   if (url.pathname === "/rest/v1/fb_documents") {
-    if (adminReadDelayMs && url.searchParams.get("select")?.startsWith("id,revision,published_revision"))
-      await new Promise(resolve => setTimeout(resolve, adminReadDelayMs));
     reads++;
     readQueries.push(url.search);
     let rows = documents;

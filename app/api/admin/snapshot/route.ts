@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   try {
     const scope = new URL(req.url).searchParams.get("scope");
-    if (scope !== "content" && scope !== "governance" && scope !== "feedback" && scope !== "deleted")
+    if (scope !== "content" && scope !== "governance" && scope !== "feedback")
       throw new HttpError(400, "Choose an administration section.");
     const user = await actor();
     requireAdmin(user);

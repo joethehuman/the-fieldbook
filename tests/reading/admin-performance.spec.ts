@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
-import { readFileSync } from "node:fs";
 
 const backend = "http://127.0.0.1:3130";
 const id = "00000000-0000-4000-8000-000000000081";
@@ -57,24 +56,17 @@ test("admin entry and section changes avoid the full workspace", async ({
     },
   ]);
   let workspaceReads = 0;
-  let sectionReads = 0;
-  const editorChunk = JSON.parse(readFileSync(".next/react-loadable-manifest.json", "utf8"))["components/Admin.tsx -> ./admin/ContentEditor"].files.at(-1);
-  let editorLoads = 0;
   let documentNavigations = 0;
   page.on("request", (req) => {
     if (req.url().includes("/api/workspace")) workspaceReads++;
-    if (req.url().includes("/api/admin/snapshot")) sectionReads++;
-    if (req.url().includes(editorChunk)) editorLoads++;
     if (req.isNavigationRequest()) documentNavigations++;
   });
   const response = await page.goto("/admin");
   expect(response?.status()).toBe(200);
   expect(await response!.text()).not.toContain(draft.body);
-  await expect(page.locator(".admin-layout:visible")).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   await expect(page.getByText(draft.title)).toBeVisible();
   expect(workspaceReads).toBe(0);
-  expect(sectionReads).toBe(0);
-  expect(editorLoads).toBe(0);
   await page.screenshot({ path: info.outputPath("admin-entry.png") });
 
   const openTab = async (name: string) => {
@@ -94,12 +86,12 @@ test("admin entry and section changes avoid the full workspace", async ({
   await openTab("Content");
   await page.getByRole("button", { name: "Edit" }).first().click();
   await expect(page.getByText(draft.body)).toBeVisible();
-  expect(editorLoads).toBe(1);
   expect(workspaceReads).toBe(0);
   await page
     .getByRole("textbox", { name: "Title" })
     .fill("Revised administration article");
-  await expect(page.getByText("Saved", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Save draft" }).click();
+  await expect(page.getByText("Draft saved", { exact: true })).toBeVisible();
   expect(workspaceReads).toBe(0);
   await page.getByRole("button", { name: "Back to content" }).click();
   const menu = page.getByRole("button", { name: "Open navigation" });
@@ -117,7 +109,7 @@ test("admin entry and section changes avoid the full workspace", async ({
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("menuitem", { name: "Manage organization" }).click();
   await expect(page).toHaveURL(/\/admin$/);
-  await expect(page.locator(".admin-layout:visible")).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   expect(documentNavigations).toBe(1);
   expect(workspaceReads).toBe(0);
 });
@@ -241,7 +233,7 @@ test("confirmed editor navigation responds while its destination is loading", as
     await route.continue();
   });
   await page.goto("/admin");
-  await expect(page.locator(".admin-layout:visible")).toBeVisible();
+  await expect(page.locator(".admin-layout")).toBeVisible();
   const picker = page.getByRole("combobox", { name: "Administration section" });
   if (await picker.isVisible()) {
     await picker.click();
@@ -266,7 +258,7 @@ test("confirmed editor navigation responds while its destination is loading", as
   try {
     await expect(
       page.getByRole("status", { name: "Opening page" }),
-    ).toHaveCount(0);
+    ).toBeVisible();
     expect(await page.locator(".topbar").boundingBox()).toEqual(topbar);
     await page.screenshot({ path: info.outputPath("pending-navigation.png") });
   } finally {

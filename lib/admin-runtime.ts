@@ -18,8 +18,9 @@ export type AdminRuntime = {
     bulk: (
       action: BulkRequest,
     ) => Promise<{ data: Workspace; results: BulkResult[] }>;
+    prefetch: () => void;
     prepare: (
-      scope: "content" | "governance" | "feedback" | "deleted",
+      scope: "content" | "governance" | "feedback",
     ) => Promise<Workspace>;
     edit: (id: string) => Promise<{ data: Workspace; item: Content }>;
     unpublish: (id: string) => Promise<Workspace>;
@@ -49,13 +50,13 @@ export function createAdminRuntime(initial: {
   data: Workspace;
   user: User;
 }): AdminRuntime {
-  let scope: "content" | "governance" | "feedback" | "deleted" = "content";
+  let scope: "content" | "governance" | "feedback" = "content";
   let openItem: string | null = null;
-  const cached = new Map<"content" | "governance" | "feedback" | "deleted", Workspace>([
+  const cached = new Map<"content" | "governance" | "feedback", Workspace>([
     ["content", initial.data],
   ]);
   const pending = new Map<
-    "content" | "governance" | "feedback" | "deleted",
+    "content" | "governance" | "feedback",
     Promise<Workspace>
   >();
   let cacheVersion = 0;
@@ -112,7 +113,7 @@ export function createAdminRuntime(initial: {
     cached.set(target, data);
     return data;
   }
-  function prepared(target: "content" | "governance" | "feedback" | "deleted") {
+  function prepared(target: "content" | "governance" | "feedback") {
     const available = cached.get(target);
     if (available) return Promise.resolve(available);
     const running = pending.get(target);
@@ -292,11 +293,15 @@ export function createAdminRuntime(initial: {
         }
         return { data: latest, results };
       },
+      prefetch: () => {
+        // Warm the two first-visit sections after Content has painted. A tab
+        // click shares the same in-flight read instead of starting another.
+        void Promise.allSettled([prepared("governance"), prepared("feedback")]);
+      },
       prepare: async (next) => {
-        const data = await prepared(next);
         scope = next;
         openItem = null;
-        return data;
+        return prepared(next);
       },
       edit: async (id) => {
         const item = await request(

@@ -114,7 +114,6 @@ export function SelectField({
   value,
   onValueChange,
   children,
-  displayValue,
   disabled,
   required,
   name,
@@ -123,7 +122,6 @@ export function SelectField({
   value: string;
   onValueChange: (value: string) => void;
   children: React.ReactNode;
-  displayValue?: React.ReactNode;
   disabled?: boolean;
   required?: boolean;
   name?: string;
@@ -146,7 +144,7 @@ export function SelectField({
         <input type="hidden" name={name} value={value} disabled={disabled} />
       )}
       <SelectTrigger {...props}>
-        <SelectValue>{displayValue}</SelectValue>
+        <SelectValue />
       </SelectTrigger>
       <SelectContent>{options(children)}</SelectContent>
     </Select>

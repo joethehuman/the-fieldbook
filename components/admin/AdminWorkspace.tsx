@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Admin from "@/components/Admin";
+import dynamic from "next/dynamic";
 import type { AdminRuntime } from "@/lib/admin-runtime";
 import type { Workspace } from "@/lib/store";
 import type { User } from "@/lib/types";
@@ -12,6 +12,7 @@ import { useWorkspaceShell } from "@/components/reader/WorkspaceContext";
 import type { ReaderShellContext } from "@/lib/reader-types";
 import { brandingFromSettings } from "@/lib/branding";
 import { mergeSavedContent } from "@/lib/content-save";
+const Admin = dynamic(() => import("@/components/Admin"));
 export function AdminWorkspace({
   initial,
   runtime,
@@ -24,7 +25,7 @@ export function AdminWorkspace({
   const [error, setError] = useState("");
   const [reportIssue, setReportIssue] = useState<string | undefined>();
   const navigationGuard = useRef<NavigationGuard | null>(null);
-  const { updateContext, registerNavigationGuard: registerShellGuard, registerContentNavigation } =
+  const { updateContext, registerNavigationGuard: registerShellGuard } =
     useWorkspaceShell();
   const registerNavigationGuard = useCallback(
     (guard: NavigationGuard | null, options?: { protected: boolean }) => {
@@ -104,7 +105,7 @@ export function AdminWorkspace({
           }}
           onOpenTab={async (next) => {
             const scope =
-              next === "deleted" ? "deleted" : next === "feedback"
+              next === "feedback"
                 ? "feedback"
                 : next === "content" || next.startsWith("settings-")
                   ? "content"
@@ -134,7 +135,6 @@ export function AdminWorkspace({
           production
           onUpload={runtime.upload}
           registerNavigationGuard={registerNavigationGuard}
-          registerContentNavigation={registerContentNavigation}
           onReload={async () => {
             const latest = await runtime.refresh();
             setData(latest);

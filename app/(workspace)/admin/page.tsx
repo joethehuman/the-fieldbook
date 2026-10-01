@@ -1,27 +1,23 @@
-import { Suspense } from "react";
+import { notFound, redirect } from "next/navigation";
 import ProductionApp from "@/app/ProductionApp";
-import { adminEntry, adminUser } from "@server/admin-entry";
-import type { User } from "@/lib/types";
-import { AdminLoading } from "@/components/admin/AdminLoading";
+import { actor, requireAdmin } from "@server/auth";
+import { readerWorkspaceContext } from "@server/reader";
 import { adminSnapshot } from "@server/admin-snapshot";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Administration | Fieldbook" };
 
 export default async function Page() {
-  const user = await adminUser();
-  // Resolve admission before a fallback streams, preserving direct 404/redirects.
-  return <Suspense fallback={<AdminLoading />}><Content user={user} /></Suspense>;
-}
-
-async function Content({ user }: { user: User }) {
-  const [data, { shell }] = await Promise.all([adminSnapshot(user, "content"), adminEntry()]);
+  const user = await actor(undefined, true);
+  if (!user) redirect("/auth/sign-in?next=%2Fadmin");
+  if (user.role !== "admin" || !user.active) notFound();
+  requireAdmin(user);
   return (
     <ProductionApp
       initialAdmin={{
-        data,
+        data: await adminSnapshot(user, "content"),
         user,
-        shell,
+        shell: await readerWorkspaceContext("/admin"),
       }}
     />
   );

@@ -69,14 +69,11 @@ import {
 } from "@/lib/store";
 import dynamic from "next/dynamic";
 import type { NavigationGuard } from "@/lib/navigation-guard";
-import type { ContentNavigation } from "@/lib/navigation-guard";
-import { AdminLoading } from "./admin/AdminLoading";
-const Admin = dynamic(() => import("./Admin"), { loading: () => <AdminLoading production={false} /> });
+const Admin = dynamic(() => import("./Admin"));
 type View = "learn" | "docs" | "briefs" | "admin" | "team";
 export default function Fieldbook() {
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
-  const contentNavigation = useRef<ContentNavigation | null>(null);
   const acceptedUrl = useRef("");
   const menuTrigger = useRef<HTMLButtonElement>(null);
   const demoTrigger = useRef<HTMLButtonElement>(null);
@@ -189,10 +186,6 @@ export default function Fieldbook() {
     origin?: string,
     lesson?: string,
   ) {
-    if (v === "admin" && view === "admin") {
-      if (await (contentNavigation.current?.() ?? true)) setMenu(false);
-      return;
-    }
     if (!(await canLeave())) return;
     if (v === "docs" && !id) setCollapsed(false);
     if (v !== "docs" || id) setMenu(false);
@@ -284,7 +277,27 @@ export default function Fieldbook() {
     a.click();
     URL.revokeObjectURL(url);
   }
-  if (!data) return <DemoProfilePicker data={freshWorkspace()} error={error} onReset={reset} />;
+  if (!data)
+    return (
+      <div
+        className={error ? "loading loading-error" : "loading"}
+        role={error ? "alert" : "status"}
+      >
+        <div className="loading-content">
+          <h2>{error || "Just a sec…"}</h2>
+          {!error && (
+            <div className="loading-bar" aria-hidden="true">
+              <span />
+            </div>
+          )}
+          {error && (
+            <Button variant="ghost" onClick={reset}>
+              Reset demo
+            </Button>
+          )}
+        </div>
+      </div>
+    );
   const demoGuest =
     uid === "guest" && data.settings?.access !== "private"
       ? guestRecommendations({
@@ -299,7 +312,47 @@ export default function Fieldbook() {
   const landingPath = homePath(branding);
   const landingView = resolveSection(landingPath.slice(1)) || "learn";
   const policyHref = privacyHref(branding);
-  if (!user) return <DemoProfilePicker data={data} onLogin={login} />;
+  if (!user)
+    return (
+      <BrandedAccount branding={brandingFromSettings(branding)}>
+        <Badge variant="default">INTERACTIVE DEMO</Badge>
+        <h1>Choose a demo profile</h1>
+        <div className="profile-list">
+          {data.users
+            .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
+            .sort(
+              (a, b) =>
+                DEMO_PROFILE_IDS.indexOf(a.id) - DEMO_PROFILE_IDS.indexOf(b.id),
+            )
+            .map((u) => (
+              <NavigationButton
+                variant="ghost"
+                key={u.id}
+                onClick={() => login(u.id)}
+              >
+                <InitialsAvatar initials={initials(u.name)} />
+                <span>
+                  <strong>{u.name}</strong>
+                  <small>
+                    {u.role === "admin"
+                      ? "Admin · Org Admin"
+                      : u.role === "manager"
+                        ? "Manager · Sales Director"
+                        : "User · Account Executive"}
+                  </small>
+                </span>
+                <ArrowRight size={18} />
+              </NavigationButton>
+            ))}
+        </div>
+        <div className="demo-note">
+          <p>
+            Changes stay in this browser. Demo profiles are not secure accounts,
+            and data is not shared between devices. Use sample content only.
+          </p>
+        </div>
+      </BrandedAccount>
+    );
   const visible = (
     demoGuest?.content ||
     data.publishedContent ||
@@ -340,6 +393,7 @@ export default function Fieldbook() {
       accent={branding.accent}
       collapsed={collapsed}
       menu={menu}
+      pending={false}
       admin={view === "admin" && user.role === "admin"}
       onDismiss={() => setMenu(false)}
       sidebar={
@@ -637,7 +691,6 @@ export default function Fieldbook() {
       {view === "admin" && user.role === "admin" ? (
         <ReportAvailability.Provider value={reportIssue}>
           <Admin
-            registerContentNavigation={(next) => { contentNavigation.current = next; }}
             data={data}
             user={user}
             onChange={persist}
@@ -814,49 +867,4 @@ function Empty({ title, description }: { title: string; description: string }) {
       <p>{description}</p>
     </EmptyState>
   );
-}
-
-function DemoProfilePicker({ data, onLogin, error, onReset }: { data: Workspace; onLogin?: (id: string) => Promise<void>; error?: string; onReset?: () => Promise<void> }) {
-  return (
-      <BrandedAccount branding={brandingFromSettings({ ...defaultSettings, ...data.settings })}>
-        <Badge variant="default">INTERACTIVE DEMO</Badge>
-        <h1>Choose a demo profile</h1>
-        {error && <Alert variant="destructive" role="alert">{error}<Button variant="ghost" onClick={onReset}>Reset demo</Button></Alert>}
-        <div className="profile-list" aria-busy={!onLogin}>
-          {data.users
-            .filter((u) => u.active && DEMO_PROFILE_IDS.includes(u.id))
-            .sort(
-              (a, b) =>
-                DEMO_PROFILE_IDS.indexOf(a.id) - DEMO_PROFILE_IDS.indexOf(b.id),
-            )
-            .map((u) => (
-              <NavigationButton
-                variant="ghost"
-                key={u.id}
-                disabled={!onLogin}
-                onClick={() => onLogin?.(u.id)}
-              >
-                <InitialsAvatar initials={initials(u.name)} />
-                <span>
-                  <strong>{u.name}</strong>
-                  <small>
-                    {u.role === "admin"
-                      ? "Admin · Org Admin"
-                      : u.role === "manager"
-                        ? "Manager · Sales Director"
-                        : "User · Account Executive"}
-                  </small>
-                </span>
-                <ArrowRight size={18} />
-              </NavigationButton>
-            ))}
-        </div>
-        <div className="demo-note">
-          <p>
-            Changes stay in this browser. Demo profiles are not secure accounts,
-            and data is not shared between devices. Use sample content only.
-          </p>
-        </div>
-      </BrandedAccount>
-    );
 }

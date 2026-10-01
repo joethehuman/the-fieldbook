@@ -4,8 +4,6 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Make Manage organization open Administration’s Content screen, including from another admin section or editor, with existing unsaved-work protection and no navigation on the Content screen. Defer unrelated admin data and load editors/reports only when opened. Remove the full-screen loading message and global navigation bars from the installed app and demo; retain the workspace frame with local content placeholders for real waits.
-
 - Remove the desktop sidebar keyboard shortcut and hover tip while retaining the accessible toggle button.
 
 - Handle command-menu Escape dismissal from the canvas or menu, preserving slash text and returning focus. Handle empty/root selections safely and add normal horizontal padding to Outline and Details buttons.

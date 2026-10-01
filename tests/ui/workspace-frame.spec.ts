@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-test("workspace frame catalog shares responsive scrolling and navigation controls", async ({
+test("workspace frame catalog shares responsive scrolling, pending and navigation controls", async ({
   page,
 }, info) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -12,7 +12,18 @@ test("workspace frame catalog shares responsive scrolling and navigation control
       () => document.documentElement.scrollWidth <= window.innerWidth,
     ),
   ).toBe(true);
-  await expect(page.locator(".app-bar-progress, .navigation-pending")).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Show pending indicator", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status", { name: "Opening page", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Hide pending indicator", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status", { name: "Opening page", exact: true }),
+  ).toHaveCount(0);
   const open = page.getByRole("button", {
     name: "Open navigation",
     exact: true,

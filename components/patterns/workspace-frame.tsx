@@ -10,6 +10,7 @@ export function WorkspaceFrame({
   accent,
   collapsed,
   menu,
+  pending,
   sidebar,
   header,
   children,
@@ -22,6 +23,7 @@ export function WorkspaceFrame({
   accent: string;
   collapsed: boolean;
   menu: boolean;
+  pending: boolean;
   sidebar: ReactNode;
   header: ReactNode;
   children: ReactNode;
@@ -49,7 +51,7 @@ export function WorkspaceFrame({
       </SkipLink>
       <aside
         id="main-sidebar"
-        className={`sidebar ${menu ? "open" : ""}`}
+        className={`sidebar ${menu ? "open" : ""} ${pending ? "navigation-pending" : ""}`}
       >
         {sidebar}
       </aside>
@@ -63,7 +65,7 @@ export function WorkspaceFrame({
         />
       )}
       <div className="main-shell">
-        <AppBar>{header}</AppBar>
+        <AppBar pending={pending}>{header}</AppBar>
         {alert}
         <main
           id="main-content"
