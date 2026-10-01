@@ -9,6 +9,7 @@ import { Button } from "../ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { createWritingBlock, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
+import { useWritingInteraction } from "./writing-interaction";
 
 type SelectionMenuController = (keyboard: boolean) => boolean;
 
@@ -33,6 +34,7 @@ export function WritingSelectionMenu({ disabled, onReady }: {
   const keyboardOpen = useRef(false);
   const dismissed = useRef("");
   const [open, setOpen] = useState(false);
+  useWritingInteraction(open && !disabled);
 
   const snapshot = useCallback(() => {
     if (!editor || disabled) return false;

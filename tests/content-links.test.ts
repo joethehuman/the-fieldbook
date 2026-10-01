@@ -1,6 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { contentLinkTarget } from "../lib/content-links";
+import { contentLinkTarget, normalizeContentLink } from "../lib/content-links";
+
+test("bare web domains receive HTTPS without changing paths, fragments, files or schemes", () => {
+  for (const value of ["google.com", "www.example.com/guide", "docs.example.co.uk:8443/help?q=next#section", "example.com?next=yes"]) {
+    assert.equal(normalizeContentLink(` ${value} `), `https://${value}`);
+    assert.equal(contentLinkTarget(value, "article"), "_blank");
+  }
+  for (const value of ["/docs/start", "../guide", "docs/start", "guide.md", "notes.pdf#part", "#next", "mailto:help@example.com", "tel:+12345", "https://example.com", "//example.com", "not a website", "javascript:alert(1)"]) {
+    assert.equal(normalizeContentLink(value), value);
+  }
+});
 
 test("course lesson hyperlinks open separately from course navigation", () => {
   assert.equal(contentLinkTarget("/docs/reference", "course"), "_blank");

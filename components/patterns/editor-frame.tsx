@@ -9,6 +9,18 @@ import { revealEditorTarget } from "./reveal-editor-target";
 
 export type DetailsReveal = { request: number; field?: string };
 
+/** Keep closing content until its slide finishes; closed panels occupy no space. */
+function usePanelPresence(open: boolean) {
+  const [present, setPresent] = useState(open);
+  useEffect(() => {
+    if (open) { setPresent(true); return; }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setPresent(false); return; }
+    const timer = window.setTimeout(() => setPresent(false), 220);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+  return open || present;
+}
+
 /** One writing canvas with optional in-page navigation and content details. */
 export function EditorFrame({
   outline,
@@ -43,6 +55,8 @@ export function EditorFrame({
   const outlineId = useId();
   const detailsId = useId();
   const [panels, setPanels] = useState({ outline: !!outline, details: false });
+  const outlinePresent = usePanelPresence(panels.outline && !!outline);
+  const detailsPresent = usePanelPresence(panels.details);
   const outlineFade = useScrollFade<HTMLElement>(panels.outline && !!outline);
   const detailsFade = useScrollFade<HTMLElement>(panels.details);
   const [canvasScrolled, setCanvasScrolled] = useState(false);
@@ -179,7 +193,8 @@ export function EditorFrame({
         </Button>
       </div>
       <div className="editor-frame-body">
-        {panels.outline && outline && (
+        {outlinePresent && outline && (
+          <div className="editor-frame-panel" data-side="outline" data-open={panels.outline} inert={!panels.outline} aria-hidden={!panels.outline}>
           <aside ref={outlineFade.ref} id={outlineId} className="editor-frame-outline scroll-fade" aria-label="Course outline"
             data-scroll-fade-before={outlineFade.edges.before} data-scroll-fade-after={outlineFade.edges.after}
             onScroll={outlineFade.measure}
@@ -191,8 +206,9 @@ export function EditorFrame({
             }}>
             {outline}
           </aside>
+          </div>
         )}
-        {panels.details && (
+        {detailsPresent && <div className="editor-frame-panel" data-side="details" data-open={panels.details} inert={!panels.details} aria-hidden={!panels.details}>
           <aside ref={detailsFade.ref} id={detailsId} className="editor-frame-details scroll-fade" aria-label="Content details" tabIndex={-1}
             data-scroll-fade-before={detailsFade.edges.before} data-scroll-fade-after={detailsFade.edges.after}
             onScroll={detailsFade.measure}
@@ -204,7 +220,7 @@ export function EditorFrame({
             }}>
             {details}
           </aside>
-        )}
+        </div>}
         <div key="canvas" ref={canvas} className="editor-frame-canvas">{children}</div>
       </div>
     </section>

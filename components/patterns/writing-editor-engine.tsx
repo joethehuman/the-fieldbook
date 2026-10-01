@@ -5,6 +5,8 @@ import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { createWritingBlock, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu } from "./writing-selection-menu";
+import { WritingLinkDialog } from "./writing-link-dialog";
+import { WritingInteractionContext } from "./writing-interaction";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -246,6 +248,15 @@ export default function WritingEditorEngine({
   const focusInsertItem = useRef(false);
   const [slashQuery, setSlashQuery] = useState("");
   const [slashIndex, setSlashIndex] = useState(0);
+  const slashNavigation = useRef<"keyboard" | "pointer">("keyboard");
+  const slashPointer = useRef<{ x: number; y: number } | null>(null);
+  const interactions = useRef(new Set<string>());
+  const [popupActive, setPopupActive] = useState(false);
+  const reportInteraction = useCallback((owner: string, active: boolean) => {
+    if (active) interactions.current.add(owner);
+    else interactions.current.delete(owner);
+    setPopupActive(interactions.current.size > 0);
+  }, []);
   const [slashPosition, setSlashPosition] = useState({ top: 0, left: 0, above: false, maxHeight: 360 });
   const [videoUrl, setVideoUrl] = useState("");
   const [mediaChooser, setMediaChooser] = useState<"image" | "video" | null>(null);
@@ -261,7 +272,7 @@ export default function WritingEditorEngine({
     if (slashFromToolbar && focusInsertItem.current) slashMenu.current.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
   }, [slashOpen, slashPosition, slashFromToolbar]);
   useLayoutEffect(() => {
-    if (!slashOpen || slashFromToolbar) return;
+    if (!slashOpen || slashFromToolbar || slashNavigation.current !== "keyboard") return;
     const options = slashMenu.current?.querySelector<HTMLElement>(
       ".writing-slash-options",
     );
@@ -566,6 +577,8 @@ export default function WritingEditorEngine({
       above,
       maxHeight: Math.max(160, Math.min(360, (above ? spaceAbove : spaceBelow) - 16)),
     });
+    slashNavigation.current = "keyboard";
+    slashPointer.current = null;
     setSlashQuery(""); setSlashIndex(0); setSlashOpen(true);
   }
   function openCommands(trigger: HTMLButtonElement, fromKeyboard: boolean) {
@@ -601,7 +614,7 @@ export default function WritingEditorEngine({
     quotePlugin(),
     thematicBreakPlugin(),
     linkPlugin(),
-    linkDialogPlugin(),
+    linkDialogPlugin({ LinkDialog: WritingLinkDialog }),
     imagePlugin({
       disableImageResize: true,
       imageUploadHandler: onUpload ? upload : undefined,
@@ -626,7 +639,8 @@ export default function WritingEditorEngine({
     }),
   ], [onUpload, disabled, busy, viewControls]);
   return (
-    <div ref={root} className="writing-editor writing-surface rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {
+    <WritingInteractionContext.Provider value={reportInteraction}>
+    <div ref={root} data-editor-interacting={popupActive || slashOpen || !!mediaChooser || undefined} className="writing-editor writing-surface rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {
       if (event.target instanceof Element && event.target.closest(".writing-toolbar-controls")) {
         toolbarSelection.current = null;
         lexicalEditor.current?.getEditorState().read(() => {
@@ -701,13 +715,15 @@ export default function WritingEditorEngine({
         }
         if (event.key === "ArrowDown" || event.key === "ArrowUp") {
           event.preventDefault();
+          slashNavigation.current = "keyboard";
           if (matchingCommands.length) setSlashIndex((index) => (index + (event.key === "ArrowDown" ? 1 : -1) + matchingCommands.length) % matchingCommands.length);
           return;
         }
         if (event.key === "Enter") { event.preventDefault(); matchingCommands[slashIndex]?.run(); return; }
-        if (event.key === "Backspace") { event.preventDefault(); if (slashQuery) setSlashQuery((query) => query.slice(0, -1)); else setSlashOpen(false); setSlashIndex(0); return; }
+        if (event.key === "Backspace") { event.preventDefault(); slashNavigation.current = "keyboard"; if (slashQuery) setSlashQuery((query) => query.slice(0, -1)); else setSlashOpen(false); setSlashIndex(0); return; }
         if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
           event.preventDefault();
+          slashNavigation.current = "keyboard";
           const nextQuery = slashQuery + event.key;
           if (commandsFor(nextQuery).length) { setSlashQuery(nextQuery); setSlashIndex(0); }
           else keepSlashAsText(nextQuery);
@@ -751,7 +767,15 @@ export default function WritingEditorEngine({
         <div ref={slashFade.ref} className="writing-slash-options scroll-fade" data-scroll-fade-before={slashFade.edges.before} data-scroll-fade-after={slashFade.edges.after} onScroll={slashFade.measure}>
           {matchingCommands.map(({ icon: Icon, ...command }, index) => <Fragment key={command.name}>
             {matchingCommands[index - 1]?.group !== command.group && <div className="writing-slash-group-label" role="presentation">{command.group}</div>}
-            <Button type="button" size="sm" variant="ghost" role="menuitem" aria-current={!slashFromToolbar && index === slashIndex ? "true" : undefined} onMouseDown={(event) => event.preventDefault()} onPointerMove={() => setSlashIndex(index)} onClick={() => runInsertCommand(command.run)}><Icon aria-hidden="true" />{command.name}</Button>
+            <Button type="button" size="sm" variant="ghost" role="menuitem" aria-current={index === slashIndex ? "true" : undefined}
+              onMouseDown={(event) => event.preventDefault()}
+              onFocus={() => { slashNavigation.current = "keyboard"; setSlashIndex(index); }}
+              onPointerMove={(event) => {
+                if (slashPointer.current?.x === event.clientX && slashPointer.current?.y === event.clientY) return;
+                slashPointer.current = { x: event.clientX, y: event.clientY };
+                slashNavigation.current = "pointer";
+                setSlashIndex(index);
+              }} onClick={() => runInsertCommand(command.run)}><Icon aria-hidden="true" />{command.name}</Button>
           </Fragment>)}
         </div>
         <div className="writing-slash-footer"><Button type="button" size="sm" variant="ghost" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={closeInsertMenu}><span>Close menu</span><kbd>esc</kbd></Button></div>
@@ -819,5 +843,6 @@ export default function WritingEditorEngine({
         plugins={plugins}
       />
     </div>
+    </WritingInteractionContext.Provider>
   );
 }
