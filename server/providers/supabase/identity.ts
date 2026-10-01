@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { db } from "./client";
+import { loginSubjectForPerson } from "./identity-store";
 import { env } from "../../env";
 import { ServiceError, isAbsentSession } from "../../errors";
 import type {
@@ -163,21 +164,26 @@ export async function verifyMcpIdentity(
   }
 }
 
-/** Lifecycle callers supply Fieldbook person IDs. This adapter uses equal Auth IDs.
- * A fresh alternate adapter resolves its own identity mapping before these operations. */
+/** Pending people have no provider identity to lock, unlock or delete. */
 export async function lockIdentity(personId: string): Promise<void> {
-  const { error } = await db().auth.admin.updateUserById(personId, {
+  const subject = await loginSubjectForPerson(personId);
+  if (!subject) return;
+  const { error } = await db().auth.admin.updateUserById(subject, {
     ban_duration: "876600h",
   });
   if (error) throw error;
 }
 export async function unlockIdentity(personId: string): Promise<void> {
-  const { error } = await db().auth.admin.updateUserById(personId, {
+  const subject = await loginSubjectForPerson(personId);
+  if (!subject) return;
+  const { error } = await db().auth.admin.updateUserById(subject, {
     ban_duration: "none",
   });
   if (error) throw error;
 }
 export async function deleteIdentity(personId: string): Promise<void> {
-  const { error } = await db().auth.admin.deleteUser(personId);
+  const subject = await loginSubjectForPerson(personId);
+  if (!subject) return;
+  const { error } = await db().auth.admin.deleteUser(subject);
   if (error && error.code !== "user_not_found") throw error;
 }

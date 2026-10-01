@@ -48,12 +48,32 @@ export function addDays(day: string, days: number) {
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
-export function onboardingTarget(user: User, settings?: SiteSettings) {
-  if (user.id === "guest" || settings?.dueDatesEnabled === false)
-    return undefined;
-  return user.onboardingStart
-    ? addDays(user.onboardingStart, settings?.onboardingDays ?? 90)
+type ClockPerson = Pick<
+  User,
+  "id" | "hireDate" | "onboardingStart" | "onboardingDays"
+>;
+export function onboardingClockTarget(
+  user: ClockPerson,
+  settings?: SiteSettings,
+) {
+  if (user.id === "guest") return undefined;
+  const start = user.hireDate || user.onboardingStart;
+  return start
+    ? addDays(start, user.onboardingDays ?? settings?.onboardingDays ?? 90)
     : undefined;
+}
+export function learningStage(
+  user: ClockPerson,
+  settings?: SiteSettings,
+  day = todayUTC(),
+) {
+  const target = onboardingClockTarget(user, settings);
+  return target && target >= day ? "New user" : "Existing user";
+}
+export function onboardingTarget(user: User, settings?: SiteSettings) {
+  return settings?.dueDatesEnabled === false
+    ? undefined
+    : onboardingClockTarget(user, settings);
 }
 export function learningTarget(
   c: Content,
@@ -116,7 +136,7 @@ export function learningState(
   const required = requiredSequence(content, user, groups),
     remaining = required.filter((c) => !isComplete(c, progress));
   const target = onboardingTarget(user, settings),
-    onboarding = !!target && target >= todayUTC();
+    onboarding = learningStage(user, settings) === "New user";
   const overdue = remaining.filter(
     (c) => (learningTarget(c, user, groups, settings) || "9999") < todayUTC(),
   );

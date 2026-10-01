@@ -10,6 +10,7 @@ export type Workspace = {
   settings?: import("./settings").SiteSettings;
   revision?: number;
   governanceRevision?: number;
+  /** Transient preregistration commands; saved roster people live in users. */
   pendingUsers?: {
     email: string;
     name: string;
@@ -17,6 +18,7 @@ export type Workspace = {
     groups: string[];
     teamId?: string;
     onboardingStart?: string;
+    hireDate?: string;
   }[];
   publishedContent?: Content[];
   schema: 1;
@@ -67,7 +69,8 @@ export function freshWorkspace(): Workspace {
     users: [
       {
         id: "demo-learner",
-        onboardingStart: new Date().toISOString().slice(0, 10),
+        hireDate: new Date().toISOString().slice(0, 10),
+        onboardingDays: defaultSettings.onboardingDays,
         name: "Alex Edwards",
         email: "alex@example.com",
         role: "learner",
@@ -273,6 +276,11 @@ export function loadWorkspace(): Workspace {
       },
     };
   for (const user of data.users as User[]) {
+    if (
+      (user.hireDate || user.onboardingStart) &&
+      user.onboardingDays === undefined
+    )
+      user.onboardingDays = data.settings?.onboardingDays ?? 90;
     const renamed = renamedProfiles[user.id];
     if (renamed?.previous.includes(user.name)) user.name = renamed.name;
   }

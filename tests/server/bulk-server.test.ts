@@ -134,6 +134,8 @@ test("worker authenticates, retries an Auth lock without early deletion, and del
   await fixture(
     (url, method, body) => {
       calls.push(`${method} ${url.pathname}`);
+      if (url.pathname === "/rest/v1/fb_profiles")
+        return { auth_user_id: url.searchParams.get("id")?.slice(3) };
       if (url.pathname.endsWith("fb_claim_deletions")) {
         assert.equal(body.p_secret.length, 64);
         return [

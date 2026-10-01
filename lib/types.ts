@@ -50,6 +50,12 @@ export type User = {
   role: "admin" | "learner" | "manager";
   groups: string[];
   active: boolean;
+  /** False until the preregistered person activates a verified login. */
+  registered?: boolean;
+  hireDate?: string;
+  /** Applied clock window; changing organization defaults does not replace it. */
+  onboardingDays?: number;
+  /** Legacy recorded clock baseline, retained without claiming it is a hire date. */
   onboardingStart?: string;
   teamId?: string;
   groupJoinedAt?: Record<string, string>;

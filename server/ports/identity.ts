@@ -28,13 +28,16 @@ export type AuthorizationDetails =
 export type AuthorizationRedirect = { redirect_url: string };
 
 /** Application person record. The adapter resolves the provider subject to this stable ID.
- * Supabase currently uses equal values; alternative fresh schemas need not do so. */
+ * Roster IDs remain stable when a preregistered person activates a provider login. */
 export type ProfileRecord = {
   id: string;
   name: string;
   email: string;
   role: "admin" | "learner" | "manager";
   active: boolean;
+  auth_user_id?: string | null;
+  hire_date?: string | null;
+  onboarding_days?: number | null;
   groups: string[];
   team_id?: string | null;
   onboarding_start?: string | null;

@@ -782,7 +782,7 @@ export function TeamsAdmin({
               <TabsContent value="members" className="grid gap-6">
                 <SectionHeader
                   title={<h3 {...memberList.targetProps}>Team members</h3>}
-                  description="Each person has one direct reporting team. Inactive accounts are labeled; pending accounts are managed in People."
+                  description="Each person has one direct reporting team. Preregistered people are available before sign-in; inactive accounts are labeled."
                 >
                   <BulkPicker
                     title="Add members"

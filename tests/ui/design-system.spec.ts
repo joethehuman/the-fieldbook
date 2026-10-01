@@ -845,34 +845,17 @@ test("long feedback prompt wraps without crowding rating controls", async ({
   await snapshotReview(page, info, "feedback-narrow-long-prompt");
 });
 
-test("new user guidance belongs to the grey fieldset footer and labels its select", async ({
-  page,
-}, info) => {
+test("hire-date guidance labels the date and stage is derived", async ({ page }, info) => {
   await admin(page);
   await adminSection(page, "Demo profiles");
-  await page.getByRole("button", { name: "New user defaults", exact: true }).click();
-  const section = page.getByRole("region", { name: "New users", exact: true });
-  const select = section.getByRole("combobox");
-  await expect(select).toHaveAccessibleDescription(
-    /Applies to newly added users/,
-  );
-  const footer = section.locator('[data-slot="card-footer"]');
-  await expect(footer).toContainText(
-    "Group membership still determines assigned courses.",
-  );
-  await expect(footer).toHaveCSS("background-color", "rgb(250, 250, 250)");
-  await select.click();
-  await page
-    .getByRole("option", { name: "New user — onboarding window", exact: true })
-    .click();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Default saved" }),
-  ).toBeVisible();
-  await page.reload();
-  await adminSection(page, "Demo profiles");
-  await page.getByRole("button", { name: "New user defaults", exact: true }).click();
-  await expect(select).toContainText("New user — onboarding window");
-  await snapshotReview(page, info, "new-users-footer");
+  await expect(page.getByRole("button", { name: "New user defaults", exact: true })).toHaveCount(0);
+  await page.getByRole("row").filter({ hasText: "Alex Edwards" }).getByRole("button", { name: "Edit", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  const date = dialog.getByLabel("Hire date", { exact: true });
+  await expect(date).toHaveAccessibleDescription(/First sign-in does not start it/);
+  await date.fill("2020-01-01");
+  await expect(dialog).toContainText("Existing user");
+  await snapshotReview(page, info, "hire-date-guidance");
 });
 
 test("feedback remains usable with enlarged text and branded selection under dark preference", async ({
