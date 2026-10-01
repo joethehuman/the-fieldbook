@@ -52,22 +52,5 @@ export function useDesktopSidebar(courseKey?: string) {
     );
   }, [courseKey, setState]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.metaKey &&
-        event.shiftKey &&
-        !event.altKey &&
-        event.key.toLowerCase() === "s" &&
-        window.matchMedia("(min-width: 48rem)").matches
-      ) {
-        event.preventDefault();
-        setCollapsed((current) => !current);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [setCollapsed]);
-
   return { collapsed, setCollapsed };
 }
