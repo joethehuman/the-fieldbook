@@ -60,7 +60,7 @@ The production application includes:
 - Public or members-only browsing and optional learner registration with Google.
 - Docs, Updates and Courses with visual Markdown editing, automatic draft saving, explicit publication and draft preview.
 - Drafts, explicit publication, revision checks, and content-write audit records.
-- Images and video-file uploads, with a 50 MB per-file ceiling and no transcoding.
+- Images and video-file uploads limited by the installation's storage settings and optional application limit, with chunked large-file transfers and no transcoding.
 - Persistent learner progress, server-graded quizzes, and optional browser-progress import.
 - Feedback from signed-in members and public visitors, administrator progress/feedback views, branding, and privacy-policy settings.
 - Administrator-only MCP tools for content, aggregate reports, and existing media references.

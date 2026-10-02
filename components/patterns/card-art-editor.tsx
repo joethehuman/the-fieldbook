@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import type { UploadProgress } from "@/lib/upload-media";
+import { MediaUploadStatus } from "./media-upload-status";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FieldDescription } from "@/components/ui/field";
@@ -53,6 +55,7 @@ export function CardArtEditor({
     seeds: [],
   });
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [notice, setNotice] = useState("");
   const current = resolvedCardArt(id, title, art, legacyCover);
   const generated = current.source === "generated";
@@ -188,11 +191,10 @@ export function CardArtEditor({
             !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(
               file.type,
             ) ||
-            !file.size ||
-            file.size > 52428800
+            !file.size
           ) {
             setNotice(
-              "Choose a JPG, PNG, WebP, or GIF image of at most 50 MB.",
+              "Choose a non-empty JPG, PNG, WebP, or GIF image.",
             );
             return;
           }
@@ -200,7 +202,7 @@ export function CardArtEditor({
           onBusyChange?.(true);
           setNotice("");
           try {
-            const imageUrl = await onUpload(file);
+            const imageUrl = await onUpload(file, setUploadProgress);
             onChange({ ...current, source: "upload", imageUrl });
             setNotice(saveMode === "automatic" ? "Card image updated." : "Image uploaded. Save this item to apply it.");
           } catch (error) {
@@ -211,15 +213,17 @@ export function CardArtEditor({
             );
           } finally {
             setUploading(false);
+            setUploadProgress(null);
             onBusyChange?.(false);
           }
         }}
       />
       <FieldDescription>
         {onUpload
-          ? "JPG, PNG, WebP or GIF, up to 50 MB. Wide images crop to fill the card."
+          ? "JPG, PNG, WebP or GIF. The installation's upload limits apply. Wide images crop to fill the card."
           : "Custom image uploads are available in an installed Fieldbook. This demo saves generated artwork."}
       </FieldDescription>
+      <MediaUploadStatus progress={uploadProgress} />
       <p role="status" className="text-sm text-muted-foreground">
         {notice}
       </p>

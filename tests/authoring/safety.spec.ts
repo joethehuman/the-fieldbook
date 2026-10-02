@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { waitForDraftSaved, openContentSettings } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
@@ -1254,4 +1255,138 @@ test("an assigned course retains learning state and legacy media when its inline
     "A small wording correction.",
   );
   expect(after.progress).toEqual(before.progress);
+});
+
+// Protocol behavior and document safety, including a lost acknowledgement after a chunk persisted.
+test("large media resumes a lost chunk acknowledgement and inserts only verified media", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+  const { state } = await setup(page, true);
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await editor.fill("Keep my original draft");
+  await waitForDraftSaved(page);
+  await page.unroute("**/api/upload");
+  const endpoint = "https://test.storage.supabase.co/storage/v1/upload/resumable/sign";
+  const uploadUrl = `${endpoint}/synthetic-upload`;
+  let signedSize = 0, offset = 0, heads = 0, completes = 0, interrupted = false;
+  let release!: () => void;
+  const chunks: Buffer[] = [];
+  await page.route("**/api/upload", async (route) => {
+    const body = route.request().postDataJSON();
+    if (body.complete) {
+      expect(offset).toBe(signedSize); completes++;
+      return route.fulfill({ json: { url: "/api/media/verified-large.png" } });
+    }
+    signedSize = body.size;
+    expect(signedSize).toBeGreaterThan(50 * 1024 * 1024);
+    return route.fulfill({ json: { id: "reserved-large", upload: {
+      protocol: "tus", url: endpoint, chunkSize: 6 * 1024 * 1024,
+      headers: { "x-signature": "path-scoped-test", "x-upsert": "false" },
+      metadata: { bucketName: "fieldbook-media", objectName: "synthetic/large.png", contentType: "image/png" },
+    } } });
+  });
+  await page.route("https://test.storage.supabase.co/**", async (route) => {
+    const req = route.request();
+    const headers = { "Tus-Resumable": "1.0.0", "Access-Control-Allow-Origin": "*", "Access-Control-Expose-Headers": "Location,Upload-Offset,Upload-Length,Tus-Resumable" };
+    expect(req.headers()["x-signature"]).toBe("path-scoped-test");
+    expect(req.headers()["x-upsert"]).toBe("false");
+    if (req.method() === "HEAD") {
+      heads++;
+      return route.fulfill({ status: 200, headers: { ...headers, "Upload-Offset": String(offset), "Upload-Length": String(signedSize) } });
+    }
+    expect(["POST", "PATCH"]).toContain(req.method());
+    if (req.method() === "PATCH") expect(Number(req.headers()["upload-offset"])).toBe(offset);
+    const bytes = req.postDataBuffer()!;
+    expect(bytes.length).toBeLessThanOrEqual(6 * 1024 * 1024);
+    chunks.push(bytes); offset += bytes.length;
+    if (req.method() === "PATCH" && !interrupted) {
+      interrupted = true;
+      await new Promise<void>((resolve) => { release = resolve; });
+      return route.abort("failed");
+    }
+    return route.fulfill({ status: req.method() === "POST" ? 201 : 204, headers: { ...headers, Location: uploadUrl, "Upload-Offset": String(offset) } });
+  });
+  const file = Buffer.alloc(54 * 1024 * 1024);
+  const filePath = info.outputPath("large.png");
+  await writeFile(filePath, file);
+  await page.locator('.writing-editor input[type="file"]').setInputFiles(filePath);
+  await expect.poll(() => !!release).toBe(true);
+  await expect(page.getByRole("progressbar", { name: "File upload progress" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Back to content" })).toBeDisabled();
+  expect(completes).toBe(0);
+  expect(state.content[0].body).toBe("Keep my original draft");
+  await page.screenshot({ path: info.outputPath("large-upload-progress.png"), fullPage: true });
+  release();
+  await expect.poll(() => completes).toBe(1);
+  await waitForDraftSaved(page);
+  expect(heads).toBeGreaterThan(0);
+  expect(createHash("sha256").update(Buffer.concat(chunks)).digest("hex")).toBe(createHash("sha256").update(file).digest("hex"));
+  expect(state.content[0].body).toContain("Keep my original draft");
+  expect(state.content[0].body).toContain("/api/media/verified-large.png");
+  await expect(page.getByRole("progressbar", { name: "File upload progress" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Back to content" })).toBeEnabled();
+});
+
+for (const failure of ["storage limit", "expired permission", "verification"] as const) {
+  test(`${failure} upload failure preserves the draft and can retry without a failed reference`, async ({ page }, info) => {
+    test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+    const { state } = await setup(page, true);
+    const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+    await editor.fill("Keep this draft intact");
+    await waitForDraftSaved(page);
+    await page.unroute("**/api/upload");
+    let failed = true, completed = 0;
+    await page.route("**/api/upload", async (route) => {
+      if (route.request().postDataJSON().complete) {
+        completed++;
+        if (failed && failure === "verification") return route.fulfill({ status: 400, json: { error: "Upload verification failed. Retry with a supported file." } });
+        return route.fulfill({ json: { url: "/api/media/retry-ready.png" } });
+      }
+      return route.fulfill({ json: { id: "retry", upload: { url: "https://test.supabase.co/ui4-upload", method: "PUT", headers: { "Content-Type": "image/png" } } } });
+    });
+    await page.route("https://test.supabase.co/ui4-upload", (route) => route.fulfill({ status: failed && failure !== "verification" ? (failure === "storage limit" ? 413 : 403) : 200, json: { message: "private token details must never reach the UI" } }));
+    const file = { name: "retry.png", mimeType: "image/png", buffer: Buffer.from("synthetic") };
+    await page.locator('.writing-editor input[type="file"]').setInputFiles(file);
+    const alert = page.locator(".writing-editor").getByRole("alert");
+    await expect(alert).toContainText(failure === "storage limit" ? "file-size limit" : failure === "expired permission" ? "permission expired or was denied" : "could not be verified");
+    await expect(alert).not.toContainText("private token");
+    await expect(editor).toHaveText("Keep this draft intact");
+    expect(state.content[0].body).toBe("Keep this draft intact");
+    expect(completed).toBe(failure === "verification" ? 1 : 0);
+    await page.screenshot({ path: info.outputPath("upload-recovery.png"), fullPage: true });
+    failed = false;
+    await page.locator('.writing-editor input[type="file"]').setInputFiles(file);
+    await expect(editor.locator("img")).toHaveAttribute("src", "/api/media/retry-ready.png");
+    await waitForDraftSaved(page);
+    expect(state.content[0].body).toContain("Keep this draft intact");
+    expect(state.content[0].body).toContain("/api/media/retry-ready.png");
+  });
+}
+
+test("card artwork above 50 MB reaches storage and a rejection preserves existing artwork", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+  const { state } = await setup(page, true, "course");
+  const original = JSON.stringify(state.content[0].cardArt);
+  await openContentSettings(page);
+  await page.unroute("**/api/upload");
+  let signed = 0, completed = 0;
+  await page.route("**/api/upload", (route) => {
+    const body = route.request().postDataJSON();
+    if (body.complete) { completed++; return route.fulfill({ json: { url: "/api/media/should-not-be-ready.png" } }); }
+    expect(body.size).toBeGreaterThan(50 * 1024 * 1024); signed++;
+    return route.fulfill({ json: { id: "artwork", upload: {
+      protocol: "tus", url: "https://test.storage.supabase.co/ui4-artwork", chunkSize: 6 * 1024 * 1024,
+      headers: { "x-signature": "synthetic" }, metadata: { bucketName: "fieldbook-media", objectName: "synthetic/artwork.png", contentType: "image/png" },
+    } } });
+  });
+  await page.route("https://test.storage.supabase.co/ui4-artwork", (route) => route.fulfill({ status: 413, json: { error: "EntityTooLarge" } }));
+  const filePath = info.outputPath("large-artwork.png");
+  await writeFile(filePath, Buffer.alloc(54 * 1024 * 1024));
+  await page.getByLabel("Upload card artwork", { exact: true }).setInputFiles(filePath);
+  const artwork = page.getByRole("region", { name: "Card artwork editor", exact: true });
+  await expect(artwork.locator("p[role='status']")).toContainText("file-size limit");
+  expect(signed).toBe(1); expect(completed).toBe(0);
+  expect(JSON.stringify(state.content[0].cardArt)).toBe(original);
+  await expect(artwork.getByRole("button", { name: "Upload image", exact: true })).toBeEnabled();
+  await artwork.locator("p[role='status']").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: info.outputPath("large-artwork-recovery.png"), fullPage: true });
 });

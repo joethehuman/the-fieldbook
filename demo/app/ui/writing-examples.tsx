@@ -6,6 +6,9 @@ import { Checkbox } from "@/components/ui/choice";
 import { CreatableCombobox } from "@/components/ui/creatable-combobox";
 import { FormField } from "@/components/patterns/form-field";
 import { Field } from "@/components/ui/field";
+import { MediaUploadStatus } from "@/components/patterns/media-upload-status";
+import { Alert } from "@/components/ui/alert";
+import { Card } from "@/components/ui/card";
 
 export function WritingExamples() {
   const [body, setBody] = useState(
@@ -40,6 +43,14 @@ export function WritingExamples() {
         />
       </FormField>
       <WritingEditor value={body} onChange={setBody} disabled={disabled} />
+      <Card aria-label="Media upload feedback">
+        <div className="grid gap-4">
+          <h3>Media upload feedback</h3>
+          <MediaUploadStatus progress={{ stage: "uploading", uploaded: 38, total: 100 }} />
+          <MediaUploadStatus progress={{ stage: "verifying", uploaded: 100, total: 100 }} />
+          <Alert variant="destructive">Storage rejected this file because it exceeds the installation's file-size limit. Ask an administrator to check the storage limits.</Alert>
+        </div>
+      </Card>
       <p className="text-copy text-muted-foreground">
         Saving a draft and publishing are separate actions in the authoring
         screen. The editor itself owns no persistence. The table demonstrates filled and empty cells with the same grid in Write

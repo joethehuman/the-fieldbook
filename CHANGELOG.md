@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Remove the fixed 50 MB application/card-art upload ceiling while respecting optional operator and storage limits. Show upload progress, use signed chunked transfers with bounded retries for large files, and explain signing, storage and verification failures without losing draft text or inserting failed media. Existing storage limits require separate operator configuration.
+
 - Add contributor accounts with the shared publishing panel, content/feedback editors and exports, authoring uploads, and content recovery. Explicit team management adds scoped reports; administrator accounts retain one organization destination. Course assignments, Docs hierarchy changes and people recovery remain administrator-only. Requires the contributor permissions migration; MCP connections remain administrator-only in this change.
 
 - Lighten shared interface typography with regular navigation, labels and controls, medium headings and restrained emphasis while preserving authored bold. Make authored-table grids clearer in visual writing, draft previews and reading without changing table tools or local scrolling.
