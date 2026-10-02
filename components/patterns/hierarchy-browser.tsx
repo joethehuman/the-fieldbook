@@ -8,12 +8,13 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ChevronRight, MoreHorizontal } from "lucide-react";
+import { ChevronRight, MoreHorizontal, Network, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/choice";
 import { Input } from "../ui/input";
 import { ActionGroup } from "../ui/action-group";
+import { CountMetric } from "../ui/count-metric";
 import {
   ConnectorLine,
   type ConnectorLineGeometry,
@@ -35,7 +36,7 @@ export type HierarchyBrowserItem = {
   parentId?: string;
   label: string;
   description?: string;
-  meta?: ReactNode;
+  directMemberCount?: number;
 };
 
 function pathFor(id: string, byId: Map<string, HierarchyBrowserItem>) {
@@ -106,7 +107,7 @@ function BrowserColumn({
       <ul
         ref={fade.ref}
         data-slot="hierarchy-column-list"
-        className="scroll-fade grid min-h-0 min-w-0 content-start gap-2 overflow-y-auto pe-2 pb-1 [scrollbar-gutter:stable]"
+        className="scroll-fade grid min-h-0 min-w-0 content-start gap-2 overflow-y-auto overscroll-y-contain pe-2 pb-1 [scrollbar-gutter:stable]"
         data-scroll-fade-before={fade.edges.before}
         data-scroll-fade-after={fade.edges.after}
         onScroll={(event) => {
@@ -164,6 +165,7 @@ export function HierarchyBrowser({
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
   const headingRefs = useRef(new Map<string, HTMLHeadingElement>());
   const pendingBrowse = useRef<string | null>(null);
+  const pendingRowFocus = useRef<string | null>(null);
   const pendingMenuBrowse = useRef(false);
   const [closedMenu, setClosedMenu] = useState(0);
   const revealed = useRef<number | null>(null);
@@ -255,7 +257,9 @@ export function HierarchyBrowser({
     const frame = frameRef.current;
     const root = rootRef.current;
     if (!frame || !root) return;
-    const owner = frame.closest<HTMLElement>(".main-content");
+    const owner =
+      frame.closest<HTMLElement>(".admin-panel") ??
+      frame.closest<HTMLElement>(".main-content");
     let scheduled = 0;
     const measure = () => {
       if (!frame.getClientRects().length) return;
@@ -273,7 +277,9 @@ export function HierarchyBrowser({
       const available =
         bottom - frame.getBoundingClientRect().top - bottomInset;
       const maximum = (owner?.clientHeight ?? window.innerHeight) - bottomInset;
-      const height = Math.max(16 * rem, Math.min(available, maximum));
+      // Keep a usable chart when enlarged controls or a short viewport require
+      // outer scrolling; ordinary viewports fit below the fixed controls.
+      const height = Math.max(8 * rem, Math.min(available, maximum));
       frame.style.setProperty("--hierarchy-height", `${Math.round(height)}px`);
       if (chartRef.current && canvasRef.current)
         canvasRef.current.style.height = `${chartRef.current.clientHeight}px`;
@@ -361,30 +367,36 @@ export function HierarchyBrowser({
           row.focus({ preventScroll: true });
           revealed.current = reveal.token;
           pendingBrowse.current = null;
+          pendingRowFocus.current = null;
           return;
         }
       }
       if (pendingBrowse.current !== branchId) return;
-      const target = columns.some((column) => column.id === branchId)
-        ? headingRefs.current.get(branchId)
-        : rowRefs.current.get(branchId);
+      const target = pendingRowFocus.current
+        ? rowRefs.current.get(pendingRowFocus.current)
+        : columns.some((column) => column.id === branchId)
+          ? headingRefs.current.get(branchId)
+          : rowRefs.current.get(branchId);
       if (target) {
         revealWithinChart(target);
         target.focus({ preventScroll: true });
       }
       pendingBrowse.current = null;
+      pendingRowFocus.current = null;
     });
     return () => cancelAnimationFrame(frame);
   }, [branchId, flat, reveal, columnKey, items, closedMenu]);
 
-  function browse(id: string) {
+  function browse(id: string, focusRow?: string) {
     pendingBrowse.current = id;
+    pendingRowFocus.current = focusRow || null;
     void onBrowse(id);
   }
   function row(item: HierarchyBrowserItem, showPath = false) {
     const childCount = items.filter(
       (child) => child.parentId === item.id,
     ).length;
+    const expanded = !flat && columns.some((column) => column.id === item.id);
     return (
       <li
         key={item.id}
@@ -427,7 +439,17 @@ export function HierarchyBrowser({
               aria-current={
                 !flat && activePath.has(item.id) ? "location" : undefined
               }
-              onClick={() => browse(item.id)}
+              aria-expanded={childCount > 0 ? expanded : undefined}
+              onClick={() =>
+                expanded
+                  ? browse(
+                      item.parentId && byId.has(item.parentId)
+                        ? item.parentId
+                        : "",
+                      item.id,
+                    )
+                  : browse(item.id)
+              }
               className="flex min-w-0 flex-1 items-start justify-between gap-2 border-0 bg-transparent px-2 py-2 text-label"
             >
               <span className="grid min-w-0 gap-1 [overflow-wrap:anywhere]">
@@ -443,45 +465,63 @@ export function HierarchyBrowser({
                 )}
                 {item.description && (
                   <span
-                    className="truncate text-xs text-muted-foreground"
+                    data-slot="hierarchy-manager"
+                    className="line-clamp-2 text-xs text-muted-foreground"
                     title={item.description}
                   >
                     {item.description}
                   </span>
                 )}
-                {item.meta && (
-                  <span className="text-xs text-muted-foreground">
-                    {item.meta}
-                  </span>
-                )}
               </span>
               {childCount > 0 && (
-                <ChevronRight className="mt-1 shrink-0" aria-hidden="true" />
+                <ChevronRight
+                  className={cn("mt-1 shrink-0", expanded && "rotate-90")}
+                  aria-hidden="true"
+                />
               )}
             </ContentAction>
           </div>
-          <ActionGroup variant="text" className="justify-end px-2 pb-2">
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              disabled={disabled}
-              aria-label={`Open ${item.label}`}
-              onClick={() => void onOpen(item.id)}
-            >
-              Open
-            </Button>
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              disabled={disabled}
-              aria-label={`Edit ${item.label}`}
-              onClick={() => void onEdit(item.id)}
-            >
-              Edit
-            </Button>
-          </ActionGroup>
+          <div
+            data-slot="hierarchy-card-footer"
+            className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-2 pb-2"
+          >
+            <div className="flex items-center gap-3">
+              {item.directMemberCount !== undefined && (
+                <CountMetric
+                  icon={<Users className="size-3" aria-hidden="true" />}
+                  value={item.directMemberCount}
+                  label={`${item.directMemberCount} direct ${item.directMemberCount === 1 ? "member" : "members"}`}
+                />
+              )}
+              <CountMetric
+                icon={<Network className="size-3" aria-hidden="true" />}
+                value={childCount}
+                label={`${childCount} ${childCount === 1 ? "subteam" : "subteams"}`}
+              />
+            </div>
+            <ActionGroup variant="text" className="ms-auto justify-end">
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                disabled={disabled}
+                aria-label={`Open ${item.label}`}
+                onClick={() => void onOpen(item.id)}
+              >
+                Open
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                disabled={disabled}
+                aria-label={`Edit ${item.label}`}
+                onClick={() => void onEdit(item.id)}
+              >
+                Edit
+              </Button>
+            </ActionGroup>
+          </div>
         </div>
       </li>
     );
@@ -605,7 +645,7 @@ export function HierarchyBrowser({
       <div
         ref={frameRef}
         data-slot="hierarchy-viewport"
-        className="h-[var(--hierarchy-height,24rem)] min-h-64 min-w-0 overflow-hidden"
+        className="h-[var(--hierarchy-height,24rem)] min-h-0 min-w-0 overflow-hidden"
       >
         {flat ? (
           <>

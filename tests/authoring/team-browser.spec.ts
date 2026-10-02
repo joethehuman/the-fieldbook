@@ -92,7 +92,7 @@ test("installed Teams keeps its organization team manageable and reveals a newly
     manager.getByRole("textbox", { name: "Team name", exact: true }),
   ).toHaveCount(0);
   await expect(
-    manager.getByRole("combobox", { name: "Parent team", exact: true }),
+    manager.getByRole("button", { name: "Parent team", exact: true }),
   ).toHaveCount(0);
   await manager.getByRole("button", { name: "Cancel", exact: true }).click();
   await page
@@ -101,8 +101,21 @@ test("installed Teams keeps its organization team manageable and reveals a newly
   await page.getByRole("button", { name: "Add team", exact: true }).click();
   const create = page.getByRole("dialog", { name: "New team", exact: true });
   await expect(
-    create.getByRole("combobox", { name: "Parent team", exact: true }),
+    create.getByRole("button", { name: "Parent team", exact: true }),
   ).toHaveText("Organization");
+  await create
+    .getByRole("button", { name: "Parent team", exact: true })
+    .click();
+  const parentSearch = page.getByRole("combobox", {
+    name: "Find a parent team",
+    exact: true,
+  });
+  await expect(parentSearch).toBeFocused();
+  await parentSearch.fill("Organization");
+  await parentSearch.press("Enter");
+  await expect(
+    create.getByRole("button", { name: "Parent team", exact: true }),
+  ).toBeFocused();
   await create
     .getByRole("textbox", { name: "Team name", exact: true })
     .fill("New region");

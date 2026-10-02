@@ -161,6 +161,15 @@ test("learning groups: shared controls, save and reload", async ({
     .getByRole("button", { name: "Create group", exact: true })
     .click();
   await expect(createDialog).not.toBeVisible();
+  const createdGroup = page.getByRole("button", {
+    name: "Sales design test",
+    exact: true,
+  });
+  await expect(createdGroup).toBeFocused();
+  await expect(
+    page.getByRole("table", { name: "Learning groups", exact: true }),
+  ).toBeVisible();
+  await createdGroup.click();
   await expect(
     page.getByRole("heading", { name: "Sales design test", exact: true }),
   ).toBeVisible();

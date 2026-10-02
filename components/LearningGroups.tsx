@@ -119,7 +119,11 @@ export default function LearningGroups({
   const [tab, setTab] = useState("people");
   const [indexQuery, setIndexQuery] = useState("");
   const [indexPage, setIndexPage] = useState(1);
+  const [indexSort, setIndexSort] = useState("name");
+  const [indexPeople, setIndexPeople] = useState("");
+  const [indexCourses, setIndexCourses] = useState("");
   const [returnToGroup, setReturnToGroup] = useState("");
+  const createdGroupCloseFocus = useRef<string | null>(null);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [peopleSort, setPeopleSort] = useState("name");
@@ -184,13 +188,90 @@ export default function LearningGroups({
     ).size;
   const matches = (value: string, term = query) =>
     value.toLowerCase().includes(term.trim().toLowerCase());
-  const groups = [...data.groups]
-    .sort(byName)
-    .filter((candidate) => matches(candidate.name, indexQuery));
+  const indexMetrics = new Map(
+    data.groups.map((candidate) => [
+      candidate.id,
+      { people: membersOf(candidate).length, courses: courseCount(candidate) },
+    ]),
+  );
+  const orderGroups = (candidates: Group[]) =>
+    [...candidates].sort((a, b) => {
+      const first = indexMetrics.get(a.id) || { people: 0, courses: 0 };
+      const second = indexMetrics.get(b.id) || { people: 0, courses: 0 };
+      const difference =
+        indexSort === "people-most"
+          ? second.people - first.people
+          : indexSort === "people-fewest"
+            ? first.people - second.people
+            : indexSort === "courses-most"
+              ? second.courses - first.courses
+              : indexSort === "courses-fewest"
+                ? first.courses - second.courses
+                : 0;
+      return (
+        difference ||
+        (indexSort === "name-reverse" ? byName(b, a) : byName(a, b)) ||
+        a.id.localeCompare(b.id)
+      );
+    });
+  const groups = orderGroups(data.groups).filter((candidate) => {
+    const metrics = indexMetrics.get(candidate.id)!;
+    return (
+      matches(candidate.name, indexQuery) &&
+      (!indexPeople ||
+        (indexPeople === "with" ? metrics.people > 0 : metrics.people === 0)) &&
+      (!indexCourses ||
+        (indexCourses === "with" ? metrics.courses > 0 : metrics.courses === 0))
+    );
+  });
   const groupPage = Math.min(
     indexPage,
     Math.max(1, Math.ceil(groups.length / PAGE_SIZE)),
   );
+  const pageGroups = groups.slice(
+    (groupPage - 1) * PAGE_SIZE,
+    groupPage * PAGE_SIZE,
+  );
+  const groupSelection = useBulkSelection(
+    JSON.stringify([selected, indexQuery, indexPeople, indexCourses]),
+    groups.map((candidate) => candidate.id),
+  );
+  const clearIndexFilters = () => {
+    setIndexQuery("");
+    setIndexPeople("");
+    setIndexCourses("");
+    setIndexPage(1);
+  };
+  const indexFilters: AppliedFilter[] = [];
+  if (indexPeople)
+    indexFilters.push({
+      id: "people",
+      label: indexPeople === "with" ? "With people" : "No people",
+      onRemove: () => {
+        setIndexPeople("");
+        setIndexPage(1);
+      },
+    });
+  if (indexCourses)
+    indexFilters.push({
+      id: "courses",
+      label:
+        indexCourses === "with"
+          ? "With assigned courses"
+          : "No assigned courses",
+      onRemove: () => {
+        setIndexCourses("");
+        setIndexPage(1);
+      },
+    });
+  const indexSortLabels: Record<string, string> = {
+    name: "Name A–Z",
+    "name-reverse": "Name Z–A",
+    "people-most": "People: most first",
+    "people-fewest": "People: fewest first",
+    "courses-most": "Courses: most first",
+    "courses-fewest": "Courses: fewest first",
+  };
   const filteredMembers = members
     .filter(
       (person) =>
@@ -338,7 +419,8 @@ export default function LearningGroups({
       ).find((button) => button.dataset.groupId === returnToGroup);
       if (row) {
         row.focus({ preventScroll: true });
-        row.scrollIntoView({ block: "nearest" });
+        // Leave breathing room so the save toast cannot cover the revealed row.
+        row.scrollIntoView({ block: "center", inline: "nearest" });
       } else
         destination.targetProps.ref.current?.focus({ preventScroll: true });
       setReturnToGroup("");
@@ -351,6 +433,25 @@ export default function LearningGroups({
   const rosterSnapshot = organizationSnapshot();
   const currentOrganization = useRef(rosterSnapshot);
   currentOrganization.current = rosterSnapshot;
+  const indexSnapshot = useMemo(
+    () =>
+      JSON.stringify([
+        data.groups,
+        data.teams,
+        data.users,
+        data.content,
+        data.publishedContent,
+        data.curricula,
+        data.settings,
+        data.pendingUsers,
+        data.progress,
+        data.revision,
+        data.governanceRevision,
+      ]),
+    [data],
+  );
+  const currentIndexSnapshot = useRef(indexSnapshot);
+  currentIndexSnapshot.current = indexSnapshot;
 
   async function run(action: () => void | Promise<void>, message: string) {
     if (saving.current) return false;
@@ -505,7 +606,18 @@ export default function LearningGroups({
         )
       ) {
         setEditor(null);
-        if (editor.kind === "create") openGroup(id);
+        if (editor.kind === "create") {
+          clearIndexFilters();
+          setSelected("");
+          groupSelection.setSelected([]);
+          setIndexPage(
+            Math.floor(
+              orderGroups(next).findIndex((candidate) => candidate.id === id) /
+                PAGE_SIZE,
+            ) + 1,
+          );
+          createdGroupCloseFocus.current = id;
+        }
       }
       return;
     }
@@ -686,6 +798,26 @@ export default function LearningGroups({
             description="Choose an audience, then choose its learning. Published content remains available to everyone with access."
           />
           <CollectionControls
+            filters={indexFilters}
+            onClear={clearIndexFilters}
+            sortLabel={indexSortLabels[indexSort]}
+            sort={
+              <FormField label="Sort learning groups">
+                <SelectField
+                  value={indexSort}
+                  onValueChange={(value) => {
+                    setIndexSort(value);
+                    setIndexPage(1);
+                  }}
+                >
+                  {Object.entries(indexSortLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </SelectField>
+              </FormField>
+            }
             primaryAction={
               <Button
                 type="button"
@@ -709,57 +841,215 @@ export default function LearningGroups({
                 />
               </FormField>
             }
-          />
+          >
+            <FormField label="Group membership">
+              <SelectField
+                value={indexPeople}
+                onValueChange={(value) => {
+                  setIndexPeople(value);
+                  setIndexPage(1);
+                }}
+              >
+                <option value="">Any membership</option>
+                <option value="with">With people</option>
+                <option value="without">No people</option>
+              </SelectField>
+            </FormField>
+            <FormField label="Group courses">
+              <SelectField
+                value={indexCourses}
+                onValueChange={(value) => {
+                  setIndexCourses(value);
+                  setIndexPage(1);
+                }}
+              >
+                <option value="">Any assigned courses</option>
+                <option value="with">With assigned courses</option>
+                <option value="without">No assigned courses</option>
+              </SelectField>
+            </FormField>
+          </CollectionControls>
+          <BulkActions
+            selected={groupSelection.actionIds}
+            collectionSize={groups.length}
+            singleItemActions={false}
+            noun="groups"
+            range={
+              groups.length
+                ? `${(groupPage - 1) * PAGE_SIZE + 1}–${Math.min(groupPage * PAGE_SIZE, groups.length)} of ${groups.length} groups`
+                : "0 groups"
+            }
+            onSelectionChange={groupSelection.setSelected}
+            commands={[
+              {
+                id: "delete-groups",
+                label: "Delete groups",
+                description:
+                  "Remove selected learning groups and their audience links. Courses and saved completions remain.",
+                destructive: true,
+                externalReview: true,
+                disabledReason:
+                  busy || needsConversion
+                    ? "Finish the current change first."
+                    : undefined,
+                successMessage: "Learning groups deleted.",
+                apply: async (_, ids = []) => {
+                  if (
+                    currentIndexSnapshot.current !== indexSnapshot ||
+                    ids.some(
+                      (id) =>
+                        !data.groups.some((candidate) => candidate.id === id),
+                    )
+                  )
+                    throw new Error(
+                      "Groups, people or learning changed. Review the current list before retrying.",
+                    );
+                  if (saving.current)
+                    throw new Error("Finish the current change first.");
+                  saving.current = true;
+                  setBusy(true);
+                  try {
+                    const deleting = new Set(ids);
+                    await onChange(
+                      {
+                        ...data,
+                        groups: data.groups.filter(
+                          (candidate) => !deleting.has(candidate.id),
+                        ),
+                        users: data.users.map((person) => ({
+                          ...person,
+                          groups: person.groups.filter(
+                            (id) => !deleting.has(id),
+                          ),
+                        })),
+                      },
+                      {
+                        locallyHandled: true,
+                        validateCurrent: () => {
+                          if (currentIndexSnapshot.current !== indexSnapshot)
+                            throw new Error(
+                              "Groups, people or learning changed. Review the current list before retrying.",
+                            );
+                        },
+                        review: {
+                          title: `Delete ${ids.length} learning ${ids.length === 1 ? "group" : "groups"}?`,
+                          description: `${data.groups
+                            .filter((candidate) => deleting.has(candidate.id))
+                            .map((candidate) => candidate.name)
+                            .join(
+                              ", ",
+                            )}. Remove these groups and their audience links. Courses and saved completions remain.`,
+                          confirmLabel:
+                            ids.length === 1 ? "Delete group" : "Delete groups",
+                          always: true,
+                        },
+                      },
+                    );
+                  } finally {
+                    saving.current = false;
+                    setBusy(false);
+                  }
+                },
+              },
+            ]}
+          >
+            {groupSelection.canSelect &&
+              pageGroups.every((candidate) =>
+                groupSelection.selected.includes(candidate.id),
+              ) &&
+              groupSelection.selected.length < groups.length && (
+                <Button
+                  type="button"
+                  variant="link"
+                  onClick={() =>
+                    groupSelection.setSelected(
+                      groups.map((candidate) => candidate.id),
+                    )
+                  }
+                >
+                  Select all {groups.length} matching
+                </Button>
+              )}
+          </BulkActions>
+
           {groups.length ? (
             <TableContainer>
-              <DataTable layout="learningGroups" aria-label="Learning groups">
+              <DataTable
+                layout="learningGroupsSelectable"
+                aria-label="Learning groups"
+              >
                 <TableHeader>
                   <TableRow>
+                    <TableHead>
+                      {groupSelection.canSelect && (
+                        <SelectRows
+                          ids={pageGroups.map((candidate) => candidate.id)}
+                          value={groupSelection.selected}
+                          onChange={groupSelection.setSelected}
+                          label={`Select page (${pageGroups.length})`}
+                        />
+                      )}
+                    </TableHead>
                     <TableHead>Group</TableHead>
                     <TableHead className="text-right">People</TableHead>
                     <TableHead className="text-right">Courses</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {groups
-                    .slice((groupPage - 1) * PAGE_SIZE, groupPage * PAGE_SIZE)
-                    .map((candidate) => {
-                      const links = groupTeamLinks(candidate),
-                        direct = data.users.filter((person) =>
-                          person.groups.includes(candidate.id),
-                        ).length;
-                      return (
-                        <TableRow key={candidate.id}>
-                          <TableCell>
-                            <Button
-                              type="button"
-                              variant="link"
-                              data-group-id={candidate.id}
-                              onClick={() => openGroup(candidate.id)}
-                            >
-                              {candidate.name}
-                            </Button>
-                            <p className="text-copy text-muted-foreground">
-                              {links.length
-                                ? `${links.length} linked ${links.length === 1 ? "team" : "teams"}`
+                  {pageGroups.map((candidate) => {
+                    const links = groupTeamLinks(candidate),
+                      direct = data.users.filter((person) =>
+                        person.groups.includes(candidate.id),
+                      ).length;
+                    return (
+                      <TableRow key={candidate.id}>
+                        <TableCell>
+                          {groupSelection.canSelect && (
+                            <Checkbox
+                              aria-label={`Select ${candidate.name}`}
+                              checked={groupSelection.selected.includes(
+                                candidate.id,
+                              )}
+                              disabled={busy}
+                              onCheckedChange={(checked) =>
+                                groupSelection.toggle(
+                                  candidate.id,
+                                  checked === true,
+                                )
+                              }
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="link"
+                            data-group-id={candidate.id}
+                            onClick={() => openGroup(candidate.id)}
+                          >
+                            {candidate.name}
+                          </Button>
+                          <p className="text-copy text-muted-foreground">
+                            {links.length
+                              ? `${links.length} linked ${links.length === 1 ? "team" : "teams"}`
+                              : ""}
+                            {links.length && direct ? " · " : ""}
+                            {direct
+                              ? `${direct} individually added`
+                              : !links.length
+                                ? "No members yet"
                                 : ""}
-                              {links.length && direct ? " · " : ""}
-                              {direct
-                                ? `${direct} individually added`
-                                : !links.length
-                                  ? "No members yet"
-                                  : ""}
-                            </p>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {membersOf(candidate).length}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {courseCount(candidate)}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
+                          </p>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {membersOf(candidate).length}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {courseCount(candidate)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </DataTable>
             </TableContainer>
@@ -768,10 +1058,11 @@ export default function LearningGroups({
               count={0}
               total={data.groups.length}
               noun="learning groups"
-              onClear={() => setIndexQuery("")}
+              onClear={clearIndexFilters}
             />
           )}
           <Pagination
+            showCount={false}
             label="Learning groups"
             page={groupPage}
             pageSize={PAGE_SIZE}
@@ -1402,6 +1693,15 @@ export default function LearningGroups({
         }}
       >
         <DialogContent
+          onCloseAutoFocus={(event) => {
+            const id = createdGroupCloseFocus.current;
+            if (!id) return;
+            event.preventDefault();
+            createdGroupCloseFocus.current = null;
+            // Reveal after Radix finishes closing, rather than racing its
+            // delayed restoration of focus to the Create group trigger.
+            setReturnToGroup(id);
+          }}
           size={
             editor?.kind === "learning" || editor?.kind === "updates"
               ? "selection"

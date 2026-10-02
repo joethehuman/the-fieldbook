@@ -295,6 +295,7 @@ export default function Admin({
   ) {
     if (!(await organizationReview.review(data, next, options)))
       throw new OrganizationChangeCanceledError();
+    options?.validateCurrent?.();
     await persist(next, { locallyHandled: options?.locallyHandled });
   }
   const adminPanel = useRevealTarget();

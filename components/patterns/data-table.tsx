@@ -24,6 +24,7 @@ const layouts = {
   progress: ["w-[28%]", "w-[17%]", "w-[17%]", "w-[12%]", "w-[11%]", "w-[15%]"],
   content: ["w-[33%]", "w-[12%]", "w-[15%]", "w-[10%]", "w-[30%]"],
   people: ["w-[26%]", "w-[12%]", "w-[23%]", "w-[11%]", "w-[28%]"],
+  learningGroupsSelectable: ["w-12", "w-[58%]", "w-[18%]", "w-[18%]"],
   learningGroups: ["w-[64%]", "w-[18%]", "w-[18%]"],
   groupMembersSelectable: ["w-12", "w-[36%]", "w-[25%]", "w-[33%]"],
   groupMembers: ["w-[40%]", "w-[25%]", "w-[35%]"],
@@ -53,12 +54,14 @@ export function DataTable({
           "peopleSelection",
           "deleted",
           "groupMembersSelectable",
+          "learningGroupsSelectable",
         ].includes(layout) &&
           "[&_td:first-child]:text-center [&_th:first-child]:text-center",
         [
           "teamMembers",
           "teamBranches",
           "learningGroups",
+          "learningGroupsSelectable",
           "groupMembers",
           "groupMembersSelectable",
           "groupUpdates",

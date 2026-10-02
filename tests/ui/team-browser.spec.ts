@@ -3,6 +3,8 @@ import { freshWorkspace, type Workspace } from "../../lib/store";
 
 const levelName = (index: number) =>
   `Revenue level ${String(index).padStart(2, "0")}${index === 11 ? " with a long internationally distributed team name" : ""}`;
+const longManagerName =
+  "Alexandra Morgan — International Customer and Partner Operations";
 function stable(workspace: Workspace) {
   workspace.users = workspace.users.map((person) => ({
     ...person,
@@ -34,6 +36,7 @@ function deepFixture() {
       id: `level-${index}`,
       name: levelName(index),
       parentId: index === 1 ? "revenue" : `level-${index - 1}`,
+      managerId: index === 11 ? "demo-manager" : undefined,
     });
   data.teams!.push(
     {
@@ -49,6 +52,8 @@ function deepFixture() {
   );
   data.users.find((person) => person.id === "demo-learner")!.teamId =
     "level-11";
+  data.users.find((person) => person.id === "demo-manager")!.name =
+    longManagerName;
   return stable(data);
 }
 async function seed(page: Page, workspace: Workspace) {
@@ -106,11 +111,37 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
   await expect(
     page.getByRole("button", { name: "Open Operations", exact: true }),
   ).toBeVisible();
-  const node = await browser
-    .locator('[data-hierarchy-id="operations"]')
-    .boundingBox();
+  const operationCard = browser.locator('[data-hierarchy-id="operations"]');
+  const node = await operationCard.boundingBox();
   expect(node!.width).toBeLessThanOrEqual(264);
-  expect(node!.height).toBeLessThan(130);
+  expect(node!.height).toBeLessThanOrEqual(100);
+  const memberCount = operationCard.getByRole("img", {
+    name: "0 direct members",
+    exact: true,
+  });
+  await expect(memberCount).toBeVisible();
+  await expect(
+    operationCard.getByRole("img", {
+      name: "0 subteams",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(operationCard.getByRole("button")).toHaveCount(3);
+  const metricBounds = (await memberCount.boundingBox())!;
+  const openBounds = (await operationCard
+    .getByRole("button", {
+      name: "Open Operations",
+      exact: true,
+    })
+    .boundingBox())!;
+  expect(
+    Math.abs(
+      metricBounds.y +
+        metricBounds.height / 2 -
+        openBounds.y -
+        openBounds.height / 2,
+    ),
+  ).toBeLessThanOrEqual(2);
   await page.screenshot({
     path: info.outputPath("teams-root-browser.png"),
     fullPage: true,
@@ -127,8 +158,70 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
   await expect(
     page.getByRole("heading", { name: "Subteams of Revenue", exact: true }),
   ).toBeFocused();
+  const fixedControls = [
+    page.getByRole("heading", { name: "Teams", exact: true }),
+    page.getByRole("searchbox", { name: "Find teams", exact: true }),
+    page.getByRole("button", { name: "Add team", exact: true }),
+    page.getByRole("navigation", { name: "Teams path", exact: true }),
+  ];
+  const fixedTops = await Promise.all(
+    fixedControls.map(async (control) => (await control.boundingBox())!.y),
+  );
+  const panel = page.locator(".admin-panel");
+  await expect
+    .poll(() =>
+      panel.evaluate((element) => element.scrollHeight - element.clientHeight),
+    )
+    .toBeLessThanOrEqual(1);
+  await chart.press("Home");
+  await roots.evaluate((list) => {
+    list.scrollTop = 0;
+  });
+  await roots.hover();
+  await page.mouse.wheel(0, 500);
+  await expect
+    .poll(() => roots.evaluate((list) => list.scrollTop))
+    .toBeGreaterThan(0);
+  // Continue past the column boundary to catch wheel chaining into the panel.
+  await page.mouse.wheel(0, 10000);
+  await expect
+    .poll(() =>
+      roots.evaluate(
+        (list) => list.scrollHeight - list.clientHeight - list.scrollTop,
+      ),
+    )
+    .toBeLessThanOrEqual(1);
+  await page.mouse.wheel(0, 500);
+  for (let index = 0; index < fixedControls.length; index++)
+    await expect
+      .poll(async () =>
+        Math.abs(
+          (await fixedControls[index].boundingBox())!.y - fixedTops[index],
+        ),
+      )
+      .toBeLessThanOrEqual(1);
+  await roots.evaluate((list, scrollTop) => {
+    list.scrollTop = scrollTop;
+  }, rootScroll);
   for (let index = 1; index <= 11; index++)
     await browse(page, levelName(index));
+  const longCard = browser.locator('[data-hierarchy-id="level-11"]');
+  const manager = longCard.locator('[data-slot="hierarchy-manager"]');
+  await expect(manager).toHaveAttribute("title", `Manager: ${longManagerName}`);
+  expect(
+    await manager.evaluate(
+      (element) =>
+        element.getBoundingClientRect().height <=
+        parseFloat(getComputedStyle(element).lineHeight) * 2 + 1,
+    ),
+  ).toBe(true);
+  await expect(
+    longCard.getByRole("img", {
+      name: "1 direct member",
+      exact: true,
+    }),
+  ).toBeVisible();
+  expect((await longCard.boundingBox())!.height).toBeLessThanOrEqual(132);
   await expect(
     browser.locator('[data-slot="hierarchy-column"]:visible'),
   ).toHaveCount(12);
@@ -163,7 +256,8 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
     exact: true,
   });
   await search.fill("Operations");
-  await expect(browser.locator("[data-hierarchy-id]")).toHaveCount(1);
+  // Search also matches the deliberately long manager name on two teams.
+  await expect(browser.locator("[data-hierarchy-id]")).toHaveCount(3);
   await search.fill("");
   await expect(browser.locator('[data-slot="hierarchy-column"]')).toHaveCount(
     12,
@@ -188,6 +282,22 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
   expect(await chart.evaluate((element) => element.scrollLeft)).toBeGreaterThan(
     0,
   );
+  const expandedAncestor = page.getByRole("button", {
+    name: `Browse ${levelName(4)} subteams`,
+    exact: true,
+  });
+  await expect(expandedAncestor).toHaveAttribute("aria-expanded", "true");
+  await expandedAncestor.click();
+  await expect(expandedAncestor).toHaveAttribute("aria-expanded", "false");
+  await expect(expandedAncestor).toBeFocused();
+  await expect(browser.locator('[data-slot="hierarchy-column"]')).toHaveCount(
+    5,
+  );
+  await expect(browser.locator('[data-branch-id="level-4"]')).toHaveCount(0);
+  await expandedAncestor.click();
+  await expect(expandedAncestor).toHaveAttribute("aria-expanded", "true");
+  for (let index = 5; index <= 11; index++)
+    await browse(page, levelName(index));
   // Earlier sibling controls remain mounted even after twelve levels. Choosing
   // a different sibling keeps its ancestors and replaces the downstream path.
   await browse(page, "Revenue alternative branch");
@@ -347,7 +457,7 @@ test("two successful new-team saves return to their parent and reveal each row; 
     .click();
   const editor = page.getByRole("dialog", { name: "New team", exact: true });
   await expect(
-    editor.getByRole("combobox", { name: "Parent team", exact: true }),
+    editor.getByRole("button", { name: "Parent team", exact: true }),
   ).toContainText("Revenue");
   await editor
     .getByRole("textbox", { name: "Team name", exact: true })
@@ -458,7 +568,7 @@ test("built-in Organization has its own manager and direct-members page", async 
     editor.getByRole("textbox", { name: "Team name", exact: true }),
   ).toHaveCount(0);
   await expect(
-    editor.getByRole("combobox", { name: "Parent team", exact: true }),
+    editor.getByRole("button", { name: "Parent team", exact: true }),
   ).toHaveCount(0);
   await editor.getByRole("combobox", { name: "Manager", exact: true }).click();
   await page.getByRole("option", { name: "Sara Downy", exact: true }).click();

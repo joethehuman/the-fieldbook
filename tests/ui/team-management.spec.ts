@@ -203,7 +203,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
     .click();
   const dialog = page.getByRole("dialog");
   await expect(
-    dialog.getByRole("combobox", { name: "Parent team", exact: true }),
+    dialog.getByRole("button", { name: "Parent team", exact: true }),
   ).toBeVisible();
   await dialog
     .getByRole("textbox", { name: "Team name", exact: true })
@@ -290,9 +290,10 @@ test("new-team parent options stay anchored to the visible dialog and preserve c
   page,
 }, info) => {
   const data = freshWorkspace();
+  const rootId = data.teams!.find((team) => team.system === "organization")!.id;
   data.teams!.push(
-    { id: "east", name: "East team" },
-    { id: "west", name: "West team" },
+    { id: "east", name: "East team", parentId: rootId },
+    { id: "west", name: "West team", parentId: rootId },
   );
   data.users = data.users.map((person) => ({
     ...person,
@@ -319,7 +320,7 @@ test("new-team parent options stay anchored to the visible dialog and preserve c
     exact: true,
     includeHidden: true,
   });
-  const parent = editor.getByRole("combobox", {
+  const parent = editor.getByRole("button", {
     name: "Parent team",
     exact: true,
     includeHidden: true,
@@ -335,7 +336,7 @@ test("new-team parent options stay anchored to the visible dialog and preserve c
   await expect
     .poll(async () => {
       const trigger = await parent.boundingBox();
-      const menu = await options.boundingBox();
+      const menu = await options.locator("xpath=..").boundingBox();
       if (!trigger || !menu) return false;
       const verticalGap = Math.min(
         Math.abs(menu.y - (trigger.y + trigger.height + 5)),
@@ -352,7 +353,7 @@ test("new-team parent options stay anchored to the visible dialog and preserve c
     path: info.outputPath("new-team-parent-options.png"),
     fullPage: true,
   });
-  await page.getByRole("option", { name: "Sales team", exact: true }).click();
+  await page.getByRole("option", { name: /Sales team$/ }).click();
   await expect(parent).toContainText("Sales team");
   await editor.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(editor).toHaveCount(0);
@@ -364,7 +365,7 @@ test("new-team parent options stay anchored to the visible dialog and preserve c
     .getByRole("textbox", { name: "Team name", exact: true })
     .fill("New regional team");
   await parent.click();
-  await page.getByRole("option", { name: "Sales team", exact: true }).click();
+  await page.getByRole("option", { name: /Sales team$/ }).click();
   await editor.getByRole("button", { name: "Save team", exact: true }).click();
   await expect(editor).toHaveCount(0);
   await expect(
@@ -420,7 +421,7 @@ test("a contributor manager has one cancelable review without changing their own
     exact: true,
   });
   await expect(
-    editor.getByRole("combobox", { name: "Parent team", exact: true }),
+    editor.getByRole("button", { name: "Parent team", exact: true }),
   ).toBeVisible();
   await editor.getByRole("combobox", { name: "Manager", exact: true }).click();
   await page.getByRole("option", { name: "Person 150", exact: true }).click();

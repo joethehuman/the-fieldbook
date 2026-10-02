@@ -75,6 +75,7 @@ import { SearchableSelectionList } from "./patterns/searchable-selection-list";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { groupPath } from "@/lib/group-hierarchy";
 import { organizationTeam } from "@/lib/organization-team";
+import { HierarchyPicker } from "./patterns/hierarchy-picker";
 
 const PAGE_SIZE = 25;
 const byName = (
@@ -503,7 +504,8 @@ export function TeamsAdmin({
       parentId: item.parentId === organization?.id ? undefined : item.parentId,
       label: item.name,
       description: `Manager: ${data.users.find((user) => user.id === item.managerId)?.name || "Unassigned"}`,
-      meta: `${data.users.filter((user) => user.teamId === item.id).length} direct members · ${teams.filter((child) => child.parentId === item.id).length} subteams`,
+      directMemberCount: data.users.filter((user) => user.teamId === item.id)
+        .length,
     }));
   const teamSelection = useBulkSelection(
     "teams" + hierarchyQuery,
@@ -1429,31 +1431,42 @@ export function TeamsAdmin({
                       />
                     </FormField>
                     <FormField label="Parent team">
-                      <SelectField
+                      <HierarchyPicker
                         disabled={busy}
                         value={editing.parentId || organization?.id || ""}
+                        searchLabel="Find a parent team"
                         onValueChange={(value) =>
                           setEditing({
                             ...editing,
                             parentId: value || organization?.id,
                           })
                         }
-                      >
-                        <option value={organization?.id || ""}>
-                          Organization
-                        </option>
-                        {teams
-                          .filter(
-                            (t) =>
-                              t.id !== organization?.id &&
-                              canParent(editing.id, t.id, teams),
-                          )
-                          .map((t) => (
-                            <option key={t.id} value={t.id}>
-                              {teamPath(t.id, teams)}
-                            </option>
-                          ))}
-                      </SelectField>
+                        options={[
+                          {
+                            id: organization?.id || "",
+                            label: "Organization",
+                            path: ["Organization"],
+                          },
+                          ...[...teams]
+                            .sort(byName)
+                            .filter(
+                              (item) =>
+                                item.id !== organization?.id &&
+                                canParent(editing.id, item.id, teams),
+                            )
+                            .map((item) => ({
+                              id: item.id,
+                              label: item.name,
+                              path: [...ancestorIds(item.id, teams)]
+                                .reverse()
+                                .map(
+                                  (id) =>
+                                    teams.find((value) => value.id === id)
+                                      ?.name || "Unknown team",
+                                ),
+                            })),
+                        ]}
+                      />
                     </FormField>
                   </>
                 )}

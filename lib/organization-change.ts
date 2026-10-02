@@ -6,6 +6,8 @@ import { expandLearning, groupItems } from "./learning-groups";
 /** Context for the one review preceding an organization save. Never an authorization bypass. */
 export type OrganizationChangeOptions = {
   locallyHandled?: boolean;
+  /** Revalidate a captured UI target after its consequence review, before persistence. */
+  validateCurrent?: () => void;
   review?: {
     title?: string;
     description?: string;

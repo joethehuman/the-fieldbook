@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
+import { HierarchyPicker } from "@/components/patterns/hierarchy-picker";
 import { HierarchyBrowser } from "@/components/patterns/hierarchy-browser";
 import {
   Dialog,
@@ -324,7 +325,9 @@ export function LibraryExamples() {
           </DialogContent>
         </Dialog>
       </SettingsSection>
+      <GroupIndexExample />
       <GroupRosterExample />
+      <HierarchyPickerExample />
       <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
@@ -370,27 +373,27 @@ export function LibraryExamples() {
               id: "revenue",
               label: "Revenue",
               description: "Manager: Alex Morgan",
-              meta: "120 people · 2 subteams",
+              directMemberCount: 120,
             },
             {
               id: "success",
               label: "Customer success",
               description: "Manager: Sam Lee",
-              meta: "45 people · No subteams",
+              directMemberCount: 45,
             },
             {
               id: "emea",
               parentId: "revenue",
               label: "Europe, Middle East and Africa",
               description: "Manager: Jordan Lee",
-              meta: "52 people · 1 subteam",
+              directMemberCount: 52,
             },
             {
               id: "emea-enterprise",
               parentId: "emea",
               label: "Enterprise customer teams across Europe",
               description: "Manager: Jordan Lee",
-              meta: "18 people · No subteams",
+              directMemberCount: 18,
             },
             ...Array.from({ length: 12 }, (_, index) => ({
               id: `level-${index + 1}`,
@@ -400,17 +403,14 @@ export function LibraryExamples() {
                   ? "North America"
                   : `Level ${index + 1} regional team`,
               description: "Manager: Casey Rivera",
-              meta:
-                index === 11
-                  ? "6 people · No subteams"
-                  : "68 people · 1 subteam",
+              directMemberCount: index === 11 ? 6 : 68,
             })),
             ...Array.from({ length: 18 }, (_, index) => ({
               id: `sibling-${index}`,
               parentId: "level-2",
               label: `Enterprise territory ${index + 1}`,
               description: "Manager: Unassigned",
-              meta: "4 people · No subteams",
+              directMemberCount: 4,
             })),
           ]}
         />
@@ -544,7 +544,6 @@ export function LibraryExamples() {
     </section>
   );
 }
-
 
 /** Synthetic relationship roster: direct removal preserves linked-team inclusion. */
 function GroupRosterExample() {
@@ -696,6 +695,193 @@ function GroupRosterExample() {
                     .filter(Boolean)
                     .join(" · ")}
                 </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </DataTable>
+      </TableContainer>
+    </SettingsSection>
+  );
+}
+
+function HierarchyPickerExample() {
+  const [parent, setParent] = useState("territory");
+  const path = [
+    "Organization",
+    "Revenue",
+    "Sales",
+    "North America",
+    "Enterprise",
+    "West",
+    "Pacific",
+    "Territory",
+  ];
+  return (
+    <SettingsSection
+      id="catalog-hierarchy-picker"
+      title={<h3>Searchable parent team</h3>}
+      guidance="Search team names and every ancestor. Long paths keep the root and final segments; the complete hierarchy can be read in the picker or expanded below the selected parent."
+    >
+      <FormField label="Example parent team">
+        <HierarchyPicker
+          value={parent}
+          onValueChange={setParent}
+          searchLabel="Find an example parent team"
+          options={[
+            {
+              id: "organization",
+              label: "Organization",
+              path: ["Organization"],
+            },
+            {
+              id: "revenue",
+              label: "Revenue",
+              path: ["Organization", "Revenue"],
+            },
+            { id: "territory", label: "Territory", path },
+            {
+              id: "success",
+              label: "Customer success",
+              path: ["Organization", "Customer success"],
+            },
+          ]}
+        />
+      </FormField>
+    </SettingsSection>
+  );
+}
+
+function GroupIndexExample() {
+  const [rows, setRows] = useState([
+    { id: "ae", name: "Account executives", people: 120, courses: 8 },
+    { id: "segment", name: "Startup segment", people: 45, courses: 4 },
+    { id: "draft-audience", name: "New audience", people: 0, courses: 0 },
+  ]);
+  const [query, setQuery] = useState("");
+  const [people, setPeople] = useState("");
+  const [sort, setSort] = useState("name");
+  const matches = rows
+    .filter(
+      (row) =>
+        row.name.toLowerCase().includes(query.toLowerCase()) &&
+        (!people || (people === "with" ? row.people > 0 : row.people === 0)),
+    )
+    .sort(
+      (a, b) =>
+        (sort === "people" ? b.people - a.people : 0) ||
+        a.name.localeCompare(b.name),
+    );
+  const selection = useBulkSelection(
+    query + people,
+    matches.map((row) => row.id),
+  );
+  return (
+    <SettingsSection
+      id="catalog-group-index"
+      title={<h3>Learning-group directory</h3>}
+      guidance="Filter and sort real audience counts before paging. Selection survives sort and page changes; discovery changes clear it. Deletion uses one consequence review, with saved learning history retained by the owner."
+    >
+      <CollectionControls
+        search={
+          <FormField label="Find an example group" visuallyHiddenLabel>
+            <Input
+              type="search"
+              placeholder="Find a group"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </FormField>
+        }
+        sortLabel={sort === "people" ? "People: most first" : "Name A–Z"}
+        sort={
+          <FormField label="Sort example groups">
+            <SelectField value={sort} onValueChange={setSort}>
+              <option value="name">Name A–Z</option>
+              <option value="people">People: most first</option>
+            </SelectField>
+          </FormField>
+        }
+        filters={
+          people
+            ? [
+                {
+                  id: "people",
+                  label: people === "with" ? "With people" : "No people",
+                  onRemove: () => setPeople(""),
+                },
+              ]
+            : []
+        }
+        onClear={() => {
+          setQuery("");
+          setPeople("");
+        }}
+      >
+        <FormField label="Example group membership">
+          <SelectField value={people} onValueChange={setPeople}>
+            <option value="">Any membership</option>
+            <option value="with">With people</option>
+            <option value="without">No people</option>
+          </SelectField>
+        </FormField>
+      </CollectionControls>
+      <BulkActions
+        selected={selection.actionIds}
+        collectionSize={matches.length}
+        singleItemActions={false}
+        noun="groups"
+        onSelectionChange={selection.setSelected}
+        commands={[
+          {
+            id: "delete",
+            label: "Delete example groups",
+            description: "Remove selected example audiences.",
+            destructive: true,
+            apply: (_, ids = []) =>
+              setRows((current) =>
+                current.filter((row) => !ids.includes(row.id)),
+              ),
+          },
+        ]}
+      />
+      <TableContainer>
+        <DataTable
+          layout="learningGroupsSelectable"
+          aria-label="Example learning groups"
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                {selection.canSelect && (
+                  <SelectRows
+                    ids={matches.map((row) => row.id)}
+                    value={selection.selected}
+                    onChange={selection.setSelected}
+                  />
+                )}
+              </TableHead>
+              <TableHead>Group</TableHead>
+              <TableHead align="right">People</TableHead>
+              <TableHead align="right">Courses</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {matches.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  {selection.canSelect && (
+                    <Checkbox
+                      aria-label={`Select example ${row.name}`}
+                      checked={selection.selected.includes(row.id)}
+                      onCheckedChange={(checked) =>
+                        selection.toggle(row.id, checked === true)
+                      }
+                    />
+                  )}
+                </TableCell>
+                <TableCell>{row.name}</TableCell>
+                <TableCell align="right">{row.people}</TableCell>
+                <TableCell align="right">{row.courses}</TableCell>
               </TableRow>
             ))}
           </TableBody>
