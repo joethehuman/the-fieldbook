@@ -134,6 +134,16 @@ test("search preserves an unsaved editor and guards result navigation", async ({
   await page.goto("/#admin");
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   const title = page.getByRole("textbox", { name: "Title", exact: true });
+  // Successful autosave allows navigation. Hold a real failed save to exercise
+  // the unsaved-work guard while search remains available over the editor.
+  await page.evaluate(() => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key === "fieldbook.workspace.v1")
+        throw new Error("Synthetic save failure");
+      setItem.call(this, key, value);
+    };
+  });
   await title.fill("Unsaved work survives search");
   const input = page.getByRole("textbox", { name: "Search all content" });
   await input.fill("Published destination");
@@ -146,4 +156,12 @@ test("search preserves an unsaved editor and guards result navigation", async ({
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(title).toHaveValue("Unsaved work survives search");
   await expect(page).toHaveURL(/#admin/);
+  await input.click();
+  await expect(result).toBeVisible();
+  await result.click();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Published destination", exact: true }),
+  ).toBeVisible();
 });

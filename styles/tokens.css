@@ -46,8 +46,13 @@
   --type-copy-leading: 1.375rem;
   --type-page: 2rem;
   --type-page-leading: 2.5rem;
-  --weight-medium: 500;
-  --weight-heading: 600;
+  --weight-copy: 400;
+  --weight-label: 400;
+  --weight-medium: var(--weight-label);
+  --weight-heading: 500;
+  --weight-emphasis: 500;
+  --weight-authored-bold: 700;
+  --authored-table-border: color-mix(in srgb, var(--foreground) 32%, var(--background));
   --link: #0069ff;
   --brand: #0069ff;
   --overlay: #17171766;

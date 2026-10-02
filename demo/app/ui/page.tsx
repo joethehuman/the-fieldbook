@@ -17,6 +17,7 @@ import { useToast } from "@/components/ui/toast";
 import { useInteractionDialog } from "@/components/ui/interaction-dialog";
 import { CsvExport } from "@/components/patterns/csv-export";
 import { SearchPanel } from "@/components/patterns/search-panel";
+import { SearchExperience } from "@/components/SearchExperience";
 import {
   SearchResultCard,
   SearchResultSkeleton,
@@ -348,6 +349,7 @@ export default function ComponentCatalog() {
           respect reduced motion.
         </p>
         <SearchPanelExample />
+        <SearchExperience id="catalog-ask-ai" content={seedContent} aiMode="demo" signedIn onOpen={() => {}} />
         <SearchResultSkeleton />
         <SearchResultCard
           result={{

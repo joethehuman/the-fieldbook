@@ -1,6 +1,6 @@
-# Ask AI server foundation
+# Ask AI
 
-This snapshot adds an optional, authenticated question-answering API using the Vercel AI SDK and AI Gateway. It is **off by default**. The learner chat interface and Admin configuration controls are not included in this snapshot; ordinary search and the browser-local demo are unchanged.
+Ask AI adds optional, authenticated answers from published Fieldbook content using the Vercel AI SDK and AI Gateway. It is **off by default** in installed applications. The search panel includes temporary conversations when enabled. Admin configuration controls are still pending; the browser-local demo shows the interface with a local unavailable response.
 
 ## Installation and configuration
 
@@ -64,3 +64,13 @@ Fieldbook does not persist or log conversation text, evidence bodies or raw prov
 `lib/ai.ts` holds plain configuration, messages and source identities. `server/ports/ai.ts` defines validation, query planning and plain-text streaming; `server/ai.ts` composes the one supported implementation. Gateway calls, credentials and public model metadata caching stay in `server/providers/vercel/ai.ts`. Retrieval RPCs stay behind `server/ports/data.ts` and the Supabase adapter. The generic AI SDK UI transport does not expose Gateway types through either port. A new provider requires a working adapter, setup instructions and verification; it is not supported merely by adding a selector.
 
 Run `pnpm test`, `pnpm typecheck`, `pnpm check:providers` and both builds. Synthetic tests cover authorization, off-state/model-call admission, input bounds, cancellation, source changes/citation metadata, SDK transport and redacted failures. Embedded PostgreSQL rehearses migration/data preservation, ordinary-search compatibility, long-passage windows and service-only grants. Those tests do not prove real hosted Google sign-in, account billing, model answer quality or deployed streaming. Exercise those separately against an isolated installation before activation.
+
+## Search and temporary conversations
+
+When enabled, the header says **Search Fieldbook or Ask AI**. Typing and ordinary Enter still use conventional search. A question ending in `?` (after trimming spaces), followed by Enter, submits it to Ask AI. The results panel also provides an Ask AI action, including when search has no matches. The Search and Ask AI tabs let you return to search or reopen the current conversation.
+
+Ask follow-up questions in the conversation field. Enter sends; Shift+Enter adds a line. Stop response cancels the request. Retry answer explicitly retries the last question after a failure, replacing its failed response. New conversation clears the thread. Source links open current content and course lessons while retaining the conversation in the workspace. Closing the panel or navigating does not erase it; reload, sign-out, account change or observing AI disabled clears it. Messages are held only in this tab's memory and are excluded from storage and exports. Only a bounded recent text context is sent for follow-ups; there is no question-count quota. Incomplete responses are labeled and excluded from later model context.
+
+Guests in an enabled public installation are prompted to sign in on an explicit AI attempt. Disabling AI restores basic search and cancels the local conversation when the changed setting reaches the shell. The server independently checks availability and access for each request.
+
+The browser-local demo shows these entry points by default, but answers every submission with “This feature is not available in the demo site.” It makes no AI network request. The installed application stays off by default; the Administration UI is still pending. Existing administrator settings operations can configure the nonsecret settings object described above.

@@ -14,7 +14,7 @@ export type ReaderShellContext = {
     id: string;
     name: string;
     email: string;
-    role: "admin" | "manager" | "learner";
+    role: User["role"];
     managesTeam: boolean;
   } | null;
   branding: {
@@ -23,6 +23,7 @@ export type ReaderShellContext = {
     accent: string;
     privacyUrl: string | null;
     externalLinks?: SiteSettings["externalLinks"];
+    askAiEnabled?: boolean;
   };
   docs: DocLink[];
   docCategoryOrder: string[];

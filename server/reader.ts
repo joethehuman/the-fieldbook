@@ -100,6 +100,7 @@ function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
   return {
     ...brandingFromSettings(config.settings),
     externalLinks: accountMenuLinks(config.settings.externalLinks),
+    askAiEnabled: config.settings.askAi?.enabled === true,
   };
 }
 function readerAccount(
@@ -237,7 +238,7 @@ export const readerTeam = cache(async () => {
     teams: [],
     progress: {},
   };
-  if (!user || !user.active || !["admin", "manager"].includes(user.role))
+  if (!user || !user.active || !["admin", "manager", "contributor"].includes(user.role))
     return { data: empty, user };
 
   const [governance, rows] = await Promise.all([

@@ -7,6 +7,7 @@ async function setup(
   installed: boolean,
   manager = false,
   external = false,
+  contributor = false,
 ) {
   const data = freshWorkspace();
   const actor = data.users.find(
@@ -43,10 +44,13 @@ async function setup(
     await setupAuthoringProvider(page, data);
     Object.assign(actor, {
       ...authoringUser,
-      role: manager ? "manager" : "admin",
+      role: manager ? "manager" : contributor ? "contributor" : "admin",
     });
     data.users = [actor, member];
-  } else data.users = [actor, member];
+  } else {
+    if (contributor) actor.role = "contributor";
+    data.users = [actor, member];
+  }
   data.teams = [{ id: "managed", name: "Managed team", managerId: actor.id }];
   if (installed) {
     await page.request.post("http://127.0.0.1:3130/fixture", {
@@ -270,11 +274,11 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
   });
 }
 
-test("My team’s progress keeps a failed editor on Cancel and opens the manager panel on Confirm", async ({
+test("Contributor team progress keeps a failed editor on Cancel and opens the manager panel on Confirm", async ({
   page,
 }, info) => {
   const installed = info.project.name.startsWith("production");
-  await setup(page, installed);
+  await setup(page, installed, false, false, true);
   await page.getByRole("button", { name: "Edit", exact: true }).first().click();
   if (installed)
     await page.route("**/api/content*", (route) =>

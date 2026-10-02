@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import type { Content, User } from "@/lib/types";
 import { data as dataStore } from "./data";
-import { requireAdmin, HttpError } from "./auth";
+import { requirePublisher, HttpError } from "./auth";
 import { contentSignature } from "@/lib/demo-publication";
 import { contentDraftSchema, contentSchema } from "./schemas";
 import { isArtworkOnlyUpdate } from "@/lib/card-art";
@@ -58,7 +58,7 @@ export const canRead = cache(async (user: User | null) => {
 });
 export async function getContent(id: string, user: User | null, draft = false) {
   await canRead(user);
-  if (draft) requireAdmin(user);
+  if (draft) requirePublisher(user);
   const data = await dataStore().findDocument(id);
   if (!data || data.deleted_at || (!draft && !data.published))
     throw new HttpError(404, "Content not found.");
@@ -73,7 +73,7 @@ export async function saveContent(
   source = "web",
   unpublish = false,
 ) {
-  requireAdmin(user);
+  requirePublisher(user);
   const parsed = (publish ? contentSchema : contentDraftSchema).safeParse(
     input,
   );
@@ -83,6 +83,7 @@ export async function saveContent(
       parsed.error.issues.map((i) => i.message).join(" "),
     );
   const c = parsed.data;
+  const contributor = user.role === "contributor";
   if (publish && !c.summary.trim())
     throw new HttpError(400, "Add a short description before publishing.");
   if (c.kind === "doc") {
@@ -93,12 +94,16 @@ export async function saveContent(
       throw new HttpError(503, "Settings are unavailable. Try again.");
     if (c.sectionId) {
       const sections = availableDocSections(
-        [],
+        contributor
+          ? ((await dataStore().listDraftIndex()).filter(
+              (doc) => doc.kind === "doc",
+            ) as Content[])
+          : [],
         config.settings.docCategoryOrder || [],
         config.settings.docSections || [],
       );
       let section = sectionForDoc(c, sections);
-      if (!section && c.sectionId.startsWith("legacy:")) {
+      if (!contributor && !section && c.sectionId.startsWith("legacy:")) {
         // Old documents can still choose a legacy section before settings
         // have been saved in the new format.
         const legacy = availableDocSections(
@@ -131,6 +136,32 @@ export async function saveContent(
   const old = await dataStore().findDocument(c.id);
   if (old?.deleted_at)
     throw new HttpError(400, "Restore this item before editing it.");
+  if (contributor && c.kind === "doc") {
+    if (c.sectionOrder !== old?.draft.sectionOrder)
+      throw new HttpError(403, "Only administrators can reorder Docs.");
+    if (!c.sectionId && (c.category || c.folder)) {
+      const placements = await dataStore().listDraftIndex();
+      if (
+        !placements.some(
+          (doc) =>
+            doc.kind === "doc" &&
+            doc.category === c.category &&
+            (doc.folder || "") === c.folder,
+        )
+      )
+        throw new HttpError(403, "Choose an existing Docs section.");
+    }
+  }
+  if (
+    contributor &&
+    c.kind === "course" &&
+    JSON.stringify(c.assignments || []) !==
+      JSON.stringify(old?.draft.assignments || [])
+  )
+    throw new HttpError(
+      403,
+      "Only administrators can change course assignments.",
+    );
   if (c.kind === "course" && c.requirePassing === undefined && !old?.published)
     c.requirePassing = false;
   if (

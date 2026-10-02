@@ -29,3 +29,21 @@ SOFTWARE.
 ## Vercel AI SDK dependencies
 
 The `ai` package and its `@ai-sdk/gateway`, `@ai-sdk/provider` and `@ai-sdk/provider-utils` dependencies retain their Apache-2.0 licenses and packaged notices. Fieldbook imports these packages; it does not relicense them under ELv2. Preserve the dependencies' license files when distributing bundled software. See the [AI SDK source](https://github.com/vercel/ai) and its [license](https://github.com/vercel/ai/blob/main/LICENSE).
+
+## Vercel AI Elements and Streamdown
+
+The message, message-content and streamed-response components in `components/ai-elements/message.tsx` are adapted from the [AI Elements message registry](https://elements.ai-sdk.dev/api/registry/message.json). Unused exports/plugins are omitted and memoization uses React's standard prop comparison. These upstream portions remain Apache-2.0; preserve their notice below. Fieldbook imports `streamdown` and `@ai-sdk/react`, which retain their Apache-2.0 licenses and packaged notices. Fieldbook's original application code remains ELv2.
+
+Copyright 2023 Vercel, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

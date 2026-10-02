@@ -4,7 +4,7 @@ These rules describe the server application. The browser-local demo simulates id
 
 ## Installation access
 
-An installation can allow public browsing or require membership. Everyone with access can browse its published library. Learning groups personalize recommendations and assign learning; they do not restrict content visibility. Draft content and unpublished curricula are administrator-only.
+An installation can allow public browsing or require membership. Everyone with access can browse its published library. Learning groups personalize recommendations and assign learning; they do not restrict content visibility. Draft content is available to administrators and contributors. Unpublished curricula remain administrator-only.
 
 Guests keep learning progress in their browser. Signed-in learners have account-backed progress. Importing browser progress rechecks answers against the current course version; local records are not trusted completion evidence.
 
@@ -12,19 +12,27 @@ Guests keep learning progress in their browser. Signed-in learners have account-
 
 - **Learners** access their own profile, progress and feedback, alongside the published library.
 - **Managers** additionally report on active people in teams they explicitly manage and those teams' descendants. Team membership alone grants no reporting access. A manager without a managed team receives no additional people or progress data. Managers do not administer content, people or learning groups; feedback remains their own.
+- **Contributors** create, edit, publish, unpublish and recover content throughout the installation, upload authoring media, and review/export content and general feedback. They can choose existing Docs sections and Update relevance groups. They cannot change course assignments, create or reorder the Docs hierarchy, manage people/groups/curricula/settings, view organization completion reports, or recover deleted people. Restored content returns as a draft.
+- **Contributors who manage teams** additionally receive the same scoped team reporting as managers. Assign a contributor as a team manager in Teams; changing a manager account to Contributor preserves its existing management assignments. Account type and explicit team responsibilities compose.
 - **Administrators** manage content, settings, people, learning groups, curricula and reporting teams, and access organization reports and feedback. They can mark a current course version complete or reset progress through revision-checked, audited operations.
 
-CSV exports use the same authorized report data and do not broaden server scope. Managers can export their team progress and person assignment details; administrator feedback and person-management details remain administrator-only. See [report exports](reporting.md).
+CSV exports use the same authorized report data and do not broaden server scope. Managers can export their team progress and person assignment details; feedback exports are available to administrators and contributors, while person-management details remain administrator-only. See [report exports](reporting.md).
 
 A person has one optional reporting team. Learning-group membership is separate and can come from individual membership, parent groups or live links to teams. See [groups and curricula](learning-groups.md).
 
 Administrators can pre-register a Google email without sending an invitation email. The person appears immediately in the People roster and team member/manager selectors, with a stable ID and separate **Not signed in** status. Verified first sign-in attaches the login to that person even when general registration is closed, preserving memberships, hire/clock dates and progress. A preregistered manager has no reporting access until that sign-in. Existing authenticated identities are never merged by email. Login emails cannot be changed through people administration. Account deactivation is distinct from deletion; hard account deletion is not exposed. Self-demotion/deactivation and removing the last active signed-in administrator are rejected.
 
+## Panel navigation
+
+Administrators see **Manage organization** in the account menu. Contributors see **Manage content**, opening the same panel shell, Content/Feedback tabs and editors. Its Organization Settings section contains only MCP and Recently deleted. Managers see **My team’s progress**; a contributor with a managed team sees both content and team destinations. An administrator sees the single organization destination. Direct requests repeat these permissions on the server.
+
+Apply `20261001234401_contributor_permissions.sql` after the roster migration before assigning contributor accounts. The migration expands the role constraint and publishing/recovery routines, preserves existing records and team responsibilities, and retains service-role-only database access. Rehearse upgrades in an isolated backend before applying them to an installation.
+
 ## Enforcement and contributor guidance
 
-The server checks identity, role and installation access before returning protected data or accepting writes. The governance snapshot scopes reporting data before serialization. Content responses for non-administrators exclude drafts and quiz answer keys. Governance writes require an administrator, validated input and the current revision; related updates and audit records are transactional.
+The server checks identity, role and installation access before returning protected data or accepting writes. The governance snapshot scopes reporting data before serialization. Reader content responses exclude quiz answer keys. Draft authoring responses require publishing permission; contributor panel snapshots exclude the roster, report history, group learning rules, unpublished privacy policy and deleted accounts. Governance writes require an administrator, validated input and the current revision; related updates and audit records are transactional.
 
-UI visibility is not a permission check. Changes to roles, groups or reporting must preserve these boundaries and include meaningful authorization checks. Relevant entry points include `server/auth.ts`, `server/snapshot.ts`, `app/api/governance/route.ts`, and the governance server tests. Optional [MCP access](mcp-setup.md) requires an active administrator and an approved connection grant; learner and manager MCP access is not implemented.
+UI visibility is not a permission check. Changes to roles, groups or reporting must preserve these boundaries and include meaningful authorization checks. Relevant entry points include `server/auth.ts`, `server/snapshot.ts`, `app/api/governance/route.ts`, and the governance server tests. Optional [MCP access](mcp-setup.md) requires an active administrator and an approved connection grant; contributor, learner and manager MCP connections are not implemented by the contributor account change. The contributor MCP tab identifies that limitation; adding a role never grants MCP access by itself. MCP tools must use the same publishing permissions and explicitly managed reporting scope when role-aware connections are added.
 
 Before using an installation, verify these rules with separate administrator, learner and manager accounts against an isolated backend. Include a manager's sibling team, anonymous/private access, draft content, stale revisions and deactivated accounts. Code inspection and demo tests do not establish that an operator's hosted authentication is configured correctly.
 

@@ -31,7 +31,7 @@ export function teamMoveImpact(data: Workspace, id: string, parentId: string) {
     (user) => user.teamId && ids.has(user.teamId),
   );
   const managers = data.users
-    .filter((user) => user.active && user.role === "manager")
+    .filter((user) => user.active && ["manager", "contributor"].includes(user.role))
     .map((manager) => {
       const before = reportTeamIds(manager, teams);
       const after = reportTeamIds(manager, next);

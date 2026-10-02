@@ -33,7 +33,7 @@
   }
   .article-header h1 {
     font-size: clamp(2rem, 3vw, 2.5rem);
-    font-weight: 600;
+    font-weight: var(--weight-heading);
     line-height: 1.2;
     letter-spacing: -0.05em;
     overflow-wrap: anywhere;
@@ -68,6 +68,10 @@
     font-size: 1rem;
     line-height: 1.75;
     overflow-wrap: anywhere;
+  }
+  .markdown :is(strong, b),
+  .writing-content :is(strong, b) {
+    font-weight: var(--weight-authored-bold);
   }
   .markdown > * + * {
     margin-top: var(--space-4);
@@ -173,8 +177,11 @@
   .markdown td {
     overflow-wrap: normal;
     vertical-align: top;
-    border: 1px solid var(--border);
+    border: 1px solid var(--authored-table-border);
     padding: var(--space-3);
+  }
+  .markdown th {
+    font-weight: var(--weight-heading);
   }
   .markdown a {
     text-decoration: underline;
@@ -217,7 +224,7 @@
     padding: 0 var(--space-2) var(--space-1);
     color: var(--foreground);
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: var(--weight-heading);
     line-height: 1.375;
     overflow-wrap: anywhere;
   }
@@ -241,7 +248,7 @@
     padding: var(--space-1) var(--space-2);
     color: var(--foreground);
     font-size: 0.875rem;
-    font-weight: 400;
+    font-weight: var(--weight-copy);
     line-height: 1.375;
     overflow-wrap: anywhere;
   }
@@ -292,7 +299,7 @@
   .reading-outline-title {
     display: none;
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: var(--weight-heading);
     padding-block: var(--space-2);
   }
   .reading-outline summary {
@@ -303,7 +310,7 @@
     list-style: none;
     cursor: pointer;
     font-size: 0.8125rem;
-    font-weight: 600;
+    font-weight: var(--weight-heading);
     padding-block: var(--space-2);
   }
   .reading-outline summary::-webkit-details-marker {
@@ -349,7 +356,7 @@
   .reading-outline a[aria-current] {
     color: var(--foreground);
     border-color: var(--foreground);
-    font-weight: 500;
+    font-weight: var(--weight-label);
   }
   .document-pagination,
   .reading-pagination {
@@ -399,7 +406,7 @@
     color: var(--muted-foreground);
     text-decoration: none;
     font-size: 0.8em;
-    font-weight: 400;
+    font-weight: var(--weight-copy);
   }
   .markdown :is(h1, h2, h3, h4, h5, h6):hover > .heading-permalink,
   .markdown :is(h1, h2, h3, h4, h5, h6):focus-within > .heading-permalink {

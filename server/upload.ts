@@ -1,7 +1,7 @@
 import "server-only";
 import { z } from "zod";
 import type { User } from "@/lib/types";
-import { HttpError, requireAdmin } from "./auth";
+import { HttpError, requirePublisher } from "./auth";
 import { mediaData } from "./media-data";
 import { storage } from "./storage";
 
@@ -15,7 +15,7 @@ const types: Record<string, string> = {
 };
 
 export async function uploadMedia(user: User | null, input: unknown) {
-  requireAdmin(user);
+  requirePublisher(user);
   const a = input as { complete?: unknown };
   if (a.complete) {
     const id = z.uuid().parse(a.complete),

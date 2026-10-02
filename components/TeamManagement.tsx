@@ -1133,7 +1133,7 @@ export function TeamsAdmin({
                     {data.users
                       .filter(
                         (u) =>
-                          u.active && ["manager", "admin"].includes(u.role),
+                          u.active && ["manager", "admin", "contributor"].includes(u.role),
                       )
                       .map((u) => (
                         <option key={u.id} value={u.id}>
