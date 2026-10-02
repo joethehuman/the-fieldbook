@@ -14,6 +14,8 @@ import { BrandedAccount } from "@/components/patterns/branded-account";
 import type { Branding } from "@/lib/branding";
 import { request, RequestError } from "@/lib/workspace-save";
 import { useEffect, useState } from "react";
+import { Field, FieldGroup } from "@/components/ui/field";
+import type { McpCapability } from "@/lib/mcp-access";
 export default function Connections({ branding }: { branding: Branding }) {
   const [items, setItems] = useState<any[]>([]),
     [error, setError] = useState("");
@@ -24,6 +26,9 @@ export default function Connections({ branding }: { branding: Branding }) {
   );
   const [loading, setLoading] = useState(true);
   const [revoking, setRevoking] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  const [approving, setApproving] = useState<string | null>(null);
+  const [permissions, setPermissions] = useState<McpCapability[]>([]);
   async function load() {
     setLoading(true);
     setError("");
@@ -47,7 +52,7 @@ export default function Connections({ branding }: { branding: Branding }) {
   return (
     <BrandedAccount branding={branding}>
       <Button asChild variant="link">
-        <a href="/admin">← Back to administration</a>
+        <a href="/">← Back to Fieldbook</a>
       </Button>
       <h1>AI connections</h1>
       <p>
@@ -136,6 +141,96 @@ export default function Connections({ branding }: { branding: Branding }) {
           </div>
           <p>{c.enabled ? "Connected" : "Revoked"}</p>
           {c.enabled && (
+            <>
+              <ul>
+                {c.access.capabilities.map((capability: McpCapability) => (
+                  <li key={capability}>
+                    {c.capabilityDescriptions[capability]}
+                  </li>
+                ))}
+              </ul>
+              {c.access.capabilities.length === 0 && (
+                <p>
+                  Your current role and approved permissions do not allow any
+                  content or reporting tools.
+                </p>
+              )}
+              {c.access.availableCapabilities.length > 0 &&
+                reviewing !== c.client_id && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setReviewing(c.client_id);
+                      setPermissions(c.access.capabilities);
+                    }}
+                  >
+                    Review permissions
+                  </Button>
+                )}
+              {reviewing === c.client_id && (
+                <>
+                  <FieldGroup>
+                    <legend>
+                      Approve tool permissions for {c.client_name}
+                    </legend>
+                    {c.access.availableCapabilities.map(
+                      (capability: McpCapability) => (
+                        <Field key={capability} orientation="horizontal">
+                          <Checkbox
+                            checked={permissions.includes(capability)}
+                            disabled={approving !== null}
+                            onCheckedChange={(checked) =>
+                              setPermissions((current) =>
+                                checked === true
+                                  ? [...current, capability]
+                                  : current.filter(
+                                      (item) => item !== capability,
+                                    ),
+                              )
+                            }
+                          />
+                          <span>{c.capabilityDescriptions[capability]}</span>
+                        </Field>
+                      ),
+                    )}
+                  </FieldGroup>
+                  <p>
+                    Approve added access only for a client you trust. Refresh
+                    its tools and start a new conversation after approval.
+                  </p>
+                  <Button
+                    loading={approving === c.client_id}
+                    disabled={approving !== null || permissions.length === 0}
+                    onClick={async () => {
+                      setApproving(c.client_id);
+                      try {
+                        await request("/api/connections", {
+                          clientId: c.client_id,
+                          capabilities: permissions,
+                        });
+                        setReviewing(null);
+                        await load();
+                      } catch (e) {
+                        setError((e as Error).message);
+                      } finally {
+                        setApproving(null);
+                      }
+                    }}
+                  >
+                    Approve selected permissions
+                  </Button>
+                  <Button
+                    variant="outline"
+                    disabled={approving !== null}
+                    onClick={() => setReviewing(null)}
+                  >
+                    Cancel
+                  </Button>
+                </>
+              )}
+            </>
+          )}
+          {c.enabled && (
             <Button
               variant="outline"
               loading={revoking === c.client_id}
@@ -160,7 +255,10 @@ export default function Connections({ branding }: { branding: Branding }) {
       {!loading && !items.length && !error && (
         <EmptyState>
           <h2>No AI connections yet.</h2>
-          <p>Connect an AI tool from administration when you’re ready.</p>
+          <p>
+            Connect an AI tool to this installation’s /api/mcp address when
+            you’re ready.
+          </p>
         </EmptyState>
       )}
     </BrandedAccount>

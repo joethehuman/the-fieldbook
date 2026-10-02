@@ -1,16 +1,48 @@
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { createMcp } from "@server/mcp";
-import {
-  verifyMcpIdentity,
-  hasConnectionGrantForSubject,
-  findProfileBySubject,
-  allowMcpRequest,
-} from "@server/identity";
-import { profile, requireAdmin, HttpError, errorResponse } from "@server/auth";
+import { verifyMcpIdentity, allowMcpRequest } from "@server/identity";
+import { HttpError, errorResponse } from "@server/auth";
+import { currentMcpAccess } from "@server/mcp-authorization";
 import { installation } from "@server/installation";
 import { invalidatePublishedReader } from "@server/reader-cache";
 export const runtime = "nodejs";
 export const maxDuration = 30;
+
+/** Read the actual stream: Content-Length can be absent or dishonest. */
+async function boundedRequest(req: Request): Promise<Request> {
+  const limit = 2_000_000;
+  if (Number(req.headers.get("content-length")) > limit)
+    throw new HttpError(413, "Request is too large.");
+  const reader = req.body?.getReader();
+  if (!reader) return req;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        await reader.cancel();
+        throw new HttpError(413, "Request is too large.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const body = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    body.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new Request(req.url, {
+    method: req.method,
+    headers: req.headers,
+    body,
+  });
+}
 async function handle(req: Request) {
   try {
     const config = installation(),
@@ -37,28 +69,20 @@ async function handle(req: Request) {
     if (!token) return unauth();
     const identity = await verifyMcpIdentity(token, resource);
     if (!identity) return unauth();
-    const approved = await hasConnectionGrantForSubject(
-      identity.subject,
-      identity.clientId,
-    );
-    if (!approved)
-      throw new HttpError(
-        403,
-        "This AI connection has not been approved or has been revoked.",
-      );
-    const row = await findProfileBySubject(identity.subject, true);
-    const user = row ? profile(row) : null;
-    requireAdmin(user);
+    const refreshAccess = () =>
+      currentMcpAccess(identity.subject, identity.clientId);
+    const { user, access } = await refreshAccess();
     const allowed = await allowMcpRequest(user.id);
     if (!allowed) throw new HttpError(429, "Request limit reached.");
     if (req.method !== "POST")
       return new Response(null, { status: 405, headers: { Allow: "POST" } });
-    if (Number(req.headers.get("content-length")) > 2000000)
-      throw new HttpError(413, "Request is too large.");
+    const request = await boundedRequest(req);
     const server = createMcp(
         user,
         identity.clientId,
         invalidatePublishedReader,
+        access,
+        refreshAccess,
       ),
       transport = new WebStandardStreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
@@ -66,7 +90,7 @@ async function handle(req: Request) {
       });
     await server.connect(transport);
     try {
-      const response = await transport.handleRequest(req);
+      const response = await transport.handleRequest(request);
       response.headers.set("Cache-Control", "no-store");
       return response;
     } finally {

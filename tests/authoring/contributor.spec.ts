@@ -68,7 +68,10 @@ test("contributors share publishing editors with four permitted destinations on 
   await expect(page.getByText("Deleted account secret", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "Users", exact: true })).toHaveCount(0);
   await section(page, "MCP");
-  if (production) await expect(page.getByText("MCP connections currently require an administrator account.")).toBeVisible();
+  if (production) {
+    await expect(page.getByText("Contributors can author and publish content, upload media and review feedback. Reporting requires an explicitly managed team.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Manage connections →" })).toBeVisible();
+  }
   if (production) {
     for (const scope of ["people", "person", "governance"]) {
       const url = `/api/admin/snapshot?scope=${scope}${scope === "person" ? `&userId=${authoringUser.id}` : ""}`;
