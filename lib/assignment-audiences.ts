@@ -1,12 +1,13 @@
 import type { Workspace } from "./store";
 import {
   ancestorIds,
+  reportingTeamId,
   effectiveGroups,
   type AssignmentAudience,
   type LearningItem,
   type User,
 } from "./types";
-import { expandLearning, groupItems } from "./learning-groups";
+import { expandLearning, groupItems, teamItems } from "./learning-groups";
 
 export const audienceKey = (a: AssignmentAudience) => `${a.kind}:${a.id}`;
 export function assignmentAudiences(data: Workspace) {
@@ -21,7 +22,7 @@ export function assignmentAudiences(data: Workspace) {
       kind: "team" as const,
       id: t.id,
       name: t.name,
-      items: t.learningItems || [],
+      items: teamItems(t),
     })),
   ].sort(
     (a, b) => a.name.localeCompare(b.name) || a.kind.localeCompare(b.kind),
@@ -29,13 +30,12 @@ export function assignmentAudiences(data: Workspace) {
 }
 export function projectAssignmentTeams(person: User, data: Workspace) {
   const teams = data.teams || [];
-  const teamId =
-    person.teamId || teams.find((t) => t.system === "organization")?.id;
+  const directTeam = reportingTeamId(person.teamId, teams);
   return teams
     .filter(
       (t) =>
-        teamId &&
-        ancestorIds(teamId, teams).has(t.id) &&
+        directTeam &&
+        ancestorIds(directTeam, teams).has(t.id) &&
         ((t.learningItems?.length || 0) > 0 ||
           (t.requiredCourseIds?.length || 0) > 0),
     )
@@ -56,7 +56,11 @@ export function courseAudienceSources(
   person: User,
   courseId: string,
 ): AssignmentAudience[] {
-  const groups = effectiveGroups(person, data.groups);
+  const groups = effectiveGroups(
+    person,
+    data.groups,
+    person.effectiveGroupIds ? undefined : data.teams,
+  );
   const projected =
     person.assignmentTeams || projectAssignmentTeams(person, data);
   const teams = new Set(projected.map((t) => t.id));
@@ -148,7 +152,7 @@ export function assignLearningToAudiences(
     })),
     teams: (data.teams || []).map((t) => ({
       ...t,
-      learningItems: edit("team", t.id, t.learningItems || []),
+      learningItems: edit("team", t.id, teamItems(t)),
     })),
   };
 }
@@ -186,11 +190,11 @@ export function learningChangeImpact(before: Workspace, after: Workspace) {
     return new Map(
       data.users.map((person) => {
         const groups = effectiveGroups(person, data.groups, data.teams || []),
-          teamId =
-            person.teamId ||
-            data.teams?.find((t) => t.system === "organization")?.id,
-          teams = teamId
-            ? ancestorIds(teamId, data.teams || [])
+          teams = reportingTeamId(person.teamId, data.teams || [])
+            ? ancestorIds(
+                reportingTeamId(person.teamId, data.teams || [])!,
+                data.teams || [],
+              )
             : new Set<string>();
         const courses = new Map<string, Set<string>>();
         for (const a of plans)

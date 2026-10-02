@@ -1,4 +1,5 @@
 "use client";
+import { isOrganizationChangeCanceled } from "@/lib/organization-change";
 import { useRef, useState, type ReactNode } from "react";
 import { BulkSelectionBar } from "./bulk-selection";
 import {
@@ -33,6 +34,7 @@ export type BulkCommand = {
   label: string;
   description: string;
   successMessage?: string;
+  applyLabel?: string;
   disabledReason?: string;
   destructive?: boolean;
   acknowledgment?: string;
@@ -40,6 +42,8 @@ export type BulkCommand = {
   selectionMode?: "single" | "multiple";
   field?: "date";
   fieldLabel?: string;
+  /** Parameter-free command whose owner supplies the sole consequence review. */
+  externalReview?: boolean;
   review?: (values: string[], sourceIds: string[]) => ReactNode;
   apply: (
     values: string[],
@@ -80,6 +84,7 @@ export function BulkActions({
     [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   const notify = useToast();
   const [resultNotice, setResultNotice] = useState<{
     message: string;
@@ -88,10 +93,42 @@ export function BulkActions({
   const command = active?.command;
   const commandLabel = (c: BulkCommand) =>
     collectionSize === 1 ? c.label.replace(/\bselected ?/, "").trim() : c.label;
+  const applyExternal = async (command: BulkCommand, ids: string[]) => {
+    if (running.current) return;
+    running.current = true;
+    setBusy(true);
+    setResultNotice(null);
+    let returnToMenu = false;
+    try {
+      const result = await command.apply([], ids);
+      if (result) {
+        onSelectionChange(result.failed);
+        if (result.failed.length) setResultNotice(result);
+        else notify(result.message);
+      } else {
+        onSelectionChange([]);
+        notify(command.successMessage || "Changes applied.");
+      }
+    } catch (error) {
+      returnToMenu = true;
+      if (!isOrganizationChangeCanceled(error))
+        setResultNotice({ message: (error as Error).message });
+    } finally {
+      running.current = false;
+      setBusy(false);
+      if (returnToMenu)
+        requestAnimationFrame(() => menuTrigger.current?.focus());
+    }
+  };
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" disabled={!selected.length}>
+        <Button
+          ref={menuTrigger}
+          type="button"
+          variant="outline"
+          disabled={busy || !selected.length}
+        >
           {collectionSize > 1 ? "Bulk actions" : "Actions"}
         </Button>
       </DropdownMenuTrigger>
@@ -109,6 +146,15 @@ export function BulkActions({
                   : undefined
               }
               onSelect={() => {
+                if (
+                  c.externalReview &&
+                  !c.options &&
+                  !c.field &&
+                  !c.acknowledgment
+                ) {
+                  void applyExternal(c, [...selected]);
+                  return;
+                }
                 setActive({
                   command: { ...c, label: commandLabel(c) },
                   ids: [...selected],
@@ -145,8 +191,12 @@ export function BulkActions({
         </BulkSelectionBar>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p role="status" className="text-copy text-muted-foreground">{collectionSize} {noun}</p>
-          {singleItemActions && collectionSize === 1 && selected.length === 1 && <ActionGroup>{menu}</ActionGroup>}
+          <p role="status" className="text-copy text-muted-foreground">
+            {range || `${collectionSize} ${noun}`}
+          </p>
+          {singleItemActions &&
+            collectionSize === 1 &&
+            selected.length === 1 && <ActionGroup>{menu}</ActionGroup>}
         </div>
       )}
       {resultNotice && (
@@ -261,17 +311,19 @@ export function BulkActions({
                     }
                     setActive(null);
                   } catch (e) {
-                    setError(
-                      (e as Error).message +
-                        " Review the current list before retrying.",
-                    );
+                    if (!isOrganizationChangeCanceled(e))
+                      setError(
+                        (e as Error).message +
+                          " Review the current list before retrying.",
+                      );
                   } finally {
                     running.current = false;
                     setBusy(false);
                   }
                 }}
               >
-                {command.destructive ? command.label : "Apply changes"}
+                {command.applyLabel ||
+                  (command.destructive ? command.label : "Apply changes")}
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -1,4 +1,5 @@
 "use client";
+import { DeadlineReview } from "./DeadlineReview";
 import { FormField } from "@/components/patterns/form-field";
 import { TextField } from "./patterns/text-field";
 import { SettingsSection as SettingsGroup } from "./patterns/settings-section";
@@ -36,7 +37,9 @@ export default function SiteSettingsPanel({
   contributor = false,
   section,
   registerNavigationGuard,
+  onReviewDeadlines,
 }: {
+  onReviewDeadlines?: (token?: string) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
   data: Workspace;
   onChange: (next: Workspace) => void | Promise<void>;
   production: boolean;
@@ -308,10 +311,11 @@ export default function SiteSettingsPanel({
           description="Set the number of days for new users and ongoing catch-up."
           guidance={
             <div id="due-dates-help">
-              When off, learners see these courses as recommendations without
-              deadlines. Turning due dates on reveals saved targets. Defaults
-              apply to future onboarding clocks and assignment episodes; existing
-              onboarding windows and saved course deadlines stay fixed.
+              Due dates add an overdue flag; completion always includes all assigned courses.
+              Turning dates off hides deadlines without resetting them or changing New/Existing stage.
+              Defaults apply to future onboarding clocks and assignment episodes. Existing onboarding
+              windows and saved course deadlines stay fixed; save the defaults, then review recalculation
+              to change existing dates.
             </div>
           }
         >
@@ -329,7 +333,7 @@ export default function SiteSettingsPanel({
               aria-describedby="due-dates-help"
               type="number"
               required
-              disabled={busy || settings.dueDatesEnabled === false}
+              disabled={busy}
               min={1}
               max={365}
               value={settings.onboardingDays ?? 90}
@@ -346,7 +350,7 @@ export default function SiteSettingsPanel({
               aria-describedby="due-dates-help"
               type="number"
               required
-              disabled={busy || settings.dueDatesEnabled === false}
+              disabled={busy}
               min={1}
               max={365}
               value={settings.catchUpDays ?? 30}
@@ -358,6 +362,7 @@ export default function SiteSettingsPanel({
               }
             />
           </FormField>
+          {onReviewDeadlines && <><FieldDescription>Save any changed defaults before reviewing existing deadlines.</FieldDescription><DeadlineReview onReview={onReviewDeadlines} disabled={busy || dirty} /></>}
         </SettingsGroup>
       )}
       {section === "access" && (

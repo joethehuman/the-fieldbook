@@ -94,9 +94,7 @@ test("contributor scopes deny protected requests before reads and project only p
       );
     assert.equal(queries.length, 0);
     const content = await adminSnapshot(user, "content");
-    assert.deepEqual(content.groups, [
-      { id: "g", name: "Relevance", parentId: undefined },
-    ]);
+    assert.deepEqual(content.groups, [{ id: "g", name: "Relevance" }]);
     assert.deepEqual(content.curricula, []);
     assert.deepEqual(content.teams, []);
     assert.equal(content.governanceRevision, undefined);
@@ -117,20 +115,37 @@ test("contributor scopes deny protected requests before reads and project only p
 
 test("feedback respondent names use bounded minimal reads without truncating larger installations", async () => {
   const { data } = await import("../../server/data");
-  const oldFetch = globalThis.fetch, oldEnv = { ...process.env };
-  Object.assign(process.env, { NEXT_PUBLIC_SUPABASE_URL: "https://contributor-contract.supabase.co", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test", SUPABASE_SECRET_KEY: "test", FIELDBOOK_URL: "https://example.test", FIELDBOOK_OWNER_EMAIL: "owner@example.test", FIELDBOOK_HOST: "node" });
-  const ids = Array.from({ length: 1201 }, (_, n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`);
+  const oldFetch = globalThis.fetch,
+    oldEnv = { ...process.env };
+  Object.assign(process.env, {
+    NEXT_PUBLIC_SUPABASE_URL: "https://contributor-contract.supabase.co",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test",
+    SUPABASE_SECRET_KEY: "test",
+    FIELDBOOK_URL: "https://example.test",
+    FIELDBOOK_OWNER_EMAIL: "owner@example.test",
+    FIELDBOOK_HOST: "node",
+  });
+  const ids = Array.from(
+    { length: 1201 },
+    (_, n) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`,
+  );
   let calls = 0;
   globalThis.fetch = async (input) => {
-    const url = new URL(String(input)); calls++;
-    assert.equal(url.pathname, "/rest/v1/fb_profiles"); assert.equal(url.searchParams.get("select"), "id,name");
+    const url = new URL(String(input));
+    calls++;
+    assert.equal(url.pathname, "/rest/v1/fb_profiles");
+    assert.equal(url.searchParams.get("select"), "id,name");
     const chunk = url.searchParams.get("id")!.slice(4, -1).split(",");
     assert.ok(chunk.length <= 100);
     return Response.json(chunk.map((id) => ({ id, name: "Respondent " + id })));
   };
   try {
     const names = await data().readProfileNames([...ids, ids[0]]);
-    assert.equal(names.length, 1201); assert.equal(calls, 13);
+    assert.equal(names.length, 1201);
+    assert.equal(calls, 13);
     assert.deepEqual(names.map((p) => p.id).sort(), [...ids].sort());
-  } finally { globalThis.fetch = oldFetch; process.env = oldEnv; }
+  } finally {
+    globalThis.fetch = oldFetch;
+    process.env = oldEnv;
+  }
 });

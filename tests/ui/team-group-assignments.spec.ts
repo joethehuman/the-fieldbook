@@ -32,25 +32,72 @@ test("course picker combines teams/groups, retains searched selection, saves onc
     .fill(course.title);
   const row = page.getByRole("row").filter({ hasText: course.title });
   await row.getByRole("button", { name: "Assign", exact: true }).click();
-  const panel = page.getByRole("region", { name: "Assign learning" });
+  const panel = page.getByRole("dialog", {
+    name: "Assign to teams or groups",
+    exact: true,
+  });
   await panel
-    .getByRole("checkbox", { name: "Team: Sales", exact: true })
+    .getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    })
     .check();
   await panel.getByRole("searchbox").fill("Group:");
   await panel
-    .getByRole("checkbox", { name: "Group: Sales", exact: true })
+    .getByRole("checkbox", {
+      name: "Assign directly to Group: Sales",
+      exact: true,
+    })
     .check();
   await panel.getByRole("searchbox").fill("");
   await expect(
-    panel.getByRole("checkbox", { name: "Team: Sales", exact: true }),
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    }),
   ).toBeChecked();
   await page.screenshot({
     path: info.outputPath("mixed-assignment-picker.png"),
   });
   await panel
-    .getByRole("button", { name: "Save assignments", exact: true })
+    .getByRole("button", { name: "Review assignments", exact: true })
     .click();
-  await expect(panel).toHaveCount(0);
+  const review = page.getByRole("dialog", {
+    name: `Assign ${course.title}`,
+    exact: true,
+  });
+  await expect(review).toBeVisible();
+  await expect(panel).not.toBeVisible();
+  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    panel.getByRole("button", { name: "Review assignments", exact: true }),
+  ).toBeFocused();
+  await expect(
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    }),
+  ).toBeChecked();
+  await expect(
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Group: Sales",
+      exact: true,
+    }),
+  ).toBeChecked();
+  const unchanged = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
+  );
+  expect(unchanged.teams[0].learningItems).toEqual([]);
+  expect(unchanged.groups[0].learningItems).toEqual([]);
+
+  await panel
+    .getByRole("button", { name: "Review assignments", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: `Assign ${course.title}`, exact: true })
+    .getByRole("button", { name: "Apply assignments", exact: true })
+    .click();
+  await expect(panel).not.toBeVisible();
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
   );
@@ -64,8 +111,28 @@ test("course picker combines teams/groups, retains searched selection, saves onc
   );
   expect(episodes).toHaveLength(1);
   await row.getByRole("button", { name: "Assign", exact: true }).click();
+  await panel
+    .getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    })
+    .uncheck();
+  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
+  const discard = page.getByRole("alertdialog", {
+    name: "Confirm action",
+    exact: true,
+  });
+  await discard.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
+  await discard.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(panel).not.toBeVisible();
   await section(page, "Demo profiles");
-  await expect(panel).toHaveCount(0);
   await expect(
     page.getByRole("heading", { name: "Demo profiles", exact: true }),
   ).toBeVisible();
@@ -76,7 +143,7 @@ test("course picker combines teams/groups, retains searched selection, saves onc
   ).toBe(true);
 });
 
-test("course editor assignment panel returns with a usable save baseline", async ({
+test("course editor assignment dialog returns with a usable save baseline", async ({
   page,
 }) => {
   const data = freshWorkspace(),
@@ -99,14 +166,24 @@ test("course editor assignment panel returns with a usable save baseline", async
   await page
     .getByRole("button", { name: "Assign to teams or groups", exact: true })
     .click();
-  const panel = page.getByRole("region", { name: "Assign learning" });
+  const panel = page.getByRole("dialog", {
+    name: "Assign to teams or groups",
+    exact: true,
+  });
   await panel
-    .getByRole("checkbox", { name: "Team: Sales team", exact: true })
+    .getByRole("checkbox", {
+      name: "Assign directly to Team: Sales team",
+      exact: true,
+    })
     .check();
   await panel
-    .getByRole("button", { name: "Save assignments", exact: true })
+    .getByRole("button", { name: "Review assignments", exact: true })
     .click();
-  await expect(panel).toHaveCount(0);
+  await page
+    .getByRole("dialog", { name: `Assign ${course.title}`, exact: true })
+    .getByRole("button", { name: "Apply assignments", exact: true })
+    .click();
+  await expect(panel).not.toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Course editor", exact: true }),
   ).toBeVisible();

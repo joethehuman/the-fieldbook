@@ -53,7 +53,7 @@ export type EffectiveAssignment = {
   catchUpDays: number;
   onboardingEnd?: string;
   sourceGroups: string[];
-  sourceAudiences: AssignmentAudience[];
+  sourceAudiences?: AssignmentAudience[];
   baseline?: boolean;
 };
 export type User = {
@@ -66,12 +66,11 @@ export type User = {
   /** False until the preregistered person activates a verified login. */
   registered?: boolean;
   learningAssignments?: EffectiveAssignment[];
-  /** Server-authorized projection of matching assignment teams, without reporting authority. */
+  /** Authorized learning-source projection; it grants no reporting access. */
   assignmentTeams?: Pick<
     Team,
     "id" | "name" | "learningItems" | "requiredCourseIds"
   >[];
-  effectiveGroupIds?: string[];
   hireDate?: string;
   /** Applied clock window; changing organization defaults does not replace it. */
   onboardingDays?: number;
@@ -80,6 +79,8 @@ export type User = {
   teamId?: string;
   groupJoinedAt?: Record<string, string>;
   effectiveGroupJoinedAt?: Record<string, string>;
+  /** Server projection for memberships rooted outside a scoped reporting tree. */
+  effectiveGroupIds?: string[];
 };
 export type Progress = {
   revision?: number;
@@ -107,22 +108,53 @@ export type Curriculum = {
 export type Group = {
   id: string;
   name: string;
+  /** Read only for converting saved hierarchical data. New groups are flat. */
   parentId?: string;
   requiredCourseIds?: string[];
   learningItems?: LearningItem[];
   teamIds?: string[];
-  teamLinkScope?: "direct" | "subtree";
+  /** Preserved pre-upgrade sources; new links always include subteams. */
   legacyDirectTeamIds?: string[];
+  /** Legacy direct links stay limited until an administrator reviews expansion. */
+  teamLinkScope?: "direct" | "subtree";
 };
+/** One source per team; a subtree link supersedes a legacy direct link. */
+export function groupTeamLinks(
+  group: Group,
+): { teamId: string; scope: "direct" | "subtree" }[] {
+  const links = new Map<string, "direct" | "subtree">();
+  for (const id of group.legacyDirectTeamIds || []) links.set(id, "direct");
+  for (const id of group.teamIds || [])
+    links.set(id, group.teamLinkScope === "direct" ? "direct" : "subtree");
+  return [...links].map(([teamId, scope]) => ({ teamId, scope }));
+}
+export function groupIncludesTeam(
+  group: Group,
+  teamId?: string,
+  teams: Team[] = [],
+) {
+  teamId = reportingTeamId(teamId, teams);
+  if (!teamId) return false;
+  const ancestors = ancestorIds(teamId, teams);
+  return groupTeamLinks(group).some(
+    (link) =>
+      link.teamId === teamId ||
+      (link.scope === "subtree" && ancestors.has(link.teamId)),
+  );
+}
 export type Team = {
-  system?: "organization";
   id: string;
   name: string;
+  system?: "organization";
   parentId?: string;
   managerId?: string;
   learningItems?: LearningItem[];
   requiredCourseIds?: string[];
 };
+/** A blank direct team belongs at the system root; never rewrite the saved field. */
+export function reportingTeamId(teamId?: string, teams: Team[] = []) {
+  return teamId || teams.find((team) => team.system === "organization")?.id;
+}
 export type Assignment = {
   teamId?: string;
   groupId?: string;
@@ -163,28 +195,25 @@ export function canParent(
   return !parentId || !ancestorIds(parentId, nodes).has(id);
 }
 export function effectiveGroups(user: User, groups: Group[], teams?: Team[]) {
-  const teamId = user.teamId || teams?.find(t => t.system === "organization")?.id;
   const direct = [
     ...user.groups,
     ...groups
-      .filter(
-        (g) =>
-          teamId &&
-          ((g.legacyDirectTeamIds || []).includes(teamId) ||
-            (g.teamIds || []).some(
-              (id) =>
-                id === teamId ||
-                (g.teamLinkScope !== "direct" &&
-                  teams &&
-                  ancestorIds(teamId, teams).has(id)),
-            )),
-      )
+      .filter((g) => groupIncludesTeam(g, user.teamId, teams))
       .map((g) => g.id),
   ];
-  return new Set([
-    ...direct.flatMap((id) => [...ancestorIds(id, groups)]),
-    ...(teams ? [] : user.effectiveGroupIds || []),
-  ]);
+  // Scoped server reads carry the database-reconciled memberships, including
+  // links rooted above the reporting branches a manager is allowed to see.
+  if (!teams)
+    direct.push(
+      ...(user.effectiveGroupIds || []).filter((id) =>
+        groups.some((g) => g.id === id),
+      ),
+    );
+  return new Set(
+    direct.filter(
+      (id) => !groups.length || groups.some((group) => group.id === id),
+    ),
+  );
 }
 export function assignmentInfo(c: Content, user: User, groups: Group[]) {
   const memberships = effectiveGroups(user, groups);
@@ -201,7 +230,7 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       const joined =
         (r.groupId ? user.effectiveGroupJoinedAt?.[r.groupId] : r.assignedAt) ||
         user.groups
-          .filter((id) => ancestorIds(id, groups).has(r.groupId || ""))
+          .filter((id) => id === r.groupId)
           .map((id) => user.groupJoinedAt?.[id] || r.assignedAt)
           .sort()[0] ||
         r.assignedAt;

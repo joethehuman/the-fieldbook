@@ -27,7 +27,7 @@ export function guestFixture() {
       ...update,
       id: "update",
       title: "Recommended update",
-      groups: ["foundation"],
+      groups: ["foundation", "visitors"],
     },
     { ...update, id: "other", title: "Other update", groups: [] },
   ];
@@ -40,7 +40,6 @@ export function guestFixture() {
     {
       id: "visitors",
       name: "Visitors",
-      parentId: "foundation",
       teamIds: ["sales-team"],
       learningItems: [
         { kind: "curriculum", id: "intro" },
@@ -62,7 +61,11 @@ export function guestFixture() {
       courseIds: [courses[0].id, courses[1].id],
     },
   ];
-  data.settings = { ...defaultSettings, guestGroupId: "visitors" };
+  data.settings = {
+    ...defaultSettings,
+    organizationTeamId: before.settings?.organizationTeamId,
+    guestGroupId: "visitors",
+  };
   data.users = data.users.map((u) => ({
     ...u,
     groups: ["account"],

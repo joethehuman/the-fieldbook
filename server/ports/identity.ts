@@ -30,8 +30,11 @@ export type AuthorizationRedirect = { redirect_url: string };
 /** Application person record. The adapter resolves the provider subject to this stable ID.
  * Roster IDs remain stable when a preregistered person activates a provider login. */
 export type ProfileRecord = {
-  assignment_context?: { learning_assignments?: import("@/lib/types").EffectiveAssignment[]; assignment_teams?: import("@/lib/types").User["assignmentTeams"]; effective_group_ids?: string[] };
-  learning_assignments?: import("@/lib/types").EffectiveAssignment[];
+  assignment_context?: {
+    learning_assignments?: import("@/lib/types").EffectiveAssignment[];
+    assignment_teams?: import("@/lib/types").User["assignmentTeams"];
+    effective_group_ids?: string[];
+  };
   assignment_teams?: import("@/lib/types").User["assignmentTeams"];
   effective_group_ids?: string[];
   id: string;
@@ -47,6 +50,9 @@ export type ProfileRecord = {
   onboarding_start?: string | null;
   group_joined_at?: Record<string, string>;
   effective_group_joined_at?: Record<string, string>;
+  learning_assignments?: (import("@/lib/types").EffectiveAssignment & {
+    ended_at?: string | null;
+  })[];
 };
 
 export type ConnectionGrant = {

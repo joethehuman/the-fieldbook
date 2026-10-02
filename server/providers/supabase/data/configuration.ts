@@ -39,13 +39,13 @@ export const configurationData: Pick<
   async readSettingsContext() {
     const { data, error } = await db()
       .from("fb_config")
-      .select("settings,groups,governance_revision")
+      .select("settings,groups,teams,governance_revision")
       .eq("id", true)
       .single();
     check(error);
     return data as Pick<
       ConfigurationRecord,
-      "settings" | "groups" | "governance_revision"
+      "settings" | "groups" | "teams" | "governance_revision"
     > | null;
   },
   async readPublicBranding() {

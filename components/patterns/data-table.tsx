@@ -24,9 +24,18 @@ const layouts = {
   progress: ["w-[28%]", "w-[17%]", "w-[17%]", "w-[12%]", "w-[11%]", "w-[15%]"],
   content: ["w-[33%]", "w-[12%]", "w-[15%]", "w-[10%]", "w-[30%]"],
   people: ["w-[26%]", "w-[12%]", "w-[23%]", "w-[11%]", "w-[28%]"],
+  learningGroupsSelectable: ["w-12", "w-[58%]", "w-[18%]", "w-[18%]"],
+  learningGroups: ["w-[64%]", "w-[18%]", "w-[18%]"],
+  groupMembersSelectable: ["w-12", "w-[36%]", "w-[25%]", "w-[33%]"],
+  groupMembers: ["w-[40%]", "w-[25%]", "w-[35%]"],
+  groupUpdates: ["w-[65%]", "w-[25%]", "w-[10%]"],
+  assignmentGroups: ["w-10", "w-[70%]", "w-[20%]"],
+  teamBranches: ["w-[36%]", "w-[30%]", "w-[16%]", "w-[18%]"],
   teamMembers: ["w-[45%]", "w-[30%]", "w-[25%]"],
   teams: ["w-[24%]", "w-[20%]", "w-[24%]", "w-[16%]", "w-[16%]"],
   assignments: ["w-[27%]", "w-[23%]", "w-[20%]", "w-[30%]"],
+  organizationReview: ["w-[23%]", "w-[32%]", "w-[25%]", "w-[20%]"],
+  deadlineReview: ["w-[23%]", "w-[37%]", "w-[20%]", "w-[20%]"],
   courses: ["w-[30%]", "w-[24%]", "w-[18%]", "w-[28%]"],
 } as const;
 export function DataTable({
@@ -40,9 +49,27 @@ export function DataTable({
       data-layout={layout}
       className={cn(
         "table-fixed [&_td]:[overflow-wrap:anywhere] [&_th]:[overflow-wrap:anywhere]",
-        ["contentSelection", "peopleSelection", "deleted"].includes(layout) &&
+        [
+          "contentSelection",
+          "peopleSelection",
+          "deleted",
+          "groupMembersSelectable",
+          "learningGroupsSelectable",
+        ].includes(layout) &&
           "[&_td:first-child]:text-center [&_th:first-child]:text-center",
-        layout === "teamMembers" ? "min-w-128" : "min-w-208",
+        [
+          "teamMembers",
+          "teamBranches",
+          "learningGroups",
+          "learningGroupsSelectable",
+          "groupMembers",
+          "groupMembersSelectable",
+          "groupUpdates",
+        ].includes(layout)
+          ? "min-w-128"
+          : layout === "assignmentGroups"
+            ? "min-w-72 [&_td]:px-2 [&_th]:px-2"
+            : "min-w-208",
         className,
       )}
       {...props}

@@ -78,14 +78,16 @@ export function peopleCommands(
       id: "team",
       label: "Set reporting team",
       description:
-        "Choose one direct team, or No team. Manager reporting and team-linked assignments change; history is preserved.",
+        "Choose a direct team, or Organization with no direct team. Manager reporting and team-linked assignments change; history is preserved.",
       selectionMode: "single",
       options: [
-        { id: "none", label: "No team" },
-        ...(data.teams || []).map((t) => ({
-          id: t.id,
-          label: teamPath(t.id, data.teams || []),
-        })),
+        { id: "none", label: "Organization (no direct team)" },
+        ...(data.teams || [])
+          .filter((t) => t.system !== "organization")
+          .map((t) => ({
+            id: t.id,
+            label: teamPath(t.id, data.teams || []),
+          })),
       ],
       apply: (ids) => apply("team", ids),
     },

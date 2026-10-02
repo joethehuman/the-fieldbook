@@ -44,23 +44,23 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
     page.getByRole("heading", { name: "Interface reference" }),
   ).toBeVisible();
   const tabs = page.getByRole("tablist", { name: "Example group sections" });
-  const members = tabs.getByRole("tab", { name: "Members" });
-  const panel = page.getByRole("tabpanel", { name: "Members" });
-  const select = panel.getByRole("combobox", { name: "Parent learning group" });
+  const members = tabs.getByRole("tab", { name: "People" });
+  const panel = page.getByRole("tabpanel", { name: "People" });
+  const select = panel.getByRole("combobox", { name: "Linked team" });
   const tabBox = await tabs.boundingBox(),
     fieldBox = await select.boundingBox();
   expect(fieldBox!.y - (tabBox!.y + tabBox!.height)).toBeGreaterThanOrEqual(20);
   await select.focus();
   await page.keyboard.press("Space");
   await expect(
-    page.getByRole("option", { name: "No parent", exact: true }),
+    page.getByRole("option", { name: "No linked team", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Home");
   await expect(
-    page.getByRole("option", { name: "No parent", exact: true }),
+    page.getByRole("option", { name: "No linked team", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(select).toHaveText("No parent");
+  await expect(select).toHaveText("No linked team");
   await select.click();
   await page
     .getByRole("option", {
@@ -74,11 +74,10 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
   await members.focus();
   await expect(members).toBeFocused();
   await page.keyboard.press("ArrowRight");
-  await expect(tabs.getByRole("tab", { name: "Learning" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  const order = page.getByRole("tabpanel", { name: "Learning" });
+  await expect(
+    tabs.getByRole("tab", { name: "Assigned Courses" }),
+  ).toHaveAttribute("aria-selected", "true");
+  const order = page.getByRole("tabpanel", { name: "Assigned Courses" });
   await order
     .getByRole("button", { name: "Move Company essentials down", exact: true })
     .click();
@@ -92,7 +91,35 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
   const trigger = page.getByRole("button", { name: "Edit example group" });
   await trigger.click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("combobox", { name: "Dialog parent group" }).click();
+  const dialogSelect = dialog.getByRole("combobox", {
+    name: "Dialog linked team",
+  });
+  await dialogSelect.click();
+  // Opening a nested Select hides siblings for accessibility; its dialog stays painted.
+  const paintedDialog = page.locator('[data-slot="dialog-content"]');
+  const paintedSelect = paintedDialog.locator('[data-slot="select-trigger"]');
+  await expect(paintedDialog).toBeVisible();
+  await expect(paintedSelect).toBeVisible();
+  const option = page.getByRole("option", { name: "Company", exact: true });
+  await expect(option).toBeVisible();
+  const triggerBox = await paintedSelect.boundingBox();
+  const menuBox = await page
+    .locator('[data-slot="select-content"]')
+    .boundingBox();
+  // A wider option list may shift to stay inside a narrow viewport.
+  expect(Math.abs(menuBox!.x - triggerBox!.x)).toBeLessThan(
+    Math.abs(menuBox!.width - triggerBox!.width) + 8,
+  );
+  expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
+  expect(
+    Math.min(
+      Math.abs(menuBox!.y - triggerBox!.y - triggerBox!.height - 5),
+      Math.abs(menuBox!.y + menuBox!.height + 5 - triggerBox!.y),
+    ),
+  ).toBeLessThan(8);
   await page.getByRole("option", { name: "Company", exact: true }).click();
   await expect(dialog.getByRole("combobox")).toHaveText("Company");
   await page.keyboard.press("Escape");
@@ -114,92 +141,78 @@ test("learning groups: shared controls, save and reload", async ({
 }, testInfo) => {
   await admin(page);
   await adminSection(page, "Learning groups");
-  await expect(
-    page.getByRole("heading", { name: "Learning groups", exact: true }),
-  ).toHaveCount(1);
-  const search = page.getByRole("searchbox", { name: "Find learning groups" });
-  const createButton = page.getByRole("button", {
-    name: "Create group",
+  const search = page.getByRole("searchbox", {
+    name: "Find a group",
     exact: true,
   });
   await expect(search).toBeVisible();
-  if (testInfo.project.name === "desktop") {
-    const searchBox = await search.boundingBox();
-    const buttonBox = await createButton.boundingBox();
-    expect(Math.abs(searchBox!.y - buttonBox!.y)).toBeLessThan(2);
-  }
-  await testInfo.attach("learning-groups-overview", {
-    body: await page.screenshot({
-      fullPage: true,
-      path: testInfo.outputPath("overview.png"),
-    }),
-    contentType: "image/png",
-  });
-  await createButton.click();
+  await page.getByRole("button", { name: "Create group", exact: true }).click();
   const createDialog = page.getByRole("dialog", {
     name: "Create learning group",
-  });
-  await expect(createDialog).toBeVisible();
-  await testInfo.attach("learning-group-create-dialog", {
-    body: await page.screenshot({
-      fullPage: true,
-      path: testInfo.outputPath("create-dialog.png"),
-    }),
-    contentType: "image/png",
+    exact: true,
   });
   await createDialog
-    .getByRole("textbox", { name: "New learning group" })
+    .getByRole("textbox", { name: "Group name", exact: true })
     .fill("Sales design test");
-  const createParent = createDialog.getByRole("combobox", {
-    name: "Parent group",
-  });
-  await expect(createParent).toHaveText("Top level");
-  await createParent.click();
-  await page
-    .getByRole("option", { name: "Account executives", exact: true })
-    .click();
-  await expect(createParent).toHaveText("Account executives");
-  await createDialog.getByRole("button", { name: "Create group" }).click();
-  await expect(createDialog).not.toBeVisible();
-  // Creation opens the detail view.
-  await expect(page.getByRole("heading", { name: "Sales design test", exact: true })).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Navigation context" })
-    .getByRole("button", { name: "Parent: Account executives", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Add child group" }).click();
   await expect(
     createDialog.getByRole("combobox", { name: "Parent group" }),
-  ).toHaveText("Account executives / Sales design test");
-  await createDialog.getByRole("button", { name: "Cancel" }).click();
+  ).toHaveCount(0);
+  await createDialog
+    .getByRole("button", { name: "Create group", exact: true })
+    .click();
   await expect(createDialog).not.toBeVisible();
-  await page.getByRole("tab", { name: "Members", exact: true }).click();
-  await page.getByRole("tab", { name: "Updates", exact: true }).click();
+  const createdGroup = page.getByRole("button", {
+    name: "Sales design test",
+    exact: true,
+  });
+  await expect(createdGroup).toBeFocused();
   await expect(
-    page.getByRole("heading", { name: "Updates for this group" }),
+    page.getByRole("table", { name: "Learning groups", exact: true }),
+  ).toBeVisible();
+  await createdGroup.click();
+  await expect(
+    page.getByRole("heading", { name: "Sales design test", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("combobox", { name: "Sort updates for this group" }),
+    page.getByRole("tab", { name: "People", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("button", { name: /Add child group|Move group/ }),
+  ).toHaveCount(0);
+  await page.getByRole("tab", { name: "People", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Add Members", exact: true }),
   ).toBeVisible();
-  await page.getByRole("tab", { name: "Members", exact: true }).click();
   await noOverflow(page);
-  await testInfo.attach("learning-group", {
-    body: await page.screenshot({
-      fullPage: true,
-      path: testInfo.outputPath("review.png"),
-    }),
-    contentType: "image/png",
+  await page.screenshot({
+    path: testInfo.outputPath("flat-group-detail.png"),
+    fullPage: true,
   });
   await page.reload();
   await adminSection(page, "Learning groups");
+  await search.fill("Sales design test");
   await page
-    .getByRole("searchbox", { name: "Find learning groups" })
-    .fill("Sales design test");
-  await page
-    .getByRole("button", { name: "Manage Sales design test", exact: true })
+    .getByRole("button", { name: "Sales design test", exact: true })
     .click();
-  await page.getByRole("tab", { name: "Members", exact: true }).click();
-  await expect(page.locator(".learning-admin")).toContainText(
-    "Parent: Account executives",
-  );
+  await page
+    .getByRole("button", { name: "Group settings", exact: true })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Rename group", exact: true })
+    .click();
+  const rename = page.getByRole("dialog", {
+    name: "Rename learning group",
+    exact: true,
+  });
+  await rename
+    .getByRole("textbox", { name: "Group name", exact: true })
+    .fill("Account executives");
+  await rename.getByRole("button", { name: "Save name", exact: true }).click();
+  await expect(rename.getByRole("alert")).toContainText("already in use");
+  await rename
+    .getByRole("textbox", { name: "Group name", exact: true })
+    .fill("Sales design test");
+  await rename.getByRole("button", { name: "Cancel", exact: true }).click();
 });
 
 test("admin menu scroll stays put while the new panel starts at the top", async ({
@@ -552,7 +565,9 @@ test("catalog remains usable with enlarged text", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Interface reference" }),
   ).toBeVisible();
-  await page.getByRole("tab", { name: "Learning", exact: true }).click();
+  await page
+    .getByRole("tab", { name: "Assigned Courses", exact: true })
+    .click();
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });
@@ -845,14 +860,24 @@ test("long feedback prompt wraps without crowding rating controls", async ({
   await snapshotReview(page, info, "feedback-narrow-long-prompt");
 });
 
-test("hire-date guidance labels the date and stage is derived", async ({ page }, info) => {
+test("hire-date guidance labels the date and stage is derived", async ({
+  page,
+}, info) => {
   await admin(page);
   await adminSection(page, "Demo profiles");
-  await expect(page.getByRole("button", { name: "New user defaults", exact: true })).toHaveCount(0);
-  await page.getByRole("row").filter({ hasText: "Alex Edwards" }).getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "New user defaults", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("row")
+    .filter({ hasText: "Alex Edwards" })
+    .getByRole("button", { name: "Edit", exact: true })
+    .click();
   const dialog = page.getByRole("dialog");
   const date = dialog.getByLabel("Hire date", { exact: true });
-  await expect(date).toHaveAccessibleDescription(/First sign-in does not start it/);
+  await expect(date).toHaveAccessibleDescription(
+    /First sign-in does not start it/,
+  );
   await date.fill("2020-01-01");
   await expect(dialog).toContainText("Existing user");
   await snapshotReview(page, info, "hire-date-guidance");

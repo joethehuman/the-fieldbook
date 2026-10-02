@@ -1,878 +1,1880 @@
 "use client";
-import { DetailNavigation } from "./patterns/detail-navigation";
-import { BulkActions } from "./patterns/bulk-actions";
-import { SelectableRows } from "./patterns/selectable-rows";
-import { groupLearningCommands } from "./bulk-relationships";
-import { useBulkSelection } from "./patterns/bulk-selection";
-import { BulkPicker } from "./patterns/bulk-selection";
-import { Note } from "@/components/ui/note";
-import { FormField } from "@/components/patterns/form-field";
-import { useToast } from "./ui/toast";
-import { OrderedLearning } from "./patterns/ordered-learning";
-import { SelectField } from "./ui/select";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
-import { useRevealTarget } from "./patterns/use-reveal-target";
-import { Input } from "@/components/ui/input";
-import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
-import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
-import { SectionHeader, EmptyState } from "@/components/patterns/layout";
-import { Alert } from "@/components/ui/alert";
-import { ActionGroup } from "@/components/ui/action-group";
-import { useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import {
-  ancestorIds,
-  canParent,
+  isOrganizationChangeCanceled,
+  type OrganizationChangeOptions,
+} from "@/lib/organization-change";
+import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
+import {
   effectiveGroups,
+  reportingTeamId,
+  groupTeamLinks,
+  groupIncludesTeam,
   type Group,
   type LearningItem,
 } from "@/lib/types";
 import { expandLearning, groupItems } from "@/lib/learning-groups";
+import { sourcePassages } from "@/lib/search";
+import { teamPath } from "@/lib/team-hierarchy";
 import {
   sortGroupBrowseItems,
   type GroupBrowseSort,
 } from "@/lib/group-browse-sort";
-import { Button } from "./ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "./ui/dialog";
-import { useInteractionDialog } from "./ui/interaction-dialog";
-import type { LearningHandler } from "./Assignments";
 import { SaveRecoveryError } from "@/lib/save-recovery";
-import { HierarchyList, hierarchyMatches } from "./patterns/hierarchy-list";
-import { groupMembershipSources, groupMoveImpact, groupPath, moveGroup } from "@/lib/group-hierarchy";
-import { teamPath } from "@/lib/team-hierarchy";
+import type { LearningHandler } from "./Assignments";
+import { Button } from "./ui/button";
+import { BulkActions } from "./patterns/bulk-actions";
+import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
+import { Input } from "./ui/input";
+import { Alert } from "./ui/alert";
+import { Checkbox } from "./ui/choice";
+import { Field, FieldGroup } from "./ui/field";
+import { SelectField } from "./ui/select";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogBody,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "./ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "./ui/dropdown-menu";
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableContainer,
+} from "./ui/table";
+import { useToast } from "./ui/toast";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { DetailNavigation } from "./patterns/detail-navigation";
+import { DataTable } from "./patterns/data-table";
+import { OrderedLearning } from "./patterns/ordered-learning";
+import { SearchableSelectionList } from "./patterns/searchable-selection-list";
+import {
+  ContentSelectionList,
+  type ContentSelectionOption,
+} from "./patterns/content-selection-list";
+import { FormField } from "./patterns/form-field";
+import { SectionHeader, EmptyState, Stack } from "./patterns/layout";
+import {
+  CollectionControls,
+  CollectionEmpty,
+  type AppliedFilter,
+} from "./patterns/collection-controls";
+import { Pagination } from "./patterns/pagination";
+import { useRevealTarget } from "./patterns/use-reveal-target";
 
-const key = (i: LearningItem) => `${i.kind}:${i.id}`;
+const PAGE_SIZE = 25;
+const key = (item: LearningItem) => `${item.kind}:${item.id}`;
+const byName = (
+  a: { name: string; id: string },
+  b: { name: string; id: string },
+) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+const sorted = (ids: string[]) => [...ids].sort();
+type Editor =
+  | { kind: "create" | "rename"; name: string; original: string }
+  | { kind: "learning" | "updates"; ids: string[]; snapshot: string }
+  | {
+      kind: "membership";
+      teams: string[];
+      people: string[];
+      legacy: string[];
+      expanded: string[];
+      original: string;
+      snapshot: string;
+    };
+
 export default function LearningGroups({
   data,
   onChange,
   onLearning,
   onLearningMany,
   initialGroup,
+  registerNavigationGuard,
 }: {
   data: Workspace;
   onChange: (
-    d: Workspace,
-    options?: { locallyHandled?: boolean },
+    data: Workspace,
+    options?: OrganizationChangeOptions,
   ) => void | Promise<void>;
   onLearning: LearningHandler;
   onLearningMany?: (
     actions: import("@/lib/learning").LearningAction[],
   ) => Promise<void>;
   initialGroup?: string;
+  registerNavigationGuard?: RegisterNavigationGuard;
 }) {
-  const destination = useRevealTarget<HTMLElement>();
-  const notify = useToast();
-  const { confirm, prompt } = useInteractionDialog();
-  const [hierarchyQuery, setHierarchyQuery] = useState("");
   const [selected, setSelected] = useState(initialGroup || "");
-  const [tab, setTab] = useState("learning");
+  const [tab, setTab] = useState("people");
+  const [indexQuery, setIndexQuery] = useState("");
+  const [indexPage, setIndexPage] = useState(1);
+  const [indexSort, setIndexSort] = useState("name");
+  const [indexPeople, setIndexPeople] = useState("");
+  const [indexCourses, setIndexCourses] = useState("");
+  const [returnToGroup, setReturnToGroup] = useState("");
+  const createdGroupCloseFocus = useRef<string | null>(null);
   const [query, setQuery] = useState("");
-  const [memberSort, setMemberSort] = useState("name");
+  const [page, setPage] = useState(1);
+  const [peopleSort, setPeopleSort] = useState("name");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [teamFilter, setTeamFilter] = useState("");
   const [updateSort, setUpdateSort] =
-    useState<GroupBrowseSort>("created-newest");
-  const [name, setName] = useState("");
-  const [createParent, setCreateParent] = useState("");
-  const [createOpen, setCreateOpen] = useState(false);
-  const [moveParent, setMoveParent] = useState<string | null>(null);
-  const [linkedOpen, setLinkedOpen] = useState(true);
-  const [childrenOpen, setChildrenOpen] = useState(true);
+    useState<GroupBrowseSort>("updated-newest");
+  const [editor, setEditor] = useState<Editor | null>(null);
+  const [sourceTab, setSourceTab] = useState("people");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const learnMany =
-    onLearningMany ||
-    (async (actions: import("@/lib/learning").LearningAction[]) => {
-      for (const action of actions) await onLearning(action);
-    });
-  const group = data.groups.find((g) => g.id === selected);
+  const saving = useRef(false);
+  const guard = useRef(async () => true);
+  const notify = useToast();
+  const { confirm } = useInteractionDialog();
+  const destination = useRevealTarget<HTMLElement>();
+  const group = data.groups.find((candidate) => candidate.id === selected);
+  const teams = data.teams || [];
   const content = data.publishedContent || data.content;
-  const published = content.filter((c) => c.status === "published");
+  const published = content.filter((item) => item.status === "published");
+  const searchableContent = useMemo(
+    () =>
+      new Map(
+        content
+          .filter((item) => item.status === "published")
+          .map((item) => [
+            item.id,
+            sourcePassages(item)
+              .map((passage) =>
+                [passage.title, passage.lessonTitle, passage.text]
+                  .filter(Boolean)
+                  .join(" "),
+              )
+              .join(" "),
+          ]),
+      ),
+    [content],
+  );
   const curricula = data.curricula || [];
   const items = group ? groupItems(group, content) : [];
-  async function save(next: Workspace, message = "Learning group saved.") {
+  // The migration owns conversion. Never quietly remove inheritance in a screen render.
+  const needsConversion = data.groups.some((candidate) => candidate.parentId);
+  const groupMembers = useMemo(() => {
+    const result = new Map<string, Workspace["users"]>();
+    for (const person of data.users) {
+      for (const id of effectiveGroups(person, data.groups, data.teams || [])) {
+        const members = result.get(id) || [];
+        members.push(person);
+        result.set(id, members);
+      }
+    }
+    return result;
+  }, [data.users, data.groups, data.teams]);
+  const membersOf = (candidate: Group) => groupMembers.get(candidate.id) || [];
+  const members = group ? [...membersOf(group)].sort(byName) : [];
+  const courseCount = (candidate: Group) =>
+    new Set(
+      expandLearning(groupItems(candidate, content), curricula).filter((id) =>
+        published.some((item) => item.id === id && item.kind === "course"),
+      ),
+    ).size;
+  const matches = (value: string, term = query) =>
+    value.toLowerCase().includes(term.trim().toLowerCase());
+  const indexMetrics = new Map(
+    data.groups.map((candidate) => [
+      candidate.id,
+      { people: membersOf(candidate).length, courses: courseCount(candidate) },
+    ]),
+  );
+  const orderGroups = (candidates: Group[]) =>
+    [...candidates].sort((a, b) => {
+      const first = indexMetrics.get(a.id) || { people: 0, courses: 0 };
+      const second = indexMetrics.get(b.id) || { people: 0, courses: 0 };
+      const difference =
+        indexSort === "people-most"
+          ? second.people - first.people
+          : indexSort === "people-fewest"
+            ? first.people - second.people
+            : indexSort === "courses-most"
+              ? second.courses - first.courses
+              : indexSort === "courses-fewest"
+                ? first.courses - second.courses
+                : 0;
+      return (
+        difference ||
+        (indexSort === "name-reverse" ? byName(b, a) : byName(a, b)) ||
+        a.id.localeCompare(b.id)
+      );
+    });
+  const groups = orderGroups(data.groups).filter((candidate) => {
+    const metrics = indexMetrics.get(candidate.id)!;
+    return (
+      matches(candidate.name, indexQuery) &&
+      (!indexPeople ||
+        (indexPeople === "with" ? metrics.people > 0 : metrics.people === 0)) &&
+      (!indexCourses ||
+        (indexCourses === "with" ? metrics.courses > 0 : metrics.courses === 0))
+    );
+  });
+  const groupPage = Math.min(
+    indexPage,
+    Math.max(1, Math.ceil(groups.length / PAGE_SIZE)),
+  );
+  const pageGroups = groups.slice(
+    (groupPage - 1) * PAGE_SIZE,
+    groupPage * PAGE_SIZE,
+  );
+  const groupSelection = useBulkSelection(
+    JSON.stringify([selected, indexQuery, indexPeople, indexCourses]),
+    groups.map((candidate) => candidate.id),
+  );
+  const clearIndexFilters = () => {
+    setIndexQuery("");
+    setIndexPeople("");
+    setIndexCourses("");
+    setIndexPage(1);
+  };
+  const indexFilters: AppliedFilter[] = [];
+  if (indexPeople)
+    indexFilters.push({
+      id: "people",
+      label: indexPeople === "with" ? "With people" : "No people",
+      onRemove: () => {
+        setIndexPeople("");
+        setIndexPage(1);
+      },
+    });
+  if (indexCourses)
+    indexFilters.push({
+      id: "courses",
+      label:
+        indexCourses === "with"
+          ? "With assigned courses"
+          : "No assigned courses",
+      onRemove: () => {
+        setIndexCourses("");
+        setIndexPage(1);
+      },
+    });
+  const indexSortLabels: Record<string, string> = {
+    name: "Name A–Z",
+    "name-reverse": "Name Z–A",
+    "people-most": "People: most first",
+    "people-fewest": "People: fewest first",
+    "courses-most": "Courses: most first",
+    "courses-fewest": "Courses: fewest first",
+  };
+  const filteredMembers = members
+    .filter(
+      (person) =>
+        matches(
+          `${person.name} ${person.email} ${teams.find((team) => team.id === reportingTeamId(person.teamId, teams))?.name || ""}`,
+        ) &&
+        (!sourceFilter ||
+          (sourceFilter === "direct"
+            ? person.groups.includes(group!.id)
+            : groupIncludesTeam(group!, person.teamId, teams))) &&
+        (!statusFilter ||
+          (statusFilter === "active" ? person.active : !person.active)) &&
+        (!teamFilter ||
+          (teamFilter === "none"
+            ? !person.teamId
+            : reportingTeamId(person.teamId, teams) === teamFilter.slice(5))),
+    )
+    .sort((a, b) => (peopleSort === "reverse" ? byName(b, a) : byName(a, b)));
+  const resetPeopleFilters = () => {
+    setQuery("");
+    setSourceFilter("");
+    setStatusFilter("");
+    setTeamFilter("");
+    setPage(1);
+  };
+  const peopleFilters: AppliedFilter[] = [];
+  if (sourceFilter)
+    peopleFilters.push({
+      id: "source",
+      label: sourceFilter === "direct" ? "Direct" : "Team",
+      onRemove: () => {
+        setSourceFilter("");
+        setPage(1);
+      },
+    });
+  if (statusFilter)
+    peopleFilters.push({
+      id: "status",
+      label: statusFilter === "active" ? "Active" : "Inactive",
+      onRemove: () => {
+        setStatusFilter("");
+        setPage(1);
+      },
+    });
+  if (teamFilter)
+    peopleFilters.push({
+      id: "team",
+      label:
+        teamFilter === "none"
+          ? "No direct team"
+          : teams.find((team) => team.id === teamFilter.slice(5))?.name ||
+            "Team",
+      onRemove: () => {
+        setTeamFilter("");
+        setPage(1);
+      },
+    });
+  const filteredItems = items.filter((item) => {
+    if (item.kind === "course")
+      return matches(
+        content.find((candidate) => candidate.id === item.id)?.title ||
+          "Unavailable course",
+      );
+    const curriculum = curricula.find((candidate) => candidate.id === item.id);
+    return matches(
+      [
+        curriculum?.name || "Unavailable curriculum",
+        ...(curriculum?.courseIds || []).map(
+          (id) => content.find((candidate) => candidate.id === id)?.title || "",
+        ),
+      ].join(" "),
+    );
+  });
+  const updates = group
+    ? sortGroupBrowseItems(
+        published
+          .filter(
+            (item) =>
+              item.kind === "brief" &&
+              item.groups.includes(group.id) &&
+              matches(item.title),
+          )
+          .map((item) => ({ ...item, name: item.title })),
+        updateSort,
+      )
+    : [];
+  const count = tab === "people" ? filteredMembers.length : updates.length;
+  const currentPage = Math.min(page, Math.max(1, Math.ceil(count / PAGE_SIZE)));
+  const pageMembers = filteredMembers.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+  const rosterSelection = useBulkSelection(
+    JSON.stringify([
+      group?.id,
+      tab,
+      query,
+      sourceFilter,
+      statusFilter,
+      teamFilter,
+    ]),
+    filteredMembers.map((person) => person.id),
+  );
+  const membershipValue = (value: Extract<Editor, { kind: "membership" }>) =>
+    JSON.stringify([
+      sorted(value.teams),
+      sorted(value.people),
+      sorted(value.expanded),
+    ]);
+  const dirty =
+    !!editor &&
+    (editor.kind === "create" || editor.kind === "rename"
+      ? editor.name !== editor.original
+      : editor.kind === "membership"
+        ? membershipValue(editor) !== editor.original
+        : editor.kind === "learning" || editor.kind === "updates"
+          ? editor.ids.length > 0
+          : false);
+  guard.current = async () =>
+    !saving.current &&
+    (!dirty || (await confirm("Discard unsaved learning group changes?")));
+  useEffect(() => {
+    registerNavigationGuard?.(() => guard.current(), {
+      protected: dirty || busy,
+    });
+    return () => registerNavigationGuard?.(null);
+  }, [registerNavigationGuard, dirty, busy]);
+  useEffect(() => {
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (dirty || saving.current) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => window.removeEventListener("beforeunload", beforeUnload);
+  }, [dirty]);
+  useEffect(() => {
+    if (group || !returnToGroup) return;
+    const frame = requestAnimationFrame(() => {
+      const row = Array.from(
+        destination.targetProps.ref.current?.querySelectorAll<HTMLButtonElement>(
+          "[data-group-id]",
+        ) || [],
+      ).find((button) => button.dataset.groupId === returnToGroup);
+      if (row) {
+        row.focus({ preventScroll: true });
+        // Leave breathing room so the save toast cannot cover the revealed row.
+        row.scrollIntoView({ block: "center", inline: "nearest" });
+      } else
+        destination.targetProps.ref.current?.focus({ preventScroll: true });
+      setReturnToGroup("");
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [group, returnToGroup, destination.targetProps.ref]);
+  const organizationSnapshot = () =>
+    JSON.stringify([data.groups, data.teams, data.users]);
+  const learningSnapshot = () => JSON.stringify([group, content, curricula]);
+  const rosterSnapshot = organizationSnapshot();
+  const currentOrganization = useRef(rosterSnapshot);
+  currentOrganization.current = rosterSnapshot;
+  const indexSnapshot = useMemo(
+    () =>
+      JSON.stringify([
+        data.groups,
+        data.teams,
+        data.users,
+        data.content,
+        data.publishedContent,
+        data.curricula,
+        data.settings,
+        data.pendingUsers,
+        data.progress,
+        data.revision,
+        data.governanceRevision,
+      ]),
+    [data],
+  );
+  const currentIndexSnapshot = useRef(indexSnapshot);
+  currentIndexSnapshot.current = indexSnapshot;
+
+  async function run(action: () => void | Promise<void>, message: string) {
+    if (saving.current) return false;
+    saving.current = true;
     setBusy(true);
     setNotice("");
     try {
-      await onChange(next, { locallyHandled: true });
-      setNotice("");
+      await action();
       notify(message);
       return true;
-    } catch (e) {
-      if (e instanceof SaveRecoveryError) {
-        const reference = e.message.match(/Reference: ([a-f0-9-]{36})\./)?.[1];
+    } catch (error) {
+      if (isOrganizationChangeCanceled(error)) return false;
+      if (error instanceof SaveRecoveryError)
         setNotice(
-          `Couldn't save this group. ${e.snapshot ? "Check the current list before trying again." : "Refresh before trying again."}${reference ? ` Reference: ${reference}.` : ""}`,
+          `Couldn't save this group. ${error.snapshot ? "Check the current list before trying again." : "Refresh before trying again."} ${error.message}`,
         );
-      } else {
-        setNotice((e as Error).message);
-      }
+      else
+        setNotice(
+          error instanceof Error ? error.message : "Could not save. Try again.",
+        );
       return false;
     } finally {
+      saving.current = false;
       setBusy(false);
     }
   }
-  async function bulkSave(next: Workspace) {
+  const save = (
+    next: Workspace,
+    message = "Learning group saved.",
+    options?: OrganizationChangeOptions,
+  ) => run(() => onChange(next, { locallyHandled: true, ...options }), message);
+  const changeGroup = (patch: Partial<Group>, message?: string) =>
+    group
+      ? save(
+          {
+            ...data,
+            groups: data.groups.map((candidate) =>
+              candidate.id === group.id
+                ? { ...candidate, ...patch }
+                : candidate,
+            ),
+          },
+          message,
+        )
+      : Promise.resolve(false);
+  const learnMany = async (
+    actions: import("@/lib/learning").LearningAction[],
+  ) => {
+    if (onLearningMany) await onLearningMany(actions);
+    else for (const action of actions) await onLearning(action);
+  };
+  function open(next: Editor) {
     setNotice("");
-    await onChange(next, { locallyHandled: true });
-    return true;
+    setEditor(next);
   }
-  const bulkChangeGroup = (patch: Partial<Group>) =>
-    group &&
-    bulkSave({
-      ...data,
-      groups: data.groups.map((g) =>
-        g.id === group.id ? { ...g, ...patch } : g,
-      ),
-    });
-  const changeGroup = (patch: Partial<Group>) =>
-    group &&
-    save({
-      ...data,
-      groups: data.groups.map((g) =>
-        g.id === group.id ? { ...g, ...patch } : g,
-      ),
-    });
-  async function deleteGroup(g: Group) {
-    const members = data.users.filter((u) =>
-      effectiveGroups(u, data.groups).has(g.id),
-    ).length;
+  async function close() {
+    if (await guard.current()) {
+      setEditor(null);
+      setNotice("");
+    }
+  }
+  function openGroup(id: string) {
+    resetPeopleFilters();
+    setSelected(id);
+    setTab("people");
+    setQuery("");
+    setPage(1);
+    setNotice("");
+    destination.reveal();
+  }
+  function openMembership() {
+    if (!group) return;
+    const links = groupTeamLinks(group);
+    const draft: Extract<Editor, { kind: "membership" }> = {
+      kind: "membership",
+      teams: [...new Set(links.map((link) => link.teamId))],
+      people: data.users
+        .filter((person) => person.groups.includes(group.id))
+        .map((person) => person.id),
+      legacy: links
+        .filter((link) => link.scope === "direct")
+        .map((link) => link.teamId),
+      expanded: [],
+      original: "",
+      snapshot: organizationSnapshot(),
+    };
+    draft.original = membershipValue(draft);
+    setSourceTab("people");
+    open(draft);
+  }
+  async function deleteGroup() {
+    if (!group) return;
     if (
-      !(await confirm(
-        `Delete ${g.name}? This removes its assignments and audience tags for ${members} people. Child groups move to its parent. Courses and learning history are preserved.`,
-      ))
-    )
-      return;
-    const ok = await save(
-      {
-        ...data,
-        groups: data.groups
-          .filter((x) => x.id !== g.id)
-          .map((x) =>
-            x.parentId === g.id ? { ...x, parentId: g.parentId } : x,
-          ),
-        users: data.users.map((u) => ({
-          ...u,
-          groups: u.groups.filter((id) => id !== g.id),
-        })),
-      },
-      "Learning group deleted. Learning history preserved.",
-    );
-    if (ok) {
+      await save(
+        {
+          ...data,
+          groups: data.groups.filter((candidate) => candidate.id !== group.id),
+          users: data.users.map((person) => ({
+            ...person,
+            groups: person.groups.filter((id) => id !== group.id),
+          })),
+        },
+        "Learning group deleted.",
+        {
+          review: {
+            title: `Delete ${group.name}?`,
+            description:
+              "Remove this learning group and its audience links. Courses and saved completions remain.",
+            confirmLabel: "Delete group",
+            always: true,
+          },
+        },
+      )
+    ) {
       setSelected("");
       destination.reveal();
     }
   }
-  const matches = (name: string) =>
-    name.toLowerCase().includes(query.trim().toLowerCase());
-  const linkedTeams = (data.teams || []).filter((t) =>
-    group?.teamIds?.includes(t.id),
-  ).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
-  const groupMembers = data.users.filter(
-    (u) =>
-      group &&
-      effectiveGroups(u, data.groups).has(group.id) &&
-      matches(u.name + " " + u.email),
-  ).sort((a, b) => (memberSort === "reverse" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id));
-  const groupUpdates = sortGroupBrowseItems(
-    published
-      .filter(
-        (c) =>
-          c.kind === "brief" &&
-          group &&
-          c.groups.includes(group.id) &&
-          matches(c.title),
+  async function applyEditor() {
+    if (!editor) return;
+    if (editor.kind === "create" || editor.kind === "rename") {
+      const name = editor.name.trim();
+      if (!name) {
+        setNotice("Enter a group name.");
+        return;
+      }
+      if (
+        data.groups.some(
+          (candidate) =>
+            candidate.id !==
+              (editor.kind === "rename" ? group?.id : undefined) &&
+            candidate.name.toLowerCase() === name.toLowerCase(),
+        )
+      ) {
+        setNotice("That group name is already in use.");
+        return;
+      }
+      const id = editor.kind === "create" ? crypto.randomUUID() : group?.id;
+      if (!id) return;
+      const next =
+        editor.kind === "create"
+          ? [...data.groups, { id, name, learningItems: [], teamIds: [] }]
+          : data.groups.map((candidate) =>
+              candidate.id === id ? { ...candidate, name } : candidate,
+            );
+      if (
+        await save(
+          { ...data, groups: next },
+          editor.kind === "create"
+            ? "Learning group created."
+            : "Learning group renamed.",
+        )
+      ) {
+        setEditor(null);
+        if (editor.kind === "create") {
+          clearIndexFilters();
+          setSelected("");
+          groupSelection.setSelected([]);
+          setIndexPage(
+            Math.floor(
+              orderGroups(next).findIndex((candidate) => candidate.id === id) /
+                PAGE_SIZE,
+            ) + 1,
+          );
+          createdGroupCloseFocus.current = id;
+        }
+      }
+      return;
+    }
+    if (!group) return;
+    if (editor.kind === "membership") {
+      if (editor.snapshot !== organizationSnapshot()) {
+        setNotice(
+          "People, teams or groups changed. Close this editor and review membership again.",
+        );
+        return;
+      }
+      const legacyDirectTeamIds = editor.teams.filter(
+        (id) => editor.legacy.includes(id) && !editor.expanded.includes(id),
+      );
+      const teamIds = editor.teams.filter(
+        (id) => !legacyDirectTeamIds.includes(id),
+      );
+      if (
+        await save(
+          {
+            ...data,
+            groups: data.groups.map((candidate) =>
+              candidate.id === group.id
+                ? {
+                    ...candidate,
+                    teamIds,
+                    legacyDirectTeamIds,
+                    teamLinkScope: "subtree" as const,
+                  }
+                : candidate,
+            ),
+            users: data.users.map((person) => ({
+              ...person,
+              groups: editor.people.includes(person.id)
+                ? [...new Set([...person.groups, group.id])]
+                : person.groups.filter((id) => id !== group.id),
+            })),
+          },
+          "Membership saved.",
+        )
       )
-      .map((c) => ({ ...c, name: c.title })),
-    updateSort,
-  );
-  const teamSelection = useBulkSelection(
-    selected + tab,
-    linkedTeams.map((t) => t.id),
-  );
-  const peopleSelection = useBulkSelection(
-    selected + tab + query,
-    groupMembers.map((u) => u.id),
-    groupMembers
-      .filter((u) => group && u.groups.includes(group.id))
-      .map((u) => u.id),
-  );
-  const learningSelection = useBulkSelection(selected + tab, items.map(key));
-  const updateSelection = useBulkSelection(
-    selected + tab + query,
-    groupUpdates.map((c) => c.id),
-  );
-  const hierarchyItems = [...data.groups].sort((a, b) => a.name.localeCompare(b.name)).map((g) => ({
-              id: g.id,
-              parentId: g.parentId,
-              label: g.name,
-              description: groupPath(g.id, data.groups),
-              meta: `${data.users.filter((u) => u.active && effectiveGroups(u, data.groups).has(g.id)).length} active people · ${data.groups.filter((child) => child.parentId === g.id).length} child groups · ${expandLearning(groupItems(g, content), curricula).filter((id) => published.some((c) => c.id === id)).length} direct assigned courses`,
-            }));
-  const overviewSelection = useBulkSelection(
-    selected + hierarchyQuery,
-    hierarchyMatches(hierarchyItems, hierarchyQuery).map((item) => item.id),
-  );
-  const parentGroups = group ? [...data.groups]
-    .filter((g) => g.id !== group.id && canParent(group.id, g.id, data.groups))
-    .sort((a, b) => groupPath(a.id, data.groups).localeCompare(groupPath(b.id, data.groups))) : [];
-  const selectedMove = group && moveParent !== null ? (() => {
-    try { return groupMoveImpact(data, group.id, moveParent || undefined); }
-    catch { return null; }
-  })() : null;
-  const childGroups = group ? data.groups.filter((g) => g.parentId === group.id).sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)) : [];
-  const inheritedGroups = group ? [...data.groups].filter((g) => g.id !== group.id && canParent(g.id, group.id, data.groups) === false) : [];
-  function closeCreate() {
-    if (busy) return;
-    setCreateOpen(false);
-    setName("");
-    setCreateParent("");
-    setNotice("");
+        setEditor(null);
+      return;
+    }
+    if (editor.kind !== "learning" && editor.kind !== "updates") return;
+    if (editor.snapshot !== learningSnapshot()) {
+      setNotice(
+        "This group's learning or content changed. Close this picker and review your selection again.",
+      );
+      return;
+    }
+    if (editor.kind === "learning") {
+      const additions = editor.ids
+        .filter((id) => learningOptions.some((option) => option.id === id))
+        .map((id) => ({
+          kind: id.startsWith("course:")
+            ? ("course" as const)
+            : ("curriculum" as const),
+          id: id.slice(id.indexOf(":") + 1),
+        }));
+      if (
+        await changeGroup(
+          { learningItems: [...items, ...additions] },
+          "Learning added.",
+        )
+      )
+        setEditor(null);
+    } else if (
+      await run(
+        () =>
+          learnMany(
+            editor.ids.map((contentId) => ({
+              operation: "target",
+              contentId,
+              groupId: group.id,
+              expected:
+                data.content.find((item) => item.id === contentId)?.revision ||
+                0,
+            })),
+          ),
+        "Updates added.",
+      )
+    )
+      setEditor(null);
   }
+  const learningOptions: ContentSelectionOption[] = [
+    ...published
+      .filter((item) => item.kind === "course")
+      .map((item) => ({
+        id: `course:${item.id}`,
+        label: item.title,
+        type: "course" as const,
+        description: item.summary,
+        category: item.category,
+        updatedAt: item.updatedAt,
+        searchText: searchableContent.get(item.id),
+      })),
+    ...curricula
+      .filter((item) => item.status === "published")
+      .map((item) => ({
+        id: `curriculum:${item.id}`,
+        label: item.name,
+        type: "curriculum" as const,
+        description: item.description,
+        searchText: item.courseIds
+          .filter((id) =>
+            published.some(
+              (course) => course.id === id && course.kind === "course",
+            ),
+          )
+          .map((id) => searchableContent.get(id) || "")
+          .join(" "),
+      })),
+  ].filter((option) => !items.some((item) => key(item) === option.id));
+  const updateOptions: ContentSelectionOption[] = published
+    .filter(
+      (item) =>
+        item.kind === "brief" && group && !item.groups.includes(group.id),
+    )
+    .map((item) => ({
+      id: item.id,
+      label: item.title,
+      type: "update" as const,
+      description: item.summary,
+      category: item.category,
+      updatedAt: item.updatedAt,
+      searchText: searchableContent.get(item.id),
+    }));
+  const modalTitle = !editor
+    ? ""
+    : editor.kind === "create"
+      ? "Create learning group"
+      : editor.kind === "rename"
+        ? "Rename learning group"
+        : editor.kind === "membership"
+          ? "Add Members"
+          : editor.kind === "learning"
+            ? "Assign Courses"
+            : "Assign Updates";
+  const modalDescription = !editor
+    ? ""
+    : editor.kind === "create" || editor.kind === "rename"
+      ? "Use a unique name for this audience."
+      : editor.kind === "membership"
+        ? `Choose people or teams to include in ${group?.name}. Clear an existing selection to remove that membership source.`
+        : editor.kind === "learning"
+          ? `Assign courses or curricula to ${group?.name}. Overlapping courses count once.`
+          : `Choose relevant Updates for ${group?.name}.`;
+  const modalAction =
+    editor?.kind === "create"
+      ? "Create group"
+      : editor?.kind === "rename"
+        ? "Save name"
+        : editor?.kind === "membership"
+          ? "Review changes"
+          : editor?.kind === "learning"
+            ? "Review assignment"
+            : "Review changes";
+
   return (
     <section
       {...destination.targetProps}
-      aria-label={group ? group.name : "Learning groups"}
       className="learning-admin"
+      aria-label={group?.name || "Learning groups"}
     >
-      {notice && !createOpen && <Alert variant="destructive">{notice}</Alert>}
+      {notice && !editor && <Alert variant="destructive">{notice}</Alert>}
+      {needsConversion && (
+        <Alert>
+          These groups still use the previous hierarchy. Convert learning groups
+          before editing their audiences or learning.
+        </Alert>
+      )}
       {!group ? (
         <>
           <SectionHeader
             variant="page"
             title={<h2>Learning groups</h2>}
-            description={
-              <>
-                Choose who courses and updates are for. Everyone can explore the
-                full library.
-              </>
-            }
-          ></SectionHeader>
-          <HierarchyList
-            query={hierarchyQuery}
-            onQueryChange={setHierarchyQuery}
-            selectionActions={
-<BulkActions
-            singleItemActions={false}
-            collectionSize={overviewSelection.collectionSize}
-            selected={overviewSelection.actionIds}
-            onSelectionChange={overviewSelection.setSelected}
-            noun="groups"
-            commands={groupLearningCommands(
-              data,
-              overviewSelection.actionIds,
-              onChange,
-              learnMany,
-            ).concat([{
-              id: "move",
-              label: "Move selected groups",
-              description: "Move each selected branch to one parent. Child groups follow their parent; inherited learning and Update relevance may change. Direct links and history stay attached.",
-              options: [{ id: "root", label: "Top level" }, ...data.groups.map((g) => ({ id: g.id, label: groupPath(g.id, data.groups) }))],
-              selectionMode: "single" as const,
-              review: (values: string[], ids: string[]) => {
-                try {
-                  if (ids.some((id) => [...ancestorIds(id, data.groups)].some((ancestor) => ancestor !== id && ids.includes(ancestor))))
-                    throw new Error("Select a parent or a descendant, not both.");
-                  const destination = values[0] === "root" ? undefined : values[0];
-                  let working = data;
-                  const impacts = ids.map((id) => {
-                    const impact = groupMoveImpact(working, id, destination);
-                    working = { ...working, groups: impact.next };
-                    return impact;
-                  });
-                  return <ul className="text-copy">{impacts.map((impact) => <li key={impact.from}>{impact.from} → {impact.to} · {impact.branch.length} groups · {impact.gainedCourses} new / {impact.lostCourses} removed effective course assignments · {impact.gainedUpdates} added / {impact.lostUpdates} removed Update links{impact.guest && ` · guest recommendations: ${impact.guest.gainedCourses} added / ${impact.guest.lostCourses} removed courses`}</li>)}</ul>;
-                } catch (error) { return <p role="alert">{(error as Error).message}</p>; }
-              },
-              apply: async (values: string[], ids: string[] = []) => {
-                if (ids.some((id) => [...ancestorIds(id, data.groups)].some((ancestor) => ancestor !== id && ids.includes(ancestor))))
-                  throw new Error("Select either a parent or its child group, not both.");
-                const destination = values[0] === "root" ? undefined : values[0];
-                let next = data.groups;
-                for (const id of ids) next = moveGroup(next, id, destination);
-                await onChange({ ...data, groups: next }, { locallyHandled: true });
-              },
-            }])}
+            description="Choose an audience, then choose its learning. Published content remains available to everyone with access."
           />
+          <CollectionControls
+            filters={indexFilters}
+            onClear={clearIndexFilters}
+            sortLabel={indexSortLabels[indexSort]}
+            sort={
+              <FormField label="Sort learning groups">
+                <SelectField
+                  value={indexSort}
+                  onValueChange={(value) => {
+                    setIndexSort(value);
+                    setIndexPage(1);
+                  }}
+                >
+                  {Object.entries(indexSortLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </SelectField>
+              </FormField>
             }
-            label="Learning groups"
-            searchAction={
-              <Button type="button" disabled={busy} onClick={() => { setCreateParent(""); setNotice(""); setCreateOpen(true); }}>
+            primaryAction={
+              <Button
+                type="button"
+                disabled={busy || needsConversion}
+                onClick={() => open({ kind: "create", name: "", original: "" })}
+              >
                 <Plus aria-hidden="true" />
                 Create group
               </Button>
             }
-            items={hierarchyItems}
-            selected={overviewSelection.selected}
-            onSelectionChange={overviewSelection.setSelected}
-            disabled={busy}
-            onOpen={(id) => { setSelected(id); destination.reveal(); setQuery(""); setNotice(""); }}
+            search={
+              <FormField label="Find a group" visuallyHiddenLabel>
+                <Input
+                  type="search"
+                  placeholder="Find a group"
+                  value={indexQuery}
+                  onChange={(event) => {
+                    setIndexQuery(event.target.value);
+                    setIndexPage(1);
+                  }}
+                />
+              </FormField>
+            }
+          >
+            <FormField label="Group membership">
+              <SelectField
+                value={indexPeople}
+                onValueChange={(value) => {
+                  setIndexPeople(value);
+                  setIndexPage(1);
+                }}
+              >
+                <option value="">Any membership</option>
+                <option value="with">With people</option>
+                <option value="without">No people</option>
+              </SelectField>
+            </FormField>
+            <FormField label="Group courses">
+              <SelectField
+                value={indexCourses}
+                onValueChange={(value) => {
+                  setIndexCourses(value);
+                  setIndexPage(1);
+                }}
+              >
+                <option value="">Any assigned courses</option>
+                <option value="with">With assigned courses</option>
+                <option value="without">No assigned courses</option>
+              </SelectField>
+            </FormField>
+          </CollectionControls>
+          <BulkActions
+            selected={groupSelection.actionIds}
+            collectionSize={groups.length}
+            singleItemActions={false}
+            noun="groups"
+            range={
+              groups.length
+                ? `${(groupPage - 1) * PAGE_SIZE + 1}–${Math.min(groupPage * PAGE_SIZE, groups.length)} of ${groups.length} groups`
+                : "0 groups"
+            }
+            onSelectionChange={groupSelection.setSelected}
+            commands={[
+              {
+                id: "delete-groups",
+                label: "Delete groups",
+                description:
+                  "Remove selected learning groups and their audience links. Courses and saved completions remain.",
+                destructive: true,
+                externalReview: true,
+                disabledReason:
+                  busy || needsConversion
+                    ? "Finish the current change first."
+                    : undefined,
+                successMessage: "Learning groups deleted.",
+                apply: async (_, ids = []) => {
+                  if (
+                    currentIndexSnapshot.current !== indexSnapshot ||
+                    ids.some(
+                      (id) =>
+                        !data.groups.some((candidate) => candidate.id === id),
+                    )
+                  )
+                    throw new Error(
+                      "Groups, people or learning changed. Review the current list before retrying.",
+                    );
+                  if (saving.current)
+                    throw new Error("Finish the current change first.");
+                  saving.current = true;
+                  setBusy(true);
+                  try {
+                    const deleting = new Set(ids);
+                    await onChange(
+                      {
+                        ...data,
+                        groups: data.groups.filter(
+                          (candidate) => !deleting.has(candidate.id),
+                        ),
+                        users: data.users.map((person) => ({
+                          ...person,
+                          groups: person.groups.filter(
+                            (id) => !deleting.has(id),
+                          ),
+                        })),
+                      },
+                      {
+                        locallyHandled: true,
+                        validateCurrent: () => {
+                          if (currentIndexSnapshot.current !== indexSnapshot)
+                            throw new Error(
+                              "Groups, people or learning changed. Review the current list before retrying.",
+                            );
+                        },
+                        review: {
+                          title: `Delete ${ids.length} learning ${ids.length === 1 ? "group" : "groups"}?`,
+                          description: `${data.groups
+                            .filter((candidate) => deleting.has(candidate.id))
+                            .map((candidate) => candidate.name)
+                            .join(
+                              ", ",
+                            )}. Remove these groups and their audience links. Courses and saved completions remain.`,
+                          confirmLabel:
+                            ids.length === 1 ? "Delete group" : "Delete groups",
+                          always: true,
+                        },
+                      },
+                    );
+                  } finally {
+                    saving.current = false;
+                    setBusy(false);
+                  }
+                },
+              },
+            ]}
+          >
+            {groupSelection.canSelect &&
+              pageGroups.every((candidate) =>
+                groupSelection.selected.includes(candidate.id),
+              ) &&
+              groupSelection.selected.length < groups.length && (
+                <Button
+                  type="button"
+                  variant="link"
+                  onClick={() =>
+                    groupSelection.setSelected(
+                      groups.map((candidate) => candidate.id),
+                    )
+                  }
+                >
+                  Select all {groups.length} matching
+                </Button>
+              )}
+          </BulkActions>
+
+          {groups.length ? (
+            <TableContainer>
+              <DataTable
+                layout="learningGroupsSelectable"
+                aria-label="Learning groups"
+              >
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      {groupSelection.canSelect && (
+                        <SelectRows
+                          ids={pageGroups.map((candidate) => candidate.id)}
+                          value={groupSelection.selected}
+                          onChange={groupSelection.setSelected}
+                          label={`Select page (${pageGroups.length})`}
+                        />
+                      )}
+                    </TableHead>
+                    <TableHead>Group</TableHead>
+                    <TableHead className="text-right">People</TableHead>
+                    <TableHead className="text-right">Courses</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pageGroups.map((candidate) => {
+                    const links = groupTeamLinks(candidate),
+                      direct = data.users.filter((person) =>
+                        person.groups.includes(candidate.id),
+                      ).length;
+                    return (
+                      <TableRow key={candidate.id}>
+                        <TableCell>
+                          {groupSelection.canSelect && (
+                            <Checkbox
+                              aria-label={`Select ${candidate.name}`}
+                              checked={groupSelection.selected.includes(
+                                candidate.id,
+                              )}
+                              disabled={busy}
+                              onCheckedChange={(checked) =>
+                                groupSelection.toggle(
+                                  candidate.id,
+                                  checked === true,
+                                )
+                              }
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            type="button"
+                            variant="link"
+                            data-group-id={candidate.id}
+                            onClick={() => openGroup(candidate.id)}
+                          >
+                            {candidate.name}
+                          </Button>
+                          <p className="text-copy text-muted-foreground">
+                            {links.length
+                              ? `${links.length} linked ${links.length === 1 ? "team" : "teams"}`
+                              : ""}
+                            {links.length && direct ? " · " : ""}
+                            {direct
+                              ? `${direct} individually added`
+                              : !links.length
+                                ? "No members yet"
+                                : ""}
+                          </p>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {membersOf(candidate).length}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {courseCount(candidate)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </DataTable>
+            </TableContainer>
+          ) : (
+            <CollectionEmpty
+              count={0}
+              total={data.groups.length}
+              noun="learning groups"
+              onClear={clearIndexFilters}
+            />
+          )}
+          <Pagination
+            showCount={false}
+            label="Learning groups"
+            page={groupPage}
+            pageSize={PAGE_SIZE}
+            total={groups.length}
+            onPageChange={setIndexPage}
           />
         </>
       ) : (
         <>
           <DetailNavigation
+            current={group.name}
             disabled={busy}
             items={[
-              { label: "All learning groups", onSelect: () => {
-                setSelected("");
-                destination.reveal();
-                setQuery("");
-                setMoveParent(null);
-              } },
-              ...(group.parentId ? [{
-                label: `Parent: ${groupPath(group.parentId, data.groups)}`,
+              {
+                label: "All learning groups",
                 onSelect: () => {
-                  setSelected(group.parentId!);
-                  destination.reveal();
-                  setQuery("");
+                  setSelected("");
                   setNotice("");
-                  setMoveParent(null);
+                  destination.reveal();
                 },
-              }] : []),
+              },
             ]}
-            current={group.name}
           />
           <SectionHeader
             variant="page"
             title={<h2>{group.name}</h2>}
-            description={
-              <>Members receive this group’s courses and Updates in For you.</>
-            }
+            description={`${members.length} ${members.length === 1 ? "person" : "people"} · ${courseCount(group)} ${courseCount(group) === 1 ? "course" : "courses"}`}
           >
-            <ActionGroup>
-              <Button
-                disabled={busy}
-                onClick={() => { setCreateParent(group.id); setNotice(""); setCreateOpen(true); }}
-              >
-                <Plus aria-hidden="true" />
-                Add child group
-              </Button>
-              <Button variant="outline" disabled={busy} onClick={() => setMoveParent(group.parentId || "")}>Move group</Button>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={async () => {
-                  const value = (
-                    await prompt("Learning group name", group.name)
-                  )?.trim();
-                  if (value) {
-                    if (
-                      data.groups.some(
-                        (g) =>
-                          g.id !== group.id &&
-                          g.name.toLowerCase() === value.toLowerCase(),
-                      )
-                    ) {
-                      setNotice("That group already exists.");
-                      return;
-                    }
-                    await changeGroup({ name: value });
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Group settings"
+                  disabled={busy || needsConversion}
+                >
+                  <MoreHorizontal aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={() =>
+                    open({
+                      kind: "rename",
+                      name: group.name,
+                      original: group.name,
+                    })
                   }
-                }}
-              >
-                Rename
-              </Button>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => deleteGroup(group)}
-              >
-                Delete group
-              </Button>
-            </ActionGroup>
+                >
+                  Rename group
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onSelect={() => void deleteGroup()}
+                >
+                  Delete group
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </SectionHeader>
-          {moveParent !== null && (
-            <div className="grid gap-3 rounded-lg border border-border p-4">
-              <h3>Review group move</h3>
-              <p className="text-copy text-muted-foreground">The whole child-group branch moves. Direct members, linked teams, and learning history stay attached. Inherited assignments and Update relevance may change.</p>
-              <FormField label="New parent group">
-                <SelectField value={moveParent} onValueChange={setMoveParent} disabled={busy}>
-                  <option value="">Top level</option>
-                  {parentGroups.map((g) => <option key={g.id} value={g.id}>{groupPath(g.id, data.groups)}</option>)}
-                </SelectField>
-              </FormField>
-              {selectedMove ? (
-                <div className="grid gap-1 text-copy">
-                  <p>{selectedMove.from} → {selectedMove.to}</p>
-                  <p>{selectedMove.branch.length} groups in this branch.</p>
-                  <p>{selectedMove.gainedCourses} new and {selectedMove.lostCourses} removed effective course assignments across members; {selectedMove.gainedUpdates} added and {selectedMove.lostUpdates} removed Update relevance links. Overlaps are counted once.</p>
-                  {selectedMove.guest && <p>Guest recommendations: {selectedMove.guest.gainedCourses} added / {selectedMove.guest.lostCourses} removed courses; {selectedMove.guest.gainedUpdates} added / {selectedMove.guest.lostUpdates} removed Updates.</p>}
-                </div>
-              ) : <p role="alert">Choose a different valid parent.</p>}
-              <ActionGroup>
-                <Button variant="outline" disabled={busy} onClick={() => setMoveParent(null)}>Cancel</Button>
-                <Button disabled={busy || !selectedMove} onClick={async () => {
-                  if (!selectedMove) return;
-                  if (await save({ ...data, groups: selectedMove.next }, "Learning group moved.")) setMoveParent(null);
-                }}>Apply move</Button>
-              </ActionGroup>
-            </div>
-          )}
-          <div className="grid gap-2">
-            <div className="flex items-center gap-2"><Button type="button" variant="ghost" size="icon" aria-label={`${childrenOpen ? "Collapse" : "Expand"} child groups`} aria-expanded={childrenOpen} onClick={() => setChildrenOpen((value) => !value)}><ChevronRight className={childrenOpen ? "rotate-90" : ""} aria-hidden="true" /></Button><h3>Child groups · {childGroups.length}</h3></div>
-            {childrenOpen && (childGroups.length ? childGroups.map((child) => (
-              <Button key={child.id} variant="link" className="justify-start" onClick={() => { setSelected(child.id); setMoveParent(null); setQuery(""); setNotice(""); destination.reveal(); }}>
-                {groupPath(child.id, data.groups)}
-              </Button>
-            )) : <p className="text-copy text-muted-foreground">No child groups.</p>)}
-          </div>
           <Tabs
             value={tab}
             onValueChange={(value) => {
               setTab(value);
-              destination.reveal(false);
               setQuery("");
+              setPage(1);
+              setNotice("");
             }}
           >
             <TabsList aria-label="Learning group sections">
-              {["members", "learning", "updates"].map((t) => (
-                <TabsTrigger value={t} key={t}>
-                  {t[0].toUpperCase() + t.slice(1)}
-                </TabsTrigger>
-              ))}
+              <TabsTrigger value="people">People</TabsTrigger>
+              <TabsTrigger value="learning">Assigned Courses</TabsTrigger>
+              <TabsTrigger value="updates">Assigned Updates</TabsTrigger>
             </TabsList>
-            <TabsContent value={tab} key={tab}>
-              <FieldGroup disabled={busy}>
-                {tab === "members" ? (
-                  <>
-                    <p className="text-copy text-muted-foreground">Parent: {group.parentId ? groupPath(group.parentId, data.groups) : "Top level"}. Child-group members are included here; this group’s direct members do not automatically join its children.</p>
-                    <div className="flex items-center gap-2"><Button type="button" variant="ghost" size="icon" aria-label={`${linkedOpen ? "Collapse" : "Expand"} linked teams`} aria-expanded={linkedOpen} onClick={() => setLinkedOpen((value) => !value)}><ChevronRight className={linkedOpen ? "rotate-90" : ""} aria-hidden="true" /></Button><h3>Linked teams · {linkedTeams.length}</h3></div>
-                    <FieldDescription>
-                      Linked teams supply their direct members. Child teams must
-                      be linked separately.
-                    </FieldDescription>
-                    <ActionGroup>
-                      <BulkPicker
-                        title="Add teams"
-                        description="Link the selected teams to this learning group. Their direct members receive its assignments and updates."
-                        options={(data.teams || [])
-                          .filter((t) => !group.teamIds?.includes(t.id))
-                          .map((t) => ({ id: t.id, label: teamPath(t.id, data.teams || []) }))}
-                        onApply={async (ids) => {
-                          if (
-                            !(await bulkChangeGroup({
-                              teamIds: [
-                                ...new Set([...(group.teamIds || []), ...ids]),
-                              ],
-                            }))
-                          )
-                            throw new Error(
-                              "Could not save. Review the group before retrying.",
-                            );
-                        }}
-                        actionLabel="Add teams"
-                      />
-                    </ActionGroup>
-                    {linkedOpen && <><BulkActions
-                      collectionSize={teamSelection.collectionSize}
-                      selected={teamSelection.actionIds}
-                      onSelectionChange={teamSelection.setSelected}
-                      commands={[
-                        {
-                          id: "remove",
-                          label: "Remove team links",
-                          description:
-                            "Remove these direct links. Individual and inherited membership and history remain.",
-                          apply: async () => {
-                            if (
-                              !(await bulkChangeGroup({
-                                teamIds: group.teamIds?.filter(
-                                  (id) => !teamSelection.actionIds.includes(id),
-                                ),
-                              }))
-                            )
-                              throw new Error("Could not save team links.");
-                          },
-                        },
-                      ]}
-                    />
-                    <SelectableRows
-                      label="Linked teams"
-                      rows={linkedTeams.map((t) => ({
-                        id: t.id,
-                        label: teamPath(t.id, data.teams || []),
-                        detail: `${data.users.filter((u) => u.teamId === t.id && u.active).length} direct active people. Child teams are linked separately.`,
-                      }))}
-                      selected={teamSelection.selected}
-                      onChange={teamSelection.setSelected}
-                    /></>}
-                    <h3>People</h3>
-                    <ActionGroup>
-                      <BulkPicker
-                        title="Add people"
-                        description="Add individual memberships. Overlapping team and group assignments are deduplicated."
-                        options={data.users
-                          .filter(
-                            (u) => u.active && !u.groups.includes(group.id),
-                          )
-                          .map((u) => ({
-                            id: u.id,
-                            label: u.name,
-                            description: u.email,
-                          }))}
-                        onApply={async (ids) => {
-                          if (
-                            !(await bulkSave({
-                              ...data,
-                              users: data.users.map((u) =>
-                                ids.includes(u.id)
-                                  ? {
-                                      ...u,
-                                      groups: [
-                                        ...new Set([...u.groups, group.id]),
-                                      ],
-                                    }
-                                  : u,
-                              ),
-                            }))
-                          )
-                            throw new Error(
-                              "Could not save. Review the group before retrying.",
-                            );
-                        }}
-                        actionLabel="Add people"
-                      />
-                    </ActionGroup>
-                    <CollectionControls sortLabel={memberSort === "name" ? "Name A–Z" : "Name Z–A"} sort={<FormField label="Sort group members"><SelectField value={memberSort} onValueChange={setMemberSort}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>} search={                    <FormField label="Find a member">
+            <TabsContent value="learning">
+              <Stack>
+                <SectionHeader
+                  title={<h3>Assigned courses and curricula</h3>}
+                  description="Arrange courses and curricula in the recommended order."
+                />
+                <CollectionControls
+                  search={
+                    <FormField
+                      label="Find an assigned course or curriculum"
+                      visuallyHiddenLabel
+                    >
                       <Input
                         type="search"
+                        placeholder="Find an assigned course or curriculum"
                         value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search name or email"
+                        onChange={(event) => setQuery(event.target.value)}
                       />
-                    </FormField>} filters={query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []} onClear={() => setQuery("")} />
-                    <BulkActions
-                      collectionSize={peopleSelection.collectionSize}
-                      selected={peopleSelection.actionIds}
-                      onSelectionChange={peopleSelection.setSelected}
-                      commands={[
-                        {
-                          id: "remove",
-                          label: "Remove from group",
-                          description:
-                            "Remove direct memberships. People included through a team or child group remain included; history is preserved.",
-                          apply: async () => {
-                            if (
-                              !(await bulkSave({
-                                ...data,
-                                users: data.users.map((u) =>
-                                  peopleSelection.actionIds.includes(u.id)
-                                    ? {
-                                        ...u,
-                                        groups: u.groups.filter(
-                                          (id) => id !== group.id,
-                                        ),
-                                      }
-                                    : u,
-                                ),
-                              }))
-                            )
-                              throw new Error("Could not save memberships.");
-                          },
-                        },
-                      ]}
-                    />
-                    <SelectableRows
-                      label="Group members"
-                      empty={<CollectionEmpty count={groupMembers.length} total={data.users.filter((u) => effectiveGroups(u, data.groups).has(group.id)).length} noun="group members" onClear={() => setQuery("")} />}
-                      scope={query + memberSort}
-                      selected={peopleSelection.selected}
-                      onChange={peopleSelection.setSelected}
-                      rows={groupMembers.map((u) => ({
-                        id: u.id,
-                        label: u.name,
-                        detail: <>{u.email} · {u.active ? "Active" : "Inactive"}<br />{groupMembershipSources(u, group.id, data).join(" · ")}</>,
-                        disabledReason: !u.groups.includes(group.id)
-                          ? "Included through a team or child group; manage that source to remove membership."
-                          : undefined,
-                      }))}
-                    />
-                    <p className="text-copy text-muted-foreground">{groupMembers.filter((u) => u.active).length} active · {groupMembers.filter((u) => !u.active).length} inactive · {(data.pendingUsers || []).filter((u) => u.groups.includes(group.id) || (!!u.teamId && !!group.teamIds?.includes(u.teamId))).length} pending direct memberships</p>
-                  </>
-                ) : tab === "learning" ? (
-                  <>
-                    <h3>Recommended sequence</h3>
-                    <ActionGroup>
-                      <BulkPicker
-                        title="Add courses or curricula"
-                        description="Append selected items to the recommended sequence. Overlapping courses count once."
-                        options={[
-                          ...published
-                            .filter((c) => c.kind === "course")
-                            .map((c) => ({
-                              id: `course:${c.id}`,
-                              label: c.title,
-                              description: "Course",
-                            })),
-                          ...curricula
-                            .filter((c) => c.status === "published")
-                            .map((c) => ({
-                              id: `curriculum:${c.id}`,
-                              label: c.name,
-                              description: "Curriculum",
-                            })),
-                        ].filter((o) => !items.some((i) => key(i) === o.id))}
-                        onApply={async (ids) => {
-                          if (
-                            !(await bulkChangeGroup({
-                              learningItems: [
-                                ...items,
-                                ...ids.map((id) => ({
-                                  kind: id.startsWith("course:")
-                                    ? ("course" as const)
-                                    : ("curriculum" as const),
-                                  id: id.slice(id.indexOf(":") + 1),
-                                })),
-                              ],
-                            }))
+                    </FormField>
+                  }
+                  primaryAction={
+                    <Button
+                      type="button"
+                      disabled={
+                        busy || needsConversion || !learningOptions.length
+                      }
+                      onClick={() =>
+                        open({
+                          kind: "learning",
+                          ids: [],
+                          snapshot: learningSnapshot(),
+                        })
+                      }
+                    >
+                      <Plus aria-hidden="true" />
+                      Assign Courses
+                    </Button>
+                  }
+                />
+                <OrderedLearning
+                  items={filteredItems.map((item) => {
+                    const curriculum =
+                      item.kind === "curriculum"
+                        ? curricula.find(
+                            (candidate) => candidate.id === item.id,
                           )
-                            throw new Error("Could not save the sequence.");
+                        : undefined;
+                    return {
+                      id: key(item),
+                      label:
+                        item.kind === "course"
+                          ? content.find(
+                              (candidate) => candidate.id === item.id,
+                            )?.title || "Unavailable course"
+                          : curriculum?.name || "Unavailable curriculum",
+                      detail: curriculum ? (
+                        <details>
+                          <summary className="text-copy text-muted-foreground">
+                            Curriculum · {curriculum.courseIds.length} courses
+                          </summary>
+                          <ul className="list-disc ps-5 text-copy">
+                            {curriculum.courseIds.map((id) => (
+                              <li key={id}>
+                                {content.find(
+                                  (candidate) => candidate.id === id,
+                                )?.title || "Unavailable course"}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      ) : (
+                        "Course"
+                      ),
+                    };
+                  })}
+                  disabled={busy || needsConversion}
+                  reorderDisabled={!!query.trim()}
+                  onReorder={(ids) =>
+                    void changeGroup(
+                      {
+                        learningItems: ids.map((id) =>
+                          items.find((item) => key(item) === id)!,
+                        ),
+                      },
+                      "Learning order saved.",
+                    )
+                  }
+                  onRemove={(id) =>
+                    void changeGroup(
+                      {
+                        learningItems: items.filter((item) => key(item) !== id),
+                      },
+                      "Learning removed from group.",
+                    )
+                  }
+                />
+                {!filteredItems.length &&
+                  (items.length ? (
+                    <CollectionEmpty
+                      count={0}
+                      total={items.length}
+                      noun="assigned courses or curricula"
+                      onClear={() => setQuery("")}
+                    />
+                  ) : (
+                    <EmptyState>
+                      Assign courses or a curriculum to this audience.
+                    </EmptyState>
+                  ))}
+              </Stack>
+            </TabsContent>
+            <TabsContent value="people">
+              <Stack>
+                <SectionHeader
+                  title={<h3>People in this group</h3>}
+                  description="People can be included through a team, individually, or both."
+                />
+                <CollectionControls
+                  filters={peopleFilters}
+                  onClear={resetPeopleFilters}
+                  sortLabel={peopleSort === "name" ? "Name A–Z" : "Name Z–A"}
+                  sort={
+                    <FormField label="Sort people">
+                      <SelectField
+                        value={peopleSort}
+                        onValueChange={setPeopleSort}
+                      >
+                        <option value="name">Name A–Z</option>
+                        <option value="reverse">Name Z–A</option>
+                      </SelectField>
+                    </FormField>
+                  }
+                  primaryAction={
+                    <Button
+                      type="button"
+                      disabled={busy || needsConversion}
+                      onClick={openMembership}
+                    >
+                      <Plus aria-hidden="true" />
+                      Add Members
+                    </Button>
+                  }
+                  search={
+                    <FormField label="Find a person" visuallyHiddenLabel>
+                      <Input
+                        type="search"
+                        placeholder="Search name, email or team"
+                        value={query}
+                        onChange={(event) => {
+                          setQuery(event.target.value);
+                          setPage(1);
                         }}
-                        actionLabel="Add items"
                       />
-                    </ActionGroup>
-                    <FieldDescription>
-                      Add courses or reusable curricula. Reorder to recommend
-                      what to take next. Every course stays available.
-                    </FieldDescription>
-                    {group.parentId && (
-                      <Note>
-                        Courses from parent groups come first. Manage them in their owning group.
-                      </Note>
-                    )}
-                    {inheritedGroups.filter((g) => groupItems(g, content).length).map((owner) => (
-                      <div key={owner.id} className="rounded-md border border-border p-3 text-copy">
-                        <p>Inherited from {groupPath(owner.id, data.groups)}</p>
-                        <ul className="list-disc ps-5">
-                          {groupItems(owner, content).map((item) => {
-                            const curriculum = item.kind === "curriculum" ? curricula.find((c) => c.id === item.id) : undefined;
-                            return <li key={key(item)}>{item.kind === "course" ? content.find((c) => c.id === item.id)?.title || "Unavailable course" : `${curriculum?.name || "Unavailable curriculum"} · ${curriculum?.courseIds.map((id) => content.find((c) => c.id === id)?.title || "Unavailable course").join(", ") || "No courses"}`}</li>;
-                          })}
-                        </ul>
-                      </div>
-                    ))}
-                    <BulkActions
-                      singleItemActions={false}
-                      collectionSize={learningSelection.collectionSize}
-                      selected={learningSelection.actionIds}
-                      onSelectionChange={learningSelection.setSelected}
-                      commands={[
-                        {
-                          id: "remove",
-                          label: "Remove from group",
-                          description:
-                            "Remove these direct learning links. Inherited assignments and history remain.",
-                          apply: async () => {
-                            if (
-                              !(await bulkChangeGroup({
-                                learningItems: items.filter(
-                                  (i) =>
-                                    !learningSelection.actionIds.includes(
-                                      key(i),
-                                    ),
-                                ),
-                              }))
-                            )
-                              throw new Error("Could not save learning items.");
-                          },
-                        },
-                      ]}
-                    />
-                    <OrderedLearning
-                      selected={learningSelection.selected}
-                      onSelectionChange={learningSelection.setSelected}
-                      items={items.map((i) => ({
-                        id: key(i),
-                        label:
-                          i.kind === "course"
-                            ? content.find((c) => c.id === i.id)?.title ||
-                              "Unavailable course"
-                            : curricula.find((c) => c.id === i.id)?.name ||
-                              "Unavailable curriculum",
-                        detail:
-                          i.kind === "curriculum"
-                            ? `Curriculum · ${curricula.find((c) => c.id === i.id)?.courseIds.map((id) => content.find((c) => c.id === id)?.title || "Unavailable course").join(", ") || "No courses"}`
-                            : "Course",
-                      }))}
-                      disabled={busy}
-                      onReorder={(ids) =>
-                        changeGroup({
-                          learningItems: ids.map((id) =>
-                            items.find((i) => key(i) === id)!,
-                          ),
-                        })
-                      }
-                      onRemove={(id) =>
-                        changeGroup({
-                          learningItems: items.filter((i) => key(i) !== id),
-                        })
-                      }
-                    />
-                    {!items.length && (
-                      <EmptyState>
-                        No assigned courses yet. Add a course or curriculum
-                        using Add courses or curricula.
-                      </EmptyState>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <h3>Updates for this group</h3>
-                    {inheritedGroups.map((owner) => {
-                      const inherited = published.filter((c) => c.kind === "brief" && c.groups.includes(owner.id));
-                      return inherited.length ? <p key={owner.id} className="text-copy text-muted-foreground">Inherited from {groupPath(owner.id, data.groups)}: {inherited.map((c) => c.title).join(" · ")}</p> : null;
-                    })}
-                    <BulkPicker
-                      title="Add Updates"
-                      description="Add Updates to this group’s For you list. Everyone can still explore published Updates."
-                      options={published
-                        .filter(
-                          (c) =>
-                            c.kind === "brief" && !c.groups.includes(group.id),
-                        )
-                        .map((c) => ({
-                          id: c.id,
-                          label: c.title,
-                          description: c.category,
-                        }))}
-                      onApply={async (ids) => {
-                        await learnMany(
-                          ids.map((contentId) => ({
-                            operation: "target",
-                            contentId,
-                            groupId: group.id,
-                            expected:
-                              data.content.find((c) => c.id === contentId)
-                                ?.revision || 0,
-                          })),
-                        );
+                    </FormField>
+                  }
+                >
+                  <FormField label="Membership source">
+                    <SelectField
+                      value={sourceFilter}
+                      onValueChange={(value) => {
+                        setSourceFilter(value);
+                        setPage(1);
                       }}
-                      actionLabel="Add Updates"
-                    />
-                    <CollectionControls
-                      sortLabel={updateSort === "title" ? "Title A–Z" : updateSort === "created-newest" ? "Created newest first" : updateSort === "created-oldest" ? "Created oldest first" : updateSort === "updated-newest" ? "Updated newest first" : "Updated oldest first"}
-                      sort={                      <FormField label="Sort updates for this group">
+                    >
+                      <option value="">All sources</option>
+                      <option value="direct">Direct</option>
+                      <option value="team">Team</option>
+                    </SelectField>
+                  </FormField>
+                  <FormField label="Person status">
+                    <SelectField
+                      value={statusFilter}
+                      onValueChange={(value) => {
+                        setStatusFilter(value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="">All statuses</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </SelectField>
+                  </FormField>
+                  <FormField label="Reporting team">
+                    <SelectField
+                      value={teamFilter}
+                      onValueChange={(value) => {
+                        setTeamFilter(value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="">All teams</option>
+                      <option value="none">No direct team</option>
+                      {[...teams].sort(byName).map((team) => (
+                        <option key={team.id} value={`team:${team.id}`}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </SelectField>
+                  </FormField>
+                </CollectionControls>
+                <BulkActions
+                  selected={rosterSelection.actionIds}
+                  collectionSize={filteredMembers.length}
+                  singleItemActions={false}
+                  noun="people"
+                  range={
+                    filteredMembers.length
+                      ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredMembers.length)} of ${filteredMembers.length} people`
+                      : "0 people"
+                  }
+                  onSelectionChange={rosterSelection.setSelected}
+                  commands={[
+                    {
+                      id: "remove-direct",
+                      label: "Remove direct members",
+                      description:
+                        "Remove individual membership. Linked team membership stays in place.",
+                      externalReview: true,
+                      destructive: true,
+                      successMessage: "Direct membership removed.",
+                      disabledReason:
+                        busy || needsConversion
+                          ? "Finish the current change first."
+                          : rosterSelection.actionIds.some(
+                                (id) =>
+                                  !members
+                                    .find((person) => person.id === id)
+                                    ?.groups.includes(group.id),
+                              )
+                            ? "Select only people with Direct membership. Team membership is managed through linked teams."
+                            : undefined,
+                      apply: async (_, ids = []) => {
+                        if (currentOrganization.current !== rosterSnapshot)
+                          throw new Error(
+                            "People, teams or groups changed. Review the current list before retrying.",
+                          );
+                        if (saving.current)
+                          throw new Error("Finish the current change first.");
+                        saving.current = true;
+                        setBusy(true);
+                        try {
+                          await onChange(
+                            {
+                              ...data,
+                              users: data.users.map((person) =>
+                                ids.includes(person.id)
+                                  ? {
+                                      ...person,
+                                      groups: person.groups.filter(
+                                        (id) => id !== group.id,
+                                      ),
+                                    }
+                                  : person,
+                              ),
+                            },
+                            {
+                              locallyHandled: true,
+                              review: {
+                                title: "Remove direct members?",
+                                confirmLabel: "Remove direct members",
+                                description:
+                                  "Remove individual membership from this group. Anyone also included through a linked team stays in the group.",
+                                always: true,
+                              },
+                            },
+                          );
+                        } finally {
+                          saving.current = false;
+                          setBusy(false);
+                        }
+                      },
+                    },
+                  ]}
+                >
+                  {rosterSelection.canSelect &&
+                    pageMembers.every((person) =>
+                      rosterSelection.selected.includes(person.id),
+                    ) &&
+                    rosterSelection.selected.length <
+                      filteredMembers.length && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        onClick={() =>
+                          rosterSelection.setSelected(
+                            filteredMembers.map((person) => person.id),
+                          )
+                        }
+                      >
+                        Select all {filteredMembers.length} matching
+                      </Button>
+                    )}
+                </BulkActions>
+
+                {filteredMembers.length ? (
+                  <TableContainer>
+                    <DataTable
+                      layout="groupMembersSelectable"
+                      aria-label="Group members"
+                    >
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>
+                            {rosterSelection.canSelect && (
+                              <SelectRows
+                                ids={pageMembers.map((person) => person.id)}
+                                value={rosterSelection.selected}
+                                onChange={rosterSelection.setSelected}
+                                label={`Select page (${pageMembers.length})`}
+                              />
+                            )}
+                          </TableHead>
+                          <TableHead>Person</TableHead>
+                          <TableHead>Reporting team</TableHead>
+                          <TableHead>Included through</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pageMembers.map((person) => {
+                          const sources = [
+                            person.groups.includes(group.id) ? "Direct" : "",
+                            groupIncludesTeam(group, person.teamId, teams)
+                              ? "Team"
+                              : "",
+                          ].filter(Boolean);
+                          return (
+                            <TableRow
+                              key={person.id}
+                              data-state={
+                                rosterSelection.selected.includes(person.id)
+                                  ? "selected"
+                                  : undefined
+                              }
+                            >
+                              <TableCell>
+                                {rosterSelection.canSelect && (
+                                  <Checkbox
+                                    aria-label={`Select ${person.name}`}
+                                    checked={rosterSelection.selected.includes(
+                                      person.id,
+                                    )}
+                                    disabled={busy}
+                                    onCheckedChange={(checked) =>
+                                      rosterSelection.toggle(
+                                        person.id,
+                                        checked === true,
+                                      )
+                                    }
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <strong>{person.name}</strong>
+                                <p className="text-copy text-muted-foreground">
+                                  {person.email}
+                                  {!person.active
+                                    ? " · Inactive"
+                                    : person.registered === false
+                                      ? " · Not signed in"
+                                      : ""}
+                                </p>
+                              </TableCell>
+                              <TableCell>
+                                {teams.find(
+                                  (team) =>
+                                    team.id ===
+                                    reportingTeamId(person.teamId, teams),
+                                )?.name || "No direct team"}
+                              </TableCell>
+                              <TableCell>{sources.join(" · ")}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </DataTable>
+                  </TableContainer>
+                ) : (
+                  <CollectionEmpty
+                    count={0}
+                    total={members.length}
+                    noun="people"
+                    onClear={resetPeopleFilters}
+                  />
+                )}
+                <Pagination
+                  showCount={false}
+                  label="Group members"
+                  page={currentPage}
+                  pageSize={PAGE_SIZE}
+                  total={filteredMembers.length}
+                  onPageChange={setPage}
+                />
+              </Stack>
+            </TabsContent>
+            <TabsContent value="updates">
+              <Stack>
+                <SectionHeader
+                  title={<h3>Assigned Updates</h3>}
+                  description="Relevant Updates appear in members’ For you feed."
+                />
+                <CollectionControls
+                  primaryAction={
+                    <Button
+                      type="button"
+                      disabled={
+                        busy || needsConversion || !updateOptions.length
+                      }
+                      onClick={() =>
+                        open({
+                          kind: "updates",
+                          ids: [],
+                          snapshot: learningSnapshot(),
+                        })
+                      }
+                    >
+                      <Plus aria-hidden="true" />
+                      Assign Updates
+                    </Button>
+                  }
+                  search={
+                    <FormField
+                      label="Find an assigned update"
+                      visuallyHiddenLabel
+                    >
+                      <Input
+                        type="search"
+                        placeholder="Find an assigned update"
+                        value={query}
+                        onChange={(event) => {
+                          setQuery(event.target.value);
+                          setPage(1);
+                        }}
+                      />
+                    </FormField>
+                  }
+                  sortLabel={
+                    updateSort === "title"
+                      ? "Title A–Z"
+                      : updateSort === "updated-newest"
+                        ? "Updated newest"
+                        : "Created newest"
+                  }
+                  sort={
+                    <FormField label="Sort Updates">
                       <SelectField
                         value={updateSort}
-                        onValueChange={(v) =>
-                          setUpdateSort(v as GroupBrowseSort)
-                        }
+                        onValueChange={(value) => {
+                          setUpdateSort(value as GroupBrowseSort);
+                          setPage(1);
+                        }}
                       >
                         <option value="updated-newest">
                           Updated newest first
                         </option>
-                        <option value="updated-oldest">
-                          Updated oldest first
-                        </option>
                         <option value="created-newest">
                           Created newest first
                         </option>
-                        <option value="created-oldest">
-                          Created oldest first
-                        </option>
                         <option value="title">Title A–Z</option>
                       </SelectField>
-                      </FormField>} filters={query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []} onClear={() => setQuery("")} search={
-                      <FormField label="Find an update" visuallyHiddenLabel>
-                        <Input
-                          type="search"
-                          value={query}
-                          onChange={(e) => setQuery(e.target.value)}
-                          placeholder="Find an update"
-                        />
-                      </FormField>
-                    }>
-
-                    </CollectionControls>
-                    <BulkActions
-                      collectionSize={updateSelection.collectionSize}
-                      selected={updateSelection.actionIds}
-                      onSelectionChange={updateSelection.setSelected}
-                      commands={[
-                        {
-                          id: "remove",
-                          label: "Remove from group",
-                          description:
-                            "Remove direct audience links. Published Updates remain available to everyone allowed into the installation.",
-                          apply: async () => {
-                            await learnMany(
-                              updateSelection.actionIds.map((contentId) => ({
-                                operation: "untarget",
-                                contentId,
-                                groupId: group.id,
-                                expected:
-                                  data.content.find((c) => c.id === contentId)
-                                    ?.revision || 0,
-                              })),
-                            );
-                          },
-                        },
-                      ]}
-                    />
-                    <SelectableRows
-                      label="Updates for this group"
-                      empty={<CollectionEmpty count={groupUpdates.length} total={published.filter((c) => c.kind === "brief" && c.groups.includes(group.id)).length} noun="updates" onClear={() => setQuery("")} />}
-                      scope={query + updateSort}
-                      selected={updateSelection.selected}
-                      onChange={updateSelection.setSelected}
-                      rows={groupUpdates.map((c) => ({
-                        id: c.id,
-                        label: c.title,
-                        detail: c.category,
-                      }))}
-                    />
-                  </>
+                    </FormField>
+                  }
+                />
+                {updates.length ? (
+                  <TableContainer>
+                    <DataTable
+                      layout="groupUpdates"
+                      aria-label="Assigned Updates"
+                    >
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Update</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>
+                            <span className="sr-only">Actions</span>
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {updates
+                          .slice(
+                            (currentPage - 1) * PAGE_SIZE,
+                            currentPage * PAGE_SIZE,
+                          )
+                          .map((item) => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.title}</TableCell>
+                              <TableCell>{item.category || "—"}</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  disabled={busy || needsConversion}
+                                  aria-label={`Remove ${item.title} from group`}
+                                  onClick={() =>
+                                    void run(
+                                      () =>
+                                        learnMany([
+                                          {
+                                            operation: "untarget",
+                                            contentId: item.id,
+                                            groupId: group.id,
+                                            expected:
+                                              data.content.find(
+                                                (candidate) =>
+                                                  candidate.id === item.id,
+                                              )?.revision || 0,
+                                          },
+                                        ]),
+                                      "Update removed from group.",
+                                    )
+                                  }
+                                >
+                                  <Trash2 aria-hidden="true" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                    </DataTable>
+                  </TableContainer>
+                ) : (
+                  <CollectionEmpty
+                    count={0}
+                    total={
+                      published.filter(
+                        (item) =>
+                          item.kind === "brief" &&
+                          item.groups.includes(group.id),
+                      ).length
+                    }
+                    noun="Updates"
+                    onClear={() => setQuery("")}
+                  />
                 )}
-              </FieldGroup>
+                <Pagination
+                  label="Group Updates"
+                  page={currentPage}
+                  pageSize={PAGE_SIZE}
+                  total={updates.length}
+                  onPageChange={setPage}
+                />
+              </Stack>
             </TabsContent>
           </Tabs>
         </>
       )}
-      <Dialog open={createOpen} onOpenChange={(open) => { if (!open) closeCreate(); }}>
+      <Dialog
+        open={!!editor}
+        onOpenChange={(value) => {
+          if (!value) void close();
+        }}
+      >
         <DialogContent
-          onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
-          onPointerDownOutside={(event) => { if (busy) event.preventDefault(); }}
-        >
-          <DialogTitle>Create learning group</DialogTitle>
-          <DialogDescription>Name the group and optionally place it beneath an existing group.</DialogDescription>
-          <form className="grid gap-4" onSubmit={async (event) => {
+          onCloseAutoFocus={(event) => {
+            const id = createdGroupCloseFocus.current;
+            if (!id) return;
             event.preventDefault();
-            const clean = name.trim();
-            if (!clean) return;
-            if (data.groups.some((g) => g.name.toLowerCase() === clean.toLowerCase())) {
-              setNotice("That group already exists.");
-              return;
-            }
-            const id = crypto.randomUUID();
-            if (await save({
-              ...data,
-              groups: [...data.groups, { id, name: clean, parentId: createParent || undefined, learningItems: [], teamIds: [] }],
-            }, "Learning group created.")) {
-              setCreateOpen(false);
-              setName("");
-              setCreateParent("");
-              setSelected(id);
-              destination.reveal();
-            }
-          }}>
-            {notice && <Alert variant="destructive">{notice}</Alert>}
-            <FieldGroup disabled={busy}>
-              <FormField label="New learning group">
-                <Input required maxLength={80} value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Account executives" />
+            createdGroupCloseFocus.current = null;
+            // Reveal after Radix finishes closing, rather than racing its
+            // delayed restoration of focus to the Create group trigger.
+            setReturnToGroup(id);
+          }}
+          size={
+            editor?.kind === "learning" || editor?.kind === "updates"
+              ? "selection"
+              : "default"
+          }
+          onEscapeKeyDown={(event) => {
+            if (busy) event.preventDefault();
+          }}
+          onPointerDownOutside={(event) => {
+            if (busy) event.preventDefault();
+          }}
+        >
+          <DialogTitle className="shrink-0">{modalTitle}</DialogTitle>
+          <DialogDescription className="shrink-0">
+            {modalDescription}
+          </DialogDescription>
+          {notice && <Alert variant="destructive">{notice}</Alert>}
+          {(editor?.kind === "create" || editor?.kind === "rename") && (
+            <form
+              id="learning-group-name"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void applyEditor();
+              }}
+            >
+              <FormField label="Group name">
+                <Input
+                  required
+                  maxLength={80}
+                  disabled={busy}
+                  value={editor.name}
+                  placeholder="e.g. Account executives"
+                  onChange={(event) =>
+                    setEditor({ ...editor, name: event.target.value })
+                  }
+                />
               </FormField>
-              <FormField label="Parent group" description="Optional. Members of a child group also receive the parent group’s learning and Updates.">
-                <SelectField value={createParent} onValueChange={setCreateParent} disabled={busy}>
-                  <option value="">Top level</option>
-                  {data.groups.map((candidate) => <option key={candidate.id} value={candidate.id}>{groupPath(candidate.id, data.groups)}</option>)}
-                </SelectField>
-              </FormField>
-            </FieldGroup>
-            <DialogFooter className="justify-end">
-              <ActionGroup>
-                <Button type="button" variant="outline" disabled={busy} onClick={closeCreate}>Cancel</Button>
-                <Button type="submit" loading={busy}>Create group</Button>
-              </ActionGroup>
-            </DialogFooter>
-          </form>
+            </form>
+          )}
+          {editor?.kind === "membership" && (
+            <Tabs value={sourceTab} onValueChange={setSourceTab}>
+              <TabsList aria-label="Membership sources">
+                <TabsTrigger value="people">People</TabsTrigger>
+                <TabsTrigger value="teams">Teams</TabsTrigger>
+              </TabsList>
+              <TabsContent value="teams">
+                <Stack>
+                  <p className="text-copy text-muted-foreground">
+                    Linked teams include their current and future subteams.
+                  </p>
+                  {editor.legacy.some((id) => editor.teams.includes(id)) && (
+                    <FieldGroup disabled={busy}>
+                      <p className="text-copy text-muted-foreground">
+                        These older links include direct members only. Choose
+                        which links should also include subteams.
+                      </p>
+                      {editor.legacy
+                        .filter((id) => editor.teams.includes(id))
+                        .map((id) => (
+                          <Field key={id} orientation="horizontal">
+                            <Checkbox
+                              checked={editor.expanded.includes(id)}
+                              onCheckedChange={(value) =>
+                                setEditor({
+                                  ...editor,
+                                  expanded:
+                                    value === true
+                                      ? [...editor.expanded, id]
+                                      : editor.expanded.filter(
+                                          (item) => item !== id,
+                                        ),
+                                })
+                              }
+                            />
+                            Include subteams for{" "}
+                            {teams.find((team) => team.id === id)?.name ||
+                              "Unknown team"}
+                          </Field>
+                        ))}
+                    </FieldGroup>
+                  )}
+                  <SearchableSelectionList
+                    key={`${group?.id}:teams`}
+                    label="Find a team"
+                    placeholder="Search teams"
+                    emptyMessage="No matching teams."
+                    disabled={busy}
+                    options={[...teams].sort(byName).map((team) => ({
+                      id: team.id,
+                      label: team.name,
+                      description: `${teamPath(team.id, teams)}${editor.legacy.includes(team.id) && !editor.expanded.includes(team.id) ? " · Direct members only" : " · Includes subteams"}`,
+                    }))}
+                    value={editor.teams}
+                    onChange={(ids) => setEditor({ ...editor, teams: ids })}
+                  />
+                </Stack>
+              </TabsContent>
+              <TabsContent value="people">
+                <SearchableSelectionList
+                  key={`${group?.id}:people`}
+                  label="Find a person"
+                  placeholder="Search name, email or team"
+                  emptyMessage="No matching people."
+                  disabled={busy}
+                  options={[...data.users].sort(byName).map((person) => ({
+                    id: person.id,
+                    label: person.name,
+                    description: `${person.email} · ${teams.find((team) => team.id === reportingTeamId(person.teamId, teams))?.name || "No direct team"}${!person.active ? " · Inactive" : ""}`,
+                  }))}
+                  value={editor.people}
+                  onChange={(ids) => setEditor({ ...editor, people: ids })}
+                />
+              </TabsContent>
+              <p className="text-copy text-muted-foreground">
+                {editor.teams.length} teams · {editor.people.length}{" "}
+                individually added. Removing one source keeps anyone included
+                through another.
+              </p>
+            </Tabs>
+          )}
+          {(editor?.kind === "learning" || editor?.kind === "updates") && (
+            <DialogBody>
+              <ContentSelectionList
+                bounded
+                label={
+                  editor.kind === "learning"
+                    ? "Find courses or curricula"
+                    : "Find Updates"
+                }
+                showTypeFilter={editor.kind === "learning"}
+                disabled={busy}
+                options={
+                  editor.kind === "learning" ? learningOptions : updateOptions
+                }
+                value={editor.ids}
+                onChange={(ids) => setEditor({ ...editor, ids })}
+              />
+            </DialogBody>
+          )}
+          <DialogFooter className="justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void close()}
+            >
+              Cancel
+            </Button>
+            {editor && (
+              <Button
+                type={
+                  editor.kind === "create" || editor.kind === "rename"
+                    ? "submit"
+                    : "button"
+                }
+                form={
+                  editor.kind === "create" || editor.kind === "rename"
+                    ? "learning-group-name"
+                    : undefined
+                }
+                loading={busy}
+                disabled={!dirty || needsConversion}
+                onClick={
+                  editor.kind === "create" || editor.kind === "rename"
+                    ? undefined
+                    : () => void applyEditor()
+                }
+              >
+                {modalAction}
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </section>

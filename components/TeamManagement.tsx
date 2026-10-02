@@ -5,23 +5,39 @@ import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
 import { Checkbox } from "./ui/choice";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MoreHorizontal, Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
-import { ancestorIds, canParent, type Team, type User } from "@/lib/types";
+import {
+  ancestorIds,
+  reportingTeamId,
+  canParent,
+  groupTeamLinks,
+  type Team,
+  type User,
+} from "@/lib/types";
+import {
+  isOrganizationChangeCanceled,
+  organizationChangeSummary,
+  type OrganizationChangeOptions,
+} from "@/lib/organization-change";
 import {
   moveTeam,
   teamMoveImpact,
   teamPath,
   teamDeletionBlockers,
 } from "@/lib/team-hierarchy";
-import { HierarchyList, hierarchyMatches } from "./patterns/hierarchy-list";
+import {
+  HierarchyBrowser,
+  hierarchyBrowserMatches,
+} from "./patterns/hierarchy-browser";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
 } from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -50,19 +66,31 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { useToast } from "./ui/toast";
 import { DataTable } from "./patterns/data-table";
 import { FormField } from "./patterns/form-field";
-import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
+import {
+  CollectionControls,
+  CollectionEmpty,
+} from "./patterns/collection-controls";
 import { SectionHeader, EmptyState } from "./patterns/layout";
-import { SettingsSection } from "./patterns/settings-section";
 import { Pagination } from "./patterns/pagination";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { groupPath } from "@/lib/group-hierarchy";
+import { organizationTeam } from "@/lib/organization-team";
+import { HierarchyPicker } from "./patterns/hierarchy-picker";
 
 const PAGE_SIZE = 25;
 const byName = (
   a: { name: string; id: string },
   b: { name: string; id: string },
 ) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+const teamMutationSnapshot = (data: Workspace) =>
+  JSON.stringify([
+    data.governanceRevision,
+    data.teams,
+    data.groups,
+    data.curricula,
+    data.users,
+  ]);
 
 export function TeamsAdmin({
   data,
@@ -70,19 +98,34 @@ export function TeamsAdmin({
   registerNavigationGuard,
 }: {
   data: Workspace;
-  onChange: (data: Workspace) => void | Promise<void>;
+  onChange: (
+    data: Workspace,
+    options?: OrganizationChangeOptions,
+  ) => void | Promise<void>;
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const teams = data.teams || [];
+  const organization = organizationTeam(
+    teams,
+    data.settings?.organizationTeamId,
+  );
   const [hierarchyQuery, setHierarchyQuery] = useState("");
+  const [browseId, setBrowseId] = useState("");
+  const [browserReveal, setBrowserReveal] = useState<{
+    id: string;
+    token: number;
+  }>();
+  const browserRevealCount = useRef(0);
   const [selected, setSelected] = useState("");
   const [tab, setTab] = useState("members");
   const [query, setQuery] = useState("");
-  const [includeSubteams, setIncludeSubteams] = useState(false);
+  const [selectTeams, setSelectTeams] = useState(false);
   const [memberSort, setMemberSort] = useState("name");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Team | null>(null);
+  const editorCloseFocus = useRef<(() => void) | null>(null);
   const baseline = useRef<Team | null>(null);
+  const editSnapshot = useRef("");
   const [moving, setMoving] = useState<{
     mode: "into" | "out";
     id: string;
@@ -92,20 +135,59 @@ export function TeamsAdmin({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
+  const latestData = useRef(data);
+  latestData.current = data;
   const notify = useToast();
   const { confirm } = useInteractionDialog();
-  const destination = useRevealTarget<HTMLElement>();
+  const destination = useRevealTarget<HTMLHeadingElement>({ context: true });
+  const browserTarget = useRevealTarget<HTMLHeadingElement>({ context: true });
   const memberList = useRevealTarget<HTMLHeadingElement>();
   const team = teams.find((t) => t.id === selected);
+  const managingOrganization = !!team && team.id === organization?.id;
   const dirty =
     moving?.choice != null ||
     (!!editing && JSON.stringify(editing) !== JSON.stringify(baseline.current));
+  const editId = editing?.id;
+  const editParentId = editing?.parentId;
+  const editManagerId = editing?.managerId;
+  const originalParentId = baseline.current?.parentId;
+  const originalManagerId = baseline.current?.managerId;
+  const editingNeedsReview = useMemo(() => {
+    if (
+      !editId ||
+      (editParentId === originalParentId && editManagerId === originalManagerId)
+    )
+      return false;
+    return organizationChangeSummary(data, {
+      ...data,
+      teams: [
+        ...(data.teams || []).filter((value) => value.id !== editId),
+        {
+          ...teams.find((value) => value.id === editId),
+          id: editId,
+          name: "",
+          parentId: editParentId,
+          managerId: editManagerId,
+          system: teams.find((value) => value.id === editId)?.system,
+        },
+      ],
+    }).changed;
+  }, [
+    data,
+    editId,
+    editParentId,
+    editManagerId,
+    originalParentId,
+    originalManagerId,
+  ]);
   const guard = useRef(async () => true);
   guard.current = async () =>
     !saving.current &&
     (!dirty || (await confirm("Discard unsaved team changes?")));
   useEffect(() => {
-    registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
+    registerNavigationGuard?.(() => guard.current(), {
+      protected: dirty || busy,
+    });
     return () => registerNavigationGuard?.(null);
   }, [registerNavigationGuard, dirty, busy]);
   useEffect(() => {
@@ -131,32 +213,74 @@ export function TeamsAdmin({
     setTab("members");
     setQuery("");
     setPage(1);
-    setIncludeSubteams(false);
-    destination.reveal();
+    if (id) destination.reveal();
+    else browserTarget.reveal();
+  }
+  async function browseTeam(id: string) {
+    if (!(await guard.current())) return;
+    resetDraft();
+    setBrowseId(id);
+    setHierarchyQuery("");
+    setSelectTeams(false);
+    teamSelection.setSelected([]);
+    setBrowserReveal(undefined);
+  }
+  function revealTeamLocation(value: Team, created = false, focus = true) {
+    setBrowseId(
+      value.parentId === organization?.id ? "" : value.parentId || "",
+    );
+    setHierarchyQuery("");
+    setSelectTeams(false);
+    teamSelection.setSelected([]);
+    setBrowserReveal(
+      !focus || value.id === organization?.id
+        ? undefined
+        : { id: value.id, token: ++browserRevealCount.current },
+    );
+    if (created) {
+      setSelected("");
+      setQuery("");
+      setPage(1);
+    }
   }
   async function editTeam(value: Team) {
     if (!(await guard.current())) return;
     resetDraft();
     baseline.current = { ...value };
+    editSnapshot.current = teamMutationSnapshot(data);
     setEditing({ ...value });
   }
-  async function closeEditor() {
-    if (await guard.current()) {
+  async function closeEditor(discard = false) {
+    if (!saving.current && (discard || (await guard.current()))) {
       setEditing(null);
       setNotice("");
     }
   }
-  async function commit(next: Workspace, message: string, propagate = false) {
+  async function commit(
+    next: Workspace,
+    message: string,
+    propagate = false,
+    options?: OrganizationChangeOptions,
+  ) {
     if (saving.current) return false;
+    if (data !== latestData.current) {
+      const error = new Error(
+        "The organization changed while this action was open. Close it and reopen the action before saving.",
+      );
+      if (propagate) throw error;
+      setNotice(error.message);
+      return false;
+    }
     saving.current = true;
     setBusy(true);
     setNotice("");
     try {
-      await onChange(next);
+      await onChange(next, options);
       notify(message);
       return true;
     } catch (error) {
       if (propagate) throw error;
+      if (isOrganizationChangeCanceled(error)) return false;
       setNotice(
         error instanceof Error ? error.message : "Could not save. Try again.",
       );
@@ -169,6 +293,12 @@ export function TeamsAdmin({
   async function saveTeam(event: React.FormEvent) {
     event.preventDefault();
     if (!editing || saving.current) return;
+    if (editSnapshot.current !== teamMutationSnapshot(data)) {
+      setNotice(
+        "Organization data changed while this editor was open. Close it and reopen the team before saving.",
+      );
+      return;
+    }
     const name = editing.name.trim();
     if (
       !name ||
@@ -194,30 +324,40 @@ export function TeamsAdmin({
             {
               ...editing,
               name,
-              parentId: created
-                ? editing.parentId
-                : teams.find((item) => item.id === editing.id)?.parentId,
+              parentId: editing.parentId,
             },
           ],
         },
         "Team saved.",
+        false,
+        { review: { title: "Review team changes", confirmLabel: "Save team" } },
       )
     ) {
+      const savedTeam = { ...editing, name };
+      // A successful save has a new destination. Wait for the editor's close
+      // auto-focus event rather than racing its delayed trigger restoration.
+      editorCloseFocus.current = () => {
+        if (!created && selected) destination.reveal();
+        else if (savedTeam.id === organization?.id) browserTarget.reveal();
+        else
+          setBrowserReveal({
+            id: savedTeam.id,
+            token: ++browserRevealCount.current,
+          });
+      };
       setEditing(null);
-      if (created) {
-        setSelected(editing.id);
-        setTab("members");
-        setQuery("");
-        setPage(1);
-      }
-      destination.reveal();
+      revealTeamLocation(savedTeam, created, false);
     }
   }
   async function startMove(mode: "into" | "out", id: string) {
     if (!(await guard.current())) return;
     resetDraft();
-    setMoving({ mode, id, choice: null });
-    destination.reveal();
+    setMoving({
+      mode,
+      id,
+      choice: null,
+      snapshot: teamMutationSnapshot(data),
+    });
   }
   const moveSource = moving?.mode === "into" ? moving.choice : moving?.id;
   const moveParent = moving?.mode === "into" ? moving.id : moving?.choice;
@@ -239,10 +379,10 @@ export function TeamsAdmin({
       saving.current
     )
       return;
-    if (moving.snapshot !== JSON.stringify([data.governanceRevision, data.teams, data.groups, data.curricula, data.users])) {
+    if (moving.snapshot !== teamMutationSnapshot(data)) {
       setMoving({ ...moving, snapshot: undefined });
       setNotice(
-        "Teams or people changed. Review the move again before applying it.",
+        "Organization data changed. Close this move and reopen it to choose from the current hierarchy.",
       );
       return;
     }
@@ -252,10 +392,19 @@ export function TeamsAdmin({
         await commit(
           { ...data, teams: next },
           "Team moved. Reporting hierarchy updated.",
+          false,
+          {
+            review: {
+              title: "Review team move",
+              description: `${impact?.from} → ${impact?.to}. The whole branch moves together.`,
+              confirmLabel: "Move team",
+            },
+          },
         )
       ) {
         resetDraft();
-        setTab("subteams");
+        revealTeamLocation(next.find((value) => value.id === moveSource)!);
+        if (moving.mode === "into") setTab("subteams");
         destination.reveal();
       }
     } catch (error) {
@@ -269,7 +418,8 @@ export function TeamsAdmin({
     resetDraft();
     const blockers = teamDeletionBlockers(data, value.id);
     const reasons = [
-      blockers.learning.length && `${blockers.learning.length} assigned courses or curricula`,
+      blockers.learning.length &&
+        `${blockers.learning.length} assigned courses or curricula`,
       blockers.members.length &&
         `${blockers.members.length} direct members (including inactive accounts)`,
       blockers.pending.length &&
@@ -281,35 +431,37 @@ export function TeamsAdmin({
     ].filter(Boolean);
     if (reasons.length) {
       setNotice(
-        `Cannot delete ${value.name}: it still has ${reasons.join("; ")}. Move or remove these links first. To keep the team but detach it, use Move team → Top-level team.`,
+        `Cannot delete ${value.name}: it still has ${reasons.join("; ")}. Move or remove these links first. To keep the team but detach it, use Move team → Organization.`,
       );
       destination.reveal();
       return;
     }
     if (
-      !(await confirm(
-        `Delete empty team “${value.name}”? This permanently removes the team. To keep it and only remove its parent, cancel and use Move team → Top-level team.`,
-      ))
-    )
-      return;
-    if (
       await commit(
         { ...data, teams: teams.filter((item) => item.id !== value.id) },
         "Empty team deleted.",
+        false,
+        {
+          review: {
+            title: `Delete ${value.name}?`,
+            description: "This permanently removes the empty team.",
+            confirmLabel: "Delete team",
+            always: true,
+          },
+        },
       )
     ) {
       setSelected("");
-      destination.reveal();
+      setBrowseId(
+        value.parentId === organization?.id ? "" : value.parentId || "",
+      );
+      setHierarchyQuery("");
+      setBrowserReveal(undefined);
+      browserTarget.reveal();
     }
   }
   async function removeMember(user: User) {
     if (!team || user.teamId !== team.id || saving.current) return;
-    if (
-      !(await confirm(
-        `Remove ${user.name} from ${team.name}? Their account and saved progress are kept. Team-linked learning assignments may change.`,
-      ))
-    )
-      return;
     if (
       await commit(
         {
@@ -318,12 +470,21 @@ export function TeamsAdmin({
             u.id === user.id ? { ...u, teamId: undefined } : u,
           ),
         },
-        "Member removed from team.",
+        "Member returned to Organization.",
+        false,
+        {
+          review: {
+            title: "Review membership changes",
+            description: `Remove ${user.name} from ${team.name}. They return to Organization. Their account and saved progress are kept.`,
+            confirmLabel: "Remove member",
+          },
+        },
       )
     )
       memberList.reveal();
   }
-  const direct = data.users.filter((u) => u.teamId === selected);
+  const memberTeam = (user: User) => reportingTeamId(user.teamId, teams);
+  const direct = data.users.filter((u) => memberTeam(u) === selected);
   const descendants = new Set(
     teams
       .filter(
@@ -334,46 +495,55 @@ export function TeamsAdmin({
   const descendantMembers = data.users.filter(
     (u) => !!u.teamId && descendants.has(u.teamId),
   );
-  const members = [...direct, ...(includeSubteams ? descendantMembers : [])]
+  const roster = managingOrganization
+    ? direct
+    : [...direct, ...descendantMembers];
+  const members = roster
     .filter((u) =>
       `${u.name} ${u.email}`.toLowerCase().includes(query.trim().toLowerCase()),
     )
-    .sort((a, b) => memberSort === "reverse" ? byName(b, a) : byName(a, b));
+    .sort((a, b) => (memberSort === "reverse" ? byName(b, a) : byName(a, b)));
   const children = teams.filter((t) => t.parentId === selected).sort(byName);
   const rosterSelection = useBulkSelection(
-    selected + tab + query + includeSubteams,
+    selected + tab + query,
     members.map((u) => u.id),
-    members.filter((u) => u.teamId === team?.id).map((u) => u.id),
+    members.filter((u) => memberTeam(u) === team?.id).map((u) => u.id),
   );
-  const hierarchyItems = [...teams].sort(byName).map((item) => ({
-              id: item.id,
-              parentId: item.parentId,
-              label: item.name,
-              description: `Manager: ${data.users.find((user) => user.id === item.managerId)?.name || "Unassigned"}`,
-              meta: `${data.users.filter((user) => user.teamId === item.id).length} direct members · ${teams.filter((child) => child.parentId === item.id).length} subteams`,
-            }));
+  const hierarchyItems = [...teams]
+    .filter((value) => value.id !== organization?.id)
+    .sort(byName)
+    .map((item) => ({
+      id: item.id,
+      parentId: item.parentId === organization?.id ? undefined : item.parentId,
+      label: item.name,
+      description: `Manager: ${data.users.find((user) => user.id === item.managerId)?.name || "Unassigned"}`,
+      directMemberCount: data.users.filter((user) => user.teamId === item.id)
+        .length,
+    }));
   const teamSelection = useBulkSelection(
-    selected + hierarchyQuery,
-    hierarchyMatches(hierarchyItems, hierarchyQuery).map((item) => item.id),
+    "teams" + hierarchyQuery,
+    hierarchyBrowserMatches(hierarchyItems, hierarchyQuery).map(
+      (item) => item.id,
+    ),
   );
   const currentPage = Math.min(
     page,
     Math.max(1, Math.ceil(members.length / PAGE_SIZE)),
   );
   const eligible = data.users
-    .filter((u) => u.active && u.teamId !== selected)
+    .filter((u) => u.active && memberTeam(u) !== selected)
     .sort(byName);
   const teamName = (id?: string) =>
-    (id ? teamPath(id, teams) : "No team");
+    teams.find((team) => team.id === reportingTeamId(id, teams))?.name ||
+    "No team";
 
   function teamTable(rows: Team[]) {
     return rows.length ? (
       <TableContainer>
-        <DataTable layout="teams" aria-label={team ? "Subteams" : "Teams"}>
+        <DataTable layout="teamBranches" aria-label="Subteams">
           <TableHeader>
             <TableRow>
               <TableHead>Team</TableHead>
-              <TableHead>Parent</TableHead>
               <TableHead>Manager</TableHead>
               <TableHead align="right">Direct members</TableHead>
               <TableHead>
@@ -387,7 +557,6 @@ export function TeamsAdmin({
                 <TableCell>
                   <strong>{t.name}</strong>
                 </TableCell>
-                <TableCell>{t.parentId ? teamName(t.parentId) : "—"}</TableCell>
                 <TableCell>
                   {data.users.find((u) => u.id === t.managerId)?.name ||
                     "Unassigned"}
@@ -421,380 +590,370 @@ export function TeamsAdmin({
 
   return (
     <section
-      {...destination.targetProps}
       aria-label={team ? `${team.name} management` : "Teams"}
       className="grid min-w-0 gap-6"
     >
-      {!team ? (
-        <>
-          <SectionHeader
-            variant="page"
-            title={<h2>Teams</h2>}
-            description="Organize reporting teams, managers and membership."
-          />
-
-          <HierarchyList
-            query={hierarchyQuery}
-            onQueryChange={setHierarchyQuery}
-            searchAction={
+      <div
+        hidden={!!team}
+        data-reveal-context
+        className={team ? "hidden" : "grid min-w-0 gap-4"}
+      >
+        <SectionHeader
+          variant="page"
+          title={<h2 {...browserTarget.targetProps}>Teams</h2>}
+        >
+          {organization && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void openTeam(organization.id)}
+            >
+              Organization
+            </Button>
+          )}
+        </SectionHeader>
+        <HierarchyBrowser
+          branchId={browseId}
+          onBrowse={browseTeam}
+          query={hierarchyQuery}
+          onQueryChange={(value) => {
+            setHierarchyQuery(value);
+            teamSelection.setSelected([]);
+          }}
+          reveal={browserReveal}
+          primaryAction={
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void editTeam({
+                  id: crypto.randomUUID(),
+                  name: "",
+                  parentId: browseId || organization?.id || undefined,
+                })
+              }
+            >
+              <Plus aria-hidden="true" />
+              Add team
+            </Button>
+          }
+          secondaryActions={
+            (hierarchyItems.length > 1 || selectTeams) && (
               <Button
                 type="button"
+                variant="ghost"
+                size="sm"
                 disabled={busy}
-                onClick={() =>
-                  void editTeam({ id: crypto.randomUUID(), name: "" })
-                }
+                aria-pressed={selectTeams}
+                onClick={() => {
+                  setSelectTeams(!selectTeams);
+                  teamSelection.setSelected([]);
+                }}
               >
-                <Plus aria-hidden="true" />
-                Add team
+                {selectTeams ? "Done selecting" : "Select teams"}
               </Button>
-            }
-            selectionActions={
+            )
+          }
+          selectionActions={
+            selectTeams ? (
               <BulkActions
                 singleItemActions={false}
                 collectionSize={teamSelection.collectionSize}
                 selected={teamSelection.actionIds}
                 onSelectionChange={teamSelection.setSelected}
                 noun="teams"
-                commands={[...([true, false] as const).map((add) => ({
-                  id: add ? "add-groups" : "remove-groups",
-                  label: add
-                    ? "Add to learning groups"
-                    : "Remove from learning groups",
-                  description:
-                    "Change direct team links. Subteams are not included automatically. People and saved progress are preserved.",
-                  options: data.groups.map((g) => ({
-                    id: g.id,
-                    label: groupPath(g.id, data.groups),
-                  })),
-                  apply: async (ids: string[]) => {
-                    if (
-                      !(await commit(
-                        {
-                          ...data,
-                          groups: data.groups.map((g) =>
-                            ids.includes(g.id)
-                              ? {
+                commands={
+                  [
+                    ...([true, false] as const).map((add) => ({
+                      id: add ? "add-groups" : "remove-groups",
+                      label: add
+                        ? "Add to learning groups"
+                        : "Remove from learning groups",
+                      description:
+                        "Linked teams include all subteams. Review assignment changes before saving; accounts and saved progress are preserved.",
+                      options: data.groups.map((g) => ({
+                        id: g.id,
+                        label: groupPath(g.id, data.groups),
+                      })),
+                      apply: async (ids: string[]) => {
+                        if (
+                          !(await commit(
+                            {
+                              ...data,
+                              groups: data.groups.map((g) => {
+                                if (!ids.includes(g.id)) return g;
+                                const links = groupTeamLinks(g);
+                                const subtree = links
+                                  .filter((link) => link.scope === "subtree")
+                                  .map((link) => link.teamId);
+                                const directOnly = links
+                                  .filter((link) => link.scope === "direct")
+                                  .map((link) => link.teamId);
+                                return {
                                   ...g,
+                                  teamLinkScope: "subtree" as const,
                                   teamIds: add
                                     ? [
                                         ...new Set([
-                                          ...(g.teamIds || []),
+                                          ...subtree,
                                           ...teamSelection.actionIds,
                                         ]),
                                       ]
-                                    : (g.teamIds || []).filter(
+                                    : subtree.filter(
                                         (id) =>
                                           !teamSelection.actionIds.includes(id),
                                       ),
-                                }
-                              : g,
-                          ),
+                                  legacyDirectTeamIds: directOnly.filter(
+                                    (id) =>
+                                      !teamSelection.actionIds.includes(id),
+                                  ),
+                                };
+                              }),
+                            },
+                            "Team links updated.",
+                            true,
+                          ))
+                        )
+                          throw new Error("Could not save team links.");
+                      },
+                    })),
+                    {
+                      id: "move",
+                      label: "Move selected teams",
+                      description:
+                        "Move each selected team with its subteams. Direct members, learning-group links, and history stay attached; manager reporting access follows the new hierarchy.",
+                      options: [
+                        {
+                          id: "root",
+                          label: organization?.name || "Top level",
                         },
-                        "Team links updated.",
-                      ))
-                    )
-                      throw new Error("Could not save team links.");
-                  },
-                })), {
-                  id: "move",
-                  label: "Move selected teams",
-                  description: "Move each selected team with its subteams. Direct members, learning-group links, and history stay attached; manager reporting access follows the new hierarchy.",
-                  options: [{ id: "root", label: "Top level" }, ...teams.map((t) => ({ id: t.id, label: teamPath(t.id, teams) }))],
-                  selectionMode: "single" as const,
-                  review: (values: string[], ids: string[]) => {
-                    try {
-                      if (ids.some((id) => [...ancestorIds(id, teams)].some((ancestor) => ancestor !== id && ids.includes(ancestor))))
-                        throw new Error("Select a parent or a subteam, not both.");
-                      const destination = values[0] === "root" ? "" : values[0];
-                      let working = data;
-                      const impacts = ids.map((id) => {
-                        const impact = teamMoveImpact(working, id, destination);
-                        working = { ...working, teams: impact.next };
-                        return impact;
-                      });
-                      return <ul className="text-copy">{impacts.map((impact) => <li key={impact.from}>{impact.from} → {impact.to} · {impact.branch.length} teams · {impact.people.length} people · {impact.managers.length} managers with reporting changes · {impact.learning.length} people with learning changes</li>)}</ul>;
-                    } catch (error) { return <p role="alert">{(error as Error).message}</p>; }
-                  },
-                  apply: async (values: string[], ids: string[] = []) => {
-                    if (ids.some((id) => [...ancestorIds(id, teams)].some((ancestor) => ancestor !== id && ids.includes(ancestor))))
-                      throw new Error("Select a parent or a subteam, not both.");
-                    const destination = values[0] === "root" ? "" : values[0];
-                    let next = teams;
-                    for (const id of ids) next = moveTeam(next, id, destination);
-                    if (!(await commit({ ...data, teams: next }, "Team branches moved.")))
-                      throw new Error("Could not save the team move.");
-                  },
-                }] as BulkCommand[]}
+                        ...teams
+                          .filter((t) => t.id !== organization?.id)
+                          .map((t) => ({
+                            id: t.id,
+                            label: teamPath(t.id, teams),
+                          })),
+                      ],
+                      selectionMode: "single" as const,
+                      review: (values: string[], ids: string[]) => {
+                        try {
+                          if (
+                            ids.some((id) =>
+                              [...ancestorIds(id, teams)].some(
+                                (ancestor) =>
+                                  ancestor !== id && ids.includes(ancestor),
+                              ),
+                            )
+                          )
+                            throw new Error(
+                              "Select a parent or a subteam, not both.",
+                            );
+                          const destination =
+                            values[0] === "root" ? "" : values[0];
+                          let working = data;
+                          const impacts = ids.map((id) => {
+                            const impact = teamMoveImpact(
+                              working,
+                              id,
+                              destination,
+                            );
+                            working = { ...working, teams: impact.next };
+                            return impact;
+                          });
+                          return (
+                            <ul className="text-copy">
+                              {impacts.map((impact) => (
+                                <li key={impact.from}>
+                                  {impact.from} → {impact.to}
+                                </li>
+                              ))}
+                            </ul>
+                          );
+                        } catch (error) {
+                          return <p role="alert">{(error as Error).message}</p>;
+                        }
+                      },
+                      apply: async (values: string[], ids: string[] = []) => {
+                        if (
+                          ids.some((id) =>
+                            [...ancestorIds(id, teams)].some(
+                              (ancestor) =>
+                                ancestor !== id && ids.includes(ancestor),
+                            ),
+                          )
+                        )
+                          throw new Error(
+                            "Select a parent or a subteam, not both.",
+                          );
+                        const destination =
+                          values[0] === "root" ? "" : values[0];
+                        let next = teams;
+                        for (const id of ids)
+                          next = moveTeam(next, id, destination);
+                        if (
+                          !(await commit(
+                            { ...data, teams: next },
+                            "Team branches moved.",
+                            true,
+                          ))
+                        )
+                          throw new Error("Could not save the team move.");
+                      },
+                    },
+                  ] as BulkCommand[]
+                }
               />
-            }
-            selected={teamSelection.selected}
-            onSelectionChange={teamSelection.setSelected}
-            label="Teams"
-            disabled={busy}
-            onOpen={(id) => void openTeam(id)}
-            items={hierarchyItems}
-          />
-        </>
-      ) : (
-        <>
-          <DetailNavigation
-            disabled={busy}
-            items={[
-              { label: "Back to teams", onSelect: () => openTeam("") },
-              ...(team.parentId
-                ? [{ label: `Parent: ${teamName(team.parentId)}`, onSelect: () => openTeam(team.parentId!) }]
-                : []),
-            ]}
-            current={team.name}
-          />
-          <SectionHeader
-            variant="page"
-            title={<h2>{team.name}</h2>}
-            description={`Manager: ${data.users.find((u) => u.id === team.managerId)?.name || "Unassigned"}`}
-          >
-            <ActionGroup>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => void editTeam(team)}
-              >
-                Edit team details
-              </Button>
-              <Button
-                variant="outline"
-                disabled={busy}
-                onClick={() => void startMove("out", team.id)}
-              >
-                Move team
-              </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    disabled={busy}
-                    aria-label="Team actions"
-                  >
-                    <MoreHorizontal aria-hidden="true" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => void deleteTeam(team)}>
-                    Delete empty team
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </ActionGroup>
-          </SectionHeader>
-          <p className="text-copy text-muted-foreground">
-            {direct.length} direct members · {descendantMembers.length} people
-            in subteams · {children.length} immediate subteams
-          </p>
-          {notice && !editing && <Alert variant="destructive">{notice}</Alert>}
-          {moving ? (
-            <SettingsSection
-              id="team-move"
+            ) : undefined
+          }
+          selected={selectTeams ? teamSelection.selected : undefined}
+          onSelectionChange={
+            selectTeams ? teamSelection.setSelected : undefined
+          }
+          label="Teams"
+          disabled={busy}
+          onOpen={(id) => void openTeam(id)}
+          onEdit={(id) =>
+            void editTeam(teams.find((value) => value.id === id)!)
+          }
+          items={hierarchyItems}
+        />
+      </div>
+      {team && (
+        <div className="grid min-w-0 gap-6">
+          <div data-reveal-context className="grid min-w-0 gap-4">
+            <DetailNavigation
+              disabled={busy}
+              items={[
+                { label: "Back to teams", onSelect: () => openTeam("") },
+                ...(team.parentId
+                  ? [
+                      {
+                        label: `Parent: ${teamName(team.parentId)}`,
+                        onSelect: () => openTeam(team.parentId!),
+                      },
+                    ]
+                  : []),
+              ]}
+              current={managingOrganization ? "Organization" : team.name}
+            />
+            <SectionHeader
+              variant="page"
               title={
-                <h3>
-                  {moving.snapshot
-                    ? "Review team move"
-                    : moving.mode === "into"
-                      ? `Move an existing team into ${team.name}`
-                      : `Move ${team.name}`}
-                </h3>
+                <h2 {...destination.targetProps}>
+                  {managingOrganization ? "Organization" : team.name}
+                </h2>
               }
-              guidance="Moving a team carries all its subteams. Direct memberships, branch managers, learning-group links and saved progress stay with their existing teams. Reporting access follows the new hierarchy."
-              actions={
-                <ActionGroup>
-                  <Button
-                    variant="outline"
-                    disabled={busy}
-                    onClick={async () => {
-                      if (await guard.current()) {
-                        resetDraft();
-                        destination.reveal();
-                      }
-                    }}
-                  >
-                    Cancel move
-                  </Button>
-                  {moving.snapshot ? (
-                    <>
+              description={`Manager: ${data.users.find((u) => u.id === team.managerId)?.name || "Unassigned"}`}
+            >
+              <ActionGroup>
+                <Button
+                  variant="outline"
+                  disabled={busy}
+                  onClick={() => void editTeam(team)}
+                >
+                  {managingOrganization ? "Edit manager" : "Edit team details"}
+                </Button>
+                {!managingOrganization && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
                       <Button
                         variant="outline"
+                        size="icon"
                         disabled={busy}
-                        onClick={() => {
-                          setMoving({ ...moving, snapshot: undefined });
-                          setNotice("");
-                        }}
+                        aria-label="Team actions"
                       >
-                        Back to selection
+                        <MoreHorizontal aria-hidden="true" />
                       </Button>
-                      <Button
-                        loading={busy}
-                        disabled={!impact}
-                        onClick={() => void applyMove()}
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onSelect={() => void startMove("out", team.id)}
                       >
                         Move team
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      disabled={!impact}
-                      onClick={() => {
-                        setMoving({
-                          ...moving,
-                          snapshot: JSON.stringify([data.governanceRevision, data.teams, data.groups, data.curricula, data.users]),
-                        });
-                        setNotice("");
-                        destination.reveal();
-                      }}
-                    >
-                      Review move
-                    </Button>
-                  )}
-                </ActionGroup>
-              }
-            >
-              {moving.snapshot && impact ? (
-                <>
-                  <dl className="grid gap-4 text-copy">
-                    <div>
-                      <dt className="font-semibold">Current location</dt>
-                      <dd className="text-muted-foreground [overflow-wrap:anywhere]">
-                        {impact.from}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold">New location</dt>
-                      <dd className="text-muted-foreground [overflow-wrap:anywhere]">
-                        {impact.to}
-                      </dd>
-                    </div>
-                  </dl>
-                  <p>
-                    {impact.branch.length}{" "}
-                    {impact.branch.length === 1 ? "team" : "teams"} and{" "}
-                    {impact.people.length}{" "}
-                    {impact.people.length === 1 ? "member" : "members"}{" "}
-                    (including inactive accounts) move together.
-                  </p>
-                  <h4>Reporting access changes</h4>
-                  <p>{impact.learning.filter(row => row.gained.length).length} people gain courses; {impact.learning.filter(row => row.lost.length).length} people lose courses; {impact.learning.filter(row => row.changed.length).length} keep courses with changed sources. Continuing assignments keep deadlines and progress.</p>
-                  {impact.managers.length ? (
-                    <ul className="grid gap-3">
-                      {impact.managers.map((change) => (
-                        <li key={change.manager.id} className="text-copy">
-                          <strong>{change.manager.name}</strong>
-                          <span className="block text-muted-foreground">
-                            {change.gained.length > 0 &&
-                              `Gains ${change.gained.length} ${change.gained.length === 1 ? "team" : "teams"} / ${change.gainedPeople} active ${change.gainedPeople === 1 ? "person" : "people"}. `}
-                            {change.lost.length > 0 &&
-                              `Loses ${change.lost.length} ${change.lost.length === 1 ? "team" : "teams"} / ${change.lostPeople} active ${change.lostPeople === 1 ? "person" : "people"}.`}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-copy text-muted-foreground">
-                      No manager gains or loses reporting access.
-                    </p>
-                  )}
-                  <p className="text-copy text-muted-foreground">
-                    Counts account for overlapping management responsibilities.
-                    Administrators retain organization-wide access.
-                  </p>
-                </>
-              ) : (
-                <SearchableSelectionList
-                  label={
-                    moving.mode === "into"
-                      ? "Find a team to move here"
-                      : "Choose a new parent"
-                  }
-                  selectionMode="single"
-                  placeholder="Team name or hierarchy path"
-                  emptyMessage="No eligible teams. Teams already here, this team and moves that create a cycle are excluded."
-                  value={moving.choice == null ? [] : [moving.choice]}
-                  onChange={(ids) =>
-                    setMoving({
-                      ...moving,
-                      choice: ids[0] ?? null,
-                      snapshot: undefined,
-                    })
-                  }
-                  disabled={busy}
-                  options={
-                    moving.mode === "into"
-                      ? [...teams]
-                          .sort(byName)
-                          .filter(
-                            (item) =>
-                              item.parentId !== team.id &&
-                              canParent(item.id, team.id, teams),
-                          )
-                          .map((item) => ({
-                            id: item.id,
-                            label: item.name,
-                            description: teamPath(item.id, teams),
-                          }))
-                      : [
-                          ...(team.parentId
-                            ? [
-                                {
-                                  id: "",
-                                  label: "Top-level team",
-                                  description:
-                                    "Detach this branch from its current parent.",
-                                },
-                              ]
-                            : []),
-                          ...[...teams]
-                            .sort(byName)
-                            .filter(
-                              (item) =>
-                                item.id !== team.parentId &&
-                                canParent(team.id, item.id, teams),
-                            )
-                            .map((item) => ({
-                              id: item.id,
-                              label: item.name,
-                              description: teamPath(item.id, teams),
-                            })),
-                        ]
-                  }
-                />
-              )}
-              {moveError && <Alert variant="destructive">{moveError}</Alert>}
-            </SettingsSection>
-          ) : (
-            <Tabs
-              value={tab}
-              onValueChange={async (value) => {
-                if (!(await guard.current())) return;
-                resetDraft();
-                setTab(value);
-                destination.reveal(false);
-              }}
-            >
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void editTeam({
+                            id: crypto.randomUUID(),
+                            name: "",
+                            parentId: team.id,
+                          })
+                        }
+                      >
+                        Create subteam
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => void startMove("into", team.id)}
+                      >
+                        Move existing team here
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => void deleteTeam(team)}>
+                        Delete empty team
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+              </ActionGroup>
+            </SectionHeader>
+            <p className="text-copy text-muted-foreground">
+              {direct.length + descendantMembers.length} people{" "}
+              {managingOrganization ? "across Organization" : "in this branch"}{" "}
+              · {direct.length}{" "}
+              {managingOrganization ? "at Organization" : "direct members"}
+              {children.length > 0 &&
+                ` · ${children.length} ${managingOrganization ? (children.length === 1 ? "top-level team" : "top-level teams") : children.length === 1 ? "subteam" : "subteams"}`}
+            </p>
+          </div>
+          {notice && !editing && !moving && (
+            <Alert variant="destructive">{notice}</Alert>
+          )}
+          <Tabs
+            value={
+              tab === "subteams" && (!children.length || managingOrganization)
+                ? "members"
+                : tab
+            }
+            onValueChange={async (value) => {
+              if (!(await guard.current())) return;
+              resetDraft();
+              setTab(value);
+              destination.reveal(false);
+            }}
+          >
+            {!managingOrganization && children.length > 0 && (
               <TabsList aria-label="Team sections">
                 <TabsTrigger value="members">Members</TabsTrigger>
-                <TabsTrigger value="subteams">Subteams</TabsTrigger>
+                {children.length > 0 && (
+                  <TabsTrigger value="subteams">Subteams</TabsTrigger>
+                )}
               </TabsList>
-              <TabsContent value="members" className="grid gap-6">
-                <SectionHeader
-                  title={<h3 {...memberList.targetProps}>Team members</h3>}
-                  description="Each person has one direct reporting team. Preregistered people are available before sign-in; inactive accounts are labeled."
-                >
+            )}
+            <TabsContent value="members" className="grid gap-6">
+              <SectionHeader
+                title={
+                  <h3 {...memberList.targetProps}>
+                    {managingOrganization ? "People at Organization" : "People"}
+                  </h3>
+                }
+                description={
+                  managingOrganization
+                    ? "People without a named team appear here automatically. The organization manager can report on everyone across all teams."
+                    : "People belong to one team. Subteam members appear here for reporting."
+                }
+              />
+              <CollectionControls
+                primaryAction={
                   <BulkPicker
                     title="Add members"
-                    description={`Add people to ${team.name}. People already in a different team move here. Manager reporting and team-linked assignments change; saved progress remains.`}
+                    description={`Add people to ${team.name}. People in another team move here. Their accounts and saved progress are kept.`}
                     options={eligible.map((u) => ({
                       id: u.id,
                       label: u.name,
                       description: u.email + " · " + teamName(u.teamId),
                     }))}
-                    actionLabel="Add members"
+                    actionLabel="Review changes"
                     onApply={async (ids) => {
                       if (
                         !(await commit(
@@ -802,24 +961,64 @@ export function TeamsAdmin({
                             ...data,
                             users: data.users.map((u) =>
                               ids.includes(u.id)
-                                ? { ...u, teamId: team.id }
+                                ? {
+                                    ...u,
+                                    teamId: managingOrganization
+                                      ? undefined
+                                      : team.id,
+                                  }
                                 : u,
                             ),
                           },
                           "Members added.",
                           true,
+                          {
+                            review: {
+                              title: "Review membership changes",
+                              confirmLabel: "Add members",
+                            },
+                          },
                         ))
                       )
                         throw new Error("Could not save members.");
                     }}
                     disabled={busy}
                   />
-                </SectionHeader>
-                <CollectionControls sortLabel={memberSort === "name" ? "Name A–Z" : "Name Z–A"}
-                  sort={<FormField label="Sort team members"><SelectField value={memberSort} onValueChange={(value) => { setMemberSort(value); setPage(1); }}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>}
-                  onClear={() => { setQuery(""); setIncludeSubteams(false); setPage(1); }}
-                  filters={[...(query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => { setQuery(""); setPage(1); } }] : []), ...(includeSubteams ? [{ id: "scope", label: "Includes subteams", onRemove: () => { setIncludeSubteams(false); setPage(1); } }] : [])]}
-                  search={
+                }
+                sortLabel={memberSort === "name" ? "Name A–Z" : "Name Z–A"}
+                sort={
+                  <FormField label="Sort team members">
+                    <SelectField
+                      value={memberSort}
+                      onValueChange={(value) => {
+                        setMemberSort(value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="name">Name A–Z</option>
+                      <option value="reverse">Name Z–A</option>
+                    </SelectField>
+                  </FormField>
+                }
+                onClear={() => {
+                  setQuery("");
+                  setPage(1);
+                }}
+                filters={
+                  query
+                    ? [
+                        {
+                          id: "query",
+                          label: `Search: ${query}`,
+                          onRemove: () => {
+                            setQuery("");
+                            setPage(1);
+                          },
+                        },
+                      ]
+                    : []
+                }
+                search={
                   <FormField label="Find a member" visuallyHiddenLabel>
                     <Input
                       type="search"
@@ -831,211 +1030,248 @@ export function TeamsAdmin({
                       placeholder="Find a member by name or email"
                     />
                   </FormField>
-                }>
-                  <FormField label="Membership scope">
-                    <SelectField
-                      value={includeSubteams ? "all" : "direct"}
-                      onValueChange={(value) => {
-                        setIncludeSubteams(value === "all");
-                        setPage(1);
-                      }}
-                    >
-                      <option value="direct">Direct members</option>
-                      <option value="all">Include subteams</option>
-                    </SelectField>
-                  </FormField>
-                </CollectionControls>
-                <BulkActions
-                  singleItemActions={false}
-                  collectionSize={rosterSelection.collectionSize}
-                  selected={rosterSelection.actionIds}
-                  onSelectionChange={rosterSelection.setSelected}
-                  noun="members"
-                  commands={[
-                    {
-                      id: "remove",
-                      label: "Remove from team",
-                      description:
-                        "Remove direct membership from this team. Reporting and team-linked assignments change; saved history remains.",
-                      apply: async () => {
-                        if (
-                          !(await commit(
-                            {
-                              ...data,
-                              users: data.users.map((u) =>
-                                rosterSelection.actionIds.includes(u.id) &&
-                                u.teamId === team.id
-                                  ? { ...u, teamId: undefined }
-                                  : u,
-                              ),
+                }
+              />
+              <BulkActions
+                singleItemActions={managingOrganization}
+                collectionSize={rosterSelection.collectionSize}
+                selected={rosterSelection.actionIds}
+                onSelectionChange={rosterSelection.setSelected}
+                noun="people"
+                range={
+                  members.length
+                    ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, members.length)} of ${members.length} people`
+                    : "0 people"
+                }
+                commands={[
+                  {
+                    id: "remove",
+                    label: "Remove from team",
+                    description:
+                      "Return direct members to Organization. Reporting and team-linked assignments change; saved history remains.",
+                    disabledReason: managingOrganization
+                      ? "People without a named team always belong to Organization. Move them to a team instead."
+                      : undefined,
+                    apply: async () => {
+                      if (
+                        !(await commit(
+                          {
+                            ...data,
+                            users: data.users.map((u) =>
+                              rosterSelection.actionIds.includes(u.id) &&
+                              memberTeam(u) === team.id
+                                ? { ...u, teamId: undefined }
+                                : u,
+                            ),
+                          },
+                          "Members returned to Organization.",
+                          true,
+                          {
+                            review: {
+                              title: "Review membership changes",
+                              confirmLabel: "Remove members",
                             },
-                            "Members removed.",
-                            true,
-                          ))
-                        )
-                          throw new Error("Could not save members.");
-                      },
-                    },
-                    {
-                      id: "move",
-                      label: "Move to team",
-                      description:
-                        "Move these direct members to one destination team. Manager reporting and team-linked assignments change; saved history remains.",
-                      selectionMode: "single",
-                      options: teams
-                        .filter((t) => t.id !== team.id)
-                        .map((t) => ({
-                          id: t.id,
-                          label: teamPath(t.id, teams),
-                        })),
-                      apply: async (ids) => {
-                        if (
-                          !(await commit(
-                            {
-                              ...data,
-                              users: data.users.map((u) =>
-                                rosterSelection.actionIds.includes(u.id) &&
-                                u.teamId === team.id
-                                  ? { ...u, teamId: ids[0] }
-                                  : u,
-                              ),
-                            },
-                            "Members moved.",
-                            true,
-                          ))
-                        )
-                          throw new Error("Could not save members.");
-                      },
-                    },
-                  ]}
-                />
-                {members.length ? (
-                  <TableContainer>
-                    <DataTable layout="teamMembers" aria-label="Team members">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>
-                            <div className="flex items-center gap-3">
-                              {rosterSelection.canSelect && (
-                                <SelectRows
-                                  label="Select this page of direct members"
-                                  ids={members
-                                    .slice(
-                                      (currentPage - 1) * PAGE_SIZE,
-                                      currentPage * PAGE_SIZE,
-                                    )
-                                    .filter((u) => u.teamId === team.id)
-                                    .map((u) => u.id)}
-                                  value={rosterSelection.selected}
-                                  onChange={rosterSelection.setSelected}
-                                />
-                              )}
-                              Person
-                            </div>
-                          </TableHead>
-                          <TableHead>Direct team</TableHead>
-                          <TableHead>
-                            <span className="sr-only">Actions</span>
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {members
-                          .slice(
-                            (currentPage - 1) * PAGE_SIZE,
-                            currentPage * PAGE_SIZE,
-                          )
-                          .map((u) => (
-                            <TableRow key={u.id}>
-                              <TableCell>
-                                <div className="flex items-center gap-3">
-                                  {rosterSelection.canSelect && (
-                                    <Checkbox
-                                      aria-label={`Select ${u.name}`}
-                                      disabled={u.teamId !== team.id}
-                                      checked={rosterSelection.selected.includes(
-                                        u.id,
-                                      )}
-                                      onCheckedChange={(v) =>
-                                        rosterSelection.toggle(u.id, v === true)
-                                      }
-                                    />
-                                  )}
-                                  <strong>{u.name}</strong>
-                                </div>
-                                {u.teamId !== team.id && (
-                                  <small>
-                                    Inherited from a subteam; manage the direct
-                                    team.
-                                  </small>
-                                )}
-                                <small>{u.email}</small>
-                                {!u.active && <Badge>Inactive</Badge>}
-                              </TableCell>
-                              <TableCell>{teamName(u.teamId)}</TableCell>
-                              <TableCell>
-                                {u.teamId === selected ? (
-                                  <Button
-                                    variant="link"
-                                    disabled={busy}
-                                    aria-label={`Remove ${u.name} from team`}
-                                    onClick={() => void removeMember(u)}
-                                  >
-                                    Remove
-                                  </Button>
-                                ) : (
-                                  <Button
-                                    variant="link"
-                                    disabled={busy}
-                                    aria-label={`Manage ${u.name}'s team`}
-                                    onClick={() => void openTeam(u.teamId!)}
-                                  >
-                                    Manage team
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                    </DataTable>
-                  </TableContainer>
-                ) : (
-                  <CollectionEmpty count={0} total={direct.length + (includeSubteams ? descendantMembers.length : 0)} noun="members" onClear={() => { setQuery(""); setPage(1); }} />
-                )}
-                {members.filter((u) => u.teamId === team.id).length >
-                  PAGE_SIZE && (
-                  <Button
-                    type="button"
-                    variant="link"
-                    onClick={() =>
-                      rosterSelection.setSelected(
-                        members
-                          .filter((u) => u.teamId === team.id)
-                          .map((u) => u.id),
+                          },
+                        ))
                       )
-                    }
-                  >
-                    Select all matching direct members
-                  </Button>
-                )}
-                <Pagination
-                  label="Team members"
-                  showCount={false}
-                  page={currentPage}
-                  pageSize={PAGE_SIZE}
-                  total={members.length}
-                  onPageChange={(value) => {
-                    setPage(value);
-                    memberList.reveal();
+                        throw new Error("Could not save members.");
+                    },
+                  },
+                  {
+                    id: "move",
+                    label: "Move to team",
+                    description:
+                      "Move these direct members to one destination team. Manager reporting and team-linked assignments change; saved history remains.",
+                    selectionMode: "single",
+                    options: teams
+                      .filter((t) => t.id !== team.id)
+                      .map((t) => ({
+                        id: t.id,
+                        label: teamPath(t.id, teams),
+                      })),
+                    apply: async (ids) => {
+                      if (
+                        !(await commit(
+                          {
+                            ...data,
+                            users: data.users.map((u) =>
+                              rosterSelection.actionIds.includes(u.id) &&
+                              memberTeam(u) === team.id
+                                ? {
+                                    ...u,
+                                    teamId:
+                                      ids[0] === organization?.id
+                                        ? undefined
+                                        : ids[0],
+                                  }
+                                : u,
+                            ),
+                          },
+                          "Members moved.",
+                          true,
+                          {
+                            review: {
+                              title: "Review membership changes",
+                              confirmLabel: "Move members",
+                            },
+                          },
+                        ))
+                      )
+                        throw new Error("Could not save members.");
+                    },
+                  },
+                ]}
+              />
+              {members.length ? (
+                <TableContainer>
+                  <DataTable layout="teamMembers" aria-label="Team members">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>
+                          <div className="flex items-center gap-3">
+                            {rosterSelection.canSelect && (
+                              <SelectRows
+                                label="Select this page of direct members"
+                                ids={members
+                                  .slice(
+                                    (currentPage - 1) * PAGE_SIZE,
+                                    currentPage * PAGE_SIZE,
+                                  )
+                                  .filter((u) => memberTeam(u) === team.id)
+                                  .map((u) => u.id)}
+                                value={rosterSelection.selected}
+                                onChange={rosterSelection.setSelected}
+                              />
+                            )}
+                            Person
+                          </div>
+                        </TableHead>
+                        <TableHead>Included through</TableHead>
+                        <TableHead>
+                          <span className="sr-only">Actions</span>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {members
+                        .slice(
+                          (currentPage - 1) * PAGE_SIZE,
+                          currentPage * PAGE_SIZE,
+                        )
+                        .map((u) => (
+                          <TableRow key={u.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                {rosterSelection.canSelect && (
+                                  <Checkbox
+                                    aria-label={`Select ${u.name}`}
+                                    disabled={memberTeam(u) !== team.id}
+                                    aria-describedby={
+                                      memberTeam(u) !== team.id
+                                        ? `team-membership-${u.id}`
+                                        : undefined
+                                    }
+                                    checked={rosterSelection.selected.includes(
+                                      u.id,
+                                    )}
+                                    onCheckedChange={(v) =>
+                                      rosterSelection.toggle(u.id, v === true)
+                                    }
+                                  />
+                                )}
+                                <strong>{u.name}</strong>
+                              </div>
+                              {memberTeam(u) !== team.id && (
+                                <span
+                                  id={`team-membership-${u.id}`}
+                                  className="sr-only"
+                                >
+                                  Manage membership in {teamName(u.teamId)}.
+                                </span>
+                              )}
+                              <small>{u.email}</small>
+                              {!u.active && <Badge>Inactive</Badge>}
+                              {u.active && u.registered === false && (
+                                <Badge>Not signed in</Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {managingOrganization && !u.teamId
+                                ? "No direct team"
+                                : memberTeam(u) === team.id
+                                  ? "Direct member"
+                                  : teamName(u.teamId)}
+                            </TableCell>
+                            <TableCell>
+                              {managingOrganization ? null : memberTeam(u) ===
+                                selected ? (
+                                <Button
+                                  variant="link"
+                                  disabled={busy}
+                                  aria-label={`Remove ${u.name} from team`}
+                                  onClick={() => void removeMember(u)}
+                                >
+                                  Remove
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="link"
+                                  disabled={busy}
+                                  aria-label={`Manage ${u.name}'s team`}
+                                  onClick={() => void openTeam(memberTeam(u)!)}
+                                >
+                                  Manage team
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                    </TableBody>
+                  </DataTable>
+                </TableContainer>
+              ) : (
+                <CollectionEmpty
+                  count={0}
+                  total={roster.length}
+                  noun="members"
+                  onClear={() => {
+                    setQuery("");
+                    setPage(1);
                   }}
-                  disabled={busy}
                 />
-              </TabsContent>
-              <TabsContent value="subteams" className="grid gap-6">
-                <SectionHeader
-                  title={<h3>Subteams</h3>}
-                  description="Open a subteam to manage its own members and children."
+              )}
+              {members.filter((u) => memberTeam(u) === team.id).length >
+                PAGE_SIZE && (
+                <Button
+                  type="button"
+                  variant="link"
+                  onClick={() =>
+                    rosterSelection.setSelected(
+                      members
+                        .filter((u) => memberTeam(u) === team.id)
+                        .map((u) => u.id),
+                    )
+                  }
                 >
+                  Select all matching direct members
+                </Button>
+              )}
+              <Pagination
+                label="Team members"
+                showCount={false}
+                page={currentPage}
+                pageSize={PAGE_SIZE}
+                total={members.length}
+                onPageChange={(value) => {
+                  setPage(value);
+                  memberList.reveal();
+                }}
+                disabled={busy}
+              />
+            </TabsContent>
+            {!managingOrganization && children.length > 0 && (
+              <TabsContent value="subteams" className="grid gap-6">
+                <SectionHeader title={<h3>Subteams</h3>}>
                   <ActionGroup>
                     <Button
                       variant="outline"
@@ -1061,10 +1297,116 @@ export function TeamsAdmin({
                 </SectionHeader>
                 {teamTable(children)}
               </TabsContent>
-            </Tabs>
-          )}
-        </>
+            )}
+          </Tabs>
+        </div>
       )}
+      <Dialog
+        open={!!moving}
+        onOpenChange={async (open) => {
+          if (!open && (await guard.current())) resetDraft();
+        }}
+      >
+        {moving && team && (
+          <DialogContent
+            onEscapeKeyDown={(event) => {
+              if (busy) event.preventDefault();
+            }}
+            onPointerDownOutside={(event) => {
+              if (busy) event.preventDefault();
+            }}
+          >
+            <DialogTitle>
+              {moving.mode === "into"
+                ? `Move a team into ${team.name}`
+                : `Move ${team.name}`}
+            </DialogTitle>
+            <DialogDescription>
+              Choose a new place for the whole branch. You’ll review any
+              reporting or learning changes before saving.
+            </DialogDescription>
+            {notice && <Alert variant="destructive">{notice}</Alert>}
+            <SearchableSelectionList
+              label={
+                moving.mode === "into"
+                  ? "Find a team to move here"
+                  : "Choose a new parent"
+              }
+              selectionMode="single"
+              placeholder="Team name or hierarchy path"
+              emptyMessage="No eligible teams. Moves that create a cycle are excluded."
+              value={moving.choice == null ? [] : [moving.choice]}
+              onChange={(ids) =>
+                setMoving({ ...moving, choice: ids[0] ?? null })
+              }
+              disabled={busy}
+              options={
+                moving.mode === "into"
+                  ? [...teams]
+                      .sort(byName)
+                      .filter(
+                        (item) =>
+                          item.parentId !== team.id &&
+                          canParent(item.id, team.id, teams),
+                      )
+                      .map((item) => ({
+                        id: item.id,
+                        label: item.name,
+                        description: teamPath(item.id, teams),
+                      }))
+                  : [
+                      ...(team.parentId && !organization
+                        ? [
+                            {
+                              id: "",
+                              label: "Top-level team",
+                              description:
+                                "Keep this branch; remove its parent.",
+                            },
+                          ]
+                        : []),
+                      ...[...teams]
+                        .sort(byName)
+                        .filter(
+                          (item) =>
+                            item.id !== team.parentId &&
+                            canParent(team.id, item.id, teams),
+                        )
+                        .map((item) => ({
+                          id: item.id,
+                          label: item.name,
+                          description: teamPath(item.id, teams),
+                        })),
+                    ]
+              }
+            />
+            {impact && (
+              <p className="text-copy text-muted-foreground [overflow-wrap:anywhere]">
+                {impact.from} → {impact.to}
+              </p>
+            )}
+            {moveError && <Alert variant="destructive">{moveError}</Alert>}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy}
+                onClick={resetDraft}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                loading={busy}
+                disabled={!impact || !moving.snapshot}
+                onClick={() => void applyMove()}
+              >
+                Review move
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
       <Dialog
         open={!!editing}
         onOpenChange={(open) => {
@@ -1073,6 +1415,13 @@ export function TeamsAdmin({
       >
         {editing && (
           <DialogContent
+            onCloseAutoFocus={(event) => {
+              const focus = editorCloseFocus.current;
+              if (!focus) return;
+              event.preventDefault();
+              editorCloseFocus.current = null;
+              focus();
+            }}
             onEscapeKeyDown={(e) => {
               if (busy) e.preventDefault();
             }}
@@ -1081,46 +1430,71 @@ export function TeamsAdmin({
             }}
           >
             <DialogTitle>
-              {teams.some((t) => t.id === editing.id)
-                ? `Edit ${baseline.current?.name}`
-                : "New team"}
+              {editing.id === organization?.id
+                ? "Organization manager"
+                : teams.some((t) => t.id === editing.id)
+                  ? `Edit ${baseline.current?.name}`
+                  : "New team"}
             </DialogTitle>
             <DialogDescription>
-              Edit the team name and manager. Use Move team to review changes to
-              an existing team's reporting hierarchy.
+              {editing.id === organization?.id
+                ? "Choose who can report on the whole organization. Manage direct members on the Organization page."
+                : "Set the name, parent and manager. You’ll review any reporting or learning changes before saving."}
             </DialogDescription>
             <form onSubmit={saveTeam} className="grid gap-4">
               {notice && <Alert variant="destructive">{notice}</Alert>}
               <FieldGroup disabled={busy}>
-                <FormField label="Team name">
-                  <Input
-                    required
-                    maxLength={80}
-                    value={editing.name}
-                    onChange={(e) =>
-                      setEditing({ ...editing, name: e.target.value })
-                    }
-                  />
-                </FormField>
-                {!teams.some((item) => item.id === editing.id) && (
-                  <FormField label="Parent team">
-                    <SelectField
-                      disabled={busy}
-                      value={editing.parentId || ""}
-                      onValueChange={(value) =>
-                        setEditing({ ...editing, parentId: value || undefined })
-                      }
-                    >
-                      <option value="">Top-level team</option>
-                      {teams
-                        .filter((t) => canParent(editing.id, t.id, teams))
-                        .map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {teamPath(t.id, teams)}
-                          </option>
-                        ))}
-                    </SelectField>
-                  </FormField>
+                {editing.id !== organization?.id && (
+                  <>
+                    <FormField label="Team name">
+                      <Input
+                        required
+                        maxLength={80}
+                        value={editing.name}
+                        onChange={(e) =>
+                          setEditing({ ...editing, name: e.target.value })
+                        }
+                      />
+                    </FormField>
+                    <FormField label="Parent team">
+                      <HierarchyPicker
+                        disabled={busy}
+                        value={editing.parentId || organization?.id || ""}
+                        searchLabel="Find a parent team"
+                        onValueChange={(value) =>
+                          setEditing({
+                            ...editing,
+                            parentId: value || organization?.id,
+                          })
+                        }
+                        options={[
+                          {
+                            id: organization?.id || "",
+                            label: "Organization",
+                            path: ["Organization"],
+                          },
+                          ...[...teams]
+                            .sort(byName)
+                            .filter(
+                              (item) =>
+                                item.id !== organization?.id &&
+                                canParent(editing.id, item.id, teams),
+                            )
+                            .map((item) => ({
+                              id: item.id,
+                              label: item.name,
+                              path: [...ancestorIds(item.id, teams)]
+                                .reverse()
+                                .map(
+                                  (id) =>
+                                    teams.find((value) => value.id === id)
+                                      ?.name || "Unknown team",
+                                ),
+                            })),
+                        ]}
+                      />
+                    </FormField>
+                  </>
                 )}
                 <FormField label="Manager">
                   <SelectField
@@ -1135,11 +1509,33 @@ export function TeamsAdmin({
                     {data.users
                       .filter(
                         (u) =>
-                          u.active && ["manager", "admin", "contributor"].includes(u.role),
+                          u.id === editing.managerId ||
+                          (u.active &&
+                            ["manager", "admin", "contributor"].includes(
+                              u.role,
+                            )),
                       )
                       .map((u) => (
-                        <option key={u.id} value={u.id}>
+                        <option
+                          key={u.id}
+                          value={u.id}
+                          disabled={
+                            !u.active ||
+                            !["manager", "admin", "contributor"].includes(
+                              u.role,
+                            )
+                          }
+                        >
                           {u.name}
+                          {!u.active
+                            ? " (inactive)"
+                            : !["manager", "admin", "contributor"].includes(
+                                  u.role,
+                                )
+                              ? " (no longer a manager)"
+                              : u.registered === false
+                                ? " (not signed in)"
+                                : ""}
                         </option>
                       ))}
                   </SelectField>
@@ -1150,20 +1546,24 @@ export function TeamsAdmin({
                   id="team-manager-guidance"
                   className="text-copy text-muted-foreground"
                 >
-                  Assigning a manager grants reporting access for this team and
-                  its subteams.
+                  The manager sees this team and its subteams, regardless of
+                  their own team membership.
                 </p>
                 <ActionGroup>
                   <Button
                     type="button"
                     variant="outline"
                     disabled={busy}
-                    onClick={() => void closeEditor()}
+                    onClick={() => void closeEditor(true)}
                   >
                     Cancel
                   </Button>
                   <Button type="submit" loading={busy}>
-                    Save team
+                    {editingNeedsReview
+                      ? "Review changes"
+                      : editing.id === organization?.id
+                        ? "Save manager"
+                        : "Save team"}
                   </Button>
                 </ActionGroup>
               </DialogFooter>

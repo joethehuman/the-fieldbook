@@ -28,6 +28,7 @@ import { Alert } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { Toolbar, EmptyState, PageHeader } from "@/components/patterns/layout";
 import Updates from "./Updates";
+import { reviewDeadlines, recalculateDeadlines } from "@/lib/assignment-episodes";
 import { reconcileLearning } from "@/lib/learning-groups";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
@@ -720,6 +721,12 @@ export default function Fieldbook() {
             data={data}
             user={user}
             onChange={persist}
+            onReviewDeadlines={async (token) => {
+              const current = loadWorkspace();
+              const review = reviewDeadlines(current);
+              if (token) { const next = recalculateDeadlines(current, token); saveWorkspace(next); setData(next); }
+              return review;
+            }}
             onSaveContent={async (content, intent) => {
               try {
                 const before = loadWorkspace();

@@ -66,7 +66,14 @@ test("admin settings guard draft and published placement; content write validate
     FIELDBOOK_URL: "https://example.test",
     FIELDBOOK_OWNER_EMAIL: "admin@example.test",
   });
-  let settings: any = { ...defaultSettings, docCategoryOrder: ["Start"] };
+  const systemSettings = {
+    ...defaultSettings,
+    organizationTeamId: "organization",
+  };
+  const teams = [
+    { id: "organization", name: "Organization", system: "organization" },
+  ];
+  let settings: any = { ...systemSettings, docCategoryOrder: ["Start"] };
   let writes = 0;
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
@@ -77,7 +84,7 @@ test("admin settings guard draft and published placement; content write validate
         writes++;
         settings = JSON.parse(String(init?.body)).settings;
         body = { revision: 2 };
-      } else body = { settings, groups: [], governance_revision: 1 };
+      } else body = { settings, teams, groups: [], governance_revision: 1 };
     } else if (url.pathname.endsWith("fb_documents")) {
       body = url.searchParams.has("id")
         ? { draft: legacy, published: legacy, revision: 1 }
@@ -94,7 +101,7 @@ test("admin settings guard draft and published placement; content write validate
     await assert.rejects(
       () =>
         saveSettings(null, {
-          settings: { ...defaultSettings, docSections: [] },
+          settings: { ...systemSettings, docSections: [] },
           expected: 1,
         }),
       /Sign in/,
@@ -103,7 +110,7 @@ test("admin settings guard draft and published placement; content write validate
       () =>
         saveSettings(admin, {
           settings: {
-            ...defaultSettings,
+            ...systemSettings,
             docCategoryOrder: [],
             docSections: [],
           },
@@ -114,7 +121,7 @@ test("admin settings guard draft and published placement; content write validate
     assert.equal(writes, 0);
     await saveSettings(admin, {
       settings: {
-        ...defaultSettings,
+        ...systemSettings,
         docCategoryOrder: [],
         docSections: [{ ...section, name: "Begin" }],
       },

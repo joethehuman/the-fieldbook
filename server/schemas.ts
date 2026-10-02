@@ -194,6 +194,7 @@ export const settingsSchema = z
       .default([]),
     homePage: z.enum(["updates", "courses", "docs"]).default("courses"),
     guestGroupId: text(80).min(1).nullable().optional(),
+    organizationTeamId: text(80).min(1).nullable().optional(),
     docCategoryOrder: z
       .array(text(80).trim().min(1))
       .max(500)

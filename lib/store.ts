@@ -1,4 +1,10 @@
 import { reconcileLearning } from "./learning-groups";
+import { reconcileAssignments } from "./assignment-episodes";
+import { flattenLearningGroups } from "./group-conversion";
+import {
+  validateOrganizationTeams,
+  withOrganizationTeam,
+} from "./organization-team";
 import { expireDemoDeleted } from "./bulk-actions";
 import { withPublishedSnapshots } from "./demo-publication";
 import { defaultSettings } from "./settings";
@@ -46,7 +52,7 @@ const completedCourse = (id: string): Progress => ({
   passed: true,
 });
 export function freshWorkspace(): Workspace {
-  return {
+  return withOrganizationTeam({
     schema: 1,
     settings: {
       ...defaultSettings,
@@ -169,7 +175,7 @@ export function freshWorkspace(): Workspace {
       ],
       "demo-rep-5": [completedCourse("course-12")],
     },
-  };
+  });
 }
 /** Repair only the original Hoolibook sample group's conflicting course selection. */
 function repairHooliSecurityAssignment(data: Workspace): Workspace {
@@ -308,7 +314,28 @@ export function loadWorkspace(): Workspace {
     if (renamed?.previous.includes(user.name)) user.name = renamed.name;
   }
   const upgraded = withPublishedSnapshots(data);
-  const current = expireDemoDeleted(repairHooliSecurityAssignment(upgraded));
+  const repaired = expireDemoDeleted(repairHooliSecurityAssignment(upgraded));
+  const legacy = repaired.users.some((p) => !p.learningAssignments)
+    ? {
+        ...repaired,
+        groups: repaired.groups.map((g) => ({
+          ...g,
+          teamLinkScope:
+            g.teamLinkScope ||
+            (g.teamIds?.length ? ("direct" as const) : ("subtree" as const)),
+        })),
+      }
+    : repaired;
+  const current = withOrganizationTeam(flattenLearningGroups(legacy));
+  if (current.users.some((p) => !p.learningAssignments)) {
+    current.users = reconcileAssignments(
+      current,
+      current,
+      new Date().toISOString(),
+      true,
+    );
+    saveWorkspace(current);
+  }
   if (current !== upgraded) saveWorkspace(current);
   const reconciled = reconcileLearning(current, current);
   if (JSON.stringify(reconciled) !== JSON.stringify(current))
@@ -316,6 +343,18 @@ export function loadWorkspace(): Workspace {
   return reconciled;
 }
 export function saveWorkspace(data: Workspace) {
+  const previous = localStorage.getItem(KEY);
+  const old: Workspace | undefined = previous
+    ? JSON.parse(previous)
+    : undefined;
+  // Legacy snapshots convert on load; once converted, ordinary writes preserve the root.
+  if (old?.teams?.some((team) => team.system === "organization"))
+    validateOrganizationTeams(
+      data.teams || [],
+      data.settings?.organizationTeamId,
+      old.teams,
+      old.settings?.organizationTeamId,
+    );
   localStorage.setItem(KEY, JSON.stringify(data));
 }
 export function updateProgress(

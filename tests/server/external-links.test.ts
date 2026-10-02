@@ -86,6 +86,13 @@ test("only administrators can save links, using the existing revision-controlled
   delete process.env.VERCEL_ENV;
   delete process.env.FIELDBOOK_ENVIRONMENT;
   const writes: any[] = [];
+  const systemSettings = {
+    ...defaultSettings,
+    organizationTeamId: "organization",
+  };
+  const teams = [
+    { id: "organization", name: "Organization", system: "organization" },
+  ];
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     if (url.pathname.endsWith("fb_config") && init?.method === "PATCH") {
@@ -97,10 +104,11 @@ test("only administrators can save links, using the existing revision-controlled
     }
     if (url.pathname.endsWith("fb_config"))
       return Response.json({
-        settings: defaultSettings,
+        settings: systemSettings,
         revision: 7,
         governance_revision: 9,
         groups: [],
+        teams,
       });
     throw new Error(`Unexpected request: ${url.pathname}`);
   };
@@ -120,14 +128,14 @@ test("only administrators can save links, using the existing revision-controlled
     ])
       await assert.rejects(
         saveSettings(user, {
-          settings: { ...defaultSettings, externalLinks: links },
+          settings: { ...systemSettings, externalLinks: links },
           expected: 7,
         }),
         (error: any) => [401, 403].includes(error.status),
       );
     assert.equal(writes.length, 0);
     const result = await saveSettings(admin, {
-      settings: { ...defaultSettings, externalLinks: links },
+      settings: { ...systemSettings, externalLinks: links },
       expected: 7,
     });
     assert.equal(result.revision, 8);
@@ -137,7 +145,7 @@ test("only administrators can save links, using the existing revision-controlled
     assert.equal(writes[0].url.searchParams.get("governance_revision"), "eq.9");
     await assert.rejects(
       saveSettings(admin, {
-        settings: { ...defaultSettings, externalLinks: links },
+        settings: { ...systemSettings, externalLinks: links },
         expected: 6,
       }),
       (error: any) => error.status === 409,

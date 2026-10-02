@@ -48,24 +48,82 @@ test("installed mixed picker saves one complete governance mutation and blocks s
     .filter({ hasText: course.title })
     .getByRole("button", { name: "Assign", exact: true })
     .click();
-  const panel = page.getByRole("region", { name: "Assign learning" });
+  const panel = page.getByRole("dialog", {
+    name: "Assign to teams or groups",
+    exact: true,
+  });
   await expect(
-    panel.getByRole("checkbox", { name: "Group: Sales", exact: true }),
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Group: Sales",
+      exact: true,
+    }),
   ).toBeVisible();
   await panel
-    .getByRole("checkbox", { name: "Team: Sales", exact: true })
+    .getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    })
     .check();
   await panel
-    .getByRole("button", { name: "Save assignments", exact: true })
+    .getByRole("button", { name: "Review assignments", exact: true })
+    .click();
+  const review = page.getByRole("dialog", {
+    name: `Assign ${course.title}`,
+    exact: true,
+  });
+  await expect(review).toBeVisible();
+  expect(calls).toBe(0);
+  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    }),
+  ).toBeChecked();
+  await expect(
+    panel.getByRole("button", { name: "Review assignments", exact: true }),
+  ).toBeFocused();
+  expect(calls).toBe(0);
+  await panel
+    .getByRole("button", { name: "Review assignments", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: `Assign ${course.title}`, exact: true })
+    .getByRole("button", { name: "Apply assignments", exact: true })
     .click();
   await expect(panel.getByRole("alert")).toBeVisible();
   await expect(
-    panel.getByRole("button", { name: "Save assignments", exact: true }),
+    panel.getByRole("button", { name: "Review assignments", exact: true }),
   ).toBeDisabled();
   expect(calls).toBe(1);
   await page.screenshot({
     path: info.outputPath("mixed-assignment-stale-recovery.png"),
   });
+  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page
+    .getByRole("alertdialog", { name: "Confirm action", exact: true })
+    .getByRole("button", { name: "Confirm", exact: true })
+    .click();
+  await expect(panel).not.toBeVisible();
+  await page
+    .getByRole("row")
+    .filter({ hasText: course.title })
+    .getByRole("button", { name: "Assign", exact: true })
+    .click();
+  await expect(
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Group: Sales",
+      exact: true,
+    }),
+  ).toBeChecked();
+  await expect(
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    }),
+  ).not.toBeChecked();
+  await expect(panel.getByRole("alert")).toHaveCount(0);
+  expect(calls).toBe(1);
 });
 
 test("installed editor saves after assignments change its document revision", async ({
@@ -130,14 +188,24 @@ test("installed editor saves after assignments change its document revision", as
   await page
     .getByRole("button", { name: "Assign to teams or groups", exact: true })
     .click();
-  const panel = page.getByRole("region", { name: "Assign learning" });
+  const panel = page.getByRole("dialog", {
+    name: "Assign to teams or groups",
+    exact: true,
+  });
   await panel
-    .getByRole("checkbox", { name: "Team: Sales", exact: true })
+    .getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    })
     .check();
   await panel
-    .getByRole("button", { name: "Save assignments", exact: true })
+    .getByRole("button", { name: "Review assignments", exact: true })
     .click();
-  await expect(panel).toHaveCount(0);
+  await page
+    .getByRole("dialog", { name: `Assign ${course.title}`, exact: true })
+    .getByRole("button", { name: "Apply assignments", exact: true })
+    .click();
+  await expect(panel).not.toBeVisible();
   const save = page.waitForResponse(
     (response) =>
       response.url().endsWith("/api/content") &&

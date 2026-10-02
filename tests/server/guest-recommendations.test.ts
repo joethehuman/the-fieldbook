@@ -11,6 +11,19 @@ test("real snapshot/progress/settings boundaries with synthetic PostgREST: no an
     originalEnv = { ...process.env };
   let data = guestFixture(),
     conflict = false;
+  data.settings!.organizationTeamId = "private-organization-team";
+  const rootId = data.teams!.find((team) => team.system === "organization")!.id;
+  data.teams = data.teams!.map((team) =>
+    team.id === rootId
+      ? { ...team, id: "private-organization-team" }
+      : {
+          ...team,
+          parentId:
+            team.parentId === rootId
+              ? "private-organization-team"
+              : team.parentId,
+        },
+  );
   const requests: { url: URL; method: string }[] = [];
   Object.assign(process.env, {
     NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
@@ -69,6 +82,8 @@ test("real snapshot/progress/settings boundaries with synthetic PostgREST: no an
     assert.deepEqual(guest.progress, {});
     assert.equal(guest.governanceRevision, undefined);
     assert.equal(guest.revision, undefined);
+    assert.equal("organizationTeamId" in guest.settings!, false);
+    assert.ok(!JSON.stringify(guest).includes("private-organization-team"));
     assert.ok(!JSON.stringify(guest).includes("SECRET"));
     assert.ok(!JSON.stringify(guest).includes(data.users[0].email));
     assert.equal(requests.length, 2);

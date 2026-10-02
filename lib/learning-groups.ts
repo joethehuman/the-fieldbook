@@ -6,6 +6,7 @@ import {
   type Group,
   type Curriculum,
   type LearningItem,
+  type Team,
 } from "./types";
 import { reconcileAssignments } from "./assignment-episodes";
 import { assignmentRules } from "./learning";
@@ -26,6 +27,15 @@ export function groupItems(group: Group, content: Content[]): LearningItem[] {
         a.title.localeCompare(b.title),
     )
     .map((c) => ({ kind: "course", id: c.id }));
+}
+/** Preserve older direct Team course plans until they are normalized on save. */
+export function teamItems(
+  team: Pick<Team, "learningItems" | "requiredCourseIds">,
+): LearningItem[] {
+  return (
+    team.learningItems ??
+    (team.requiredCourseIds || []).map((id) => ({ kind: "course", id }))
+  );
 }
 export function expandLearning(
   items: LearningItem[],
@@ -102,8 +112,8 @@ export function reconcileLearning(
   }));
   next.teams = (next.teams || []).map((t) => ({
     ...t,
-    learningItems: t.learningItems || [],
-    requiredCourseIds: expandLearning(t.learningItems || [], next.curricula!),
+    learningItems: teamItems(t),
+    requiredCourseIds: expandLearning(teamItems(t), next.curricula!),
   }));
   next.users = next.users.map((u) => {
     const old = before.users.find((p) => p.id === u.id);
@@ -112,12 +122,17 @@ export function reconcileLearning(
       : new Set<string>();
     return {
       ...u,
+      onboardingDays:
+        u.hireDate || u.onboardingStart
+          ? (u.onboardingDays ?? next.settings?.onboardingDays ?? 90)
+          : undefined,
       groupJoinedAt: Object.fromEntries(
         u.groups.map((id) => [
           id,
           old?.groups.includes(id) ? old.groupJoinedAt?.[id] || stamp : stamp,
         ]),
       ),
+      effectiveGroupIds: undefined,
       effectiveGroupJoinedAt: Object.fromEntries(
         [...effectiveGroups(u, next.groups, next.teams || [])].map((id) => [
           id,

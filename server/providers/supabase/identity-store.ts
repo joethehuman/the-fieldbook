@@ -11,7 +11,10 @@ export async function findProfileBySubject(
   subject: string,
   activeOnly = false,
 ): Promise<ProfileRecord | null> {
-  let query = db().from("fb_profiles").select("*,assignment_context:fb_profile_learning").eq("auth_user_id", subject);
+  let query = db()
+    .from("fb_profiles")
+    .select("*,assignment_context:fb_profile_learning")
+    .eq("auth_user_id", subject);
   if (activeOnly) query = query.eq("active", true);
   const { data, error } = await query.maybeSingle();
   check(error);

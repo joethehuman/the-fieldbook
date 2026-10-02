@@ -1,4 +1,5 @@
 "use client";
+import { isOrganizationChangeCanceled } from "@/lib/organization-change";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Plus } from "lucide-react";
 import { Checkbox } from "../ui/choice";
@@ -226,10 +227,11 @@ export function BulkPicker({
                   );
                   setOpen(false);
                 } catch (e) {
-                  setError(
-                    (e as Error).message +
-                      " Close this dialog and review the current list before trying again.",
-                  );
+                  if (!isOrganizationChangeCanceled(e))
+                    setError(
+                      (e as Error).message +
+                        " Close this dialog and review the current list before trying again.",
+                    );
                 } finally {
                   running.current = false;
                   setBusy(false);

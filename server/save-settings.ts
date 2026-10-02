@@ -9,6 +9,7 @@ import {
   sectionForDoc,
 } from "@/lib/docs-navigation";
 import type { DocLink } from "@/lib/docs-navigation";
+import { organizationTeam } from "@/lib/organization-team";
 export async function saveSettings(
   user: User | null,
   a: { settings: unknown; expected: number },
@@ -32,6 +33,22 @@ export async function saveSettings(
         "That learning group is unavailable. Choose another group or None.",
       );
   }
+  const selectedTeam = parsed.data.organizationTeamId;
+  const root = organizationTeam(
+    config.teams || [],
+    config.settings.organizationTeamId,
+  );
+  if (!root || root.id !== config.settings.organizationTeamId)
+    throw new HttpError(
+      503,
+      "Organization team setup is incomplete. Apply the matching migration before saving.",
+    );
+  if (selectedTeam !== undefined && selectedTeam !== root.id)
+    throw new HttpError(
+      400,
+      "The built-in Organization team cannot be changed or removed.",
+    );
+  parsed.data.organizationTeamId = root.id;
   if (
     JSON.stringify(parsed.data.docSections) !==
     JSON.stringify(config.settings.docSections)

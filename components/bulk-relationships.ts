@@ -27,14 +27,20 @@ export function contentRelationshipCommands(
   const reason = records.some(
     (c) => !published.some((p) => p.id === c.id && p.status === "published"),
   )
-    ? "Publish every selected item before changing group assignments or audiences."
+    ? "Publish every selected item before changing assignments or audiences."
     : undefined;
   const commands: BulkCommand[] = ([true, false] as const).map((add) => ({
     id: add ? "group-add" : "group-remove",
-    label: kind === "brief" ? (add ? "Add relevant groups" : "Remove relevant groups") : add
-      ? "Assign to teams or groups"
-      : "Remove team or group assignments",
+    label:
+      kind === "brief"
+        ? add
+          ? "Add relevant groups"
+          : "Remove relevant groups"
+        : add
+          ? "Assign to teams or groups"
+          : "Remove team or group assignments",
     disabledReason: reason,
+    applyLabel: "Review changes",
     description: add
       ? "Add direct learning assignments or Update audiences. Overlapping courses count once. Existing history is preserved."
       : "Remove direct links only. Learning inherited through a curriculum or another team or group remains; saved history is preserved.",
@@ -74,6 +80,7 @@ export function contentRelationshipCommands(
       id: "curriculum-add",
       label: "Add to curricula",
       disabledReason: reason,
+      applyLabel: "Review changes",
       description:
         "Append these courses without duplicates. Teams and groups using these curricula receive the added courses; history is preserved.",
       options: (data.curricula || []).map((c) => ({ id: c.id, label: c.name })),
@@ -100,6 +107,7 @@ export function curriculumGroupCommands(
     label: add
       ? "Assign to teams or groups"
       : "Remove team or group assignments",
+    applyLabel: "Review assignments",
     description:
       "Change direct curriculum assignments. Course content and saved learning history are preserved.",
     disabledReason:

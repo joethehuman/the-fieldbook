@@ -257,20 +257,41 @@ test("installed Organization fallback includes people without direct teams in as
   assert.deepEqual(learningChangeImpact(data, after)[0].gained, [course.id]);
   const saved = reconcileLearning(data, after);
   assert.equal(
-    saved.users[0].learningAssignments?.[0].sourceAudiences[0].id,
+    saved.users[0].learningAssignments?.[0].sourceAudiences?.[0].id,
     "org",
   );
 });
 
-
 test("Organization manager reporting retains unassigned members while subteam managers remain scoped", async () => {
- const {teamProgressRows} = await import("../lib/reporting");
- const data = freshWorkspace();
- const manager = {...data.users[0], id: "manager", role: "manager" as const, active: true};
- const childManager = {...manager, id: "child-manager"};
- data.teams = [{id: "org", name: "Organization", system: "organization", managerId: manager.id}, {id: "child", name: "Child", parentId: "org", managerId: childManager.id}];
- data.users = [{...data.users[1], id: "root-member", teamId: undefined}, {...data.users[1], id: "child-member", teamId: "child"}];
- assert.deepEqual(teamProgressRows(data, manager).map(r=>r.u.id), ["root-member", "child-member"]);
- assert.equal(teamProgressRows(data, manager)[0].team, "Organization");
- assert.deepEqual(teamProgressRows(data, childManager).map(r=>r.u.id), ["child-member"]);
+  const { teamProgressRows } = await import("../lib/reporting");
+  const data = freshWorkspace();
+  const manager = {
+    ...data.users[0],
+    id: "manager",
+    role: "manager" as const,
+    active: true,
+  };
+  const childManager = { ...manager, id: "child-manager" };
+  data.teams = [
+    {
+      id: "org",
+      name: "Organization",
+      system: "organization",
+      managerId: manager.id,
+    },
+    { id: "child", name: "Child", parentId: "org", managerId: childManager.id },
+  ];
+  data.users = [
+    { ...data.users[1], id: "root-member", teamId: undefined },
+    { ...data.users[1], id: "child-member", teamId: "child" },
+  ];
+  assert.deepEqual(
+    teamProgressRows(data, manager).map((r) => r.u.id),
+    ["root-member", "child-member"],
+  );
+  assert.equal(teamProgressRows(data, manager)[0].team, "Organization");
+  assert.deepEqual(
+    teamProgressRows(data, childManager).map((r) => r.u.id),
+    ["child-member"],
+  );
 });
