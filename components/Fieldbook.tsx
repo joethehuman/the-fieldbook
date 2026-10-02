@@ -880,6 +880,7 @@ export default function Fieldbook() {
             settings={data.settings}
             user={user}
             groups={learningGroups}
+            teams={uid === "guest" ? [] : data.teams}
             onOpen={(id) => navigate("briefs", id)}
           />
         </>

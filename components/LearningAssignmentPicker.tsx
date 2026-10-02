@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { Workspace } from "@/lib/store";
 import type { LearningItem } from "@/lib/types";
-import { effectiveGroups, ancestorIds, reportingTeamId } from "@/lib/types";
+import { AudienceSelection } from "./patterns/audience-selection";
+import { audienceOptions, contentAudienceKey } from "@/lib/content-audiences";
 import {
   assignLearningToAudiences,
   curriculumAudienceSources,
@@ -17,27 +18,15 @@ import {
 } from "@/lib/organization-change";
 import { Button } from "./ui/button";
 import { Alert } from "./ui/alert";
-import { Checkbox } from "./ui/choice";
 import { useToast } from "./ui/toast";
 import {
   Dialog,
   DialogContent,
+  DialogBody,
   DialogDescription,
   DialogFooter,
   DialogTitle,
 } from "./ui/dialog";
-import { DataTable } from "./patterns/data-table";
-import {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableContainer,
-} from "./ui/table";
-import { SearchField } from "./patterns/search-field";
-import { Input } from "./ui/input";
-import { Pagination } from "./patterns/pagination";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 
@@ -50,14 +39,20 @@ export function LearningAssignmentPicker({
   onPrepare,
   triggerLabel = "Assign to teams or groups",
   compact = false,
+  draftAudiences,
+  onDraftChange,
+  showPeople = true,
 }: {
   onPrepare?: () => Promise<Workspace | null>;
   triggerLabel?: string;
   compact?: boolean;
   data: Workspace;
-  item: LearningItem;
+  item: LearningItem | { kind: "brief"; id: string };
+  draftAudiences?: string[];
+  showPeople?: boolean;
+  onDraftChange?: (keys: string[]) => void;
   title: string;
-  onChange: (
+  onChange?: (
     next: Workspace,
     options?: OrganizationChangeOptions,
   ) => void | Promise<void>;
@@ -65,8 +60,6 @@ export function LearningAssignmentPicker({
 }) {
   const [open, setOpen] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
-    [query, setQuery] = useState(""),
-    [page, setPage] = useState(1),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [stale, setStale] = useState(false);
@@ -111,36 +104,19 @@ export function LearningAssignmentPicker({
     };
   }, [open, dirty, busy, registerNavigationGuard]);
   const allAudiences = assignmentAudiences(data);
-  const audiences = allAudiences.filter((audience) =>
-    `${audience.kind}: ${audience.name}`
-      .toLowerCase()
-      .includes(query.trim().toLowerCase()),
+  const learningItem = item.kind === "brief" ? undefined : item;
+  const inherited = Object.fromEntries(
+    allAudiences.flatMap((candidate) => {
+      const key = audienceKey(candidate);
+      const sources = learningItem
+        ? curriculumAudienceSources(data, key, learningItem)
+        : [];
+      return sources.length ? [[key, sources]] : [];
+    }),
   );
-  const currentPage = Math.min(
-    page,
-    Math.max(1, Math.ceil(audiences.length / 10)),
-  );
-  const hasPerson = (
-    person: Workspace["users"][number],
-    audience: (typeof allAudiences)[number],
-  ) =>
-    audience.kind === "group"
-      ? effectiveGroups(person, data.groups, data.teams || []).has(audience.id)
-      : ancestorIds(
-          reportingTeamId(person.teamId, data.teams || []) || "",
-          data.teams || [],
-        ).has(audience.id);
-  const covered = allAudiences.filter(
-    (audience) =>
-      selected.includes(audienceKey(audience)) ||
-      curriculumAudienceSources(data, audienceKey(audience), item).length > 0,
-  );
-  const audience = data.users.filter(
-    (person) =>
-      person.active &&
-      covered.some((candidate) => hasPerson(person, candidate)),
-  ).length;
-  const initialCount = directlyAssignedAudiences(data, item).length;
+  const initialKeys =
+    draftAudiences ||
+    (learningItem ? directlyAssignedAudiences(data, learningItem) : []);
   const assignmentSnapshot = (workspace: Workspace) =>
     JSON.stringify([
       workspace.groups,
@@ -185,21 +161,32 @@ export function LearningAssignmentPicker({
     setError("");
     try {
       validateCurrent();
-      await onChange(
-        assignLearningToAudiences(dataRef.current, [item], selected),
-        {
-          locallyHandled: true,
-          validateCurrent,
-          review: {
-            title: `Assign ${title}`,
-            confirmLabel: "Apply assignments",
-            always: true,
+      if (item.kind === "brief") {
+        if (!onDraftChange)
+          throw new Error("Update audience editing is unavailable.");
+        onDraftChange(selected);
+      } else {
+        if (!onChange) throw new Error("Assignment saving is unavailable.");
+        await onChange(
+          assignLearningToAudiences(dataRef.current, [item], selected),
+          {
+            locallyHandled: true,
+            validateCurrent,
+            review: {
+              title: `Assign ${title}`,
+              confirmLabel: "Apply assignments",
+              always: true,
+            },
           },
-        },
-      );
+        );
+      }
       initial.current = selected;
       setOpen(false);
-      notify("Assignments saved. Existing history and deadlines preserved.");
+      notify(
+        item.kind === "brief"
+          ? "Audience updated in draft. Publish to update recommendations."
+          : "Assignments saved. Existing history and deadlines preserved.",
+      );
     } catch (e) {
       if (!isOrganizationChangeCanceled(e)) {
         if (e instanceof SaveRecoveryError) setStale(true);
@@ -219,13 +206,14 @@ export function LearningAssignmentPicker({
     try {
       const prepared = onPrepare ? await onPrepare() : dataRef.current;
       if (!prepared || !mounted.current) return;
-      const ids = directlyAssignedAudiences(prepared, item);
+      const ids =
+        item.kind === "brief"
+          ? draftAudiences || []
+          : directlyAssignedAudiences(prepared, item);
       initial.current = ids;
       revision.current = prepared.governanceRevision;
       snapshot.current = assignmentSnapshot(prepared);
       setSelected(ids);
-      setQuery("");
-      setPage(1);
       setOpen(true);
     } catch (e) {
       if (mounted.current) setError((e as Error).message);
@@ -248,16 +236,20 @@ export function LearningAssignmentPicker({
       {!open && error && <Alert variant="destructive">{error}</Alert>}
       {!compact && (
         <p className="text-sm text-muted-foreground">
-          {initialCount} direct{" "}
-          {initialCount === 1 ? "audience assignment" : "audience assignments"}
-          {item.kind === "course" &&
-          allAudiences.some(
-            (candidate) =>
-              curriculumAudienceSources(data, audienceKey(candidate), item)
-                .length,
-          )
-            ? " · also included through curricula"
-            : ""}
+          {initialKeys.length || Object.keys(inherited).length
+            ? [...new Set([...initialKeys, ...Object.keys(inherited)])]
+                .map((key) => {
+                  const option = audienceOptions(data).find(
+                    (a) => contentAudienceKey(a) === key,
+                  );
+                  return option?.organization
+                    ? "Everyone in the organization"
+                    : option?.publicGuests
+                      ? "Public guests"
+                      : option?.name || "Saved team audience";
+                })
+                .join(" · ")
+            : "No audiences selected"}
         </p>
       )}
       <Dialog
@@ -266,136 +258,27 @@ export function LearningAssignmentPicker({
           if (!next) void close();
         }}
       >
-        <DialogContent className="max-w-4xl">
+        <DialogContent size="selection" className="max-w-4xl">
           <DialogTitle>Assign to teams or groups</DialogTitle>
           <DialogDescription>
-            {title}. Choose which teams or groups receive it directly. Teams
-            include their subteams.
-            {item.kind === "course"
-              ? " Existing curriculum assignments stay attached."
-              : ""}
+            {title}. Choose who receives this content in For you. Teams include
+            their subteams.
+            {item.kind === "brief"
+              ? " Updates have no completion requirement or due date. Apply to draft, then Publish to update recommendations."
+              : " Courses count toward assigned learning; due dates follow organization settings. Existing curriculum assignments are retained."}
           </DialogDescription>
           {error && <Alert variant="destructive">{error}</Alert>}
-          <SearchField>
-            <Input
-              type="search"
-              value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Search teams or groups"
-              aria-label="Find a team or group"
-              disabled={busy}
+          <DialogBody className="overflow-y-auto">
+            <AudienceSelection
+              key={open ? "open" : "closed"}
+              data={data}
+              selected={selected}
+              onChange={setSelected}
+              disabled={busy || stale}
+              inherited={inherited}
+              showPeople={showPeople}
             />
-          </SearchField>
-          <TableContainer>
-            <DataTable
-              layout="assignmentGroups"
-              aria-label="Team and group assignments"
-            >
-              <TableHeader>
-                <TableRow>
-                  <TableHead>
-                    <span className="sr-only">Assign</span>
-                  </TableHead>
-                  <TableHead>Team or group</TableHead>
-                  <TableHead>People</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {audiences
-                  .slice((currentPage - 1) * 10, currentPage * 10)
-                  .map((candidate) => {
-                    const key = audienceKey(candidate);
-                    const label = `${candidate.kind === "team" ? "Team" : "Group"}: ${candidate.name}`;
-                    const through = curriculumAudienceSources(data, key, item);
-                    const parents =
-                      candidate.kind === "team"
-                        ? allAudiences.filter(
-                            (parent) =>
-                              parent.kind === "team" &&
-                              parent.id !== candidate.id &&
-                              ancestorIds(candidate.id, data.teams || []).has(
-                                parent.id,
-                              ) &&
-                              (selected.includes(audienceKey(parent)) ||
-                                curriculumAudienceSources(
-                                  data,
-                                  audienceKey(parent),
-                                  item,
-                                ).length > 0),
-                          )
-                        : [];
-                    return (
-                      <TableRow key={key}>
-                        <TableCell>
-                          <Checkbox
-                            aria-label={`Assign directly to ${label}`}
-                            disabled={busy}
-                            checked={selected.includes(key)}
-                            onCheckedChange={(checked) =>
-                              setSelected((ids) =>
-                                checked === true
-                                  ? [...new Set([...ids, key])]
-                                  : ids.filter((id) => id !== key),
-                              )
-                            }
-                          />
-                        </TableCell>
-                        <TableCell>
-                          {label}
-                          {!!through.length && (
-                            <p className="text-xs text-muted-foreground">
-                              Also included through {through.join(", ")}. This
-                              course stays assigned through these curricula.
-                            </p>
-                          )}
-                          {!!parents.length && (
-                            <p className="text-xs text-muted-foreground">
-                              Also included through{" "}
-                              {parents
-                                .map((parent) => `Team: ${parent.name}`)
-                                .join(", ")}
-                              . Removing this direct link keeps parent-team
-                              assignments.
-                            </p>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {
-                            data.users.filter(
-                              (person) =>
-                                person.active && hasPerson(person, candidate),
-                            ).length
-                          }
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-              </TableBody>
-            </DataTable>
-          </TableContainer>
-          {!audiences.length && (
-            <p className="text-copy text-muted-foreground">
-              {allAudiences.length
-                ? "No matching teams or groups."
-                : "Create a team or group before assigning learning."}
-            </p>
-          )}
-          <Pagination
-            page={currentPage}
-            pageSize={10}
-            total={audiences.length}
-            onPageChange={setPage}
-            label="Teams and groups"
-          />
-          <p className="text-sm text-muted-foreground">
-            {selected.length} direct{" "}
-            {selected.length === 1 ? "audience" : "audiences"} selected ·{" "}
-            {audience} active {audience === 1 ? "person" : "people"} across
-            direct and curriculum assignments. Overlapping courses count once.
-          </p>
+          </DialogBody>
           <DialogFooter>
             <Button
               type="button"
@@ -411,7 +294,7 @@ export function LearningAssignmentPicker({
               disabled={!dirty || stale}
               onClick={() => void save()}
             >
-              Review assignments
+              {item.kind === "brief" ? "Apply to draft" : "Review assignments"}
             </Button>
           </DialogFooter>
         </DialogContent>

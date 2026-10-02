@@ -28,6 +28,7 @@ const contentIndex = async (): Promise<Content[]> => {
     revision: row.revision,
     publishedRevision: row.published_revision || undefined,
     groups: row.groups || [],
+    updateTeams: row.updateTeams || undefined,
     assignments: row.assignments || [],
     duration: Number(row.duration) || 5,
     coverImageUrl: row.coverImageUrl || undefined,

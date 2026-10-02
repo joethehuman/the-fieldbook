@@ -1,4 +1,6 @@
 "use client";
+import { AudienceSelection } from "@/components/patterns/audience-selection";
+import { freshWorkspace } from "@/lib/store";
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
 import { HierarchyPicker } from "@/components/patterns/hierarchy-picker";
@@ -62,6 +64,17 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ActionGroup } from "@/components/ui/action-group";
 
+function AudienceSelectionExample() {
+  const [selected, setSelected] = useState<string[]>(["team:organization"]);
+  const [data] = useState(() => ({ ...freshWorkspace(),
+    settings: { ...freshWorkspace().settings!, access: "public" as const, guestGroupId: "visitors" },
+    groups: [{ id: "visitors", name: "Visitors" }, { id: "sales", name: "Account executives" }],
+    teams: [{ id: "organization", name: "Organization", system: "organization" as const }, { id: "sales", name: "Sales", parentId: "organization" }],
+    users: freshWorkspace().users.map(user => ({ ...user, teamId: "sales", groups: ["sales"] })),
+  }));
+  return <section><h3>Content audiences</h3><AudienceSelection data={data} selected={selected} onChange={setSelected} /></section>;
+}
+
 export function LibraryExamples() {
   const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
   const [browserBranch, setBrowserBranch] = useState("");
@@ -107,6 +120,7 @@ export function LibraryExamples() {
       className="grid min-w-0 gap-6"
     >
       <h2>Shared library states and usage</h2>
+      <AudienceSelectionExample />
       <div>
         <Button variant="outline" onClick={() => progressTarget.reveal()}>
           View progress examples

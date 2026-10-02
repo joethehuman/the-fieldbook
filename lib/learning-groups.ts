@@ -8,6 +8,7 @@ import {
   type LearningItem,
   type Team,
 } from "./types";
+import { updateMatchesAudience } from "./content-audiences";
 import { reconcileAssignments } from "./assignment-episodes";
 import { assignmentRules } from "./learning";
 
@@ -66,8 +67,8 @@ export function updatesForUser(
   content: Content[],
   user: Workspace["users"][number],
   groups: Group[],
+  teams: Team[] = [],
 ) {
-  const memberships = effectiveGroups(user, groups);
   const updatesById = new Map<string, Content>();
   for (const item of content) {
     if (
@@ -86,7 +87,7 @@ export function updatesForUser(
     if (bTime !== undefined) return 1;
     return a.id.localeCompare(b.id);
   });
-  const matches = (c: Content) => c.groups.some((g) => memberships.has(g));
+  const matches = (c: Content) => updateMatchesAudience(c, user, groups, teams);
   const featured = updates.filter(matches).slice(0, 2);
   const featuredIds = new Set(featured.map((item) => item.id));
   return {

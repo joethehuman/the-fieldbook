@@ -81,6 +81,7 @@ export function guestRecommendations(
       : [],
     // Legacy group-only assignment rules preserve matching without real dates or IDs.
     assignments: undefined,
+    updateTeams: undefined,
   }));
   return {
     user,

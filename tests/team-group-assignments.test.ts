@@ -117,6 +117,67 @@ for (const history of [
         await value("select groups value from fb_config where id"),
         priorGroups,
       );
+      // Existing document JSON and triggers must retain additive Update team targeting
+      // without creating course obligations or changing an already published audience.
+      await pg.exec("begin");
+      try {
+        const brief = {
+          id: id(90),
+          kind: "brief",
+          title: "Targeted Update",
+          summary: "Useful update",
+          category: "News",
+          status: "draft",
+          version: 1,
+          groups: [],
+          updateTeams: ["legacy-child"],
+          assignments: [],
+          lessons: [],
+          questions: [],
+          body: "News",
+          duration: 0,
+        };
+        const episodes = await value(
+          "select coalesce(jsonb_agg(to_jsonb(e) order by id),'[]') value from fb_assignment_episodes e",
+        );
+        await value(
+          "select fb_save_document($1,0,$2,false,false,$3,'web') value",
+          [id(90), brief, id(21)],
+        );
+        const saved = await value(
+          "select to_jsonb(d) value from fb_documents d where id=$1",
+          [id(90)],
+        );
+        assert.deepEqual(saved.draft.updateTeams, ["legacy-child"]);
+        assert.equal(saved.published, null);
+        await value(
+          "select fb_save_document($1,1,$2,true,false,$3,'web') value",
+          [id(90), brief, id(21)],
+        );
+        const published = await value(
+          "select to_jsonb(d) value from fb_documents d where id=$1",
+          [id(90)],
+        );
+        assert.deepEqual(published.published.updateTeams, ["legacy-child"]);
+        await value(
+          "select fb_save_document($1,2,$2,false,false,$3,'web') value",
+          [id(90), { ...brief, updateTeams: [] }, id(21)],
+        );
+        const changed = await value(
+          "select to_jsonb(d) value from fb_documents d where id=$1",
+          [id(90)],
+        );
+        assert.deepEqual(changed.draft.updateTeams, []);
+        assert.deepEqual(changed.published.updateTeams, ["legacy-child"]);
+        assert.deepEqual(
+          await value(
+            "select coalesce(jsonb_agg(to_jsonb(e) order by id),'[]') value from fb_assignment_episodes e",
+          ),
+          episodes,
+        );
+      } finally {
+        await pg.exec("rollback");
+      }
       if (history === "preview-organization") {
         const cfg = await value(
           "select to_jsonb(c) value from fb_config c where id",
