@@ -4,7 +4,7 @@ import { contentSignature } from "./demo-publication";
 export type SaveIntent = "draft" | "published";
 
 /** One writer per open document. Acknowledgements never replace newer edits.
- * Failures stop the queue until the author explicitly reviews/reloads a saved copy.
+ * Failures stop the queue until the author explicitly checks/reloads a saved copy.
  */
 export function createDraftSaveQueue(options: {
   initial: Content;
@@ -72,6 +72,10 @@ export function createDraftSaveQueue(options: {
     },
     get blocked() {
       return blocked;
+    },
+    block() {
+      blocked = true;
+      publishRequested = false;
     },
     reset(saved: Content) {
       baseline = saved;

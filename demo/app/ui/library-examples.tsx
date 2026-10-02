@@ -46,6 +46,7 @@ import { Note } from "@/components/ui/note";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { PublicationStatus } from "@/components/patterns/publication-status";
+import { EditorSaveStatus } from "@/components/patterns/editor-save-status";
 import {
   Progress,
   ProgressRing,
@@ -223,7 +224,16 @@ export function LibraryExamples() {
           <PublicationStatus published={false} />
           <PublicationStatus published />
           <PublicationStatus published hasUnpublishedChanges />
+          <PublicationStatus published hasUnpublishedChanges layout="inline" />
         </ActionGroup>
+        <div className="grid gap-3" aria-label="Editor save status examples">
+          <EditorSaveStatus status="Not saved" published={false} />
+          <EditorSaveStatus status="Saved" published={false} />
+          <EditorSaveStatus status="Saved" published />
+          <EditorSaveStatus status="Saved" published hasUnpublishedChanges />
+          <EditorSaveStatus status="Saving…" published hasUnpublishedChanges />
+          <EditorSaveStatus status="Changes not saved" published failed />
+        </div>
         <p className="text-copy text-muted-foreground">
           Badges hold a short, single-line status. Keep details such as draft
           changes outside the pill.
