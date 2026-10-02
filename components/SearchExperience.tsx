@@ -1,6 +1,6 @@
 "use client";
 import { useLayoutEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import type { Content } from "@/lib/types";
 import type { SearchProvider, SearchResult } from "@/lib/search";
 import type { AiCitation } from "@/lib/ai";
@@ -45,8 +45,10 @@ export function SearchExperience({
   useLayoutEffect(() => {
     // Search starts with its first result, independently of chat autoscrolling.
     if (view === "search") {
-      const panel = document.getElementById(id);
-      if (panel) panel.scrollTop = 0;
+      const results = document
+        .getElementById(id)
+        ?.querySelector('[data-slot="search-results-scroll"]');
+      if (results) results.scrollTop = 0;
     }
   }, [id, view, query, visible]);
   async function ask() {
@@ -153,9 +155,9 @@ export function SearchExperience({
         <Tabs
           value={view}
           onValueChange={setView}
-          className="[--search-tabs-offset:calc(var(--control-height)+0.5rem)]"
+          className="flex h-full min-h-0 flex-col"
         >
-          <div className="sticky top-0 z-20 flex items-center justify-between gap-2 bg-card px-4 pt-2">
+          <div className="flex shrink-0 items-center justify-between gap-2 bg-card px-4 pt-2">
             <TabsList aria-label="Search and Ask AI">
               <TabsTrigger value="search">Search</TabsTrigger>
               <TabsTrigger value="ai">Ask AI</TabsTrigger>
@@ -164,20 +166,26 @@ export function SearchExperience({
               <Button
                 type="button"
                 variant="ghost"
-                size="sm"
+                size="default"
                 onClick={async () => {
                   await chat.reset();
                   setDraft("");
                 }}
               >
+                <Plus aria-hidden="true" />
                 New conversation
               </Button>
             )}
           </div>
-          <TabsContent value="search" className="mt-0">
-            {results}
+          <TabsContent value="search" className="mt-0 min-h-0 flex-1">
+            <div
+              data-slot="search-results-scroll"
+              className="h-full overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
+            >
+              {results}
+            </div>
           </TabsContent>
-          <TabsContent value="ai" className="mt-0">
+          <TabsContent value="ai" className="mt-0 min-h-0 flex-1">
             <AskAiConversation
               id={id}
               chat={chat}
@@ -188,7 +196,12 @@ export function SearchExperience({
           </TabsContent>
         </Tabs>
       ) : (
-        results
+        <div
+          data-slot="search-results-scroll"
+          className="h-full overflow-y-auto overscroll-contain [scrollbar-gutter:stable_both-edges]"
+        >
+          {results}
+        </div>
       )}
     </SearchPanel>
   );
