@@ -234,8 +234,27 @@ test("Search returns to the first results and chat uses an embedded multiline co
 
   const field = chat.locator('[data-slot="message-composer-field"]');
   const action = chat.getByRole("button", { name: "Ask AI", exact: true });
+  await follow.fill(
+    "How can I apply the customer conversation guidance to a new account? ".repeat(
+      8,
+    ),
+  );
   const fieldBox = (await field.boundingBox())!;
+  const textBox = (await follow.boundingBox())!;
   const actionBox = (await action.boundingBox())!;
+  expect(fieldBox.width - textBox.width).toBeLessThan(4);
+  const textPadding = await follow.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return {
+      left: parseFloat(style.paddingLeft),
+      right: parseFloat(style.paddingRight),
+    };
+  });
+  expect(textPadding.left).toBe(textPadding.right);
+  expect(textBox.y + textBox.height).toBeLessThan(actionBox.y);
+  expect(
+    fieldBox.y + fieldBox.height - textBox.y - textBox.height,
+  ).toBeGreaterThan(actionBox.height);
   expect(actionBox.x).toBeGreaterThan(fieldBox.x);
   expect(actionBox.x + actionBox.width).toBeLessThan(
     fieldBox.x + fieldBox.width,
@@ -248,6 +267,10 @@ test("Search returns to the first results and chat uses an embedded multiline co
   const rightPadding =
     panelBox.x + panelBox.width - fieldBox.x - fieldBox.width;
   expect(Math.abs(leftPadding - rightPadding)).toBeLessThan(2);
+  await page.screenshot({
+    path: info.outputPath("ask-ai-full-width-composer.png"),
+  });
+  await follow.fill("A follow-up\nWith more detail");
   await page.screenshot({
     path: info.outputPath("ask-ai-embedded-composer.png"),
   });

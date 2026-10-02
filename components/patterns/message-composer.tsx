@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { Field } from "../ui/field";
 import { Textarea } from "../ui/textarea";
 
-/** A multiline field with an embedded action; the group owns its focus ring. */
+/** Full-width text above an action row; the group owns its focus ring. */
 export function MessageComposer({
   id,
   label,
@@ -39,14 +39,14 @@ export function MessageComposer({
       </Field>
       <div
         data-slot="message-composer-field"
-        className="relative rounded-control border border-control-border bg-background transition-colors motion-reduce:transition-none hover:border-control-hover focus-within:border-ring focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
+        className="rounded-control border border-control-border bg-background transition-colors motion-reduce:transition-none hover:border-control-hover focus-within:border-ring focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
       >
         <Textarea
           id={id}
           variant="embedded"
           size="compact"
           rows={2}
-          className="block max-h-40 overflow-y-auto pe-14 [field-sizing:content]"
+          className="block max-h-40 overflow-y-auto [field-sizing:content]"
           maxLength={maxLength}
           value={value}
           placeholder={placeholder}
@@ -63,29 +63,34 @@ export function MessageComposer({
             }
           }}
         />
-        <Button
-          type={busy ? "button" : "submit"}
-          variant={busy ? "outline" : "default"}
-          size="icon"
-          className="absolute bottom-2 right-2 rounded-full"
-          aria-label={busy ? "Stop response" : "Ask AI"}
-          title={busy ? "Stop response" : "Ask AI"}
-          disabled={!busy && !value.trim()}
-          onClick={
-            busy
-              ? (event) => {
-                  event.preventDefault();
-                  onStop();
-                }
-              : undefined
-          }
+        <div
+          data-slot="message-composer-actions"
+          className="flex justify-end px-2 pb-2 pt-1"
         >
-          {busy ? (
-            <Square aria-hidden="true" />
-          ) : (
-            <ArrowUp aria-hidden="true" />
-          )}
-        </Button>
+          <Button
+            type={busy ? "button" : "submit"}
+            variant={busy ? "outline" : "default"}
+            size="icon"
+            className="rounded-full"
+            aria-label={busy ? "Stop response" : "Ask AI"}
+            title={busy ? "Stop response" : "Ask AI"}
+            disabled={!busy && !value.trim()}
+            onClick={
+              busy
+                ? (event) => {
+                    event.preventDefault();
+                    onStop();
+                  }
+                : undefined
+            }
+          >
+            {busy ? (
+              <Square aria-hidden="true" />
+            ) : (
+              <ArrowUp aria-hidden="true" />
+            )}
+          </Button>
+        </div>
       </div>
     </form>
   );
