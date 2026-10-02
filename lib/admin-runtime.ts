@@ -77,7 +77,7 @@ export function createAdminRuntime(initial: {
     let data = state.data as Workspace;
     if (
       openItem &&
-      target === "content" &&
+      (target === "content" || target === "people") &&
       data.content.some((entry) => entry.id === openItem)
     ) {
       const item = await request(

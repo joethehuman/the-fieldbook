@@ -30,6 +30,10 @@ export type AuthorizationRedirect = { redirect_url: string };
 /** Application person record. The adapter resolves the provider subject to this stable ID.
  * Roster IDs remain stable when a preregistered person activates a provider login. */
 export type ProfileRecord = {
+  assignment_context?: { learning_assignments?: import("@/lib/types").EffectiveAssignment[]; assignment_teams?: import("@/lib/types").User["assignmentTeams"]; effective_group_ids?: string[] };
+  learning_assignments?: import("@/lib/types").EffectiveAssignment[];
+  assignment_teams?: import("@/lib/types").User["assignmentTeams"];
+  effective_group_ids?: string[];
   id: string;
   name: string;
   email: string;

@@ -20,14 +20,18 @@ const schema = z
     contentId: z.uuid(),
     expected: z.number().int().positive(),
     groupId: z.string().min(1).max(80).optional(),
+    teamId: z.string().min(1).max(80).optional(),
     userId: z.uuid().optional(),
     version: z.number().int().positive().optional(),
     progressExpected: z.number().int().nonnegative().optional(),
     due: z.object({ type: z.literal("none") }).optional(),
   })
   .superRefine((a, ctx) => {
-    if (!!a.groupId === !!a.userId)
-      ctx.addIssue({ code: "custom", message: "Choose one group or person." });
+    if ([a.groupId, a.teamId, a.userId].filter(Boolean).length !== 1)
+      ctx.addIssue({
+        code: "custom",
+        message: "Choose one team, group or person.",
+      });
     if (
       ["complete", "reset"].includes(a.operation) &&
       (!a.userId || !a.version || a.progressExpected === undefined)
@@ -37,12 +41,20 @@ const schema = z
         message: "Choose a person and current course progress.",
       });
     if (
-      ["assign", "unassign", "target", "untarget"].includes(a.operation) &&
-      (!a.groupId || a.userId)
+      ["assign", "unassign"].includes(a.operation) &&
+      (!(a.groupId || a.teamId) || a.userId)
     )
       ctx.addIssue({
         code: "custom",
-        message: "Choose a learning group.",
+        message: "Choose a team or learning group.",
+      });
+    if (
+      ["target", "untarget"].includes(a.operation) &&
+      (!a.groupId || a.teamId || a.userId)
+    )
+      ctx.addIssue({
+        code: "custom",
+        message: "Choose a learning group for Update relevance.",
       });
   });
 export async function POST(req: Request) {

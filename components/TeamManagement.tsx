@@ -239,7 +239,7 @@ export function TeamsAdmin({
       saving.current
     )
       return;
-    if (moving.snapshot !== JSON.stringify([data.teams, data.users])) {
+    if (moving.snapshot !== JSON.stringify([data.governanceRevision, data.teams, data.groups, data.curricula, data.users])) {
       setMoving({ ...moving, snapshot: undefined });
       setNotice(
         "Teams or people changed. Review the move again before applying it.",
@@ -269,6 +269,7 @@ export function TeamsAdmin({
     resetDraft();
     const blockers = teamDeletionBlockers(data, value.id);
     const reasons = [
+      blockers.learning.length && `${blockers.learning.length} assigned courses or curricula`,
       blockers.members.length &&
         `${blockers.members.length} direct members (including inactive accounts)`,
       blockers.pending.length &&
@@ -511,7 +512,7 @@ export function TeamsAdmin({
                         working = { ...working, teams: impact.next };
                         return impact;
                       });
-                      return <ul className="text-copy">{impacts.map((impact) => <li key={impact.from}>{impact.from} → {impact.to} · {impact.branch.length} teams · {impact.people.length} people · {impact.managers.length} managers with reporting changes</li>)}</ul>;
+                      return <ul className="text-copy">{impacts.map((impact) => <li key={impact.from}>{impact.from} → {impact.to} · {impact.branch.length} teams · {impact.people.length} people · {impact.managers.length} managers with reporting changes · {impact.learning.length} people with learning changes</li>)}</ul>;
                     } catch (error) { return <p role="alert">{(error as Error).message}</p>; }
                   },
                   apply: async (values: string[], ids: string[] = []) => {
@@ -643,7 +644,7 @@ export function TeamsAdmin({
                       onClick={() => {
                         setMoving({
                           ...moving,
-                          snapshot: JSON.stringify([data.teams, data.users]),
+                          snapshot: JSON.stringify([data.governanceRevision, data.teams, data.groups, data.curricula, data.users]),
                         });
                         setNotice("");
                         destination.reveal();
@@ -679,6 +680,7 @@ export function TeamsAdmin({
                     (including inactive accounts) move together.
                   </p>
                   <h4>Reporting access changes</h4>
+                  <p>{impact.learning.filter(row => row.gained.length).length} people gain courses; {impact.learning.filter(row => row.lost.length).length} people lose courses; {impact.learning.filter(row => row.changed.length).length} keep courses with changed sources. Continuing assignments keep deadlines and progress.</p>
                   {impact.managers.length ? (
                     <ul className="grid gap-3">
                       {impact.managers.map((change) => (

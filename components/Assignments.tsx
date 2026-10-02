@@ -1,4 +1,5 @@
 "use client";
+import { assignmentSourcePaths } from "@/lib/assignment-audiences";
 import { FormField } from "@/components/patterns/form-field";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
@@ -30,6 +31,7 @@ import type { Workspace } from "@/lib/store";
 import { groupPath } from "@/lib/group-hierarchy";
 import {
   ancestorIds,
+  assignmentMatches,
   effectiveGroups,
   isComplete,
   type Content,
@@ -188,10 +190,7 @@ export function Assignments({
     .map((c) => {
       const sources = assignmentRules(c).filter(
         (a) =>
-          a.groupId &&
-          (person
-            ? effectiveGroups(person, data.groups).has(a.groupId)
-            : ancestorIds(groupId, data.groups).has(a.groupId)),
+          person ? assignmentMatches(a, person, data.groups) : !!a.groupId && ancestorIds(groupId, data.groups).has(a.groupId),
       );
       const people = peopleFor(c);
       return {
@@ -201,9 +200,9 @@ export function Assignments({
         completed: people.filter((u) =>
           isComplete(c, data.progress[u.id] || []),
         ).length,
-        sourceLabels: sources.map(
+        sourceLabels: person ? assignmentSourcePaths(data, person, c.id) : sources.map(
           (a) =>
-            `${data.groups.find((g) => g.id === a.groupId)?.name || ""}${a.groupId !== groupId && !person ? " · inherited" : ""}`,
+            `${a.teamId ? "Team" : "Group"}: ${a.teamId ? data.teams?.find(t => t.id === a.teamId)?.name || "Removed team" : data.groups.find(g => g.id === a.groupId)?.name || "Removed group"}${a.groupId !== groupId && !person ? " · inherited" : ""}`,
         ),
       };
     });
@@ -306,7 +305,7 @@ export function Assignments({
         description={
           <>
             {person
-              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Assigned courses come from group membership.`
+              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Assigned courses come from team and group membership.`
               : "Choose the courses each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
           </>
         }

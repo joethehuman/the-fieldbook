@@ -177,7 +177,7 @@ test("product settings: connected help, editor hints and enlarged navigation", a
     name: "Ongoing catch-up window (days)",
   });
   await expect(onboardingDays).toHaveAccessibleDescription(
-    /Changes recalculate targets for everyone/,
+    /Defaults apply to future onboarding clocks and assignment episodes/,
   );
   await useDueDates.uncheck();
   await expect(onboardingDays).toBeDisabled();

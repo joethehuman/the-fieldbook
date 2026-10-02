@@ -86,6 +86,7 @@ export async function snapshot(user: User | null): Promise<Workspace> {
         assignments: c.assignments?.filter(
           (a) =>
             (a.groupId && groupIds.has(a.groupId)) ||
+            (a.teamId && users.some(u => u.assignmentTeams?.some(t => t.id === a.teamId))) ||
             (a.userId && users.some((u) => u.id === a.userId)),
         ),
       };

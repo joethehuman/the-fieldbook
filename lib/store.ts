@@ -1,3 +1,4 @@
+import { reconcileLearning } from "./learning-groups";
 import { expireDemoDeleted } from "./bulk-actions";
 import { withPublishedSnapshots } from "./demo-publication";
 import { defaultSettings } from "./settings";
@@ -266,7 +267,12 @@ function repairHooliSecurityAssignment(data: Workspace): Workspace {
 }
 export function loadWorkspace(): Workspace {
   const raw = localStorage.getItem(KEY);
-  if (!raw) return withPublishedSnapshots(freshWorkspace());
+  if (!raw) {
+    const fresh = withPublishedSnapshots(freshWorkspace());
+    const saved = reconcileLearning(fresh, fresh);
+    saveWorkspace(saved);
+    return saved;
+  }
   const data = JSON.parse(raw);
   if (
     data.schema !== 1 ||
@@ -304,7 +310,10 @@ export function loadWorkspace(): Workspace {
   const upgraded = withPublishedSnapshots(data);
   const current = expireDemoDeleted(repairHooliSecurityAssignment(upgraded));
   if (current !== upgraded) saveWorkspace(current);
-  return current;
+  const reconciled = reconcileLearning(current, current);
+  if (JSON.stringify(reconciled) !== JSON.stringify(current))
+    saveWorkspace(reconciled);
+  return reconciled;
 }
 export function saveWorkspace(data: Workspace) {
   localStorage.setItem(KEY, JSON.stringify(data));

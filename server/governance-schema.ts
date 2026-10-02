@@ -6,6 +6,8 @@ const node = z.object({
   name: z.string().trim().min(1).max(80),
   parentId: id.optional(),
   requiredCourseIds: z.array(z.uuid()).max(1000).optional(),
+  teamLinkScope: z.enum(["direct", "subtree"]).optional(),
+  legacyDirectTeamIds: z.array(id).max(1000).optional(),
   teamIds: z.array(id).max(1000).optional(),
   learningItems: z
     .array(z.object({ kind: z.enum(["course", "curriculum"]), id }))
@@ -29,7 +31,7 @@ export const governanceSchema = z
       .max(1000)
       .optional(),
     groups: z.array(node).max(1000),
-    teams: z.array(node.extend({ managerId: z.uuid().optional() })).max(1000),
+    teams: z.array(node.extend({ managerId: z.uuid().optional(), system: z.literal("organization").optional() })).max(1000),
     users: z
       .array(
         z.object({
@@ -87,7 +89,7 @@ export const governanceSchema = z
         (c.status === "published" && !c.courseIds.length)
       )
         fail("Published curricula need unique courses.");
-    for (const g of value.groups) {
+    for (const g of [...value.groups, ...value.teams]) {
       if (
         g.teamIds?.some((id) => !teams.has(id)) ||
         new Set(g.teamIds).size !== (g.teamIds?.length || 0)

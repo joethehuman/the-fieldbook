@@ -1,4 +1,6 @@
 "use client";
+import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
+import { assignmentAudiences } from "@/lib/assignment-audiences";
 import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { BulkActions } from "./patterns/bulk-actions";
@@ -44,6 +46,7 @@ export default function Curricula({
   onChange: (data: Workspace) => void | Promise<void>;
   onUpload?: UploadMedia;
 }) {
+  const [assigning, setAssigning] = useState<string | null>(null);
   const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
   const [editing, setEditing] = useState<Curriculum | null>(null);
@@ -60,9 +63,10 @@ export default function Curricula({
   guard.current = async () =>
     !busy && (!dirty || (await confirm("Discard unsaved curriculum changes?")));
   useEffect(() => {
+    if (assigning) return;
     registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
     return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard, dirty, busy]);
+  }, [registerNavigationGuard, dirty, busy, assigning]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty || busy) {
@@ -83,12 +87,7 @@ export default function Curricula({
     editing ? editing.courseIds : visibleCurricula.map((c) => c.id),
   );
   const content = data.publishedContent || data.content;
-  const linked = (id: string) =>
-    data.groups.filter((g) =>
-      groupItems(g, content).some(
-        (i) => i.kind === "curriculum" && i.id === id,
-      ),
-    );
+  const linked = (id: string) => assignmentAudiences(data).filter(a => a.items.some(i => i.kind === "curriculum" && i.id === id));
   async function closeEditor() {
     if (await guard.current()) {
       setEditing(null);
@@ -147,7 +146,7 @@ export default function Curricula({
   async function remove(c: Curriculum) {
     if (
       !(await confirm(
-        `Delete ${c.name}? It will be removed from ${linked(c.id).length} learning groups. Course content and completion history are preserved.`,
+        `Delete ${c.name}? It will be removed from ${linked(c.id).length} teams or groups. Course content and completion history are preserved.`,
       ))
     )
       return;
@@ -155,6 +154,7 @@ export default function Curricula({
     try {
       await onChange({
         ...data,
+        teams: data.teams?.map(t => ({ ...t, learningItems: t.learningItems?.filter(i => i.kind !== "curriculum" || i.id !== c.id) })),
         curricula: all.filter((x) => x.id !== c.id),
         groups: data.groups.map((g) => ({
           ...g,
@@ -178,7 +178,7 @@ export default function Curricula({
       className="learning-admin"
     >
       {notice && <Alert variant="destructive">{notice}</Alert>}
-      {editing ? (
+      {assigning ? <LearningAssignmentPicker data={data} item={{kind: "curriculum", id: assigning}} registerNavigationGuard={registerNavigationGuard} onChange={onChange} onCancel={() => setAssigning(null)} /> : editing ? (
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -305,7 +305,7 @@ export default function Curricula({
             />
             <FormField
               label="Status"
-              description="Published curricula are available in the library and can be added to learning groups."
+              description="Published curricula are available in the library and can be added to teams or groups."
             >
               <SelectField
                 disabled={busy}
@@ -325,9 +325,9 @@ export default function Curricula({
             </FormField>
             {!!linked(editing.id).length && (
               <Note>
-                Saving updates {linked(editing.id).length} learning groups. New
+                Saving updates {linked(editing.id).length} teams or groups. New
                 courses join their assigned learning lists; existing completions
-                are preserved. Remove group links before returning this
+                are preserved. Remove assignment links before returning this
                 curriculum to draft.
               </Note>
             )}
@@ -339,7 +339,7 @@ export default function Curricula({
             variant="page"
             title={<h2>Curricula</h2>}
             description={
-              <>Create reusable playlists, then add them to learning groups.</>
+              <>Create reusable playlists, then add them to teams or groups.</>
             }
           />
           <CollectionControls search={            <FormField className="min-w-0 basis-64 flex-1" label="Find curricula" visuallyHiddenLabel>
@@ -387,7 +387,7 @@ export default function Curricula({
                 label: published ? "Publish selected" : "Unpublish selected",
                 description: published
                   ? "Make these curricula available in the library. Each must contain published courses."
-                  : "Return these curricula to draft. Remove their learning-group links first. Course history is preserved.",
+                  : "Return these curricula to draft. Remove their team and group links first. Course history is preserved.",
                 apply: async () => {
                   if (
                     published &&
@@ -411,7 +411,7 @@ export default function Curricula({
                     selection.actionIds.some((id) => linked(id).length)
                   )
                     throw new Error(
-                      "Remove learning-group links before unpublishing these curricula.",
+                      "Remove team and group links before unpublishing these curricula.",
                     );
                   await onChange({
                     ...data,
@@ -463,9 +463,10 @@ export default function Curricula({
                 <CardFooter className="mt-auto">
                   <p className="text-copy text-muted-foreground">
                     {c.courseIds.length} courses · {linked(c.id).length}{" "}
-                    learning groups
+                    teams or groups
                   </p>
                   <ActionGroup>
+                    {c.status === "published" && <Button variant="outline" disabled={busy} onClick={() => setAssigning(c.id)}>Assign</Button>}
                     <Button
                       variant="outline"
                       disabled={busy}

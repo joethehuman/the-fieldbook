@@ -59,7 +59,7 @@ export const contentBaseSchema = z.object({
   cardArt: cardArtSchema.optional(),
   duration: z.number().int().min(0).max(10000),
   requirePassing: z.boolean().optional(),
-  groups: z.array(text(80)).max(100),
+  groups: z.array(text(80)).max(1000),
   lessons: z
     .array(
       z.object({
@@ -87,6 +87,7 @@ export const contentBaseSchema = z.object({
     .array(
       z.object({
         groupId: text(80).optional(),
+        teamId: text(80).optional(),
         userId: z.uuid().optional(),
         assignedAt: z.iso.datetime(),
         due: z.discriminatedUnion("type", [
@@ -99,7 +100,7 @@ export const contentBaseSchema = z.object({
         ]),
       }),
     )
-    .max(100)
+    .max(2000)
     .optional(),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime(),

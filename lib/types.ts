@@ -43,6 +43,19 @@ export type Content = {
   /** Missing on older published courses, which retain the original passing rule. */
   requirePassing?: boolean;
 };
+export type AssignmentAudience = { kind: "group" | "team"; id: string };
+export type EffectiveAssignment = {
+  episodeId: string;
+  contentId: string;
+  version: number;
+  assignedAt: string;
+  dueDate: string;
+  catchUpDays: number;
+  onboardingEnd?: string;
+  sourceGroups: string[];
+  sourceAudiences: AssignmentAudience[];
+  baseline?: boolean;
+};
 export type User = {
   id: string;
   name: string;
@@ -52,6 +65,13 @@ export type User = {
   active: boolean;
   /** False until the preregistered person activates a verified login. */
   registered?: boolean;
+  learningAssignments?: EffectiveAssignment[];
+  /** Server-authorized projection of matching assignment teams, without reporting authority. */
+  assignmentTeams?: Pick<
+    Team,
+    "id" | "name" | "learningItems" | "requiredCourseIds"
+  >[];
+  effectiveGroupIds?: string[];
   hireDate?: string;
   /** Applied clock window; changing organization defaults does not replace it. */
   onboardingDays?: number;
@@ -91,14 +111,20 @@ export type Group = {
   requiredCourseIds?: string[];
   learningItems?: LearningItem[];
   teamIds?: string[];
+  teamLinkScope?: "direct" | "subtree";
+  legacyDirectTeamIds?: string[];
 };
 export type Team = {
+  system?: "organization";
   id: string;
   name: string;
   parentId?: string;
   managerId?: string;
+  learningItems?: LearningItem[];
+  requiredCourseIds?: string[];
 };
 export type Assignment = {
+  teamId?: string;
   groupId?: string;
   userId?: string;
   assignedAt: string;
@@ -136,14 +162,29 @@ export function canParent(
 ) {
   return !parentId || !ancestorIds(parentId, nodes).has(id);
 }
-export function effectiveGroups(user: User, groups: Group[]) {
+export function effectiveGroups(user: User, groups: Group[], teams?: Team[]) {
+  const teamId = user.teamId || teams?.find(t => t.system === "organization")?.id;
   const direct = [
     ...user.groups,
     ...groups
-      .filter((g) => user.teamId && g.teamIds?.includes(user.teamId))
+      .filter(
+        (g) =>
+          teamId &&
+          ((g.legacyDirectTeamIds || []).includes(teamId) ||
+            (g.teamIds || []).some(
+              (id) =>
+                id === teamId ||
+                (g.teamLinkScope !== "direct" &&
+                  teams &&
+                  ancestorIds(teamId, teams).has(id)),
+            )),
+      )
       .map((g) => g.id),
   ];
-  return new Set(direct.flatMap((id) => [...ancestorIds(id, groups)]));
+  return new Set([
+    ...direct.flatMap((id) => [...ancestorIds(id, groups)]),
+    ...(teams ? [] : user.effectiveGroupIds || []),
+  ]);
 }
 export function assignmentInfo(c: Content, user: User, groups: Group[]) {
   const memberships = effectiveGroups(user, groups);
@@ -155,7 +196,7 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       due: { type: "none" },
     }));
   const matches = rules
-    .filter((r) => !!r.groupId && memberships.has(r.groupId))
+    .filter((r) => assignmentMatches(r, user, groups))
     .map((r) => {
       const joined =
         (r.groupId ? user.effectiveGroupJoinedAt?.[r.groupId] : r.assignedAt) ||
@@ -175,7 +216,10 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       return { assignedAt, dueDate };
     });
   return {
-    assignedAt: matches.map((m) => m.assignedAt).sort()[0],
+    assignedAt:
+      user.learningAssignments?.find(
+        (a) => a.contentId === c.id && a.version === c.version,
+      )?.assignedAt || matches.map((m) => m.assignedAt).sort()[0],
     dueDate: matches.flatMap((m) => (m.dueDate ? [m.dueDate] : [])).sort()[0],
   };
 }
@@ -222,7 +266,15 @@ export function assignedCourses(
       c.kind === "course" &&
       c.status === "published" &&
       (c.assignments
-        ? c.assignments.some((a) => !!a.groupId && memberships.has(a.groupId))
+        ? c.assignments.some((a) => assignmentMatches(a, user, groups))
         : c.groups.some((g) => memberships.has(g))),
+  );
+}
+
+/** Matching assignment teams are projected by the server or full demo reconciliation. */
+export function assignmentMatches(a: Assignment, user: User, groups: Group[]) {
+  return (
+    !!(a.groupId && effectiveGroups(user, groups).has(a.groupId)) ||
+    !!(a.teamId && user.assignmentTeams?.some((t) => t.id === a.teamId))
   );
 }

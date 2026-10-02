@@ -309,10 +309,9 @@ export default function SiteSettingsPanel({
           guidance={
             <div id="due-dates-help">
               When off, learners see these courses as recommendations without
-              deadlines. Turning due dates on uses the windows below to set
-              targets. The onboarding default applies when a person's clock is
-              first set; existing onboarding windows stay fixed. Changes to the
-              catch-up window still update course targets.
+              deadlines. Turning due dates on reveals saved targets. Defaults
+              apply to future onboarding clocks and assignment episodes; existing
+              onboarding windows and saved course deadlines stay fixed.
             </div>
           }
         >

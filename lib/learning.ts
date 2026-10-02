@@ -5,6 +5,7 @@ export type LearningAction = {
   contentId: string;
   expected: number;
   groupId?: string;
+  teamId?: string;
   userId?: string;
   due?: Assignment["due"];
   version?: number;
@@ -20,8 +21,16 @@ export function assignmentRules(c: Content): Assignment[] {
     }))
   );
 }
-export function assignmentKey(a: { groupId?: string; userId?: string }) {
-  return a.groupId ? `group:${a.groupId}` : `user:${a.userId}`;
+export function assignmentKey(a: {
+  groupId?: string;
+  teamId?: string;
+  userId?: string;
+}) {
+  return a.groupId
+    ? `group:${a.groupId}`
+    : a.teamId
+      ? `team:${a.teamId}`
+      : `user:${a.userId}`;
 }
 export function deadlineLabel(due: Assignment["due"]) {
   return due.type === "date"
@@ -83,6 +92,10 @@ export function learningTarget(
 ) {
   if (user.id === "guest" || settings?.dueDatesEnabled === false)
     return undefined;
+  const episode = user.learningAssignments?.find(
+    (a) => a.contentId === c.id && a.version === c.version,
+  );
+  if (episode) return episode.dueDate;
   const started = assignmentInfo(c, user, groups).assignedAt;
   if (!started) return undefined;
   const catchUp = addDays(started, settings?.catchUpDays ?? 30),
@@ -122,6 +135,27 @@ export function requiredSequence(
       if (!seen.has(c.id)) {
         seen.add(c.id);
         result.push(c);
+      }
+  }
+  for (const team of user.assignmentTeams || []) {
+    const ids =
+      team.requiredCourseIds ||
+      (team.learningItems || [])
+        .filter((i) => i.kind === "course")
+        .map((i) => i.id);
+    const courses = required.filter((c) =>
+      assignmentRules(c).some((a) => a.teamId === team.id),
+    );
+    courses.sort(
+      (a, b) =>
+        (ids.includes(a.id) ? ids.indexOf(a.id) : 99999) -
+          (ids.includes(b.id) ? ids.indexOf(b.id) : 99999) ||
+        a.title.localeCompare(b.title),
+    );
+    for (const course of courses)
+      if (!seen.has(course.id)) {
+        seen.add(course.id);
+        result.push(course);
       }
   }
   return result;

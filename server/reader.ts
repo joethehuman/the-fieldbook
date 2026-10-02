@@ -264,7 +264,7 @@ export const readerTeam = cache(async () => {
       (person: User) =>
         user.role === "admin" ||
         person.id === user.id ||
-        (!!person.teamId && allowed.has(person.teamId)),
+        allowed.has(person.teamId || teams.find((team: {id: string; system?: string}) => team.system === "organization")?.id || ""),
     );
   const peopleIds = new Set(people.map((person) => person.id));
   const allGroups = governance.groups || [];
@@ -287,6 +287,7 @@ export const readerTeam = cache(async () => {
       assignments: course.assignments?.filter(
         (assignment) =>
           (assignment.groupId && groupIds.has(assignment.groupId)) ||
+          (assignment.teamId && people.some(person => person.assignmentTeams?.some(t => t.id === assignment.teamId))) ||
           (assignment.userId && peopleIds.has(assignment.userId)),
       ),
     }));
@@ -389,7 +390,7 @@ export const readerCourses = cache(async () => {
     assignments: course.assignments?.filter(
       (assignment) =>
         (assignment.groupId && groupIds.has(assignment.groupId)) ||
-        assignment.userId === user.id,
+        (assignment.teamId && user.assignmentTeams?.some(t => t.id === assignment.teamId)) || assignment.userId === user.id,
     ),
   }));
   const ids = new Set(courses.map(({ id }) => id));
