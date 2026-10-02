@@ -67,7 +67,7 @@ export function TeamProgress({
   const users = rows.map((r) => r.u);
   const total = rows.reduce((n, r) => n + r.assigned.length, 0),
     done = rows.reduce((n, r) => n + r.completed, 0);
-  if (!user.active || !["admin", "manager"].includes(user.role))
+  if (!user.active || !["admin", "manager", "contributor"].includes(user.role))
     return (
       <EmptyState>
         Reporting requires an administrator or manager account.

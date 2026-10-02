@@ -40,6 +40,8 @@ export function AccountMenu({
   description,
   guest = false,
   onManageOrganization,
+  onManageContent,
+  onManageContentIntent,
   onTeamProgress,
   onMenuOpen,
   onManageOrganizationIntent,
@@ -61,6 +63,8 @@ export function AccountMenu({
   description?: string;
   guest?: boolean;
   onManageOrganization?: () => void;
+  onManageContent?: () => void;
+  onManageContentIntent?: () => void;
   onTeamProgress?: () => void;
   onMenuOpen?: () => void;
   onManageOrganizationIntent?: () => void;
@@ -150,7 +154,7 @@ export function AccountMenu({
               Feedback{" "}
               <MessageSquare className="ml-auto size-4" aria-hidden="true" />
             </DropdownMenuItem>
-            {onTeamProgress && (
+            {onTeamProgress && !onManageOrganization && (
               <DropdownMenuItem
                 onSelect={onTeamProgress}
                 onPointerEnter={onTeamProgressIntent}
@@ -158,6 +162,16 @@ export function AccountMenu({
               >
                 My team’s progress{" "}
                 <GraduationCap className="ml-auto size-4" aria-hidden="true" />
+              </DropdownMenuItem>
+            )}
+            {onManageContent && !onManageOrganization && (
+              <DropdownMenuItem
+                onSelect={onManageContent}
+                onPointerEnter={onManageContentIntent}
+                onFocus={onManageContentIntent}
+              >
+                Manage content{" "}
+                <BookOpen className="ml-auto size-4" aria-hidden="true" />
               </DropdownMenuItem>
             )}
             {onManageOrganization && (

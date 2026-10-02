@@ -11,11 +11,12 @@ import { DEMO_PROFILE_IDS, freshWorkspace, updateProgress } from "../lib/store";
 import { learningTarget } from "../lib/learning";
 import { videoSource } from "../lib/video";
 
-test("demo presents three personas and a five-rep manager team with varied completion", () => {
+test("demo presents four personas and a five-rep manager team with varied completion", () => {
   const d = freshWorkspace();
   assert.deepEqual(DEMO_PROFILE_IDS, [
     "demo-learner",
     "demo-manager",
+    "demo-contributor",
     "demo-admin",
   ]);
   const manager = d.users.find((u) => u.id === "demo-manager")!;

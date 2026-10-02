@@ -110,6 +110,7 @@ import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
 import { type UploadMedia } from "./MarkdownEditor";
 import { CourseBuilder } from "./CourseBuilder";
 import { requiresPassing, validQuestion } from "@/lib/course-quiz";
+import { canAdminister, canOpenAdminTab, roleLabel } from "@/lib/permissions";
 import SiteSettingsPanel from "./SiteSettingsPanel";
 import { FeedbackAdmin } from "./Feedback";
 import { TeamsAdmin, TeamProgress } from "./Teams";
@@ -279,6 +280,11 @@ export default function Admin({
     },
     [registerNavigationGuard],
   );
+  const admin = canAdminister(user);
+  const visibleSections = adminSections.map((section) => ({
+    ...section, items: section.items.filter((item) => canOpenAdminTab(user, item.id)).map((item) =>
+      item.id === "deleted" && !admin ? { ...item, description: "Recover deleted content for 30 days." } : item),
+  })).filter((section) => section.items.length);
   const [tab, setTab] = useState("content"),
     [openingTab, setOpeningTab] = useState<string | null>(null),
     [openingItem, setOpeningItem] = useState<string | null>(null),
@@ -418,7 +424,7 @@ export default function Admin({
   ];
   const peopleFilters = [
     ...(query ? [{ id: "search", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []),
-    ...(peopleRole !== "all" ? [{ id: "role", label: peopleRole === "admin" ? "Administrator" : peopleRole === "manager" ? "Manager" : "Learner", onRemove: () => setPeopleRole("all") }] : []),
+    ...(peopleRole !== "all" ? [{ id: "role", label: roleLabel(peopleRole as User["role"]), onRemove: () => setPeopleRole("all") }] : []),
     ...(peopleStatus !== "all" ? [{ id: "status", label: peopleStatus === "active" ? "Active" : "Inactive", onRemove: () => setPeopleStatus("all") }] : []),
     ...(peopleGroup !== "all" ? [{ id: "group", label: `Group: ${groupPath(peopleGroup, data.groups)}`, onRemove: () => setPeopleGroup("all") }] : []),
     ...(peopleTeam !== "all" ? [{ id: "team", label: peopleTeam === "none" ? "No team" : teamPath(peopleTeam, data.teams || []), onRemove: () => setPeopleTeam("all") }] : []),
@@ -624,9 +630,9 @@ export default function Admin({
         onCancel={() => setEditing(null)}
         onUpload={onUpload}
         production={production}
-        onLearning={manageLearning}
-        onLearningMany={manageLearningMany}
-        onWorkspaceChange={onChange}
+        onLearning={admin ? manageLearning : undefined}
+        onLearningMany={admin ? manageLearningMany : undefined}
+        onWorkspaceChange={admin ? onChange : undefined}
         registerNavigationGuard={registerNavigationGuard}
         onReload={onReload}
       />
@@ -652,6 +658,7 @@ export default function Admin({
   );
 
   async function changeAdminTab(next: string, approved = false) {
+    if (!canOpenAdminTab(user, next)) return false;
     if (
       (next === tab && !detailScope && !editing && !person) ||
       (!approved && adminGuard.current && !(await adminGuard.current()))
@@ -678,7 +685,7 @@ export default function Admin({
   }
   return (
     <div className="admin-workspace" aria-busy={!!openingTab || !!openingItem}>
-      <h1 className="sr-only">Administration</h1>
+      <h1 className="sr-only">{admin ? "Administration" : "Publishing"}</h1>
       {openingTab && (
         <span className="sr-only" role="status">
           Loading administration data
@@ -691,13 +698,13 @@ export default function Admin({
         onValueChange={changeAdminTab}
       >
         <ResponsiveTabsNavigation
-          label="Administration section"
+          label={admin ? "Administration section" : "Publishing section"}
           value={tab}
           pendingValue={openingTab}
           onValueChange={async (next) => {
             await changeAdminTab(next);
           }}
-          options={adminSections
+          options={visibleSections
             .flatMap((section) => section.items)
             .map((item) => ({
               id: item.id,
@@ -707,7 +714,7 @@ export default function Admin({
                   : item.name,
             }))}
         >
-          {adminSections.map((section) => (
+          {visibleSections.map((section) => (
             <div className="admin-nav-group" key={section.label}>
               <span className="admin-nav-label">{section.label}</span>
               {section.items.map((item) => (
@@ -742,7 +749,7 @@ export default function Admin({
               title={
                 <h2>
                   {
-                    tab === "people" && !production ? "Demo profiles" : adminSections
+                    tab === "people" && !production ? "Demo profiles" : visibleSections
                       .flatMap((s) => s.items)
                       .find((s) => s.id === tab)?.name
                   }
@@ -751,7 +758,7 @@ export default function Admin({
               description={
                 <>
                   {
-                    adminSections
+                    visibleSections
                       .flatMap((s) => s.items)
                       .find((s) => s.id === tab)?.description
                   }
@@ -781,10 +788,11 @@ export default function Admin({
           )}
           {notice && <Alert variant="destructive">{notice}</Alert>}
           {detailView ? detailView : tab === "deleted" ? (
-            <RecentlyDeleted data={data} onBulk={onBulk} />
+            <RecentlyDeleted data={data} onBulk={onBulk} contentOnly={!admin} />
           ) : tab.startsWith("settings-") ? (
             <SiteSettingsPanel
               key={tab}
+              contributor={!admin}
               section={
                 tab.slice(9) as import("./SiteSettingsPanel").SettingsSection
               }
@@ -1139,6 +1147,7 @@ export default function Admin({
                     <option value="all">All roles</option>
                     <option value="learner">Learner</option>
                     <option value="manager">Manager</option>
+                  <option value="contributor">Contributor</option>
                     <option value="admin">Admin</option>
                   </SelectField>
                 </FormField>
@@ -1237,7 +1246,7 @@ export default function Admin({
                           <strong>{u.name}</strong>
                           <small>{u.email}</small>
                         </TableCell>
-                        <TableCell>{u.role === "admin" ? "Administrator" : u.role === "manager" ? "Manager" : "Learner"}</TableCell>
+                        <TableCell>{roleLabel(u.role)}</TableCell>
                         <TableCell>
                           {data.groups
                             .filter((g) =>
@@ -1404,6 +1413,7 @@ export default function Admin({
                   <option value="learner">Learner</option>
                   <option value="admin">Administrator</option>
                   <option value="manager">Manager</option>
+                  <option value="contributor">Contributor</option>
                 </SelectField>
               </FormField>
               <FormField label="Reporting team">
@@ -1778,6 +1788,7 @@ export function Editor({
           <>
             <DocSectionPicker
               sections={docSections}
+              canCreate={!!onWorkspaceChange}
               value={sectionForDoc(c, docSections)?.id || ""}
               disabled={busy}
               onChange={(sectionId) => {
@@ -1795,7 +1806,7 @@ export function Editor({
                 }));
               }}
             />
-            <Button
+            {onWorkspaceChange && <Button
               type="button"
               disabled={busy}
               onClick={() => setCreatingSection((open) => !open)}
@@ -1804,7 +1815,7 @@ export function Editor({
               {creatingSection
                 ? "Close section form"
                 : "Create section"}
-            </Button>
+            </Button>}
             {creatingSection && (
               <DocSectionCreate
                 sections={docSections}
@@ -1884,14 +1895,14 @@ export function Editor({
           </Field>
           <FieldDescription id="course-version-help">Current version: {c.version}. Keep this unchecked for minor corrections.</FieldDescription>
         </EditorDetailsGroup>}
-        <EditorDetailsGroup id="course-assignments" title="Learning groups"
+        {onLearning && <EditorDetailsGroup id="course-assignments" title="Learning groups"
           description="Groups assign courses; completion windows are managed in organization settings.">
-          {existing && (data.publishedContent ?? data.content).some((item) => item.id === c.id && item.status === "published") && onLearning
+          {existing && (data.publishedContent ?? data.content).some((item) => item.id === c.id && item.status === "published")
             ? <Button type="button" variant="outline" size="sm" onClick={async () => {
                 if (await guard.current()) setEditorTab("assignments");
               }}>Manage learning groups</Button>
             : <p className="text-copy text-muted-foreground">Publish this course to add it to a group’s assigned courses.</p>}
-        </EditorDetailsGroup>
+        </EditorDetailsGroup>}
       </>}
       <Collapsible>
         <CollapsibleTrigger asChild><Button type="button" variant="ghost" size="sm" className="justify-start">Draft recovery</Button></CollapsibleTrigger>

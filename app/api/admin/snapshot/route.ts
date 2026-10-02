@@ -1,4 +1,4 @@
-import { actor, errorResponse, HttpError, requireAdmin } from "@server/auth";
+import { actor, errorResponse, HttpError, requirePublisher } from "@server/auth";
 import { adminSnapshot, type AdminScope } from "@server/admin-snapshot";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     if (scope !== "person" && userId)
       throw new HttpError(400, "Choose a person section for course history.");
     const user = await actor();
-    requireAdmin(user);
+    requirePublisher(user);
     return Response.json(
       {
         data: await adminSnapshot(

@@ -1,4 +1,5 @@
 import "server-only";
+import { canPublish } from "@/lib/permissions";
 import type { User } from "@/lib/types";
 import { HttpError } from "./errors";
 import { canRead } from "./content";
@@ -14,7 +15,7 @@ export async function signedMediaUrl(file: string, user: User | null) {
     throw new HttpError(404, "Media not found.");
   const reference = `/api/media/${file}`;
   if (
-    user?.role !== "admin" &&
+    !canPublish(user) &&
     !(await mediaData().hasPublishedDocumentReference(reference)) &&
     !config?.curricula?.some(
       (curriculum: {

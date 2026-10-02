@@ -25,13 +25,15 @@ export function teamProgressRows(
 ) {
   const teams = data.teams || [],
     allowed = reportTeamIds(viewer, teams);
-  if (!viewer.active) return [];
+  if (!viewer.active || viewer.registered === false) return [];
   return data.users
     .filter(
       (u) =>
         u.active &&
         (viewer.role === "admin" ||
-          (viewer.role === "manager" && !!u.teamId && allowed.has(u.teamId))) &&
+          (["manager", "contributor"].includes(viewer.role) &&
+            !!u.teamId &&
+            allowed.has(u.teamId))) &&
         (teamId === "all" ||
           (!!u.teamId && ancestorIds(u.teamId, teams).has(teamId))) &&
         `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()),

@@ -36,7 +36,7 @@ export const governanceSchema = z
           id: z.uuid(),
           name: z.string().trim().min(1).max(80),
           email: z.email().max(254),
-          role: z.enum(["admin", "manager", "learner"]),
+          role: z.enum(["admin", "manager", "learner", "contributor"]),
           active: z.boolean(),
           groups: z.array(id).max(100),
           teamId: id.optional(),
@@ -125,7 +125,7 @@ export const pendingSchema = z.object({
     .max(254)
     .transform((s) => s.trim().toLowerCase()),
   name: z.string().trim().min(1).max(80),
-  role: z.enum(["learner", "manager", "admin"]),
+  role: z.enum(["learner", "manager", "admin", "contributor"]),
   groups: z.array(id).max(100),
   teamId: id.optional(),
   onboardingStart: z.iso.date().optional(),

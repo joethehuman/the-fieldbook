@@ -1,6 +1,7 @@
 import "server-only";
 import { installation, siteOrigins } from "./installation";
 import type { User } from "@/lib/types";
+import { canPublish } from "@/lib/permissions";
 import type { ProfileRecord } from "./ports/identity";
 import {
   findProfileBySubject,
@@ -83,4 +84,9 @@ export function sameOrigin(req: Request) {
       403,
       "This request must come from your Fieldbook site.",
     );
+}
+
+export function requirePublisher(user: User | null): asserts user is User {
+  if (!user) throw new HttpError(401, "Sign in to publish content.");
+  if (!canPublish(user)) throw new HttpError(403, "Administrator or contributor publishing access is required.");
 }

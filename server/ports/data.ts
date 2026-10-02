@@ -192,7 +192,7 @@ export interface DataStore {
     actorId: string,
     userId?: string,
   ): Promise<GovernanceRecord>;
-  listDeletedItems(): Promise<DeletedItemRecord[]>;
+  listDeletedItems(entity?: "content" | "user"): Promise<DeletedItemRecord[]>;
   readCleanupStatus(): Promise<{
     endpoint: string | null;
     last_run: string | null;
