@@ -44,6 +44,21 @@ let fixtureGeneration = Date.now();
 let aiGenerations = 0,
   aiFailure = "",
   aiPassages = [];
+let aiStage = 0;
+let stageWaiters = [];
+const waitForAiStage = (stage) =>
+  aiStage >= stage
+    ? Promise.resolve()
+    : new Promise((resolve) => {
+        const timeout = setTimeout(resolve, 20_000);
+        stageWaiters.push({
+          stage,
+          release: () => {
+            clearTimeout(timeout);
+            resolve();
+          },
+        });
+      });
 let readQueries = [];
 let settings = initial(),
   configuredGroups = [],
@@ -121,8 +136,20 @@ createServer(async (req, res) => {
     role = change.role || "admin";
     revision = 1;
     aiGenerations = 0;
+    aiStage = 0;
+    stageWaiters.forEach(({ release }) => release());
+    stageWaiters = [];
     aiFailure = change.aiFailure || "";
     aiPassages = change.aiPassages || [];
+    return send(res, { ok: true });
+  }
+  if (url.pathname === "/ai-stage") {
+    aiStage = JSON.parse(body).stage;
+    stageWaiters = stageWaiters.filter((waiter) => {
+      if (waiter.stage > aiStage) return true;
+      waiter.release();
+      return false;
+    });
     return send(res, { ok: true });
   }
   if (url.pathname === "/reads")
@@ -185,6 +212,11 @@ createServer(async (req, res) => {
       inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
       outputTokens: { total: 8, text: 8, reasoning: 0 },
     };
+    if (
+      aiFailure === "staged-answer" &&
+      req.headers["ai-language-model-streaming"] === "false"
+    )
+      await waitForAiStage(1);
     if (req.headers["ai-language-model-streaming"] === "false")
       return send(res, {
         content: [
@@ -199,6 +231,26 @@ createServer(async (req, res) => {
         usage,
       });
     res.writeHead(200, { "Content-Type": "text/event-stream" });
+    if (aiFailure === "staged-answer") {
+      const write = (part) =>
+        res.write("data: " + JSON.stringify(part) + "\n\n");
+      write({ type: "stream-start", warnings: [] });
+      write({ type: "text-start", id: "answer" });
+      await waitForAiStage(2);
+      write({
+        type: "text-delta",
+        id: "answer",
+        delta: "Hi! What would you like to know?",
+      });
+      await waitForAiStage(3);
+      write({ type: "text-end", id: "answer" });
+      write({
+        type: "finish",
+        finishReason: { unified: "stop", raw: "stop" },
+        usage,
+      });
+      return res.end();
+    }
     return res.end(
       [
         { type: "stream-start", warnings: [] },

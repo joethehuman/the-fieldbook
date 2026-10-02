@@ -383,15 +383,78 @@ test("one plan and one answer expose verified lesson links without source bodies
   assert.equal(Object.keys(f.deps.store).length, 3);
 });
 
-test("no matching evidence returns a restrained answer without a second model call", async () => {
-  const f = fixture();
-  f.setPassages([]);
-  const events = await collect(
-    await prepareAskAi(request(), user, new AbortController().signal, f.deps),
-  );
-  assert.equal(events.length, 1);
-  assert.equal(f.calls.plan, 1);
-  assert.equal(f.calls.answer, 0);
+test("empty evidence still reaches the bounded answer step regardless of punctuation", async () => {
+  for (const text of [
+    "Hi!",
+    "hello?",
+    "hello",
+    "Thanks!",
+    "How does quorum work?",
+  ]) {
+    const f = fixture();
+    f.setPassages([]);
+    f.provider.planSearch = async (input) => {
+      f.calls.plan++;
+      assert.equal(input.messages.at(-1)?.text, text);
+      return ["hello"];
+    };
+    const answer =
+      text === "How does quorum work?"
+        ? "The published content does not answer that question. Try Search."
+        : "Hi! What would you like to know?";
+    f.provider.streamAnswer = async function* (input) {
+      f.calls.answer++;
+      assert.equal(input.messages.at(-1)?.text, text);
+      assert.deepEqual(input.sources, []);
+      assert.match(input.instructions, /regardless of punctuation/);
+      assert.match(
+        input.instructions,
+        /If no evidence is supplied, do not invent an answer/,
+      );
+      assert.match(
+        input.instructions,
+        /factual questions from general knowledge/,
+      );
+      yield answer;
+    };
+    const events = await collect(
+      await prepareAskAi(
+        request(text),
+        user,
+        new AbortController().signal,
+        f.deps,
+      ),
+    );
+    assert.deepEqual(events, [
+      { type: "text", text: answer },
+      { type: "sources", sources: [] },
+    ]);
+    assert.equal(f.calls.plan, 1);
+    assert.equal(f.calls.answer, 1);
+    assert.equal(f.calls.current, 0);
+  }
+});
+
+test("empty evidence cannot issue invented source links and still rechecks access", async () => {
+  for (const revoke of [false, true]) {
+    const f = fixture();
+    f.setPassages([]);
+    f.provider.streamAnswer = async function* () {
+      if (revoke) f.setEnabled(false);
+      yield "An unsupported answer. [S1]";
+    };
+    await assert.rejects(
+      collect(
+        await prepareAskAi(
+          request(),
+          user,
+          new AbortController().signal,
+          f.deps,
+        ),
+      ),
+      revoke ? /Ask AI is unavailable/ : /could not verify its source links/,
+    );
+  }
 });
 
 test("four supplied citations complete the SDK stream and retain every internal source link", async () => {

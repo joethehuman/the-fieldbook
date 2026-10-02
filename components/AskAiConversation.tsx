@@ -7,6 +7,7 @@ import { Message, MessageContent } from "./ai-elements/message";
 import { AskAiAnswer } from "./AskAiAnswer";
 import { Button } from "./ui/button";
 import { Alert } from "./ui/alert";
+import { LoadingDots } from "./ui/loading-dots";
 import { MessageComposer } from "./patterns/message-composer";
 import type { useAskAi } from "./use-ask-ai";
 
@@ -25,6 +26,10 @@ export function AskAiConversation({
 }) {
   const transcript = useRef<HTMLDivElement>(null);
   const following = useRef(true);
+  const latest = chat.messages.at(-1);
+  const thinking =
+    chat.busy &&
+    (!latest || latest.role === "user" || !messageText(latest).trim());
   useEffect(() => {
     const scrollArea = transcript.current;
     if (!scrollArea) return;
@@ -73,6 +78,9 @@ export function AskAiConversation({
             {chat.messages.map((message) => {
               const complete = chat.completed.has(message.id);
               const text = messageText(message);
+              // SDK start/text-start can create an empty assistant before text arrives.
+              // Keep one pending row in its place throughout planning and streaming setup.
+              if (message.role === "assistant" && !text.trim()) return null;
               return (
                 <Message key={message.id} from={message.role}>
                   <span className="sr-only">
@@ -104,6 +112,13 @@ export function AskAiConversation({
                 </Message>
               );
             })}
+            {thinking && (
+              <Message from="assistant">
+                <MessageContent>
+                  <LoadingDots />
+                </MessageContent>
+              </Message>
+            )}
           </div>
           {chat.error && (
             <Alert variant="destructive">
@@ -122,7 +137,7 @@ export function AskAiConversation({
           <p
             role="status"
             className={
-              chat.busy || chat.notice
+              !chat.busy && chat.notice
                 ? "text-sm text-muted-foreground"
                 : "sr-only"
             }

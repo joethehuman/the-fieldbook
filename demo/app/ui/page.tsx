@@ -3,6 +3,7 @@ import { EditorFrame, EditorDetailsGroup } from "@/components/patterns/editor-fr
 import { NavigationButton } from "@/components/patterns/navigation-button";
 import { ResponsiveTabsNavigation } from "@/components/patterns/responsive-tabs-navigation";
 import { Spinner } from "@/components/ui/spinner";
+import { LoadingDots } from "@/components/ui/loading-dots";
 import { DetailNavigation } from "@/components/patterns/detail-navigation";
 import { BulkExamples } from "./bulk-examples";
 import { WritingExamples } from "./writing-examples";
@@ -346,6 +347,10 @@ export default function ComponentCatalog() {
       </section>
       <section className="grid gap-4">
         <h2>Search results</h2>
+        <div className="flex items-center gap-3">
+          <LoadingDots />
+          <span className="text-sm text-muted-foreground">Thinking indicator (static with reduced motion)</span>
+        </div>
         <p>
           Contained search keeps the current page in place. Loading placeholders
           respect reduced motion.

@@ -559,3 +559,86 @@ test("Ask AI demo responds locally, respects composition and clears on profile c
   );
   expect(calls).toBe(0);
 });
+
+test("thinking stays in one assistant position from submission through first streamed text", async ({
+  page,
+  request,
+}, info) => {
+  await fixture(page, request, true, true, "staged-answer");
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  await input.fill("hello?");
+  await input.press("Enter");
+  const region = page.getByRole("region", { name: "Ask AI conversation" });
+  const dots = region.locator('[data-slot="loading-dots"]');
+  const composer = region.getByRole("textbox", { name: "Ask a follow-up" });
+  await expect(dots).toHaveCount(1);
+  await expect(dots).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        (await (await request.get("http://127.0.0.1:3130/reads")).json())
+          .aiGenerations,
+    )
+    .toBe(1);
+  const before = {
+    dots: await dots.boundingBox(),
+    panel: await region.boundingBox(),
+    composer: await composer.boundingBox(),
+  };
+  const animation = await dots
+    .locator("span")
+    .first()
+    .evaluate((el) => getComputedStyle(el).animationName);
+  expect(animation).toBe("bounce");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect
+    .poll(() =>
+      dots
+        .locator("span")
+        .first()
+        .evaluate((el) => getComputedStyle(el).animationName),
+    )
+    .toBe("none");
+  const headersReceived = page.waitForResponse((response) =>
+    response.url().endsWith("/api/ask-ai"),
+  );
+  await request.post("http://127.0.0.1:3130/ai-stage", { data: { stage: 1 } });
+  await headersReceived;
+  await expect
+    .poll(
+      async () =>
+        (await (await request.get("http://127.0.0.1:3130/reads")).json())
+          .aiGenerations,
+    )
+    .toBe(2);
+  await expect(dots).toHaveCount(1);
+  const started = await dots.boundingBox();
+  expect(Math.abs(started!.y - before.dots!.y)).toBeLessThanOrEqual(1);
+  await page.screenshot({ path: info.outputPath("thinking.png") });
+  await request.post("http://127.0.0.1:3130/ai-stage", { data: { stage: 2 } });
+  const answer = region.getByText("Hi! What would you like to know?", {
+    exact: true,
+  });
+  await expect(answer).toBeVisible();
+  await expect(dots).toHaveCount(0);
+  const after = {
+    answer: await answer.boundingBox(),
+    panel: await region.boundingBox(),
+    composer: await composer.boundingBox(),
+  };
+  expect(Math.abs(after.answer!.y - before.dots!.y)).toBeLessThanOrEqual(1);
+  for (const key of ["x", "y", "width", "height"] as const) {
+    expect(
+      Math.abs(after.panel![key] - before.panel![key]),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(after.composer![key] - before.composer![key]),
+    ).toBeLessThanOrEqual(1);
+  }
+  await request.post("http://127.0.0.1:3130/ai-stage", { data: { stage: 3 } });
+  await expect(region.getByRole("status")).toHaveText("Answer ready.");
+  await expect(
+    region.getByText("Response incomplete.", { exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("greeting.png") });
+});
