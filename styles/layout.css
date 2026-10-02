@@ -236,11 +236,12 @@
     display: grid;
     gap: var(--space-4);
     min-width: 0;
+    container: editor-shell / inline-size;
   }
   .editor-heading {
     display: flex;
     min-width: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
@@ -252,9 +253,18 @@
     background: var(--background);
   }
   .editor-heading[data-sticky="false"] { position: static; }
-  .editor-heading-actions { display: flex; min-width: 0; max-width: 100%; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: var(--space-2); margin-inline-start: auto; }
-  .editor-save-status { display: flex; min-width: 0; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: var(--space-2); color: var(--muted-foreground); font-size: var(--type-label); line-height: var(--type-label-leading); }
-  .editor-save-status > [role="status"] { min-width: 0; max-width: 40%; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .editor-heading-actions { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-inline-start: auto; }
+  .editor-save-status { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; gap: var(--space-3); color: var(--muted-foreground); }
+  .editor-status-phrase, .editor-status-wide { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
+  .editor-status-separator { color: var(--muted-foreground); }
+  .editor-status-compact { display: none; }
+  @container editor-shell (width < 40rem) {
+    .editor-heading { gap: var(--space-2); }
+    .editor-heading-actions, .editor-save-status { gap: var(--space-2); }
+    .editor-status-wide { display: none; }
+    .editor-status-compact { display: inline-flex; align-items: center; gap: var(--space-1); }
+    [data-slot="detail-navigation"][data-compact] .detail-navigation-label { display: none; }
+  }
   .editor-content { gap: var(--space-4); }
   .editor-introduction { display: grid; width: 100%; gap: var(--space-3); padding-block: var(--space-2); }
   .editor-introduction [data-slot="input"], .editor-introduction [data-slot="textarea"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }

@@ -1,6 +1,7 @@
 "use client";
 import { useOrganizationChangeReview } from "./OrganizationChangeReview";
 import { DetailNavigation } from "./patterns/detail-navigation";
+import { EditorSaveStatus } from "./patterns/editor-save-status";
 import { Badge } from "./ui/badge";
 import { Spinner } from "./ui/spinner";
 import { Pagination } from "./patterns/pagination";
@@ -2280,9 +2281,9 @@ export function Editor({
   const set = (key: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: value }));
   const saveStatus = saving || busy
-    ? uploadCount ? "Uploading media…" : "Saving…"
+    ? uploadCount ? "Uploading…" : "Saving…"
     : queue.current!.blocked ? "Changes not saved"
-    : dirty ? "Saving…" : savedMessage || (existing ? "Saved" : "Not saved yet");
+    : dirty ? "Saving…" : savedMessage || (existing ? "Saved" : "Not saved");
   const details = (
     <FieldGroup disabled={busy} className="editor-details-content">
       <EditorDetailsGroup id="writing-readiness" title="Before publishing">
@@ -2555,6 +2556,7 @@ export function Editor({
         </h1>
         <DetailNavigation
           flush
+          compact
           disabled={busy}
           items={[
             {
@@ -2566,20 +2568,15 @@ export function Editor({
           ]}
         />
         <div className="editor-heading-actions">
-          <div className="editor-save-status">
-            <span role="status" title={saveStatus}>
-              {saveStatus}
-            </span>
-            <PublicationStatus
-              layout="inline"
-              published={!!c.publishedRevision}
-              hasUnpublishedChanges={
-                !!c.publishedRevision && publicationChanged
-              }
-            />
-          </div>
+          <EditorSaveStatus
+            status={saveStatus}
+            published={!!c.publishedRevision}
+            hasUnpublishedChanges={!!c.publishedRevision && publicationChanged}
+            failed={needsRecovery}
+          />
           <Button
             type="button"
+            size="sm"
             className="shrink-0"
             disabled={
               busy ||
@@ -2590,28 +2587,29 @@ export function Editor({
             }
             onClick={(event) => void submit(event, "published")}
           >
-            {!publicationChanged
-              ? "Published"
-              : c.publishedRevision
-                ? "Publish changes"
-                : "Publish"}
+            Publish
           </Button>
         </div>
       </div>
       {error && (
-        <Alert variant="destructive" role="alert">
-          {needsRecovery && <p>Your latest changes aren’t confirmed saved. Keep this page open.</p>}
-          <p>{error}</p>
-          {needsRecovery && <ActionGroup className="mt-3">
-            {onReload && <Button type="button" variant="outline" disabled={busy || saving}
+        <Alert variant="destructive" role="alert" className={needsRecovery ? "text-foreground" : undefined}>
+          {needsRecovery && <>
+            <p className="font-medium text-copy">We couldn’t confirm your latest changes were saved.</p>
+            <p className="text-xs text-muted-foreground">Your work is still here. Keep this page open.</p>
+          </>}
+          <p className={needsRecovery ? "text-xs text-muted-foreground" : undefined}>{error}</p>
+          {needsRecovery && <ActionGroup className="mt-1 gap-x-4 gap-y-2">
+            {onReload && <Button type="button" size="sm" disabled={busy || saving}
               onClick={() => void retrySaving()}>Retry saving</Button>}
-            <Button type="button" variant="outline" onClick={downloadDraft}>
+            <Button type="button" variant="link" size="sm" className="text-xs text-muted-foreground underline" onClick={downloadDraft}>
               Download your changes
             </Button>
             {onReload && (
               <Button
                 type="button"
-                variant="outline"
+                variant="link"
+                size="sm"
+                className="text-xs text-muted-foreground underline"
                 disabled={busy}
                 onClick={reloadSaved}
               >

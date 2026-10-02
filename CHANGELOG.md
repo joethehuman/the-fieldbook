@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Replace the editor’s permanent Draft recovery section with a confirmed Revert to published version action at the bottom of Details. Keep save text, unpublished-edit text, the publication pill and Publish in one header line. Failed saves retain open work and offer a revision-checked retry, saved-draft reload and download without changing live content or learner progress.
+- Replace the editor’s permanent Draft recovery section with a confirmed Revert to published version action at the bottom of Details. Group quiet save and unpublished-edit text beside the publication pill and a consistent Publish action in one header line, with deliberate compact labels instead of clipped text on phones. Failed saves retain open work and offer a primary revision-checked retry plus quiet saved-draft reload and download actions without changing live content or learner progress.
 
 - Make Organization visible on Teams. People without a named team automatically appear there for membership, reporting and Organization-linked learning groups; moving or removing a team membership keeps saved learning history and deadlines. Guests use the configured guest learning group and stay outside the reporting hierarchy. Existing installations require `20261002184642_organization_membership.sql` after the built-in Organization migration.
 
