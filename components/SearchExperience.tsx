@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import type { Content } from "@/lib/types";
 import type { SearchProvider, SearchResult } from "@/lib/search";
@@ -42,6 +42,13 @@ export function SearchExperience({
   const visible =
     open &&
     (!!query.trim() || (enabled && (view === "ai" || !!chat.messages.length)));
+  useLayoutEffect(() => {
+    // Search starts with its first result, independently of chat autoscrolling.
+    if (view === "search") {
+      const panel = document.getElementById(id);
+      if (panel) panel.scrollTop = 0;
+    }
+  }, [id, view, query, visible]);
   async function ask() {
     setView("ai");
     setOpen(true);

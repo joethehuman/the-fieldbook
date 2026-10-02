@@ -98,6 +98,8 @@ Browser tests cover desktop, tablet and phone layouts, keyboard Select/Tabs, lon
 
 ## Review requirements
 
+`MessageComposer` combines a labeled multiline `Textarea` with an embedded send/stop action. The `embedded` textarea variant delegates its border and focus ring to the enclosing field; other textareas retain the default appearance. Reserve room for the action while text wraps or grows, preserve Enter/Shift+Enter and composition behavior, and keep icon buttons named for assistive technology. The live Search/Ask AI catalog example demonstrates this pattern.
+
 1. Reuse or extend a shared primitive/pattern before adding feature styling.
 2. Preserve heading hierarchy, label associations, focus and keyboard behavior.
 3. Check narrow screens, long content and enlarged text; keep data tables independently scrollable.

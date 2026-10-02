@@ -9,10 +9,8 @@ import {
   MessageResponse,
 } from "./ai-elements/message";
 import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
 import { Alert } from "./ui/alert";
-import { Field } from "./ui/field";
-import { ActionGroup } from "./ui/action-group";
+import { MessageComposer } from "./patterns/message-composer";
 import type { useAskAi } from "./use-ask-ai";
 
 export function AskAiConversation({
@@ -28,7 +26,7 @@ export function AskAiConversation({
   chat: ReturnType<typeof useAskAi>;
   onSource: (source: AiCitation) => void;
 }) {
-  const tail = useRef<HTMLDivElement>(null);
+  const tail = useRef<HTMLParagraphElement>(null);
   const following = useRef(true);
   useEffect(() => {
     const panel = tail.current?.closest('[data-slot="search-panel"]');
@@ -158,65 +156,33 @@ export function AskAiConversation({
           </Button>
         </Alert>
       )}
-      <p role="status" className="text-sm text-muted-foreground">
+      <p
+        role="status"
+        className={
+          chat.busy || chat.notice ? "text-sm text-muted-foreground" : "sr-only"
+        }
+      >
         {chat.busy
           ? "Answering…"
           : chat.notice || (chat.completion ? "Answer ready." : "")}
       </p>
       {chat.notice.startsWith("Sign in") && <a href="/auth/sign-in">Sign in</a>}
-      <form
-        className="sticky bottom-0 grid gap-2 border-t border-border bg-card pt-3"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void send();
-        }}
-      >
-        <Field htmlFor={`${id}-follow-up`}>
-          <span>
-            {chat.messages.length ? "Ask a follow-up" : "Your question"}
-          </span>
-          <Textarea
-            id={`${id}-follow-up`}
-            size="compact"
-            maxLength={aiBounds.questionCharacters}
-            value={draft}
-            placeholder="Ask Fieldbook a question…"
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (
-                event.key === "Enter" &&
-                !event.shiftKey &&
-                !event.nativeEvent.isComposing &&
-                event.keyCode !== 229
-              ) {
-                event.preventDefault();
-                if (!event.repeat) void send();
-              }
-            }}
-          />
-        </Field>
-        <ActionGroup className="justify-end">
-          {chat.busy ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void chat.stop()}
-            >
-              Stop response
-            </Button>
-          ) : (
-            <Button type="submit" size="sm" disabled={!draft.trim()}>
-              Ask AI
-            </Button>
-          )}
-        </ActionGroup>
-      </form>
-      <p className="text-xs text-muted-foreground">
-        AI can make mistakes. Check the sources. This conversation clears when
-        you reload or sign out.
+      <div className="sticky bottom-0 bg-card pt-2">
+        <MessageComposer
+          id={`${id}-follow-up`}
+          label={chat.messages.length ? "Ask a follow-up" : "Your question"}
+          value={draft}
+          onValueChange={setDraft}
+          onSend={() => void send()}
+          onStop={() => void chat.stop()}
+          busy={chat.busy}
+          maxLength={aiBounds.questionCharacters}
+          placeholder="Ask Fieldbook a question…"
+        />
+      </div>
+      <p ref={tail} className="text-xs text-muted-foreground">
+        AI can make mistakes. This chat clears on reload or sign-out.
       </p>
-      <div ref={tail} />
     </section>
   );
 }

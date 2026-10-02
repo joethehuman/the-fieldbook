@@ -260,6 +260,8 @@ test("Ask AI failure, explicit retry, stop and new conversation cancel pending w
   ).toBeVisible();
   await input.press("Enter");
   expect(calls).toBe(3);
+  const draft = page.getByRole("textbox", { name: "Ask a follow-up" });
+  await draft.fill("An unsent follow-up stays here");
   await page.getByRole("button", { name: "Stop response" }).click();
   release?.();
   await expect(
@@ -267,6 +269,8 @@ test("Ask AI failure, explicit retry, stop and new conversation cancel pending w
       .getByRole("region", { name: "Ask AI conversation" })
       .getByRole("status"),
   ).toContainText("Response stopped");
+  expect(calls).toBe(3);
+  await expect(draft).toHaveValue("An unsent follow-up stays here");
   await input.fill("Another slow question?");
   await input.press("Enter");
   await expect(

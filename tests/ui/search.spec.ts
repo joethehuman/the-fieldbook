@@ -165,3 +165,104 @@ test("search preserves an unsaved editor and guards result navigation", async ({
     page.getByRole("heading", { name: "Published destination", exact: true }),
   ).toBeVisible();
 });
+
+test("Search returns to the first results and chat uses an embedded multiline composer", async ({
+  page,
+}, info) => {
+  const data = freshWorkspace();
+  const doc = data.content.find((item) => item.kind === "doc")!;
+  data.content.push(
+    ...Array.from({ length: 22 }, (_, i) => ({
+      ...doc,
+      id: `polish-reference-${i}`,
+      title: `Customer reference ${String(i).padStart(2, "0")}`,
+      status: "published" as const,
+      body: "Customer reference instructions for a support conversation.",
+    })),
+  );
+  await page.addInitScript((data) => {
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-learner");
+  }, data);
+  const aiRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/ask-ai")) aiRequests.push(request.url());
+  });
+  await page.goto("/#courses");
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  await input.fill("Customer reference");
+  const panel = page.locator('[data-slot="search-panel"]');
+  const first = panel.getByRole("link", { name: /Customer reference/ }).first();
+  await expect(first).toBeVisible();
+  const firstY = (await first.boundingBox())!.y;
+  await panel.getByRole("button", { name: "Ask AI", exact: true }).click();
+  const chat = page.getByRole("region", { name: "Ask AI conversation" });
+  const follow = chat.getByRole("textbox", { name: "Ask a follow-up" });
+  await expect(follow).toBeVisible();
+  await follow.fill("More detail about this customer reference. ".repeat(45));
+  await follow.press("Enter");
+  await expect(chat.getByRole("status")).toContainText("Answer ready");
+  await expect
+    .poll(() => panel.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
+  await panel.getByRole("tab", { name: "Search", exact: true }).click();
+  await expect
+    .poll(() => panel.evaluate((element) => element.scrollTop))
+    .toBe(0);
+  await expect(first).toBeVisible();
+  expect(Math.abs((await first.boundingBox())!.y - firstY)).toBeLessThan(2);
+  await page.screenshot({ path: info.outputPath("search-return-top.png") });
+
+  await panel.getByRole("tab", { name: "Ask AI", exact: true }).click();
+  await panel.getByRole("button", { name: "New conversation" }).click();
+  const question = chat.getByRole("textbox", { name: "Your question" });
+  await question.fill("Where should I start?");
+  await chat.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await expect(chat.getByRole("status")).toContainText("Answer ready");
+  await follow.fill("A follow-up");
+  await follow.press("Shift+Enter");
+  await follow.pressSequentially("With more detail");
+  await follow.dispatchEvent("keydown", { key: "Enter", isComposing: true });
+  await expect(follow).toHaveValue("A follow-up\nWith more detail");
+  await expect(
+    chat
+      .getByRole("log")
+      .getByText("This feature is not available in the demo site.", {
+        exact: true,
+      }),
+  ).toHaveCount(1);
+
+  const field = chat.locator('[data-slot="message-composer-field"]');
+  const action = chat.getByRole("button", { name: "Ask AI", exact: true });
+  const fieldBox = (await field.boundingBox())!;
+  const actionBox = (await action.boundingBox())!;
+  expect(actionBox.x).toBeGreaterThan(fieldBox.x);
+  expect(actionBox.x + actionBox.width).toBeLessThan(
+    fieldBox.x + fieldBox.width,
+  );
+  expect(actionBox.y + actionBox.height).toBeLessThan(
+    fieldBox.y + fieldBox.height,
+  );
+  const panelBox = (await panel.boundingBox())!;
+  const leftPadding = fieldBox.x - panelBox.x;
+  const rightPadding =
+    panelBox.x + panelBox.width - fieldBox.x - fieldBox.width;
+  expect(Math.abs(leftPadding - rightPadding)).toBeLessThan(2);
+  await page.screenshot({
+    path: info.outputPath("ask-ai-embedded-composer.png"),
+  });
+  await action.click();
+  await expect(chat.getByRole("log")).toContainText("With more detail");
+  expect(aiRequests).toEqual([]);
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(input).toHaveValue("");
+  await expect(
+    panel.getByRole("tab", { name: "Search", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(chat).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+});
