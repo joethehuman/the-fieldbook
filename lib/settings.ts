@@ -31,6 +31,7 @@ export type SiteSettings = {
   externalLinks?: ExternalLink[];
   homePage?: "updates" | "courses" | "docs";
   guestGroupId?: string | null;
+  organizationTeamId?: string | null;
   docCategoryOrder?: string[];
   docSections?: import("./docs-navigation").DocSection[];
   newUserStage?: "existing" | "newhire";
@@ -49,6 +50,7 @@ export const defaultSettings: SiteSettings = {
   externalLinks: [],
   homePage: "courses",
   guestGroupId: null,
+  organizationTeamId: null,
   newUserStage: "existing",
   dueDatesEnabled: true,
   onboardingDays: 90,
@@ -68,6 +70,7 @@ export function publicSettings(
 ): SiteSettings {
   const {
     guestGroupId: _guestGroupId,
+    organizationTeamId: _organizationTeamId,
     logoUrl: _legacyLogoUrl,
     tagline: _legacyTagline,
     ...visible

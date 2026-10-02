@@ -56,44 +56,50 @@ export async function adminSnapshot(
   const reports = scope === "governance" || scope === "person";
   // Start independent reads together after the request-time permission check.
   // Housekeeping cannot delay or fail an unrelated account/content list.
-  const [config, content, governance, courseRows, feedback, maintenance] =
-    await Promise.all([
-      readConfig(),
-      contentIndex(),
-      scope === "people" || scope === "person"
-        ? store.readAdminPeopleSnapshot(user.id, userId)
-        : scope === "governance"
-          ? store.readGovernanceSnapshot(user.id)
-          : null,
-      reports ? store.listDraftCourses() : [],
-      scope === "feedback"
-        ? store.listFeedback().then(async (ratings) => ({
-            ratings,
-            people: admin
-              ? await store.listProfiles()
-              : await store.readProfileNames([
-                  ...new Set(
-                    ratings.flatMap((row) =>
-                      row.user_id ? [row.user_id] : [],
-                    ),
-                  ),
-                ]),
-          }))
+  const [
+    config,
+    content,
+    governance,
+    courseRows,
+    publishedAssignmentRows,
+    feedback,
+    maintenance,
+  ] = await Promise.all([
+    readConfig(),
+    contentIndex(),
+    scope === "people" || scope === "person"
+      ? store.readAdminPeopleSnapshot(user.id, userId)
+      : scope === "governance"
+        ? store.readGovernanceSnapshot(user.id)
         : null,
-      scope === "maintenance"
-        ? Promise.all([
-            store
-              .listDeletedItems(admin ? undefined : "content")
-              .then(async (deleted) => ({
-                deleted,
-                names: await store.readProfileNames([
-                  ...new Set(deleted.map((d) => d.deleted_by)),
-                ]),
-              })),
-            admin ? store.readCleanupStatus() : null,
-          ])
-        : null,
-    ]);
+    reports ? store.listDraftCourses() : [],
+    scope === "governance" ? store.listPublishedAssignmentContent() : [],
+    scope === "feedback"
+      ? store.listFeedback().then(async (ratings) => ({
+          ratings,
+          people: admin
+            ? await store.listProfiles()
+            : await store.readProfileNames([
+                ...new Set(
+                  ratings.flatMap((row) => (row.user_id ? [row.user_id] : [])),
+                ),
+              ]),
+        }))
+      : null,
+    scope === "maintenance"
+      ? Promise.all([
+          store
+            .listDeletedItems(admin ? undefined : "content")
+            .then(async (deleted) => ({
+              deleted,
+              names: await store.readProfileNames([
+                ...new Set(deleted.map((d) => d.deleted_by)),
+              ]),
+            })),
+          admin ? store.readCleanupStatus() : null,
+        ])
+      : null,
+  ]);
   const data: Workspace = {
     schema: 1,
     settings: admin
@@ -216,7 +222,9 @@ export async function adminSnapshot(
     const row = courses.get(item.id);
     return row ? document(row, true) : item;
   });
-  data.publishedContent = courseRows
+  data.publishedContent = (
+    scope === "governance" ? publishedAssignmentRows : courseRows
+  )
     .filter((row) => row.published)
     .map((row) => document(row));
   return data;

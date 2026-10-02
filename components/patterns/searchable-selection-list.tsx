@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Checkbox, Radio } from "../ui/choice";
 import { Input } from "../ui/input";
 import { Field, FieldGroup } from "../ui/field";
@@ -25,6 +25,11 @@ export function SearchableSelectionList({
   selectionMode = "multiple",
   placeholder = "Name or email",
   emptyMessage = "No matching people.",
+  searchControls,
+  visibleOptions,
+  onReviewSelected,
+  pageResetKey,
+  emptyAction,
 }: {
   options: SelectionOption[];
   value: string[];
@@ -34,12 +39,22 @@ export function SearchableSelectionList({
   selectionMode?: "single" | "multiple";
   placeholder?: string;
   emptyMessage?: string;
+  /** A specialized collection may own discovery while reusing bounded selection. */
+  searchControls?: ReactNode;
+  visibleOptions?: SelectionOption[];
+  onReviewSelected?: () => void;
+  pageResetKey?: string;
+  emptyAction?: ReactNode;
 }) {
   const groupName = useId();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selectedOnly, setSelectedOnly] = useState(false);
-  const matches = options.filter(
+  useEffect(() => setPage(1), [pageResetKey]);
+  useEffect(() => {
+    if (!value.length) setSelectedOnly(false);
+  }, [value.length]);
+  const matches = (visibleOptions || options).filter(
     (option) =>
       (!selectedOnly || value.includes(option.id)) &&
       `${option.label} ${option.description || ""}`
@@ -56,20 +71,22 @@ export function SearchableSelectionList({
   ).length;
   return (
     <FieldGroup disabled={disabled}>
-      <FormField
-        label={label}
-        description="Selections are kept while you search or change pages."
-      >
-        <Input
-          type="search"
-          placeholder={placeholder}
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setPage(1);
-          }}
-        />
-      </FormField>
+      {searchControls || (
+        <FormField
+          label={label}
+          description="Selections are kept while you search or change pages."
+        >
+          <Input
+            type="search"
+            placeholder={placeholder}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
+          />
+        </FormField>
+      )}
       {selectionMode === "multiple" && options.length > 1 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3">
           {pageOptions.length > 1 && (
@@ -112,7 +129,7 @@ export function SearchableSelectionList({
           />
           {matches.length > pageOptions.length &&
             pageSelected === pageOptions.length &&
-            value.length < matches.length && (
+            matches.some((option) => !value.includes(option.id)) && (
               <Button
                 type="button"
                 variant="link"
@@ -133,6 +150,7 @@ export function SearchableSelectionList({
                 variant="outline"
                 disabled={disabled}
                 onClick={() => {
+                  onReviewSelected?.();
                   setSelectedOnly(!selectedOnly);
                   setQuery("");
                   setPage(1);
@@ -144,7 +162,10 @@ export function SearchableSelectionList({
                 type="button"
                 variant="ghost"
                 disabled={disabled}
-                onClick={() => onChange([])}
+                onClick={() => {
+                  setSelectedOnly(false);
+                  onChange([]);
+                }}
               >
                 Clear selection
               </Button>
@@ -191,7 +212,12 @@ export function SearchableSelectionList({
             </span>
           </Field>
         ))}
-        {!matches.length && <EmptyState>{emptyMessage}</EmptyState>}
+        {!matches.length && (
+          <EmptyState>
+            {emptyMessage}
+            {emptyAction}
+          </EmptyState>
+        )}
       </div>
       {(matches.length > 10 ||
         selectionMode === "single" ||

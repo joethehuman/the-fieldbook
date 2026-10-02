@@ -9,6 +9,7 @@ import {
   sectionForDoc,
 } from "@/lib/docs-navigation";
 import type { DocLink } from "@/lib/docs-navigation";
+import { organizationTeam } from "@/lib/organization-team";
 export async function saveSettings(
   user: User | null,
   a: { settings: unknown; expected: number },
@@ -32,6 +33,16 @@ export async function saveSettings(
         "That learning group is unavailable. Choose another group or None.",
       );
   }
+  const selectedTeam = parsed.data.organizationTeamId;
+  if (
+    selectedTeam &&
+    selectedTeam !== config.settings.organizationTeamId &&
+    !organizationTeam(config.teams, selectedTeam)
+  )
+    throw new HttpError(
+      400,
+      "Choose the only top-level team as the Organization team, or leave it unset.",
+    );
   if (
     JSON.stringify(parsed.data.docSections) !==
     JSON.stringify(config.settings.docSections)

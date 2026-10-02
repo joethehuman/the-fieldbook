@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
-import { DirectoryWorkspace } from "@/components/patterns/directory-workspace";
-import { SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { HierarchyBrowser } from "@/components/patterns/hierarchy-browser";
+import { ContentSelectionList } from "@/components/patterns/content-selection-list";
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
@@ -41,7 +41,11 @@ import { ActionGroup } from "@/components/ui/action-group";
 
 export function LibraryExamples() {
   const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
-  const [directoryTeam, setDirectoryTeam] = useState("");
+  const [browserBranch, setBrowserBranch] = useState("");
+  const [browserQuery, setBrowserQuery] = useState("");
+  const [browserSelection, setBrowserSelection] = useState<string[]>([]);
+  const [selectBrowserTeams, setSelectBrowserTeams] = useState(false);
+  const [selectedContent, setSelectedContent] = useState<string[]>([]);
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const progressTarget = useRevealTarget<HTMLElement>();
   const [feedback, setFeedback] = useState<{
@@ -224,69 +228,114 @@ export function LibraryExamples() {
         />
       </SettingsSection>
       <SettingsSection
+        id="catalog-content-selection"
+        title={<h3>Content assignment picker</h3>}
+        guidance="Browse 100 items by recent updates, category and content type, or search across published content. Selections stay checked across filters, sorting and pages."
+      >
+        <ContentSelectionList
+          value={selectedContent}
+          onChange={setSelectedContent}
+          showTypeFilter
+          options={Array.from({ length: 100 }, (_, index) => ({
+            id: `catalog-content-${index}`,
+            label: `${["Discovery", "Security", "Customer success", "Product knowledge"][index % 4]} ${String(index + 1).padStart(3, "0")}`,
+            type:
+              index % 10 === 0 ? ("curriculum" as const) : ("course" as const),
+            category:
+              index % 10 === 0
+                ? undefined
+                : ["Sales", "Operations", "Customer success", "Product"][
+                    index % 4
+                  ],
+            description:
+              index % 10 === 0
+                ? "A collection of related courses"
+                : "A concise introduction for new and experienced learners",
+            searchText: `Published lesson about product discovery scenario ${index + 1}`,
+            updatedAt:
+              index % 10 === 0
+                ? undefined
+                : new Date(Date.UTC(2026, 8, 1 + index)).toISOString(),
+          }))}
+        />
+      </SettingsSection>
+      <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
-        guidance="Use a disclosure list for nested teams. Search retains ancestor context; Tab and Enter operate ordinary buttons. Use single selection for branch moves, then review their reporting impact before saving."
+        guidance="Browse subteams in bounded horizontal columns. A twelve-level branch keeps its ancestors in the path; Open and Edit are explicit row actions. Search finds teams across every branch. Selection uses one flat list without selecting descendants."
       >
-        <DirectoryWorkspace
-          navigationLabel="Example reporting team navigation"
-          hasSelection={!!directoryTeam}
-          navigation={
-            <HierarchyList
-              variant="navigation"
-              label="Workspace teams"
-              activeId={directoryTeam}
-              onOpen={setDirectoryTeam}
-              searchAction={
-                <Button
-                  onClick={() =>
-                    setMessage("Add a team in this example workspace.")
-                  }
-                >
-                  <Plus aria-hidden="true" /> Add team
-                </Button>
-              }
-              items={[
-                { id: "revenue", label: "Revenue" },
-                {
-                  id: "americas",
-                  parentId: "revenue",
-                  label: "Account executives — Americas",
-                },
-                {
-                  id: "emea",
-                  parentId: "revenue",
-                  label: "Account executives — EMEA",
-                },
-              ]}
-            />
+        <HierarchyBrowser
+          label="Example reporting teams"
+          branchId={browserBranch}
+          onBrowse={setBrowserBranch}
+          onOpen={(id) => setMessage(`Open team roster: ${id}`)}
+          onEdit={(id) => setMessage(`Edit team: ${id}`)}
+          query={browserQuery}
+          onQueryChange={setBrowserQuery}
+          primaryAction={
+            <Button
+              onClick={() => setMessage("Create a team in this example.")}
+            >
+              <Plus aria-hidden="true" /> Add team
+            </Button>
           }
-        >
-          {directoryTeam ? (
-            <>
-              <Button variant="link" onClick={() => setDirectoryTeam("")}>
-                Back to workspace teams
-              </Button>
-              <SectionHeader
-                title={
-                  <h3>
-                    {directoryTeam === "revenue"
-                      ? "Revenue"
-                      : directoryTeam === "americas"
-                        ? "Account executives — Americas"
-                        : "Account executives — EMEA"}
-                  </h3>
-                }
-                description="Team detail remains beside the hierarchy when space allows. Narrow layouts return to the same collection."
-              />
-            </>
-          ) : (
-            <EmptyState>
-              <h3>Select a team</h3>
-              <p>Use the tree to open a team workspace.</p>
-            </EmptyState>
-          )}
-        </DirectoryWorkspace>
+          secondaryActions={
+            <Button
+              variant="ghost"
+              onClick={() => setSelectBrowserTeams(!selectBrowserTeams)}
+            >
+              {selectBrowserTeams ? "Done selecting" : "Select teams"}
+            </Button>
+          }
+          selected={selectBrowserTeams ? browserSelection : undefined}
+          onSelectionChange={setBrowserSelection}
+          selectionActions={
+            selectBrowserTeams ? (
+              <p role="status">{browserSelection.length} selected</p>
+            ) : undefined
+          }
+          items={[
+            {
+              id: "revenue",
+              label: "Revenue",
+              description: "Manager: Alex Morgan",
+              meta: "120 people · 2 subteams",
+            },
+            {
+              id: "success",
+              label: "Customer success",
+              description: "Manager: Sam Lee",
+              meta: "45 people · No subteams",
+            },
+            {
+              id: "emea",
+              parentId: "revenue",
+              label: "Europe, Middle East and Africa",
+              description: "Manager: Jordan Lee",
+              meta: "52 people · No subteams",
+            },
+            ...Array.from({ length: 12 }, (_, index) => ({
+              id: `level-${index + 1}`,
+              parentId: index ? `level-${index}` : "revenue",
+              label:
+                index === 0
+                  ? "North America"
+                  : `Level ${index + 1} regional team`,
+              description: "Manager: Casey Rivera",
+              meta:
+                index === 11
+                  ? "6 people · No subteams"
+                  : "68 people · 1 subteam",
+            })),
+            ...Array.from({ length: 18 }, (_, index) => ({
+              id: `sibling-${index}`,
+              parentId: "level-2",
+              label: `Enterprise territory ${index + 1}`,
+              description: "Manager: Unassigned",
+              meta: "4 people · No subteams",
+            })),
+          ]}
+        />
         <CollectionControls
           search={
             <FormField

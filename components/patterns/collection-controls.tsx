@@ -16,6 +16,7 @@ export function CollectionControls({
   onClear,
   actions,
   primaryAction,
+  secondaryRow = false,
 }: {
   search: ReactNode;
   children?: ReactNode;
@@ -26,6 +27,8 @@ export function CollectionControls({
   actions?: ReactNode;
   /** Primary collection action beside search; secondary controls get their own row. */
   primaryAction?: ReactNode;
+  /** Keep discovery controls beneath search, including inside bounded pickers. */
+  secondaryRow?: boolean;
 }) {
   const secondary = (
     <>
@@ -81,9 +84,9 @@ export function CollectionControls({
         >
           {search}
         </div>
-        {primaryAction || secondary}
+        {primaryAction || (!secondaryRow && secondary)}
       </div>
-      {primaryAction && (children || sort || actions) && (
+      {(primaryAction || secondaryRow) && (children || sort || actions) && (
         <div
           data-slot="collection-secondary-row"
           className="flex min-w-0 flex-wrap items-center gap-3"

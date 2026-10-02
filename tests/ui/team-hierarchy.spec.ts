@@ -59,25 +59,25 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   const baseline = await saved(page);
   await section(page);
   const expand = page.getByRole("button", {
-    name: "Expand Customer success",
+    name: "Browse Customer success subteams",
     exact: true,
   });
   await expand.focus();
   await page.keyboard.press("Enter");
   await expect(
     page.getByRole("button", {
-      name: "Manage Regional customer success with a long descriptive name",
+      name: "Open Regional customer success with a long descriptive name",
       exact: true,
     }),
   ).toBeVisible();
   await page
     .getByRole("searchbox", { name: "Find teams", exact: true })
     .fill("Regional");
+  await expect(page.locator('[data-slot="hierarchy-browser"]')).toContainText(
+    "Customer success / Regional customer success with a long descriptive name",
+  );
   await expect(
-    page.getByRole("button", { name: "Manage Customer success", exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Manage Sales team", exact: true }),
+    page.getByRole("button", { name: "Open Sales team", exact: true }),
   ).toHaveCount(0);
   await page.screenshot({
     path: info.outputPath("hierarchy-search.png"),
@@ -87,7 +87,11 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
     .getByRole("searchbox", { name: "Find teams", exact: true })
     .fill("");
   await page
-    .getByRole("button", { name: "Manage Sales team", exact: true })
+    .getByRole("navigation", { name: "Teams path", exact: true })
+    .getByRole("button", { name: "Teams", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Open Sales team", exact: true })
     .click();
   await expect(
     page.getByRole("tab", { name: "Subteams", exact: true }),
@@ -170,19 +174,28 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
     .fill("Enterprise EMEA");
   await expect(
     page.getByRole("button", {
-      name: "Manage Enterprise EMEA account executives and solutions engineering",
+      name: "Open Enterprise EMEA account executives and solutions engineering",
       exact: true,
     }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Manage Sales team", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator('[data-slot="hierarchy-browser"]')).toContainText(
+    "Sales team / Customer success / Regional customer success with a long descriptive name / Enterprise EMEA account executives and solutions engineering",
+  );
+  await page
+    .getByRole("button", {
+      name: "Browse Enterprise EMEA account executives and solutions engineering subteams",
+      exact: true,
+    })
+    .click();
   await page.screenshot({
     path: info.outputPath("four-level-hierarchy.png"),
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "Manage Customer success", exact: true })
+    .getByRole("searchbox", { name: "Find teams", exact: true })
+    .fill("Customer success");
+  await page
+    .getByRole("button", { name: "Open Customer success", exact: true })
     .click();
   await action(page, "Move team");
   await expect(
@@ -219,6 +232,9 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
     .fill("Empty team");
   await dialog.getByRole("button", { name: "Save team", exact: true }).click();
   await expect(dialog).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Open Empty team", exact: true })
+    .click();
   await action(page, "Delete empty team");
   const deletion = page.getByRole("dialog", {
     name: "Delete Empty team?",

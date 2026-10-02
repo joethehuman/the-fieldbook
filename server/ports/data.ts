@@ -29,6 +29,11 @@ export type WorkspaceDocumentRecord = Pick<
   "id" | "revision" | "published" | "published_revision" | "updated_at"
 > &
   Partial<Pick<DocumentRecord, "draft" | "deleted_at">>;
+/** Assignment discovery loads published text without unpublished drafts. */
+export type PublishedAssignmentRecord = Pick<
+  DocumentRecord,
+  "id" | "published" | "revision" | "published_revision" | "updated_at"
+>;
 export type ConfigurationRecord = {
   settings: SiteSettings;
   revision: number;
@@ -147,7 +152,7 @@ export interface DataStore {
   readSettings(): Promise<Pick<ConfigurationRecord, "settings"> | null>;
   readSettingsContext(): Promise<Pick<
     ConfigurationRecord,
-    "settings" | "groups" | "governance_revision"
+    "settings" | "groups" | "teams" | "governance_revision"
   > | null>;
   readPublicBranding(): Promise<PublicBrandingRecord | null>;
   updateSettings(
@@ -172,6 +177,7 @@ export interface DataStore {
   >;
   listDraftIndex(): Promise<DraftIndexRecord[]>;
   listDraftCourses(): Promise<DocumentRecord[]>;
+  listPublishedAssignmentContent(): Promise<PublishedAssignmentRecord[]>;
   listPublishedReaderIndex(): Promise<ReaderIndexRecord[]>;
   listPublishedCourseIndex(): Promise<CourseIndexRecord[]>;
   listRecentMcpDocuments(): Promise<DocumentRecord[]>;

@@ -250,27 +250,20 @@ test("branch membership stays staged and explains overlapping sources", async ({
     .click();
   await expect(membership).not.toBeVisible();
   const row = page.getByRole("row").filter({ hasText: "Alex Edwards" });
-  await row
-    .getByRole("button", { name: "2 membership sources", exact: true })
-    .click();
-  const source = page.getByRole("dialog", {
-    name: "Alex Edwards",
-    exact: true,
-  });
-  await expect(source).toContainText("Revenue");
-  await expect(source).toContainText("Individually added");
+  await expect(row).toContainText("Direct · Team");
+  await expect(row.getByRole("button")).toHaveCount(0);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
   await page.screenshot({
     path: info.outputPath("membership-sources.png"),
     fullPage: true,
   });
-  await source.getByRole("button", { name: "Done", exact: true }).click();
   await page.reload();
   await section(page);
   await page.getByRole("button", { name: "Pilot", exact: true }).click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
   await expect(
     page.getByRole("row").filter({ hasText: "Alex Edwards" }),
-  ).toContainText("2 membership sources");
+  ).toContainText("Direct · Team");
 });
 
 test("large group roster is paginated, searchable and contained on narrow screens", async ({

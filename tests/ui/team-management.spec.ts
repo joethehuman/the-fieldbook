@@ -63,7 +63,7 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await expect(page.locator(".admin-layout")).toBeVisible();
   await section(page, "Teams");
   await page
-    .getByRole("button", { name: "Manage Sales team", exact: true })
+    .getByRole("button", { name: "Open Sales team", exact: true })
     .click();
   await expect(
     page.getByText("150 people in this branch · 50 direct members · 1 subteam"),
@@ -224,14 +224,14 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await page.reload();
   await section(page, "Teams");
   await page
-    .getByRole("button", { name: "Manage Sales renamed", exact: true })
+    .getByRole("button", { name: "Open Sales renamed", exact: true })
     .click();
   await expect(
     page.getByText("151 people in this branch · 51 direct members · 1 subteam"),
   ).toBeVisible();
 });
 
-test("team detail retains the tree search and optional selection on return", async ({
+test("team detail retains browser search and optional selection on return", async ({
   page,
 }) => {
   const data = fixture();
@@ -249,7 +249,7 @@ test("team detail retains the tree search and optional selection on return", asy
   });
   await search.fill("Sales");
   await page
-    .getByRole("button", { name: "Manage Sales team", exact: true })
+    .getByRole("button", { name: "Open Sales team", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Back to teams", exact: true })
@@ -261,7 +261,7 @@ test("team detail retains the tree search and optional selection on return", asy
   await search.fill("");
   await expect(search).toHaveValue("");
   await expect(
-    page.getByRole("button", { name: "Manage Other team", exact: true }),
+    page.getByRole("button", { name: "Open Other team", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Select teams", exact: true }).click();
   const choice = page.getByRole("checkbox", {
@@ -270,7 +270,7 @@ test("team detail retains the tree search and optional selection on return", asy
   });
   await choice.check();
   await page
-    .getByRole("button", { name: "Manage Sales team", exact: true })
+    .getByRole("button", { name: "Open Sales team", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Back to teams", exact: true })
@@ -371,6 +371,18 @@ test("new-team parent options stay anchored to the visible dialog and preserve c
     page.getByRole("dialog", { name: "Review team changes", exact: true }),
   ).toHaveCount(0);
   await expect(
+    page.getByRole("button", {
+      name: "Browse New regional team subteams",
+      exact: true,
+    }),
+  ).toBeFocused();
+  await expect(
+    page.getByRole("navigation", { name: "Teams path", exact: true }),
+  ).toContainText("Sales team");
+  await page
+    .getByRole("button", { name: "Open New regional team", exact: true })
+    .click();
+  await expect(
     page.getByRole("heading", { name: "New regional team", exact: true }),
   ).toBeVisible();
   await expect(
@@ -398,7 +410,7 @@ test("a contributor manager has one cancelable review without changing their own
   await section(page, "Teams");
   const baseline = await saved(page);
   await page
-    .getByRole("button", { name: "Manage Sales team", exact: true })
+    .getByRole("button", { name: "Open Sales team", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Edit team details", exact: true })

@@ -10,11 +10,12 @@ import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import {
   effectiveGroups,
   groupTeamLinks,
+  groupIncludesTeam,
   type Group,
   type LearningItem,
 } from "@/lib/types";
 import { expandLearning, groupItems } from "@/lib/learning-groups";
-import { groupMembershipSources } from "@/lib/group-hierarchy";
+import { sourcePassages } from "@/lib/search";
 import { teamPath } from "@/lib/team-hierarchy";
 import {
   sortGroupBrowseItems,
@@ -57,6 +58,10 @@ import { DetailNavigation } from "./patterns/detail-navigation";
 import { DataTable } from "./patterns/data-table";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
+import {
+  ContentSelectionList,
+  type ContentSelectionOption,
+} from "./patterns/content-selection-list";
 import { FormField } from "./patterns/form-field";
 import { SectionHeader, EmptyState, Stack } from "./patterns/layout";
 import {
@@ -84,8 +89,7 @@ type Editor =
       expanded: string[];
       original: string;
       snapshot: string;
-    }
-  | { kind: "source"; personId: string };
+    };
 
 export default function LearningGroups({
   data,
@@ -129,6 +133,24 @@ export default function LearningGroups({
   const teams = data.teams || [];
   const content = data.publishedContent || data.content;
   const published = content.filter((item) => item.status === "published");
+  const searchableContent = useMemo(
+    () =>
+      new Map(
+        content
+          .filter((item) => item.status === "published")
+          .map((item) => [
+            item.id,
+            sourcePassages(item)
+              .map((passage) =>
+                [passage.title, passage.lessonTitle, passage.text]
+                  .filter(Boolean)
+                  .join(" "),
+              )
+              .join(" "),
+          ]),
+      ),
+    [content],
+  );
   const curricula = data.curricula || [];
   const items = group ? groupItems(group, content) : [];
   // The migration owns conversion. Never quietly remove inheritance in a screen render.
@@ -369,7 +391,7 @@ export default function LearningGroups({
     }
   }
   async function applyEditor() {
-    if (!editor || editor.kind === "source") return;
+    if (!editor) return;
     if (editor.kind === "create" || editor.kind === "rename") {
       const name = editor.name.trim();
       if (!name) {
@@ -457,13 +479,13 @@ export default function LearningGroups({
       return;
     }
     if (editor.kind === "learning") {
-      const additions = learningOptions
-        .filter((option) => editor.ids.includes(option.id))
-        .map((option) => ({
-          kind: option.id.startsWith("course:")
+      const additions = editor.ids
+        .filter((id) => learningOptions.some((option) => option.id === id))
+        .map((id) => ({
+          kind: id.startsWith("course:")
             ? ("course" as const)
             : ("curriculum" as const),
-          id: option.id.slice(option.id.indexOf(":") + 1),
+          id: id.slice(id.indexOf(":") + 1),
         }));
       if (
         await changeGroup(
@@ -490,25 +512,36 @@ export default function LearningGroups({
     )
       setEditor(null);
   }
-  const learningOptions = [
+  const learningOptions: ContentSelectionOption[] = [
     ...published
       .filter((item) => item.kind === "course")
       .map((item) => ({
         id: `course:${item.id}`,
         label: item.title,
-        description: "Course",
+        type: "course" as const,
+        description: item.summary,
+        category: item.category,
+        updatedAt: item.updatedAt,
+        searchText: searchableContent.get(item.id),
       })),
     ...curricula
       .filter((item) => item.status === "published")
       .map((item) => ({
         id: `curriculum:${item.id}`,
         label: item.name,
-        description: `Curriculum · ${item.courseIds.length} courses`,
+        type: "curriculum" as const,
+        description: item.description,
+        searchText: item.courseIds
+          .filter((id) =>
+            published.some(
+              (course) => course.id === id && course.kind === "course",
+            ),
+          )
+          .map((id) => searchableContent.get(id) || "")
+          .join(" "),
       })),
-  ]
-    .filter((option) => !items.some((item) => key(item) === option.id))
-    .sort((a, b) => a.label.localeCompare(b.label));
-  const updateOptions = published
+  ].filter((option) => !items.some((item) => key(item) === option.id));
+  const updateOptions: ContentSelectionOption[] = published
     .filter(
       (item) =>
         item.kind === "brief" && group && !item.groups.includes(group.id),
@@ -516,13 +549,12 @@ export default function LearningGroups({
     .map((item) => ({
       id: item.id,
       label: item.title,
-      description: item.category,
-    }))
-    .sort((a, b) => a.label.localeCompare(b.label));
-  const sourcePerson =
-    editor?.kind === "source"
-      ? data.users.find((person) => person.id === editor.personId)
-      : undefined;
+      type: "update" as const,
+      description: item.summary,
+      category: item.category,
+      updatedAt: item.updatedAt,
+      searchText: searchableContent.get(item.id),
+    }));
   const modalTitle = !editor
     ? ""
     : editor.kind === "create"
@@ -533,9 +565,7 @@ export default function LearningGroups({
           ? "Add Members"
           : editor.kind === "learning"
             ? "Assign Courses"
-            : editor.kind === "updates"
-              ? "Assign Updates"
-              : sourcePerson?.name || "Membership source";
+            : "Assign Updates";
   const modalDescription = !editor
     ? ""
     : editor.kind === "create" || editor.kind === "rename"
@@ -544,9 +574,7 @@ export default function LearningGroups({
         ? `Choose people or teams to include in ${group?.name}. Clear an existing selection to remove that membership source.`
         : editor.kind === "learning"
           ? `Assign courses or curricula to ${group?.name}. Overlapping courses count once.`
-          : editor.kind === "updates"
-            ? `Choose relevant Updates for ${group?.name}.`
-            : `Why this person is included in ${group?.name}.`;
+          : `Choose relevant Updates for ${group?.name}.`;
   const modalAction =
     editor?.kind === "create"
       ? "Create group"
@@ -900,11 +928,12 @@ export default function LearningGroups({
                             currentPage * PAGE_SIZE,
                           )
                           .map((person) => {
-                            const sources = groupMembershipSources(
-                              person,
-                              group.id,
-                              data,
-                            );
+                            const sources = [
+                              person.groups.includes(group.id) ? "Direct" : "",
+                              groupIncludesTeam(group, person.teamId, teams)
+                                ? "Team"
+                                : "",
+                            ].filter(Boolean);
                             return (
                               <TableRow key={person.id}>
                                 <TableCell>
@@ -925,22 +954,7 @@ export default function LearningGroups({
                                       )?.name || "Unknown team"
                                     : "No reporting team"}
                                 </TableCell>
-                                <TableCell>
-                                  <Button
-                                    type="button"
-                                    variant="link"
-                                    onClick={() =>
-                                      open({
-                                        kind: "source",
-                                        personId: person.id,
-                                      })
-                                    }
-                                  >
-                                    {sources.length > 1
-                                      ? `${sources.length} membership sources`
-                                      : sources[0] || "View membership"}
-                                  </Button>
-                                </TableCell>
+                                <TableCell>{sources.join(" · ")}</TableCell>
                               </TableRow>
                             );
                           })}
@@ -1238,14 +1252,13 @@ export default function LearningGroups({
             </Tabs>
           )}
           {(editor?.kind === "learning" || editor?.kind === "updates") && (
-            <SearchableSelectionList
+            <ContentSelectionList
               label={
                 editor.kind === "learning"
                   ? "Find courses or curricula"
                   : "Find Updates"
               }
-              placeholder="Search titles"
-              emptyMessage="No matching items."
+              showTypeFilter={editor.kind === "learning"}
               disabled={busy}
               options={
                 editor.kind === "learning" ? learningOptions : updateOptions
@@ -1254,21 +1267,6 @@ export default function LearningGroups({
               onChange={(ids) => setEditor({ ...editor, ids })}
             />
           )}
-          {editor?.kind === "source" && sourcePerson && group && (
-            <Stack>
-              <ul className="list-disc ps-5 text-copy">
-                {groupMembershipSources(sourcePerson, group.id, data).map(
-                  (source) => (
-                    <li key={source}>{source}</li>
-                  ),
-                )}
-              </ul>
-              <p className="text-copy text-muted-foreground">
-                A person remains included while any membership source applies.
-                Team membership follows their reporting team.
-              </p>
-            </Stack>
-          )}
           <DialogFooter className="justify-end">
             <Button
               type="button"
@@ -1276,9 +1274,9 @@ export default function LearningGroups({
               disabled={busy}
               onClick={() => void close()}
             >
-              {editor?.kind === "source" ? "Done" : "Cancel"}
+              Cancel
             </Button>
-            {editor && editor.kind !== "source" && (
+            {editor && (
               <Button
                 type={
                   editor.kind === "create" || editor.kind === "rename"

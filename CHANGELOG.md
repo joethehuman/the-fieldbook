@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Browse reporting teams in horizontal branch columns with ancestor navigation and explicit Open/Edit actions. New teams return to their parent list. Content assignment pickers add recent/title sorting, published-content search and category filters, while membership sources use plain Direct/Team labels. An explicitly designated organization team can be managed from the Teams action menu while its children start the browser.
+
 - Make learning groups independent overlapping audiences with a searchable index and focused People, Assigned Courses and Assigned Updates views. Teams retain their reporting hierarchy in a compact tree/detail workspace with one source-aware people roster. Search and primary assignment/member actions share a row; parent-team menus remain anchored inside dialogs. Assign learning from a group or from existing Content/Curricula controls, using one contextual consequence review. The flat-group upgrade preserves current memberships, learning, deadlines, history and guest relevance while ending future parent-group propagation.
 
 - Save one continuous course-version assignment and deadline per person across overlapping sources. Team links include subteams, with explicit impact review for older direct-only links and organizational changes. Timing defaults affect future work; administrators can review and recalculate existing clocks and unfinished deadlines. Requires the stable-assignment migration.
