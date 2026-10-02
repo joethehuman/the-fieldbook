@@ -11,7 +11,7 @@ import { answerPolicy, planningInstructions } from "./ask-ai";
 
 const setupSchema = z
   .object({
-    action: z.enum(["check", "test"]),
+    action: z.enum(["check", "test", "test-fallback"]),
     settings: askAiSettingsSchema,
   })
   .strict();
@@ -57,7 +57,7 @@ export async function aiSetup(
     checkedAt: new Date().toISOString(),
     models:
       catalog.status === "fulfilled"
-        ? aiModelChoices(catalog.value, settings.model)
+        ? aiModelChoices(catalog.value, settings.model, settings.fallbackModel)
         : [],
     catalog: {
       ready: catalog.status === "fulfilled",
@@ -76,6 +76,10 @@ export async function aiSetup(
     },
   };
   if (action === "check") return { setup: status };
+  const selectedModel =
+    action === "test-fallback" ? settings.fallbackModel : settings.model;
+  if (!selectedModel)
+    throw new HttpError(400, "Choose the model before testing an answer.");
   if (
     !status.catalog.ready ||
     !status.retrieval.ready ||
@@ -93,13 +97,13 @@ export async function aiSetup(
       throw new HttpError(401, "Sign in again before testing an answer.");
   }
   await admission();
-  await provider.validateModel(settings.model, signal);
+  await provider.validateModel(selectedModel, signal);
   const messages = [
     { role: "user" as const, text: "What is the Fieldbook setup check code?" },
   ];
   aiSearchPlanSchema.parse({
     queries: await provider.planSearch({
-      model: settings.model,
+      model: selectedModel,
       messages,
       instructions: planningInstructions,
       signal,
@@ -122,7 +126,7 @@ export async function aiSetup(
   ];
   let answer = "";
   for await (const text of provider.streamAnswer({
-    model: settings.model,
+    model: selectedModel,
     messages,
     sources,
     instructions:
@@ -149,5 +153,5 @@ export async function aiSetup(
       502,
       "The model did not return a verifiable test answer. Try again or choose another model.",
     );
-  return { setup: status, answer, model: settings.model };
+  return { setup: status, answer, model: selectedModel };
 }

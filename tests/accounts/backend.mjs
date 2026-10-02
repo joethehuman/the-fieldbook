@@ -127,7 +127,7 @@ createServer(async (req, res) => {
     return send(res, {
       data: [
         {
-          id: "inclusionai/ling-3.1-flash-free",
+          id: "test/primary",
           name: "Synthetic free model",
           type: "language",
           tags: ["tool-use"],

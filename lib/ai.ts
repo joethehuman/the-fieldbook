@@ -4,6 +4,7 @@ import type { SearchKind } from "./search";
 export type AskAiSettings = {
   enabled: boolean;
   model: string;
+  fallbackModel: string;
   sources: SearchKind[];
   guidance: string;
 };
@@ -15,7 +16,6 @@ export type AiModel = {
   outputPerMillion: number | null;
   zeroRetention: "all" | "some" | "none" | "unknown";
   noTraining: "all" | "some" | "none" | "unknown";
-  expiresOn: string | null;
 };
 export type AiConnection = {
   configured: boolean;
@@ -31,8 +31,9 @@ export type AiSetup = {
 };
 export const defaultAskAiSettings: AskAiSettings = {
   enabled: false,
-  // This promotional ID stops serving instead of beginning to bill.
-  model: "inclusionai/ling-3.1-flash-free",
+  // Each installation chooses its models before enabling AI.
+  model: "",
+  fallbackModel: "",
   sources: ["doc", "brief", "course"],
   guidance:
     "Answer directly and briefly. Use one or two sentences when that is enough. Otherwise use at most two short paragraphs, with up to three useful source links. Include only detail needed to answer the question. Say when the available Fieldbook content does not contain the answer.",

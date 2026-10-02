@@ -9,7 +9,7 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
     oldError = console.error,
     oldWarn = console.warn;
   process.env.AI_GATEWAY_API_KEY = "synthetic-server-key";
-  const model = defaultAskAiSettings.model;
+  const model = "test/primary";
   const usage = {
     inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
     outputTokens: { total: 8, text: 8, reasoning: 0 },
@@ -24,6 +24,11 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
   const calls: any[] = [],
     logs: unknown[] = [];
   let mode = "success";
+  let expectedModel = model,
+    catalogMode = "all",
+    clock = Date.now();
+  const oldNow = Date.now;
+  Date.now = () => clock;
   console.error = (...args) => {
     logs.push(args);
   };
@@ -34,16 +39,30 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
     if (String(url).endsWith("/v1/models"))
       return Response.json({
         data: [
-          {
-            id: model,
-            type: "language",
-            tags: ["tool-use"],
-            supported_parameters: ["reasoning"],
-            name: "Synthetic free model",
-            pricing: { input: "0", output: "0" },
-            zdr: "none",
-            no_training: "some",
-          },
+          ...(catalogMode === "all"
+            ? [
+                {
+                  id: model,
+                  type: "language",
+                  tags: ["tool-use"],
+                  supported_parameters: ["reasoning"],
+                  name: "Synthetic free model",
+                  pricing: { input: "0", output: "0" },
+                  zdr: "none",
+                  no_training: "some",
+                },
+              ]
+            : []),
+          ...(catalogMode !== "none"
+            ? [
+                {
+                  id: "test/backup",
+                  type: "language",
+                  tags: ["tool-use"],
+                  supported_parameters: ["reasoning"],
+                },
+              ]
+            : []),
           { id: "unsupported/model", type: "language", tags: [] },
           {
             id: "synthetic/embedding",
@@ -60,7 +79,7 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
     assert.ok(String(url).endsWith("/language-model"));
     const headers = new Headers(init?.headers),
       body = JSON.parse(String(init?.body));
-    assert.equal(headers.get("ai-language-model-id"), model);
+    assert.equal(headers.get("ai-language-model-id"), expectedModel);
     assert.equal(headers.get("authorization"), "Bearer synthetic-server-key");
     calls.push(body);
     if (mode === "http-error")
@@ -155,7 +174,7 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
   };
   try {
     const catalog = await vercelAi.models(signal);
-    assert.equal(catalog.length, 1);
+    assert.equal(catalog.length, 2);
     assert.equal(catalog[0].inputPerMillion, 0);
     assert.equal(catalog[0].zeroRetention, "none");
     assert.equal(catalog[0].noTraining, "some");
@@ -182,8 +201,34 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
     );
     mode = "length";
     await assert.rejects(answer(), { status: 503 });
+    mode = "success";
+    const routed = { ...input, fallbackModel: "test/backup" };
+    await vercelAi.planSearch(routed);
+    assert.deepEqual(calls.at(-1).providerOptions.gateway.models, [
+      "test/backup",
+    ]);
+    let fallbackText = "";
+    for await (const text of vercelAi.streamAnswer({ ...routed, sources }))
+      fallbackText += text;
+    assert.equal(fallbackText, "A quorum elects a leader. [S1]");
+    assert.deepEqual(calls.at(-1).providerOptions.gateway.models, [
+      "test/backup",
+    ]);
+    catalogMode = "backup";
+    clock += 300_001;
+    expectedModel = "test/backup";
+    await vercelAi.planSearch(routed);
+    assert.equal(calls.at(-1).providerOptions, undefined);
+    const beforeUnavailable = calls.length;
+    await assert.rejects(vercelAi.planSearch(input), { status: 503 });
+    assert.equal(calls.length, beforeUnavailable);
+    catalogMode = "none";
+    clock += 300_001;
+    await assert.rejects(vercelAi.planSearch(routed), { status: 503 });
+    assert.equal(calls.length, beforeUnavailable);
     assert.deepEqual(logs, []);
   } finally {
+    Date.now = oldNow;
     globalThis.fetch = oldFetch;
     process.env = oldEnv;
     console.error = oldError;

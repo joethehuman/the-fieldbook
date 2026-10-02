@@ -48,13 +48,13 @@ function connection() {
   if (process.env.AI_GATEWAY_API_KEY)
     return {
       configured: true,
-      message: "Server API key configured. Test answer verifies access.",
+      message: "Server API key configured. Model tests verify access.",
     };
   if (process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL)
     return {
       configured: true,
       message:
-        "Vercel project authentication expected. Test answer verifies access.",
+        "Vercel project authentication expected. Model tests verify access.",
     };
   return {
     configured: false,
@@ -67,15 +67,7 @@ function credentialCheck() {
   if (!status.configured) throw new HttpError(503, status.message);
 }
 function compatible(entry: z.infer<typeof modelSchema>) {
-  return (
-    entry.type === "language" &&
-    entry.tags.includes("tool-use") &&
-    // The -free endpoint stops serving, rather than silently becoming paid.
-    !(
-      entry.id === "inclusionai/ling-3.1-flash-free" &&
-      Date.now() >= Date.parse("2026-10-14T00:00:00Z")
-    )
-  );
+  return entry.type === "language" && entry.tags.includes("tool-use");
 }
 function price(value: string | undefined) {
   if (value === undefined || !value.trim()) return null;
@@ -87,18 +79,39 @@ function assurance(value: string | undefined): AiModel["zeroRetention"] {
     ? value
     : "unknown";
 }
-async function modelOptions(model: string, signal: AbortSignal) {
-  const entry = (await availableModels(signal)).find(
-    (entry) => entry.id === model,
+async function modelOptions(
+  model: string,
+  fallbackModel: string | undefined,
+  signal: AbortSignal,
+) {
+  credentialCheck();
+  const catalog = await availableModels(signal);
+  const entries = [...new Set([model, fallbackModel].filter(Boolean))].flatMap(
+    (id) => {
+      const entry = catalog.find((candidate) => candidate.id === id);
+      return entry && compatible(entry) ? [entry] : [];
+    },
   );
-  if (!entry || !compatible(entry))
+  if (!entries.length)
     throw new HttpError(
       503,
       "Choose an available Gateway text model that supports tool use.",
     );
-  return entry.supported_parameters.includes("reasoning")
-    ? { reasoning: "none" as const }
-    : {};
+  return {
+    model: gateway(entries[0].id),
+    ...(entries.length > 1
+      ? {
+          providerOptions: {
+            gateway: { models: entries.slice(1).map((entry) => entry.id) },
+          },
+        }
+      : {}),
+    ...(entries.every((entry) =>
+      entry.supported_parameters.includes("reasoning"),
+    )
+      ? { reasoning: "none" as const }
+      : {}),
+  };
 }
 
 export const vercelAi: AiProvider = {
@@ -115,10 +128,6 @@ export const vercelAi: AiProvider = {
           outputPerMillion: price(entry.pricing?.output),
           zeroRetention: assurance(entry.zdr),
           noTraining: assurance(entry.no_training),
-          expiresOn:
-            entry.id === "inclusionai/ling-3.1-flash-free"
-              ? "2026-10-13"
-              : null,
         }));
     } catch (error) {
       if (signal.aborted) throw error;
@@ -128,7 +137,7 @@ export const vercelAi: AiProvider = {
   async validateModel(model, signal) {
     credentialCheck();
     try {
-      await modelOptions(model, signal);
+      await modelOptions(model, undefined, signal);
     } catch (error) {
       if (error instanceof HttpError || signal.aborted) throw error;
       throw unavailable();
@@ -137,7 +146,6 @@ export const vercelAi: AiProvider = {
   async planSearch(input) {
     try {
       const result = await generateText({
-        model: gateway(input.model),
         system: input.instructions,
         messages: input.messages.map((message) => ({
           role: message.role,
@@ -156,7 +164,7 @@ export const vercelAi: AiProvider = {
         maxOutputTokens: aiBounds.planningOutputTokens,
         maxRetries: 0,
         abortSignal: input.signal,
-        ...(await modelOptions(input.model, input.signal)),
+        ...(await modelOptions(input.model, input.fallbackModel, input.signal)),
       });
       if (
         result.toolCalls.length !== 1 ||
@@ -172,7 +180,6 @@ export const vercelAi: AiProvider = {
   async *streamAnswer(input) {
     try {
       const result = streamText({
-        model: gateway(input.model),
         system: input.instructions,
         messages: [
           ...input.messages.map((message) => ({
@@ -197,7 +204,7 @@ export const vercelAi: AiProvider = {
         maxRetries: 0,
         abortSignal: input.signal,
         onError: () => {},
-        ...(await modelOptions(input.model, input.signal)),
+        ...(await modelOptions(input.model, input.fallbackModel, input.signal)),
       });
       for await (const part of result.stream) {
         input.signal.throwIfAborted();

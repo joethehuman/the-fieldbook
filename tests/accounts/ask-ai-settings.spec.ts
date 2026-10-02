@@ -12,6 +12,14 @@ async function section(page: Page, name: string) {
     name: "Administration section",
     exact: true,
   });
+  // The demo hydrates before choosing its responsive navigation surface.
+  await expect
+    .poll(
+      async () =>
+        (await picker.isVisible()) ||
+        (await page.getByRole("tab", { name, exact: true }).isVisible()),
+    )
+    .toBe(true);
   if (await picker.isVisible()) {
     await picker.click();
     await page.getByRole("option", { name, exact: true }).click();
@@ -59,23 +67,65 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
     page.getByRole("switch", { name: "Enable Ask AI" }),
   ).not.toBeChecked();
   await expect(page.getByLabel("Setup status")).toContainText(
-    "Published-content retrieval is ready",
+    "Published-content retrieval",
   );
   expect(await setupCalls(request)).toBe(0);
-  await page.getByRole("button", { name: "Test answer", exact: true }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Primary model", exact: true }),
+  ).toContainText("Choose a primary model");
+  await expect(
+    page.getByRole("button", { name: "Test primary", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("switch", { name: "Enable Ask AI" }).check();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText("Choose a primary model before saving Ask AI on."),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Primary model", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Synthetic free model", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Test primary", exact: true }).click();
   await expect(
     page.getByRole("status").filter({ hasText: "Test answer received" }),
   ).toContainText("setup check code is ready");
   expect(await setupCalls(request)).toBe(2);
-  const model = page.getByRole("combobox", { name: "Model", exact: true });
+  const model = page.getByRole("combobox", {
+    name: "Primary model",
+    exact: true,
+  });
   await model.click();
   await page.getByRole("option", { name: /Synthetic paid model/ }).click();
-  await expect(page.getByLabel("Selected model details")).toContainText(
-    "$0.02",
-  );
+  await expect(page.getByText(/Input \$0.02/)).toContainText("$0.02");
   await expect(
     page.getByText("Test answer received.", { exact: false }),
   ).toHaveCount(0);
+  await page
+    .getByRole("combobox", { name: "Fallback model", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Synthetic free model", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Test fallback", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Test answer received" }),
+  ).toContainText("test/primary");
+  expect(await setupCalls(request)).toBe(4);
+  await page
+    .getByRole("button", { name: "Model details and data policies" })
+    .click();
+  await expect(page.getByLabel("Fallback model details")).toContainText(
+    "test/primary",
+  );
+  await page
+    .getByRole("button", { name: "Model details and data policies" })
+    .click();
   await page
     .getByLabel("Answer guidance", { exact: true })
     .fill("Keep answers to two sentences.");
@@ -104,7 +154,7 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
     0,
   );
-  expect(await setupCalls(request)).toBe(2); // save/check never generate
+  expect(await setupCalls(request)).toBe(4); // save/check never generate
   await expect(
     page.getByPlaceholder("Search Fieldbook or Ask AI", { exact: true }),
   ).toBeVisible();
@@ -117,8 +167,11 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
     page.getByRole("checkbox", { name: "Updates", exact: true }),
   ).not.toBeChecked();
   await expect(
-    page.getByRole("combobox", { name: "Model", exact: true }),
+    page.getByRole("combobox", { name: "Primary model", exact: true }),
   ).toContainText("Synthetic paid model");
+  await expect(
+    page.getByRole("combobox", { name: "Fallback model", exact: true }),
+  ).toContainText("Synthetic free model");
   await expect(
     page.getByRole("button", { name: "Check setup", exact: true }),
   ).toBeEnabled();
@@ -148,6 +201,23 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await expect(
     page.getByPlaceholder("Search Fieldbook", { exact: true }),
   ).toBeVisible();
+  await page.getByRole("switch", { name: "Enable Ask AI" }).check();
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByPlaceholder("Search Fieldbook or Ask AI", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Primary model", exact: true }),
+  ).toContainText("Synthetic paid model");
+  await expect(
+    page.getByRole("combobox", { name: "Fallback model", exact: true }),
+  ).toContainText("Synthetic free model");
+  await page.getByRole("switch", { name: "Enable Ask AI" }).uncheck();
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
   const guidance = page.getByLabel("Answer guidance", { exact: true });
   await guidance.fill("Keep this unsaved draft.");
   await page.route("**/api/settings", (route) =>
@@ -234,7 +304,27 @@ test("Demo Admin controls and test answer stay local; saved off state restores b
   await expect(
     page.getByRole("switch", { name: "Enable Ask AI" }),
   ).toBeChecked();
-  await page.getByRole("button", { name: "Test answer", exact: true }).click();
+  await page.getByRole("button", { name: "Test primary", exact: true }).click();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "This feature is not available in the demo site." }),
+  ).toBeVisible();
+  await page
+    .getByRole("combobox", { name: "Primary model", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Example primary model", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Fallback model", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Example backup model", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Test fallback", exact: true })
+    .click();
   await expect(
     page
       .getByRole("status")

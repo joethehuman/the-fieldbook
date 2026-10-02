@@ -1,15 +1,18 @@
 import { z } from "zod";
 import { defaultAskAiSettings } from "./ai";
 
+const modelId = z
+  .string()
+  .trim()
+  .max(160)
+  .regex(/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i)
+  .or(z.literal(""));
+
 export const askAiSettingsSchema = z
   .object({
     enabled: z.boolean(),
-    model: z
-      .string()
-      .trim()
-      .max(160)
-      .regex(/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i)
-      .default(defaultAskAiSettings.model),
+    model: modelId.default(""),
+    fallbackModel: modelId.default(""),
     sources: z
       .array(z.enum(["doc", "brief", "course"]))
       .min(1)
@@ -22,7 +25,21 @@ export const askAiSettingsSchema = z
       .max(2_000)
       .default(defaultAskAiSettings.guidance),
   })
-  .strict();
+  .strict()
+  .superRefine((settings, context) => {
+    if (settings.enabled && !settings.model)
+      context.addIssue({
+        code: "custom",
+        path: ["model"],
+        message: "Choose a primary model before enabling Ask AI.",
+      });
+    if (settings.fallbackModel && settings.fallbackModel === settings.model)
+      context.addIssue({
+        code: "custom",
+        path: ["fallbackModel"],
+        message: "Choose a fallback different from the primary model.",
+      });
+  });
 
 export const aiSearchPlanSchema = z
   .object({

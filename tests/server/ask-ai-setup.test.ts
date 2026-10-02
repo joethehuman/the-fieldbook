@@ -12,13 +12,12 @@ const admin: any = {
   registered: true,
 };
 const model: AiModel = {
-  id: defaultAskAiSettings.model,
+  id: "test/primary",
   name: "Synthetic",
   inputPerMillion: 0,
   outputPerMillion: 0,
   zeroRetention: "none",
   noTraining: "none",
-  expiresOn: "2026-10-13",
 };
 function fixture() {
   const calls = {
@@ -97,7 +96,11 @@ function fixture() {
 }
 const input = (action: "check" | "test") => ({
   action,
-  settings: { ...defaultAskAiSettings, guidance: "Brief answers" },
+  settings: {
+    ...defaultAskAiSettings,
+    model: "test/primary",
+    guidance: "Brief answers",
+  },
 });
 const signal = () => new AbortController().signal;
 
@@ -216,7 +219,7 @@ test("Revoking the administrator after planning prevents the second generation",
   assert.equal(f.calls.planning, 1);
   assert.equal(f.calls.answer, 0);
 });
-test("Short model menu orders prices and preserves current/default choices without inventing unavailable models", () => {
+test("Short model menu orders prices and preserves saved primary/backup choices without inventing unavailable models", () => {
   const models: AiModel[] = Array.from({ length: 10 }, (_, i) => ({
     ...model,
     id: `test/model-${i}`,
@@ -229,12 +232,53 @@ test("Short model menu orders prices and preserves current/default choices witho
     inputPerMillion: null,
     outputPerMillion: null,
   });
-  const choices = aiModelChoices(models, "test/unknown");
-  assert.equal(choices.length, 7);
+  const choices = aiModelChoices(models, "test/unknown", "test/model-9");
+  assert.equal(choices.length, 8);
   assert.equal(choices[0].id, "test/model-0");
-  assert.equal(choices.at(-1)?.id, "test/unknown");
+  assert.equal(choices.at(-2)?.id, "test/unknown");
+  assert.equal(choices.at(-1)?.id, "test/model-9");
   assert.ok(
     !choices.some((choice) => choice.id === defaultAskAiSettings.model),
   );
   assert.equal(models.length, 11);
+});
+
+test("A separate fallback test uses only the approved backup, never hides its failure with the primary", async () => {
+  const f = fixture();
+  const ids: string[] = [];
+  f.provider.validateModel = async (id) => {
+    ids.push(id);
+  };
+  f.provider.planSearch = async (value) => {
+    assert.equal(value.model, "test/backup");
+    assert.equal(value.fallbackModel, undefined);
+    return ["setup check"];
+  };
+  const answer = f.provider.streamAnswer;
+  f.provider.streamAnswer = (value) => {
+    assert.equal(value.model, "test/backup");
+    assert.equal(value.fallbackModel, undefined);
+    return answer(value);
+  };
+  const result = await aiSetup(
+    {
+      ...input("test"),
+      action: "test-fallback",
+      settings: { ...input("test").settings, fallbackModel: "test/backup" },
+    },
+    admin,
+    signal(),
+    f.deps,
+  );
+  assert.equal(result.model, "test/backup");
+  assert.deepEqual(ids, ["test/backup"]);
+  await assert.rejects(
+    aiSetup(
+      { ...input("test"), action: "test-fallback" },
+      admin,
+      signal(),
+      f.deps,
+    ),
+    { status: 400 },
+  );
 });

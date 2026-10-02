@@ -71,7 +71,7 @@ async function fixture(
     data: {
       settings: {
         access: "public",
-        askAi: { ...defaultAskAiSettings, enabled },
+        askAi: { ...defaultAskAiSettings, enabled, model: "test/primary" },
       },
       documents: [doc, course].map((item) => ({
         id: item.id,

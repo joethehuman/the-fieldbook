@@ -71,10 +71,16 @@ export async function prepareAskAi(
   // Prove retrieval setup exists before the first generation. Empty queries read no content.
   await store.searchAiPassages([], settings.sources, signal);
   const provider = dependencies.provider();
-  await provider.validateModel(settings.model, signal);
+  try {
+    await provider.validateModel(settings.model, signal);
+  } catch (error) {
+    if (!settings.fallbackModel || signal.aborted) throw error;
+    await provider.validateModel(settings.fallbackModel, signal);
+  }
   const queries = aiSearchPlanSchema.parse({
     queries: await provider.planSearch({
       model: settings.model,
+      fallbackModel: settings.fallbackModel,
       messages,
       instructions: planningInstructions,
       signal,
@@ -131,6 +137,7 @@ export async function prepareAskAi(
     let answer = "";
     for await (const text of provider.streamAnswer({
       model: settings.model,
+      fallbackModel: settings.fallbackModel,
       messages,
       sources,
       instructions:

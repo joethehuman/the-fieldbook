@@ -8,12 +8,14 @@ export interface AiProvider {
   validateModel(model: string, signal: AbortSignal): Promise<void>;
   planSearch(input: {
     model: string;
+    fallbackModel?: string;
     messages: AiMessage[];
     instructions: string;
     signal: AbortSignal;
   }): Promise<string[]>;
   streamAnswer(input: {
     model: string;
+    fallbackModel?: string;
     messages: AiMessage[];
     sources: AiSource[];
     instructions: string;

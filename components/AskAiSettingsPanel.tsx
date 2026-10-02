@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ChevronDown, ExternalLink } from "lucide-react";
 import {
   defaultAskAiSettings,
+  type AiModel,
   type AiSetup,
   type AskAiSettings,
 } from "@/lib/ai";
@@ -16,39 +18,42 @@ import { Textarea } from "./ui/textarea";
 import { Checkbox } from "./ui/checkbox";
 import { Field, FieldDescription, FieldGroup } from "./ui/field";
 import { Alert } from "./ui/alert";
-import type { ReactNode } from "react";
+import { Badge } from "./ui/badge";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "./ui/collapsible";
 
 const sourceChoices = [
   { value: "doc", label: "Docs" },
   { value: "brief", label: "Updates" },
   { value: "course", label: "Courses and lessons" },
 ] as const;
+// Illustrative catalog only; no model is selected automatically in the demo.
 const demoSetup: AiSetup = {
   provider: "Vercel AI Gateway",
   checkedAt: "",
   catalog: {
     ready: true,
-    message: "Illustrative model only. No connection is made in the demo.",
+    message: "Illustrative models. No connection is made in the demo.",
   },
   connection: {
     configured: false,
-    message: "Connections are available in your own installation.",
+    message: "Connect Gateway in your own installation.",
   },
   retrieval: {
     ready: false,
     message: "The demo uses browser-local sample data.",
   },
-  models: [
-    {
-      id: defaultAskAiSettings.model,
-      name: "Ling 3.1 Flash (Free)",
-      inputPerMillion: 0,
-      outputPerMillion: 0,
-      zeroRetention: "none",
-      noTraining: "none",
-      expiresOn: "2026-10-13",
-    },
-  ],
+  models: ["primary", "backup"].map((name) => ({
+    id: `demo/${name}`,
+    name: name === "primary" ? "Example primary model" : "Example backup model",
+    inputPerMillion: null,
+    outputPerMillion: null,
+    zeroRetention: "unknown",
+    noTraining: "unknown",
+  })),
 };
 function cost(amount: number | null) {
   return amount === null
@@ -59,15 +64,32 @@ function cost(amount: number | null) {
         maximumFractionDigits: 4,
       }).format(amount);
 }
-function privacy(value: "all" | "some" | "none" | "unknown") {
+function privacy(value: AiModel["zeroRetention"]) {
   return value === "all"
-    ? "All routes advertise this"
+    ? "Advertised on all routes"
     : value === "some"
-      ? "Some routes advertise this; not guaranteed"
+      ? "Advertised on some routes; not guaranteed"
       : value === "none"
         ? "No guarantee advertised"
         : "Not reported";
 }
+function ModelDetails({ title, model }: { title: string; model: AiModel }) {
+  return (
+    <div className="grid gap-2 text-copy" aria-label={`${title} details`}>
+      <p className="font-medium">{title}</p>
+      <p className="text-muted-foreground [overflow-wrap:anywhere]">
+        {model.id}
+      </p>
+      <FieldDescription>
+        Zero data retention: {privacy(model.zeroRetention)}.
+      </FieldDescription>
+      <FieldDescription>
+        No prompt training: {privacy(model.noTraining)}.
+      </FieldDescription>
+    </div>
+  );
+}
+type SetupAction = "check" | "test" | "test-fallback";
 
 export function AskAiSettingsPanel({
   value,
@@ -87,20 +109,25 @@ export function AskAiSettingsPanel({
   const [setup, setSetup] = useState<AiSetup | null>(
     production ? null : demoSetup,
   );
-  const [working, setWorking] = useState<"check" | "test" | null>(null);
+  const [working, setWorking] = useState<SetupAction | null>(null);
   const [notice, setNotice] = useState("");
-  const [result, setResult] = useState<{ answer: string; key: string } | null>(
-    null,
-  );
+  const [result, setResult] = useState<{
+    answer: string;
+    key: string;
+    model: string;
+  } | null>(null);
   const model = setup?.models.find((entry) => entry.id === value.model);
+  const fallback = setup?.models.find(
+    (entry) => entry.id === value.fallbackModel,
+  );
   const configKey = JSON.stringify(value);
 
-  async function run(action: "check" | "test", settings = value) {
+  async function run(action: SetupAction, settings = value) {
     if (!production) {
       setNotice(
-        action === "test"
-          ? "This feature is not available in the demo site."
-          : "Demo only: no accounts, credentials or AI requests are used.",
+        action === "check"
+          ? "Demo only: no accounts, credentials or AI requests are used."
+          : "This feature is not available in the demo site.",
       );
       return;
     }
@@ -114,7 +141,12 @@ export function AskAiSettingsPanel({
       const response = await fetch("/api/admin/ask-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, settings }),
+        // Checking a draft must work before the administrator chooses a model.
+        body: JSON.stringify({
+          action,
+          settings:
+            action === "check" ? { ...settings, enabled: false } : settings,
+        }),
         cache: "no-store",
         signal: AbortSignal.any([
           controller.signal,
@@ -128,8 +160,12 @@ export function AskAiSettingsPanel({
         );
       if (controller.signal.aborted) return;
       setSetup(data.setup);
-      if (action === "test")
-        setResult({ answer: data.answer, key: JSON.stringify(settings) });
+      if (action !== "check")
+        setResult({
+          answer: data.answer,
+          key: JSON.stringify(settings),
+          model: data.model,
+        });
     } catch (error) {
       if (!controller.signal.aborted)
         setNotice(
@@ -146,9 +182,68 @@ export function AskAiSettingsPanel({
     // Only metadata and empty retrieval checks on entry; generation is explicit.
     void run("check", initial.current);
     return () => pending.current?.abort();
-    // Initial settings are captured once; edits never trigger model generation.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [production]);
+
+  const picker = (backup: boolean) => {
+    const selected = backup ? value.fallbackModel : value.model;
+    const entry = backup ? fallback : model;
+    return (
+      <FormField
+        label={backup ? "Fallback model" : "Primary model"}
+        error={
+          !backup && value.enabled && !selected
+            ? "Choose a primary model before saving Ask AI on."
+            : undefined
+        }
+        description={
+          <>
+            {backup
+              ? "Optional backup if the primary cannot respond."
+              : "Required to enable AI; stays saved while off."}
+            {entry && (
+              <span className="block">
+                Input {cost(entry.inputPerMillion)} · Output{" "}
+                {cost(entry.outputPerMillion)} / million tokens.
+              </span>
+            )}
+          </>
+        }
+      >
+        <SelectField
+          value={selected}
+          disabled={busy || working !== null || !setup?.catalog.ready}
+          onValueChange={(id) =>
+            onChange(
+              backup
+                ? { ...value, fallbackModel: id }
+                : {
+                    ...value,
+                    model: id,
+                    fallbackModel:
+                      id === value.fallbackModel ? "" : value.fallbackModel,
+                  },
+            )
+          }
+        >
+          <option value="">{backup ? "None" : "Choose a primary model"}</option>
+          {selected && !entry && (
+            <option value={selected}>
+              {selected} —{" "}
+              {setup?.catalog.ready ? "unavailable" : "checking availability"}
+            </option>
+          )}
+          {setup?.models
+            .filter((entry) => !backup || entry.id !== value.model)
+            .map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
+              </option>
+            ))}
+        </SelectField>
+      </FormField>
+    );
+  };
 
   return (
     <SettingsSection
@@ -156,183 +251,190 @@ export function AskAiSettingsPanel({
       title={<h3>Ask AI</h3>}
       disabled={busy}
       actions={actions}
-      description="Short answers from your published Fieldbook content. Conversations stay in the current tab and clear on reload or sign-out."
+      description="Concise answers from your published Fieldbook content."
       guidance={
         production
-          ? "Save settings to apply changes. Keep credentials in your deployment settings."
+          ? "Save settings to apply changes. Model choices and guidance are shared across this installation."
           : "Demo settings affect this browser only. AI answers are unavailable."
       }
     >
-      <Field orientation="horizontal">
-        <Switch
-          checked={value.enabled}
-          disabled={busy}
-          onCheckedChange={(enabled) => onChange({ ...value, enabled })}
-        />
-        Enable Ask AI
-      </Field>
-      <FieldDescription>
-        Off restores basic search. When enabled, signed-in readers can ask
-        questions from the search bar.
-      </FieldDescription>
-      <FormField
-        label="Model"
-        description={
-          production
-            ? "A short list of the lowest-priced compatible models, plus your saved selection. Prices are per million tokens in USD and can change."
-            : "Illustrative selection; prices are not fetched in the demo."
-        }
-      >
-        <SelectField
-          value={value.model}
-          disabled={busy || working !== null || !setup?.catalog.ready}
-          onValueChange={(selected) => onChange({ ...value, model: selected })}
-        >
-          {!model && (
-            <option value={value.model}>
-              {value.model} —{" "}
-              {setup?.catalog.ready
-                ? "unavailable"
-                : "availability not confirmed"}
-            </option>
-          )}
-          {setup?.models.map((entry) => (
-            <option key={entry.id} value={entry.id}>
-              {entry.name} · {cost(entry.inputPerMillion)} in /{" "}
-              {cost(entry.outputPerMillion)} out
-            </option>
-          ))}
-        </SelectField>
-      </FormField>
-      {!model && setup?.catalog.ready && (
-        <Alert>
-          The selected model is unavailable. Choose another before enabling Ask
-          AI.
-        </Alert>
-      )}
-      {model && (
-        <div
-          className="grid gap-2 text-copy text-muted-foreground"
-          aria-label="Selected model details"
-        >
-          <p className="[overflow-wrap:anywhere]">{model.id}</p>
-          <p>
-            Input {cost(model.inputPerMillion)} · Output{" "}
-            {cost(model.outputPerMillion)} per million tokens.
-          </p>
-          {model.expiresOn && (
+      <FieldGroup>
+        <Field orientation="horizontal">
+          <Switch
+            checked={value.enabled}
+            disabled={busy}
+            onCheckedChange={(enabled) => onChange({ ...value, enabled })}
+          />
+          Enable Ask AI
+        </Field>
+        <FieldDescription>
+          Signed-in readers can ask questions from Search. Off restores basic
+          search.
+        </FieldDescription>
+      </FieldGroup>
+      <FieldGroup>
+        <legend>Models</legend>
+        <div className="grid gap-4 md:grid-cols-2">
+          {picker(false)}
+          {picker(true)}
+        </div>
+        {production && setup?.catalog.ready && value.model && !model && (
+          <Alert>
+            {fallback
+              ? "The primary is unavailable. The saved fallback can serve questions; choose a replacement primary."
+              : "The primary is unavailable. Choose an available model before enabling Ask AI."}
+          </Alert>
+        )}
+        {production &&
+          setup?.catalog.ready &&
+          value.fallbackModel &&
+          !fallback && (
             <Alert>
-              This free model stops serving after {model.expiresOn}. Select
-              another model before then; Fieldbook will not switch
-              automatically.
+              The fallback is unavailable. Choose a replacement or select None.
             </Alert>
           )}
-          {!model.expiresOn && (
-            <p>
-              Expiry date: not reported. Review availability before changing
-              models.
-            </p>
-          )}
-          <p>
-            <a
-              href="https://vercel.com/ai-gateway/models"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Review Gateway models and data policies ↗
-            </a>
-          </p>
-          <p>
-            Zero data retention: {privacy(model.zeroRetention)}. No prompt
-            training: {privacy(model.noTraining)}.
-          </p>
-          <p>
-            Questions and relevant published text are sent to Gateway and its
-            upstream provider. Review their data policies before enabling AI.
-          </p>
-        </div>
-      )}
+        <FieldDescription>
+          {production
+            ? "Live Gateway catalog. Prices are per million tokens and may change. Only your selected models are used."
+            : "Illustrative models only; the demo does not connect to Gateway."}
+        </FieldDescription>
+        {(model || fallback) && (
+          <Collapsible>
+            <CollapsibleTrigger asChild>
+              <Button type="button" variant="ghost" className="group">
+                Model details and data policies
+                <ChevronDown
+                  aria-hidden="true"
+                  className="group-data-[state=open]:rotate-180"
+                />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="grid gap-4 pt-4">
+              {model && <ModelDetails title="Primary model" model={model} />}
+              {fallback && (
+                <ModelDetails title="Fallback model" model={fallback} />
+              )}
+              <FieldDescription>
+                These are Gateway’s advertised assurances, not a routing policy
+                enforced by Fieldbook. Questions and relevant published text go
+                to Gateway and the model provider.
+              </FieldDescription>
+              <Button type="button" variant="link" asChild>
+                <a
+                  href="https://vercel.com/ai-gateway/models"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Review Gateway models and policies
+                  <ExternalLink aria-hidden="true" />
+                </a>
+              </Button>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </FieldGroup>
       <FieldGroup aria-describedby="ai-sources-description">
         <legend>Published sources</legend>
         <FieldDescription id="ai-sources-description">
-          Choose at least one. Drafts, quizzes, media files and private account
-          data are excluded.
+          Choose at least one. Drafts, quizzes, media and account data are
+          excluded.
         </FieldDescription>
-        {sourceChoices.map((source) => (
-          <Field key={source.value} orientation="horizontal">
-            <Checkbox
-              checked={value.sources.includes(source.value)}
-              disabled={
-                busy ||
-                (value.sources.length === 1 &&
-                  value.sources.includes(source.value))
-              }
-              onCheckedChange={(checked) =>
-                onChange({
-                  ...value,
-                  sources: checked
-                    ? [...value.sources, source.value]
-                    : value.sources.filter((item) => item !== source.value),
-                })
-              }
-            />
-            {source.label}
-          </Field>
-        ))}
+        <div className="flex flex-wrap gap-4">
+          {sourceChoices.map((source) => (
+            <Field key={source.value} orientation="horizontal">
+              <Checkbox
+                checked={value.sources.includes(source.value)}
+                disabled={
+                  busy ||
+                  (value.sources.length === 1 &&
+                    value.sources.includes(source.value))
+                }
+                onCheckedChange={(checked) =>
+                  onChange({
+                    ...value,
+                    sources: checked
+                      ? [...value.sources, source.value]
+                      : value.sources.filter((item) => item !== source.value),
+                  })
+                }
+              />
+              {source.label}
+            </Field>
+          ))}
+        </div>
       </FieldGroup>
-      <FormField
-        label="Answer guidance"
-        description={`${value.guidance.length.toLocaleString()} / 2,000 characters. Supplements Fieldbook’s fixed access, evidence and citation rules.`}
-      >
-        <Textarea
-          value={value.guidance}
-          disabled={busy}
-          maxLength={2_000}
-          rows={5}
-          onChange={(event) =>
-            onChange({ ...value, guidance: event.target.value })
-          }
-        />
-      </FormField>
-      <ActionGroup>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy || value.guidance === defaultAskAiSettings.guidance}
-          onClick={() =>
-            onChange({ ...value, guidance: defaultAskAiSettings.guidance })
-          }
-        >
-          Reset to default
-        </Button>
-      </ActionGroup>
       <FieldGroup>
-        <legend>Setup</legend>
-        <ol className="list-decimal pl-5 space-y-2 text-copy">
-          <li>
-            In the Vercel team that hosts Fieldbook, open AI Gateway and review
-            available credits. Project authentication is used automatically.
-          </li>
-          <li>
-            Apply the Ask AI migration to your installation’s Supabase database.
-            Follow the installation guide included with the source.
-          </li>
-          <li>
-            Check setup, then test an answer with the selected model. Save
-            settings when you are ready to enable it.
-          </li>
-        </ol>
-        <FieldDescription>
-          Outside Vercel or for local development, configure a server-only
-          Gateway API key and restart or redeploy. Never enter a key here.{" "}
-          <a
-            href="https://vercel.com/docs/ai-gateway/getting-started"
-            target="_blank"
-            rel="noopener noreferrer"
+        <FormField
+          label="Answer guidance"
+          description={`${value.guidance.length.toLocaleString()} / 2,000 characters. Adds to the fixed access, evidence and citation rules.`}
+        >
+          <Textarea
+            value={value.guidance}
+            disabled={busy}
+            maxLength={2_000}
+            rows={4}
+            onChange={(event) =>
+              onChange({ ...value, guidance: event.target.value })
+            }
+          />
+        </FormField>
+        <ActionGroup>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || value.guidance === defaultAskAiSettings.guidance}
+            onClick={() =>
+              onChange({ ...value, guidance: defaultAskAiSettings.guidance })
+            }
           >
-            Gateway setup ↗
-          </a>
-        </FieldDescription>
+            Reset to default
+          </Button>
+        </ActionGroup>
+      </FieldGroup>
+      <FieldGroup>
+        <legend>Connection</legend>
+        {setup && (
+          <div className="grid gap-3" aria-label="Setup status">
+            {[
+              {
+                label: "Gateway catalog",
+                ready: setup.catalog.ready,
+                status: "Loaded",
+                message: setup.catalog.message,
+              },
+              {
+                label: "Credentials",
+                ready: setup.connection.configured,
+                status: "Present",
+                message: setup.connection.message,
+              },
+              {
+                label: "Published-content retrieval",
+                ready: setup.retrieval.ready,
+                status: "Ready",
+                message: setup.retrieval.message,
+              },
+            ].map((item) => (
+              <div key={item.label} className="grid gap-1">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-copy">
+                  <span>{item.label}</span>
+                  <Badge
+                    variant={item.ready || !production ? "default" : "warning"}
+                  >
+                    {item.ready
+                      ? item.status
+                      : production
+                        ? "Needs setup"
+                        : "Demo only"}
+                  </Badge>
+                </div>
+                {!item.ready && (
+                  <FieldDescription>{item.message}</FieldDescription>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
         <ActionGroup>
           <Button
             type="button"
@@ -350,43 +452,84 @@ export function AskAiSettingsPanel({
             disabled={busy || working !== null || (production && !model)}
             onClick={() => void run("test")}
           >
-            Test answer
+            Test primary
           </Button>
+          {value.fallbackModel && (
+            <Button
+              type="button"
+              variant="outline"
+              loading={working === "test-fallback"}
+              disabled={busy || working !== null || (production && !fallback)}
+              onClick={() => void run("test-fallback")}
+            >
+              Test fallback
+            </Button>
+          )}
         </ActionGroup>
         <FieldDescription>
           {production
-            ? "Check setup makes no AI generation. Test answer makes up to two small model calls using synthetic text and your current guidance. It may incur token charges and does not save settings."
-            : "Check setup and Test answer are illustrative here. They make no network or model calls and do not save settings."}
+            ? "Check setup uses no AI tokens. Each model test makes up to two small calls using synthetic text, may incur charges and does not save settings. Test each selected model to confirm access."
+            : "Setup checks and model tests stay local. No network or AI calls are made."}
         </FieldDescription>
-        {setup && (
-          <div className="grid gap-2 text-copy" aria-label="Setup status">
-            <p>
-              {setup.provider}: {setup.connection.message}
-            </p>
-            <p>{setup.catalog.message}</p>
-            <p>{setup.retrieval.message}</p>
-            {production && (
-              <FieldDescription>
-                Model metadata may be cached for up to five minutes. Only Test
-                answer confirms model access.
-              </FieldDescription>
-            )}
-          </div>
-        )}
         {notice && <Alert role="status">{notice}</Alert>}
         {result?.key === configKey && (
           <Alert role="status">
             <p>Test answer received. Model access and tool use worked.</p>
+            <p className="text-muted-foreground [overflow-wrap:anywhere]">
+              {result.model}
+            </p>
             <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">
               {result.answer}
             </p>
             <p>Test citation [S1] refers only to synthetic setup data.</p>
           </Alert>
         )}
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="ghost" className="group">
+              Setup instructions
+              <ChevronDown
+                aria-hidden="true"
+                className="group-data-[state=open]:rotate-180"
+              />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="grid gap-4 pt-4">
+            <ol className="list-decimal pl-5 space-y-2 text-copy">
+              <li>
+                Open AI Gateway in your Vercel account and review credits and
+                billing.
+              </li>
+              <li>
+                On Vercel, project authentication is automatic. Elsewhere or
+                locally, add a server-only Gateway API key in deployment
+                settings and restart or redeploy. Never enter a key here.
+              </li>
+              <li>
+                Apply the Ask AI migration to your installation’s Supabase
+                database, following the source’s installation guide.
+              </li>
+              <li>
+                Choose a primary and optional fallback, test each, then save
+                settings with Ask AI enabled.
+              </li>
+            </ol>
+            <Button type="button" variant="link" asChild>
+              <a
+                href="https://vercel.com/docs/ai-gateway/getting-started"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Gateway setup
+                <ExternalLink aria-hidden="true" />
+              </a>
+            </Button>
+          </CollapsibleContent>
+        </Collapsible>
         <FieldDescription>
-          No question quota or monthly cap is enforced by Fieldbook. Manage
-          credits, refill settings and spend alerts in your Gateway account. No
-          automatic model fallback is configured.
+          Chats stay in this tab and clear on reload or sign-out. Fieldbook
+          enforces no monthly cap or question quota. Manage credits and spending
+          in Gateway; a fallback uses its own model price.
         </FieldDescription>
       </FieldGroup>
     </SettingsSection>

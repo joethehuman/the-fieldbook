@@ -212,7 +212,7 @@ const adminSections = [
       {
         id: "settings-ai",
         name: "Ask AI",
-        description: "Choose the model, published sources and answer guidance.",
+        description: "Choose primary and fallback models, published sources and answer guidance.",
         icon: Settings,
       },
       {

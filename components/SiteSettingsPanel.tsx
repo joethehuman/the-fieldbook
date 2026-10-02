@@ -55,6 +55,7 @@ export default function SiteSettingsPanel({
       const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
       return {
         ...defaultSettings, ...withoutLogo,
+        ...(withoutLogo.askAi ? { askAi: { ...defaultAskAiSettings, ...withoutLogo.askAi } } : {}),
         ...(section === "ai" && !withoutLogo.askAi ? {
           askAi: { ...defaultAskAiSettings, enabled: !production },
         } : {}),
@@ -94,7 +95,7 @@ export default function SiteSettingsPanel({
     <ActionGroup>
       {dirty && <span role="status" className="text-caption text-muted-foreground">Unsaved changes</span>}
       {dirty && <Button type="button" variant="outline" disabled={busy} onClick={() => { setSettings(savedSettings.current); setNotice(""); }}>Discard changes</Button>}
-      <Button type="submit" loading={busy}>{busy ? "Saving…" : "Save settings"}</Button>
+      <Button type="submit" loading={busy} disabled={section === "ai" && !!settings.askAi?.enabled && !settings.askAi.model}>{busy ? "Saving…" : "Save settings"}</Button>
     </ActionGroup>
   );
   return (
@@ -103,6 +104,10 @@ export default function SiteSettingsPanel({
       onSubmit={async (e) => {
         e.preventDefault();
         if (busy) return;
+        if (section === "ai" && settings.askAi?.enabled && !settings.askAi.model) {
+          setNotice("Choose a primary model before enabling Ask AI.");
+          return;
+        }
         if (section === "links") {
           const invalid = settings.externalLinks?.find(
             (link) =>

@@ -39,7 +39,7 @@ const passage: SourcePassage = {
 function fixture() {
   let settings = {
     ...defaultSettings,
-    askAi: { ...defaultAskAiSettings, enabled: true },
+    askAi: { ...defaultAskAiSettings, enabled: true, model: "test/primary" },
   };
   let current = { ...user },
     fresh = true,
@@ -49,7 +49,9 @@ function fixture() {
   const provider: AiProvider = {
     name: "Synthetic",
     connection: () => ({ configured: true, message: "Synthetic" }),
-    async models() { return []; },
+    async models() {
+      return [];
+    },
     async validateModel() {
       calls.validation++;
     },
@@ -122,8 +124,24 @@ const collect = async <T>(events: AsyncIterable<T>) => {
 
 test("AI defaults are off, configuration is bounded, public settings reveal only availability", () => {
   assert.equal(defaultAskAiSettings.enabled, false);
-  const settings = askAiSettingsSchema.parse({ enabled: true });
-  assert.equal(settings.model, "inclusionai/ling-3.1-flash-free");
+  const empty = askAiSettingsSchema.parse({ enabled: false });
+  assert.equal(empty.model, "");
+  assert.equal(empty.fallbackModel, "");
+  assert.equal(askAiSettingsSchema.safeParse({ enabled: true }).success, false);
+  assert.equal(
+    askAiSettingsSchema.safeParse({
+      enabled: true,
+      model: "test/primary",
+      fallbackModel: "test/primary",
+    }).success,
+    false,
+  );
+  const settings = askAiSettingsSchema.parse({
+    enabled: true,
+    model: "test/primary",
+  });
+  assert.equal(settings.model, "test/primary");
+  assert.equal(settings.fallbackModel, "");
   for (const invalid of [
     { enabled: true, model: "https://evil.test" },
     { enabled: true, sources: [] },
@@ -131,7 +149,10 @@ test("AI defaults are off, configuration is bounded, public settings reveal only
     { enabled: true, guidance: "x".repeat(2001) },
     { enabled: true, apiKey: "secret" },
   ])
-    assert.equal(askAiSettingsSchema.safeParse(invalid).success, false);
+    assert.equal(
+      askAiSettingsSchema.safeParse({ ...settings, ...invalid }).success,
+      false,
+    );
   const publicValue = publicSettings({ ...defaultSettings, askAi: settings });
   assert.equal(publicValue.askAiEnabled, true);
   assert.equal("askAi" in publicValue, false);
@@ -389,4 +410,65 @@ test("AI SDK transport streams typed sources, sanitizes failures and forwards ca
   await reader.read();
   await reader.cancel();
   assert.equal(c3.signal.aborted, true);
+});
+
+test("A missing primary may use only the saved backup; admission and source validation still apply", async () => {
+  const f = fixture();
+  const originalRead = f.deps.store.readSettings;
+  f.deps.store.readSettings = async () => {
+    const record = await originalRead();
+    record.settings.askAi.fallbackModel = "test/backup";
+    return record;
+  };
+  const validated: string[] = [];
+  f.provider.validateModel = async (id) => {
+    validated.push(id);
+    if (id === "test/primary") throw new Error("primary unavailable");
+  };
+  const plan = f.provider.planSearch,
+    answer = f.provider.streamAnswer;
+  f.provider.planSearch = (input) => {
+    assert.equal(input.fallbackModel, "test/backup");
+    return plan(input);
+  };
+  f.provider.streamAnswer = (input) => {
+    assert.equal(input.fallbackModel, "test/backup");
+    return answer(input);
+  };
+  const result = await collect(
+    await prepareAskAi(
+      {
+        messages: [
+          {
+            role: "user",
+            parts: [{ type: "text", text: "How does quorum work?" }],
+          },
+        ],
+      },
+      user,
+      new AbortController().signal,
+      f.deps,
+    ),
+  );
+  assert.deepEqual(validated, ["test/primary", "test/backup"]);
+  assert.ok(result.some((event: any) => event.type === "sources"));
+  const saved = await f.deps.store.readSettings();
+  assert.equal(saved.settings.askAi.model, "test/primary");
+  f.setEnabled(false);
+  await assert.rejects(
+    prepareAskAi(
+      {
+        messages: [
+          {
+            role: "user",
+            parts: [{ type: "text", text: "How does quorum work?" }],
+          },
+        ],
+      },
+      user,
+      new AbortController().signal,
+      f.deps,
+    ),
+    { status: 403 },
+  );
 });

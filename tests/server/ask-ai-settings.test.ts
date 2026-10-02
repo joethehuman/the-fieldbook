@@ -19,6 +19,7 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
   const configured = {
     ...defaultAskAiSettings,
     enabled: true,
+    model: "test/primary",
     guidance: "Operator guidance",
   };
   const writes: any[] = [];
@@ -156,6 +157,34 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
         expected: 7,
       }),
       { status: 503 },
+    );
+    assert.equal(writes, 0);
+    await assert.rejects(
+      saveSettings(admin, {
+        settings: {
+          ...defaultSettings,
+          askAi: { ...enabled, fallbackModel: "test/unavailable" },
+        },
+        expected: 7,
+      }),
+      { status: 503 },
+    );
+    await assert.rejects(
+      saveSettings(admin, {
+        settings: {
+          ...defaultSettings,
+          askAi: { ...enabled, fallbackModel: enabled.model },
+        },
+        expected: 7,
+      }),
+      { status: 400 },
+    );
+    await assert.rejects(
+      saveSettings(admin, {
+        settings: { ...defaultSettings, askAi: { ...enabled, model: "" } },
+        expected: 7,
+      }),
+      { status: 400 },
     );
     assert.equal(writes, 0);
     ready = true;

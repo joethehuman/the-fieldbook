@@ -31,10 +31,14 @@ export async function saveSettings(
   // Disabling and unrelated saves must work even when Gateway is unavailable.
   if (
     nextAi?.enabled &&
-    (!previousAi.enabled || nextAi.model !== previousAi.model)
+    (!previousAi.enabled ||
+      nextAi.model !== previousAi.model ||
+      nextAi.fallbackModel !== (previousAi.fallbackModel ?? ""))
   ) {
     const signal = AbortSignal.timeout(10_000);
     await ai().validateModel(nextAi.model, signal);
+    if (nextAi.fallbackModel)
+      await ai().validateModel(nextAi.fallbackModel, signal);
     await Promise.all([
       dataStore().searchAiPassages([], nextAi.sources, signal),
       dataStore().areAiSourcesCurrent([], signal),
