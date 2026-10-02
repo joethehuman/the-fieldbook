@@ -89,7 +89,13 @@ export async function saveSettings(
     }
   }
   const data = await dataStore().updateSettings(
-    parsed.data,
+    {
+      ...parsed.data,
+      // Older loaded Admin clients must not erase a new optional configuration.
+      ...(parsed.data.askAi === undefined && config.settings.askAi
+        ? { askAi: config.settings.askAi }
+        : {}),
+    },
     a.expected,
     config.governance_revision,
   );

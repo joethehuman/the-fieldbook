@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const composition = new Set([
   "server/data.ts",
+  "server/ai.ts",
   "server/identity.ts",
   "server/storage.ts",
   "server/media-data.ts",
@@ -27,8 +28,19 @@ function inspect(directory) {
     const name = relative(root, path).replaceAll("\\", "/");
     if (name.startsWith("server/providers/")) continue;
     const source = readFileSync(path, "utf8");
-    if (/["'](?:@supabase\/|@vercel\/(?:analytics|speed-insights))/.test(source))
+    if (
+      /["'](?:@supabase\/|@vercel\/(?:analytics|speed-insights))/.test(source)
+    )
       violations.push(`${name}: provider SDK import`);
+    if (
+      /["']@ai-sdk\/gateway/.test(source) ||
+      /import\s*\{[^}]*\b(?:gateway|createGateway)\b[^}]*\}\s*from\s*["']ai["']/s.test(
+        source,
+      )
+    )
+      violations.push(`${name}: AI Gateway SDK import`);
+    if (/\b(?:AI_GATEWAY_API_KEY|VERCEL_OIDC_TOKEN)\b/.test(source))
+      violations.push(`${name}: AI credential outside its provider adapter`);
     if (/\bdb\s*\(/.test(source))
       violations.push(`${name}: provider query client`);
     if (

@@ -13,6 +13,7 @@ The goal is a choice of complete stacks for a fresh installation. A future Digit
 | Persistence | Content validation, permissions, publication, quiz grading and reporting calculations | `server/ports/data.ts`, composed in `server/data.ts`; Supabase queries and complete reads under `server/providers/supabase/` |
 | Identity | Registration policy, active people, roles, MCP grants and same-origin checks | `server/identity.ts`, plain types in `server/ports/identity.ts`; Supabase browser sessions and OAuth operations in its adapter |
 | Private files | Upload limits, ownership, readiness, reference protection and access checks | `server/ports/storage.ts`, composed in `server/storage.ts`; Supabase Storage behind signed upload/read instructions |
+| Ask AI | Reader admission, published evidence, concise guidance and source provenance | `server/ports/ai.ts`, composed in `server/ai.ts`; AI SDK/Gateway generation in `server/providers/vercel/ai.ts`, passage retrieval behind the data port |
 | Recovery | Immediate logical deletion, 30-day restoration, retry and permanent-erasure policy | Fieldbook bulk/cleanup services; current SQL transactions and provider identity/object operations |
 
 Routes validate requests and call Fieldbook services. Adapters translate provider operations into plain values and application errors. Browser uploads receive a temporary request instruction; browser code does not construct a provider SDK client. Stored media references stay `/api/media/{id}.{extension}` so published content does not store temporary provider URLs.

@@ -8,6 +8,8 @@ import type {
 } from "@/lib/types";
 import type { SiteSettings } from "@/lib/settings";
 import type { SourcePassage } from "@/lib/search";
+import type { AiSourceIdentity } from "@/lib/ai";
+import type { SearchKind } from "@/lib/search";
 import type { LearningAction } from "@/lib/learning";
 import type { governanceSchema, pendingSchema } from "../governance-schema";
 
@@ -252,4 +254,14 @@ export interface DataStore {
     documents: Pick<DocumentRecord, "id" | "published">[];
   }>;
   searchPublished(query: string, kind: string): Promise<SourcePassage[]>;
+  /** Current safe published excerpts; empty queries verify setup without reading sources. */
+  searchAiPassages(
+    queries: string[],
+    kinds: SearchKind[],
+    signal?: AbortSignal,
+  ): Promise<SourcePassage[]>;
+  areAiSourcesCurrent(
+    sources: AiSourceIdentity[],
+    signal?: AbortSignal,
+  ): Promise<boolean>;
 }
