@@ -8,10 +8,10 @@ In **Organization Settings → Access**, choose public browsing. **Guest recomme
 
 - Select an existing learning group, then **Save settings**. A group already used by members is valid; Fieldbook does not require or create an “All organization” group.
 - Or select **Create guest group**, name it and choose **Create group**. This explicitly saves an empty learning group and selects it in the form. Choose **Save settings** to apply the selection. Leaving without saving keeps the new group but leaves the previous guest selection unchanged.
-- In **Learning groups**, add courses/curricula and relevant Updates to that group. An empty group provides no recommendations until it or its parents have learning or Update targets.
+- In **Learning groups**, open that group’s **Learning** view to add published courses/curricula and **Updates** to choose relevant Updates. An empty group provides no recommendations until it has learning or Update targets.
 - Choose **None — no personalized recommendations.** to remove the selection. Public browsing remains available, with quiet empty states in For you.
 
-The normal group rules apply: direct membership in the selected group includes its ancestors, with parent foundations first. Child or sibling groups are not included. Reporting-team links do not enroll guests in anything. Published curricula expand to courses; overlapping assignments count each course once and optional learning does not reduce assigned completion.
+Recommendations come from the selected flat group alone, following its saved learning order. Other learning groups are independent. Reporting-team links and individual membership do not enroll guests in anything. Published curricula expand to courses; overlapping assignments count each course once. Optional learning does not reduce assigned completion.
 
 Deleting the selected group safely removes guest recommendations. The Access settings page retains an “Unavailable group” option and asks for another selection or None. Turning access private retains the selection for a later return to public access; anonymous requests are denied and neither the selection nor its recommendations are exposed before sign-in.
 
@@ -25,7 +25,9 @@ The demo profile picker offers the named sample profiles. Public installations c
 
 ## Upgrade and operation
 
-No new migration, environment variable or service is required. `guestGroupId` is an optional value in the existing settings JSON. Missing or null means no guest recommendations, so older public installations remain usable immediately after upgrading. Deployment alone does not select or create a group.
+The optional guest selection uses `guestGroupId` in the existing settings JSON and requires no additional environment variable or service. Missing or null means no guest recommendations. Deployment alone does not select or create a group.
+
+When upgrading to the version with flat learning groups, follow the [flat learning-group upgrade](upgrading.md#flat-learning-group-upgrade), including `20261002022921_flat_learning_groups.sql`. The conversion makes the selected guest group’s previous ancestor learning and Update relevance explicit, preserving its recommendations without introducing an account or an automatic all-people group. After conversion, future edits to other groups do not propagate into the guest group.
 
 Recommendation resolution happens inside the existing uncached workspace read, after the public/private check. The response includes the public library and a synthetic recommendation group with the minimum sequence/curriculum data needed by the shared UI. It omits real group identities, team links, membership rosters, assignment timestamps, governance revisions, drafts and answer keys. Administrator settings writes retain authorization and revision checks and also reject a changed group configuration during saving.
 

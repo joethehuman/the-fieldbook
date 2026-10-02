@@ -1,5 +1,8 @@
 "use client";
-import { CollectionControls, CollectionEmpty } from "./patterns/collection-controls";
+import {
+  CollectionControls,
+  CollectionEmpty,
+} from "./patterns/collection-controls";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { BulkActions } from "./patterns/bulk-actions";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
@@ -32,6 +35,12 @@ import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
 import type { UploadMedia } from "./MarkdownEditor";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Plus } from "lucide-react";
+import { LearningGroupAssignments } from "./LearningGroupAssignments";
+import { useNestedNavigationGuard } from "./patterns/use-nested-navigation-guard";
+import {
+  isOrganizationChangeCanceled,
+  type OrganizationChangeOptions,
+} from "@/lib/organization-change";
 
 export default function Curricula({
   data,
@@ -41,7 +50,10 @@ export default function Curricula({
 }: {
   registerNavigationGuard?: RegisterNavigationGuard;
   data: Workspace;
-  onChange: (data: Workspace) => void | Promise<void>;
+  onChange: (
+    data: Workspace,
+    options?: OrganizationChangeOptions,
+  ) => void | Promise<void>;
   onUpload?: UploadMedia;
 }) {
   const destination = useRevealTarget<HTMLElement>();
@@ -52,17 +64,21 @@ export default function Curricula({
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("name");
   const [status, setStatus] = useState("all");
-  const clearFilters = () => { setQuery(""); setStatus("all"); };
+  const clearFilters = () => {
+    setQuery("");
+    setStatus("all");
+  };
   const { confirm } = useInteractionDialog();
   const savedCurriculum = useRef<Curriculum | null>(null);
   const dirty = !!editing && !equalJson(editing, savedCurriculum.current);
   const guard = useRef(async () => true);
   guard.current = async () =>
     !busy && (!dirty || (await confirm("Discard unsaved curriculum changes?")));
-  useEffect(() => {
-    registerNavigationGuard?.(() => guard.current(), { protected: dirty || busy });
-    return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard, dirty, busy]);
+  const registerAssignmentGuard = useNestedNavigationGuard(
+    () => guard.current(),
+    dirty || busy,
+    registerNavigationGuard,
+  );
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty || busy) {
@@ -75,9 +91,20 @@ export default function Curricula({
   }, [dirty, busy]);
   const all = data.curricula || [];
   const search = query.trim().toLowerCase();
-  const visibleCurricula = all.filter((curriculum) =>
-    (status === "all" || curriculum.status === status) && `${curriculum.name} ${curriculum.description}`.toLowerCase().includes(search),
-  ).sort((a, b) => (sort === "reverse" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id));
+  const visibleCurricula = all
+    .filter(
+      (curriculum) =>
+        (status === "all" || curriculum.status === status) &&
+        `${curriculum.name} ${curriculum.description}`
+          .toLowerCase()
+          .includes(search),
+    )
+    .sort(
+      (a, b) =>
+        (sort === "reverse"
+          ? b.name.localeCompare(a.name)
+          : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id),
+    );
   const selection = useBulkSelection(
     editing?.id || `curricula:${search}:${status}`,
     editing ? editing.courseIds : visibleCurricula.map((c) => c.id),
@@ -130,8 +157,18 @@ export default function Curricula({
       await onChange({
         ...data,
         curricula: (() => {
-          const updated = { ...editing, name, cardArt: editing.cardArt || (all.some((c) => c.id === editing.id) ? undefined : resolvedCardArt(editing.id, name)) };
-          return all.some((c) => c.id === editing.id) ? all.map((c) => c.id === editing.id ? updated : c) : [...all, updated];
+          const updated = {
+            ...editing,
+            name,
+            cardArt:
+              editing.cardArt ||
+              (all.some((c) => c.id === editing.id)
+                ? undefined
+                : resolvedCardArt(editing.id, name)),
+          };
+          return all.some((c) => c.id === editing.id)
+            ? all.map((c) => (c.id === editing.id ? updated : c))
+            : [...all, updated];
         })(),
       });
       setEditing(null);
@@ -139,34 +176,39 @@ export default function Curricula({
       setNotice("");
       notify("Curriculum saved.");
     } catch (e) {
-      setNotice((e as Error).message);
+      if (!isOrganizationChangeCanceled(e)) setNotice((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
   async function remove(c: Curriculum) {
-    if (
-      !(await confirm(
-        `Delete ${c.name}? It will be removed from ${linked(c.id).length} learning groups. Course content and completion history are preserved.`,
-      ))
-    )
-      return;
     setBusy(true);
     try {
-      await onChange({
-        ...data,
-        curricula: all.filter((x) => x.id !== c.id),
-        groups: data.groups.map((g) => ({
-          ...g,
-          learningItems: groupItems(g, content).filter(
-            (i) => i.kind !== "curriculum" || i.id !== c.id,
-          ),
-        })),
-      });
+      await onChange(
+        {
+          ...data,
+          curricula: all.filter((x) => x.id !== c.id),
+          groups: data.groups.map((g) => ({
+            ...g,
+            learningItems: groupItems(g, content).filter(
+              (i) => i.kind !== "curriculum" || i.id !== c.id,
+            ),
+          })),
+        },
+        {
+          review: {
+            title: `Delete ${c.name}?`,
+            description:
+              "Its group links are removed. Course content and saved completion stay available.",
+            confirmLabel: "Delete curriculum",
+            always: true,
+          },
+        },
+      );
       setNotice("");
       notify("Curriculum deleted. Learning history preserved.");
     } catch (e) {
-      setNotice((e as Error).message);
+      if (!isOrganizationChangeCanceled(e)) setNotice((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -193,7 +235,13 @@ export default function Curricula({
             />
             <SectionHeader
               variant="page"
-              title={<h2>{all.some((c) => c.id === editing.id) ? "Edit curriculum" : "New curriculum"}</h2>}
+              title={
+                <h2>
+                  {all.some((c) => c.id === editing.id)
+                    ? "Edit curriculum"
+                    : "New curriculum"}
+                </h2>
+              }
               description="A playlist of courses, in the order you recommend."
             >
               <Button type="button" variant="outline" onClick={closeEditor}>
@@ -342,39 +390,81 @@ export default function Curricula({
               <>Create reusable playlists, then add them to learning groups.</>
             }
           />
-          <CollectionControls search={            <FormField className="min-w-0 basis-64 flex-1" label="Find curricula" visuallyHiddenLabel>
-              <Input
-                type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="Find curricula"
-              />
-            </FormField>
-} actions={            <Button
-              type="button"
-              onClick={() => {
-                const draft: Curriculum = {
-                  id: crypto.randomUUID(),
-                  name: "",
-                  description: "",
-                  courseIds: [],
-                  status: "draft",
-                };
-                savedCurriculum.current = draft;
-                setEditing(draft);
-                destination.reveal();
-                setNotice("");
-              }}
-            >
-              <Plus aria-hidden="true" />
-              Create curriculum
-            </Button>
-}
+          <CollectionControls
+            search={
+              <FormField
+                className="min-w-0 basis-64 flex-1"
+                label="Find curricula"
+                visuallyHiddenLabel
+              >
+                <Input
+                  type="search"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  placeholder="Find curricula"
+                />
+              </FormField>
+            }
+            actions={
+              <Button
+                type="button"
+                onClick={() => {
+                  const draft: Curriculum = {
+                    id: crypto.randomUUID(),
+                    name: "",
+                    description: "",
+                    courseIds: [],
+                    status: "draft",
+                  };
+                  savedCurriculum.current = draft;
+                  setEditing(draft);
+                  destination.reveal();
+                  setNotice("");
+                }}
+              >
+                <Plus aria-hidden="true" />
+                Create curriculum
+              </Button>
+            }
             sortLabel={sort === "name" ? "Name A–Z" : "Name Z–A"}
-            sort={<FormField label="Sort curricula"><SelectField value={sort} onValueChange={setSort}><option value="name">Name A–Z</option><option value="reverse">Name Z–A</option></SelectField></FormField>}
-            filters={[...(query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []), ...(status !== "all" ? [{ id: "status", label: status === "published" ? "Published" : "Draft", onRemove: () => setStatus("all") }] : [])]}
+            sort={
+              <FormField label="Sort curricula">
+                <SelectField value={sort} onValueChange={setSort}>
+                  <option value="name">Name A–Z</option>
+                  <option value="reverse">Name Z–A</option>
+                </SelectField>
+              </FormField>
+            }
+            filters={[
+              ...(query
+                ? [
+                    {
+                      id: "query",
+                      label: `Search: ${query}`,
+                      onRemove: () => setQuery(""),
+                    },
+                  ]
+                : []),
+              ...(status !== "all"
+                ? [
+                    {
+                      id: "status",
+                      label: status === "published" ? "Published" : "Draft",
+                      onRemove: () => setStatus("all"),
+                    },
+                  ]
+                : []),
+            ]}
             onClear={clearFilters}
-          ><FormField label="Status"><SelectField value={status} onValueChange={setStatus}><option value="all">All statuses</option><option value="published">Published</option><option value="draft">Draft</option></SelectField></FormField></CollectionControls>
+          >
+            <FormField label="Status">
+              <SelectField value={status} onValueChange={setStatus}>
+                <option value="all">All statuses</option>
+                <option value="published">Published</option>
+                <option value="draft">Draft</option>
+              </SelectField>
+            </FormField>
+          </CollectionControls>
           <BulkActions
             singleItemActions={false}
             collectionSize={selection.collectionSize}
@@ -465,32 +555,48 @@ export default function Curricula({
                     {c.courseIds.length} courses · {linked(c.id).length}{" "}
                     learning groups
                   </p>
-                  <ActionGroup>
-                    <Button
-                      variant="outline"
-                      disabled={busy}
-                      onClick={() => {
-                        savedCurriculum.current = structuredClone(c);
-                        setEditing(structuredClone(c));
-                        destination.reveal();
-                        setNotice("");
-                      }}
-                    >
-                      Edit {c.name}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={busy}
-                      onClick={() => remove(c)}
-                    >
-                      Delete
-                    </Button>
-                  </ActionGroup>
+                  <div className="grid gap-3">
+                    {c.status === "published" && (
+                      <LearningGroupAssignments
+                        data={data}
+                        item={{ kind: "curriculum", id: c.id }}
+                        title={c.name}
+                        onChange={onChange}
+                        registerNavigationGuard={registerAssignmentGuard}
+                      />
+                    )}
+                    <ActionGroup>
+                      <Button
+                        variant="outline"
+                        disabled={busy}
+                        onClick={() => {
+                          savedCurriculum.current = structuredClone(c);
+                          setEditing(structuredClone(c));
+                          destination.reveal();
+                          setNotice("");
+                        }}
+                      >
+                        Edit {c.name}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => remove(c)}
+                      >
+                        Delete
+                      </Button>
+                    </ActionGroup>
+                  </div>
                 </CardFooter>
               </Card>
             ))}
           </div>
-          <CollectionEmpty count={visibleCurricula.length} total={all.length} noun="curricula" onClear={clearFilters} />
+          <CollectionEmpty
+            count={visibleCurricula.length}
+            total={all.length}
+            noun="curricula"
+            onClear={clearFilters}
+          />
         </>
       )}
     </section>

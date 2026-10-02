@@ -118,6 +118,11 @@ export function AdminWorkspace({
             setData(result.data);
             return result.results;
           }}
+          onPrepareAssignments={async () => {
+            const next = await runtime.admin.prepare("governance");
+            setData(next);
+            return next;
+          }}
           onOpenTab={async (next) => {
             const scope =
               next === "people" || next === "teams"

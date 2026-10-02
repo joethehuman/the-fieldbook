@@ -11,11 +11,12 @@ import { DEMO_PROFILE_IDS, freshWorkspace, updateProgress } from "../lib/store";
 import { learningTarget } from "../lib/learning";
 import { videoSource } from "../lib/video";
 
-test("demo presents three personas and a five-rep manager team with varied completion", () => {
+test("demo presents four personas and a five-rep manager team with varied completion", () => {
   const d = freshWorkspace();
   assert.deepEqual(DEMO_PROFILE_IDS, [
     "demo-learner",
     "demo-manager",
+    "demo-contributor",
     "demo-admin",
   ]);
   const manager = d.users.find((u) => u.id === "demo-manager")!;
@@ -40,17 +41,18 @@ test("demo presents three personas and a five-rep manager team with varied compl
   );
 });
 
-test("nested memberships inherit assignments once and preserve full library access", () => {
+test("independent overlapping audiences deduplicate assignments and preserve full library access", () => {
   const d = freshWorkspace();
   const u = { ...d.users[0], groups: ["startup", "sales"] };
-  const groups = [
-    ...d.groups,
-    { id: "startup", name: "Startup", parentId: "sales" },
-  ];
+  const groups = [...d.groups, { id: "startup", name: "Startup" }];
   assert.equal(assignedCourses(d.content, u, groups).length, 4);
   assert.equal(
-    assignedCourses(d.content, { ...u, groups: ["startup"] }, groups).length,
-    4,
+    assignedCourses(
+      d.content,
+      { ...u, groups: ["startup"], teamId: undefined },
+      groups,
+    ).length,
+    0,
   );
   assert.equal(
     d.content.filter((c) => c.kind === "course" && c.status === "published")
@@ -75,16 +77,16 @@ test("catch-up starts at the later membership or group requirement date, using t
       },
     ],
   };
-  const groups = [
-    ...d.groups,
-    { id: "startup", name: "Startup", parentId: "sales" },
-  ];
+  const groups = [...d.groups, { id: "startup", name: "Startup" }];
   const u = {
     ...d.users[0],
     hireDate: undefined,
     onboardingStart: undefined,
-    groups: ["startup"],
-    groupJoinedAt: { startup: "2026-09-10T12:00:00Z" },
+    groups: ["sales", "startup"],
+    groupJoinedAt: {
+      sales: "2026-09-10T12:00:00Z",
+      startup: "2026-09-10T12:00:00Z",
+    },
   };
   assert.equal(learningTarget(c, u, groups), "2026-10-10");
   assert.equal(

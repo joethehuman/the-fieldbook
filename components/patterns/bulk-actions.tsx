@@ -1,4 +1,5 @@
 "use client";
+import { isOrganizationChangeCanceled } from "@/lib/organization-change";
 import { useRef, useState, type ReactNode } from "react";
 import { BulkSelectionBar } from "./bulk-selection";
 import {
@@ -33,6 +34,7 @@ export type BulkCommand = {
   label: string;
   description: string;
   successMessage?: string;
+  applyLabel?: string;
   disabledReason?: string;
   destructive?: boolean;
   acknowledgment?: string;
@@ -145,8 +147,12 @@ export function BulkActions({
         </BulkSelectionBar>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p role="status" className="text-copy text-muted-foreground">{collectionSize} {noun}</p>
-          {singleItemActions && collectionSize === 1 && selected.length === 1 && <ActionGroup>{menu}</ActionGroup>}
+          <p role="status" className="text-copy text-muted-foreground">
+            {collectionSize} {noun}
+          </p>
+          {singleItemActions &&
+            collectionSize === 1 &&
+            selected.length === 1 && <ActionGroup>{menu}</ActionGroup>}
         </div>
       )}
       {resultNotice && (
@@ -261,17 +267,19 @@ export function BulkActions({
                     }
                     setActive(null);
                   } catch (e) {
-                    setError(
-                      (e as Error).message +
-                        " Review the current list before retrying.",
-                    );
+                    if (!isOrganizationChangeCanceled(e))
+                      setError(
+                        (e as Error).message +
+                          " Review the current list before retrying.",
+                      );
                   } finally {
                     running.current = false;
                     setBusy(false);
                   }
                 }}
               >
-                {command.destructive ? command.label : "Apply changes"}
+                {command.applyLabel ||
+                  (command.destructive ? command.label : "Apply changes")}
               </Button>
             </DialogFooter>
           </DialogContent>

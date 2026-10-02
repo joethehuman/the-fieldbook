@@ -27,6 +27,7 @@ import {
 } from "@/components/patterns/desktop-sidebar";
 import { useDesktopSidebar } from "@/components/patterns/desktop-sidebar-state";
 import { DocumentTree } from "@/components/patterns/document-tree";
+import { roleLabel } from "@/lib/permissions";
 import { AccountMenu } from "@/components/patterns/account-menu";
 import { NavigationButton } from "@/components/patterns/navigation-button";
 import { Alert } from "@/components/ui/alert";
@@ -157,7 +158,7 @@ export function ReaderShell({
         : section === "team"
           ? "Team progress"
           : section === "admin"
-            ? "Administration"
+            ? context.user?.role === "contributor" ? "Publishing" : "Administration"
             : section === "privacy"
               ? "Privacy policy"
               : "Updates";
@@ -338,15 +339,9 @@ export function ReaderShell({
                         .join("")
                     : "G"
                 }
-                description={
-                  context.user?.role === "admin"
-                    ? "Administrator"
-                    : context.user?.role === "manager"
-                      ? "Manager"
-                      : context.user
-                        ? "Learner"
-                        : undefined
-                }
+                description={context.user ? roleLabel(context.user.role) : undefined}
+                onManageContent={context.user?.role === "contributor" ? () => { void navigate("/admin"); } : undefined}
+                onManageContentIntent={() => router.prefetch("/admin")}
                 onManageOrganization={
                   context.user?.role === "admin"
                     ? () => {
@@ -363,8 +358,8 @@ export function ReaderShell({
                     : undefined
                 }
                 onMenuOpen={() => {
-                  if (context.user?.role === "admin") router.prefetch("/admin");
-                  else if (context.user?.role === "manager")
+                  if (["admin", "contributor"].includes(context.user?.role || "")) router.prefetch("/admin");
+                  if (context.user?.role !== "admin" && (context.user?.role === "manager" || context.user?.managesTeam))
                     router.prefetch("/team");
                 }}
                 onManageOrganizationIntent={() => router.prefetch("/admin")}

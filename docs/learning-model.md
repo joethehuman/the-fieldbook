@@ -4,10 +4,12 @@ Everyone with access to an installation can explore its full published library. 
 
 ## Groups, categories and curricula
 
-- A learning group answers “who is this for?” People can belong to several groups, individually or through linked teams. Parent-group membership is inherited. New team links include the linked team and its subteams automatically. Older links retain direct membership until an administrator reviews and applies their expansion. Teams continue to govern manager reporting independently.
+- A learning group answers “who is this for?” Groups are flat, and people can belong to several groups through individual membership or linked teams. New team links include the linked team and its current and future subteams. Older direct-only links retain that reach until an administrator explicitly reviews their expansion. There is no membership or learning inheritance between groups. Teams retain their hierarchy and govern manager reporting independently.
 - A category organizes courses in the library. Each course has one category. It does not determine assignments.
 - A curriculum is a named, ordered playlist of courses. Published curricula can be browsed by everyone and added to learning groups. Draft curricula are only available to administrators. Curricula are maintained in their own admin tab.
-- A learning group's sequence can contain both courses and curricula. Parent groups come first, then groups at the same depth sort by name. Within a group, follow its saved item order and each curriculum's course order. A course encountered more than once appears once in the combined recommendation. Courses are never locked.
+- A learning group's sequence can contain both courses and curricula. The combined recommendation follows saved group order, then each group's saved item order and each curriculum's course order. The flat upgrade preserves the previous ancestor-first group priority in that saved order. A course encountered more than once appears once in the combined recommendation. Courses are never locked.
+
+Administrators manage each group through **Learning**, **People** and **Updates**, starting with Learning. **Manage membership** selects teams and individuals; **Add learning** selects courses and curricula. The existing Content and Curricula workflows also offer **Assign to learning groups**. These controls edit the same saved plan and review consequential changes before saving. See [learning group administration](learning-groups.md#administration).
 
 ## For you and completion
 
@@ -25,7 +27,7 @@ Self-directed activity never changes the assigned completion percentage. Someone
 
 Course-row arrows appear only when the row overflows and are disabled at each unavailable endpoint. Resizing and course-list changes recalculate their state. Compact progress indicators are shared UI primitives, with text status as well as color.
 
-The Updates page shows up to two recent published updates for the viewer's effective groups, including inherited groups and the configured guest group. Below that, the full published Updates library continues in the same order, excluding only the updates already featured; older relevant updates remain in the library. The library reveals ten more items at a time, without fetching another page because the catalog is already loaded. An update appears at most once. Updates have no completion requirement and do not affect course completion or deadlines. Users without matching groups see the full library without a For you section.
+The Updates page shows up to two recent published updates for the signed-in viewer's effective groups, or the configured guest group for signed-out visitors. Below that, the full published Updates library continues in the same order, excluding only the updates already featured; older relevant updates remain in the library. The library reveals ten more items at a time, without fetching another page because the catalog is already loaded. An update appears at most once. Updates have no completion requirement and do not affect course completion or deadlines. Users without matching groups see the full library without a For you section.
 
 The current content model does not store a first-publication timestamp. Ordering therefore uses the timestamp on the published snapshot (`updatedAt`), falling back to a valid creation timestamp and then a stable ID order for undated items. Draft-only edits do not change the published snapshot or move an update. Republishing an edited update does change its published timestamp and can move it higher in the feed. A separate first-publication date would require a future data-model change.
 
@@ -47,15 +49,17 @@ Changing either default affects future clocks/assignments. Existing deadlines st
 
 Curricula remain linked to groups. Adding a course to a linked curriculum adds that course to the group's learning list. Removing a course removes that source only; another direct assignment or curriculum can keep it assigned. Reordering or changing assignment sources within the same group preserves a continuously active assignment's date. Existing valid course completions remain valid.
 
-Leaving a linked team removes that membership source. Individual membership or another inherited source keeps membership active. Removing the final course-assignment source ends its episode. Rejoining starts a new episode and deadline while retaining same-version completion history. Deleting a group removes its links and tags, moves child groups to its parent, and preserves all course content and progress. Curriculum deletion removes its links from groups, preserving individual course records and any other assignment sources.
+Leaving a linked team removes that membership source. Individual membership or another matching team link keeps membership active. Removing the final course-assignment source ends its episode. Rejoining starts a new episode and deadline while retaining same-version completion history. Deleting a group removes its assignment links and Update tags while preserving all course content and progress. Other groups are independent and stay in place. Curriculum deletion removes its links from groups, preserving individual course records and any other assignment sources.
 
-Reports count each course once per learner. Managers retain their existing team-and-descendant reporting scope. Administrators can mark a person's current course version complete or reset progress with revision checks and an audit record.
+Reports count each course once per learner. Managers and contributors explicitly assigned as team managers receive team-and-descendant reporting scope. Learning-group membership grants no reporting access. Administrators can mark a person's current course version complete or reset progress with revision checks and an audit record.
+
+The flat upgrade replaces former group inheritance with explicit sources. It preserves stable IDs, current membership and course-version coverage, progress, saved deadlines, Update relevance and guest recommendations. Linked team branches remain live; future changes to a former child group no longer change its former ancestors. Older direct-only team sources remain direct until reviewed expansion.
 
 See [learning groups installation and verification](learning-groups.md) before upgrading. This describes implementation, not proof of any installation's deployment state.
 
 ### Curriculum presentation
 
-For you replaces courses contained in an explicitly assigned, published curriculum with a curriculum card. Inherited group assignments count. Standalone assigned courses remain visible; assigning the same curriculum through multiple groups does not duplicate its card. Overlapping curricula may both appear, but their shared courses still count only once in the overall assigned completion summary. Draft or unassigned curricula never suppress assigned course cards.
+For you replaces courses contained in an explicitly assigned, published curriculum with a curriculum card. Membership through linked teams counts in the same way as individual membership. Standalone assigned courses remain visible; assigning the same curriculum through multiple groups does not duplicate its card. Overlapping curricula may both appear, but their shared courses still count only once in the overall assigned completion summary. Draft or unassigned curricula never suppress assigned course cards.
 
 The home queue hides complete cards; the full Assigned browser includes them unless Hide completed is selected. In progress and Completed remain course-level views across assigned and self-directed learning. Category filtering matches a curriculum when one of its courses belongs to that category; searching also matches its course titles. Curricula outside assignments are accessible through Browse curricula.
 

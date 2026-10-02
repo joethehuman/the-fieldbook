@@ -1,6 +1,8 @@
 "use client";
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
+import { DirectoryWorkspace } from "@/components/patterns/directory-workspace";
+import { SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
@@ -37,6 +39,7 @@ import { ActionGroup } from "@/components/ui/action-group";
 
 export function LibraryExamples() {
   const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
+  const [directoryTeam, setDirectoryTeam] = useState("");
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const progressTarget = useRevealTarget<HTMLElement>();
   const [feedback, setFeedback] = useState<{
@@ -223,6 +226,56 @@ export function LibraryExamples() {
         title={<h3>Reporting hierarchy</h3>}
         guidance="Use a disclosure list for nested teams. Search retains ancestor context; Tab and Enter operate ordinary buttons. Use single selection for branch moves, then review their reporting impact before saving."
       >
+        <DirectoryWorkspace
+          navigationLabel="Example reporting team navigation"
+          hasSelection={!!directoryTeam}
+          navigation={
+            <HierarchyList
+              variant="navigation"
+              label="Workspace teams"
+              activeId={directoryTeam}
+              onOpen={setDirectoryTeam}
+              items={[
+                { id: "revenue", label: "Revenue" },
+                {
+                  id: "americas",
+                  parentId: "revenue",
+                  label: "Account executives — Americas",
+                },
+                {
+                  id: "emea",
+                  parentId: "revenue",
+                  label: "Account executives — EMEA",
+                },
+              ]}
+            />
+          }
+        >
+          {directoryTeam ? (
+            <>
+              <Button variant="link" onClick={() => setDirectoryTeam("")}>
+                Back to workspace teams
+              </Button>
+              <SectionHeader
+                title={
+                  <h3>
+                    {directoryTeam === "revenue"
+                      ? "Revenue"
+                      : directoryTeam === "americas"
+                        ? "Account executives — Americas"
+                        : "Account executives — EMEA"}
+                  </h3>
+                }
+                description="Team detail remains beside the hierarchy when space allows. Narrow layouts return to the same collection."
+              />
+            </>
+          ) : (
+            <EmptyState>
+              <h3>Select a team</h3>
+              <p>Use the tree to open a team workspace.</p>
+            </EmptyState>
+          )}
+        </DirectoryWorkspace>
         <HierarchyList
           label="Example teams"
           onOpen={(id) => setMessage(`Open example team: ${id}`)}
@@ -289,7 +342,9 @@ export function LibraryExamples() {
             setFeedback({ rating, comment });
           }}
         />
-        <p className="text-copy text-muted-foreground">Expanded course finish example</p>
+        <p className="text-copy text-muted-foreground">
+          Expanded course finish example
+        </p>
         <ContentFeedback expanded onSave={async () => {}} />
         <p className="text-copy text-muted-foreground">Disabled example</p>
         <ContentFeedback disabled onSave={() => {}} />

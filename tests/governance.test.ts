@@ -58,8 +58,13 @@ const users = [
   },
 ];
 
-test("governance request validation rejects cycles, missing parents and invalid membership", () => {
-  const data = { expected: 1, users, groups, teams };
+test("governance request validation rejects group hierarchy, team cycles, missing parents and invalid membership", () => {
+  const data = {
+    expected: 1,
+    users,
+    groups: groups.map(({ parentId: _parent, ...group }) => group),
+    teams,
+  };
   assert.equal(governanceSchema.safeParse(data).success, true);
   for (const bad of [
     {
@@ -71,6 +76,14 @@ test("governance request validation rejects cycles, missing parents and invalid 
       ],
     },
     { ...data, teams: [{ id: "west", name: "West", parentId: "missing" }] },
+    {
+      ...data,
+      teams: [
+        { id: "west", name: "West", parentId: "child" },
+        teams[1],
+        teams[2],
+      ],
+    },
     { ...data, users: [...users, users[0]] },
     { ...data, groups: [] },
   ])

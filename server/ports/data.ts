@@ -186,14 +186,18 @@ export interface DataStore {
       path: string;
     }[]
   >;
-  reviewDeadlines(actorId: string, apply: boolean, token?: string): Promise<import("@/lib/assignment-episodes").DeadlineReview>;
+  reviewDeadlines(
+    actorId: string,
+    apply: boolean,
+    token?: string,
+  ): Promise<import("@/lib/assignment-episodes").DeadlineReview>;
   readGovernanceSnapshot(actorId: string): Promise<GovernanceRecord>;
   /** Complete account list, with progress restricted to a requested person. */
   readAdminPeopleSnapshot(
     actorId: string,
     userId?: string,
   ): Promise<GovernanceRecord>;
-  listDeletedItems(): Promise<DeletedItemRecord[]>;
+  listDeletedItems(entity?: "content" | "user"): Promise<DeletedItemRecord[]>;
   readCleanupStatus(): Promise<{
     endpoint: string | null;
     last_run: string | null;

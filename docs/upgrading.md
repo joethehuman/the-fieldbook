@@ -86,7 +86,7 @@ Versions containing `20260921205449_published_search.sql` require that additive 
 
 ## Optional guest recommendations
 
-This feature needs no new migration or environment variables. Older public installations start with no guest selection and continue to support public browsing. After deploying the application update, an administrator may choose a group in Organization Settings → Access and save. Group creation is explicit and separate from saving the selection. Review [guest recommendations](guest-recommendations.md) for fallback, sign-in and verification behavior.
+The optional guest selection uses the existing settings JSON and needs no additional environment variables or service. Older public installations start with no guest selection. After deploying the matching application, an administrator may choose a group in Organization Settings → Access and save; group creation is explicit and separate. An upgrade to flat learning groups still requires the migration below, which preserves the selected guest group’s former ancestor recommendations. Review [guest recommendations](guest-recommendations.md) for fallback, sign-in and verification behavior.
 
 ## Guarded team deletion
 
@@ -100,6 +100,35 @@ Apply `supabase/migrations/20260923230000_scope_pending_group_cleanup.sql` after
 
 `20261001232329_stable_assignment_episodes.sql` requires the roster migration and every earlier migration. Back up and rehearse on isolated non-production, comparing current derived targets with the backfilled baseline and preserving progress, content and identity links. Pause old writers/cleanup, apply the migration, deploy matching code and reload clients before resuming writes. This version adds private episode storage and changes registration’s internal RPC result to include saved assignments; old code cannot provide its deadline/legacy-link review controls. Prefer a forward fix; a code rollback does not undo episodes or explicit subtree/recalculation changes. A restore must account for later writes.
 
-Schema application preserves the reach of every existing direct team link. In Learning groups → Members, choose **Include subteams** and review the exact courses and reporting access affected before applying. New team links include descendants. In Organization Settings → Due dates, save defaults first; **Review existing deadlines** is a separate, explicit operation. It previews active onboarding clocks and unfinished obligations, keeps assignment start dates fixed, excludes completed courses, and rejects stale reviews. A migration alone never performs either operation.
+Schema application preserves the reach of every existing direct team link. In the flat-group UI, open **Learning groups → People → Manage membership**, check **Include subteams** for the specific older link, and review the added course coverage before applying. Group links do not grant manager access. New team links include descendants. In Organization Settings → Due dates, save defaults first; **Review existing deadlines** is a separate, explicit operation. It previews active onboarding clocks and unfinished obligations, keeps assignment start dates fixed, excludes completed courses, and rejects stale reviews. A migration alone never expands a direct-only link or recalculates deadlines.
 
 Verify overlap/source removal/rejoin, day 83/84/90 boundaries, old overdue work after onboarding, new course versions, pending activation, descendant moves and scoped manager reads. Verify date changes remain future-only until reviewed recalculation; turning deadlines off/on preserves targets and completion. New episode tables/functions are service-only; browser sessions cannot query them directly.
+
+## Flat learning-group upgrade
+
+`20261002022921_flat_learning_groups.sql` is a separate, required migration for this application version, including installations whose groups already have no parents. Teams retain their hierarchy; learning groups become independent audiences. Apply every missing earlier migration first. The relevant final order is:
+
+1. `20261001222227_roster_people.sql`
+2. `20261001232329_stable_assignment_episodes.sql`
+3. `20261001234401_contributor_permissions.sql`
+4. `20261002022921_flat_learning_groups.sql`
+
+These are immutable migrations. Check the installation’s ledger, apply missing predecessors, and do not edit or replay an applied file. If contributor permissions were applied before stable assignment episodes, keep that recorded application and apply the missing episode migration followed by the flat migration while writes remain paused. The final migration combines episode-aware atomic governance and scoped reporting with contributor publishing permissions; the intermediate database state must not serve application writes.
+
+The conversion runs in one locked transaction. Each former ancestor group receives explicit individual memberships and team-link sources from its descendants. Subtree links remain dynamic, including future subteams; older direct-only links become separate preserved sources and are never expanded automatically. Group, team and person IDs remain stable. Current effective group membership, assigned course versions, assignment episode IDs/history/start dates/deadlines, saved progress, hire/onboarding clocks and Update relevance are preserved. The configured guest group receives its previous ancestor learning and Update relevance explicitly. Saved group order retains the previous ancestor-first recommendation priority.
+
+After conversion, groups no longer propagate membership, learning or relevance to one another. Removing a person or team link from a former child group does not remove the explicit source now held by its former ancestor; manage each audience independently. A linked team branch still responds to future roster and hierarchy changes. No automatic all-people group or CSV import is introduced.
+
+The migration compares current effective membership, course-version coverage, assignment history/deadlines, Update relevance and guest recommendations before and after conversion, and aborts the transaction if any differ. It does not recalculate deadlines or rewrite progress. Resolve a failed rehearsal against the actual data before proceeding; do not remove the preservation checks to force application.
+
+Use a coordinated maintenance rollout:
+
+1. Back up the database and media, record the applied migrations, and rehearse the full missing-migration sequence against an isolated backend. Include nested groups, overlapping courses/curricula, mixed direct/subtree team links, guest recommendations and preregistered people. Compare learning order, current membership, assignments, deadlines and progress before and after.
+2. Pause application, administrator/MCP and cleanup-worker writes. Keep users out of the upgrade interval; old code cannot safely manage the converted model.
+3. Apply the required migrations, deploy the matching application, and reload previously open clients before reopening writes. A code deployment alone does not perform conversion. Do not mix old and new governance writers.
+4. Verify sign-in, contributor publishing and team reporting, manager descendant/sibling boundaries, People clock stages, assignment overlap/removal/rejoin, group learning order and guest recommendations. Verify **All people** and **Direct members** against known team branches. A legacy direct-only link must remain direct until its individually reviewed expansion; continuous assignments must retain their dates.
+5. Reopen writes and resume the matching cleanup worker only after those checks pass. Record the installed code and migration versions privately.
+
+The browser-local demo performs its equivalent one-time conversion when saved data loads. A demo check or local integration test does not establish that a hosted database upgrade, authentication or concurrent operators work. Rehearse those against the isolated installation.
+
+Code-only rollback to the hierarchy model is unsupported after conversion. Prefer a forward fix, or stop writes and use a tested database/media restore with the matching earlier code. A restore can lose changes made after the backup and requires review of subsequent Auth changes. Old applied migration files remain unchanged, and no new environment variables are required.

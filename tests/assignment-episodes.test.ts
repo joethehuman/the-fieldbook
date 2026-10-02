@@ -4,6 +4,8 @@ import {
   rosterDatabase,
   migrate,
   episodeMigration,
+  contributorMigration,
+  flatGroupMigration,
   saveRoster,
   value,
 } from "./helpers/roster-database";
@@ -483,6 +485,16 @@ test("Postgres backfill, explicit subtree activation, stable deadlines, revision
         );
         assert.equal(result.users.length, 502);
         assert.equal(result.progress.length, 0);
+        await migrate(pg, contributorMigration);
+        await migrate(pg, flatGroupMigration);
+        assert.equal(
+          await value(
+            pg,
+            "select count(*)::int as value from public.fb_assignment_episodes where ended_at is null",
+          ),
+          50000,
+          "Atomic flat conversion preserves every obligation at target scale",
+        );
       },
     );
   } finally {

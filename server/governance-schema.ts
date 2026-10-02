@@ -7,6 +7,7 @@ const node = z.object({
   parentId: id.optional(),
   requiredCourseIds: z.array(z.uuid()).max(1000).optional(),
   teamIds: z.array(id).max(1000).optional(),
+  legacyDirectTeamIds: z.array(id).max(1000).optional(),
   teamLinkScope: z.enum(["direct", "subtree"]).optional(),
   learningItems: z
     .array(z.object({ kind: z.enum(["course", "curriculum"]), id }))
@@ -37,7 +38,7 @@ export const governanceSchema = z
           id: z.uuid(),
           name: z.string().trim().min(1).max(80),
           email: z.email().max(254),
-          role: z.enum(["admin", "manager", "learner"]),
+          role: z.enum(["admin", "manager", "learner", "contributor"]),
           active: z.boolean(),
           groups: z.array(id).max(100),
           teamId: id.optional(),
@@ -89,9 +90,21 @@ export const governanceSchema = z
       )
         fail("Published curricula need unique courses.");
     for (const g of value.groups) {
+      if (g.parentId)
+        fail(
+          "Learning groups are independent audiences and cannot have parents.",
+        );
+      if (g.teamLinkScope === "direct")
+        fail(
+          "Legacy direct team links must be preserved separately. Reload before saving.",
+        );
       if (
-        g.teamIds?.some((id) => !teams.has(id)) ||
-        new Set(g.teamIds).size !== (g.teamIds?.length || 0)
+        [...(g.teamIds || []), ...(g.legacyDirectTeamIds || [])].some(
+          (id) => !teams.has(id),
+        ) ||
+        new Set([...(g.teamIds || []), ...(g.legacyDirectTeamIds || [])])
+          .size !==
+          (g.teamIds?.length || 0) + (g.legacyDirectTeamIds?.length || 0)
       )
         fail("Invalid team link.");
       if (
@@ -126,7 +139,7 @@ export const pendingSchema = z.object({
     .max(254)
     .transform((s) => s.trim().toLowerCase()),
   name: z.string().trim().min(1).max(80),
-  role: z.enum(["learner", "manager", "admin"]),
+  role: z.enum(["learner", "manager", "admin", "contributor"]),
   groups: z.array(id).max(100),
   teamId: id.optional(),
   onboardingStart: z.iso.date().optional(),

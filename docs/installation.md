@@ -22,7 +22,9 @@ Start with your own deployment repository at a chosen release; follow [versions 
 6. In Supabase Auth URL configuration, set the Site URL to `FIELDBOOK_URL` and allow the exact application callback URL `FIELDBOOK_URL/auth/callback`. Do not add wildcard preview domains to the production allowlist. Supabase provider sign-up may create an Auth record, but Fieldbook's registration setting controls whether it gains application access.
 7. Deploy and sign in as the configured owner. The first verified sign-in at that email creates the administrator profile. Other new users get learner profiles. No one can select their role in the browser.
 8. **Complete the deletion worker setup before using Delete.** The migration installs its schedule but leaves its destination unset. In this installation's Supabase project, set `fb_cleanup_config.endpoint` to the deployed app's direct canonical HTTPS address, then verify an authenticated request and the scheduled job. Follow [deletion worker setup and checks](bulk-actions.md#install-or-upgrade-the-cleanup-worker). A redirecting address can lose the worker's Authorization header. Keep each preview backend pointed only at its own preview app; do not reuse production credentials or point it at this installation.
-9. Create real content in `/admin`. Start with one draft article, one update, and one course; publish only after checking the previews. No demo data is seeded into this database.
+9. Create real content in `/admin`. Start with one draft article, one update, and one course; publish only after checking the previews. No demo data is seeded into this database. Administrators can assign Contributor access in People after applying the contributor permissions migration. See [roles and permissions](permissions.md) for the shared publishing panel and additive team management.
+
+The included Vercel Analytics and Speed Insights SDKs turn on for Vercel deployments. Enable Web Analytics in your own project and deploy after activation; standard Speed Insights uses the deployed SDK. See [activation, verification and opt-outs](../deployment/vercel/README.md#analytics-and-speed-insights).
 
 The included Vercel Analytics and Speed Insights SDKs turn on for Vercel deployments. Enable Web Analytics in your own project and deploy after activation; standard Speed Insights uses the deployed SDK. See [activation, verification and opt-outs](../deployment/vercel/README.md#analytics-and-speed-insights).
 
@@ -43,7 +45,7 @@ The authenticated endpoint is `FIELDBOOK_URL/api/mcp`. It runs inside this Next.
 5. Verify `search`, `fetch`, `create_content`, `update_content`, `publish_content`, `unpublish_content`, `content_report`, and `list_media`. Start with a disposable draft. Verify stale revisions are rejected and public content stays unchanged until publication.
 6. Use `/connections` to revoke a client. Fieldbook checks its active grant on every request; revocation also removes the provider's OAuth grant and refresh tokens.
 
-The AI can edit Markdown, lessons, and quizzes through the same service as the admin editor. Upload binary files through the app, then use `list_media` to reference them from MCP. MCP does not accept a service-role key or unauthenticated writes. The current tools are admin-only; learner and manager MCP access is not implemented.
+The AI can edit Markdown, lessons, and quizzes through the same service as the admin editor. Upload binary files through the app, then use `list_media` to reference them from MCP. MCP does not accept a service-role key or unauthenticated writes. The current tools are admin-only; contributor, learner and manager MCP connections are not implemented. Contributor panel access does not grant an MCP connection.
 
 ## Media and free-plan boundaries
 

@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { assignedCourses } from "../lib/types";
-import { learningState, learningTarget, onboardingTarget, requiredSequence } from "../lib/learning";
+import {
+  learningState,
+  learningTarget,
+  onboardingTarget,
+  requiredSequence,
+} from "../lib/learning";
 import { freshWorkspace } from "../lib/store";
 import { defaultSettings } from "../lib/settings";
 const admin = "00000000-0000-4000-8000-000000000001",
@@ -177,18 +182,21 @@ test("group requirements and person progress administration are atomic, versione
     await pg.close();
   }
 });
-test("overlapping parent and child group requirements count once; individual rules do not require courses", () => {
+test("overlapping independent group requirements count once; individual rules do not require courses", () => {
   const data = freshWorkspace();
   const user = {
     ...data.users[0],
     hireDate: undefined,
     onboardingStart: undefined,
-    groups: ["startup"],
-    groupJoinedAt: { startup: "2026-09-20T00:00:00Z" },
+    groups: ["sales", "startup"],
+    groupJoinedAt: {
+      sales: "2026-09-20T00:00:00Z",
+      startup: "2026-09-20T00:00:00Z",
+    },
   };
   const groups = [
     { id: "sales", name: "Sales" },
-    { id: "startup", name: "Startup", parentId: "sales" },
+    { id: "startup", name: "Startup" },
   ];
   const course = {
     ...data.content.find((c) => c.kind === "course")!,
@@ -272,9 +280,18 @@ test("completion targets preserve the applied onboarding window and use the late
   };
   assert.equal(learningTarget(newlyRequired, user, data.groups), "2026-12-20");
   const withoutDueDates = { ...defaultSettings, dueDatesEnabled: false };
-  assert.equal(learningTarget(course, user, data.groups, withoutDueDates), undefined);
+  assert.equal(
+    learningTarget(course, user, data.groups, withoutDueDates),
+    undefined,
+  );
   assert.equal(onboardingTarget(user, withoutDueDates), undefined);
-  const state = learningState([course], existingUser, data.groups, [], withoutDueDates);
+  const state = learningState(
+    [course],
+    existingUser,
+    data.groups,
+    [],
+    withoutDueDates,
+  );
   assert.equal(state.required.length, 1);
   assert.equal(state.remaining.length, 1);
   assert.deepEqual(state.overdue, []);

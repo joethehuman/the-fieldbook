@@ -695,7 +695,7 @@ test("public guest can send general feedback through the account menu", async ({
   await expect(page.getByText("Guest feedback", { exact: true })).toBeVisible();
 });
 
-test("an administrator who manages a team sees both account destinations", async ({
+test("an administrator who manages a team sees only the organization destination", async ({
   page,
   request,
 }) => {
@@ -719,7 +719,10 @@ test("an administrator who manages a team sees both account destinations", async
   ).toBeVisible();
   await expect(
     page.getByRole("menuitem", { name: "My team’s progress" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("menuitem", { name: "Manage content" }),
+  ).toHaveCount(0);
 });
 
 test("shared settings library and connection states work in the server app", async ({
@@ -740,7 +743,7 @@ test("shared settings library and connection states work in the server app", asy
   await section("Due dates");
   await expect(
     page.getByRole("spinbutton", { name: "New user onboarding window (days)" }),
-  ).toHaveAccessibleDescription(/Changes recalculate targets for everyone/);
+  ).toHaveAccessibleDescription(/existing onboarding windows stay fixed.*Changes to the catch-up window still update course targets/);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("server-settings-window.png"),

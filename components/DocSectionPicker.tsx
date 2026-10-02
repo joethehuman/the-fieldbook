@@ -10,11 +10,13 @@ export function DocSectionPicker({
   value,
   onChange,
   disabled = false,
+  canCreate = true,
 }: {
   sections: DocSection[];
   value: string;
   onChange: (id: string) => void;
   disabled?: boolean;
+  canCreate?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const matches = sections.filter((section) =>
@@ -58,7 +60,7 @@ export function DocSectionPicker({
           <p className="text-sm text-muted-foreground">
             {sections.length
               ? "No matching sections."
-              : "No sections yet. Create one below."}
+              : canCreate ? "No sections yet. Create one below." : "An administrator must create a Docs section first."}
           </p>
         )}
       </div>

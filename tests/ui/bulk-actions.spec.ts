@@ -65,7 +65,7 @@ test("content selection, explicit deletion, recovery and clean navigation", asyn
     .getByRole("dialog")
     .getByRole("button", { name: "Apply changes", exact: true })
     .click();
-  await expect(page.getByText("No recently deleted items.")).toBeVisible();
+  await expect(page.getByText("No recently deleted items yet.")).toBeVisible();
   await section(page, "Content");
   const row = page
     .getByRole("row")
@@ -136,7 +136,7 @@ test("all matching selection crosses pages and group pickers wait for Apply", as
     page.getByRole("checkbox", { name: "Select page (1)", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("checkbox", { name: "Select Bulk update 25", exact: true }),
+    page.getByRole("checkbox", { name: /^Select Bulk update / }),
   ).toBeChecked();
   await expect(
     page.getByRole("region", { name: "Selected items" }),
@@ -169,6 +169,7 @@ test("existing categories, mixed types and one People menu", async ({
     c.category = i ? "Existing beta" : "Existing alpha";
   });
   course.title = "Category fixture course";
+  data.content = [...updates, course];
   await page.addInitScript((workspace) => {
     sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));

@@ -19,6 +19,9 @@ export const rosterMigrations = [
   "20261001222227_roster_people.sql",
 ];
 export const episodeMigration = "20261001232329_stable_assignment_episodes.sql";
+export const contributorMigration =
+  "20261001234401_contributor_permissions.sql";
+export const flatGroupMigration = "20261002022921_flat_learning_groups.sql";
 export async function migrate(pg: PGlite, name: string) {
   await pg.exec(
     await readFile(

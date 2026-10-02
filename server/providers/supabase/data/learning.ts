@@ -54,13 +54,20 @@ export const learningData: Pick<
     );
   },
   async readProfileNames(ids) {
-    if (!ids.length) return [];
-    const { data, error } = await db()
-      .from("fb_profiles")
-      .select("id,name")
-      .in("id", ids);
-    check(error);
-    return (data || []) as Pick<ProfileRecord, "id" | "name">[];
+    const unique = [...new Set(ids)];
+    const names: Pick<ProfileRecord, "id" | "name">[] = [];
+    // Keep URLs bounded and each result below the provider's row limit.
+    for (let start = 0; start < unique.length; start += 500) {
+      const chunks = Array.from({ length: Math.ceil(Math.min(500, unique.length - start) / 100) },
+        (_, offset) => unique.slice(start + offset * 100, start + (offset + 1) * 100));
+      const batch = await Promise.all(chunks.map(async (chunk) => {
+        const { data, error } = await db().from("fb_profiles").select("id,name").in("id", chunk);
+        check(error);
+        return (data || []) as Pick<ProfileRecord, "id" | "name">[];
+      }));
+      names.push(...batch.flat());
+    }
+    return names;
   },
   async findOwnerProfile(email) {
     const { data, error } = await db()
@@ -162,9 +169,9 @@ export const learningData: Pick<
     check(error);
     return data as ProgressRecord;
   },
-  async listDeletedItems() {
-    return await readAll<DeletedItemRecord>((from, to) =>
-      db()
+  async listDeletedItems(entity) {
+    return await readAll<DeletedItemRecord>((from, to) => {
+      const query = db()
         .from("fb_deleted_items")
         .select(
           "entity,id,name,kind,revision,deleted_at,purge_after,deleted_by,purging,error",
@@ -172,8 +179,9 @@ export const learningData: Pick<
         )
         .order("id")
         .order("entity")
-        .range(from, to),
-    );
+        .range(from, to);
+      return entity ? query.eq("entity", entity) : query;
+    });
   },
   async readCleanupStatus() {
     const { data, error } = await db()

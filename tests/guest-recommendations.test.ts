@@ -14,7 +14,7 @@ import { updatesForUser, reconcileLearning } from "../lib/learning-groups";
 import { settingsSchema } from "../server/schemas";
 import { publicSettings } from "../lib/settings";
 
-test("anonymous recommendations inherit parents, expand curricula and deduplicate without membership or deadlines", () => {
+test("anonymous recommendations use the selected flat audience, expand curricula and deduplicate without membership or deadlines", () => {
   const data = guestFixture(),
     before = JSON.stringify(data),
     p = guestRecommendations(data);
@@ -109,7 +109,7 @@ test("old public settings, missing groups and private mode never substitute the 
   data.settings!.access = "public";
   assert.equal(guestRecommendations(data).groups.length, 1);
 });
-test("publication, removal, curriculum and hierarchy changes recalculate without touching people or reports", () => {
+test("publication, removal, curriculum and audience changes recalculate without touching people or reports", () => {
   const before = guestFixture(),
     data = structuredClone(before);
   data.content[1].status = "draft";

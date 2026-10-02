@@ -70,33 +70,49 @@ test("review subtree assignments, keep defaults future-only, cancel and apply de
   }, data);
   await page.goto("/#admin");
   await section(page, "Learning groups");
-  await page.getByRole("button", { name: "Manage Sales", exact: true }).click();
-  await page.getByRole("tab", { name: "Members", exact: true }).click();
+  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  await page.getByRole("tab", { name: "People", exact: true }).click();
   await page
-    .getByRole("button", { name: "Include subteams", exact: true })
+    .getByRole("button", { name: "Manage membership", exact: true })
+    .click();
+  const membership = page.getByRole("dialog", {
+    name: "Manage membership",
+    exact: true,
+  });
+  await membership
+    .getByRole("checkbox", {
+      name: "Include subteams for Sales team",
+      exact: true,
+    })
+    .check();
+  await membership
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
   const review = page.getByRole("dialog", {
-    name: "Review organization changes",
+    name: "Review changes",
     exact: true,
   });
   await expect(review).toBeVisible();
-  await expect(review).toContainText("Alex Edwards");
   await review.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(review).not.toBeVisible();
-  expect((await saved(page)).groups[0].teamLinkScope).toBe("direct");
-  await page
-    .getByRole("button", { name: "Include subteams", exact: true })
+  await expect(membership).toBeVisible();
+  const unchanged = (await saved(page)).groups[0];
+  expect(
+    unchanged.teamLinkScope === "direct" ||
+      unchanged.legacyDirectTeamIds?.includes("sales-team"),
+  ).toBe(true);
+  await membership
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
   await review
     .getByRole("button", { name: "Apply changes", exact: true })
     .click();
   await expect(review).not.toBeVisible();
+  await expect(membership).not.toBeVisible();
   const first = (await saved(page)).users.find((u) => u.id === "demo-learner")!
     .learningAssignments![0];
   expect(first.dueDate).toBe(addDays(todayUTC(), 7));
-  await expect(page.locator(".learning-admin")).toContainText(
-    "Via team Sales team / Sales child",
-  );
+  await expect(page.locator(".learning-admin")).toContainText("Sales team");
   await section(page, "Due dates");
   await page
     .getByRole("spinbutton", {

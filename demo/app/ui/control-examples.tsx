@@ -36,11 +36,15 @@ export function ControlExamples() {
       <Card aria-label="Typography and tokens">
         <div className="grid gap-4">
           <p className="text-page font-semibold tracking-tight">
-            Page heading · 32 / 40
+            Page heading · 32 / 40 · medium
           </p>
-          <h3>Section heading · 16 / 24</h3>
-          <p className="text-label font-medium">Label · 14 / 20 · medium</p>
+          <h3>Section heading · 16 / 24 · medium</h3>
+          <p className="text-label font-medium">Label · 14 / 20 · regular</p>
           <p className="text-copy">Supporting copy · 14 / 22 · regular</p>
+          <p className="text-copy">Interface <strong>emphasis</strong> · medium</p>
+          <div className="markdown">
+            <p>Authored <strong>bold text</strong> stays strong within regular prose.</p>
+          </div>
           <p className="text-compact text-muted-foreground">
             Compact action · 14 / 20
           </p>

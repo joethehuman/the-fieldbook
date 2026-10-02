@@ -1,6 +1,7 @@
 import "server-only";
 import { installation, siteOrigins } from "./installation";
 import type { User } from "@/lib/types";
+import { canPublish } from "@/lib/permissions";
 import type { ProfileRecord } from "./ports/identity";
 import {
   findProfileBySubject,
@@ -18,7 +19,9 @@ export function profile(row: ProfileRecord): User {
     role: row.role,
     active: row.active,
     registered: row.auth_user_id !== null,
-    learningAssignments: row.learning_assignments?.filter((a) => !a.ended_at).map((a) => ({ ...a, onboardingEnd: a.onboardingEnd || undefined })),
+    learningAssignments: row.learning_assignments
+      ?.filter((a) => !a.ended_at)
+      .map((a) => ({ ...a, onboardingEnd: a.onboardingEnd || undefined })),
     hireDate: row.hire_date || undefined,
     onboardingDays: row.onboarding_days ?? undefined,
     groups: row.groups,
@@ -26,7 +29,9 @@ export function profile(row: ProfileRecord): User {
     onboardingStart: row.onboarding_start || undefined,
     groupJoinedAt: row.group_joined_at,
     effectiveGroupJoinedAt: row.effective_group_joined_at,
-    effectiveGroupIds: row.effective_group_joined_at ? Object.keys(row.effective_group_joined_at) : undefined,
+    effectiveGroupIds: row.effective_group_joined_at
+      ? Object.keys(row.effective_group_joined_at)
+      : undefined,
   };
 }
 export async function actor(
@@ -84,5 +89,14 @@ export function sameOrigin(req: Request) {
     throw new HttpError(
       403,
       "This request must come from your Fieldbook site.",
+    );
+}
+
+export function requirePublisher(user: User | null): asserts user is User {
+  if (!user) throw new HttpError(401, "Sign in to publish content.");
+  if (!canPublish(user))
+    throw new HttpError(
+      403,
+      "Administrator or contributor publishing access is required.",
     );
 }

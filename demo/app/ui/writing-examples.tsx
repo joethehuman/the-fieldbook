@@ -9,7 +9,7 @@ import { Field } from "@/components/ui/field";
 
 export function WritingExamples() {
   const [body, setBody] = useState(
-    "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.",
+    "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.\n\n| Area | Owner | Next step |\n| :--- | :--- | :--- |\n| **Documentation** | Enablement | Confirm the source |\n| | | |\n| Customer follow-up | Account team | Keep the next decision and its context visible |",
   );
   const [category, setCategory] = useState("");
   const [disabled, setDisabled] = useState(false);
@@ -42,8 +42,8 @@ export function WritingExamples() {
       <WritingEditor value={body} onChange={setBody} disabled={disabled} />
       <p className="text-copy text-muted-foreground">
         Saving a draft and publishing are separate actions in the authoring
-        screen. The editor itself owns no persistence. This catalog does not
-        upload files.
+        screen. The editor itself owns no persistence. The table demonstrates filled and empty cells with the same grid in Write
+        and Preview draft. This catalog does not upload files.
       </p>
     </section>
   );

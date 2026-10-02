@@ -1,28 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { freshWorkspace } from "../lib/store";
-import { groupMembershipSources, groupMoveImpact, groupPath, moveGroup } from "../lib/group-hierarchy";
+import { groupMembershipSources, groupPath } from "../lib/group-hierarchy";
 import { effectiveGroups } from "../lib/types";
 
-test("group paths and membership sources explain overlapping direct, team, and child inclusion", () => {
+test("flat group names and membership sources explain overlapping individual and team inclusion", () => {
   const data = freshWorkspace();
   data.groups = [
-    { id: "root", name: "Sales" },
-    { id: "child", name: "West", parentId: "root", teamIds: ["team"] },
-    { id: "leaf", name: "Accounts", parentId: "child" },
+    { id: "root", name: "Sales", teamIds: ["team"] },
+    { id: "child", name: "West", teamIds: ["team"] },
+    { id: "leaf", name: "Accounts" },
   ];
   data.teams = [{ id: "team", name: "Territory" }];
   const user = { ...data.users[0], groups: ["root", "leaf"], teamId: "team" };
-  assert.equal(groupPath("leaf", data.groups), "Sales / West / Accounts");
+  assert.equal(groupPath("leaf", data.groups), "Accounts");
   assert.deepEqual(groupMembershipSources(user, "root", data), [
-    "Directly added",
-    "Via child group Sales / West / Accounts",
-    "Via team Territory linked to Sales / West",
+    "Individually added",
+    "Territory (includes subteams)",
   ]);
   assert.equal(effectiveGroups(user, data.groups).size, 3);
 });
 
-test("group move carries its descendants, preserves IDs and rejects cycles and missing targets", () => {
+test("legacy parent fields do not restore hierarchy or hidden inherited membership", () => {
   const data = freshWorkspace();
   data.groups = [
     { id: "a", name: "A" },
@@ -30,11 +29,7 @@ test("group move carries its descendants, preserves IDs and rejects cycles and m
     { id: "child", name: "Child", parentId: "a" },
     { id: "leaf", name: "Leaf", parentId: "child" },
   ];
-  const impact = groupMoveImpact(data, "child", "b");
-  assert.equal(impact.from, "A / Child");
-  assert.equal(impact.to, "B / Child");
-  assert.deepEqual(impact.branch.map((group) => group.id), ["child", "leaf"]);
-  assert.equal(impact.next.find((group) => group.id === "leaf")?.parentId, "child");
-  assert.throws(() => moveGroup(data.groups, "a", "leaf"), /cannot move/);
-  assert.throws(() => moveGroup(data.groups, "child", "missing"), /changed/);
+  const user = { ...data.users[0], groups: ["leaf"], teamId: undefined };
+  assert.deepEqual([...effectiveGroups(user, data.groups)], ["leaf"]);
+  assert.deepEqual(groupMembershipSources(user, "a", data), []);
 });

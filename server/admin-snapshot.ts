@@ -1,10 +1,12 @@
 import "server-only";
 import { data as dataStore } from "./data";
 import { document, readConfig } from "./content";
-import { profile, requireAdmin } from "./auth";
+import { profile, requirePublisher, HttpError } from "./auth";
 import type { Workspace } from "@/lib/store";
 import type { Content, User } from "@/lib/types";
 
+import { canAdminister, canOpenPublishingScope } from "@/lib/permissions";
+import { publicSettings } from "@/lib/settings";
 import type { AdminScope } from "@/lib/admin-scope";
 export type { AdminScope } from "@/lib/admin-scope";
 
@@ -37,16 +39,22 @@ const contentIndex = async (): Promise<Content[]> => {
   })) as unknown as Content[];
 };
 
-/** Only administrator data crosses this boundary. Never cache it. */
+/** Return only the requested, authorized publishing/administration data. Never cache it. */
 export async function adminSnapshot(
   user: User,
   scope: AdminScope,
   userId?: string,
 ): Promise<Workspace> {
-  requireAdmin(user);
+  requirePublisher(user);
+  if (!canOpenPublishingScope(user, scope))
+    throw new HttpError(
+      403,
+      "Administrator access is required for this section.",
+    );
+  const admin = canAdminister(user);
   const store = dataStore();
   const reports = scope === "governance" || scope === "person";
-  // Start independent reads together after the request-time administrator check.
+  // Start independent reads together after the request-time permission check.
   // Housekeeping cannot delay or fail an unrelated account/content list.
   const [config, content, governance, courseRows, feedback, maintenance] =
     await Promise.all([
@@ -59,25 +67,44 @@ export async function adminSnapshot(
           : null,
       reports ? store.listDraftCourses() : [],
       scope === "feedback"
-        ? Promise.all([store.listFeedback(), store.listProfiles()])
+        ? store.listFeedback().then(async (ratings) => ({
+            ratings,
+            people: admin
+              ? await store.listProfiles()
+              : await store.readProfileNames([
+                  ...new Set(
+                    ratings.flatMap((row) =>
+                      row.user_id ? [row.user_id] : [],
+                    ),
+                  ),
+                ]),
+          }))
         : null,
       scope === "maintenance"
         ? Promise.all([
-            store.listDeletedItems().then(async (deleted) => ({
-              deleted,
-              names: await store.readProfileNames([
-                ...new Set(deleted.map((d) => d.deleted_by)),
-              ]),
-            })),
-            store.readCleanupStatus(),
+            store
+              .listDeletedItems(admin ? undefined : "content")
+              .then(async (deleted) => ({
+                deleted,
+                names: await store.readProfileNames([
+                  ...new Set(deleted.map((d) => d.deleted_by)),
+                ]),
+              })),
+            admin ? store.readCleanupStatus() : null,
           ])
         : null,
     ]);
   const data: Workspace = {
     schema: 1,
-    settings: config.settings,
+    settings: admin
+      ? config.settings
+      : {
+          ...publicSettings(config.settings),
+          docSections: config.settings.docSections,
+          docCategoryOrder: config.settings.docCategoryOrder,
+        },
     revision: config.revision,
-    governanceRevision: config.governance_revision,
+    governanceRevision: admin ? config.governance_revision : undefined,
     content,
     publishedContent: content
       .filter((item) => item.publishedRevision)
@@ -87,8 +114,13 @@ export async function adminSnapshot(
         revision: item.publishedRevision ?? undefined,
       })),
     users: [user],
-    groups: config.groups || [],
-    curricula: config.curricula || [],
+    groups: admin
+      ? config.groups || []
+      : (config.groups || []).map((group) => ({
+          id: group.id,
+          name: group.name,
+        })),
+    curricula: admin ? config.curricula || [] : [],
     teams: [],
     pendingUsers: [],
     progress: {},
@@ -105,19 +137,39 @@ export async function adminSnapshot(
       deletedAt: d.deleted_at,
       purgeAfter: d.purge_after,
       deletedBy:
-        names.find((p) => p.id === d.deleted_by)?.name ||
-        "Former administrator",
+        names.find((p) => p.id === d.deleted_by)?.name || "Former publisher",
       purging: d.purging,
       error: d.error || undefined,
     }));
-    data.cleanupStatus = {
-      configured: !!cleanup?.endpoint,
-      lastRun: cleanup?.last_run || undefined,
-    };
+    if (cleanup)
+      data.cleanupStatus = {
+        configured: !!cleanup.endpoint,
+        lastRun: cleanup.last_run || undefined,
+      };
   }
   if (feedback) {
-    const [ratings, people] = feedback;
-    data.users = people.filter((p) => !p.deleted_at).map(profile);
+    const { ratings, people } = feedback;
+    data.users = admin
+      ? (
+          people as (import("./ports/identity").ProfileRecord & {
+            deleted_at?: string;
+          })[]
+        )
+          .filter((p) => !p.deleted_at)
+          .map(profile)
+      : [
+          user,
+          ...people
+            .filter((p) => p.id !== user.id)
+            .map((p) => ({
+              id: p.id,
+              name: p.name,
+              email: "",
+              role: "learner" as const,
+              active: true,
+              groups: [],
+            })),
+        ];
     data.feedback = ratings.map((row) => ({
       id: row.id,
       userId: row.user_id || "guest",

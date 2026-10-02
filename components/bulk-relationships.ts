@@ -28,6 +28,7 @@ export function contentRelationshipCommands(
     id: add ? "group-add" : "group-remove",
     label: add ? "Add to learning groups" : "Remove from learning groups",
     disabledReason: reason,
+    applyLabel: "Review changes",
     description: add
       ? "Add direct learning assignments or Update audiences. Overlapping courses count once. Existing history is preserved."
       : "Remove direct links only. Learning inherited through a curriculum or another group remains; saved history is preserved.",
@@ -78,6 +79,7 @@ export function contentRelationshipCommands(
       id: "curriculum-add",
       label: "Add to curricula",
       disabledReason: reason,
+      applyLabel: "Review changes",
       description:
         "Append these courses without duplicates. Learning groups using these curricula receive the added courses; history is preserved.",
       options: (data.curricula || []).map((c) => ({ id: c.id, label: c.name })),
@@ -102,6 +104,7 @@ export function curriculumGroupCommands(
   return ([true, false] as const).map((add) => ({
     id: add ? "group-add" : "group-remove",
     label: add ? "Add to learning groups" : "Remove from learning groups",
+    applyLabel: "Review assignments",
     description:
       "Change direct curriculum assignments. Course content and saved learning history are preserved.",
     disabledReason:

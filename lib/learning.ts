@@ -34,7 +34,6 @@ export function deadlineLabel(due: Assignment["due"]) {
 import {
   assignmentInfo,
   assignedCourses,
-  ancestorIds,
   effectiveGroups,
   isComplete,
   type Group,
@@ -83,7 +82,9 @@ export function learningTarget(
 ) {
   if (user.id === "guest" || settings?.dueDatesEnabled === false)
     return undefined;
-  const saved = user.learningAssignments?.find((a) => a.contentId === c.id && a.version === c.version);
+  const saved = user.learningAssignments?.find(
+    (a) => a.contentId === c.id && a.version === c.version,
+  );
   if (saved) return saved.dueDate;
   const started = assignmentInfo(c, user, groups).assignedAt;
   if (!started) return undefined;
@@ -98,13 +99,9 @@ export function requiredSequence(
 ) {
   const required = assignedCourses(content, user, groups),
     memberships = effectiveGroups(user, groups);
-  const orderedGroups = groups
-    .filter((g) => memberships.has(g.id))
-    .sort(
-      (a, b) =>
-        ancestorIds(a.id, groups).size - ancestorIds(b.id, groups).size ||
-        a.name.localeCompare(b.name),
-    );
+  // Saved group order gives overlapping audiences a deterministic sequence.
+  // The hierarchy upgrade records the former ancestor-first order here.
+  const orderedGroups = groups.filter((g) => memberships.has(g.id));
   const seen = new Set<string>(),
     result: Content[] = [];
   for (const g of orderedGroups) {

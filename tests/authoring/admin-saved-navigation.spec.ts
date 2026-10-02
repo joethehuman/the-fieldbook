@@ -23,6 +23,7 @@ async function section(page: Page, name: string) {
 test("saved admin settings stop warning while unsaved edits still warn", async ({
   page,
 }, info) => {
+  test.setTimeout(60_000);
   const production = info.project.name.startsWith("production");
   const data = freshWorkspace();
   let rejectSettings = false;

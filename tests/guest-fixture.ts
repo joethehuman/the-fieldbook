@@ -27,7 +27,7 @@ export function guestFixture() {
       ...update,
       id: "update",
       title: "Recommended update",
-      groups: ["foundation"],
+      groups: ["foundation", "visitors"],
     },
     { ...update, id: "other", title: "Other update", groups: [] },
   ];
@@ -40,7 +40,6 @@ export function guestFixture() {
     {
       id: "visitors",
       name: "Visitors",
-      parentId: "foundation",
       teamIds: ["sales-team"],
       learningItems: [
         { kind: "curriculum", id: "intro" },

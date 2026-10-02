@@ -1,5 +1,11 @@
 import type { Workspace } from "./store";
-import { ancestorIds, canParent, reportTeamIds, type Team } from "./types";
+import {
+  ancestorIds,
+  canParent,
+  reportTeamIds,
+  groupTeamLinks,
+  type Team,
+} from "./types";
 
 export function teamPath(id: string, teams: Team[]) {
   return [...ancestorIds(id, teams)]
@@ -31,7 +37,7 @@ export function teamMoveImpact(data: Workspace, id: string, parentId: string) {
     (user) => user.teamId && ids.has(user.teamId),
   );
   const managers = data.users
-    .filter((user) => user.active && user.role === "manager")
+    .filter((user) => user.active && ["manager", "contributor"].includes(user.role))
     .map((manager) => {
       const before = reportTeamIds(manager, teams);
       const after = reportTeamIds(manager, next);
@@ -66,6 +72,8 @@ export function teamDeletionBlockers(data: Workspace, id: string) {
     members: data.users.filter((user) => user.teamId === id),
     pending: (data.pendingUsers || []).filter((user) => user.teamId === id),
     children: (data.teams || []).filter((team) => team.parentId === id),
-    groups: data.groups.filter((group) => group.teamIds?.includes(id)),
+    groups: data.groups.filter((group) =>
+      groupTeamLinks(group).some((link) => link.teamId === id),
+    ),
   };
 }

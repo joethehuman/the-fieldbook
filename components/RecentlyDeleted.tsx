@@ -25,9 +25,11 @@ import { Alert } from "./ui/alert";
 export function RecentlyDeleted({
   data,
   onBulk,
+  contentOnly = false,
 }: {
   data: Workspace;
   onBulk: BulkHandler;
+  contentOnly?: boolean;
 }) {
   const [filter, setFilter] = useState("all");
   const [query, setQuery] = useState("");
@@ -36,7 +38,7 @@ export function RecentlyDeleted({
   const clearFilters = () => { setFilter("all"); setQuery(""); setPage(1); };
   const displayData = {
     ...data,
-    deletedItems: data.deletedItems?.map((d) => ({
+    deletedItems: data.deletedItems?.filter((item) => !contentOnly || item.entity === "content").map((d) => ({
       ...d,
       id: `${d.entity}:${d.id}`,
     })),
@@ -67,9 +69,9 @@ export function RecentlyDeleted({
       <p>
         Deleted items can be recovered for 30 days. Permanent deletion also
         erases associated learning history and feedback. Restored content is a
-        draft; restored users need an access review.
+        draft{contentOnly ? "." : "; restored users need an access review."}
       </p>
-      {data.cleanupStatus &&
+      {!contentOnly && data.cleanupStatus &&
         (!data.cleanupStatus.configured ||
           !data.cleanupStatus.lastRun ||
           Date.now() - Date.parse(data.cleanupStatus.lastRun) >
@@ -80,7 +82,7 @@ export function RecentlyDeleted({
             succeeds.
           </Alert>
         )}
-      <FilterOptions
+      {!contentOnly && <FilterOptions
         label="Deleted item type"
         variant="underline"
         value={filter}
@@ -93,7 +95,7 @@ export function RecentlyDeleted({
           { value: "content", label: "Content" },
           { value: "user", label: "Users" },
         ]}
-      />
+      />}
       <CollectionControls search={        <FormField className="min-w-[14rem] flex-1" label="Search recently deleted" visuallyHiddenLabel>
           <Input
             type="search"

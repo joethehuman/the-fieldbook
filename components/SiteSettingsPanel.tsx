@@ -34,6 +34,7 @@ export default function SiteSettingsPanel({
   data,
   onChange,
   production,
+  contributor = false,
   section,
   registerNavigationGuard,
   onReviewDeadlines,
@@ -42,6 +43,7 @@ export default function SiteSettingsPanel({
   data: Workspace;
   onChange: (next: Workspace) => void | Promise<void>;
   production: boolean;
+  contributor?: boolean;
   section: SettingsSection;
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
@@ -539,7 +541,7 @@ export default function SiteSettingsPanel({
           />
         </section>
       )}
-      {section === "mcp" && <McpSettings production={production} />}
+      {section === "mcp" && <McpSettings production={production} contributor={contributor} />}
       {section !== "mcp" && notice && (
         <div className="settings-save-bar">
           <Alert role="status">{notice}</Alert>
@@ -549,12 +551,18 @@ export default function SiteSettingsPanel({
   );
 }
 
-function McpSettings({ production }: { production: boolean }) {
+function McpSettings({ production, contributor }: { production: boolean; contributor: boolean }) {
   const [copied, setCopied] = useState("");
   const [address, setAddress] = useState("");
   useEffect(() => {
     setAddress(`${window.location.origin}/api/mcp`);
   }, []);
+  if (contributor && production) return (
+    <SettingsGroup id="mcp-contributor" title={<h3>Connect an AI tool</h3>}
+      guidance="MCP connections currently require an administrator account.">
+      <p>Use the publishing panel to manage content and feedback. Contributor MCP connections are not enabled in this version.</p>
+    </SettingsGroup>
+  );
   if (!production)
     return (
       <SettingsGroup
@@ -563,7 +571,7 @@ function McpSettings({ production }: { production: boolean }) {
         guidance="Connections are available in an installed organization; this demo does not provide an MCP server."
       >
         <p>
-          MCP lets administrators connect tools such as ChatGPT and Claude to
+          MCP lets authorized accounts connect tools such as ChatGPT and Claude to
           their Fieldbook installation.
         </p>
       </SettingsGroup>

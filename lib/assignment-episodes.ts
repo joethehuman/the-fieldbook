@@ -213,6 +213,7 @@ export function assignmentImpact(
 ): AssignmentImpact[] {
   const courses = after.publishedContent || after.content;
   return after.users
+    .filter((person) => person.active)
     .map((person) => {
       const old = before.users.find((p) => p.id === person.id);
       const assigned = (p: User, data: Workspace) => {
@@ -255,7 +256,7 @@ export function reportingImpact(before: Workspace, after: Workspace) {
   const managers = [
     ...new Map(
       [...before.users, ...after.users]
-        .filter((p) => p.role === "manager")
+        .filter((p) => p.role === "manager" || p.role === "contributor")
         .map((p) => [p.id, p]),
     ).values(),
   ];

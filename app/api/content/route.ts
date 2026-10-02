@@ -3,7 +3,7 @@ import {
   sameOrigin,
   errorResponse,
   HttpError,
-  requireAdmin,
+  requirePublisher,
 } from "@server/auth";
 import { saveContent, getContent } from "@server/content";
 import { invalidatePublishedReader } from "@server/reader-cache";
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   try {
     sameOrigin(req);
     const user = await actor();
-    requireAdmin(user);
+    requirePublisher(user);
     if (Number(req.headers.get("content-length")) > 2000000)
       throw new HttpError(413, "Content is too large.");
     const a = await req.json();

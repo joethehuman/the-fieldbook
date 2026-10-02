@@ -148,6 +148,7 @@ export function PendingPeople({
               >
                 <option value="learner">Learner</option>
                 <option value="manager">Manager</option>
+                  <option value="contributor">Contributor</option>
                 <option value="admin">Administrator</option>
               </SelectField>
             </FormField>

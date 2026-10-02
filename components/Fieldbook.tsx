@@ -20,6 +20,7 @@ import { useDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { brandingFromSettings } from "@/lib/branding";
 import { CurriculumPage } from "./CurriculumPage";
 import { Badge } from "@/components/ui/badge";
+import { canPublish } from "@/lib/permissions";
 import { AccountMenu } from "./patterns/account-menu";
 import { SearchField } from "./patterns/search-field";
 import { NavigationButton } from "./patterns/navigation-button";
@@ -350,7 +351,7 @@ export default function Fieldbook() {
                   <small>
                     {u.role === "admin"
                       ? "Admin · Org Admin"
-                      : u.role === "manager"
+                      : u.role === "contributor" ? "Contributor" : u.role === "manager"
                         ? "Manager · Sales Director"
                         : "User · Account Executive"}
                   </small>
@@ -402,14 +403,14 @@ export default function Fieldbook() {
           ? "Updates"
           : view === "team"
             ? "Team progress"
-            : "Administration";
+            : user.role === "contributor" ? "Publishing" : "Administration";
   return (
     <WorkspaceFrame
       accent={branding.accent}
       collapsed={collapsed}
       menu={menu}
       pending={false}
-      admin={view === "admin" && user.role === "admin"}
+      admin={view === "admin" && canPublish(user)}
       onDismiss={() => setMenu(false)}
       sidebar={
         <>
@@ -469,13 +470,14 @@ export default function Fieldbook() {
               description={
                 user.role === "admin"
                   ? "Administrator"
-                  : user.role === "manager"
+                  : user.role === "contributor" ? "Contributor" : user.role === "manager"
                     ? "Sales Director"
                     : "Account Executive"
               }
               onManageOrganization={
                 user.role === "admin" ? () => navigate("admin") : undefined
               }
+              onManageContent={user.role === "contributor" ? () => navigate("admin") : undefined}
               onTeamProgress={
                 user.role === "manager" ||
                 (data.teams || []).some((t) => t.managerId === user.id)
@@ -713,7 +715,7 @@ export default function Fieldbook() {
         </>
       }
     >
-      {view === "admin" && user.role === "admin" ? (
+      {view === "admin" && canPublish(user) ? (
         <ReportAvailability.Provider value={reportIssue}>
           <Admin
             data={data}

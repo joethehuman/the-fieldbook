@@ -1,4 +1,5 @@
 import { reconcileAssignments } from "./assignment-episodes";
+import { flattenLearningGroups } from "./group-conversion";
 import { expireDemoDeleted } from "./bulk-actions";
 import { withPublishedSnapshots } from "./demo-publication";
 import { defaultSettings } from "./settings";
@@ -33,7 +34,12 @@ export type Workspace = {
 };
 const KEY = "fieldbook.workspace.v1";
 export const SESSION = "fieldbook.profile.v1";
-export const DEMO_PROFILE_IDS = ["demo-learner", "demo-manager", "demo-admin"];
+export const DEMO_PROFILE_IDS = [
+  "demo-learner",
+  "demo-manager",
+  "demo-contributor",
+  "demo-admin",
+];
 const completedCourse = (id: string): Progress => ({
   content_id: id,
   version: 1,
@@ -129,6 +135,14 @@ export function freshWorkspace(): Workspace {
         email: "jordan@example.com",
         role: "manager",
         groups: ["sales"],
+        active: true,
+      },
+      {
+        id: "demo-contributor",
+        name: "Jordan Patel",
+        email: "contributor@example.com",
+        role: "contributor",
+        groups: [],
         active: true,
       },
     ],
@@ -256,7 +270,12 @@ export function loadWorkspace(): Workspace {
   const raw = localStorage.getItem(KEY);
   if (!raw) {
     const fresh = withPublishedSnapshots(freshWorkspace());
-    fresh.users = reconcileAssignments(fresh, fresh, new Date().toISOString(), true);
+    fresh.users = reconcileAssignments(
+      fresh,
+      fresh,
+      new Date().toISOString(),
+      true,
+    );
     saveWorkspace(fresh);
     return fresh;
   }
@@ -270,6 +289,10 @@ export function loadWorkspace(): Workspace {
   )
     throw new Error(
       "Saved demo data could not be opened. Export or reset this browser’s demo.",
+    );
+  if (!data.users.some((user: User) => user.id === "demo-contributor"))
+    data.users.push(
+      freshWorkspace().users.find((user) => user.id === "demo-contributor")!,
     );
   // Refresh saved default personas without replacing visitors' custom names.
   const renamedProfiles: Record<string, { previous: string[]; name: string }> =
@@ -291,10 +314,26 @@ export function loadWorkspace(): Workspace {
     if (renamed?.previous.includes(user.name)) user.name = renamed.name;
   }
   const upgraded = withPublishedSnapshots(data);
-  const current = expireDemoDeleted(repairHooliSecurityAssignment(upgraded));
+  const repaired = expireDemoDeleted(repairHooliSecurityAssignment(upgraded));
+  const legacy = repaired.users.some((p) => !p.learningAssignments)
+    ? {
+        ...repaired,
+        groups: repaired.groups.map((g) => ({
+          ...g,
+          teamLinkScope:
+            g.teamLinkScope ||
+            (g.teamIds?.length ? ("direct" as const) : ("subtree" as const)),
+        })),
+      }
+    : repaired;
+  const current = flattenLearningGroups(legacy);
   if (current.users.some((p) => !p.learningAssignments)) {
-    current.groups = current.groups.map((g) => ({ ...g, teamLinkScope: g.teamLinkScope || (g.teamIds?.length ? "direct" : "subtree") }));
-    current.users = reconcileAssignments(current, current, new Date().toISOString(), true);
+    current.users = reconcileAssignments(
+      current,
+      current,
+      new Date().toISOString(),
+      true,
+    );
     saveWorkspace(current);
   }
   if (current !== upgraded) saveWorkspace(current);

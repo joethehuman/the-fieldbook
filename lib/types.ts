@@ -58,7 +58,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "learner" | "manager";
+  role: "admin" | "learner" | "manager" | "contributor";
   groups: string[];
   active: boolean;
   /** False until the preregistered person activates a verified login. */
@@ -101,13 +101,39 @@ export type Curriculum = {
 export type Group = {
   id: string;
   name: string;
+  /** Read only for converting saved hierarchical data. New groups are flat. */
   parentId?: string;
   requiredCourseIds?: string[];
   learningItems?: LearningItem[];
   teamIds?: string[];
+  /** Preserved pre-upgrade sources; new links always include subteams. */
+  legacyDirectTeamIds?: string[];
   /** Legacy direct links stay limited until an administrator reviews expansion. */
   teamLinkScope?: "direct" | "subtree";
 };
+/** One source per team; a subtree link supersedes a legacy direct link. */
+export function groupTeamLinks(
+  group: Group,
+): { teamId: string; scope: "direct" | "subtree" }[] {
+  const links = new Map<string, "direct" | "subtree">();
+  for (const id of group.legacyDirectTeamIds || []) links.set(id, "direct");
+  for (const id of group.teamIds || [])
+    links.set(id, group.teamLinkScope === "direct" ? "direct" : "subtree");
+  return [...links].map(([teamId, scope]) => ({ teamId, scope }));
+}
+export function groupIncludesTeam(
+  group: Group,
+  teamId?: string,
+  teams: Team[] = [],
+) {
+  if (!teamId) return false;
+  const ancestors = ancestorIds(teamId, teams);
+  return groupTeamLinks(group).some(
+    (link) =>
+      link.teamId === teamId ||
+      (link.scope === "subtree" && ancestors.has(link.teamId)),
+  );
+}
 export type Team = {
   id: string;
   name: string;
@@ -156,15 +182,22 @@ export function effectiveGroups(user: User, groups: Group[], teams?: Team[]) {
   const direct = [
     ...user.groups,
     ...groups
-      .filter((g) => user.teamId && g.teamIds?.some((id) =>
-        id === user.teamId || (g.teamLinkScope !== "direct" && teams && ancestorIds(user.teamId!, teams).has(id)),
-      ))
+      .filter((g) => groupIncludesTeam(g, user.teamId, teams))
       .map((g) => g.id),
   ];
   // Scoped server reads carry the database-reconciled memberships, including
   // links rooted above the reporting branches a manager is allowed to see.
-  if (!teams) direct.push(...(user.effectiveGroupIds || []).filter((id) => groups.some((g) => g.id === id)));
-  return new Set(direct.flatMap((id) => [...ancestorIds(id, groups)]));
+  if (!teams)
+    direct.push(
+      ...(user.effectiveGroupIds || []).filter((id) =>
+        groups.some((g) => g.id === id),
+      ),
+    );
+  return new Set(
+    direct.filter(
+      (id) => !groups.length || groups.some((group) => group.id === id),
+    ),
+  );
 }
 export function assignmentInfo(c: Content, user: User, groups: Group[]) {
   const memberships = effectiveGroups(user, groups);
@@ -181,7 +214,7 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       const joined =
         (r.groupId ? user.effectiveGroupJoinedAt?.[r.groupId] : r.assignedAt) ||
         user.groups
-          .filter((id) => ancestorIds(id, groups).has(r.groupId || ""))
+          .filter((id) => id === r.groupId)
           .map((id) => user.groupJoinedAt?.[id] || r.assignedAt)
           .sort()[0] ||
         r.assignedAt;
@@ -196,13 +229,17 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       return { assignedAt, dueDate };
     });
   return {
-    assignedAt: user.learningAssignments?.find((a) => a.contentId === c.id && a.version === c.version)?.assignedAt || matches.map((m) => m.assignedAt).sort()[0],
+    assignedAt:
+      user.learningAssignments?.find(
+        (a) => a.contentId === c.id && a.version === c.version,
+      )?.assignedAt || matches.map((m) => m.assignedAt).sort()[0],
     dueDate: matches.flatMap((m) => (m.dueDate ? [m.dueDate] : [])).sort()[0],
   };
 }
 export function reportTeamIds(user: User, teams: Team[]) {
+  if (!user.active || user.registered === false) return new Set<string>();
   if (user.role === "admin") return new Set(teams.map((t) => t.id));
-  if (!user.active || user.role !== "manager") return new Set<string>();
+  if (!["manager", "contributor"].includes(user.role)) return new Set<string>();
   const roots = teams.filter((t) => t.managerId === user.id).map((t) => t.id);
   return new Set(
     teams

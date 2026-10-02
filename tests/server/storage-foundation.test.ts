@@ -78,7 +78,9 @@ test("upload authorization and format/size checks run before provider access", a
   );
 });
 
-test("upload reservation returns a direct PUT instruction without provider credentials", async () => {
+for (const role of ["admin", "contributor"] as const)
+  test(`upload reservation returns a direct PUT instruction without provider credentials (${role})`, async () => {
+  const publisher = { ...admin, role };
   let registered = false;
   await fixture(
     (url, method, body) => {
@@ -107,7 +109,7 @@ test("upload reservation returns a direct PUT instruction without provider crede
       throw new Error(`Unexpected request ${url.pathname}`);
     },
     async () => {
-      const signed = await uploadMedia(admin, {
+      const signed = await uploadMedia(publisher, {
         name: "image.png",
         type: "image/png",
         size: 16,
@@ -140,7 +142,9 @@ test("upload rate rejection does not reserve or sign a file", async () => {
   );
 });
 
-test("completion verifies ownership, exact object, size and MIME before marking ready", async () => {
+for (const role of ["admin", "contributor"] as const)
+  test(`completion verifies ownership, exact object, size and MIME before marking ready (${role})`, async () => {
+  const publisher = { ...admin, role };
   let storedSize = 16,
     storedMime = "image/png",
     storedName = `${id}.png`,
@@ -181,19 +185,19 @@ test("completion verifies ownership, exact object, size and MIME before marking 
     async () => {
       const complete = { complete: id };
       reservedPath = `another-owner/${id}.png`;
-      await assert.rejects(uploadMedia(admin, complete), /verification failed/);
+      await assert.rejects(uploadMedia(publisher, complete), /verification failed/);
       reservedPath = path;
       storedSize = 17;
-      await assert.rejects(uploadMedia(admin, complete), /verification failed/);
+      await assert.rejects(uploadMedia(publisher, complete), /verification failed/);
       storedSize = 16;
       storedMime = "video/mp4";
-      await assert.rejects(uploadMedia(admin, complete), /verification failed/);
+      await assert.rejects(uploadMedia(publisher, complete), /verification failed/);
       storedMime = "image/png";
       storedName = `extra-${id}.png`;
-      await assert.rejects(uploadMedia(admin, complete), /verification failed/);
+      await assert.rejects(uploadMedia(publisher, complete), /verification failed/);
       assert.equal(updates, 0);
       storedName = `${id}.png`;
-      assert.deepEqual(await uploadMedia(admin, complete), {
+      assert.deepEqual(await uploadMedia(publisher, complete), {
         url: `/api/media/${id}.png`,
       });
       assert.equal(updates, 1);

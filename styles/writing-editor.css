@@ -111,7 +111,7 @@
   padding: var(--space-2) var(--space-3);
   color: var(--muted-foreground);
   font-size: 0.75rem;
-  font-weight: 500;
+  font-weight: var(--weight-label);
 }
 .writing-slash-menu [role="menuitem"] {
   width: 100%;
@@ -327,6 +327,10 @@
   > tr
   > :is(td, th):not([data-tool-cell="true"]):not(:first-child) {
   min-width: 11rem;
+  border-color: var(--authored-table-border);
+}
+.writing-editor .writing-content table tbody > tr > th:not([data-tool-cell="true"]):not(:first-child) {
+  font-weight: var(--weight-heading);
 }
 .writing-editor
   .writing-content

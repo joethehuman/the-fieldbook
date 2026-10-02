@@ -84,39 +84,66 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   await page
     .getByRole("button", { name: "Manage Sales team", exact: true })
     .click();
-  await page.getByRole("tab", { name: "Subteams", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Create subteam", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Move existing team here", exact: true })
-    .click();
+    page.getByRole("tab", { name: "Subteams", exact: true }),
+  ).toHaveCount(0);
+  await action(page, "Move existing team here");
   await page
     .getByRole("radio", {
       name: "Customer success Customer success",
       exact: true,
     })
     .check();
-  await page.getByRole("button", { name: "Review move", exact: true }).click();
-  const review = page.locator("#team-move");
-  await expect(review).toContainText("Sales team / Customer success");
-  await expect(review).toContainText("2 teams and 1 member");
-  await expect(review).toContainText("Gains 2 teams / 1 active person.");
+  const movePicker = page.getByRole("dialog", {
+    name: "Move a team into Sales team",
+    exact: true,
+  });
+  await expect(movePicker).toContainText("Sales team / Customer success");
+  await movePicker
+    .getByRole("button", { name: "Review move", exact: true })
+    .click();
+  const effects = page.getByRole("dialog", {
+    name: "Review team move",
+    exact: true,
+  });
+  await expect(effects).toContainText("Sales team / Customer success");
+  await info.attach("review-dialog-dom", {
+    body: JSON.stringify(
+      await page.locator('[role="dialog"]').evaluateAll((nodes) =>
+        nodes.map((node) => ({
+          title: document.getElementById(
+            node.getAttribute("aria-labelledby") || "",
+          )?.textContent,
+          ariaHidden: node.getAttribute("aria-hidden"),
+          parentAriaHidden: node.parentElement?.getAttribute("aria-hidden"),
+          dataSlot: node.getAttribute("data-slot"),
+        })),
+      ),
+      null,
+      2,
+    ),
+    contentType: "application/json",
+  });
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await effects.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(effects).toHaveCount(0);
+  await expect(movePicker).toBeVisible();
+  await expect(
+    movePicker.getByRole("button", { name: "Review move", exact: true }),
+  ).toBeFocused();
+  expect(
+    (await saved(page)).teams!.find((team) => team.id === "other")!.parentId,
+  ).toBeUndefined();
+  await movePicker
+    .getByRole("button", { name: "Review move", exact: true })
+    .click();
   await page.screenshot({
     path: info.outputPath("branch-move-review.png"),
     fullPage: true,
   });
-  await review.getByRole("button", { name: "Move team", exact: true }).click();
-  const effects = page.getByRole("dialog", {
-    name: "Review organization changes",
-    exact: true,
-  });
-  await expect(effects).toContainText("Alex Edwards");
-  await expect(effects).toContainText("Reporting access added");
-  await effects
-    .getByRole("button", { name: "Apply changes", exact: true })
-    .click();
-  await expect(review).toHaveCount(0);
+  await expect(effects).toBeVisible();
+  await effects.getByRole("button", { name: "Move team", exact: true }).click();
+  await expect(movePicker).toHaveCount(0);
   let after = await saved(page);
   expect(after.teams!.find((team) => team.id === "other")!.parentId).toBe(
     "sales-team",
@@ -128,9 +155,10 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   expect(after.progress).toEqual(baseline.progress);
   expect(after.groups).toEqual(baseline.groups);
   await page
+    .getByRole("table", { name: "Subteams", exact: true })
     .getByRole("button", { name: "Manage Customer success", exact: true })
     .click();
-  await page.getByRole("button", { name: "Move team", exact: true }).click();
+  await action(page, "Move team");
   await expect(
     page.getByRole("radio", { name: /Regional customer success/ }),
   ).toHaveCount(0);
@@ -139,13 +167,11 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   ).toHaveCount(0);
   await page.getByRole("radio", { name: /^Top-level team/ }).check();
   await page.getByRole("button", { name: "Review move", exact: true }).click();
-  await expect(review).toContainText("Loses 2 teams / 1 active person.");
-  await review.getByRole("button", { name: "Move team", exact: true }).click();
-  await expect(effects).toContainText("Reporting access removed");
-  await effects
-    .getByRole("button", { name: "Apply changes", exact: true })
-    .click();
-  await expect(review).toHaveCount(0);
+  await expect(effects).toContainText("Customer success");
+  await effects.getByRole("button", { name: "Move team", exact: true }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Move Customer success", exact: true }),
+  ).toHaveCount(0);
   after = await saved(page);
   expect(
     after.teams!.find((team) => team.id === "other")!.parentId,
@@ -168,9 +194,13 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   await dialog.getByRole("button", { name: "Save team", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   await action(page, "Delete empty team");
-  await page
-    .getByRole("alertdialog")
-    .getByRole("button", { name: "Confirm", exact: true })
+  const deletion = page.getByRole("dialog", {
+    name: "Delete Empty team?",
+    exact: true,
+  });
+  await expect(deletion).toContainText("permanently removes the empty team");
+  await deletion
+    .getByRole("button", { name: "Delete team", exact: true })
     .click();
   await expect(
     page.getByRole("searchbox", { name: "Find teams", exact: true }),
