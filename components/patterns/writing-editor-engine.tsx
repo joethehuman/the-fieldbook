@@ -9,6 +9,8 @@ import { WritingLinkDialog } from "./writing-link-dialog";
 import { WritingInteractionContext } from "./writing-interaction";
 import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import type { UploadProgress } from "@/lib/upload-media";
+import { MediaUploadStatus } from "./media-upload-status";
 import {
   MDXEditor,
   type MDXEditorMethods,
@@ -241,6 +243,7 @@ export default function WritingEditorEngine({
   const [media, setMedia] = useState<"image" | "video">("image");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [slashOpen, setSlashOpen] = useState(false);
   const slashFade = useScrollFade<HTMLDivElement>(slashOpen);
   const [slashFromToolbar, setSlashFromToolbar] = useState(false);
@@ -326,12 +329,13 @@ export default function WritingEditorEngine({
     setBusy(true);
     setError("");
     try {
-      return await onUpload(file);
+      return await onUpload(file, setUploadProgress);
     } catch (error) {
       setError((error as Error).message);
       throw error;
     } finally {
       setBusy(false);
+      setUploadProgress(null);
     }
   }
   function clearPendingList() {
@@ -807,6 +811,7 @@ export default function WritingEditorEngine({
           }
         }}
       />
+      {uploadProgress && <div className="px-3 py-2"><MediaUploadStatus progress={uploadProgress} /></div>}
       <MDXEditor
         ref={editor}
         markdown={initial.current}

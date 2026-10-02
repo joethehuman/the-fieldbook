@@ -1626,11 +1626,11 @@ export function Editor({
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy, saving, needsRecovery]);
   const upload: UploadMedia | undefined = onUpload
-    ? async (file) => {
+    ? async (file, onProgress) => {
         pendingUploads.current++;
         setUploadCount(pendingUploads.current);
         try {
-          return await onUpload(file);
+          return await onUpload(file, onProgress);
         } finally {
           pendingUploads.current--;
           setUploadCount(pendingUploads.current);

@@ -69,11 +69,15 @@ test("upload authorization and format/size checks run before provider access", a
       for (const invalid of [
         { ...file, type: "image/svg+xml" },
         { ...file, size: 0 },
-        { ...file, size: 52428801 },
+        { ...file, size: Number.MAX_SAFE_INTEGER + 1 },
       ])
-        await assert.rejects(uploadMedia(admin, invalid), /at most 50 MB/);
+        await assert.rejects(uploadMedia(admin, invalid), /non-empty.*valid size/);
       process.env.FIELDBOOK_UPLOAD_MAX_BYTES = "10";
-      await assert.rejects(uploadMedia(admin, file), /at most 50 MB/);
+      await assert.rejects(uploadMedia(admin, file), /configured upload limit/);
+      for (const invalid of ["0", "-1", "invalid", "1.5", "Infinity"] ) {
+        process.env.FIELDBOOK_UPLOAD_MAX_BYTES = invalid;
+        await assert.rejects(uploadMedia(admin, file), /upload limit is invalid/);
+      }
     },
   );
 });
@@ -115,6 +119,7 @@ for (const role of ["admin", "contributor"] as const)
         size: 16,
       });
       assert(signed.upload);
+      assert(!("protocol" in signed.upload));
       assert.equal(signed.upload.method, "PUT");
       assert.equal(signed.upload.headers["Content-Type"], "image/png");
       assert.equal(signed.upload.headers["x-upsert"], "false");
@@ -125,6 +130,58 @@ for (const role of ["admin", "contributor"] as const)
       assert(!JSON.stringify(signed).includes("publishable-test-key"));
     },
   );
+});
+
+for (const role of ["admin", "contributor"] as const)
+  test(`files above 50 MB receive path-scoped resumable instructions unless the operator limits them (${role})`, async () => {
+  const publisher = { ...admin, role };
+  await fixture(
+    (url, method, body) => {
+      if (url.pathname.endsWith("fb_allow_request")) return true;
+      if (url.pathname.endsWith("fb_media")) {
+        assert.equal(body.bytes, 80 * 1024 * 1024);
+        assert.equal(body.owner, admin.id);
+        return null;
+      }
+      if (url.pathname.includes("/object/upload/sign/")) return {
+        url: `/object/upload/sign/fieldbook-media/${path}?token=synthetic`,
+      };
+      throw new Error(`Unexpected ${method} ${url.pathname}`);
+    },
+    async () => {
+      const file = { name: "large.mp4", type: "video/mp4", size: 80 * 1024 * 1024 };
+      delete process.env.FIELDBOOK_UPLOAD_MAX_BYTES;
+      for (const configured of [undefined, String(100 * 1024 * 1024)]) {
+        if (configured) process.env.FIELDBOOK_UPLOAD_MAX_BYTES = configured;
+        const signed = await uploadMedia(publisher, file);
+        assert(signed.upload);
+        assert("protocol" in signed.upload);
+        assert.equal(signed.upload.protocol, "tus");
+        assert.equal(signed.upload.url, "https://test.storage.supabase.co/storage/v1/upload/resumable/sign");
+        assert.equal(signed.upload.headers["x-signature"], "synthetic");
+        assert.equal(signed.upload.headers.apikey, "publishable-test-key");
+        assert.equal(signed.upload.headers["x-upsert"], "false");
+        assert.equal(signed.upload.metadata.bucketName, "fieldbook-media");
+        assert(signed.upload.metadata.objectName.startsWith(`${admin.id}/`));
+        assert.equal(signed.upload.metadata.contentType, "video/mp4");
+        assert.equal(signed.upload.chunkSize, 6 * 1024 * 1024);
+        assert(!JSON.stringify(signed).includes("server-secret-test-key"));
+      }
+      process.env.FIELDBOOK_UPLOAD_MAX_BYTES = String(60 * 1024 * 1024);
+      await assert.rejects(uploadMedia(publisher, file), /configured upload limit/);
+    },
+  );
+});
+
+test("signing rejection gives a storage-specific message without exposing provider details", async () => {
+  await fixture((url) => {
+    if (url.pathname.endsWith("fb_allow_request")) return true;
+    if (url.pathname.endsWith("fb_media")) return null;
+    if (url.pathname.includes("/object/upload/sign/")) return { error: "synthetic private provider detail" };
+    throw new Error(`Unexpected ${url.pathname}`);
+  }, async () => {
+    await assert.rejects(uploadMedia(admin, { name: "a.png", type: "image/png", size: 16 }), /Storage could not authorize/);
+  });
 });
 
 test("upload rate rejection does not reserve or sign a file", async () => {
