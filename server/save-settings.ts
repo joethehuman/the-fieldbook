@@ -3,6 +3,8 @@ import type { User, Content } from "@/lib/types";
 import { requireAdmin, HttpError } from "./auth";
 import { data as dataStore } from "./data";
 import { settingsSchema } from "./schemas";
+import { ai } from "./ai";
+import { defaultAskAiSettings } from "@/lib/ai";
 import {
   availableDocSections,
   legacySectionConflict,
@@ -24,6 +26,20 @@ export async function saveSettings(
     throw new HttpError(400, "A settings revision is required.");
   const config = await dataStore().readSettingsContext();
   if (!config) throw new HttpError(503, "Settings are unavailable. Try again.");
+  const previousAi = config.settings.askAi ?? defaultAskAiSettings;
+  const nextAi = parsed.data.askAi;
+  // Disabling and unrelated saves must work even when Gateway is unavailable.
+  if (
+    nextAi?.enabled &&
+    (!previousAi.enabled || nextAi.model !== previousAi.model)
+  ) {
+    const signal = AbortSignal.timeout(10_000);
+    await ai().validateModel(nextAi.model, signal);
+    await Promise.all([
+      dataStore().searchAiPassages([], nextAi.sources, signal),
+      dataStore().areAiSourcesCurrent([], signal),
+    ]);
+  }
   const selected = parsed.data.guestGroupId;
   if (selected && selected !== config.settings.guestGroupId) {
     if (!config.groups.some((g: { id: string }) => g.id === selected))

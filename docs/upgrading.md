@@ -66,6 +66,12 @@ Your content and settings remain in your own Supabase project. An upgrade must p
 
 Keep the previous deployment available. Reverting to old code is safe only when it is compatible with the current database. If it is not, stop writes and follow a tested database/media restore or forward-fix plan. Restoring an older backup can lose changes made since that backup. Do not assume Vercel rollback reverses a migration.
 
+## Provider-limited uploads
+
+This upload update needs no database migration and does not automatically raise storage limits. The historical initial migration and existing installations may still have an explicit 50 MB `fieldbook-media` bucket limit. Follow [Configure upload limits](installation.md#configure-upload-limits) to deliberately set Supabase's global and private-bucket limits and review any `FIELDBOOK_UPLOAD_MAX_BYTES` override. Keep current MIME restrictions, privacy and ownership checks. An account upgrade alone does not change these settings.
+
+Rehearse a representative larger upload, interruption/retry, provider rejection and draft preservation with an isolated backend before production rollout. Large files use signed chunked TUS transfers; file bytes bypass the application host. Install the locked dependencies before building. Code rollback does not lower operator storage settings or delete uploaded media; older code again rejects files above its old application ceiling.
+
 ## Stable roster and hire-date upgrade
 
 `20261001222227_roster_people.sql` requires all earlier migrations, including `admin_people_reads`. It evolves `fb_profiles` into a roster with an optional unique `auth_user_id`, preserving existing person IDs and attaching their current Auth IDs. Progress, feedback and MCP grants reference the person. Legacy preregistrations become roster people with new stable IDs; the redundant `fb_pending_profiles` table is removed. Team/group relationships, documents and existing learning history are preserved. Recorded legacy onboarding starts retain the current onboarding window as their applied baseline; hire dates are left unknown. Review conflicting normalized emails and orphan person references before applying: the transaction rejects conflicts rather than merging accounts.

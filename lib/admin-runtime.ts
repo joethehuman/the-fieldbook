@@ -9,6 +9,7 @@ import type { Content, User } from "./types";
 import type { SaveIntent } from "./draft-save-queue";
 import { mergeSavedContent } from "./content-save";
 import { SaveRecoveryError } from "./save-recovery";
+import { uploadMediaFile } from "./upload-media";
 export type AdminRuntime = {
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
   saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
@@ -25,25 +26,6 @@ export type AdminRuntime = {
     unpublish: (id: string) => Promise<Workspace>;
   };
 };
-async function upload(file: File) {
-  const sign = await request("/api/upload", {
-    name: file.name,
-    size: file.size,
-    type: file.type,
-  });
-  try {
-    const response = await fetch(sign.upload.url, {
-      method: sign.upload.method,
-      headers: sign.upload.headers,
-      body: file,
-      credentials: "omit",
-    });
-    if (!response.ok) throw new Error("Upload rejected");
-  } catch {
-    throw new Error("Upload failed. Check the file size and your connection.");
-  }
-  return (await request("/api/upload", { complete: sign.id })).url;
-}
 export function createAdminRuntime(initial: {
   data: Workspace;
   user: User;
@@ -125,7 +107,7 @@ export function createAdminRuntime(initial: {
   }
   const saver = createWorkspaceSaver(request, fresh);
   return {
-    upload,
+    upload: uploadMediaFile,
     saveContent: (content, intent) =>
       mutate(async () => {
         if (contentSaveInFlight)

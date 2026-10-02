@@ -210,6 +210,12 @@ const adminSections = [
         icon: FileText,
       },
       {
+        id: "settings-ai",
+        name: "Ask AI",
+        description: "Choose the model, published sources and answer guidance.",
+        icon: Settings,
+      },
+      {
         id: "settings-mcp",
         name: "MCP",
         description: "Connect your AI tools to Fieldbook.",
@@ -1626,11 +1632,11 @@ export function Editor({
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy, saving, needsRecovery]);
   const upload: UploadMedia | undefined = onUpload
-    ? async (file) => {
+    ? async (file, onProgress) => {
         pendingUploads.current++;
         setUploadCount(pendingUploads.current);
         try {
-          return await onUpload(file);
+          return await onUpload(file, onProgress);
         } finally {
           pendingUploads.current--;
           setUploadCount(pendingUploads.current);

@@ -7,6 +7,28 @@ export type AskAiSettings = {
   sources: SearchKind[];
   guidance: string;
 };
+/** Public provider metadata, never credentials or SDK objects. Prices are USD. */
+export type AiModel = {
+  id: string;
+  name: string;
+  inputPerMillion: number | null;
+  outputPerMillion: number | null;
+  zeroRetention: "all" | "some" | "none" | "unknown";
+  noTraining: "all" | "some" | "none" | "unknown";
+  expiresOn: string | null;
+};
+export type AiConnection = {
+  configured: boolean;
+  message: string;
+};
+export type AiSetup = {
+  provider: string;
+  checkedAt: string;
+  models: AiModel[];
+  catalog: { ready: boolean; message: string };
+  connection: AiConnection;
+  retrieval: { ready: boolean; message: string };
+};
 export const defaultAskAiSettings: AskAiSettings = {
   enabled: false,
   // This promotional ID stops serving instead of beginning to bill.

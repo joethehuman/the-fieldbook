@@ -33,6 +33,7 @@ export default defineConfig({
         NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "synthetic-test-key",
         SUPABASE_SECRET_KEY: "synthetic-secret",
+        AI_GATEWAY_API_KEY: "synthetic-gateway-key",
         FIELDBOOK_URL: "http://localhost:3131",
         FIELDBOOK_OWNER_EMAIL: "admin@example.test",
         VERCEL_ENV: "",

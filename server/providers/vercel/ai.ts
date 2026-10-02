@@ -1,7 +1,7 @@
 import "server-only";
 import { gateway, generateText, streamText, tool } from "ai";
 import { z } from "zod";
-import { aiBounds } from "@/lib/ai";
+import { aiBounds, type AiModel } from "@/lib/ai";
 import type { AiProvider } from "../../ports/ai";
 import { aiSearchPlanSchema } from "../../ai-schema";
 import { HttpError } from "../../errors";
@@ -16,9 +16,16 @@ const unavailable = () =>
   );
 const modelSchema = z.object({
   id: z.string(),
+  name: z.string().optional(),
   type: z.string(),
   tags: z.array(z.string()).default([]),
   supported_parameters: z.array(z.string()).default([]),
+  // Embedding/video entries in this mixed catalog have different price fields.
+  pricing: z
+    .object({ input: z.string().optional(), output: z.string().optional() })
+    .optional(),
+  zdr: z.string().optional(),
+  no_training: z.string().optional(),
 });
 let catalog:
   { until: number; models: z.infer<typeof modelSchema>[] } | undefined;
@@ -37,22 +44,54 @@ async function availableModels(signal: AbortSignal) {
   catalog = { until: Date.now() + 300_000, models: parsed.data };
   return parsed.data;
 }
+function connection() {
+  if (process.env.AI_GATEWAY_API_KEY)
+    return {
+      configured: true,
+      message: "Server API key configured. Test answer verifies access.",
+    };
+  if (process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL)
+    return {
+      configured: true,
+      message:
+        "Vercel project authentication expected. Test answer verifies access.",
+    };
+  return {
+    configured: false,
+    message:
+      "Connect this Vercel project to AI Gateway, or set a server-only AI_GATEWAY_API_KEY and redeploy.",
+  };
+}
 function credentialCheck() {
-  if (
-    !process.env.AI_GATEWAY_API_KEY &&
-    !process.env.VERCEL_OIDC_TOKEN &&
-    !process.env.VERCEL
-  )
-    throw new HttpError(
-      503,
-      "Ask AI needs Vercel project authentication or a server-only AI_GATEWAY_API_KEY.",
-    );
+  const status = connection();
+  if (!status.configured) throw new HttpError(503, status.message);
+}
+function compatible(entry: z.infer<typeof modelSchema>) {
+  return (
+    entry.type === "language" &&
+    entry.tags.includes("tool-use") &&
+    // The -free endpoint stops serving, rather than silently becoming paid.
+    !(
+      entry.id === "inclusionai/ling-3.1-flash-free" &&
+      Date.now() >= Date.parse("2026-10-14T00:00:00Z")
+    )
+  );
+}
+function price(value: string | undefined) {
+  if (value === undefined || !value.trim()) return null;
+  const amount = Number(value) * 1_000_000;
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+function assurance(value: string | undefined): AiModel["zeroRetention"] {
+  return value === "all" || value === "some" || value === "none"
+    ? value
+    : "unknown";
 }
 async function modelOptions(model: string, signal: AbortSignal) {
   const entry = (await availableModels(signal)).find(
     (entry) => entry.id === model,
   );
-  if (!entry || entry.type !== "language" || !entry.tags.includes("tool-use"))
+  if (!entry || !compatible(entry))
     throw new HttpError(
       503,
       "Choose an available Gateway text model that supports tool use.",
@@ -63,6 +102,29 @@ async function modelOptions(model: string, signal: AbortSignal) {
 }
 
 export const vercelAi: AiProvider = {
+  name: "Vercel AI Gateway",
+  connection,
+  async models(signal) {
+    try {
+      return (await availableModels(signal))
+        .filter(compatible)
+        .map((entry) => ({
+          id: entry.id,
+          name: entry.name || entry.id,
+          inputPerMillion: price(entry.pricing?.input),
+          outputPerMillion: price(entry.pricing?.output),
+          zeroRetention: assurance(entry.zdr),
+          noTraining: assurance(entry.no_training),
+          expiresOn:
+            entry.id === "inclusionai/ling-3.1-flash-free"
+              ? "2026-10-13"
+              : null,
+        }));
+    } catch (error) {
+      if (signal.aborted) throw error;
+      throw unavailable();
+    }
+  },
   async validateModel(model, signal) {
     credentialCheck();
     try {

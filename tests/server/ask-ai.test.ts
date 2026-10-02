@@ -47,6 +47,9 @@ function fixture() {
   const calls = { retrieval: 0, plan: 0, answer: 0, validation: 0, current: 0 };
   let answer = "A quorum elects a leader. [S1]";
   const provider: AiProvider = {
+    name: "Synthetic",
+    connection: () => ({ configured: true, message: "Synthetic" }),
+    async models() { return []; },
     async validateModel() {
       calls.validation++;
     },

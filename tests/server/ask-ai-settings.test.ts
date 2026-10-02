@@ -67,3 +67,120 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
     process.env = oldEnv;
   }
 });
+
+test("Enabling validates model and both retrieval functions; disabling needs no Gateway and conflicts preserve settings", async () => {
+  const oldFetch = globalThis.fetch,
+    oldEnv = { ...process.env };
+  Object.assign(process.env, {
+    NEXT_PUBLIC_SUPABASE_URL: "https://synthetic.supabase.co",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "synthetic",
+    SUPABASE_SECRET_KEY: "synthetic",
+    FIELDBOOK_URL: "https://example.test",
+    FIELDBOOK_OWNER_EMAIL: "admin@example.test",
+  });
+  for (const key of [
+    "AI_GATEWAY_API_KEY",
+    "VERCEL_OIDC_TOKEN",
+    "VERCEL",
+    "VERCEL_ENV",
+    "FIELDBOOK_ENVIRONMENT",
+  ])
+    delete process.env[key];
+  let ready = false,
+    writes = 0,
+    generations = 0,
+    catalogReads = 0;
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    if (url.host === "ai-gateway.vercel.sh") {
+      if (url.pathname !== "/v1/models") {
+        generations++;
+        throw Error("Unexpected generation");
+      }
+      catalogReads++;
+      return Response.json({
+        data: [{ id: "test/valid", type: "language", tags: ["tool-use"] }],
+      });
+    }
+    if (url.pathname.endsWith("fb_ai_passages"))
+      return ready
+        ? Response.json([])
+        : Response.json(
+            { code: "PGRST202", message: "synthetic missing function" },
+            { status: 404 },
+          );
+    if (url.pathname.endsWith("fb_ai_sources_current"))
+      return Response.json(true);
+    assert.ok(url.pathname.endsWith("fb_config"));
+    if (init?.method === "PATCH") {
+      if (url.searchParams.get("revision") !== "eq.7")
+        return Response.json(null);
+      writes++;
+      return Response.json({ revision: 8 });
+    }
+    return Response.json({
+      settings: defaultSettings,
+      groups: [],
+      governance_revision: 9,
+    });
+  };
+  const admin: any = { id: "admin", role: "admin", active: true, groups: [] };
+  const enabled = {
+    ...defaultAskAiSettings,
+    enabled: true,
+    model: "test/valid",
+  };
+  try {
+    await assert.rejects(
+      saveSettings(admin, {
+        settings: { ...defaultSettings, askAi: enabled },
+        expected: 7,
+      }),
+      { status: 503 },
+    );
+    assert.equal(catalogReads, 0);
+    process.env.AI_GATEWAY_API_KEY = "synthetic-only";
+    await assert.rejects(
+      saveSettings(admin, {
+        settings: {
+          ...defaultSettings,
+          askAi: { ...enabled, model: "test/unavailable" },
+        },
+        expected: 7,
+      }),
+      { status: 503 },
+    );
+    await assert.rejects(
+      saveSettings(admin, {
+        settings: { ...defaultSettings, askAi: enabled },
+        expected: 7,
+      }),
+      { status: 503 },
+    );
+    assert.equal(writes, 0);
+    ready = true;
+    await saveSettings(admin, {
+      settings: { ...defaultSettings, askAi: enabled },
+      expected: 7,
+    });
+    assert.equal(writes, 1);
+    await assert.rejects(
+      saveSettings(admin, {
+        settings: { ...defaultSettings, askAi: enabled },
+        expected: 6,
+      }),
+      { status: 409 },
+    );
+    assert.equal(writes, 1);
+    delete process.env.AI_GATEWAY_API_KEY;
+    await saveSettings(admin, {
+      settings: { ...defaultSettings, askAi: { ...enabled, enabled: false } },
+      expected: 7,
+    });
+    assert.equal(writes, 2);
+    assert.equal(generations, 0);
+  } finally {
+    globalThis.fetch = oldFetch;
+    process.env = oldEnv;
+  }
+});

@@ -23,8 +23,10 @@ import {
   Pencil,
 } from "lucide-react";
 import Markdown from "./Markdown";
+import type { UploadProgress } from "@/lib/upload-media";
+import { MediaUploadStatus } from "./patterns/media-upload-status";
 
-export type UploadMedia = (file: File) => Promise<string>;
+export type UploadMedia = (file: File, onProgress?: (progress: UploadProgress) => void) => Promise<string>;
 export default function MarkdownEditor({
   label,
   value,
@@ -46,6 +48,7 @@ export default function MarkdownEditor({
   const [preview, setPreview] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const range = useRef({ start: 0, end: 0 });
   function insert(before: string, after = "", placeholder = "text") {
     const el = input.current;
@@ -70,7 +73,7 @@ export default function MarkdownEditor({
     setBusy(true);
     setError("");
     try {
-      const url = await onUpload(f);
+      const url = await onUpload(f, setUploadProgress);
       const alt = f.name.replace(/[\[\]\\\n]/g, " ");
       const snippet = f.type.startsWith("video/")
         ? `\n\n[${alt}](${url})\n\n`
@@ -80,6 +83,7 @@ export default function MarkdownEditor({
       setError((e as Error).message);
     } finally {
       setBusy(false);
+      setUploadProgress(null);
       if (file.current) file.current.value = "";
     }
   }
@@ -202,7 +206,8 @@ export default function MarkdownEditor({
           placeholder="Start with what matters…"
         />
       )}
-      <FieldDescription id={`${id}-help`} role={busy ? "status" : undefined}>
+      <MediaUploadStatus progress={uploadProgress} />
+      <FieldDescription id={`${id}-help`} role={busy && !uploadProgress ? "status" : undefined}>
         {busy
           ? "Uploading media…"
           : "Markdown with formatting shortcuts. Preview before publishing."}

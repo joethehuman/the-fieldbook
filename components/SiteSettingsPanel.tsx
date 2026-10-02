@@ -17,6 +17,8 @@ import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { CardPaletteSettings } from "./CardPaletteSettings";
 import { ExternalLinksSettings } from "./ExternalLinksSettings";
+import { AskAiSettingsPanel } from "./AskAiSettingsPanel";
+import { defaultAskAiSettings } from "@/lib/ai";
 import {
   externalLinkLabelError,
   externalLinkUrlError,
@@ -28,7 +30,7 @@ import { equalJson } from "@/lib/equal-json";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
 export type SettingsSection =
-  "identity" | "links" | "docs" | "courses" | "access" | "privacy" | "mcp";
+  "identity" | "links" | "docs" | "courses" | "access" | "privacy" | "mcp" | "ai";
 export default function SiteSettingsPanel({
   data,
   onChange,
@@ -51,7 +53,12 @@ export default function SiteSettingsPanel({
         logoUrl?: string;
       };
       const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
-      return { ...defaultSettings, ...withoutLogo };
+      return {
+        ...defaultSettings, ...withoutLogo,
+        ...(section === "ai" && !withoutLogo.askAi ? {
+          askAi: { ...defaultAskAiSettings, enabled: !production },
+        } : {}),
+      };
     }),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
@@ -539,6 +546,11 @@ export default function SiteSettingsPanel({
         </section>
       )}
       {section === "mcp" && <McpSettings production={production} contributor={contributor} />}
+      {section === "ai" && !contributor && <AskAiSettingsPanel
+        production={production} busy={busy} actions={saveAction}
+        value={settings.askAi ?? defaultAskAiSettings}
+        onChange={(askAi) => setSettings({ ...settings, askAi })}
+      />}
       {section !== "mcp" && notice && (
         <div className="settings-save-bar">
           <Alert role="status">{notice}</Alert>

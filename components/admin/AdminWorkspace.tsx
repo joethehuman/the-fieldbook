@@ -59,6 +59,7 @@ export function AdminWorkspace({
       },
       branding: {
         ...brandingFromSettings(data.settings || {}),
+        askAiEnabled: data.settings?.askAi?.enabled === true,
         externalLinks: accountMenuLinks(data.settings?.externalLinks),
       },
       docs: [],

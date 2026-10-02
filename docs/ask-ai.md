@@ -1,12 +1,32 @@
 # Ask AI
 
-Ask AI adds optional, authenticated answers from published Fieldbook content using the Vercel AI SDK and AI Gateway. It is **off by default** in installed applications. The search panel includes temporary conversations when enabled. Admin configuration controls are still pending; the browser-local demo shows the interface with a local unavailable response.
+Ask AI adds optional, authenticated answers from published Fieldbook content using the Vercel AI SDK and AI Gateway. It is **off by default** in installed applications. The search panel includes temporary conversations when enabled. Administrators configure it under **Organization Settings → Ask AI**. The browser-local demo shows the same controls with an illustrative model; all answers remain local unavailable responses.
 
 ## Installation and configuration
 
 Use the supported [Vercel + Supabase + Google installation](installation.md). Apply `supabase/migrations/20261002011512_ask_ai_passages.sql` after all earlier migrations, first on an isolated backend. It adds two read-only, service-role-only functions over the existing published search index. It creates no new tables and does not change content, settings, profiles, progress or ordinary search. Older application code remains compatible. Apply each migration once and record it; code rollback can leave these functions in place.
 
-Gateway uses Vercel project authentication automatically. An operator needs their own Gateway-enabled Vercel account and an available model. Local execution can use an expiring Vercel OIDC token from `vercel env pull`, or a server-only `AI_GATEWAY_API_KEY`. Never put either credential in site settings, a browser variable or an AI prompt. No separate model-provider account/key is required for Gateway-managed access. See [Gateway OIDC](https://vercel.com/docs/ai-gateway/authentication-and-byok/oidc) and [API keys](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys).
+### Turn it on in your installation
+
+1. Complete the ordinary [installation](installation.md) with your own Vercel, Supabase and Google accounts. Sign in to Fieldbook as an administrator. AI off requires no Gateway key or account connection, and enabling AI does not change Google sign-in or Supabase credentials.
+2. Apply the migration above to your isolated preview backend before deploying/testing this code there. For an existing live installation, back up and rehearse first, then apply the additive migration before its code deployment. Follow [upgrades](upgrading.md); Vercel does not run SQL automatically.
+3. In the Vercel **team that owns your Fieldbook project**, open **AI Gateway**. Review credits, payment/refill settings and permitted models. Deployed Vercel projects use automatic project OIDC authentication when no Gateway API key is set; you do not need a separate upstream provider account/key for Gateway-managed access. Free credits can have account/payment requirements. See [Gateway setup](https://vercel.com/docs/ai-gateway/getting-started) and [OIDC](https://vercel.com/docs/ai-gateway/authentication-and-byok/oidc).
+4. In Fieldbook, open **Manage organization → Organization Settings → Ask AI**. Choose a model and review its price, expiry and data handling. Choose published sources; edit Answer guidance if needed. Reset to default restores the concise guidance.
+5. **Check setup** reads public model metadata and checks both retrieval functions with empty inputs; it generates no answer and reads no published bodies. A configured key/project and a loaded catalog do **not** prove authentication. Resolve any missing-connection or migration message.
+6. Click **Test answer** to verify access to the selected model, forced tool use and a cited answer using synthetic text. It uses your current draft guidance, works with learner AI off, makes up to two small model calls and may incur charges. It saves no settings and sends no installation content. Success establishes connectivity and basic response format, not answer quality across your library.
+7. Switch **Enable Ask AI** on and **Save settings**. Enabling or changing an enabled model validates availability and retrieval without generating text. Try a question about known published content from the header. Switch off and save to return to basic search; disabling remains available when Gateway is down. A stale save fails rather than overwriting a newer administrator's changes.
+
+The model menu is built from Gateway's live public catalog, filtered to text models supporting tool use. It shows six low-cost choices ordered by combined input/output token price, plus the default and saved model when available. Metadata is cached for up to five minutes. Missing prices and privacy guarantees are reported as unknown, never assumed. The selected model applies installation-wide; learners do not pick models. There is no automatic model fallback.
+
+### Server API key alternative
+
+For local development or an environment without Vercel OIDC, open your Vercel team's **AI Gateway → API Keys**, create a key and copy it directly into the server environment as `AI_GATEWAY_API_KEY`. On Vercel, use **Project → Settings → Environment Variables**, select only the intended environment, and redeploy. Locally, use an ignored root `.env.local` and restart the server. Never put the key in site settings, a `NEXT_PUBLIC_` variable, an export, an AI prompt or a screenshot. If a key is set it takes precedence over OIDC. See [API keys](https://vercel.com/docs/ai-gateway/authentication-and-byok/api-keys).
+
+Alternatively, local Vercel development can use `vercel link` and `vercel env pull`; pulled OIDC tokens expire and need refreshing. The adapter can call Gateway from another host with a server key, but Fieldbook currently documents and verifies only its Vercel/Supabase/Google stack. Changing the entire hosting/router stack requires a separate supported recipe.
+
+An operator can give a setup agent this request:
+
+> Follow docs/installation.md and docs/ask-ai.md for my Fieldbook installation. Identify my own Vercel project and isolated Supabase environment first. Keep AI off while checking the migration, Gateway authentication and model metadata. Do not print credentials, alter production or make a paid model request without my explicit approval. Report exactly which setup steps you verified and which remain.
 
 Nonsecret configuration lives in the existing revision-controlled installation settings as `askAi`:
 
@@ -61,9 +81,9 @@ Fieldbook does not persist or log conversation text, evidence bodies or raw prov
 
 ## Provider boundaries and verification
 
-`lib/ai.ts` holds plain configuration, messages and source identities. `server/ports/ai.ts` defines validation, query planning and plain-text streaming; `server/ai.ts` composes the one supported implementation. Gateway calls, credentials and public model metadata caching stay in `server/providers/vercel/ai.ts`. Retrieval RPCs stay behind `server/ports/data.ts` and the Supabase adapter. The generic AI SDK UI transport does not expose Gateway types through either port. A new provider requires a working adapter, setup instructions and verification; it is not supported merely by adding a selector.
+`lib/ai.ts` holds plain configuration, messages and source identities. `server/ports/ai.ts` defines connection metadata, model discovery, validation, query planning and plain-text streaming; `server/ai.ts` composes the one supported implementation. Gateway calls, credentials and public model metadata caching stay in `server/providers/vercel/ai.ts`. Retrieval RPCs stay behind `server/ports/data.ts` and the Supabase adapter. The generic AI SDK UI transport does not expose Gateway types through either port. A new provider requires a working adapter, setup instructions and verification; it is not supported merely by adding a selector.
 
-Run `pnpm test`, `pnpm typecheck`, `pnpm check:providers` and both builds. Synthetic tests cover authorization, off-state/model-call admission, input bounds, cancellation, source changes/citation metadata, SDK transport and redacted failures. Embedded PostgreSQL rehearses migration/data preservation, ordinary-search compatibility, long-passage windows and service-only grants. Those tests do not prove real hosted Google sign-in, account billing, model answer quality or deployed streaming. Exercise those separately against an isolated installation before activation.
+Use the repository’s risk-based checks for the affected change: focused model/server and browser tests, `pnpm typecheck`, `pnpm check:ui`, `pnpm check:providers` and both builds for a substantial AI change. Synthetic tests cover authorization, off-state/model-call admission, input bounds, cancellation, source changes/citation metadata, SDK transport and redacted failures. Embedded PostgreSQL rehearses migration/data preservation, ordinary-search compatibility, long-passage windows and service-only grants. Those tests do not prove real hosted Google sign-in, account billing, model answer quality or deployed streaming. Exercise those separately against an isolated installation before activation.
 
 ## Search and temporary conversations
 
@@ -73,4 +93,4 @@ Ask follow-up questions in the conversation field. Enter sends; Shift+Enter adds
 
 Guests in an enabled public installation are prompted to sign in on an explicit AI attempt. Disabling AI restores basic search and cancels the local conversation when the changed setting reaches the shell. The server independently checks availability and access for each request.
 
-The browser-local demo shows these entry points by default, but answers every submission with “This feature is not available in the demo site.” It makes no AI network request. The installed application stays off by default; the Administration UI is still pending. Existing administrator settings operations can configure the nonsecret settings object described above.
+The browser-local demo shows these entry points by default, but answers every submission with “This feature is not available in the demo site.” It makes no AI network request. The demo’s illustrative Admin toggle affects this browser’s search UI only. The installed application stays off by default. Administrator controls and the existing revision-checked settings operations configure the same nonsecret object described above.

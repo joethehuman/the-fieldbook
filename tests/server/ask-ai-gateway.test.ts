@@ -39,8 +39,22 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
             type: "language",
             tags: ["tool-use"],
             supported_parameters: ["reasoning"],
+            name: "Synthetic free model",
+            pricing: { input: "0", output: "0" },
+            zdr: "none",
+            no_training: "some",
           },
           { id: "unsupported/model", type: "language", tags: [] },
+          {
+            id: "synthetic/embedding",
+            type: "embedding",
+            pricing: { input: "0.00000001" },
+          },
+          {
+            id: "synthetic/video",
+            type: "video",
+            pricing: { video_duration_pricing: [{ cost_per_second: "0.15" }] },
+          },
         ],
       });
     assert.ok(String(url).endsWith("/language-model"));
@@ -140,6 +154,12 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
     return text;
   };
   try {
+    const catalog = await vercelAi.models(signal);
+    assert.equal(catalog.length, 1);
+    assert.equal(catalog[0].inputPerMillion, 0);
+    assert.equal(catalog[0].zeroRetention, "none");
+    assert.equal(catalog[0].noTraining, "some");
+    assert.equal(calls.length, 0); // public catalog access is not authentication
     await vercelAi.validateModel(model, signal);
     await assert.rejects(vercelAi.validateModel("unsupported/model", signal), {
       status: 503,

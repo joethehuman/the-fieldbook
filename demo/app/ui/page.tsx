@@ -18,6 +18,8 @@ import { useInteractionDialog } from "@/components/ui/interaction-dialog";
 import { CsvExport } from "@/components/patterns/csv-export";
 import { SearchPanel } from "@/components/patterns/search-panel";
 import { SearchExperience } from "@/components/SearchExperience";
+import { AskAiSettingsPanel } from "@/components/AskAiSettingsPanel";
+import { defaultAskAiSettings } from "@/lib/ai";
 import {
   SearchResultCard,
   SearchResultSkeleton,
@@ -350,6 +352,7 @@ export default function ComponentCatalog() {
         </p>
         <SearchPanelExample />
         <SearchExperience id="catalog-ask-ai" content={seedContent} aiMode="demo" signedIn onOpen={() => {}} />
+        <AskAiSettingsExample />
         <SearchResultSkeleton />
         <SearchResultCard
           result={{
@@ -860,6 +863,11 @@ export default function ComponentCatalog() {
       </section>
     </ReadingPage>
   );
+}
+
+function AskAiSettingsExample() {
+  const [value, setValue] = useState(defaultAskAiSettings);
+  return <AskAiSettingsPanel value={value} onChange={setValue} production={false} busy={false} actions={<Button type="button" disabled>Save settings</Button>} />;
 }
 
 function SearchPanelExample() {
