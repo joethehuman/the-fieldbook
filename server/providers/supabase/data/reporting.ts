@@ -8,11 +8,69 @@ import type {
 import { db, check } from "../client";
 import { readAll } from "../read-all";
 import { contentDate } from "@/lib/search";
+import { HttpError } from "../../../errors";
+import type {
+  LearningReportPage,
+  ReportPage,
+  FeedbackReportRow,
+  ReportingScopes,
+} from "../../../ports/mcp-reporting";
+
+function reportError(error: { message: string; code?: string } | null) {
+  if (error?.code === "42501")
+    throw new HttpError(
+      403,
+      "These reporting filters are outside your current access. Refresh the available reporting scopes.",
+    );
+  if (error?.code === "40001")
+    throw new HttpError(
+      409,
+      "This report changed during pagination. Start the report again to export a consistent result.",
+    );
+  if (error?.code === "22023")
+    throw new HttpError(
+      400,
+      "Invalid reporting filters. Refresh the available reporting scopes.",
+    );
+  check(error);
+}
 
 export const reportingData: Pick<
   DataStore,
-  "readReportInputs" | "searchPublished"
+  | "readReportInputs"
+  | "searchPublished"
+  | "readMcpReportingScopes"
+  | "readMcpLearningReport"
+  | "readMcpFeedbackReport"
 > = {
+  async readMcpReportingScopes(actorId) {
+    const { data, error } = await db().rpc("fb_mcp_reporting_scopes", {
+      p_actor: actorId,
+    });
+    reportError(error);
+    return data as ReportingScopes;
+  },
+  async readMcpLearningReport(actorId, input, after, expectedFingerprint) {
+    const { data, error } = await db().rpc("fb_mcp_learning_report", {
+      p_actor: actorId,
+      p_input: input,
+      p_after_person: after?.personId || null,
+      p_after_course: after?.courseId || null,
+      p_expected_fingerprint: expectedFingerprint,
+    });
+    reportError(error);
+    return data as LearningReportPage;
+  },
+  async readMcpFeedbackReport(actorId, input, afterId, expectedFingerprint) {
+    const { data, error } = await db().rpc("fb_mcp_feedback_report", {
+      p_actor: actorId,
+      p_input: input,
+      p_after: afterId,
+      p_expected_fingerprint: expectedFingerprint,
+    });
+    reportError(error);
+    return data as ReportPage<FeedbackReportRow>;
+  },
   async readReportInputs() {
     const [progress, feedback, documents] = await Promise.all([
       readAll<ProgressRecord>((from, to) =>

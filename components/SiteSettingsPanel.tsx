@@ -558,12 +558,6 @@ function McpSettings({ production, contributor }: { production: boolean; contrib
   useEffect(() => {
     setAddress(`${window.location.origin}/api/mcp`);
   }, []);
-  if (contributor && production) return (
-    <SettingsGroup id="mcp-contributor" title={<h3>Connect an AI tool</h3>}
-      guidance="MCP connections currently require an administrator account.">
-      <p>Use the publishing panel to manage content and feedback. Contributor MCP connections are not enabled in this version.</p>
-    </SettingsGroup>
-  );
   if (!production)
     return (
       <SettingsGroup
@@ -582,7 +576,9 @@ function McpSettings({ production, contributor }: { production: boolean; contrib
       id="mcp-connection"
       title={<h3>Connect an AI tool</h3>}
       description="Add Fieldbook as a custom MCP server in ChatGPT, Claude, or another compatible tool."
-      guidance="Review or revoke access from connected AI tools."
+      guidance={contributor
+        ? "Contributors can author and publish content, upload media and review feedback. Reporting requires an explicitly managed team."
+        : "Review, approve added permissions or revoke access from connected AI tools. Managers report only on explicitly managed teams and descendants."}
       actions={
         <Button asChild variant="outline">
           <a href="/connections">Manage connections →</a>
@@ -618,8 +614,9 @@ function McpSettings({ production, contributor }: { production: boolean; contrib
       <FieldDescription role="status">{copied}</FieldDescription>
       <ol className="mcp-steps">
         <li>Add the server address in your AI tool’s connection settings.</li>
-        <li>Sign in to Fieldbook as an administrator.</li>
-        <li>Review and approve the requested connection.</li>
+        <li>Sign in with your administrator, contributor or team manager account.</li>
+        <li>Review and approve the requested tool permissions.</li>
+        <li>For an existing connection, review added permissions in Manage connections, refresh its tools and start a new conversation.</li>
       </ol>
     </SettingsGroup>
   );

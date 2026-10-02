@@ -20,6 +20,7 @@ export {
   findProfileBySubject,
   registerProfile,
   hasConnectionGrantForSubject,
+  connectionGrantForPerson,
   connectionGrants,
   enableConnectionGrant,
   disableConnectionGrant,

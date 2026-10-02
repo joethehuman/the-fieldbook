@@ -12,6 +12,8 @@ import {
 } from "../../server/identity";
 import { POST as mcp } from "../../app/api/mcp/route";
 import { proxy } from "../../proxy";
+import { LEGACY_MCP_CAPABILITIES } from "../../lib/mcp-access";
+import { defaultSettings } from "../../lib/settings";
 
 const subject = "11111111-1111-4111-8111-111111111111";
 const config = {
@@ -213,13 +215,28 @@ test("MCP checks signed resource identity, current grant and profile before tran
       if (url.pathname === "/rest/v1/fb_mcp_grants") {
         assert.equal(url.searchParams.get("user_id"), `eq.${personId}`);
         assert.equal(url.searchParams.get("client_id"), "eq.client-one");
-        return Response.json({ enabled });
+        return Response.json({
+          enabled,
+          capabilities: [...LEGACY_MCP_CAPABILITIES],
+          capability_version: 0,
+          role_at_consent: "admin",
+        });
       }
       if (url.pathname === "/rest/v1/fb_profiles") {
         assert.equal(url.searchParams.get("auth_user_id"), `eq.${subject}`);
         assert.equal(url.searchParams.get("active"), "eq.true");
+        assert.equal(url.searchParams.get("deleted_at"), "is.null");
         return Response.json(profile.active ? profile : null);
       }
+      if (url.pathname === "/rest/v1/fb_config")
+        return Response.json({
+          settings: defaultSettings,
+          teams: [],
+          groups: [],
+          curricula: [],
+          revision: 1,
+          governance_revision: 1,
+        });
       assert.equal(url.pathname, "/rest/v1/rpc/fb_allow_request");
       return Response.json(allowed);
     };
@@ -244,6 +261,7 @@ test("MCP checks signed resource identity, current grant and profile before tran
       { iss: "https://other.example/auth/v1" },
       { aud: "authenticated" },
       { client_id: undefined },
+      { exp: undefined },
       { exp: 1 },
     ])
       assert.equal((await mcp(request(await signed(claims)))).status, 401);
@@ -267,7 +285,47 @@ test("MCP checks signed resource identity, current grant and profile before tran
     const response = await mcp(request(valid));
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Cache-Control"), "no-store");
-    assert.equal((await response.json()).result.tools.length, 8);
+    const tools = (await response.json()).result.tools.map(
+      (tool: { name: string }) => tool.name,
+    );
+    for (const name of [
+      "search",
+      "fetch",
+      "create_content",
+      "update_content",
+      "publish_content",
+      "unpublish_content",
+      "content_report",
+      "list_media",
+    ])
+      assert.equal(
+        tools.includes(name),
+        true,
+        `${name} remains available to a legacy connection`,
+      );
+    assert.equal(
+      tools.includes("learning_report"),
+      false,
+      "individual reports require added consent",
+    );
+    assert.equal(
+      tools.includes("create_media_upload"),
+      false,
+      "uploads require added consent",
+    );
+    const tooLarge = new Request(resource, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${valid}`,
+        "Content-Type": "application/json",
+      },
+      body: " ".repeat(2_000_001),
+    });
+    assert.equal(
+      (await mcp(tooLarge)).status,
+      413,
+      "actual bytes are bounded without Content-Length",
+    );
     const before = databaseReads;
     assert.equal(
       (await mcp(request(valid, "https://untrusted.example"))).status,
