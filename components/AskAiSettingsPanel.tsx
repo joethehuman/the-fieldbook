@@ -30,6 +30,7 @@ const sourceChoices = [
   { value: "brief", label: "Updates" },
   { value: "course", label: "Courses and lessons" },
 ] as const;
+const primaryRequired = "Choose a primary model to enable AI.";
 // Illustrative catalog only; no model is selected automatically in the demo.
 const demoSetup: AiSetup = {
   provider: "Vercel AI Gateway",
@@ -191,22 +192,21 @@ export function AskAiSettingsPanel({
     return (
       <FormField
         label={backup ? "Fallback model" : "Primary model"}
+        errorPlaceholder={!backup ? primaryRequired : undefined}
         error={
-          !backup && value.enabled && !selected
-            ? "Choose a primary model before saving Ask AI on."
-            : undefined
+          !backup && value.enabled && !selected ? primaryRequired : undefined
         }
         description={
           <>
             {backup
-              ? "Optional backup if the primary cannot respond."
-              : "Required to enable AI; stays saved while off."}
-            {entry && (
-              <span className="block">
-                Input {cost(entry.inputPerMillion)} · Output{" "}
-                {cost(entry.outputPerMillion)} / million tokens.
-              </span>
-            )}
+              ? "Optional. Saved while AI is off."
+              : "Required. Saved while AI is off."}
+            <span className="block">
+              Input {entry ? cost(entry.inputPerMillion) : "—"}
+            </span>
+            <span className="block">
+              Output {entry ? cost(entry.outputPerMillion) : "—"}
+            </span>
           </>
         }
       >
@@ -248,7 +248,7 @@ export function AskAiSettingsPanel({
   return (
     <SettingsSection
       id="settings-ai"
-      title={<h3>Ask AI</h3>}
+      title={<h3>Configuration</h3>}
       disabled={busy}
       actions={actions}
       description="Concise answers from your published Fieldbook content."
@@ -258,7 +258,7 @@ export function AskAiSettingsPanel({
           : "Demo settings affect this browser only. AI answers are unavailable."
       }
     >
-      <FieldGroup>
+      <FieldGroup className="gap-2">
         <Field orientation="horizontal">
           <Switch
             checked={value.enabled}
@@ -274,7 +274,7 @@ export function AskAiSettingsPanel({
       </FieldGroup>
       <FieldGroup>
         <legend>Models</legend>
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid items-start gap-4 md:grid-cols-2">
           {picker(false)}
           {picker(true)}
         </div>
@@ -296,44 +296,48 @@ export function AskAiSettingsPanel({
         <FieldDescription>
           {production
             ? "Live Gateway catalog. Prices are per million tokens and may change. Only your selected models are used."
-            : "Illustrative models only; the demo does not connect to Gateway."}
+            : "Illustrative models only. Prices are per million tokens; the demo does not connect to Gateway."}
         </FieldDescription>
-        {(model || fallback) && (
-          <Collapsible>
-            <CollapsibleTrigger asChild>
-              <Button type="button" variant="ghost" className="group">
-                Model details and data policies
-                <ChevronDown
-                  aria-hidden="true"
-                  className="group-data-[state=open]:rotate-180"
-                />
-              </Button>
+        <Collapsible>
+          <Button
+            asChild
+            variant="ghost"
+            className="group w-full justify-between"
+          >
+            <CollapsibleTrigger disabled={!model && !fallback}>
+              Model details and data policies
+              <ChevronDown
+                aria-hidden="true"
+                className="group-data-[state=open]:rotate-180"
+              />
             </CollapsibleTrigger>
-            <CollapsibleContent className="grid gap-4 pt-4">
+          </Button>
+          <CollapsibleContent className="grid gap-3 pt-3">
+            <div className="grid items-start gap-4 md:grid-cols-2">
               {model && <ModelDetails title="Primary model" model={model} />}
               {fallback && (
                 <ModelDetails title="Fallback model" model={fallback} />
               )}
-              <FieldDescription>
-                These are Gateway’s advertised assurances, not a routing policy
-                enforced by Fieldbook. Questions and relevant published text go
-                to Gateway and the model provider.
-              </FieldDescription>
-              <Button type="button" variant="link" asChild>
-                <a
-                  href="https://vercel.com/ai-gateway/models"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Review Gateway models and policies
-                  <ExternalLink aria-hidden="true" />
-                </a>
-              </Button>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
+            </div>
+            <FieldDescription>
+              These are Gateway’s advertised assurances, not a routing policy
+              enforced by Fieldbook. Questions and relevant published text go to
+              Gateway and the model provider.
+            </FieldDescription>
+            <Button type="button" variant="link" asChild>
+              <a
+                href="https://vercel.com/ai-gateway/models"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Review Gateway models and policies
+                <ExternalLink aria-hidden="true" />
+              </a>
+            </Button>
+          </CollapsibleContent>
+        </Collapsible>
       </FieldGroup>
-      <FieldGroup aria-describedby="ai-sources-description">
+      <FieldGroup className="gap-3" aria-describedby="ai-sources-description">
         <legend>Published sources</legend>
         <FieldDescription id="ai-sources-description">
           Choose at least one. Drafts, quizzes, media and account data are
@@ -363,7 +367,7 @@ export function AskAiSettingsPanel({
           ))}
         </div>
       </FieldGroup>
-      <FieldGroup>
+      <FieldGroup className="gap-3">
         <FormField
           label="Answer guidance"
           description={`${value.guidance.length.toLocaleString()} / 2,000 characters. Adds to the fixed access, evidence and citation rules.`}
@@ -391,50 +395,56 @@ export function AskAiSettingsPanel({
           </Button>
         </ActionGroup>
       </FieldGroup>
-      <FieldGroup>
+      <FieldGroup className="gap-3">
         <legend>Connection</legend>
-        {setup && (
-          <div className="grid gap-3" aria-label="Setup status">
-            {[
-              {
-                label: "Gateway catalog",
-                ready: setup.catalog.ready,
-                status: "Loaded",
-                message: setup.catalog.message,
-              },
-              {
-                label: "Credentials",
-                ready: setup.connection.configured,
-                status: "Present",
-                message: setup.connection.message,
-              },
-              {
-                label: "Published-content retrieval",
-                ready: setup.retrieval.ready,
-                status: "Ready",
-                message: setup.retrieval.message,
-              },
-            ].map((item) => (
-              <div key={item.label} className="grid gap-1">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-copy">
-                  <span>{item.label}</span>
-                  <Badge
-                    variant={item.ready || !production ? "default" : "warning"}
-                  >
-                    {item.ready
+        <div
+          className="grid gap-2"
+          aria-label="Setup status"
+          aria-busy={!setup}
+        >
+          {[
+            {
+              label: "Gateway catalog",
+              ready: setup?.catalog.ready,
+              status: "Loaded",
+              message: setup?.catalog.message,
+            },
+            {
+              label: "Credentials",
+              ready: setup?.connection.configured,
+              status: "Present",
+              message: setup?.connection.message,
+            },
+            {
+              label: "Published-content retrieval",
+              ready: setup?.retrieval.ready,
+              status: "Ready",
+              message: setup?.retrieval.message,
+            },
+          ].map((item) => (
+            <div key={item.label} className="grid gap-1">
+              <div className="flex flex-wrap items-center justify-between gap-2 text-copy">
+                <span>{item.label}</span>
+                <Badge
+                  variant={
+                    !setup || item.ready || !production ? "default" : "warning"
+                  }
+                >
+                  {!setup
+                    ? "Checking"
+                    : item.ready
                       ? item.status
                       : production
                         ? "Needs setup"
                         : "Demo only"}
-                  </Badge>
-                </div>
-                {!item.ready && (
-                  <FieldDescription>{item.message}</FieldDescription>
-                )}
+                </Badge>
               </div>
-            ))}
-          </div>
-        )}
+              {!item.ready && item.message && (
+                <FieldDescription>{item.message}</FieldDescription>
+              )}
+            </div>
+          ))}
+        </div>
         <ActionGroup>
           <Button
             type="button"
@@ -454,17 +464,20 @@ export function AskAiSettingsPanel({
           >
             Test primary
           </Button>
-          {value.fallbackModel && (
-            <Button
-              type="button"
-              variant="outline"
-              loading={working === "test-fallback"}
-              disabled={busy || working !== null || (production && !fallback)}
-              onClick={() => void run("test-fallback")}
-            >
-              Test fallback
-            </Button>
-          )}
+          <Button
+            type="button"
+            variant="outline"
+            loading={working === "test-fallback"}
+            disabled={
+              busy ||
+              working !== null ||
+              !value.fallbackModel ||
+              (production && !fallback)
+            }
+            onClick={() => void run("test-fallback")}
+          >
+            Test fallback
+          </Button>
         </ActionGroup>
         <FieldDescription>
           {production
@@ -485,15 +498,19 @@ export function AskAiSettingsPanel({
           </Alert>
         )}
         <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button type="button" variant="ghost" className="group">
+          <Button
+            asChild
+            variant="ghost"
+            className="group w-full justify-between"
+          >
+            <CollapsibleTrigger>
               Setup instructions
               <ChevronDown
                 aria-hidden="true"
                 className="group-data-[state=open]:rotate-180"
               />
-            </Button>
-          </CollapsibleTrigger>
+            </CollapsibleTrigger>
+          </Button>
           <CollapsibleContent className="grid gap-4 pt-4">
             <ol className="list-decimal pl-5 space-y-2 text-copy">
               <li>

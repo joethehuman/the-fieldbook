@@ -81,7 +81,7 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
     page.getByRole("button", { name: "Save settings", exact: true }),
   ).toBeDisabled();
   await expect(
-    page.getByText("Choose a primary model before saving Ask AI on."),
+    page.getByText("Choose a primary model to enable AI."),
   ).toBeVisible();
   await page
     .getByRole("combobox", { name: "Primary model", exact: true })
