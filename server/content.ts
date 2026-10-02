@@ -56,12 +56,14 @@ export const canRead = cache(async (user: User | null) => {
   assertCanRead(user, config);
   return config;
 });
-export async function getContent(id: string, user: User | null, draft = false) {
+export async function getContent(id: string, user: User | null, draft = false, publishedForEditing = false) {
   await canRead(user);
-  if (draft) requirePublisher(user);
+  if (draft || publishedForEditing) requirePublisher(user);
   const data = await dataStore().findDocument(id);
-  if (!data || data.deleted_at || (!draft && !data.published))
+  if (!data || data.deleted_at || ((!draft || publishedForEditing) && !data.published))
     throw new HttpError(404, "Content not found.");
+  if (publishedForEditing)
+    return document({ ...data, draft: data.published }, true);
   const c = document(data, draft);
   return draft ? c : redact(c);
 }

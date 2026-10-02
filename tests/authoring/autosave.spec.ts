@@ -113,6 +113,21 @@ test("Docs, Updates and Courses quietly save incomplete drafts, revert to Publis
       expect((await read(true)).title).toBe(before.title);
       await expect(current.getByRole("button", { name: "Publish changes", exact: true })).toBeDisabled();
       const details = await openContentSettings(current);
+      await expect(current.getByRole("button", { name: "Draft recovery", exact: true })).toHaveCount(0);
+      await details.getByRole("button", { name: "Revert to published version", exact: true }).click();
+      await current.getByRole("button", { name: "Cancel", exact: true }).click();
+      await expect(current.getByLabel("Title", { exact: true })).toHaveValue("");
+      await details.getByRole("button", { name: "Revert to published version", exact: true }).click();
+      await current.getByRole("button", { name: "Confirm", exact: true }).click();
+      await expect.poll(async () => (await read()).title).toBe(before.title);
+      await expect(current.getByLabel("Title", { exact: true })).toHaveValue(before.title);
+      await expect(details.getByRole("button", { name: "Revert to published version", exact: true })).toBeDisabled();
+      expect((await read(true)).title).toBe(before.title);
+      expect((await read()).version).toBe(before.version);
+      if (kind === "course") expect((await read()).assignments).toEqual(before.assignments);
+      await current.screenshot({ path: info.outputPath(`published-revert-${kind}.png`) });
+      await current.getByLabel("Title", { exact: true }).fill("");
+      await expect.poll(async () => (await read()).title).toBe("");
       await expect(details.getByRole("button", { name: "Add a title", exact: true })).toBeEnabled();
       await current.getByLabel("Title", { exact: true }).fill(before.title);
       await expect(
@@ -142,6 +157,61 @@ test("Docs, Updates and Courses quietly save incomplete drafts, revert to Publis
       await context.close();
     }
   }
+});
+
+for (const lostResponse of [false, true])
+  test(`retry saves newer open edits after ${lostResponse ? "a committed save with a lost response" : "a rejected save"}`, async ({ page }, info) => {
+    test.skip(!info.project.name.startsWith("production"), "Synthetic API failure requires installed mode.");
+    const { read } = await setup(page, true, "doc");
+    let writes = 0;
+    await page.route("**/api/content", async (route) => {
+      if (route.request().method() !== "POST") return route.fallback();
+      writes++;
+      if (writes !== 1) return route.fallback();
+      if (lostResponse) {
+        await route.fetch();
+        return route.abort();
+      }
+      return route.fulfill({ status: 503, json: { error: "Temporary save failure" } });
+    });
+    await page.getByLabel("Title", { exact: true }).fill("First attempt");
+    await expect(page.locator(".editor-heading [role=status]")).toHaveText("Changes not saved");
+    await page.getByLabel("Title", { exact: true }).fill("Newest open edits");
+    await page.waitForTimeout(1000);
+    expect(writes).toBe(1);
+    await page.screenshot({ path: info.outputPath(`save-failure-${lostResponse}.png`) });
+    await page.getByRole("button", { name: "Retry saving", exact: true }).click();
+    await expect(page.locator(".editor-heading [role=status]")).toHaveText("Saved");
+    expect((await read()).title).toBe("Newest open edits");
+    expect((await read(true)).title).toBe("Autosave fixture");
+    expect(writes).toBe(2);
+    await expect(page.getByRole("button", { name: "Download your changes" })).toHaveCount(0);
+  });
+
+test("conflicting retry keeps open edits and requires a confirmed saved-draft reload", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Synthetic conflict requires installed mode.");
+  const { read, before } = await setup(page, true, "doc");
+  let writes = 0;
+  await page.route("**/api/content", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    writes++;
+    return route.fulfill({ status: 409, json: { error: "Another author changed this draft" } });
+  });
+  await page.getByLabel("Title", { exact: true }).fill("Keep my open work");
+  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Changes not saved");
+  await page.route("**/api/content?*draft=true*", route => route.fulfill({ json: { ...before, title: "Other author's work", revision: 2 } }));
+  await page.getByRole("button", { name: "Retry saving", exact: true }).click();
+  await expect(page.locator("form.editor [role=alert]")).toContainText("another session");
+  expect(writes).toBe(1);
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Keep my open work");
+  await page.getByRole("button", { name: "Load saved draft", exact: true }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Keep my open work");
+  await page.getByRole("button", { name: "Load saved draft", exact: true }).click();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Other author's work");
+  expect(writes).toBe(1);
+  expect((await read(true)).title).toBe(before.title);
 });
 
 test("typing survives a slow draft response and Publish serializes the newest content", async ({

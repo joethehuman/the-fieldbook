@@ -77,6 +77,9 @@ export function reconcileDemoPublication(
           }
         : {}),
       revision,
+      publishedSignature: item.status === "published"
+        ? contentSignature(item)
+        : live ? contentSignature(live) : undefined,
       publishedRevision:
         item.status === "published" ||
         (live && contentSignature(live) === contentSignature(item))

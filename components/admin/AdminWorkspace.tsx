@@ -175,6 +175,7 @@ export function AdminWorkspace({
             setError("");
             return latest;
           }}
+          onLoadPublished={runtime.publishedContent}
         />
       </ReportAvailability.Provider>
     </>
