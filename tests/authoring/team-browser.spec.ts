@@ -30,7 +30,7 @@ test("installed Teams keeps its organization team manageable and reveals a newly
     { id: "organization", name: "Company", system: "organization" },
     { id: "sales", name: "Sales", parentId: "organization" },
   ];
-  state.users = [{ ...authoringUser, teamId: "organization" }];
+  state.users = [{ ...authoringUser, teamId: undefined }];
   state.settings!.organizationTeamId = "organization";
   state.revision = 3;
   state.governanceRevision = 9;
@@ -62,17 +62,12 @@ test("installed Teams keeps its organization team manageable and reveals a newly
   await expect(
     browser.getByRole("button", { name: "Open Sales", exact: true }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Teams page actions", exact: true })
-    .click();
-  await page
-    .getByRole("menuitem", { name: "Manage organization team", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Organization", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Organization", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Direct members", exact: true }),
+    page.getByRole("heading", { name: "People at Organization", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Team actions", exact: true }),

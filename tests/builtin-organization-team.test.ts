@@ -296,3 +296,175 @@ test(
     }
   },
 );
+
+const membershipMigration = "20261002184642_organization_membership.sql";
+test("Organization fallback includes active signed-in and pending people, preserves named branches, and retains continuous deadlines", async () => {
+  const pg = await fixture();
+  try {
+    await migrate(pg, migration);
+    const cfg = await value(
+      pg,
+      "select to_jsonb(c) as value from public.fb_config c",
+    );
+    const root = cfg.settings.organizationTeamId;
+    const pending = "00000000-0000-4000-8000-000000000006";
+    const inactive = "00000000-0000-4000-8000-000000000007";
+    await pg.query(
+      "insert into public.fb_profiles(id,name,email,role,active) values($1,'Pending','pending@example.test','learner',true),($2,'Inactive','inactive@example.test','learner',false)",
+      [pending, inactive],
+    );
+    await saveRoster(pg, admin, (data) => {
+      data.teams.find((t: any) => t.id === root).managerId = manager;
+      data.groups.find((g: any) => g.id === "subtree").teamIds = [root];
+    });
+    const oldEpisodes = await value(
+      pg,
+      "select jsonb_agg(to_jsonb(e) order by id) as value from public.fb_assignment_episodes e",
+    );
+    const originalProgress = await value(
+      pg,
+      "select jsonb_agg(to_jsonb(p)) as value from public.fb_progress p",
+    );
+    const oldTeams = await value(
+      pg,
+      "select jsonb_agg(jsonb_build_object('id',id,'team',team_id) order by id) as value from public.fb_profiles",
+    );
+    const beforeScope = await value(
+      pg,
+      "select public.fb_governance_snapshot($1) as value",
+      [manager],
+    );
+    assert.equal(
+      beforeScope.users.some((p: any) => p.id === pending),
+      false,
+    );
+    await migrate(pg, membershipMigration);
+    const afterScope = await value(
+      pg,
+      "select public.fb_governance_snapshot($1) as value",
+      [manager],
+    );
+    assert.ok(afterScope.users.some((p: any) => p.id === admin));
+    assert.ok(afterScope.users.some((p: any) => p.id === pending));
+    assert.equal(
+      afterScope.users.some((p: any) => p.id === inactive),
+      false,
+    );
+    assert.deepEqual(
+      await value(
+        pg,
+        "select jsonb_agg(jsonb_build_object('id',id,'team',team_id) order by id) as value from public.fb_profiles",
+      ),
+      oldTeams,
+    );
+    assert.deepEqual(
+      await value(
+        pg,
+        "select jsonb_agg(to_jsonb(p)) as value from public.fb_progress p",
+      ),
+      originalProgress,
+    );
+    const episodes = await value(
+      pg,
+      "select jsonb_agg(to_jsonb(e) order by id) as value from public.fb_assignment_episodes e",
+    );
+    for (const previous of oldEpisodes) {
+      const current = episodes.find((e: any) => e.id === previous.id);
+      assert.equal(current.started_at, previous.started_at);
+      assert.equal(current.due_date, previous.due_date);
+      assert.equal(current.ended_at, previous.ended_at);
+    }
+    const obligation = episodes.find(
+      (e: any) => e.user_id === pending && !e.ended_at,
+    );
+    assert.ok(obligation);
+    assert.deepEqual(
+      await value(
+        pg,
+        "select jsonb_agg(id order by id) as value from public.fb_member_groups('[]',null,(select groups from public.fb_config))",
+      ),
+      ["subtree"],
+    );
+    await saveRoster(pg, admin, (data) => {
+      data.teams.find((t: any) => t.id === root).managerId = undefined;
+      data.teams.find((t: any) => t.id === "sales").managerId = manager;
+      data.users.find((p: any) => p.id === pending).teamId = "leaf";
+    });
+    const namedScope = await value(
+      pg,
+      "select public.fb_governance_snapshot($1) as value",
+      [manager],
+    );
+    assert.ok(namedScope.users.some((p: any) => p.id === pending));
+    assert.equal(
+      namedScope.users.some((p: any) => p.id === admin),
+      false,
+    );
+    await saveRoster(pg, admin, (data) => {
+      data.users.find((p: any) => p.id === pending).teamId = null;
+    });
+    const returnedScope = await value(
+      pg,
+      "select public.fb_governance_snapshot($1) as value",
+      [manager],
+    );
+    assert.equal(
+      returnedScope.users.some((p: any) => p.id === pending),
+      false,
+    );
+    const retained = await value(
+      pg,
+      "select to_jsonb(e) as value from public.fb_assignment_episodes e where user_id=$1 and ended_at is null",
+      [pending],
+    );
+    assert.equal(retained.id, obligation.id);
+    assert.equal(retained.due_date, obligation.due_date);
+    assert.equal(
+      await value(
+        pg,
+        "select has_function_privilege('anon','public.fb_reporting_team_id(text,jsonb)','execute') as value",
+      ),
+      false,
+    );
+    assert.equal(
+      await value(
+        pg,
+        "select has_function_privilege('authenticated','public.fb_reporting_team_id(text,jsonb)','execute') as value",
+      ),
+      false,
+    );
+  } finally {
+    await pg.close();
+  }
+});
+
+test(
+  "Organization scope patch retains direct-assignment projections when that migration precedes it",
+  { skip: !compatibility },
+  async () => {
+    const pg = await fixture();
+    try {
+      await migrate(pg, migration);
+      await pg.exec(await readFile(compatibility!, "utf8"));
+      const before = await value(
+        pg,
+        "select pg_get_functiondef('public.fb_governance_snapshot(uuid)'::regprocedure) as value",
+      );
+      await migrate(pg, membershipMigration);
+      const after = await value(
+        pg,
+        "select pg_get_functiondef('public.fb_governance_snapshot(uuid)'::regprocedure) as value",
+      );
+      assert.equal(
+        after,
+        before.replace(
+          "p.team_id in(select id from allowed)",
+          "public.fb_reporting_team_id(p.team_id,(select teams from cfg)) in(select id from allowed)",
+        ),
+      );
+      assert.ok(after.includes("fb_profile_learning"));
+    } finally {
+      await pg.close();
+    }
+  },
+);

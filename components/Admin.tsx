@@ -134,7 +134,12 @@ import { FeedbackAdmin } from "./Feedback";
 import { TeamsAdmin, TeamProgress } from "./Teams";
 import { videoSource } from "@/lib/video";
 import type { Workspace } from "@/lib/store";
-import { effectiveGroups, type Content, type User } from "@/lib/types";
+import {
+  effectiveGroups,
+  reportingTeamId,
+  type Content,
+  type User,
+} from "@/lib/types";
 const adminSections = [
   {
     label: "Publishing",
@@ -437,7 +442,9 @@ export default function Admin({
       (u) =>
         `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()) &&
         (peopleTeam === "all" ||
-          (peopleTeam === "none" ? !u.teamId : u.teamId === peopleTeam)) &&
+          (peopleTeam === "none"
+            ? !u.teamId
+            : reportingTeamId(u.teamId, data.teams) === peopleTeam)) &&
         (peopleRole === "all" || u.role === peopleRole) &&
         (peopleGroup === "all" ||
           effectiveGroups(u, data.groups).has(peopleGroup)) &&
@@ -575,7 +582,7 @@ export default function Admin({
             id: "team",
             label:
               peopleTeam === "none"
-                ? "No team"
+                ? "No direct team"
                 : teamPath(peopleTeam, data.teams || []),
             onRemove: () => setPeopleTeam("all"),
           },
@@ -1441,7 +1448,7 @@ export default function Admin({
                       onValueChange={setPeopleTeam}
                     >
                       <option value="all">All teams</option>
-                      <option value="none">No team</option>
+                      <option value="none">No direct team</option>
                       {(data.teams || []).map((t) => (
                         <option key={t.id} value={t.id}>
                           {teamPath(t.id, data.teams || [])}
@@ -1715,7 +1722,7 @@ export default function Admin({
                       setPerson({ ...person, teamId: value || undefined })
                     }
                   >
-                    <option value="">No team</option>
+                    <option value="">Organization (no direct team)</option>
                     {(data.teams || []).map((t) => (
                       <option key={t.id} value={t.id}>
                         {teamPath(t.id, data.teams || [])}

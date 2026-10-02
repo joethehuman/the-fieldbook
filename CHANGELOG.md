@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Make Organization visible on Teams. People without a named team automatically appear there for membership, reporting and Organization-linked learning groups; moving or removing a team membership keeps saved learning history and deadlines. Public guests are identified separately from roster counts. Existing installations require `20261002184642_organization_membership.sql` after the built-in Organization migration.
+
 - Browse reporting teams in compact connected columns that scroll horizontally through every depth, following one branch with explicit Open/Edit actions. New teams return to their parent list. Organization is a built-in reporting root with a manager and direct-member page; upgrading preserves existing team IDs, members and saved learning. Assignment pickers use full-content relevance search with highlighted excerpts, independent category/type filters and pagination in a stable-size dialog. Learning-group People adds shared filters, sorting and reviewed bulk removal of direct memberships.
 
 - Search parent-team names and ancestry, with compact paths and an accessible full hierarchy. Teams use smaller icon/count cards with toggleable branches and persistent controls above independently scrolling chart columns. Omit the conditional chart breadcrumb so opening a branch does not shift its layout, and discard old connector lines when switching branches. Learning-group creation returns to its index, with shared sorting, filters and one reviewed bulk deletion.

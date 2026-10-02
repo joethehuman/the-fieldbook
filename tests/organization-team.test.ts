@@ -237,3 +237,58 @@ test("governance preserves the system marker and rejects a second root; public s
   });
   assert.equal("organizationTeamId" in publicSettings(settings), false);
 });
+
+test("people without a named team belong to Organization for learning and reporting without rewriting membership", async () => {
+  const { reportingTeamId, effectiveGroups } = await import("../lib/types");
+  const { teamProgressRows, teamProgressCsv } =
+    await import("../lib/reporting");
+  const { reportingImpact, reconcileAssignments } =
+    await import("../lib/assignment-episodes");
+  const data = freshWorkspace();
+  const root = organizationTeam(data.teams!)!;
+  const manager = data.users.find((p) => p.role === "manager")!;
+  const admin = data.users.find((p) => p.role === "admin")!;
+  const before = structuredClone(data);
+  root.managerId = manager.id;
+  assert.equal(reportingTeamId(admin.teamId, data.teams), root.id);
+  assert.equal(reportingTeamId("missing", data.teams), "missing");
+  assert.equal(reportingTeamId(undefined, []), undefined);
+  const rows = teamProgressRows(data, manager);
+  assert.ok(rows.some((r) => r.u.id === admin.id && r.team === root.name));
+  assert.ok(
+    teamProgressRows(data, manager, root.id).some((r) => r.u.id === admin.id),
+  );
+  assert.equal(
+    teamProgressRows(data, manager, "sales-team").some(
+      (r) => r.u.id === admin.id,
+    ),
+    false,
+  );
+  assert.ok(teamProgressCsv(rows).rows.some((r) => r.includes(root.name)));
+  assert.ok(
+    reportingImpact(before, data).some(
+      (r) => r.person.id === admin.id && r.change === "Reporting access added",
+    ),
+  );
+  const group = data.groups.find((g) => g.id === "sales") || data.groups[0];
+  group.teamIds = [root.id];
+  group.legacyDirectTeamIds = [];
+  assert.ok(effectiveGroups(admin, data.groups, data.teams).has(group.id));
+  const assigned = {
+    ...data,
+    users: reconcileAssignments(data, data, "2026-10-02T12:00:00Z"),
+  };
+  const first = assigned.users.find((p) => p.id === admin.id)!;
+  const moved = {
+    ...assigned,
+    users: assigned.users.map((p) =>
+      p.id === admin.id ? { ...p, teamId: "sales-team" } : p,
+    ),
+  };
+  moved.users = reconcileAssignments(assigned, moved, "2026-10-03T12:00:00Z");
+  assert.deepEqual(
+    moved.users.find((p) => p.id === admin.id)!.learningAssignments,
+    first.learningAssignments,
+  );
+  assert.equal(admin.teamId, undefined);
+});

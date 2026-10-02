@@ -126,6 +126,7 @@ export function groupIncludesTeam(
   teamId?: string,
   teams: Team[] = [],
 ) {
+  teamId = reportingTeamId(teamId, teams);
   if (!teamId) return false;
   const ancestors = ancestorIds(teamId, teams);
   return groupTeamLinks(group).some(
@@ -141,6 +142,10 @@ export type Team = {
   parentId?: string;
   managerId?: string;
 };
+/** A blank direct team belongs at the system root; never rewrite the saved field. */
+export function reportingTeamId(teamId?: string, teams: Team[] = []) {
+  return teamId || teams.find((team) => team.system === "organization")?.id;
+}
 export type Assignment = {
   groupId?: string;
   userId?: string;

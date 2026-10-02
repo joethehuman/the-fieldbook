@@ -14,6 +14,7 @@ import { HttpError } from "./errors";
 import { brandingFromSettings } from "@/lib/branding";
 import {
   effectiveGroups,
+  reportingTeamId,
   type Content,
   type Curriculum,
   type Progress,
@@ -237,7 +238,11 @@ export const readerTeam = cache(async () => {
     teams: [],
     progress: {},
   };
-  if (!user || !user.active || !["admin", "manager", "contributor"].includes(user.role))
+  if (
+    !user ||
+    !user.active ||
+    !["admin", "manager", "contributor"].includes(user.role)
+  )
     return { data: empty, user };
 
   const [governance, rows] = await Promise.all([
@@ -264,7 +269,8 @@ export const readerTeam = cache(async () => {
       (person: User) =>
         user.role === "admin" ||
         person.id === user.id ||
-        (!!person.teamId && allowed.has(person.teamId)),
+        (person.active &&
+          allowed.has(reportingTeamId(person.teamId, teams) || "")),
     );
   const peopleIds = new Set(people.map((person) => person.id));
   const allGroups = governance.groups || [];

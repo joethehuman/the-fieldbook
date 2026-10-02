@@ -84,10 +84,9 @@ async function saved(page: Page) {
   );
 }
 async function pageAction(page: Page, name: string) {
-  await page
-    .getByRole("button", { name: "Teams page actions", exact: true })
-    .click();
-  await page.getByRole("menuitem", { name, exact: true }).click();
+  if (name !== "Manage organization team")
+    throw new Error(`Unknown Teams action: ${name}`);
+  await page.getByRole("button", { name: "Organization", exact: true }).click();
 }
 async function browse(page: Page, name: string) {
   await page
@@ -640,7 +639,7 @@ test("built-in Organization has its own manager and direct-members page", async 
 }, info) => {
   const data = stable(freshWorkspace());
   const root = data.teams!.find((team) => team.system === "organization")!;
-  data.users.find((person) => person.id === "demo-admin")!.teamId = root.id;
+  data.users.find((person) => person.id === "demo-admin")!.teamId = undefined;
   data.teams!.push({ id: "west", name: "West team", parentId: "sales-team" });
   data.users.find((person) => person.id === "demo-learner")!.teamId = "west";
   await seed(page, data);
@@ -656,7 +655,7 @@ test("built-in Organization has its own manager and direct-members page", async 
     page.getByRole("heading", { name: "Organization", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Direct members", exact: true }),
+    page.getByRole("heading", { name: "People at Organization", exact: true }),
   ).toBeVisible();
   const table = page.getByRole("table", { name: "Team members", exact: true });
   await expect(table).toContainText("Oliver Anderson");
@@ -710,7 +709,7 @@ test("built-in Organization has its own manager and direct-members page", async 
   expect(after.progress).toEqual(baseline.progress);
   expect(
     after.users.find((person) => person.id === "demo-learner")!.teamId,
-  ).toBe(root.id);
+  ).toBeUndefined();
 });
 
 test("legacy root upgrade preserves an explicit sole root and neutrally joins multiple roots", async ({
@@ -750,4 +749,90 @@ test("legacy root upgrade preserves an explicit sole root and neutrally joins mu
       page.getByRole("heading", { name: "Organization", exact: true }),
     ).toBeVisible();
   }
+});
+
+test("Organization automatically includes people without teams and supports a reviewed round trip", async ({
+  page,
+}, info) => {
+  const data = stable(freshWorkspace());
+  const admin = data.users.find((person) => person.id === "demo-admin")!;
+  expect(admin.teamId).toBeUndefined();
+  await seed(page, data);
+  await page.getByRole("button", { name: "Organization", exact: true }).click();
+  const table = page.getByRole("table", { name: "Team members", exact: true });
+  await expect(table).toContainText(admin.name);
+  await expect(page.getByText("Guests", { exact: true })).toBeVisible();
+  await table
+    .getByRole("checkbox", { name: `Select ${admin.name}`, exact: true })
+    .check();
+  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Remove from team", exact: true }),
+  ).toHaveAttribute("aria-disabled", "true");
+  await page
+    .getByRole("menuitem", { name: "Move to team", exact: true })
+    .click();
+  const move = page.getByRole("dialog", { name: "Move to team", exact: true });
+  await move
+    .getByRole("combobox", { name: "Destination", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Organization / Sales team", exact: true })
+    .click();
+  await move
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
+  const review = page.getByRole("dialog", {
+    name: "Review membership changes",
+    exact: true,
+  });
+  await review
+    .getByRole("button", { name: "Move members", exact: true })
+    .click();
+  await expect(move).not.toBeVisible();
+  await expect(table).not.toContainText(admin.email);
+  expect(
+    (await saved(page)).users.find((person) => person.id === admin.id)!.teamId,
+  ).toBe("sales-team");
+  await page
+    .getByRole("button", { name: "Back to teams", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Open Sales team", exact: true })
+    .click();
+  await page
+    .getByRole("button", {
+      name: `Remove ${admin.name} from team`,
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Review membership changes", exact: true })
+    .getByRole("button", { name: "Remove member", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Back to teams", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Organization", exact: true }).click();
+  await expect(table).toContainText(admin.name);
+  const after = await saved(page);
+  expect(
+    after.users.find((person) => person.id === admin.id)!.teamId,
+  ).toBeUndefined();
+  expect(after.progress).toEqual(data.progress);
+  expect(after.teams).toEqual(data.teams);
+  await page.screenshot({
+    path: info.outputPath("organization-fallback-round-trip.png"),
+    fullPage: true,
+  });
+  after.settings!.access = "private";
+  await page.evaluate(
+    (workspace) =>
+      localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace)),
+    after,
+  );
+  await page.reload();
+  await teamsSection(page);
+  await page.getByRole("button", { name: "Organization", exact: true }).click();
+  await expect(page.getByText("Guests", { exact: true })).toHaveCount(0);
 });

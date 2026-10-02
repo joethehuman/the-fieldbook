@@ -5,6 +5,8 @@ import {
   effectiveGroups,
   isComplete,
   reportTeamIds,
+  reportingTeamId,
+  type Team,
 } from "./types";
 import { addDays, assignmentRules, onboardingClockTarget } from "./learning";
 
@@ -275,14 +277,16 @@ export function reportingImpact(before: Workspace, after: Workspace) {
       },
       after.teams || [],
     );
-    const inScope = (p: User, ids: Set<string>) =>
-      p.active && !!p.teamId && ids.has(p.teamId);
+    const inScope = (p: User, ids: Set<string>, teams: Team[]) =>
+      p.active && ids.has(reportingTeamId(p.teamId, teams) || "");
     return [
       ...after.users
         .filter(
           (p) =>
-            inScope(p, now) &&
-            !before.users.some((old) => old.id === p.id && inScope(old, was)),
+            inScope(p, now, after.teams || []) &&
+            !before.users.some(
+              (old) => old.id === p.id && inScope(old, was, before.teams || []),
+            ),
         )
         .map((person) => ({
           manager,
@@ -292,8 +296,11 @@ export function reportingImpact(before: Workspace, after: Workspace) {
       ...before.users
         .filter(
           (p) =>
-            inScope(p, was) &&
-            !after.users.some((next) => next.id === p.id && inScope(next, now)),
+            inScope(p, was, before.teams || []) &&
+            !after.users.some(
+              (next) =>
+                next.id === p.id && inScope(next, now, after.teams || []),
+            ),
         )
         .map((person) => ({
           manager,

@@ -9,6 +9,7 @@ import {
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import {
   effectiveGroups,
+  reportingTeamId,
   groupTeamLinks,
   groupIncludesTeam,
   type Group,
@@ -276,7 +277,7 @@ export default function LearningGroups({
     .filter(
       (person) =>
         matches(
-          `${person.name} ${person.email} ${teams.find((team) => team.id === person.teamId)?.name || ""}`,
+          `${person.name} ${person.email} ${teams.find((team) => team.id === reportingTeamId(person.teamId, teams))?.name || ""}`,
         ) &&
         (!sourceFilter ||
           (sourceFilter === "direct"
@@ -287,7 +288,7 @@ export default function LearningGroups({
         (!teamFilter ||
           (teamFilter === "none"
             ? !person.teamId
-            : person.teamId === teamFilter.slice(5))),
+            : reportingTeamId(person.teamId, teams) === teamFilter.slice(5))),
     )
     .sort((a, b) => (peopleSort === "reverse" ? byName(b, a) : byName(a, b)));
   const resetPeopleFilters = () => {
@@ -321,7 +322,7 @@ export default function LearningGroups({
       id: "team",
       label:
         teamFilter === "none"
-          ? "No reporting team"
+          ? "No direct team"
           : teams.find((team) => team.id === teamFilter.slice(5))?.name ||
             "Team",
       onRemove: () => {
@@ -1330,7 +1331,7 @@ export default function LearningGroups({
                       }}
                     >
                       <option value="">All teams</option>
-                      <option value="none">No reporting team</option>
+                      <option value="none">No direct team</option>
                       {[...teams].sort(byName).map((team) => (
                         <option key={team.id} value={`team:${team.id}`}>
                           {team.name}
@@ -1502,11 +1503,11 @@ export default function LearningGroups({
                                 </p>
                               </TableCell>
                               <TableCell>
-                                {person.teamId
-                                  ? teams.find(
-                                      (team) => team.id === person.teamId,
-                                    )?.name || "Unknown team"
-                                  : "No reporting team"}
+                                {teams.find(
+                                  (team) =>
+                                    team.id ===
+                                    reportingTeamId(person.teamId, teams),
+                                )?.name || "No direct team"}
                               </TableCell>
                               <TableCell>{sources.join(" · ")}</TableCell>
                             </TableRow>
@@ -1809,7 +1810,7 @@ export default function LearningGroups({
                   options={[...data.users].sort(byName).map((person) => ({
                     id: person.id,
                     label: person.name,
-                    description: `${person.email} · ${teams.find((team) => team.id === person.teamId)?.name || "No reporting team"}${!person.active ? " · Inactive" : ""}`,
+                    description: `${person.email} · ${teams.find((team) => team.id === reportingTeamId(person.teamId, teams))?.name || "No direct team"}${!person.active ? " · Inactive" : ""}`,
                   }))}
                   value={editor.people}
                   onChange={(ids) => setEditor({ ...editor, people: ids })}

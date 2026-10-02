@@ -9,7 +9,17 @@ Everyone with access to an installation can explore its full published library. 
 - A curriculum is a named, ordered playlist of courses. Published curricula can be browsed by everyone and added to learning groups. Draft curricula are only available to administrators. Curricula are maintained in their own admin tab.
 - A learning group's sequence can contain both courses and curricula. The combined recommendation follows saved group order, then each group's saved item order and each curriculum's course order. The flat upgrade preserves the previous ancestor-first group priority in that saved order. A course encountered more than once appears once in the combined recommendation. Courses are never locked.
 
-Administrators manage each group through **Learning**, **People** and **Updates**, starting with Learning. **Manage membership** selects teams and individuals; **Add learning** selects courses and curricula. The existing Content and Curricula workflows also offer **Assign to learning groups**. These controls edit the same saved plan and review consequential changes before saving. See [learning group administration](learning-groups.md#administration).
+Administrators manage each group through **People**, **Assigned Courses** and **Assigned Updates**, starting with People. **Add Members** selects teams and individuals; **Assign Courses** selects courses and curricula. The existing Content and Curricula workflows also offer **Assign to learning groups**. These controls edit the same saved plan and review consequential changes before saving. See [learning group administration](learning-groups.md#administration).
+
+## Organization and reporting teams
+
+Every installation has one built-in **Organization** team. Top-level teams belong directly beneath it; each other team has one parent. Organization is available through the visible **Organization** button on Teams and does not occupy a column in the team browser.
+
+A person can have one direct team or leave that field blank. People without a named team automatically appear at Organization. Its page manages the organization manager and these people, including preregistered accounts. Moving someone into a team changes their reporting location; removing them from a named team returns them to Organization. The Organization manager can report on active people across every team, including those without a named team. Other managers see only the branches they manage.
+
+Linking Organization to a learning group includes everyone in the hierarchy, including people without a named team. This is derived membership: their optional team field remains blank, overlapping assignments count once, and a continuously assigned course keeps its deadline. Existing direct-only links retain their direct reach.
+
+In public installations, Organization also identifies the **Guests** audience. Anonymous visitors are not roster entries and are not included in people counts or manager reports. Their progress stays in their browser, and recommendations continue to use the configured guest learning group.
 
 ## For you and completion
 

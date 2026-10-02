@@ -11,6 +11,7 @@ import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import {
   ancestorIds,
+  reportingTeamId,
   canParent,
   groupTeamLinks,
   type Team,
@@ -458,12 +459,12 @@ export function TeamsAdmin({
             u.id === user.id ? { ...u, teamId: undefined } : u,
           ),
         },
-        "Member removed from team.",
+        "Member returned to Organization.",
         false,
         {
           review: {
             title: "Review membership changes",
-            description: `Remove ${user.name} from ${team.name}. Their account and saved progress are kept.`,
+            description: `Remove ${user.name} from ${team.name}. They return to Organization. Their account and saved progress are kept.`,
             confirmLabel: "Remove member",
           },
         },
@@ -471,7 +472,8 @@ export function TeamsAdmin({
     )
       memberList.reveal();
   }
-  const direct = data.users.filter((u) => u.teamId === selected);
+  const memberTeam = (user: User) => reportingTeamId(user.teamId, teams);
+  const direct = data.users.filter((u) => memberTeam(u) === selected);
   const descendants = new Set(
     teams
       .filter(
@@ -494,7 +496,7 @@ export function TeamsAdmin({
   const rosterSelection = useBulkSelection(
     selected + tab + query,
     members.map((u) => u.id),
-    members.filter((u) => u.teamId === team?.id).map((u) => u.id),
+    members.filter((u) => memberTeam(u) === team?.id).map((u) => u.id),
   );
   const hierarchyItems = [...teams]
     .filter((value) => value.id !== organization?.id)
@@ -518,10 +520,11 @@ export function TeamsAdmin({
     Math.max(1, Math.ceil(members.length / PAGE_SIZE)),
   );
   const eligible = data.users
-    .filter((u) => u.active && u.teamId !== selected)
+    .filter((u) => u.active && memberTeam(u) !== selected)
     .sort(byName);
   const teamName = (id?: string) =>
-    teams.find((team) => team.id === id)?.name || "No team";
+    teams.find((team) => team.id === reportingTeamId(id, teams))?.name ||
+    "No team";
 
   function teamTable(rows: Team[]) {
     return rows.length ? (
@@ -588,28 +591,16 @@ export function TeamsAdmin({
           variant="page"
           title={<h2 {...browserTarget.targetProps}>Teams</h2>}
         >
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                disabled={busy}
-                aria-label="Teams page actions"
-              >
-                <MoreHorizontal aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {organization && (
-                <DropdownMenuItem
-                  onSelect={() => void openTeam(organization.id)}
-                >
-                  Manage organization team
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {organization && (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={busy}
+              onClick={() => void openTeam(organization.id)}
+            >
+              Organization
+            </Button>
+          )}
         </SectionHeader>
         <HierarchyBrowser
           branchId={browseId}
@@ -891,10 +882,12 @@ export function TeamsAdmin({
               </ActionGroup>
             </SectionHeader>
             <p className="text-copy text-muted-foreground">
-              {direct.length + descendantMembers.length} people in this branch ·{" "}
-              {direct.length} direct members
+              {direct.length + descendantMembers.length} people{" "}
+              {managingOrganization ? "across Organization" : "in this branch"}{" "}
+              · {direct.length}{" "}
+              {managingOrganization ? "at Organization" : "direct members"}
               {children.length > 0 &&
-                ` · ${children.length} ${children.length === 1 ? "subteam" : "subteams"}`}
+                ` · ${children.length} ${managingOrganization ? (children.length === 1 ? "top-level team" : "top-level teams") : children.length === 1 ? "subteam" : "subteams"}`}
             </p>
           </div>
           {notice && !editing && !moving && (
@@ -925,12 +918,12 @@ export function TeamsAdmin({
               <SectionHeader
                 title={
                   <h3 {...memberList.targetProps}>
-                    {managingOrganization ? "Direct members" : "People"}
+                    {managingOrganization ? "People at Organization" : "People"}
                   </h3>
                 }
                 description={
                   managingOrganization
-                    ? "People who report directly at the organization level. The organization manager can report on everyone across its teams."
+                    ? "People without a named team appear here automatically. The organization manager can report on everyone across all teams."
                     : "People belong to one team. Subteam members appear here for reporting."
                 }
               />
@@ -952,7 +945,12 @@ export function TeamsAdmin({
                             ...data,
                             users: data.users.map((u) =>
                               ids.includes(u.id)
-                                ? { ...u, teamId: team.id }
+                                ? {
+                                    ...u,
+                                    teamId: managingOrganization
+                                      ? undefined
+                                      : team.id,
+                                  }
                                 : u,
                             ),
                           },
@@ -1019,7 +1017,7 @@ export function TeamsAdmin({
                 }
               />
               <BulkActions
-                singleItemActions={false}
+                singleItemActions={managingOrganization}
                 collectionSize={rosterSelection.collectionSize}
                 selected={rosterSelection.actionIds}
                 onSelectionChange={rosterSelection.setSelected}
@@ -1034,7 +1032,10 @@ export function TeamsAdmin({
                     id: "remove",
                     label: "Remove from team",
                     description:
-                      "Remove direct membership from this team. Reporting and team-linked assignments change; saved history remains.",
+                      "Return direct members to Organization. Reporting and team-linked assignments change; saved history remains.",
+                    disabledReason: managingOrganization
+                      ? "People without a named team always belong to Organization. Move them to a team instead."
+                      : undefined,
                     apply: async () => {
                       if (
                         !(await commit(
@@ -1042,12 +1043,12 @@ export function TeamsAdmin({
                             ...data,
                             users: data.users.map((u) =>
                               rosterSelection.actionIds.includes(u.id) &&
-                              u.teamId === team.id
+                              memberTeam(u) === team.id
                                 ? { ...u, teamId: undefined }
                                 : u,
                             ),
                           },
-                          "Members removed.",
+                          "Members returned to Organization.",
                           true,
                           {
                             review: {
@@ -1079,8 +1080,14 @@ export function TeamsAdmin({
                             ...data,
                             users: data.users.map((u) =>
                               rosterSelection.actionIds.includes(u.id) &&
-                              u.teamId === team.id
-                                ? { ...u, teamId: ids[0] }
+                              memberTeam(u) === team.id
+                                ? {
+                                    ...u,
+                                    teamId:
+                                      ids[0] === organization?.id
+                                        ? undefined
+                                        : ids[0],
+                                  }
                                 : u,
                             ),
                           },
@@ -1114,7 +1121,7 @@ export function TeamsAdmin({
                                     (currentPage - 1) * PAGE_SIZE,
                                     currentPage * PAGE_SIZE,
                                   )
-                                  .filter((u) => u.teamId === team.id)
+                                  .filter((u) => memberTeam(u) === team.id)
                                   .map((u) => u.id)}
                                 value={rosterSelection.selected}
                                 onChange={rosterSelection.setSelected}
@@ -1142,9 +1149,9 @@ export function TeamsAdmin({
                                 {rosterSelection.canSelect && (
                                   <Checkbox
                                     aria-label={`Select ${u.name}`}
-                                    disabled={u.teamId !== team.id}
+                                    disabled={memberTeam(u) !== team.id}
                                     aria-describedby={
-                                      u.teamId !== team.id
+                                      memberTeam(u) !== team.id
                                         ? `team-membership-${u.id}`
                                         : undefined
                                     }
@@ -1158,7 +1165,7 @@ export function TeamsAdmin({
                                 )}
                                 <strong>{u.name}</strong>
                               </div>
-                              {u.teamId !== team.id && (
+                              {memberTeam(u) !== team.id && (
                                 <span
                                   id={`team-membership-${u.id}`}
                                   className="sr-only"
@@ -1173,12 +1180,15 @@ export function TeamsAdmin({
                               )}
                             </TableCell>
                             <TableCell>
-                              {u.teamId === team.id
-                                ? "Direct member"
-                                : teamName(u.teamId)}
+                              {managingOrganization && !u.teamId
+                                ? "No direct team"
+                                : memberTeam(u) === team.id
+                                  ? "Direct member"
+                                  : teamName(u.teamId)}
                             </TableCell>
                             <TableCell>
-                              {u.teamId === selected ? (
+                              {managingOrganization ? null : memberTeam(u) ===
+                                selected ? (
                                 <Button
                                   variant="link"
                                   disabled={busy}
@@ -1192,7 +1202,7 @@ export function TeamsAdmin({
                                   variant="link"
                                   disabled={busy}
                                   aria-label={`Manage ${u.name}'s team`}
-                                  onClick={() => void openTeam(u.teamId!)}
+                                  onClick={() => void openTeam(memberTeam(u)!)}
                                 >
                                   Manage team
                                 </Button>
@@ -1214,7 +1224,7 @@ export function TeamsAdmin({
                   }}
                 />
               )}
-              {members.filter((u) => u.teamId === team.id).length >
+              {members.filter((u) => memberTeam(u) === team.id).length >
                 PAGE_SIZE && (
                 <Button
                   type="button"
@@ -1222,7 +1232,7 @@ export function TeamsAdmin({
                   onClick={() =>
                     rosterSelection.setSelected(
                       members
-                        .filter((u) => u.teamId === team.id)
+                        .filter((u) => memberTeam(u) === team.id)
                         .map((u) => u.id),
                     )
                   }
@@ -1242,6 +1252,12 @@ export function TeamsAdmin({
                 }}
                 disabled={busy}
               />
+              {managingOrganization && data.settings?.access === "public" && (
+                <SectionHeader
+                  title={<h3>Guests</h3>}
+                  description="Public visitors are part of Organization. Their learning progress stays in their browser and is excluded from people counts and manager reports."
+                />
+              )}
             </TabsContent>
             {!managingOrganization && children.length > 0 && (
               <TabsContent value="subteams" className="grid gap-6">
