@@ -72,13 +72,12 @@ test("review subtree assignments, keep defaults future-only, cancel and apply de
   await section(page, "Learning groups");
   await page.getByRole("button", { name: "Sales", exact: true }).click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Manage membership", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const membership = page.getByRole("dialog", {
-    name: "Manage membership",
+    name: "Add Members",
     exact: true,
   });
+  await membership.getByRole("tab", { name: "Teams", exact: true }).click();
   await membership
     .getByRole("checkbox", {
       name: "Include subteams for Sales team",

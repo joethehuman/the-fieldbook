@@ -6,7 +6,9 @@ import { SectionHeader, EmptyState } from "@/components/patterns/layout";
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
-import { Settings } from "lucide-react";
+import { Settings, Plus } from "lucide-react";
+import { CollectionControls } from "@/components/patterns/collection-controls";
+import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/patterns/form-field";
 import { SettingsSection } from "@/components/patterns/settings-section";
 import { LoadMore } from "@/components/patterns/load-more";
@@ -235,6 +237,15 @@ export function LibraryExamples() {
               label="Workspace teams"
               activeId={directoryTeam}
               onOpen={setDirectoryTeam}
+              searchAction={
+                <Button
+                  onClick={() =>
+                    setMessage("Add a team in this example workspace.")
+                  }
+                >
+                  <Plus aria-hidden="true" /> Add team
+                </Button>
+              }
               items={[
                 { id: "revenue", label: "Revenue" },
                 {
@@ -276,6 +287,31 @@ export function LibraryExamples() {
             </EmptyState>
           )}
         </DirectoryWorkspace>
+        <CollectionControls
+          search={
+            <FormField
+              label="Find a person in the example team"
+              visuallyHiddenLabel
+            >
+              <Input type="search" placeholder="Find a person in this team" />
+            </FormField>
+          }
+          primaryAction={
+            <Button
+              onClick={() => setMessage("Add members to this example team.")}
+            >
+              <Plus aria-hidden="true" /> Add Members
+            </Button>
+          }
+          sortLabel="Name A–Z"
+          sort={
+            <FormField label="Example member order">
+              <SelectField value="name" onValueChange={() => {}}>
+                <option value="name">Name A–Z</option>
+              </SelectField>
+            </FormField>
+          }
+        />
         <HierarchyList
           label="Example teams"
           onOpen={(id) => setMessage(`Open example team: ${id}`)}

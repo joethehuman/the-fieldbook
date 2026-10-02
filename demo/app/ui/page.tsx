@@ -85,7 +85,7 @@ import {
 
 const choices = (
   <>
-    <option value="">No parent</option>
+    <option value="">No linked team</option>
     <option value="company">Company</option>
     <option value="sales">
       Sales and customer success with a deliberately long group name
@@ -514,7 +514,7 @@ export default function ComponentCatalog() {
               <Textarea placeholder="Who is this group for?" />
             </Field>
             <Field>
-              Parent learning group
+              Linked team
               <SelectField value={group} onValueChange={setGroup}>
                 {choices}
               </SelectField>
@@ -567,14 +567,14 @@ export default function ComponentCatalog() {
       <Card>
         <Tabs defaultValue="members">
           <TabsList aria-label="Example group sections">
-            <TabsTrigger value="members">Members</TabsTrigger>
-            <TabsTrigger value="learning">Learning</TabsTrigger>
-            <TabsTrigger value="updates">Updates</TabsTrigger>
+            <TabsTrigger value="members">People</TabsTrigger>
+            <TabsTrigger value="learning">Assigned Courses</TabsTrigger>
+            <TabsTrigger value="updates">Assigned Updates</TabsTrigger>
           </TabsList>
           <TabsContent value="members">
             <FieldGroup>
               <Field>
-                Parent learning group
+                Linked team
                 <SelectField value={group} onValueChange={setGroup}>
                   {choices}
                 </SelectField>
@@ -815,7 +815,7 @@ export default function ComponentCatalog() {
             correctly.
           </DialogDescription>
           <Field>
-            Dialog parent group
+            Dialog linked team
             <SelectField value={group} onValueChange={setGroup}>
               {choices}
             </SelectField>

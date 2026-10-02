@@ -73,16 +73,32 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
     exact: true,
   });
   await expect(members.locator("tbody tr")).toHaveCount(25);
+  await expect(
+    members.getByRole("columnheader", {
+      name: "Included through",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(members.locator("tbody tr").first()).toContainText(
+    "Direct member",
+  );
+  await expect(
+    page.getByRole("button", { name: "All people", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Direct members", exact: true }),
+  ).toHaveCount(0);
   const pages = page.getByRole("navigation", { name: "Team members pages" });
   await pages.getByRole("button", { name: "Next", exact: true }).click();
   await expect(members).toContainText("Person 025");
   await expect(members).toContainText("Inactive");
 
-  await page
-    .getByRole("button", { name: "Direct members", exact: true })
-    .click();
+  await pages.getByRole("button", { name: "Next", exact: true }).click();
   await expect(members.locator("tbody tr")).toHaveCount(25);
-  await page.getByRole("button", { name: "All people", exact: true }).click();
+  await expect(members.locator("tbody tr").first()).toContainText("Child team");
+  await expect(
+    members.getByRole("checkbox", { name: "Select Person 050", exact: true }),
+  ).toBeDisabled();
   await page
     .getByRole("searchbox", { name: "Find a member", exact: true })
     .fill("person125@example.test");
@@ -268,6 +284,104 @@ test("team detail retains the tree search and optional selection on return", asy
     .click();
   await expect(choice).toHaveCount(0);
   expect((await saved(page)).users).toEqual(baseline.users);
+});
+
+test("new-team parent options stay anchored to the visible dialog and preserve cancel or save", async ({
+  page,
+}, info) => {
+  const data = freshWorkspace();
+  data.teams!.push(
+    { id: "east", name: "East team" },
+    { id: "west", name: "West team" },
+  );
+  data.users = data.users.map((person) => ({
+    ...person,
+    groupJoinedAt: Object.fromEntries(
+      person.groups.map((id) => [id, "2026-01-01T00:00:00.000Z"]),
+    ),
+    effectiveGroupJoinedAt: Object.fromEntries(
+      person.groups.map((id) => [id, "2026-01-01T00:00:00.000Z"]),
+    ),
+  }));
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript((workspace) => {
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+    if (!localStorage.getItem("fieldbook.workspace.v1"))
+      localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+  }, data);
+  await page.goto("/#admin");
+  await expect(page.locator(".admin-layout")).toBeVisible();
+  await section(page, "Teams");
+  const baseline = await saved(page);
+  await page.getByRole("button", { name: "Add team", exact: true }).click();
+  const editor = page.getByRole("dialog", {
+    name: "New team",
+    exact: true,
+    includeHidden: true,
+  });
+  const parent = editor.getByRole("combobox", {
+    name: "Parent team",
+    exact: true,
+    includeHidden: true,
+  });
+  await editor
+    .getByRole("textbox", { name: "Team name", exact: true })
+    .fill("New regional team");
+  await parent.click();
+  const options = page.getByRole("listbox");
+  await expect(options).toBeVisible();
+  await expect(editor).toBeVisible();
+  await expect(parent).toBeVisible();
+  await expect
+    .poll(async () => {
+      const trigger = await parent.boundingBox();
+      const menu = await options.boundingBox();
+      if (!trigger || !menu) return false;
+      const verticalGap = Math.min(
+        Math.abs(menu.y - (trigger.y + trigger.height + 5)),
+        Math.abs(menu.y + menu.height + 5 - trigger.y),
+      );
+      return (
+        Math.abs(menu.x - trigger.x) < 8 &&
+        menu.width >= trigger.width - 2 &&
+        verticalGap < 8
+      );
+    })
+    .toBe(true);
+  await page.screenshot({
+    path: info.outputPath("new-team-parent-options.png"),
+    fullPage: true,
+  });
+  await page.getByRole("option", { name: "Sales team", exact: true }).click();
+  await expect(parent).toContainText("Sales team");
+  await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  expect((await saved(page)).teams).toEqual(baseline.teams);
+
+  await page.getByRole("button", { name: "Add team", exact: true }).click();
+  await editor
+    .getByRole("textbox", { name: "Team name", exact: true })
+    .fill("New regional team");
+  await parent.click();
+  await page.getByRole("option", { name: "Sales team", exact: true }).click();
+  await editor.getByRole("button", { name: "Save team", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await expect(
+    page.getByRole("dialog", { name: "Review team changes", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "New regional team", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Parent: Sales team", exact: true }),
+  ).toBeVisible();
+  const after = await saved(page);
+  expect(
+    after.teams!.find((team) => team.name === "New regional team")!.parentId,
+  ).toBe("sales-team");
+  expect(after.users).toEqual(baseline.users);
+  expect(after.progress).toEqual(baseline.progress);
 });
 
 test("a contributor manager has one cancelable review without changing their own membership", async ({

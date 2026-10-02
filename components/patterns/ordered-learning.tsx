@@ -11,6 +11,7 @@ export function OrderedLearning({
   onReorder,
   onRemove,
   disabled = false,
+  reorderDisabled = false,
   selected,
   onSelectionChange,
 }: {
@@ -18,13 +19,15 @@ export function OrderedLearning({
   onReorder: (ids: string[]) => void;
   onRemove: (id: string) => void;
   disabled?: boolean;
+  /** Filtering may pause ordering while retaining removal and selection. */
+  reorderDisabled?: boolean;
   selected?: string[];
   onSelectionChange?: (ids: string[]) => void;
 }) {
   const drag = useRowReorder(
     items,
     (id, target) => move(id, target),
-    disabled,
+    disabled || reorderDisabled,
     (item) => item.label,
   );
   function move(id: string, position: number) {
@@ -35,7 +38,8 @@ export function OrderedLearning({
       position < 0 ||
       position >= ids.length ||
       from === position ||
-      disabled
+      disabled ||
+      reorderDisabled
     )
       return;
     ids.splice(from, 1);
@@ -76,8 +80,8 @@ export function OrderedLearning({
                 variant="ghost"
                 type="button"
                 className="order-handle"
-                draggable={!disabled}
-                disabled={disabled}
+                draggable={!disabled && !reorderDisabled}
+                disabled={disabled || reorderDisabled}
                 aria-label={`Reorder ${item.label}; use up or down arrow`}
                 onDragStart={(e) => drag.start(e, item.id)}
                 onDragEnd={drag.cancel}
@@ -129,7 +133,7 @@ export function OrderedLearning({
                   variant="ghost"
                   size="icon"
                   aria-label={`Move ${item.label} up`}
-                  disabled={disabled || index === 0}
+                  disabled={disabled || reorderDisabled || index === 0}
                   onClick={() => move(item.id, index - 1)}
                 >
                   <ArrowUp size={16} />
@@ -139,7 +143,9 @@ export function OrderedLearning({
                   variant="ghost"
                   size="icon"
                   aria-label={`Move ${item.label} down`}
-                  disabled={disabled || index === items.length - 1}
+                  disabled={
+                    disabled || reorderDisabled || index === items.length - 1
+                  }
                   onClick={() => move(item.id, index + 1)}
                 >
                   <ArrowDown size={16} />

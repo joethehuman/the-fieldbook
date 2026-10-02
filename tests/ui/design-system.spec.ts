@@ -44,23 +44,23 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
     page.getByRole("heading", { name: "Interface reference" }),
   ).toBeVisible();
   const tabs = page.getByRole("tablist", { name: "Example group sections" });
-  const members = tabs.getByRole("tab", { name: "Members" });
-  const panel = page.getByRole("tabpanel", { name: "Members" });
-  const select = panel.getByRole("combobox", { name: "Parent learning group" });
+  const members = tabs.getByRole("tab", { name: "People" });
+  const panel = page.getByRole("tabpanel", { name: "People" });
+  const select = panel.getByRole("combobox", { name: "Linked team" });
   const tabBox = await tabs.boundingBox(),
     fieldBox = await select.boundingBox();
   expect(fieldBox!.y - (tabBox!.y + tabBox!.height)).toBeGreaterThanOrEqual(20);
   await select.focus();
   await page.keyboard.press("Space");
   await expect(
-    page.getByRole("option", { name: "No parent", exact: true }),
+    page.getByRole("option", { name: "No linked team", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Home");
   await expect(
-    page.getByRole("option", { name: "No parent", exact: true }),
+    page.getByRole("option", { name: "No linked team", exact: true }),
   ).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(select).toHaveText("No parent");
+  await expect(select).toHaveText("No linked team");
   await select.click();
   await page
     .getByRole("option", {
@@ -74,11 +74,10 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
   await members.focus();
   await expect(members).toBeFocused();
   await page.keyboard.press("ArrowRight");
-  await expect(tabs.getByRole("tab", { name: "Learning" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  const order = page.getByRole("tabpanel", { name: "Learning" });
+  await expect(
+    tabs.getByRole("tab", { name: "Assigned Courses" }),
+  ).toHaveAttribute("aria-selected", "true");
+  const order = page.getByRole("tabpanel", { name: "Assigned Courses" });
   await order
     .getByRole("button", { name: "Move Company essentials down", exact: true })
     .click();
@@ -92,7 +91,35 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
   const trigger = page.getByRole("button", { name: "Edit example group" });
   await trigger.click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("combobox", { name: "Dialog parent group" }).click();
+  const dialogSelect = dialog.getByRole("combobox", {
+    name: "Dialog linked team",
+  });
+  await dialogSelect.click();
+  // Opening a nested Select hides siblings for accessibility; its dialog stays painted.
+  const paintedDialog = page.locator('[data-slot="dialog-content"]');
+  const paintedSelect = paintedDialog.locator('[data-slot="select-trigger"]');
+  await expect(paintedDialog).toBeVisible();
+  await expect(paintedSelect).toBeVisible();
+  const option = page.getByRole("option", { name: "Company", exact: true });
+  await expect(option).toBeVisible();
+  const triggerBox = await paintedSelect.boundingBox();
+  const menuBox = await page
+    .locator('[data-slot="select-content"]')
+    .boundingBox();
+  // A wider option list may shift to stay inside a narrow viewport.
+  expect(Math.abs(menuBox!.x - triggerBox!.x)).toBeLessThan(
+    Math.abs(menuBox!.width - triggerBox!.width) + 8,
+  );
+  expect(menuBox!.x).toBeGreaterThanOrEqual(0);
+  expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(
+    page.viewportSize()!.width,
+  );
+  expect(
+    Math.min(
+      Math.abs(menuBox!.y - triggerBox!.y - triggerBox!.height - 5),
+      Math.abs(menuBox!.y + menuBox!.height + 5 - triggerBox!.y),
+    ),
+  ).toBeLessThan(8);
   await page.getByRole("option", { name: "Company", exact: true }).click();
   await expect(dialog.getByRole("combobox")).toHaveText("Company");
   await page.keyboard.press("Escape");
@@ -138,14 +165,14 @@ test("learning groups: shared controls, save and reload", async ({
     page.getByRole("heading", { name: "Sales design test", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("tab", { name: "Learning", exact: true }),
+    page.getByRole("tab", { name: "People", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
   await expect(
     page.getByRole("button", { name: /Add child group|Move group/ }),
   ).toHaveCount(0);
   await page.getByRole("tab", { name: "People", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Manage membership", exact: true }),
+    page.getByRole("button", { name: "Add Members", exact: true }),
   ).toBeVisible();
   await noOverflow(page);
   await page.screenshot({
@@ -529,7 +556,9 @@ test("catalog remains usable with enlarged text", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Interface reference" }),
   ).toBeVisible();
-  await page.getByRole("tab", { name: "Learning", exact: true }).click();
+  await page
+    .getByRole("tab", { name: "Assigned Courses", exact: true })
+    .click();
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });

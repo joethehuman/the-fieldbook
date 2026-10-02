@@ -108,7 +108,7 @@ export default function LearningGroups({
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const [selected, setSelected] = useState(initialGroup || "");
-  const [tab, setTab] = useState("learning");
+  const [tab, setTab] = useState("people");
   const [indexQuery, setIndexQuery] = useState("");
   const [indexPage, setIndexPage] = useState(1);
   const [returnToGroup, setReturnToGroup] = useState("");
@@ -117,7 +117,7 @@ export default function LearningGroups({
   const [updateSort, setUpdateSort] =
     useState<GroupBrowseSort>("updated-newest");
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [sourceTab, setSourceTab] = useState("teams");
+  const [sourceTab, setSourceTab] = useState("people");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const saving = useRef(false);
@@ -166,6 +166,22 @@ export default function LearningGroups({
       `${person.name} ${person.email} ${teams.find((team) => team.id === person.teamId)?.name || ""}`,
     ),
   );
+  const filteredItems = items.filter((item) => {
+    if (item.kind === "course")
+      return matches(
+        content.find((candidate) => candidate.id === item.id)?.title ||
+          "Unavailable course",
+      );
+    const curriculum = curricula.find((candidate) => candidate.id === item.id);
+    return matches(
+      [
+        curriculum?.name || "Unavailable curriculum",
+        ...(curriculum?.courseIds || []).map(
+          (id) => content.find((candidate) => candidate.id === id)?.title || "",
+        ),
+      ].join(" "),
+    );
+  });
   const updates = group
     ? sortGroupBrowseItems(
         published
@@ -298,7 +314,7 @@ export default function LearningGroups({
   }
   function openGroup(id: string) {
     setSelected(id);
-    setTab("learning");
+    setTab("people");
     setQuery("");
     setPage(1);
     setNotice("");
@@ -321,7 +337,7 @@ export default function LearningGroups({
       snapshot: organizationSnapshot(),
     };
     draft.original = membershipValue(draft);
-    setSourceTab("teams");
+    setSourceTab("people");
     open(draft);
   }
   async function deleteGroup() {
@@ -514,20 +530,20 @@ export default function LearningGroups({
       : editor.kind === "rename"
         ? "Rename learning group"
         : editor.kind === "membership"
-          ? "Manage membership"
+          ? "Add Members"
           : editor.kind === "learning"
-            ? "Add learning"
+            ? "Assign Courses"
             : editor.kind === "updates"
-              ? "Add Updates"
+              ? "Assign Updates"
               : sourcePerson?.name || "Membership source";
   const modalDescription = !editor
     ? ""
     : editor.kind === "create" || editor.kind === "rename"
       ? "Use a unique name for this audience."
       : editor.kind === "membership"
-        ? `Choose the teams and people included in ${group?.name}.`
+        ? `Choose people or teams to include in ${group?.name}. Clear an existing selection to remove that membership source.`
         : editor.kind === "learning"
-          ? `Add courses or curricula to ${group?.name}. Overlapping courses count once.`
+          ? `Assign courses or curricula to ${group?.name}. Overlapping courses count once.`
           : editor.kind === "updates"
             ? `Choose relevant Updates for ${group?.name}.`
             : `Why this person is included in ${group?.name}.`;
@@ -561,17 +577,18 @@ export default function LearningGroups({
             variant="page"
             title={<h2>Learning groups</h2>}
             description="Choose an audience, then choose its learning. Published content remains available to everyone with access."
-          >
-            <Button
-              type="button"
-              disabled={busy || needsConversion}
-              onClick={() => open({ kind: "create", name: "", original: "" })}
-            >
-              <Plus aria-hidden="true" />
-              Create group
-            </Button>
-          </SectionHeader>
+          />
           <CollectionControls
+            primaryAction={
+              <Button
+                type="button"
+                disabled={busy || needsConversion}
+                onClick={() => open({ kind: "create", name: "", original: "" })}
+              >
+                <Plus aria-hidden="true" />
+                Create group
+              </Button>
+            }
             search={
               <FormField label="Find a group" visuallyHiddenLabel>
                 <Input
@@ -720,35 +737,51 @@ export default function LearningGroups({
             }}
           >
             <TabsList aria-label="Learning group sections">
-              <TabsTrigger value="learning">Learning</TabsTrigger>
               <TabsTrigger value="people">People</TabsTrigger>
-              <TabsTrigger value="updates">Updates</TabsTrigger>
+              <TabsTrigger value="learning">Assigned Courses</TabsTrigger>
+              <TabsTrigger value="updates">Assigned Updates</TabsTrigger>
             </TabsList>
             <TabsContent value="learning">
               <Stack>
                 <SectionHeader
-                  title={<h3>Assigned learning</h3>}
+                  title={<h3>Assigned courses and curricula</h3>}
                   description="Arrange courses and curricula in the recommended order."
-                >
-                  <Button
-                    type="button"
-                    disabled={
-                      busy || needsConversion || !learningOptions.length
-                    }
-                    onClick={() =>
-                      open({
-                        kind: "learning",
-                        ids: [],
-                        snapshot: learningSnapshot(),
-                      })
-                    }
-                  >
-                    <Plus aria-hidden="true" />
-                    Add learning
-                  </Button>
-                </SectionHeader>
+                />
+                <CollectionControls
+                  search={
+                    <FormField
+                      label="Find an assigned course or curriculum"
+                      visuallyHiddenLabel
+                    >
+                      <Input
+                        type="search"
+                        placeholder="Find an assigned course or curriculum"
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                      />
+                    </FormField>
+                  }
+                  primaryAction={
+                    <Button
+                      type="button"
+                      disabled={
+                        busy || needsConversion || !learningOptions.length
+                      }
+                      onClick={() =>
+                        open({
+                          kind: "learning",
+                          ids: [],
+                          snapshot: learningSnapshot(),
+                        })
+                      }
+                    >
+                      <Plus aria-hidden="true" />
+                      Assign Courses
+                    </Button>
+                  }
+                />
                 <OrderedLearning
-                  items={items.map((item) => {
+                  items={filteredItems.map((item) => {
                     const curriculum =
                       item.kind === "curriculum"
                         ? curricula.find(
@@ -784,6 +817,7 @@ export default function LearningGroups({
                     };
                   })}
                   disabled={busy || needsConversion}
+                  reorderDisabled={!!query.trim()}
                   onReorder={(ids) =>
                     void changeGroup(
                       {
@@ -803,11 +837,19 @@ export default function LearningGroups({
                     )
                   }
                 />
-                {!items.length && (
-                  <EmptyState>
-                    Add courses or a curriculum for this audience.
-                  </EmptyState>
-                )}
+                {!filteredItems.length &&
+                  (items.length ? (
+                    <CollectionEmpty
+                      count={0}
+                      total={items.length}
+                      noun="assigned courses or curricula"
+                      onClear={() => setQuery("")}
+                    />
+                  ) : (
+                    <EmptyState>
+                      Assign courses or a curriculum to this audience.
+                    </EmptyState>
+                  ))}
               </Stack>
             </TabsContent>
             <TabsContent value="people">
@@ -815,16 +857,18 @@ export default function LearningGroups({
                 <SectionHeader
                   title={<h3>People in this group</h3>}
                   description="People can be included through a team, individually, or both."
-                >
-                  <Button
-                    type="button"
-                    disabled={busy || needsConversion}
-                    onClick={openMembership}
-                  >
-                    Manage membership
-                  </Button>
-                </SectionHeader>
+                />
                 <CollectionControls
+                  primaryAction={
+                    <Button
+                      type="button"
+                      disabled={busy || needsConversion}
+                      onClick={openMembership}
+                    >
+                      <Plus aria-hidden="true" />
+                      Add Members
+                    </Button>
+                  }
                   search={
                     <FormField label="Find a person" visuallyHiddenLabel>
                       <Input
@@ -923,30 +967,36 @@ export default function LearningGroups({
             <TabsContent value="updates">
               <Stack>
                 <SectionHeader
-                  title={<h3>Updates for this group</h3>}
+                  title={<h3>Assigned Updates</h3>}
                   description="Relevant Updates appear in members’ For you feed."
-                >
-                  <Button
-                    type="button"
-                    disabled={busy || needsConversion || !updateOptions.length}
-                    onClick={() =>
-                      open({
-                        kind: "updates",
-                        ids: [],
-                        snapshot: learningSnapshot(),
-                      })
-                    }
-                  >
-                    <Plus aria-hidden="true" />
-                    Add Updates
-                  </Button>
-                </SectionHeader>
+                />
                 <CollectionControls
+                  primaryAction={
+                    <Button
+                      type="button"
+                      disabled={
+                        busy || needsConversion || !updateOptions.length
+                      }
+                      onClick={() =>
+                        open({
+                          kind: "updates",
+                          ids: [],
+                          snapshot: learningSnapshot(),
+                        })
+                      }
+                    >
+                      <Plus aria-hidden="true" />
+                      Assign Updates
+                    </Button>
+                  }
                   search={
-                    <FormField label="Find an update" visuallyHiddenLabel>
+                    <FormField
+                      label="Find an assigned update"
+                      visuallyHiddenLabel
+                    >
                       <Input
                         type="search"
-                        placeholder="Find an update"
+                        placeholder="Find an assigned update"
                         value={query}
                         onChange={(event) => {
                           setQuery(event.target.value);
@@ -986,7 +1036,7 @@ export default function LearningGroups({
                   <TableContainer>
                     <DataTable
                       layout="groupUpdates"
-                      aria-label="Updates for this group"
+                      aria-label="Assigned Updates"
                     >
                       <TableHeader>
                         <TableRow>
@@ -1109,8 +1159,8 @@ export default function LearningGroups({
           {editor?.kind === "membership" && (
             <Tabs value={sourceTab} onValueChange={setSourceTab}>
               <TabsList aria-label="Membership sources">
+                <TabsTrigger value="people">People</TabsTrigger>
                 <TabsTrigger value="teams">Teams</TabsTrigger>
-                <TabsTrigger value="individuals">Individuals</TabsTrigger>
               </TabsList>
               <TabsContent value="teams">
                 <Stack>
@@ -1164,7 +1214,7 @@ export default function LearningGroups({
                   />
                 </Stack>
               </TabsContent>
-              <TabsContent value="individuals">
+              <TabsContent value="people">
                 <SearchableSelectionList
                   key={`${group?.id}:people`}
                   label="Find a person"

@@ -28,7 +28,7 @@ export function DialogDescription({
 }
 export const dialogOverlayClass = "fixed inset-0 z-40 bg-overlay";
 export const dialogContentClass =
-  "aria-hidden:hidden fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-xl outline-none";
+  "[&:has(~_[data-slot=dialog-content][data-state=open])]:hidden fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-xl outline-none";
 export function DialogContent({
   className,
   size = "default",

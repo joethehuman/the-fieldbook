@@ -32,8 +32,13 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
       name: "Regional customer success with a long descriptive name",
       parentId: "other",
     },
+    {
+      id: "deep",
+      name: "Enterprise EMEA account executives and solutions engineering",
+      parentId: "child",
+    },
   );
-  data.users.find((user) => user.id === "demo-learner")!.teamId = "child";
+  data.users.find((user) => user.id === "demo-learner")!.teamId = "deep";
   data.users = data.users.map((user) => ({
     ...user,
     groupJoinedAt: Object.fromEntries(
@@ -151,11 +156,32 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   expect(after.teams!.find((team) => team.id === "child")!.parentId).toBe(
     "other",
   );
+  expect(after.teams!.find((team) => team.id === "deep")!.parentId).toBe(
+    "child",
+  );
   expect(after.users).toEqual(baseline.users);
   expect(after.progress).toEqual(baseline.progress);
   expect(after.groups).toEqual(baseline.groups);
   await page
-    .getByRole("table", { name: "Subteams", exact: true })
+    .getByRole("button", { name: "Back to teams", exact: true })
+    .click();
+  await page
+    .getByRole("searchbox", { name: "Find teams", exact: true })
+    .fill("Enterprise EMEA");
+  await expect(
+    page.getByRole("button", {
+      name: "Manage Enterprise EMEA account executives and solutions engineering",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Manage Sales team", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("four-level-hierarchy.png"),
+    fullPage: true,
+  });
+  await page
     .getByRole("button", { name: "Manage Customer success", exact: true })
     .click();
   await action(page, "Move team");

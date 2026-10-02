@@ -69,6 +69,10 @@ Use the shared spacing scale (4, 8, 12, 16, 24, 32, 48 px). Standard controls ha
 
 Before creating a new layout, check the pattern library. Extend a shared variant or add a small reusable pattern when necessary. Semantic HTML and genuinely specialized geometry remain appropriate; a generic component with dozens of flags is not the goal.
 
+`CollectionControls` accepts a `primaryAction` for a collection’s main task. Search and that action share the first row; sorting, filters and secondary actions occupy the next row. Narrow layouts may wrap while preserving that order. Use precise search labels that identify the current collection, such as assigned courses. The compact `HierarchyList` navigation uses the same toolbar and a bordered neutral disclosure surface with a distinct selected row. `DirectoryWorkspace` places hierarchy and selected detail side by side when space allows and uses list/detail navigation otherwise.
+
+Dialog coverage follows other open dialogs, rather than `aria-hidden` alone. Radix Select also applies `aria-hidden` to its surrounding dialog while its options are open; that must not hide the dialog or invalidate the trigger’s positioning. The catalog demonstrates a dialog with a Select and collection actions beside search. `OrderedLearning` can pause reordering during a filtered view while retaining removal and selection.
+
 ## Next.js and performance
 
 Both app roots use the same source and theme. Keep noninteractive primitives server-compatible and add client boundaries only for interactivity. Preserve the lazy-loaded admin bundle, local Geist font loading and direct component imports. Tailwind generates static CSS at build time; do not add runtime styling dependencies to solve layout problems.

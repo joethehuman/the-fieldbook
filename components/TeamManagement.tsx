@@ -5,7 +5,7 @@ import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
 import { Checkbox } from "./ui/choice";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MoreHorizontal, Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
@@ -18,6 +18,7 @@ import {
 } from "@/lib/types";
 import {
   isOrganizationChangeCanceled,
+  organizationChangeSummary,
   type OrganizationChangeOptions,
 } from "@/lib/organization-change";
 import {
@@ -67,7 +68,6 @@ import {
 } from "./patterns/collection-controls";
 import { SectionHeader, EmptyState } from "./patterns/layout";
 import { DirectoryWorkspace } from "./patterns/directory-workspace";
-import { FilterOptions } from "./patterns/filter-options";
 import { Pagination } from "./patterns/pagination";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
 import { useRevealTarget } from "./patterns/use-reveal-target";
@@ -96,7 +96,6 @@ export function TeamsAdmin({
   const [selected, setSelected] = useState("");
   const [tab, setTab] = useState("members");
   const [query, setQuery] = useState("");
-  const [includeSubteams, setIncludeSubteams] = useState(true);
   const [selectTeams, setSelectTeams] = useState(false);
   const [memberSort, setMemberSort] = useState("name");
   const [page, setPage] = useState(1);
@@ -122,6 +121,37 @@ export function TeamsAdmin({
   const dirty =
     moving?.choice != null ||
     (!!editing && JSON.stringify(editing) !== JSON.stringify(baseline.current));
+  const editId = editing?.id;
+  const editParentId = editing?.parentId;
+  const editManagerId = editing?.managerId;
+  const originalParentId = baseline.current?.parentId;
+  const originalManagerId = baseline.current?.managerId;
+  const editingNeedsReview = useMemo(() => {
+    if (
+      !editId ||
+      (editParentId === originalParentId && editManagerId === originalManagerId)
+    )
+      return false;
+    return organizationChangeSummary(data, {
+      ...data,
+      teams: [
+        ...(data.teams || []).filter((value) => value.id !== editId),
+        {
+          id: editId,
+          name: "",
+          parentId: editParentId,
+          managerId: editManagerId,
+        },
+      ],
+    }).changed;
+  }, [
+    data,
+    editId,
+    editParentId,
+    editManagerId,
+    originalParentId,
+    originalManagerId,
+  ]);
   const guard = useRef(async () => true);
   guard.current = async () =>
     !saving.current &&
@@ -155,7 +185,6 @@ export function TeamsAdmin({
     setTab("members");
     setQuery("");
     setPage(1);
-    setIncludeSubteams(true);
     destination.reveal();
   }
   async function editTeam(value: Team) {
@@ -395,14 +424,14 @@ export function TeamsAdmin({
   const descendantMembers = data.users.filter(
     (u) => !!u.teamId && descendants.has(u.teamId),
   );
-  const members = [...direct, ...(includeSubteams ? descendantMembers : [])]
+  const members = [...direct, ...descendantMembers]
     .filter((u) =>
       `${u.name} ${u.email}`.toLowerCase().includes(query.trim().toLowerCase()),
     )
     .sort((a, b) => (memberSort === "reverse" ? byName(b, a) : byName(a, b)));
   const children = teams.filter((t) => t.parentId === selected).sort(byName);
   const rosterSelection = useBulkSelection(
-    selected + tab + query + includeSubteams,
+    selected + tab + query,
     members.map((u) => u.id),
     members.filter((u) => u.teamId === team?.id).map((u) => u.id),
   );
@@ -504,34 +533,33 @@ export function TeamsAdmin({
               query={hierarchyQuery}
               onQueryChange={setHierarchyQuery}
               searchAction={
-                <ActionGroup>
+                <Button
+                  type="button"
+                  disabled={busy}
+                  onClick={() =>
+                    void editTeam({ id: crypto.randomUUID(), name: "" })
+                  }
+                >
+                  <Plus aria-hidden="true" />
+                  Add team
+                </Button>
+              }
+              secondaryActions={
+                teams.length > 1 && (
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="ghost"
+                    size="sm"
                     disabled={busy}
-                    onClick={() =>
-                      void editTeam({ id: crypto.randomUUID(), name: "" })
-                    }
+                    aria-pressed={selectTeams}
+                    onClick={() => {
+                      setSelectTeams(!selectTeams);
+                      teamSelection.setSelected([]);
+                    }}
                   >
-                    <Plus aria-hidden="true" />
-                    Add team
+                    {selectTeams ? "Done selecting" : "Select teams"}
                   </Button>
-                  {teams.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      aria-pressed={selectTeams}
-                      onClick={() => {
-                        setSelectTeams(!selectTeams);
-                        teamSelection.setSelected([]);
-                      }}
-                    >
-                      {selectTeams ? "Done selecting" : "Select teams"}
-                    </Button>
-                  )}
-                </ActionGroup>
+                )
               }
               selectionActions={
                 selectTeams ? (
@@ -802,62 +830,45 @@ export function TeamsAdmin({
               <TabsContent value="members" className="grid gap-6">
                 <SectionHeader
                   title={<h3 {...memberList.targetProps}>People</h3>}
-                >
-                  <BulkPicker
-                    title="Add members"
-                    description={`Add people to ${team.name}. People in another team move here. Their accounts and saved progress are kept.`}
-                    options={eligible.map((u) => ({
-                      id: u.id,
-                      label: u.name,
-                      description: u.email + " · " + teamName(u.teamId),
-                    }))}
-                    actionLabel="Review changes"
-                    onApply={async (ids) => {
-                      if (
-                        !(await commit(
-                          {
-                            ...data,
-                            users: data.users.map((u) =>
-                              ids.includes(u.id)
-                                ? { ...u, teamId: team.id }
-                                : u,
-                            ),
-                          },
-                          "Members added.",
-                          true,
-                          {
-                            review: {
-                              title: "Review membership changes",
-                              confirmLabel: "Add members",
-                            },
-                          },
-                        ))
-                      )
-                        throw new Error("Could not save members.");
-                    }}
-                    disabled={busy}
-                  />
-                </SectionHeader>
-                <FilterOptions
-                  label="Membership scope"
-                  variant="underline"
-                  options={[
-                    {
-                      value: "all",
-                      label: "All people",
-                    },
-                    {
-                      value: "direct",
-                      label: "Direct members",
-                    },
-                  ]}
-                  value={includeSubteams ? "all" : "direct"}
-                  onValueChange={(value) => {
-                    setIncludeSubteams(value === "all");
-                    setPage(1);
-                  }}
+                  description="People belong to one team. Subteam members appear here for reporting."
                 />
                 <CollectionControls
+                  primaryAction={
+                    <BulkPicker
+                      title="Add members"
+                      description={`Add people to ${team.name}. People in another team move here. Their accounts and saved progress are kept.`}
+                      options={eligible.map((u) => ({
+                        id: u.id,
+                        label: u.name,
+                        description: u.email + " · " + teamName(u.teamId),
+                      }))}
+                      actionLabel="Review changes"
+                      onApply={async (ids) => {
+                        if (
+                          !(await commit(
+                            {
+                              ...data,
+                              users: data.users.map((u) =>
+                                ids.includes(u.id)
+                                  ? { ...u, teamId: team.id }
+                                  : u,
+                              ),
+                            },
+                            "Members added.",
+                            true,
+                            {
+                              review: {
+                                title: "Review membership changes",
+                                confirmLabel: "Add members",
+                              },
+                            },
+                          ))
+                        )
+                          throw new Error("Could not save members.");
+                      }}
+                      disabled={busy}
+                    />
+                  }
                   sortLabel={memberSort === "name" ? "Name A–Z" : "Name Z–A"}
                   sort={
                     <FormField label="Sort team members">
@@ -1010,7 +1021,7 @@ export function TeamsAdmin({
                               Person
                             </div>
                           </TableHead>
-                          <TableHead>Direct team</TableHead>
+                          <TableHead>Included through</TableHead>
                           <TableHead>
                             <span className="sr-only">Actions</span>
                           </TableHead>
@@ -1059,7 +1070,11 @@ export function TeamsAdmin({
                                   <Badge>Not signed in</Badge>
                                 )}
                               </TableCell>
-                              <TableCell>{teamName(u.teamId)}</TableCell>
+                              <TableCell>
+                                {u.teamId === team.id
+                                  ? "Direct member"
+                                  : teamName(u.teamId)}
+                              </TableCell>
                               <TableCell>
                                 {u.teamId === selected ? (
                                   <Button
@@ -1089,10 +1104,7 @@ export function TeamsAdmin({
                 ) : (
                   <CollectionEmpty
                     count={0}
-                    total={
-                      direct.length +
-                      (includeSubteams ? descendantMembers.length : 0)
-                    }
+                    total={direct.length + descendantMembers.length}
                     noun="members"
                     onClear={() => {
                       setQuery("");
@@ -1393,10 +1405,7 @@ export function TeamsAdmin({
                     Cancel
                   </Button>
                   <Button type="submit" loading={busy}>
-                    {editing.managerId !== baseline.current?.managerId ||
-                    editing.parentId !== baseline.current?.parentId
-                      ? "Review changes"
-                      : "Save team"}
+                    {editingNeedsReview ? "Review changes" : "Save team"}
                   </Button>
                 </ActionGroup>
               </DialogFooter>

@@ -38,6 +38,7 @@ export function HierarchyList({
   onSelectionChange,
   selectionActions,
   searchAction,
+  secondaryActions,
   query: controlledQuery,
   onQueryChange,
   variant = "collection",
@@ -51,6 +52,7 @@ export function HierarchyList({
   onSelectionChange?: (ids: string[]) => void;
   selectionActions?: ReactNode;
   searchAction?: ReactNode;
+  secondaryActions?: ReactNode;
   query?: string;
   onQueryChange?: (query: string) => void;
   variant?: "collection" | "navigation";
@@ -121,7 +123,7 @@ export function HierarchyList({
                 className={cn(
                   "flex min-w-0 items-center gap-2",
                   compact
-                    ? "px-1 py-1"
+                    ? "px-2 py-1.5"
                     : "border-b border-border px-3 py-3 last:border-b-0",
                 )}
               >
@@ -168,7 +170,7 @@ export function HierarchyList({
                         "h-auto min-h-9 whitespace-normal [overflow-wrap:anywhere]",
                       compact &&
                         activeId === item.id &&
-                        "bg-muted text-foreground",
+                        "bg-background text-foreground ring-1 ring-border",
                     )}
                     disabled={disabled}
                     aria-current={activeId === item.id ? "page" : undefined}
@@ -210,21 +212,27 @@ export function HierarchyList({
   return (
     <div className="grid min-w-0 gap-4">
       {compact ? (
-        <div className="grid min-w-0 gap-3">
-          <FormField label={`Find ${label.toLowerCase()}`} visuallyHiddenLabel>
-            <Input
-              type="search"
-              value={query}
-              disabled={disabled}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                onSelectionChange?.([]);
-              }}
-              placeholder={`Find ${label.toLowerCase()}`}
-            />
-          </FormField>
-          {searchAction}
-        </div>
+        <CollectionControls
+          search={
+            <FormField
+              label={`Find ${label.toLowerCase()}`}
+              visuallyHiddenLabel
+            >
+              <Input
+                type="search"
+                value={query}
+                disabled={disabled}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  onSelectionChange?.([]);
+                }}
+                placeholder={`Find ${label.toLowerCase()}`}
+              />
+            </FormField>
+          }
+          primaryAction={searchAction}
+          actions={secondaryActions}
+        />
       ) : (
         <CollectionControls
           search={
@@ -302,7 +310,8 @@ export function HierarchyList({
           aria-label={label}
           className={cn(
             "min-w-0 overflow-hidden",
-            compact && "max-h-96 overflow-y-auto",
+            compact &&
+              "max-h-96 overflow-y-auto rounded-lg border border-border bg-surface p-1",
             !compact && "rounded-lg border border-border",
           )}
         >

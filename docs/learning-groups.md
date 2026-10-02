@@ -4,11 +4,11 @@ Learning groups choose learning audiences. Teams represent the reporting hierarc
 
 ## Administration
 
-In **Learning groups**, search the group directory or choose **Create group**. Group names must be unique within the installation; team names have their own unique-name requirement. Selecting a group opens **Learning**, with **People** and **Updates** beside it. Rename and delete are in the group’s action menu.
+In **Learning groups**, search the group directory or choose **Create group**. Group names must be unique within the installation; team names have their own unique-name requirement. Selecting a group opens **People**, followed by **Assigned Courses** and **Assigned Updates**. Rename and delete are in the group’s action menu.
 
-- **Learning → Add learning** selects published courses and curricula. Reorder the saved list with drag handles, keyboard up/down on a handle, or the move buttons. The same controls order courses inside a curriculum. Overlapping sources count each course once.
-- **People → Manage membership** selects teams and individuals in one dialog. New team links include all current and future subteams. Each person appears once; **Included through** explains every matching team link and any individual membership. Removing one source leaves membership intact when another source still includes the person.
-- **Updates → Add Updates** selects relevant published Updates. These tags guide the For you feed and never create completion requirements or deadlines.
+- **People → Add Members** selects teams and individuals in one dialog. New team links include all current and future subteams. Each person appears once; **Included through** explains every matching team link and any individual membership. Removing one source leaves membership intact when another source still includes the person.
+- **Assigned Courses → Assign Courses** selects published courses and curricula. Search filters the assigned list, including course titles inside curricula. Reordering pauses while searching; removal remains available. Reorder the full saved list with drag handles, keyboard up/down on a handle, or the move buttons. The same controls order courses inside a curriculum. Overlapping sources count each course once.
+- **Assigned Updates → Assign Updates** selects relevant published Updates. These tags guide the For you feed and never create completion requirements or deadlines.
 
 An older team link can appear as **Direct members only**. It keeps its previous reach until an administrator checks **Include subteams** for that specific link and reviews the change. Editing another link does not silently expand it. New direct-only links cannot be created.
 
@@ -20,7 +20,7 @@ Membership, assignment and hierarchy changes lead to one consequence review befo
 
 ## Reporting teams
 
-In **Teams**, search and expand the compact hierarchy, then select a team. The tree sits beside its detail on wider screens and stacks on narrow screens. **All people** is the default member view, including subteams; choose **Direct members** to manage only that team’s own roster. People are shown once with their direct team, name/email search and pagination. Subteams lists immediate children. Team paths and parent navigation keep the reporting structure visible.
+In **Teams**, search and expand the compact hierarchy, then select a team. The tree and selected detail form a horizontal org chart on wider screens and use list/detail navigation on narrow screens. The member table includes everyone in the selected branch. **Included through** identifies a direct member or their subteam. Manage an indirect member in that person’s own team. Search, sorting and pagination use the same roster; Add Members sits beside search. Subteams lists immediate children. Team paths and parent navigation keep the reporting structure visible.
 
 **Add members** searches roster people, keeps multiple selections across searches/pages, and reviews additions or moves before applying them together. Each person has one optional direct reporting team. Removing a direct member clears that team membership; it does not delete or deactivate the account or erase progress. Inactive members remain labeled. Preregistered people appear in People and can join teams before sign-in.
 

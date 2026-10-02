@@ -116,16 +116,21 @@ test("flat groups retain curriculum links and deduplicate learning across audien
     .getByRole("button", { name: "Account executives", exact: true })
     .click();
   await expect(
-    page.getByRole("tab", { name: "Learning", exact: true }),
+    page.getByRole("tab", { name: "People", exact: true }),
   ).toHaveAttribute("aria-selected", "true");
   await expect(
     page.getByRole("button", { name: /Add child|Move group/ }),
   ).toHaveCount(0);
+  await page
+    .getByRole("tab", { name: "Assigned Courses", exact: true })
+    .click();
   await page.getByText("Curriculum · 2 courses", { exact: true }).click();
   await expect(page.getByText("Foundation one", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Add learning", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Assign Courses", exact: true })
+    .click();
   const picker = page.getByRole("dialog", {
-    name: "Add learning",
+    name: "Assign Courses",
     exact: true,
   });
   await picker.getByRole("checkbox", { name: /Discovery/ }).check();
@@ -195,13 +200,15 @@ test("branch membership stays staged and explains overlapping sources", async ({
   await start(page, fixture());
   await page.getByRole("button", { name: "Pilot", exact: true }).click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
-  await page
-    .getByRole("button", { name: "Manage membership", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const membership = page.getByRole("dialog", {
-    name: "Manage membership",
+    name: "Add Members",
     exact: true,
   });
+  await expect(
+    membership.getByRole("tab", { name: "People", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await membership.getByRole("tab", { name: "Teams", exact: true }).click();
   await membership
     .getByRole("checkbox", {
       name: "Revenue Revenue · Includes subteams",
@@ -232,12 +239,8 @@ test("branch membership stays staged and explains overlapping sources", async ({
   await expect(
     page.getByRole("table", { name: "Group members" }),
   ).toContainText("Alex Edwards");
-  await page
-    .getByRole("button", { name: "Manage membership", exact: true })
-    .click();
-  await membership
-    .getByRole("tab", { name: "Individuals", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Add Members", exact: true }).click();
+  await membership.getByRole("tab", { name: "People", exact: true }).click();
   await membership
     .getByRole("searchbox", { name: "Find a person", exact: true })
     .fill("Alex Edwards");
@@ -300,4 +303,139 @@ test("large group roster is paginated, searchable and contained on narrow screen
     path: info.outputPath("large-roster.png"),
     fullPage: true,
   });
+});
+
+test("group workspace starts with people and clearly separates assigned content from assignment pickers", async ({
+  page,
+}, info) => {
+  const data = fixture();
+  data.groups
+    .find((group) => group.id === "ae")!
+    .learningItems!.push({
+      kind: "course",
+      id: "flat-course-2",
+    });
+  const update = freshWorkspace().content.find(
+    (item) => item.kind === "brief",
+  )!;
+  data.content.push(
+    ...["Assigned launch", "Assigned product", "Unassigned release"].map(
+      (title, index) => ({
+        ...update,
+        id: `flat-update-${index}`,
+        title,
+        status: "published" as const,
+        groups: index < 2 ? ["ae"] : [],
+      }),
+    ),
+  );
+  await start(page, data);
+  await page
+    .getByRole("button", { name: "Account executives", exact: true })
+    .click();
+  const tabs = page.getByRole("tablist", { name: "Learning group sections" });
+  await expect(tabs.getByRole("tab")).toHaveText([
+    "People",
+    "Assigned Courses",
+    "Assigned Updates",
+  ]);
+  await expect(
+    tabs.getByRole("tab", { name: "People", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.getByRole("table", { name: "Group members" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("people-default-toolbar.png"),
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Add Members", exact: true }).click();
+  const membership = page.getByRole("dialog", {
+    name: "Add Members",
+    exact: true,
+  });
+  await expect(
+    membership.getByRole("tab", { name: "People", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(
+    membership.getByRole("tab", { name: "Teams", exact: true }),
+  ).toBeVisible();
+  await membership.getByRole("button", { name: "Cancel", exact: true }).click();
+
+  await tabs
+    .getByRole("tab", { name: "Assigned Courses", exact: true })
+    .click();
+  const courseSearch = page.getByRole("searchbox", {
+    name: "Find an assigned course or curriculum",
+    exact: true,
+  });
+  await courseSearch.fill("Foundation two");
+  await expect(
+    page.getByRole("button", { name: "Remove GTM foundation", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    page.getByRole("button", { name: "Remove Discovery", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Reorder GTM foundation; use up or down arrow",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await courseSearch.clear();
+  await expect(
+    page.getByRole("button", { name: "Move GTM foundation down", exact: true }),
+  ).toBeEnabled();
+  expect(
+    (await saved(page)).groups.find((group) => group.id === "ae")!
+      .learningItems,
+  ).toEqual([
+    { kind: "curriculum", id: "foundation" },
+    { kind: "course", id: "flat-course-2" },
+  ]);
+  await page.screenshot({
+    path: info.outputPath("assigned-courses-toolbar.png"),
+    fullPage: true,
+  });
+
+  await tabs
+    .getByRole("tab", { name: "Assigned Updates", exact: true })
+    .click();
+  const updateSearch = page.getByRole("searchbox", {
+    name: "Find an assigned update",
+    exact: true,
+  });
+  const table = page.getByRole("table", {
+    name: "Assigned Updates",
+    exact: true,
+  });
+  await expect(table).toContainText("Assigned launch");
+  await expect(table).not.toContainText("Unassigned release");
+  await updateSearch.fill("product");
+  await expect(table).toContainText("Assigned product");
+  await expect(table).not.toContainText("Assigned launch");
+  await updateSearch.clear();
+  await page.screenshot({
+    path: info.outputPath("assigned-updates-toolbar.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Assign Updates", exact: true })
+    .click();
+  const picker = page.getByRole("dialog", {
+    name: "Assign Updates",
+    exact: true,
+  });
+  await expect(
+    picker.getByRole("checkbox", { name: /Unassigned release/ }),
+  ).toBeVisible();
+  await expect(
+    picker.getByRole("checkbox", { name: /Assigned launch/ }),
+  ).toHaveCount(0);
+  await picker.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
 });
