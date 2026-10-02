@@ -154,7 +154,14 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
     .scrollIntoViewIfNeeded();
   const rootScroll = await roots.evaluate((list) => list.scrollTop);
   expect(rootScroll).toBeGreaterThan(0);
+  const chartTop = (await chart.boundingBox())!.y;
   await browse(page, "Revenue");
+  await expect(
+    page.getByRole("navigation", { name: "Teams path", exact: true }),
+  ).toHaveCount(0);
+  await expect
+    .poll(async () => Math.abs((await chart.boundingBox())!.y - chartTop))
+    .toBeLessThanOrEqual(1);
   await expect(
     page.getByRole("heading", { name: "Subteams of Revenue", exact: true }),
   ).toBeFocused();
@@ -162,7 +169,6 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
     page.getByRole("heading", { name: "Teams", exact: true }),
     page.getByRole("searchbox", { name: "Find teams", exact: true }),
     page.getByRole("button", { name: "Add team", exact: true }),
-    page.getByRole("navigation", { name: "Teams path", exact: true }),
   ];
   const fixedTops = await Promise.all(
     fixedControls.map(async (control) => (await control.boundingBox())!.y),
@@ -242,9 +248,9 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
       exact: true,
     }),
   ).toBeFocused();
-  await expect(
-    page.getByRole("navigation", { name: "Teams path", exact: true }),
-  ).toContainText(levelName(11));
+  await expect(browser.locator('[data-hierarchy-id="level-11"]')).toContainText(
+    levelName(11),
+  );
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth + 1,
@@ -318,19 +324,10 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
   await expect(browser.locator('[data-slot="hierarchy-column"]')).toHaveCount(
     12,
   );
-  const ancestors = page.getByRole("button", {
-    name: "Teams ancestors",
-    exact: true,
-  });
-  await ancestors.click();
-  await page.keyboard.press("Escape");
-  await expect(ancestors).toBeFocused();
-  await ancestors.click();
-  const ancestor = [
-    "Revenue",
-    ...Array.from({ length: 4 }, (_, index) => levelName(index + 1)),
-  ].join(" / ");
-  await page.getByRole("menuitem", { name: ancestor, exact: true }).click();
+  // Ancestor cards remain the way to collapse/reopen an earlier branch.
+  await chart.press("Home");
+  await browse(page, levelName(4));
+  await browse(page, levelName(4));
   await expect(
     page.getByRole("heading", {
       name: `Subteams of ${levelName(4)}`,
@@ -380,15 +377,126 @@ test("twelve-level chart retains every depth, replaces the expanded sibling path
   expect(await chart.evaluate((element) => element.scrollLeft)).toBeGreaterThan(
     0,
   );
-  await page
-    .getByRole("navigation", { name: "Teams path", exact: true })
-    .getByRole("button", { name: "Teams", exact: true })
-    .click();
+  await chart.press("Home");
+  await browse(page, "Revenue");
   await expect
     .poll(() => roots.evaluate((list) => list.scrollTop))
     .toBeGreaterThanOrEqual(rootScroll - 1);
   expect((await saved(page)).teams).toEqual(baseline.teams);
   expect((await saved(page)).users).toEqual(baseline.users);
+});
+
+test("saved parent owns its child and connector across sibling switches and reload", async ({
+  page,
+}, info) => {
+  const data = freshWorkspace();
+  const root = data.teams!.find((team) => team.system === "organization")!;
+  data.teams!.push(
+    { id: "chart-sales", name: "Chart sales", parentId: root.id },
+    { id: "chart-two", name: "Team 2", parentId: "chart-sales" },
+    { id: "chart-a", name: "Team A", parentId: "chart-sales" },
+    { id: "chart-y", name: "Team Y", parentId: "chart-a" },
+    { id: "chart-empty", name: "Empty sibling", parentId: "chart-sales" },
+  );
+  await seed(page, stable(data));
+  await browse(page, "Chart sales");
+  await browse(page, "Team A");
+  await page.getByRole("button", { name: "Add team", exact: true }).click();
+  const editor = page.getByRole("dialog", { name: "New team", exact: true });
+  await editor
+    .getByRole("textbox", { name: "Team name", exact: true })
+    .fill("Team C");
+  await editor
+    .getByRole("button", { name: "Parent team", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Find a parent team", exact: true })
+    .fill("Team 2");
+  await page.getByRole("option", { name: /Team 2$/, exact: false }).click();
+  await editor.getByRole("button", { name: "Save team", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const created = (await saved(page)).teams!.find(
+    (team) => team.name === "Team C",
+  )!;
+  expect(created.parentId).toBe("chart-two");
+  const browser = page.locator('[data-slot="hierarchy-browser"]');
+  const chart = browser.getByRole("region", {
+    name: "Teams chart",
+    exact: true,
+  });
+  const createdCard = browser.locator(`[data-hierarchy-id="${created.id}"]`);
+  const createdEdge = browser.locator(
+    `[data-slot="hierarchy-child-connection"][data-child-id="${created.id}"]`,
+  );
+  async function ownBranch() {
+    await expect(
+      page.getByRole("heading", { name: "Subteams of Team 2", exact: true }),
+    ).toBeVisible();
+    await expect(createdCard).toBeVisible();
+    await expect(createdEdge).toHaveCount(1);
+    await expect(createdEdge).toHaveAttribute("data-parent-id", "chart-two");
+    await expect(browser.locator('[data-hierarchy-id="chart-y"]')).toHaveCount(
+      0,
+    );
+    // Measure the stem itself: it must start at Team 2's right edge and midpoint.
+    const stem = browser
+      .locator(
+        '[data-slot="hierarchy-connection"][data-parent-id="chart-two"] > [data-slot="connector-line"]',
+      )
+      .first();
+    await expect
+      .poll(async () => {
+        const parent = (await browser
+          .locator('[data-hierarchy-id="chart-two"]')
+          .boundingBox())!;
+        const line = (await stem.boundingBox())!;
+        return Math.max(
+          Math.abs(line.x - parent.x - parent.width),
+          Math.abs(line.y - parent.y - parent.height / 2),
+        );
+      })
+      .toBeLessThanOrEqual(1);
+  }
+  await ownBranch();
+  for (let index = 0; index < 3; index++) {
+    await browse(page, "Team A");
+    await expect(createdCard).toHaveCount(0);
+    await expect(createdEdge).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Subteams of Team A", exact: true }),
+    ).toBeVisible();
+    await expect(
+      browser.locator(
+        '[data-slot="hierarchy-child-connection"][data-child-id="chart-y"]',
+      ),
+    ).toHaveAttribute("data-parent-id", "chart-a");
+    await browse(page, "Team 2");
+    await ownBranch();
+  }
+  await browse(page, "Empty sibling");
+  await expect(browser.locator('[data-slot="hierarchy-column"]')).toHaveCount(
+    2,
+  );
+  await expect(createdCard).toHaveCount(0);
+  await expect(createdEdge).toHaveCount(0);
+  await browse(page, "Team 2");
+  await ownBranch();
+  await page.screenshot({
+    path: info.outputPath("single-parent-branch.png"),
+    fullPage: true,
+  });
+  const beforeReload = await saved(page);
+  await page.reload();
+  await teamsSection(page);
+  expect((await saved(page)).teams).toEqual(beforeReload.teams);
+  await browse(page, "Chart sales");
+  await browse(page, "Team 2");
+  await ownBranch();
+  await chart.focus();
+  await chart.press("Home");
+  await browse(page, "Team 2");
+  await expect(createdCard).toHaveCount(0);
+  await expect(createdEdge).toHaveCount(0);
 });
 
 test("path search and flat bulk selection share the same matches; browsing a result reveals its branch", async ({
@@ -473,10 +581,7 @@ test("two successful new-team saves return to their parent and reveal each row; 
       exact: true,
     }),
   ).toBeFocused();
-  await page
-    .getByRole("navigation", { name: "Teams path", exact: true })
-    .getByRole("button", { name: "Teams", exact: true })
-    .click();
+  await browse(page, "Revenue");
   await browse(page, "Operations");
   const before = await saved(page);
   await page.getByRole("button", { name: "Add team", exact: true }).click();
@@ -489,8 +594,11 @@ test("two successful new-team saves return to their parent and reveal each row; 
   ).toBeFocused();
   expect((await saved(page)).teams).toEqual(before.teams);
   await expect(
-    page.getByRole("navigation", { name: "Teams path", exact: true }),
-  ).toContainText("Operations");
+    page.getByRole("button", {
+      name: "Browse Operations subteams",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-current", "location");
   await page.getByRole("button", { name: "Add team", exact: true }).click();
   await editor
     .getByRole("textbox", { name: "Team name", exact: true })
@@ -510,8 +618,8 @@ test("two successful new-team saves return to their parent and reveal each row; 
     }),
   ).toBeFocused();
   await expect(
-    page.getByRole("navigation", { name: "Teams path", exact: true }),
-  ).toContainText("Operations");
+    page.getByRole("heading", { name: "Subteams of Operations", exact: true }),
+  ).toBeVisible();
   const after = await saved(page);
   expect(
     after.teams!.find((team) => team.name === "Regional team A")!.parentId,

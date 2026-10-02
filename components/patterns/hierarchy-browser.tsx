@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { ChevronRight, MoreHorizontal, Network, Users } from "lucide-react";
+import { ChevronRight, Network, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/choice";
@@ -19,12 +19,6 @@ import {
   ConnectorLine,
   type ConnectorLineGeometry,
 } from "../ui/connector-line";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
 import { CollectionControls, CollectionEmpty } from "./collection-controls";
 import { FormField } from "./form-field";
 import { canBulkSelect, SelectRows } from "./bulk-selection";
@@ -37,6 +31,12 @@ export type HierarchyBrowserItem = {
   label: string;
   description?: string;
   directMemberCount?: number;
+};
+
+type BranchConnection = {
+  parentId: string;
+  stem: ConnectorLineGeometry[];
+  children: { id: string; line: ConnectorLineGeometry }[];
 };
 
 function pathFor(id: string, byId: Map<string, HierarchyBrowserItem>) {
@@ -161,13 +161,14 @@ export function HierarchyBrowser({
   const chartRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const horizontalPosition = useRef(0);
-  const [connections, setConnections] = useState<ConnectorLineGeometry[]>([]);
+  const [connections, setConnections] = useState<{
+    key: string;
+    branches: BranchConnection[];
+  }>({ key: "", branches: [] });
   const rowRefs = useRef(new Map<string, HTMLButtonElement>());
   const headingRefs = useRef(new Map<string, HTMLHeadingElement>());
   const pendingBrowse = useRef<string | null>(null);
   const pendingRowFocus = useRef<string | null>(null);
-  const pendingMenuBrowse = useRef(false);
-  const [closedMenu, setClosedMenu] = useState(0);
   const revealed = useRef<number | null>(null);
   const byId = new Map(items.map((item) => [item.id, item]));
   const ordered = [...items].sort(
@@ -191,12 +192,15 @@ export function HierarchyBrowser({
     }),
   ];
   const columnKey = columns.map((column) => column.id).join("\u001f");
+  const connectionKey = JSON.stringify(
+    columns.map((column) => [column.id, column.rows.map((item) => item.id)]),
+  );
 
   const measureConnections = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !canvas.getClientRects().length) return;
     const origin = canvas.getBoundingClientRect();
-    const next: typeof connections = [];
+    const next: BranchConnection[] = [];
     for (const column of canvas.querySelectorAll<HTMLElement>(
       '[data-slot="hierarchy-column"][data-branch-id]',
     )) {
@@ -219,18 +223,25 @@ export function HierarchyBrowser({
         continue;
       const viewport = list.getBoundingClientRect();
       const children = [...list.children]
-        .map((node) => node.getBoundingClientRect())
         .filter(
-          (bounds) =>
+          (node): node is HTMLElement =>
+            node instanceof HTMLElement && node.dataset.parentId === parentId,
+        )
+        .map((node) => ({
+          id: node.dataset.hierarchyId!,
+          bounds: node.getBoundingClientRect(),
+        }))
+        .filter(
+          ({ bounds }) =>
             bounds.bottom > viewport.top && bounds.top < viewport.bottom,
         );
       if (!children.length) continue;
-      const childX = children[0].left - origin.left;
+      const childX = children[0].bounds.left - origin.left;
       const parentX = parentBounds.right - origin.left;
       const bridgeX = (parentX + childX) / 2;
       const y = parentY - origin.top;
       const childYs = children.map(
-        (bounds) =>
+        ({ bounds }) =>
           Math.min(
             viewport.bottom,
             Math.max(viewport.top, bounds.top + bounds.height / 2),
@@ -238,20 +249,30 @@ export function HierarchyBrowser({
       );
       const top = Math.min(y, ...childYs);
       const bottom = Math.max(y, ...childYs);
-      next.push({ x: parentX, y, width: bridgeX - parentX, height: 0 });
-      next.push({ x: bridgeX, y: top, width: 0, height: bottom - top });
-      for (const childY of childYs)
-        next.push({
-          x: bridgeX,
-          y: childY,
-          width: childX - bridgeX,
-          height: 0,
-        });
+      next.push({
+        parentId,
+        stem: [
+          { x: parentX, y, width: bridgeX - parentX, height: 0 },
+          { x: bridgeX, y: top, width: 0, height: bottom - top },
+        ],
+        children: children.map((child, index) => ({
+          id: child.id,
+          line: {
+            x: bridgeX,
+            y: childYs[index],
+            width: childX - bridgeX,
+            height: 0,
+          },
+        })),
+      });
     }
     setConnections((previous) =>
-      JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
+      previous.key === connectionKey &&
+      JSON.stringify(previous.branches) === JSON.stringify(next)
+        ? previous
+        : { key: connectionKey, branches: next },
     );
-  }, []);
+  }, [connectionKey]);
 
   useLayoutEffect(() => {
     const frame = frameRef.current;
@@ -352,9 +373,7 @@ export function HierarchyBrowser({
   }
 
   useEffect(() => {
-    // Radix restores the menu trigger after unmount. Hand navigation focus off
-    // from its close event so that restoration cannot undo the new destination.
-    if (flat || pendingMenuBrowse.current) return;
+    if (flat) return;
     const frame = requestAnimationFrame(() => {
       if (reveal && revealed.current !== reveal.token) {
         const row = rowRefs.current.get(reveal.id);
@@ -385,7 +404,7 @@ export function HierarchyBrowser({
       pendingRowFocus.current = null;
     });
     return () => cancelAnimationFrame(frame);
-  }, [branchId, flat, reveal, columnKey, items, closedMenu]);
+  }, [branchId, flat, reveal, columnKey, items]);
 
   function browse(id: string, focusRow?: string) {
     pendingBrowse.current = id;
@@ -401,6 +420,7 @@ export function HierarchyBrowser({
       <li
         key={item.id}
         data-hierarchy-id={item.id}
+        data-parent-id={item.parentId}
         className="min-w-0 @container/hierarchy-row"
       >
         <div
@@ -548,85 +568,6 @@ export function HierarchyBrowser({
         primaryAction={primaryAction}
         actions={secondaryActions}
       />
-      {!flat && path.length > 0 && (
-        <nav aria-label={`${label} path`}>
-          <ol className="flex min-w-0 flex-wrap items-center gap-1 text-label text-muted-foreground">
-            <li>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={disabled}
-                onClick={() => browse("")}
-              >
-                {label}
-              </Button>
-            </li>
-            {path.length > 2 && (
-              <li className="flex items-center gap-1">
-                <ChevronRight className="size-3" aria-hidden="true" />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={disabled}
-                      aria-label={`${label} ancestors`}
-                    >
-                      <MoreHorizontal aria-hidden="true" />
-                      Ancestors
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent
-                    align="start"
-                    className="max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height))] max-w-[min(24rem,calc(100vw-2rem))]"
-                    onCloseAutoFocus={(event) => {
-                      if (!pendingMenuBrowse.current) return;
-                      event.preventDefault();
-                      pendingMenuBrowse.current = false;
-                      setClosedMenu((count) => count + 1);
-                    }}
-                  >
-                    {path.slice(0, -1).map((item) => (
-                      <DropdownMenuItem
-                        key={item.id}
-                        onSelect={() => {
-                          pendingMenuBrowse.current = true;
-                          browse(item.id);
-                        }}
-                      >
-                        {pathFor(item.id, byId)
-                          .map((part) => part.label)
-                          .join(" / ")}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </li>
-            )}
-            {(path.length > 2 ? path.slice(-1) : path).map((item) => (
-              <li
-                key={item.id}
-                className="flex min-w-0 max-w-full items-center gap-1"
-              >
-                <ChevronRight className="size-3 shrink-0" aria-hidden="true" />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="min-w-0 max-w-full whitespace-normal text-start [overflow-wrap:anywhere]"
-                  disabled={disabled}
-                  onClick={() => browse(item.id)}
-                  aria-current={item.id === branchId ? "location" : undefined}
-                >
-                  {item.label}
-                </Button>
-              </li>
-            ))}
-          </ol>
-        </nav>
-      )}
       {selectionActions}
       {flat &&
         selected &&
@@ -713,9 +654,30 @@ export function HierarchyBrowser({
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-0"
               >
-                {connections.map((line, index) => (
-                  <ConnectorLine key={index} {...line} />
-                ))}
+                {connections.key === connectionKey &&
+                  connections.branches.map((branch) => (
+                    <div
+                      key={branch.parentId}
+                      data-slot="hierarchy-connection"
+                      data-parent-id={branch.parentId}
+                      className="contents"
+                    >
+                      {branch.stem.map((line, index) => (
+                        <ConnectorLine key={index} {...line} />
+                      ))}
+                      {branch.children.map((child) => (
+                        <div
+                          key={child.id}
+                          data-slot="hierarchy-child-connection"
+                          data-parent-id={branch.parentId}
+                          data-child-id={child.id}
+                          className="contents"
+                        >
+                          <ConnectorLine {...child.line} />
+                        </div>
+                      ))}
+                    </div>
+                  ))}
               </div>
               {columns.map((column) => (
                 <BrowserColumn
