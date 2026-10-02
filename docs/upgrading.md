@@ -132,3 +132,11 @@ Use a coordinated maintenance rollout:
 The browser-local demo performs its equivalent one-time conversion when saved data loads. A demo check or local integration test does not establish that a hosted database upgrade, authentication or concurrent operators work. Rehearse those against the isolated installation.
 
 Code-only rollback to the hierarchy model is unsupported after conversion. Prefer a forward fix, or stop writes and use a tested database/media restore with the matching earlier code. A restore can lose changes made after the backup and requires review of subsequent Auth changes. Old applied migration files remain unchanged, and no new environment variables are required.
+
+## Built-in Organization reporting team
+
+`20261002135103_builtin_organization_team.sql` requires the roster, stable-assignment, Contributor and flat-group migrations. Rehearse in isolation, stop older application writers, apply this migration, then deploy the matching code. Older clients cannot submit a hierarchy without the system root. Code-only rollback to those writers is unsupported; use a tested restore or forward fix.
+
+The migration preserves an explicitly designated sole top-level team, including its ID, historical name, manager and direct members. Otherwise it creates a neutral Organization team with no manager and attaches only the former top-level teams. Unassigned people remain unassigned. Existing teams, group links, content, progress, course-version coverage and assignment episodes/deadlines are preserved. Both configuration revision counters advance once to invalidate open editors. A database guard protects the root ID/name, prevents deleting or moving it, and validates one connected team hierarchy. Normal teams can still be renamed, moved and managed.
+
+Use **Teams → page actions → Manage organization team** to configure its manager and direct members. Appointing that manager explicitly grants the whole reporting branch and follows the usual consequence review. Verify root management, ordinary team creation/moves, direct-member reporting and denied root replacement. The migration adds independent helpers/trigger and does not replace governance or assignment RPC bodies; reconcile other pending migration histories before applying them.

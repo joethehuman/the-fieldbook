@@ -107,14 +107,20 @@ function near(a: string, b: string) {
   }
   return skips <= 1;
 }
-export function makeResult(source: SourcePassage, query: string): SearchResult {
+export function makeResult(
+  source: SourcePassage,
+  query: string,
+  { fuzzy = true }: { fuzzy?: boolean } = {},
+): SearchResult {
   const words = [
     ...new Set([...searchWords(query), ...(source.matchedTerms || [])]),
   ];
   const text = plainText(source.text);
   const matches = [...text.matchAll(/[\p{L}\p{N}]+/gu)].filter((m) =>
     words.some(
-      (w) => m[0].toLowerCase().startsWith(w) || near(w, m[0].toLowerCase()),
+      (w) =>
+        m[0].toLowerCase().startsWith(w) ||
+        (fuzzy && near(w, m[0].toLowerCase())),
     ),
   );
   const start = Math.max(0, (matches[0]?.index ?? 0) - 65);
@@ -126,6 +132,40 @@ export function makeResult(source: SourcePassage, query: string): SearchResult {
     href: destination(source),
     highlights: [...new Set([...words, ...matches.map((m) => m[0])])],
   };
+}
+/** Shared local ranking for published-content discovery. No result-count limit. */
+export function scorePassage(
+  p: Pick<SourcePassage, "title" | "lessonTitle" | "text">,
+  query: string,
+  { fuzzy = true }: { fuzzy?: boolean } = {},
+) {
+  const words = searchWords(query);
+  if (!words.length) return 0;
+  const title = p.title.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [],
+    heading =
+      (p.lessonTitle || "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
+  // Do not truncate source vocabulary to the query's 12-term limit.
+  const all =
+    (p.title + " " + (p.lessonTitle || "") + " " + p.text)
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+/gu) || [];
+  const score = words.every((w) =>
+    all.some((t) => t.startsWith(w) || (fuzzy && near(w, t))),
+  )
+    ? words.reduce(
+        (s, w) =>
+          s +
+          (title.some((t) => t === w)
+            ? 20
+            : heading.some((t) => t === w)
+              ? 12
+              : all.some((t) => t.startsWith(w))
+                ? 5
+                : 1),
+        0,
+      ) + (p.title.toLowerCase() === query.trim().toLowerCase() ? 100 : 0)
+    : 0;
+  return score;
 }
 // Synthetic, browser-local demonstration. PostgreSQL owns production ranking.
 export function demoSearch(
@@ -139,30 +179,7 @@ export function demoSearch(
     .flatMap(sourcePassages)
     .filter((p) => filter === "all" || p.kind === filter)
     .map((p) => {
-      const title = p.title.toLowerCase().match(/[\p{L}\p{N}]+/gu) || [],
-        heading =
-          (p.lessonTitle || "").toLowerCase().match(/[\p{L}\p{N}]+/gu) || [];
-      // Do not truncate source vocabulary to the query's 12-term limit.
-      const all =
-        (p.title + " " + (p.lessonTitle || "") + " " + p.text)
-          .toLowerCase()
-          .match(/[\p{L}\p{N}]+/gu) || [];
-      const score = words.every((w) =>
-        all.some((t) => t.startsWith(w) || near(w, t)),
-      )
-        ? words.reduce(
-            (s, w) =>
-              s +
-              (title.some((t) => t === w)
-                ? 20
-                : heading.some((t) => t === w)
-                  ? 12
-                  : all.some((t) => t.startsWith(w))
-                    ? 5
-                    : 1),
-            0,
-          ) + (p.title.toLowerCase() === query.trim().toLowerCase() ? 100 : 0)
-        : 0;
+      const score = scorePassage(p, query);
       return { p, score };
     })
     .filter((x) => x.score > 0)

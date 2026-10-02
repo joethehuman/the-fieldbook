@@ -364,3 +364,119 @@ test("100 Updates expose real categories and searchable descriptions without a c
     ),
   ).toEqual([]);
 });
+
+test("content search explains body matches and holds dialog and footer geometry for many, few and zero results", async ({
+  page,
+}, info) => {
+  const picker = await start(page);
+  const search = picker.getByRole("searchbox", {
+    name: "Find courses or curricula",
+    exact: true,
+  });
+  const original = await picker.boundingBox();
+  const footer = picker.locator('[data-slot="dialog-footer"]');
+  const footerOriginal = await footer.boundingBox();
+  expect(original).not.toBeNull();
+  expect(footerOriginal).not.toBeNull();
+  await search.fill("harb quart");
+  const match = picker
+    .locator("label")
+    .filter({ has: page.getByRole("checkbox", { name: /^Course 003\b/ }) });
+  await expect(match).toContainText("Quartz harbor");
+  await expect(
+    match.locator("mark").filter({ hasText: "Quartz" }).first(),
+  ).toBeVisible();
+  await expect(
+    match.locator("mark").filter({ hasText: "harbor" }).first(),
+  ).toBeVisible();
+  for (const query of ["Course 097", "nothingmatcheszzqx"]) {
+    await search.fill(query);
+    const box = await picker.boundingBox();
+    const actions = await footer.boundingBox();
+    expect(Math.abs(box!.height - original!.height)).toBeLessThanOrEqual(1);
+    expect(Math.abs(box!.y - original!.y)).toBeLessThanOrEqual(1);
+    expect(Math.abs(actions!.y - footerOriginal!.y)).toBeLessThanOrEqual(1);
+    await expect(
+      picker.getByRole("button", { name: "Cancel", exact: true }),
+    ).toBeInViewport();
+  }
+  await search.fill("Course 003");
+  await expect(
+    picker.getByRole("checkbox", { name: /^(Course|Foundation)/ }).first(),
+  ).toHaveAccessibleName(/^Course 003\b/);
+  const cards = await picker
+    .locator('[data-slot="selection-results"] > label')
+    .evaluateAll((rows) =>
+      rows.map((row) => {
+        const card = row.getBoundingClientRect();
+        const text = row
+          .querySelector(":scope > span")!
+          .getBoundingClientRect();
+        const excerpt = row.querySelector<HTMLElement>(
+          '[data-slot="selection-excerpt"]',
+        )!;
+        const detail = excerpt.getBoundingClientRect();
+        return {
+          top: card.top,
+          bottom: card.bottom,
+          textBottom: text.bottom,
+          excerptBottom: detail.bottom,
+          excerptHeight: detail.height,
+          lineHeight: Number.parseFloat(getComputedStyle(excerpt).lineHeight),
+        };
+      }),
+    );
+  expect(cards).toHaveLength(2);
+  for (const [index, card] of cards.entries()) {
+    expect(card.textBottom).toBeLessThanOrEqual(card.bottom + 1);
+    expect(card.excerptBottom).toBeLessThanOrEqual(card.bottom + 1);
+    expect(card.excerptHeight).toBeLessThanOrEqual(card.lineHeight * 3 + 1);
+    if (index) expect(card.top).toBeGreaterThanOrEqual(cards[index - 1].bottom);
+  }
+  await page.screenshot({
+    path: info.outputPath("content-search-excerpt-stable-dialog.png"),
+    fullPage: true,
+  });
+  await search.fill("Engineering");
+  await expect(picker.getByText(/^No content matches/)).toBeVisible();
+  await picker
+    .getByRole("button", { name: "Clear search and filters", exact: true })
+    .click();
+  await expect(picker.getByRole("checkbox", { name: /^Course/ })).toHaveCount(
+    10,
+  );
+  await picker.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect((await saved(page)).groups[0].learningItems).toEqual([]);
+});
+
+test("changing title sort during search applies additions in the visible relevance order", async ({
+  page,
+}) => {
+  const picker = await start(page);
+  await picker
+    .getByRole("searchbox", { name: "Find courses or curricula", exact: true })
+    .fill("Course 003");
+  await picker.getByRole("checkbox", { name: /^Course 003\b/ }).check();
+  await picker
+    .getByRole("checkbox", { name: /^Foundation curriculum/ })
+    .check();
+  await choose(page, picker, "Sort content", "Title Z–A");
+  await expect(
+    picker.getByRole("checkbox", { name: /^(Course|Foundation)/ }).first(),
+  ).toHaveAccessibleName(/^Course 003\b/);
+  await picker
+    .getByRole("button", { name: "Review assignment", exact: true })
+    .click();
+  const review = page.getByRole("dialog", {
+    name: "Review changes",
+    exact: true,
+  });
+  await review
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
+  await expect(picker).not.toBeVisible();
+  expect((await saved(page)).groups[0].learningItems).toEqual([
+    { kind: "course", id: "course-3" },
+    { kind: "curriculum", id: "foundation" },
+  ]);
+});

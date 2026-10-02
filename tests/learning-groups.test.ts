@@ -229,7 +229,10 @@ test("learning governance rejects bad team links, duplicate items and unpublishe
   const input = {
     expected: 1,
     users: [],
-    teams: [{ id: "t", name: "Team" }],
+    teams: [
+      { id: "organization", name: "Organization", system: "organization" },
+      { id: "t", name: "Team", parentId: "organization" },
+    ],
     groups: [
       {
         id: "g",

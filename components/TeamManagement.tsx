@@ -75,7 +75,6 @@ import { SearchableSelectionList } from "./patterns/searchable-selection-list";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { groupPath } from "@/lib/group-hierarchy";
 import { organizationTeam } from "@/lib/organization-team";
-import { defaultSettings } from "@/lib/settings";
 
 const PAGE_SIZE = 25;
 const byName = (
@@ -100,9 +99,6 @@ export function TeamsAdmin({
     teams,
     data.settings?.organizationTeamId,
   );
-  const topLevelTeams = teams.filter((value) => !value.parentId);
-  const organizationCandidate =
-    topLevelTeams.length === 1 ? topLevelTeams[0] : undefined;
   const [hierarchyQuery, setHierarchyQuery] = useState("");
   const [browseId, setBrowseId] = useState("");
   const [browserReveal, setBrowserReveal] = useState<{
@@ -118,11 +114,6 @@ export function TeamsAdmin({
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState<Team | null>(null);
   const editorCloseFocus = useRef<(() => void) | null>(null);
-  const [organizationDraft, setOrganizationDraft] = useState<string | null>(
-    null,
-  );
-  const organizationBaseline = useRef("");
-  const organizationSnapshot = useRef("");
   const baseline = useRef<Team | null>(null);
   const editSnapshot = useRef("");
   const [moving, setMoving] = useState<{
@@ -142,10 +133,9 @@ export function TeamsAdmin({
   const browserTarget = useRevealTarget<HTMLHeadingElement>({ context: true });
   const memberList = useRevealTarget<HTMLHeadingElement>();
   const team = teams.find((t) => t.id === selected);
+  const managingOrganization = !!team && team.id === organization?.id;
   const dirty =
     moving?.choice != null ||
-    (organizationDraft !== null &&
-      organizationDraft !== organizationBaseline.current) ||
     (!!editing && JSON.stringify(editing) !== JSON.stringify(baseline.current));
   const editId = editing?.id;
   const editParentId = editing?.parentId;
@@ -167,6 +157,7 @@ export function TeamsAdmin({
           name: "",
           parentId: editParentId,
           managerId: editManagerId,
+          system: teams.find((value) => value.id === editId)?.system,
         },
       ],
     }).changed;
@@ -202,7 +193,6 @@ export function TeamsAdmin({
   function resetDraft() {
     setMoving(null);
     setEditing(null);
-    setOrganizationDraft(null);
     setNotice("");
   }
   async function openTeam(id: string) {
@@ -253,56 +243,6 @@ export function TeamsAdmin({
     if (!saving.current && (discard || (await guard.current()))) {
       setEditing(null);
       setNotice("");
-    }
-  }
-  async function editOrganization() {
-    if (!(await guard.current())) return;
-    resetDraft();
-    organizationBaseline.current = organization?.id || "";
-    organizationSnapshot.current = JSON.stringify([data.teams, data.settings]);
-    setOrganizationDraft(organizationBaseline.current);
-  }
-  async function closeOrganization(discard = false) {
-    if (!saving.current && (discard || (await guard.current()))) {
-      setOrganizationDraft(null);
-      setNotice("");
-    }
-  }
-  async function saveOrganization(event: React.FormEvent) {
-    event.preventDefault();
-    if (organizationDraft === null || saving.current) return;
-    if (
-      organizationSnapshot.current !==
-      JSON.stringify([data.teams, data.settings])
-    ) {
-      setNotice(
-        "Teams or settings changed. Close this dialog and reopen it before saving.",
-      );
-      return;
-    }
-    if (organizationDraft && !organizationTeam(teams, organizationDraft)) {
-      setNotice("Choose the single top-level team, or None.");
-      return;
-    }
-    if (
-      await commit(
-        {
-          ...data,
-          settings: {
-            ...(data.settings || defaultSettings),
-            organizationTeamId: organizationDraft || null,
-          },
-        },
-        "Organization team saved.",
-      )
-    ) {
-      setOrganizationDraft(null);
-      setBrowseId("");
-      setHierarchyQuery("");
-      setSelectTeams(false);
-      teamSelection.setSelected([]);
-      setBrowserReveal(undefined);
-      browserTarget.reveal();
     }
   }
   async function commit(
@@ -478,7 +418,7 @@ export function TeamsAdmin({
     ].filter(Boolean);
     if (reasons.length) {
       setNotice(
-        `Cannot delete ${value.name}: it still has ${reasons.join("; ")}. Move or remove these links first. To keep the team but detach it, use Move team → Top-level team.`,
+        `Cannot delete ${value.name}: it still has ${reasons.join("; ")}. Move or remove these links first. To keep the team but detach it, use Move team → Organization.`,
       );
       destination.reveal();
       return;
@@ -541,7 +481,10 @@ export function TeamsAdmin({
   const descendantMembers = data.users.filter(
     (u) => !!u.teamId && descendants.has(u.teamId),
   );
-  const members = [...direct, ...descendantMembers]
+  const roster = managingOrganization
+    ? direct
+    : [...direct, ...descendantMembers];
+  const members = roster
     .filter((u) =>
       `${u.name} ${u.email}`.toLowerCase().includes(query.trim().toLowerCase()),
     )
@@ -663,9 +606,6 @@ export function TeamsAdmin({
                   Manage organization team
                 </DropdownMenuItem>
               )}
-              <DropdownMenuItem onSelect={() => void editOrganization()}>
-                Organization team…
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </SectionHeader>
@@ -886,11 +826,15 @@ export function TeamsAdmin({
                     ]
                   : []),
               ]}
-              current={team.name}
+              current={managingOrganization ? "Organization" : team.name}
             />
             <SectionHeader
               variant="page"
-              title={<h2 {...destination.targetProps}>{team.name}</h2>}
+              title={
+                <h2 {...destination.targetProps}>
+                  {managingOrganization ? "Organization" : team.name}
+                </h2>
+              }
               description={`Manager: ${data.users.find((u) => u.id === team.managerId)?.name || "Unassigned"}`}
             >
               <ActionGroup>
@@ -899,47 +843,49 @@ export function TeamsAdmin({
                   disabled={busy}
                   onClick={() => void editTeam(team)}
                 >
-                  Edit team details
+                  {managingOrganization ? "Edit manager" : "Edit team details"}
                 </Button>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      disabled={busy}
-                      aria-label="Team actions"
-                    >
-                      <MoreHorizontal aria-hidden="true" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onSelect={() => void startMove("out", team.id)}
-                    >
-                      Move team
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() =>
-                        void editTeam({
-                          id: crypto.randomUUID(),
-                          name: "",
-                          parentId: team.id,
-                        })
-                      }
-                    >
-                      Create subteam
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onSelect={() => void startMove("into", team.id)}
-                    >
-                      Move existing team here
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onSelect={() => void deleteTeam(team)}>
-                      Delete empty team
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                {!managingOrganization && (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        disabled={busy}
+                        aria-label="Team actions"
+                      >
+                        <MoreHorizontal aria-hidden="true" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        onSelect={() => void startMove("out", team.id)}
+                      >
+                        Move team
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          void editTeam({
+                            id: crypto.randomUUID(),
+                            name: "",
+                            parentId: team.id,
+                          })
+                        }
+                      >
+                        Create subteam
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onSelect={() => void startMove("into", team.id)}
+                      >
+                        Move existing team here
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onSelect={() => void deleteTeam(team)}>
+                        Delete empty team
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </ActionGroup>
             </SectionHeader>
             <p className="text-copy text-muted-foreground">
@@ -949,11 +895,15 @@ export function TeamsAdmin({
                 ` · ${children.length} ${children.length === 1 ? "subteam" : "subteams"}`}
             </p>
           </div>
-          {notice && !editing && !moving && organizationDraft === null && (
+          {notice && !editing && !moving && (
             <Alert variant="destructive">{notice}</Alert>
           )}
           <Tabs
-            value={tab === "subteams" && !children.length ? "members" : tab}
+            value={
+              tab === "subteams" && (!children.length || managingOrganization)
+                ? "members"
+                : tab
+            }
             onValueChange={async (value) => {
               if (!(await guard.current())) return;
               resetDraft();
@@ -961,7 +911,7 @@ export function TeamsAdmin({
               destination.reveal(false);
             }}
           >
-            {children.length > 0 && (
+            {!managingOrganization && children.length > 0 && (
               <TabsList aria-label="Team sections">
                 <TabsTrigger value="members">Members</TabsTrigger>
                 {children.length > 0 && (
@@ -971,8 +921,16 @@ export function TeamsAdmin({
             )}
             <TabsContent value="members" className="grid gap-6">
               <SectionHeader
-                title={<h3 {...memberList.targetProps}>People</h3>}
-                description="People belong to one team. Subteam members appear here for reporting."
+                title={
+                  <h3 {...memberList.targetProps}>
+                    {managingOrganization ? "Direct members" : "People"}
+                  </h3>
+                }
+                description={
+                  managingOrganization
+                    ? "People who report directly at the organization level. The organization manager can report on everyone across its teams."
+                    : "People belong to one team. Subteam members appear here for reporting."
+                }
               />
               <CollectionControls
                 primaryAction={
@@ -1246,7 +1204,7 @@ export function TeamsAdmin({
               ) : (
                 <CollectionEmpty
                   count={0}
-                  total={direct.length + descendantMembers.length}
+                  total={roster.length}
                   noun="members"
                   onClear={() => {
                     setQuery("");
@@ -1283,7 +1241,7 @@ export function TeamsAdmin({
                 disabled={busy}
               />
             </TabsContent>
-            {children.length > 0 && (
+            {!managingOrganization && children.length > 0 && (
               <TabsContent value="subteams" className="grid gap-6">
                 <SectionHeader title={<h3>Subteams</h3>}>
                   <ActionGroup>
@@ -1315,67 +1273,6 @@ export function TeamsAdmin({
           </Tabs>
         </div>
       )}
-      <Dialog
-        open={organizationDraft !== null}
-        onOpenChange={(open) => {
-          if (!open) void closeOrganization();
-        }}
-      >
-        {organizationDraft !== null && (
-          <DialogContent
-            onEscapeKeyDown={(event) => {
-              if (busy) event.preventDefault();
-            }}
-            onPointerDownOutside={(event) => {
-              if (busy) event.preventDefault();
-            }}
-          >
-            <DialogTitle>Organization team</DialogTitle>
-            <DialogDescription>
-              Choose the team that represents the whole organization. Its
-              subteams appear at the top of the team browser. The team keeps its
-              name, people and reporting permissions.
-            </DialogDescription>
-            <form className="grid gap-4" onSubmit={saveOrganization}>
-              {notice && <Alert variant="destructive">{notice}</Alert>}
-              <FormField label="Organization team">
-                <SelectField
-                  value={organizationDraft}
-                  disabled={busy}
-                  onValueChange={setOrganizationDraft}
-                >
-                  <option value="">None</option>
-                  {organizationCandidate && (
-                    <option value={organizationCandidate.id}>
-                      {organizationCandidate.name}
-                    </option>
-                  )}
-                </SelectField>
-              </FormField>
-              {!organizationCandidate && (
-                <p className="text-copy text-muted-foreground">
-                  Choose one top-level team. If there are several, use the
-                  parent controls to combine them before choosing an
-                  organization team here.
-                </p>
-              )}
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={() => void closeOrganization(true)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" loading={busy}>
-                  Save organization team
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        )}
-      </Dialog>
       <Dialog
         open={!!moving}
         onOpenChange={async (open) => {
@@ -1505,45 +1402,61 @@ export function TeamsAdmin({
             }}
           >
             <DialogTitle>
-              {teams.some((t) => t.id === editing.id)
-                ? `Edit ${baseline.current?.name}`
-                : "New team"}
+              {editing.id === organization?.id
+                ? "Organization manager"
+                : teams.some((t) => t.id === editing.id)
+                  ? `Edit ${baseline.current?.name}`
+                  : "New team"}
             </DialogTitle>
             <DialogDescription>
-              Set the name, parent and manager. You’ll review any reporting or
-              learning changes before saving.
+              {editing.id === organization?.id
+                ? "Choose who can report on the whole organization. Manage direct members on the Organization page."
+                : "Set the name, parent and manager. You’ll review any reporting or learning changes before saving."}
             </DialogDescription>
             <form onSubmit={saveTeam} className="grid gap-4">
               {notice && <Alert variant="destructive">{notice}</Alert>}
               <FieldGroup disabled={busy}>
-                <FormField label="Team name">
-                  <Input
-                    required
-                    maxLength={80}
-                    value={editing.name}
-                    onChange={(e) =>
-                      setEditing({ ...editing, name: e.target.value })
-                    }
-                  />
-                </FormField>
-                <FormField label="Parent team">
-                  <SelectField
-                    disabled={busy}
-                    value={editing.parentId || ""}
-                    onValueChange={(value) =>
-                      setEditing({ ...editing, parentId: value || undefined })
-                    }
-                  >
-                    <option value="">Top-level team</option>
-                    {teams
-                      .filter((t) => canParent(editing.id, t.id, teams))
-                      .map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {teamPath(t.id, teams)}
+                {editing.id !== organization?.id && (
+                  <>
+                    <FormField label="Team name">
+                      <Input
+                        required
+                        maxLength={80}
+                        value={editing.name}
+                        onChange={(e) =>
+                          setEditing({ ...editing, name: e.target.value })
+                        }
+                      />
+                    </FormField>
+                    <FormField label="Parent team">
+                      <SelectField
+                        disabled={busy}
+                        value={editing.parentId || organization?.id || ""}
+                        onValueChange={(value) =>
+                          setEditing({
+                            ...editing,
+                            parentId: value || organization?.id,
+                          })
+                        }
+                      >
+                        <option value={organization?.id || ""}>
+                          Organization
                         </option>
-                      ))}
-                  </SelectField>
-                </FormField>
+                        {teams
+                          .filter(
+                            (t) =>
+                              t.id !== organization?.id &&
+                              canParent(editing.id, t.id, teams),
+                          )
+                          .map((t) => (
+                            <option key={t.id} value={t.id}>
+                              {teamPath(t.id, teams)}
+                            </option>
+                          ))}
+                      </SelectField>
+                    </FormField>
+                  </>
+                )}
                 <FormField label="Manager">
                   <SelectField
                     disabled={busy}
@@ -1607,7 +1520,11 @@ export function TeamsAdmin({
                     Cancel
                   </Button>
                   <Button type="submit" loading={busy}>
-                    {editingNeedsReview ? "Review changes" : "Save team"}
+                    {editingNeedsReview
+                      ? "Review changes"
+                      : editing.id === organization?.id
+                        ? "Save manager"
+                        : "Save team"}
                   </Button>
                 </ActionGroup>
               </DialogFooter>

@@ -2,6 +2,28 @@
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
 import { HierarchyBrowser } from "@/components/patterns/hierarchy-browser";
+import {
+  Dialog,
+  DialogContent,
+  DialogBody,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { BulkActions } from "@/components/patterns/bulk-actions";
+import {
+  SelectRows,
+  useBulkSelection,
+} from "@/components/patterns/bulk-selection";
+import { DataTable } from "@/components/patterns/data-table";
+import {
+  TableContainer,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { ContentSelectionList } from "@/components/patterns/content-selection-list";
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
@@ -46,6 +68,26 @@ export function LibraryExamples() {
   const [browserSelection, setBrowserSelection] = useState<string[]>([]);
   const [selectBrowserTeams, setSelectBrowserTeams] = useState(false);
   const [selectedContent, setSelectedContent] = useState<string[]>([]);
+  const [contentPickerOpen, setContentPickerOpen] = useState(false);
+  const [contentDraft, setContentDraft] = useState<string[]>([]);
+  const contentOptions = Array.from({ length: 100 }, (_, index) => ({
+    id: `catalog-content-${index}`,
+    label: `${["Discovery", "Security", "Customer success", "Product knowledge"][index % 4]} ${String(index + 1).padStart(3, "0")}`,
+    type: index % 10 === 0 ? ("curriculum" as const) : ("course" as const),
+    category:
+      index % 10 === 0
+        ? undefined
+        : ["Sales", "Operations", "Customer success", "Product"][index % 4],
+    description:
+      index % 10 === 0
+        ? "A collection of related courses"
+        : "A concise introduction for new and experienced learners",
+    searchText: `Published lesson about product discovery scenario ${index + 1}`,
+    updatedAt:
+      index % 10 === 0
+        ? undefined
+        : new Date(Date.UTC(2026, 8, 1 + index)).toISOString(),
+  }));
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const progressTarget = useRevealTarget<HTMLElement>();
   const [feedback, setFeedback] = useState<{
@@ -236,38 +278,67 @@ export function LibraryExamples() {
           value={selectedContent}
           onChange={setSelectedContent}
           showTypeFilter
-          options={Array.from({ length: 100 }, (_, index) => ({
-            id: `catalog-content-${index}`,
-            label: `${["Discovery", "Security", "Customer success", "Product knowledge"][index % 4]} ${String(index + 1).padStart(3, "0")}`,
-            type:
-              index % 10 === 0 ? ("curriculum" as const) : ("course" as const),
-            category:
-              index % 10 === 0
-                ? undefined
-                : ["Sales", "Operations", "Customer success", "Product"][
-                    index % 4
-                  ],
-            description:
-              index % 10 === 0
-                ? "A collection of related courses"
-                : "A concise introduction for new and experienced learners",
-            searchText: `Published lesson about product discovery scenario ${index + 1}`,
-            updatedAt:
-              index % 10 === 0
-                ? undefined
-                : new Date(Date.UTC(2026, 8, 1 + index)).toISOString(),
-          }))}
+          options={contentOptions}
         />
+        <Button
+          variant="outline"
+          onClick={() => {
+            setContentDraft(selectedContent);
+            setContentPickerOpen(true);
+          }}
+        >
+          Open assignment picker
+        </Button>
+        <Dialog open={contentPickerOpen} onOpenChange={setContentPickerOpen}>
+          <DialogContent size="selection">
+            <DialogTitle>Assign example content</DialogTitle>
+            <DialogDescription>
+              Search published content. The result area scrolls while controls
+              and actions stay in place.
+            </DialogDescription>
+            <DialogBody>
+              <ContentSelectionList
+                bounded
+                showTypeFilter
+                options={contentOptions}
+                value={contentDraft}
+                onChange={setContentDraft}
+              />
+            </DialogBody>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setContentPickerOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedContent(contentDraft);
+                  setContentPickerOpen(false);
+                }}
+              >
+                Apply selection
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SettingsSection>
+      <GroupRosterExample />
       <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
-        guidance="Browse subteams in bounded horizontal columns. A twelve-level branch keeps its ancestors in the path; Open and Edit are explicit row actions. Search finds teams across every branch. Selection uses one flat list without selecting descendants."
+        guidance="Compact teams form one horizontal chart across every explored level. Choose a sibling to replace the downstream branch; scroll back to any earlier level. Open and Edit are explicit actions. Search and bulk selection use a flat list."
       >
         <HierarchyBrowser
           label="Example reporting teams"
           branchId={browserBranch}
-          onBrowse={setBrowserBranch}
+          onBrowse={(id) => {
+            setBrowserBranch(id);
+            setBrowserQuery("");
+            setSelectBrowserTeams(false);
+            setBrowserSelection([]);
+          }}
           onOpen={(id) => setMessage(`Open team roster: ${id}`)}
           onEdit={(id) => setMessage(`Edit team: ${id}`)}
           query={browserQuery}
@@ -312,7 +383,14 @@ export function LibraryExamples() {
               parentId: "revenue",
               label: "Europe, Middle East and Africa",
               description: "Manager: Jordan Lee",
-              meta: "52 people · No subteams",
+              meta: "52 people · 1 subteam",
+            },
+            {
+              id: "emea-enterprise",
+              parentId: "emea",
+              label: "Enterprise customer teams across Europe",
+              description: "Manager: Jordan Lee",
+              meta: "18 people · No subteams",
             },
             ...Array.from({ length: 12 }, (_, index) => ({
               id: `level-${index + 1}`,
@@ -464,5 +542,165 @@ export function LibraryExamples() {
         />
       </SettingsSection>
     </section>
+  );
+}
+
+
+/** Synthetic relationship roster: direct removal preserves linked-team inclusion. */
+function GroupRosterExample() {
+  const [rows, setRows] = useState([
+    { id: "one", name: "Alex Example", direct: true, team: true },
+    { id: "two", name: "Blair Example", direct: true, team: false },
+    { id: "three", name: "Casey Example", direct: false, team: true },
+  ]);
+  const [query, setQuery] = useState("");
+  const [source, setSource] = useState("");
+  const [reverse, setReverse] = useState(false);
+  const matches = rows
+    .filter(
+      (row) =>
+        row.name.toLowerCase().includes(query.toLowerCase()) &&
+        (!source || (source === "direct" ? row.direct : row.team)),
+    )
+    .sort((a, b) =>
+      reverse ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name),
+    );
+  const selection = useBulkSelection(
+    JSON.stringify([query, source]),
+    matches.map((row) => row.id),
+  );
+  return (
+    <SettingsSection
+      id="catalog-group-roster"
+      title={<h3>Group People selection</h3>}
+      guidance="Filter before paging. Only direct membership can be removed; linked-team inclusion remains. The feature owns its final consequence review."
+    >
+      <CollectionControls
+        search={
+          <FormField label="Find example group members">
+            <Input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </FormField>
+        }
+        sortLabel={reverse ? "Name Z–A" : "Name A–Z"}
+        sort={
+          <FormField label="Sort example members">
+            <SelectField
+              value={reverse ? "reverse" : "name"}
+              onValueChange={(value) => setReverse(value === "reverse")}
+            >
+              <option value="name">Name A–Z</option>
+              <option value="reverse">Name Z–A</option>
+            </SelectField>
+          </FormField>
+        }
+        filters={
+          source
+            ? [
+                {
+                  id: "source",
+                  label: source === "direct" ? "Direct" : "Team",
+                  onRemove: () => setSource(""),
+                },
+              ]
+            : []
+        }
+        onClear={() => {
+          setQuery("");
+          setSource("");
+        }}
+      >
+        <FormField label="Example membership source">
+          <SelectField value={source} onValueChange={setSource}>
+            <option value="">All sources</option>
+            <option value="direct">Direct</option>
+            <option value="team">Team</option>
+          </SelectField>
+        </FormField>
+      </CollectionControls>
+      <BulkActions
+        selected={selection.actionIds}
+        collectionSize={matches.length}
+        singleItemActions={false}
+        noun="people"
+        onSelectionChange={selection.setSelected}
+        commands={[
+          {
+            id: "remove",
+            label: "Remove direct members",
+            description:
+              "Linked-team inclusion remains after removing a direct link.",
+            destructive: true,
+            disabledReason: selection.actionIds.some(
+              (id) => !rows.find((row) => row.id === id)?.direct,
+            )
+              ? "Select only people with Direct membership."
+              : undefined,
+            apply: (_, ids = []) =>
+              setRows((current) =>
+                current.flatMap((row) =>
+                  !ids.includes(row.id)
+                    ? [row]
+                    : row.team
+                      ? [{ ...row, direct: false }]
+                      : [],
+                ),
+              ),
+          },
+        ]}
+      />
+      <TableContainer>
+        <DataTable
+          layout="groupMembersSelectable"
+          aria-label="Example group members"
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                {selection.canSelect && (
+                  <SelectRows
+                    ids={matches.map((row) => row.id)}
+                    value={selection.selected}
+                    onChange={selection.setSelected}
+                  />
+                )}
+              </TableHead>
+              <TableHead>Person</TableHead>
+              <TableHead>Reporting team</TableHead>
+              <TableHead>Included through</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {matches.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  {selection.canSelect && (
+                    <Checkbox
+                      aria-label={`Select ${row.name}`}
+                      checked={selection.selected.includes(row.id)}
+                      onCheckedChange={(checked) =>
+                        selection.toggle(row.id, checked === true)
+                      }
+                    />
+                  )}
+                </TableCell>
+                <TableCell>{row.name}</TableCell>
+                <TableCell>
+                  {row.team ? "Example team" : "No reporting team"}
+                </TableCell>
+                <TableCell>
+                  {[row.direct ? "Direct" : "", row.team ? "Team" : ""]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </DataTable>
+      </TableContainer>
+    </SettingsSection>
   );
 }

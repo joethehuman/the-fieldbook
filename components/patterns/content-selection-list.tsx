@@ -1,6 +1,13 @@
 "use client";
 import { useMemo, useState } from "react";
-import { plainText, searchWords } from "@/lib/search";
+import {
+  plainText,
+  searchWords,
+  scorePassage,
+  makeResult,
+  type SourcePassage,
+} from "@/lib/search";
+import { Highlight } from "./search-result";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { SelectField } from "../ui/select";
@@ -34,6 +41,15 @@ function ordered(options: ContentSelectionOption[], sort: Sort) {
     return (sort === "title-desc" ? -title : title) || a.id.localeCompare(b.id);
   });
 }
+function ranked(
+  options: ContentSelectionOption[],
+  sort: Sort,
+  scores: Map<string, number>,
+) {
+  return ordered(options, sort).sort(
+    (a, b) => (scores.get(b.id) || 0) - (scores.get(a.id) || 0),
+  );
+}
 /** Content discovery owns filters and sorting; shared selection retains stable IDs across them. */
 export function ContentSelectionList({
   options,
@@ -42,6 +58,7 @@ export function ContentSelectionList({
   disabled = false,
   showTypeFilter = false,
   label = "Find content",
+  bounded = false,
 }: {
   options: ContentSelectionOption[];
   value: string[];
@@ -49,12 +66,49 @@ export function ContentSelectionList({
   disabled?: boolean;
   showTypeFilter?: boolean;
   label?: string;
+  bounded?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [type, setType] = useState("");
   const [sort, setSort] = useState<Sort>("newest");
-  const sorted = useMemo(() => ordered(options, sort), [options, sort]);
+  const words = searchWords(query);
+  const passages = useMemo(
+    () =>
+      new Map(
+        options.map((option) => [
+          option.id,
+          {
+            contentId: option.id,
+            kind: option.type === "update" ? "brief" : "course",
+            title: option.label,
+            passageId: "content",
+            lessonId: null,
+            lessonTitle: null,
+            text: plainText(
+              [option.description, option.searchText].filter(Boolean).join(" "),
+            ),
+            publishedRevision: null,
+            contentDate: option.updatedAt || null,
+          } satisfies SourcePassage,
+        ]),
+      ),
+    [options],
+  );
+  const scores = useMemo(
+    () =>
+      new Map(
+        [...passages].map(([id, passage]) => [
+          id,
+          scorePassage(passage, query, { fuzzy: false }),
+        ]),
+      ),
+    [passages, query],
+  );
+  const sorted = useMemo(
+    () => ranked(options, sort, scores),
+    [options, sort, scores],
+  );
   const categories = [
     ...new Set(
       options
@@ -62,62 +116,67 @@ export function ContentSelectionList({
         .filter((name): name is string => !!name),
     ),
   ].sort((a, b) => a.localeCompare(b));
-  const vocabulary = useMemo(
-    () =>
-      new Map(
-        options.map((option) => [
-          option.id,
-          // Source vocabulary is unbounded; searchWords limits only query terms.
-          plainText(
-            [
-              option.label,
-              option.category,
-              option.description,
-              option.searchText,
-            ]
-              .filter(Boolean)
-              .join(" "),
-          )
-            .toLowerCase()
-            .match(/[\p{L}\p{N}]+/gu) || [],
-        ]),
-      ),
-    [options],
-  );
-  const words = searchWords(query);
   const matches = sorted.filter(
     (option) =>
       (!category || option.category === category) &&
       (!type || option.type === type) &&
-      words.every((word) =>
-        vocabulary.get(option.id)?.some((term) => term.startsWith(word)),
-      ),
+      (!words.length || (scores.get(option.id) || 0) > 0),
   );
-  const display = (option: ContentSelectionOption) => ({
-    id: option.id,
-    label: option.label,
-    description: [
-      option.type === "curriculum"
-        ? "Curriculum"
-        : option.type === "course"
-          ? "Course"
-          : "Update",
-      option.category,
-      option.description,
-    ]
-      .filter(Boolean)
-      .join(" · "),
-  });
+  const results = useMemo(
+    () =>
+      new Map(
+        [...passages]
+          .filter(([id]) => (scores.get(id) || 0) > 0)
+          .map(([id, passage]) => [
+            id,
+            makeResult(passage, query, { fuzzy: false }),
+          ]),
+      ),
+    [passages, scores, query],
+  );
+  const display = (option: ContentSelectionOption) => {
+    const result = results.get(option.id);
+    return {
+      id: option.id,
+      label: option.label,
+      labelContent: result ? (
+        <Highlight text={option.label} terms={result.highlights} />
+      ) : undefined,
+      detail: result?.excerpt ? (
+        <Highlight text={result.excerpt} terms={result.highlights} />
+      ) : undefined,
+      description: [
+        option.type === "curriculum"
+          ? "Curriculum"
+          : option.type === "course"
+            ? "Course"
+            : "Update",
+        option.category,
+        words.length ? undefined : option.description,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+    };
+  };
   const clearFilters = () => {
     setQuery("");
     setCategory("");
     setType("");
+    keepDisplayedOrder(ordered(options, sort));
   };
   const selectionInOrder = (ids: string[], order = sorted) => {
     const selected = new Set(ids);
     return order
       .filter((option) => selected.has(option.id))
       .map((option) => option.id);
+  };
+  const keepDisplayedOrder = (order: ContentSelectionOption[]) => {
+    const next = selectionInOrder(value, order);
+    if (
+      next.some((id, index) => id !== value[index]) ||
+      next.length !== value.length
+    )
+      onChange(next);
   };
   const filters: AppliedFilter[] = [];
   if (category)
@@ -134,6 +193,7 @@ export function ContentSelectionList({
     });
   return (
     <SearchableSelectionList
+      bounded={bounded}
       options={sorted.map(display)}
       visibleOptions={matches.map(display)}
       value={value}
@@ -168,18 +228,30 @@ export function ContentSelectionList({
                 placeholder="Search content"
                 value={query}
                 disabled={disabled}
-                onChange={(event) => setQuery(event.target.value)}
+                onChange={(event) => {
+                  const nextQuery = event.target.value;
+                  setQuery(nextQuery);
+                  const nextScores = new Map(
+                    [...passages].map(([id, passage]) => [
+                      id,
+                      scorePassage(passage, nextQuery, { fuzzy: false }),
+                    ]),
+                  );
+                  keepDisplayedOrder(ranked(options, sort, nextScores));
+                }}
               />
             </FormField>
           }
           filters={filters}
           onClear={clearFilters}
           sortLabel={
-            sort === "newest"
-              ? "Updated newest"
-              : sort === "title"
-                ? "Title A–Z"
-                : "Title Z–A"
+            words.length
+              ? "Relevance"
+              : sort === "newest"
+                ? "Updated newest"
+                : sort === "title"
+                  ? "Title A–Z"
+                  : "Title Z–A"
           }
           sort={
             <FormField label="Sort content">
@@ -189,7 +261,7 @@ export function ContentSelectionList({
                 onValueChange={(next) => {
                   const nextSort = next as Sort;
                   setSort(nextSort);
-                  onChange(selectionInOrder(value, ordered(options, nextSort)));
+                  keepDisplayedOrder(ranked(options, nextSort, scores));
                 }}
               >
                 <option value="newest">Updated newest</option>

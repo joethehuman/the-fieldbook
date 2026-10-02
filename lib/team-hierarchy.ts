@@ -1,4 +1,5 @@
 import type { Workspace } from "./store";
+import { organizationParent, organizationTeam } from "./organization-team";
 import {
   ancestorIds,
   canParent,
@@ -17,6 +18,9 @@ export function teamPath(id: string, teams: Team[]) {
 /** One parent changes; stable team IDs preserve members and learning-group links. */
 export function moveTeam(teams: Team[], id: string, parentId: string) {
   const team = teams.find((item) => item.id === id);
+  if (team?.system === "organization")
+    throw new Error("The Organization team cannot be moved.");
+  if (organizationTeam(teams)) parentId = organizationParent(teams, parentId);
   if (!team || (parentId && !teams.some((item) => item.id === parentId)))
     throw new Error("The team or destination changed. Choose again.");
   if (!canParent(id, parentId, teams))
@@ -37,7 +41,9 @@ export function teamMoveImpact(data: Workspace, id: string, parentId: string) {
     (user) => user.teamId && ids.has(user.teamId),
   );
   const managers = data.users
-    .filter((user) => user.active && ["manager", "contributor"].includes(user.role))
+    .filter(
+      (user) => user.active && ["manager", "contributor"].includes(user.role),
+    )
     .map((manager) => {
       const before = reportTeamIds(manager, teams);
       const after = reportTeamIds(manager, next);
@@ -69,6 +75,10 @@ export function teamMoveImpact(data: Workspace, id: string, parentId: string) {
 /** Include inactive and pending accounts; removing references is a separate save. */
 export function teamDeletionBlockers(data: Workspace, id: string) {
   return {
+    organization:
+      data.teams?.some(
+        (team) => team.id === id && team.system === "organization",
+      ) || false,
     members: data.users.filter((user) => user.teamId === id),
     pending: (data.pendingUsers || []).filter((user) => user.teamId === id),
     children: (data.teams || []).filter((team) => team.parentId === id),

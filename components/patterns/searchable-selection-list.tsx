@@ -14,6 +14,8 @@ export type SelectionOption = {
   id: string;
   label: string;
   description?: string;
+  labelContent?: ReactNode;
+  detail?: ReactNode;
 };
 /** Bounded, searchable single or multiple selection. Search and pages never discard selections. */
 export function SearchableSelectionList({
@@ -30,6 +32,7 @@ export function SearchableSelectionList({
   onReviewSelected,
   pageResetKey,
   emptyAction,
+  bounded = false,
 }: {
   options: SelectionOption[];
   value: string[];
@@ -45,6 +48,8 @@ export function SearchableSelectionList({
   onReviewSelected?: () => void;
   pageResetKey?: string;
   emptyAction?: ReactNode;
+  /** Fill a DialogBody, scrolling results without moving controls or actions. */
+  bounded?: boolean;
 }) {
   const groupName = useId();
   const [query, setQuery] = useState("");
@@ -70,7 +75,14 @@ export function SearchableSelectionList({
     value.includes(option.id),
   ).length;
   return (
-    <FieldGroup disabled={disabled}>
+    <FieldGroup
+      disabled={disabled}
+      className={
+        bounded
+          ? "flex h-full min-h-0 flex-col [&>:not([data-slot=selection-results])]:shrink-0"
+          : undefined
+      }
+    >
       {searchControls || (
         <FormField
           label={label}
@@ -173,13 +185,20 @@ export function SearchableSelectionList({
           )}
         </div>
       )}
-      <div className="grid gap-2">
+      <div
+        data-slot="selection-results"
+        className={
+          bounded
+            ? "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+            : "grid gap-2"
+        }
+      >
         {pageOptions.map((option) => (
           <Field
             key={option.id}
             orientation="horizontal"
             data-selected={value.includes(option.id)}
-            className="min-h-16 rounded-md border border-border p-3 hover:bg-muted/40 data-[selected=true]:border-primary/40 data-[selected=true]:bg-selected/40"
+            className="min-h-16 shrink-0 rounded-md border border-border p-3 hover:bg-muted/40 data-[selected=true]:border-primary/40 data-[selected=true]:bg-selected/40"
           >
             {selectionMode === "single" ? (
               <Radio
@@ -202,11 +221,21 @@ export function SearchableSelectionList({
                 }
               />
             )}
-            <span className="min-w-0 [overflow-wrap:anywhere]">
-              <span className="block">{option.label}</span>
+            <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+              <span className="block">
+                {option.labelContent || option.label}
+              </span>
               {option.description && (
                 <span className="block text-copy font-normal text-muted-foreground">
                   {option.description}
+                </span>
+              )}
+              {option.detail && (
+                <span
+                  data-slot="selection-excerpt"
+                  className="mt-1 line-clamp-3 text-copy font-normal text-muted-foreground"
+                >
+                  {option.detail}
                 </span>
               )}
             </span>

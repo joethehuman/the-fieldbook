@@ -24,6 +24,8 @@ import {
 import { SaveRecoveryError } from "@/lib/save-recovery";
 import type { LearningHandler } from "./Assignments";
 import { Button } from "./ui/button";
+import { BulkActions } from "./patterns/bulk-actions";
+import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { Input } from "./ui/input";
 import { Alert } from "./ui/alert";
 import { Checkbox } from "./ui/choice";
@@ -33,6 +35,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import {
   Dialog,
   DialogContent,
+  DialogBody,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -67,6 +70,7 @@ import { SectionHeader, EmptyState, Stack } from "./patterns/layout";
 import {
   CollectionControls,
   CollectionEmpty,
+  type AppliedFilter,
 } from "./patterns/collection-controls";
 import { Pagination } from "./patterns/pagination";
 import { useRevealTarget } from "./patterns/use-reveal-target";
@@ -118,6 +122,10 @@ export default function LearningGroups({
   const [returnToGroup, setReturnToGroup] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
+  const [peopleSort, setPeopleSort] = useState("name");
+  const [sourceFilter, setSourceFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [teamFilter, setTeamFilter] = useState("");
   const [updateSort, setUpdateSort] =
     useState<GroupBrowseSort>("updated-newest");
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -183,11 +191,63 @@ export default function LearningGroups({
     indexPage,
     Math.max(1, Math.ceil(groups.length / PAGE_SIZE)),
   );
-  const filteredMembers = members.filter((person) =>
-    matches(
-      `${person.name} ${person.email} ${teams.find((team) => team.id === person.teamId)?.name || ""}`,
-    ),
-  );
+  const filteredMembers = members
+    .filter(
+      (person) =>
+        matches(
+          `${person.name} ${person.email} ${teams.find((team) => team.id === person.teamId)?.name || ""}`,
+        ) &&
+        (!sourceFilter ||
+          (sourceFilter === "direct"
+            ? person.groups.includes(group!.id)
+            : groupIncludesTeam(group!, person.teamId, teams))) &&
+        (!statusFilter ||
+          (statusFilter === "active" ? person.active : !person.active)) &&
+        (!teamFilter ||
+          (teamFilter === "none"
+            ? !person.teamId
+            : person.teamId === teamFilter.slice(5))),
+    )
+    .sort((a, b) => (peopleSort === "reverse" ? byName(b, a) : byName(a, b)));
+  const resetPeopleFilters = () => {
+    setQuery("");
+    setSourceFilter("");
+    setStatusFilter("");
+    setTeamFilter("");
+    setPage(1);
+  };
+  const peopleFilters: AppliedFilter[] = [];
+  if (sourceFilter)
+    peopleFilters.push({
+      id: "source",
+      label: sourceFilter === "direct" ? "Direct" : "Team",
+      onRemove: () => {
+        setSourceFilter("");
+        setPage(1);
+      },
+    });
+  if (statusFilter)
+    peopleFilters.push({
+      id: "status",
+      label: statusFilter === "active" ? "Active" : "Inactive",
+      onRemove: () => {
+        setStatusFilter("");
+        setPage(1);
+      },
+    });
+  if (teamFilter)
+    peopleFilters.push({
+      id: "team",
+      label:
+        teamFilter === "none"
+          ? "No reporting team"
+          : teams.find((team) => team.id === teamFilter.slice(5))?.name ||
+            "Team",
+      onRemove: () => {
+        setTeamFilter("");
+        setPage(1);
+      },
+    });
   const filteredItems = items.filter((item) => {
     if (item.kind === "course")
       return matches(
@@ -219,6 +279,21 @@ export default function LearningGroups({
     : [];
   const count = tab === "people" ? filteredMembers.length : updates.length;
   const currentPage = Math.min(page, Math.max(1, Math.ceil(count / PAGE_SIZE)));
+  const pageMembers = filteredMembers.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE,
+  );
+  const rosterSelection = useBulkSelection(
+    JSON.stringify([
+      group?.id,
+      tab,
+      query,
+      sourceFilter,
+      statusFilter,
+      teamFilter,
+    ]),
+    filteredMembers.map((person) => person.id),
+  );
   const membershipValue = (value: Extract<Editor, { kind: "membership" }>) =>
     JSON.stringify([
       sorted(value.teams),
@@ -273,6 +348,9 @@ export default function LearningGroups({
   const organizationSnapshot = () =>
     JSON.stringify([data.groups, data.teams, data.users]);
   const learningSnapshot = () => JSON.stringify([group, content, curricula]);
+  const rosterSnapshot = organizationSnapshot();
+  const currentOrganization = useRef(rosterSnapshot);
+  currentOrganization.current = rosterSnapshot;
 
   async function run(action: () => void | Promise<void>, message: string) {
     if (saving.current) return false;
@@ -335,6 +413,7 @@ export default function LearningGroups({
     }
   }
   function openGroup(id: string) {
+    resetPeopleFilters();
     setSelected(id);
     setTab("people");
     setQuery("");
@@ -887,6 +966,20 @@ export default function LearningGroups({
                   description="People can be included through a team, individually, or both."
                 />
                 <CollectionControls
+                  filters={peopleFilters}
+                  onClear={resetPeopleFilters}
+                  sortLabel={peopleSort === "name" ? "Name A–Z" : "Name Z–A"}
+                  sort={
+                    <FormField label="Sort people">
+                      <SelectField
+                        value={peopleSort}
+                        onValueChange={setPeopleSort}
+                      >
+                        <option value="name">Name A–Z</option>
+                        <option value="reverse">Name Z–A</option>
+                      </SelectField>
+                    </FormField>
+                  }
                   primaryAction={
                     <Button
                       type="button"
@@ -910,54 +1003,224 @@ export default function LearningGroups({
                       />
                     </FormField>
                   }
-                />
+                >
+                  <FormField label="Membership source">
+                    <SelectField
+                      value={sourceFilter}
+                      onValueChange={(value) => {
+                        setSourceFilter(value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="">All sources</option>
+                      <option value="direct">Direct</option>
+                      <option value="team">Team</option>
+                    </SelectField>
+                  </FormField>
+                  <FormField label="Person status">
+                    <SelectField
+                      value={statusFilter}
+                      onValueChange={(value) => {
+                        setStatusFilter(value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="">All statuses</option>
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </SelectField>
+                  </FormField>
+                  <FormField label="Reporting team">
+                    <SelectField
+                      value={teamFilter}
+                      onValueChange={(value) => {
+                        setTeamFilter(value);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="">All teams</option>
+                      <option value="none">No reporting team</option>
+                      {[...teams].sort(byName).map((team) => (
+                        <option key={team.id} value={`team:${team.id}`}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </SelectField>
+                  </FormField>
+                </CollectionControls>
+                <BulkActions
+                  selected={rosterSelection.actionIds}
+                  collectionSize={filteredMembers.length}
+                  singleItemActions={false}
+                  noun="people"
+                  range={
+                    filteredMembers.length
+                      ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, filteredMembers.length)} of ${filteredMembers.length} people`
+                      : "0 people"
+                  }
+                  onSelectionChange={rosterSelection.setSelected}
+                  commands={[
+                    {
+                      id: "remove-direct",
+                      label: "Remove direct members",
+                      description:
+                        "Remove individual membership. Linked team membership stays in place.",
+                      externalReview: true,
+                      destructive: true,
+                      successMessage: "Direct membership removed.",
+                      disabledReason:
+                        busy || needsConversion
+                          ? "Finish the current change first."
+                          : rosterSelection.actionIds.some(
+                                (id) =>
+                                  !members
+                                    .find((person) => person.id === id)
+                                    ?.groups.includes(group.id),
+                              )
+                            ? "Select only people with Direct membership. Team membership is managed through linked teams."
+                            : undefined,
+                      apply: async (_, ids = []) => {
+                        if (currentOrganization.current !== rosterSnapshot)
+                          throw new Error(
+                            "People, teams or groups changed. Review the current list before retrying.",
+                          );
+                        if (saving.current)
+                          throw new Error("Finish the current change first.");
+                        saving.current = true;
+                        setBusy(true);
+                        try {
+                          await onChange(
+                            {
+                              ...data,
+                              users: data.users.map((person) =>
+                                ids.includes(person.id)
+                                  ? {
+                                      ...person,
+                                      groups: person.groups.filter(
+                                        (id) => id !== group.id,
+                                      ),
+                                    }
+                                  : person,
+                              ),
+                            },
+                            {
+                              locallyHandled: true,
+                              review: {
+                                title: "Remove direct members?",
+                                confirmLabel: "Remove direct members",
+                                description:
+                                  "Remove individual membership from this group. Anyone also included through a linked team stays in the group.",
+                                always: true,
+                              },
+                            },
+                          );
+                        } finally {
+                          saving.current = false;
+                          setBusy(false);
+                        }
+                      },
+                    },
+                  ]}
+                >
+                  {rosterSelection.canSelect &&
+                    pageMembers.every((person) =>
+                      rosterSelection.selected.includes(person.id),
+                    ) &&
+                    rosterSelection.selected.length <
+                      filteredMembers.length && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        onClick={() =>
+                          rosterSelection.setSelected(
+                            filteredMembers.map((person) => person.id),
+                          )
+                        }
+                      >
+                        Select all {filteredMembers.length} matching
+                      </Button>
+                    )}
+                </BulkActions>
+
                 {filteredMembers.length ? (
                   <TableContainer>
-                    <DataTable layout="groupMembers" aria-label="Group members">
+                    <DataTable
+                      layout="groupMembersSelectable"
+                      aria-label="Group members"
+                    >
                       <TableHeader>
                         <TableRow>
+                          <TableHead>
+                            {rosterSelection.canSelect && (
+                              <SelectRows
+                                ids={pageMembers.map((person) => person.id)}
+                                value={rosterSelection.selected}
+                                onChange={rosterSelection.setSelected}
+                                label={`Select page (${pageMembers.length})`}
+                              />
+                            )}
+                          </TableHead>
                           <TableHead>Person</TableHead>
                           <TableHead>Reporting team</TableHead>
                           <TableHead>Included through</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredMembers
-                          .slice(
-                            (currentPage - 1) * PAGE_SIZE,
-                            currentPage * PAGE_SIZE,
-                          )
-                          .map((person) => {
-                            const sources = [
-                              person.groups.includes(group.id) ? "Direct" : "",
-                              groupIncludesTeam(group, person.teamId, teams)
-                                ? "Team"
-                                : "",
-                            ].filter(Boolean);
-                            return (
-                              <TableRow key={person.id}>
-                                <TableCell>
-                                  <strong>{person.name}</strong>
-                                  <p className="text-copy text-muted-foreground">
-                                    {person.email}
-                                    {!person.active
-                                      ? " · Inactive"
-                                      : person.registered === false
-                                        ? " · Not signed in"
-                                        : ""}
-                                  </p>
-                                </TableCell>
-                                <TableCell>
-                                  {person.teamId
-                                    ? teams.find(
-                                        (team) => team.id === person.teamId,
-                                      )?.name || "Unknown team"
-                                    : "No reporting team"}
-                                </TableCell>
-                                <TableCell>{sources.join(" · ")}</TableCell>
-                              </TableRow>
-                            );
-                          })}
+                        {pageMembers.map((person) => {
+                          const sources = [
+                            person.groups.includes(group.id) ? "Direct" : "",
+                            groupIncludesTeam(group, person.teamId, teams)
+                              ? "Team"
+                              : "",
+                          ].filter(Boolean);
+                          return (
+                            <TableRow
+                              key={person.id}
+                              data-state={
+                                rosterSelection.selected.includes(person.id)
+                                  ? "selected"
+                                  : undefined
+                              }
+                            >
+                              <TableCell>
+                                {rosterSelection.canSelect && (
+                                  <Checkbox
+                                    aria-label={`Select ${person.name}`}
+                                    checked={rosterSelection.selected.includes(
+                                      person.id,
+                                    )}
+                                    disabled={busy}
+                                    onCheckedChange={(checked) =>
+                                      rosterSelection.toggle(
+                                        person.id,
+                                        checked === true,
+                                      )
+                                    }
+                                  />
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                <strong>{person.name}</strong>
+                                <p className="text-copy text-muted-foreground">
+                                  {person.email}
+                                  {!person.active
+                                    ? " · Inactive"
+                                    : person.registered === false
+                                      ? " · Not signed in"
+                                      : ""}
+                                </p>
+                              </TableCell>
+                              <TableCell>
+                                {person.teamId
+                                  ? teams.find(
+                                      (team) => team.id === person.teamId,
+                                    )?.name || "Unknown team"
+                                  : "No reporting team"}
+                              </TableCell>
+                              <TableCell>{sources.join(" · ")}</TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </DataTable>
                   </TableContainer>
@@ -966,10 +1229,11 @@ export default function LearningGroups({
                     count={0}
                     total={members.length}
                     noun="people"
-                    onClear={() => setQuery("")}
+                    onClear={resetPeopleFilters}
                   />
                 )}
                 <Pagination
+                  showCount={false}
                   label="Group members"
                   page={currentPage}
                   pageSize={PAGE_SIZE}
@@ -1138,6 +1402,11 @@ export default function LearningGroups({
         }}
       >
         <DialogContent
+          size={
+            editor?.kind === "learning" || editor?.kind === "updates"
+              ? "selection"
+              : "default"
+          }
           onEscapeKeyDown={(event) => {
             if (busy) event.preventDefault();
           }}
@@ -1145,8 +1414,10 @@ export default function LearningGroups({
             if (busy) event.preventDefault();
           }}
         >
-          <DialogTitle>{modalTitle}</DialogTitle>
-          <DialogDescription>{modalDescription}</DialogDescription>
+          <DialogTitle className="shrink-0">{modalTitle}</DialogTitle>
+          <DialogDescription className="shrink-0">
+            {modalDescription}
+          </DialogDescription>
           {notice && <Alert variant="destructive">{notice}</Alert>}
           {(editor?.kind === "create" || editor?.kind === "rename") && (
             <form
@@ -1252,20 +1523,23 @@ export default function LearningGroups({
             </Tabs>
           )}
           {(editor?.kind === "learning" || editor?.kind === "updates") && (
-            <ContentSelectionList
-              label={
-                editor.kind === "learning"
-                  ? "Find courses or curricula"
-                  : "Find Updates"
-              }
-              showTypeFilter={editor.kind === "learning"}
-              disabled={busy}
-              options={
-                editor.kind === "learning" ? learningOptions : updateOptions
-              }
-              value={editor.ids}
-              onChange={(ids) => setEditor({ ...editor, ids })}
-            />
+            <DialogBody>
+              <ContentSelectionList
+                bounded
+                label={
+                  editor.kind === "learning"
+                    ? "Find courses or curricula"
+                    : "Find Updates"
+                }
+                showTypeFilter={editor.kind === "learning"}
+                disabled={busy}
+                options={
+                  editor.kind === "learning" ? learningOptions : updateOptions
+                }
+                value={editor.ids}
+                onChange={(ids) => setEditor({ ...editor, ids })}
+              />
+            </DialogBody>
           )}
           <DialogFooter className="justify-end">
             <Button

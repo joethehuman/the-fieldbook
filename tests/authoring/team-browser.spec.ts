@@ -27,27 +27,20 @@ test("installed Teams keeps its organization team manageable and reveals a newly
   state.curricula = [];
   state.progress = {};
   state.teams = [
-    { id: "organization", name: "Company" },
+    { id: "organization", name: "Company", system: "organization" },
     { id: "sales", name: "Sales", parentId: "organization" },
   ];
   state.users = [{ ...authoringUser, teamId: "organization" }];
-  state.settings!.organizationTeamId = null;
+  state.settings!.organizationTeamId = "organization";
   state.revision = 3;
   state.governanceRevision = 9;
   await setupAuthoringProvider(page, state);
   await page.route("**/api/admin/snapshot?**", (route) =>
     route.fulfill({ json: { data: state, user: authoringUser } }),
   );
-  let settingsWrites = 0,
-    teamWrites = 0;
-  await page.route("**/api/settings", (route) => {
-    settingsWrites++;
-    const input = route.request().postDataJSON();
-    expect(input.expected).toBe(3);
-    expect(input.settings.organizationTeamId).toBe("organization");
-    state.settings = input.settings;
-    state.revision = 4;
-    return route.fulfill({ json: { revision: 4 } });
+  let teamWrites = 0;
+  await page.route("**/api/settings", () => {
+    throw new Error("Organization identity is not a settings choice.");
   });
   await page.route("**/api/governance", (route) => {
     teamWrites++;
@@ -65,28 +58,6 @@ test("installed Teams keeps its organization team manageable and reveals a newly
   const browser = page.locator('[data-slot="hierarchy-browser"]');
   await expect(
     browser.getByRole("button", { name: "Open Company", exact: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Teams page actions", exact: true })
-    .click();
-  await page
-    .getByRole("menuitem", { name: "Organization team…", exact: true })
-    .click();
-  const settings = page.getByRole("dialog", {
-    name: "Organization team",
-    exact: true,
-  });
-  await settings
-    .getByRole("combobox", { name: "Organization team", exact: true })
-    .click();
-  await page.getByRole("option", { name: "Company", exact: true }).click();
-  await settings
-    .getByRole("button", { name: "Save organization team", exact: true })
-    .click();
-  await expect(settings).not.toBeVisible();
-  expect(settingsWrites).toBe(1);
-  await expect(
-    browser.getByRole("button", { name: "Open Company", exact: true }),
   ).toHaveCount(0);
   await expect(
     browser.getByRole("button", { name: "Open Sales", exact: true }),
@@ -98,8 +69,32 @@ test("installed Teams keeps its organization team manageable and reveals a newly
     .getByRole("menuitem", { name: "Manage organization team", exact: true })
     .click();
   await expect(
+    page.getByRole("heading", { name: "Organization", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Direct members", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Team actions", exact: true }),
+  ).toHaveCount(0);
+  await expect(
     page.getByRole("table", { name: "Team members", exact: true }),
   ).toContainText(authoringUser.name);
+  await page.getByRole("button", { name: "Edit manager", exact: true }).click();
+  const manager = page.getByRole("dialog", {
+    name: "Organization manager",
+    exact: true,
+  });
+  await expect(
+    manager.getByRole("combobox", { name: "Manager", exact: true }),
+  ).toBeVisible();
+  await expect(
+    manager.getByRole("textbox", { name: "Team name", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    manager.getByRole("combobox", { name: "Parent team", exact: true }),
+  ).toHaveCount(0);
+  await manager.getByRole("button", { name: "Cancel", exact: true }).click();
   await page
     .getByRole("button", { name: "Back to teams", exact: true })
     .click();
@@ -107,7 +102,7 @@ test("installed Teams keeps its organization team manageable and reveals a newly
   const create = page.getByRole("dialog", { name: "New team", exact: true });
   await expect(
     create.getByRole("combobox", { name: "Parent team", exact: true }),
-  ).toHaveText("Company");
+  ).toHaveText("Organization");
   await create
     .getByRole("textbox", { name: "Team name", exact: true })
     .fill("New region");

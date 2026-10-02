@@ -17,14 +17,16 @@ function stable(workspace: Workspace) {
 }
 function deepFixture() {
   const data = freshWorkspace();
+  const rootId = data.teams!.find((team) => team.system === "organization")!.id;
   data.teams!.push(
-    { id: "revenue", name: "Revenue" },
-    { id: "operations", name: "Operations" },
+    { id: "revenue", name: "Revenue", parentId: rootId },
+    { id: "operations", name: "Operations", parentId: rootId },
   );
   data.teams!.push(
     ...Array.from({ length: 24 }, (_, index) => ({
       id: `peer-${index}`,
       name: `Peer team ${String(index).padStart(2, "0")}`,
+      parentId: rootId,
     })),
   );
   for (let index = 1; index <= 11; index++)
@@ -33,6 +35,18 @@ function deepFixture() {
       name: levelName(index),
       parentId: index === 1 ? "revenue" : `level-${index - 1}`,
     });
+  data.teams!.push(
+    {
+      id: "alternate",
+      name: "Revenue alternative branch",
+      parentId: "level-4",
+    },
+    {
+      id: "alternate-child",
+      name: "Revenue alternative territory",
+      parentId: "alternate",
+    },
+  );
   data.users.find((person) => person.id === "demo-learner")!.teamId =
     "level-11";
   return stable(data);
@@ -76,18 +90,27 @@ async function browse(page: Page, name: string) {
     .click();
 }
 
-test("twelve-level browser keeps bounded columns, recoverable ancestors and explicit open/edit", async ({
+test("twelve-level chart retains every depth, replaces the expanded sibling path and preserves scroll", async ({
   page,
 }, info) => {
   await seed(page, deepFixture());
   const baseline = await saved(page);
   const browser = page.locator('[data-slot="hierarchy-browser"]');
+  const chart = browser.getByRole("region", {
+    name: "Teams chart",
+    exact: true,
+  });
   await expect(
     browser.locator('[data-slot="hierarchy-column"]:visible'),
   ).toHaveCount(1);
   await expect(
     page.getByRole("button", { name: "Open Operations", exact: true }),
   ).toBeVisible();
+  const node = await browser
+    .locator('[data-hierarchy-id="operations"]')
+    .boundingBox();
+  expect(node!.width).toBeLessThanOrEqual(264);
+  expect(node!.height).toBeLessThan(130);
   await page.screenshot({
     path: info.outputPath("teams-root-browser.png"),
     fullPage: true,
@@ -106,10 +129,20 @@ test("twelve-level browser keeps bounded columns, recoverable ancestors and expl
   ).toBeFocused();
   for (let index = 1; index <= 11; index++)
     await browse(page, levelName(index));
-  const width = (await browser.boundingBox())!.width;
   await expect(
     browser.locator('[data-slot="hierarchy-column"]:visible'),
-  ).toHaveCount(width >= 960 ? 3 : width >= 608 ? 2 : 1);
+  ).toHaveCount(12);
+  expect(
+    await chart.evaluate(
+      (element) => element.scrollWidth > element.clientWidth,
+    ),
+  ).toBe(true);
+  expect(await chart.evaluate((element) => element.scrollLeft)).toBeGreaterThan(
+    0,
+  );
+  await expect
+    .poll(() => browser.locator('[data-slot="connector-line"]').count())
+    .toBeGreaterThan(0);
   await expect(
     page.getByRole("button", {
       name: `Browse ${levelName(11)} subteams`,
@@ -124,10 +157,57 @@ test("twelve-level browser keeps bounded columns, recoverable ancestors and expl
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
+  const chartPosition = await chart.evaluate((element) => element.scrollLeft);
+  const search = page.getByRole("searchbox", {
+    name: "Find teams",
+    exact: true,
+  });
+  await search.fill("Operations");
+  await expect(browser.locator("[data-hierarchy-id]")).toHaveCount(1);
+  await search.fill("");
+  await expect(browser.locator('[data-slot="hierarchy-column"]')).toHaveCount(
+    12,
+  );
+  await expect
+    .poll(async () =>
+      Math.abs(
+        (await chart.evaluate((element) => element.scrollLeft)) - chartPosition,
+      ),
+    )
+    .toBeLessThanOrEqual(1);
   await page.screenshot({
     path: info.outputPath("twelve-level-browser.png"),
     fullPage: true,
   });
+  await chart.focus();
+  await page.keyboard.press("Home");
+  await expect
+    .poll(() => chart.evaluate((element) => element.scrollLeft))
+    .toBe(0);
+  await page.keyboard.press("End");
+  expect(await chart.evaluate((element) => element.scrollLeft)).toBeGreaterThan(
+    0,
+  );
+  // Earlier sibling controls remain mounted even after twelve levels. Choosing
+  // a different sibling keeps its ancestors and replaces the downstream path.
+  await browse(page, "Revenue alternative branch");
+  await expect(browser.locator('[data-slot="hierarchy-column"]')).toHaveCount(
+    7,
+  );
+  await expect(browser.locator('[data-branch-id="level-5"]')).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Open Revenue alternative territory",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await browse(page, levelName(5));
+  await expect(browser.locator('[data-branch-id="alternate"]')).toHaveCount(0);
+  for (let index = 6; index <= 11; index++)
+    await browse(page, levelName(index));
+  await expect(browser.locator('[data-slot="hierarchy-column"]')).toHaveCount(
+    12,
+  );
   const ancestors = page.getByRole("button", {
     name: "Teams ancestors",
     exact: true,
@@ -187,6 +267,9 @@ test("twelve-level browser keeps bounded columns, recoverable ancestors and expl
       exact: true,
     }),
   ).toBeVisible();
+  expect(await chart.evaluate((element) => element.scrollLeft)).toBeGreaterThan(
+    0,
+  );
   await page
     .getByRole("navigation", { name: "Teams path", exact: true })
     .getByRole("button", { name: "Teams", exact: true })
@@ -209,7 +292,7 @@ test("path search and flat bulk selection share the same matches; browsing a res
     exact: true,
   });
   await search.fill("Revenue");
-  await expect(browser.locator("[data-hierarchy-id]")).toHaveCount(12);
+  await expect(browser.locator("[data-hierarchy-id]")).toHaveCount(14);
   await expect(browser).toContainText(
     [
       "Revenue",
@@ -219,11 +302,11 @@ test("path search and flat bulk selection share the same matches; browsing a res
   await page.getByRole("button", { name: "Select teams", exact: true }).click();
   await expect(
     browser.getByRole("checkbox", { name: /^Select Revenue/ }),
-  ).toHaveCount(12);
+  ).toHaveCount(14);
   await browser
     .getByRole("checkbox", { name: "Select all matching teams", exact: true })
     .check();
-  await expect(browser).toContainText("12 selected");
+  await expect(browser).toContainText("14 selected");
   await browser
     .getByRole("button", { name: "Clear selection", exact: true })
     .click();
@@ -334,146 +417,119 @@ test("two successful new-team saves return to their parent and reveal each row; 
   });
 });
 
-test("organization designation is explicit, cancelable and preserved on reload without changing memberships", async ({
+test("built-in Organization has its own manager and direct-members page", async ({
   page,
 }, info) => {
-  const data = freshWorkspace();
-  data.teams![0].name = "Company";
-  data.teams!.push(
-    { id: "west", name: "West team", parentId: "sales-team" },
-    { id: "east", name: "East team", parentId: "sales-team" },
-  );
+  const data = stable(freshWorkspace());
+  const root = data.teams!.find((team) => team.system === "organization")!;
+  data.users.find((person) => person.id === "demo-admin")!.teamId = root.id;
+  data.teams!.push({ id: "west", name: "West team", parentId: "sales-team" });
   data.users.find((person) => person.id === "demo-learner")!.teamId = "west";
-  await seed(page, stable(data));
+  await seed(page, data);
   const baseline = await saved(page);
   await expect(
-    page.getByRole("button", { name: "Open Company", exact: true }),
-  ).toBeVisible();
-  await pageAction(page, "Organization team…");
-  const editor = page.getByRole("dialog", {
-    name: "Organization team",
-    exact: true,
-  });
-  await editor
-    .getByRole("combobox", { name: "Organization team", exact: true })
-    .click();
-  await page.getByRole("option", { name: "Company", exact: true }).click();
-  await editor.getByRole("button", { name: "Cancel", exact: true }).click();
-  expect((await saved(page)).settings?.organizationTeamId).toEqual(
-    baseline.settings?.organizationTeamId,
-  );
-  await expect(
-    page.getByRole("button", { name: "Open Company", exact: true }),
-  ).toBeVisible();
-  await pageAction(page, "Organization team…");
-  await editor
-    .getByRole("combobox", { name: "Organization team", exact: true })
-    .click();
-  await page.getByRole("option", { name: "Company", exact: true }).click();
-  await editor
-    .getByRole("button", { name: "Save organization team", exact: true })
-    .click();
-  await expect(editor).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Open Company", exact: true }),
+    page.getByRole("button", { name: "Open Organization", exact: true }),
   ).toHaveCount(0);
   await expect(
-    page.getByRole("button", { name: "Open West team", exact: true }),
+    page.getByRole("button", { name: "Open Sales team", exact: true }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Open East team", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Add team", exact: true }).click();
-  const newTeam = page.getByRole("dialog", { name: "New team", exact: true });
-  await expect(
-    newTeam.getByRole("combobox", { name: "Parent team", exact: true }),
-  ).toContainText("Company");
-  await newTeam.getByRole("button", { name: "Cancel", exact: true }).click();
   await pageAction(page, "Manage organization team");
   await expect(
-    page.getByRole("heading", { name: "Company", exact: true }),
+    page.getByRole("heading", { name: "Organization", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("table", { name: "Team members", exact: true }),
-  ).toContainText("Direct member");
+    page.getByRole("heading", { name: "Direct members", exact: true }),
+  ).toBeVisible();
+  const table = page.getByRole("table", { name: "Team members", exact: true });
+  await expect(table).toContainText("Oliver Anderson");
+  await expect(table).not.toContainText("Alex Edwards");
   await expect(
-    page.getByRole("table", { name: "Team members", exact: true }),
-  ).toContainText("West team");
+    page.getByRole("button", { name: "Team actions", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("tab", { name: "Subteams", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Edit manager", exact: true }).click();
+  const editor = page.getByRole("dialog", {
+    name: "Organization manager",
+    exact: true,
+  });
+  await expect(
+    editor.getByRole("textbox", { name: "Team name", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    editor.getByRole("combobox", { name: "Parent team", exact: true }),
+  ).toHaveCount(0);
+  await editor.getByRole("combobox", { name: "Manager", exact: true }).click();
+  await page.getByRole("option", { name: "Sara Downy", exact: true }).click();
+  await editor.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect((await saved(page)).teams).toEqual(baseline.teams);
+  await page.getByRole("button", { name: "Add members", exact: true }).click();
+  const add = page.getByRole("dialog", { name: "Add members", exact: true });
+  await add.getByRole("checkbox", { name: /^Alex Edwards/ }).check();
+  await add.getByRole("button", { name: /^Review changes/ }).click();
+  const review = page.getByRole("dialog", {
+    name: "Review membership changes",
+    exact: true,
+  });
+  await review
+    .getByRole("button", { name: "Add members", exact: true })
+    .click();
+  await expect(add).not.toBeVisible();
+  await expect(table).toContainText("Alex Edwards");
+  await page.screenshot({
+    path: info.outputPath("organization-direct-members.png"),
+    fullPage: true,
+  });
   await page
     .getByRole("button", { name: "Back to teams", exact: true })
     .click();
   await page.reload();
   await teamsSection(page);
-  await expect(
-    page.getByRole("button", { name: "Open Company", exact: true }),
-  ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Open East team", exact: true }),
-  ).toBeVisible();
   const after = await saved(page);
-  expect(after.settings?.organizationTeamId).toBe("sales-team");
+  expect(after.settings!.organizationTeamId).toBe(root.id);
   expect(after.teams).toEqual(baseline.teams);
-  expect(after.users).toEqual(baseline.users);
   expect(after.progress).toEqual(baseline.progress);
-  await page.screenshot({
-    path: info.outputPath("organization-subteams.png"),
-    fullPage: true,
-  });
+  expect(
+    after.users.find((person) => person.id === "demo-learner")!.teamId,
+  ).toBe(root.id);
 });
 
-test("missing, child and multiple-root designations fall back to ordinary stored teams", async ({
+test("legacy root upgrade preserves an explicit sole root and neutrally joins multiple roots", async ({
   page,
 }) => {
-  const data = stable(freshWorkspace());
-  data.teams!.push({ id: "child", name: "Child team", parentId: "sales-team" });
-  data.settings!.organizationTeamId = "missing";
-  await seed(page, data);
-  for (const id of ["missing", "child", "sales-team"]) {
-    const next = structuredClone(data);
-    next.settings!.organizationTeamId = id;
-    if (id === "sales-team")
-      next.teams!.push({ id: "other", name: "Other root" });
-    await page.evaluate(
-      (workspace) =>
-        localStorage.setItem(
-          "fieldbook.workspace.v1",
-          JSON.stringify(workspace),
-        ),
-      next,
-    );
+  for (const preserve of [true, false]) {
+    const data = stable(freshWorkspace());
+    data.teams = [
+      { id: "company", name: "Company", managerId: "demo-manager" },
+      { id: "sales-team", name: "Sales team", parentId: "company" },
+      ...(preserve ? [] : [{ id: "other", name: "Other team" }]),
+    ];
+    data.settings!.organizationTeamId = "company";
+    data.users.find((person) => person.id === "demo-admin")!.teamId = "company";
+    await page.goto("/");
+    await page.evaluate((workspace) => {
+      sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+      localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+    }, data);
+    await page.goto("/#admin");
     await page.reload();
     await teamsSection(page);
+    const after = await saved(page);
+    const root = after.teams!.find((team) => team.system === "organization")!;
+    expect(root.parentId).toBeUndefined();
+    expect(root.id).toBe(after.settings!.organizationTeamId);
+    expect(root.managerId).toBe(preserve ? "demo-manager" : undefined);
+    expect(root.name).toBe(preserve ? "Company" : "Organization");
+    expect(root.id === "company").toBe(preserve);
+    expect(after.users.map((person) => person.teamId)).toEqual(
+      data.users.map((person) => person.teamId),
+    );
+    expect(after.progress).toEqual(data.progress);
+    expect(after.teams!.filter((team) => !team.parentId)).toHaveLength(1);
+    await pageAction(page, "Manage organization team");
     await expect(
-      page.getByRole("button", { name: "Open Sales team", exact: true }),
+      page.getByRole("heading", { name: "Organization", exact: true }),
     ).toBeVisible();
-    await page
-      .getByRole("button", { name: "Teams page actions", exact: true })
-      .click();
-    await expect(
-      page.getByRole("menuitem", {
-        name: "Manage organization team",
-        exact: true,
-      }),
-    ).toHaveCount(0);
-    await page
-      .getByRole("menuitem", { name: "Organization team…", exact: true })
-      .click();
-    const editor = page.getByRole("dialog", {
-      name: "Organization team",
-      exact: true,
-    });
-    if (id === "sales-team") {
-      await expect(editor).toContainText(
-        "use the parent controls to combine them",
-      );
-      await editor
-        .getByRole("combobox", { name: "Organization team", exact: true })
-        .click();
-      await expect(page.getByRole("option")).toHaveCount(1);
-      await page.getByRole("option", { name: "None", exact: true }).click();
-    }
-    await editor.getByRole("button", { name: "Cancel", exact: true }).click();
-    expect((await saved(page)).settings?.organizationTeamId).toBe(id);
-    expect((await saved(page)).teams).toEqual(next.teams);
   }
 });

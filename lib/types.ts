@@ -137,6 +137,7 @@ export function groupIncludesTeam(
 export type Team = {
   id: string;
   name: string;
+  system?: "organization";
   parentId?: string;
   managerId?: string;
 };

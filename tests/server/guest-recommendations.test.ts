@@ -12,6 +12,18 @@ test("real snapshot/progress/settings boundaries with synthetic PostgREST: no an
   let data = guestFixture(),
     conflict = false;
   data.settings!.organizationTeamId = "private-organization-team";
+  const rootId = data.teams!.find((team) => team.system === "organization")!.id;
+  data.teams = data.teams!.map((team) =>
+    team.id === rootId
+      ? { ...team, id: "private-organization-team" }
+      : {
+          ...team,
+          parentId:
+            team.parentId === rootId
+              ? "private-organization-team"
+              : team.parentId,
+        },
+  );
   const requests: { url: URL; method: string }[] = [];
   Object.assign(process.env, {
     NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",

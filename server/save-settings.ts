@@ -34,15 +34,21 @@ export async function saveSettings(
       );
   }
   const selectedTeam = parsed.data.organizationTeamId;
-  if (
-    selectedTeam &&
-    selectedTeam !== config.settings.organizationTeamId &&
-    !organizationTeam(config.teams, selectedTeam)
-  )
+  const root = organizationTeam(
+    config.teams || [],
+    config.settings.organizationTeamId,
+  );
+  if (!root || root.id !== config.settings.organizationTeamId)
+    throw new HttpError(
+      503,
+      "Organization team setup is incomplete. Apply the matching migration before saving.",
+    );
+  if (selectedTeam !== undefined && selectedTeam !== root.id)
     throw new HttpError(
       400,
-      "Choose the only top-level team as the Organization team, or leave it unset.",
+      "The built-in Organization team cannot be changed or removed.",
     );
+  parsed.data.organizationTeamId = root.id;
   if (
     JSON.stringify(parsed.data.docSections) !==
     JSON.stringify(config.settings.docSections)

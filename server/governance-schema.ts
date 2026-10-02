@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cardArtSchema } from "./schemas";
+import { validateOrganizationTeams } from "@/lib/organization-team";
 const id = z.string().min(1).max(80);
 const node = z.object({
   id,
@@ -31,7 +32,14 @@ export const governanceSchema = z
       .max(1000)
       .optional(),
     groups: z.array(node).max(1000),
-    teams: z.array(node.extend({ managerId: z.uuid().optional() })).max(1000),
+    teams: z
+      .array(
+        node.extend({
+          managerId: z.uuid().optional(),
+          system: z.literal("organization").optional(),
+        }),
+      )
+      .max(1000),
     users: z
       .array(
         z.object({
@@ -50,6 +58,14 @@ export const governanceSchema = z
   })
   .superRefine((value, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: "custom", message });
+    try {
+      validateOrganizationTeams(
+        value.teams,
+        value.teams.find((team) => team.system === "organization")?.id,
+      );
+    } catch (error) {
+      fail((error as Error).message);
+    }
     for (const nodes of [value.groups, value.teams]) {
       const map = new Map(nodes.map((n) => [n.id, n]));
       if (

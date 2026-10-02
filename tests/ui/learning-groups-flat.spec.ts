@@ -211,7 +211,7 @@ test("branch membership stays staged and explains overlapping sources", async ({
   await membership.getByRole("tab", { name: "Teams", exact: true }).click();
   await membership
     .getByRole("checkbox", {
-      name: "Revenue Revenue · Includes subteams",
+      name: "Revenue Organization / Revenue · Includes subteams",
       exact: true,
     })
     .check();
@@ -277,16 +277,16 @@ test("large group roster is paginated, searchable and contained on narrow screen
   const table = page.getByRole("table", { name: "Group members" });
   await expect(table.getByRole("row")).toHaveCount(26);
   await expect(
-    page.getByRole("navigation", { name: "Group members pages" }),
-  ).toContainText("1–25 of 500");
+    page.getByRole("region", { name: "Selected items" }),
+  ).toContainText("1–25 of 500 people");
   await page
     .getByRole("searchbox", { name: "Find a person", exact: true })
     .fill("Person 499");
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("Person 499");
   await expect(
-    page.getByRole("navigation", { name: "Group members pages" }),
-  ).toContainText("1–1 of 1");
+    page.getByText("1–1 of 1 people", { exact: true }),
+  ).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth + 1,
@@ -431,4 +431,146 @@ test("group workspace starts with people and clearly separates assigned content 
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("People filters and bulk direct removal preserve team membership and cancel without saving", async ({
+  page,
+}, info) => {
+  const data = fixture();
+  const learner = data.users.find((person) => person.id === "demo-learner")!;
+  learner.groups = ["ae"];
+  data.users.push({
+    ...learner,
+    id: "direct-only",
+    name: "Zoe Direct",
+    email: "zoe@example.test",
+    teamId: undefined,
+    active: false,
+  });
+  await start(page, data);
+  await page
+    .getByRole("button", { name: "Account executives", exact: true })
+    .click();
+  const table = page.getByRole("table", { name: "Group members" });
+  await expect(table).toHaveAttribute("data-layout", "groupMembersSelectable");
+  await expect(table.getByRole("checkbox")).toHaveCount(4);
+  await table
+    .getByRole("checkbox", { name: "Select page (3)", exact: true })
+    .check();
+  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
+  await expect(
+    page.getByRole("menuitem", { name: "Remove direct members", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText(
+      "Select only people with Direct membership. Team membership is managed through linked teams.",
+    ),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  await page
+    .getByRole("combobox", { name: "Membership source", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Direct", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Collection filters", exact: true })
+    .press("Escape");
+  await expect(table.getByRole("row")).toHaveCount(3);
+  await expect(
+    page.getByRole("button", { name: "Bulk actions", exact: true }),
+  ).toBeDisabled();
+  const columns = await table
+    .locator("col")
+    .evaluateAll((items) =>
+      items.map((item) => item.getBoundingClientRect().width),
+    );
+  for (const [label, choice, reset] of [
+    ["Person status", "Inactive", "All statuses"],
+    ["Reporting team", "No reporting team", "All teams"],
+  ]) {
+    await page.getByRole("button", { name: /^Filters/ }).click();
+    await page.getByRole("combobox", { name: label, exact: true }).click();
+    await page.getByRole("option", { name: choice, exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "Collection filters", exact: true })
+      .press("Escape");
+    await expect(table.getByRole("row")).toHaveCount(2);
+    await expect(table.getByRole("checkbox")).toHaveCount(0);
+    expect(
+      await table
+        .locator("col")
+        .evaluateAll((items) =>
+          items.map((item) => item.getBoundingClientRect().width),
+        ),
+    ).toEqual(columns);
+    await page.getByRole("button", { name: /^Filters/ }).click();
+    await page.getByRole("combobox", { name: label, exact: true }).click();
+    await page.getByRole("option", { name: reset, exact: true }).click();
+    await page
+      .getByRole("dialog", { name: "Collection filters", exact: true })
+      .press("Escape");
+  }
+  await page
+    .getByRole("button", { name: "Sort: Name A–Z", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Sort people", exact: true })
+    .click();
+  await page.getByRole("option", { name: "Name Z–A", exact: true }).click();
+  await page
+    .getByRole("dialog", { name: "Collection sort", exact: true })
+    .press("Escape");
+  await expect(table.getByRole("row").nth(1)).toContainText("Zoe Direct");
+  await table
+    .getByRole("checkbox", { name: "Select page (2)", exact: true })
+    .check();
+  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Remove direct members", exact: true })
+    .click();
+  const review = page.getByRole("dialog", {
+    name: "Remove direct members?",
+    exact: true,
+  });
+  await expect(review).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Bulk actions", exact: true }),
+  ).toBeFocused();
+  await expect(
+    table.getByRole("checkbox", {
+      name: `Select ${learner.name}`,
+      exact: true,
+    }),
+  ).toBeChecked();
+  expect(
+    (await saved(page)).users.find((person) => person.id === learner.id)!
+      .groups,
+  ).toContain("ae");
+  // The global announcement region stays mounted; Cancel must announce no error.
+  await expect(page.getByRole("alert")).toHaveText("");
+  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
+  await page
+    .getByRole("menuitem", { name: "Remove direct members", exact: true })
+    .click();
+  await review
+    .getByRole("button", { name: "Remove direct members", exact: true })
+    .click();
+  await expect(review).not.toBeVisible();
+  expect(
+    (await saved(page)).users.find((person) => person.id === learner.id)!
+      .groups,
+  ).not.toContain("ae");
+  await page
+    .getByRole("button", { name: "Remove Direct filter", exact: true })
+    .click();
+  const retained = table.getByRole("row").filter({ hasText: learner.email });
+  await expect(retained).toContainText("Team");
+  await expect(retained).not.toContainText("Direct");
+  await expect(table).not.toContainText("Zoe Direct");
+  await page.screenshot({
+    path: info.outputPath("people-bulk-removal-retains-team.png"),
+    fullPage: true,
+  });
 });

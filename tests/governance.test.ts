@@ -63,7 +63,13 @@ test("governance request validation rejects group hierarchy, team cycles, missin
     expected: 1,
     users,
     groups: groups.map(({ parentId: _parent, ...group }) => group),
-    teams,
+    teams: [
+      { id: "organization", name: "Organization", system: "organization" },
+      ...teams.map((team) => ({
+        ...team,
+        parentId: team.parentId || "organization",
+      })),
+    ],
   };
   assert.equal(governanceSchema.safeParse(data).success, true);
   for (const bad of [
@@ -75,14 +81,17 @@ test("governance request validation rejects group hierarchy, team cycles, missin
         groups[2],
       ],
     },
-    { ...data, teams: [{ id: "west", name: "West", parentId: "missing" }] },
     {
       ...data,
-      teams: [
-        { id: "west", name: "West", parentId: "child" },
-        teams[1],
-        teams[2],
-      ],
+      teams: data.teams.map((team) =>
+        team.id === "west" ? { ...team, parentId: "missing" } : team,
+      ),
+    },
+    {
+      ...data,
+      teams: data.teams.map((team) =>
+        team.id === "west" ? { ...team, parentId: "child" } : team,
+      ),
     },
     { ...data, users: [...users, users[0]] },
     { ...data, groups: [] },

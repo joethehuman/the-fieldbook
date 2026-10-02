@@ -25,6 +25,7 @@ const layouts = {
   content: ["w-[33%]", "w-[12%]", "w-[15%]", "w-[10%]", "w-[30%]"],
   people: ["w-[26%]", "w-[12%]", "w-[23%]", "w-[11%]", "w-[28%]"],
   learningGroups: ["w-[64%]", "w-[18%]", "w-[18%]"],
+  groupMembersSelectable: ["w-12", "w-[36%]", "w-[25%]", "w-[33%]"],
   groupMembers: ["w-[40%]", "w-[25%]", "w-[35%]"],
   groupUpdates: ["w-[65%]", "w-[25%]", "w-[10%]"],
   assignmentGroups: ["w-10", "w-[70%]", "w-[20%]"],
@@ -47,13 +48,19 @@ export function DataTable({
       data-layout={layout}
       className={cn(
         "table-fixed [&_td]:[overflow-wrap:anywhere] [&_th]:[overflow-wrap:anywhere]",
-        ["contentSelection", "peopleSelection", "deleted"].includes(layout) &&
+        [
+          "contentSelection",
+          "peopleSelection",
+          "deleted",
+          "groupMembersSelectable",
+        ].includes(layout) &&
           "[&_td:first-child]:text-center [&_th:first-child]:text-center",
         [
           "teamMembers",
           "teamBranches",
           "learningGroups",
           "groupMembers",
+          "groupMembersSelectable",
           "groupUpdates",
         ].includes(layout)
           ? "min-w-128"

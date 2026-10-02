@@ -42,6 +42,8 @@ export type BulkCommand = {
   selectionMode?: "single" | "multiple";
   field?: "date";
   fieldLabel?: string;
+  /** Parameter-free command whose owner supplies the sole consequence review. */
+  externalReview?: boolean;
   review?: (values: string[], sourceIds: string[]) => ReactNode;
   apply: (
     values: string[],
@@ -82,6 +84,7 @@ export function BulkActions({
     [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
   const notify = useToast();
   const [resultNotice, setResultNotice] = useState<{
     message: string;
@@ -90,10 +93,42 @@ export function BulkActions({
   const command = active?.command;
   const commandLabel = (c: BulkCommand) =>
     collectionSize === 1 ? c.label.replace(/\bselected ?/, "").trim() : c.label;
+  const applyExternal = async (command: BulkCommand, ids: string[]) => {
+    if (running.current) return;
+    running.current = true;
+    setBusy(true);
+    setResultNotice(null);
+    let returnToMenu = false;
+    try {
+      const result = await command.apply([], ids);
+      if (result) {
+        onSelectionChange(result.failed);
+        if (result.failed.length) setResultNotice(result);
+        else notify(result.message);
+      } else {
+        onSelectionChange([]);
+        notify(command.successMessage || "Changes applied.");
+      }
+    } catch (error) {
+      returnToMenu = true;
+      if (!isOrganizationChangeCanceled(error))
+        setResultNotice({ message: (error as Error).message });
+    } finally {
+      running.current = false;
+      setBusy(false);
+      if (returnToMenu)
+        requestAnimationFrame(() => menuTrigger.current?.focus());
+    }
+  };
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" disabled={!selected.length}>
+        <Button
+          ref={menuTrigger}
+          type="button"
+          variant="outline"
+          disabled={busy || !selected.length}
+        >
           {collectionSize > 1 ? "Bulk actions" : "Actions"}
         </Button>
       </DropdownMenuTrigger>
@@ -111,6 +146,15 @@ export function BulkActions({
                   : undefined
               }
               onSelect={() => {
+                if (
+                  c.externalReview &&
+                  !c.options &&
+                  !c.field &&
+                  !c.acknowledgment
+                ) {
+                  void applyExternal(c, [...selected]);
+                  return;
+                }
                 setActive({
                   command: { ...c, label: commandLabel(c) },
                   ids: [...selected],
@@ -148,7 +192,7 @@ export function BulkActions({
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p role="status" className="text-copy text-muted-foreground">
-            {collectionSize} {noun}
+            {range || `${collectionSize} ${noun}`}
           </p>
           {singleItemActions &&
             collectionSize === 1 &&

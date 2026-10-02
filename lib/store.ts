@@ -1,5 +1,9 @@
 import { reconcileAssignments } from "./assignment-episodes";
 import { flattenLearningGroups } from "./group-conversion";
+import {
+  validateOrganizationTeams,
+  withOrganizationTeam,
+} from "./organization-team";
 import { expireDemoDeleted } from "./bulk-actions";
 import { withPublishedSnapshots } from "./demo-publication";
 import { defaultSettings } from "./settings";
@@ -47,7 +51,7 @@ const completedCourse = (id: string): Progress => ({
   passed: true,
 });
 export function freshWorkspace(): Workspace {
-  return {
+  return withOrganizationTeam({
     schema: 1,
     settings: {
       ...defaultSettings,
@@ -170,7 +174,7 @@ export function freshWorkspace(): Workspace {
       ],
       "demo-rep-5": [completedCourse("course-12")],
     },
-  };
+  });
 }
 /** Repair only the original Hoolibook sample group's conflicting course selection. */
 function repairHooliSecurityAssignment(data: Workspace): Workspace {
@@ -326,7 +330,7 @@ export function loadWorkspace(): Workspace {
         })),
       }
     : repaired;
-  const current = flattenLearningGroups(legacy);
+  const current = withOrganizationTeam(flattenLearningGroups(legacy));
   if (current.users.some((p) => !p.learningAssignments)) {
     current.users = reconcileAssignments(
       current,
@@ -340,6 +344,18 @@ export function loadWorkspace(): Workspace {
   return current;
 }
 export function saveWorkspace(data: Workspace) {
+  const previous = localStorage.getItem(KEY);
+  const old: Workspace | undefined = previous
+    ? JSON.parse(previous)
+    : undefined;
+  // Legacy snapshots convert on load; once converted, ordinary writes preserve the root.
+  if (old?.teams?.some((team) => team.system === "organization"))
+    validateOrganizationTeams(
+      data.teams || [],
+      data.settings?.organizationTeamId,
+      old.teams,
+      old.settings?.organizationTeamId,
+    );
   localStorage.setItem(KEY, JSON.stringify(data));
 }
 export function updateProgress(
