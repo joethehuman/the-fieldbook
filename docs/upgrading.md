@@ -159,3 +159,15 @@ Apply all missing migrations through `20261002214011_combined_governance_safegua
 Preflight legacy Team plans before the typed-source migration: if a team has nonempty `requiredCourseIds` but no `learningItems`, stop and normalize that metadata in a separately reviewed preservation step. The historical migration derives its expanded course list from `learningItems` and cannot recover an omitted plan afterward. The matching application normalizes browser-local legacy Team plans while preserving their courses.
 
 Rehearse both fresh migration order and the installation’s actual ledger order, including typed assignments preceding flat conversion with nonempty Team plans. Compare current unique course coverage, episode IDs/start dates/deadlines/policy, completion, people identities, Team/Group plans and unrelated content before and after. The combined successor and final safeguard verify these records are unchanged and advance only the governance revision to invalidate open reviews. Confirm current grants, pending/active manager scope, Organization fallback, legacy direct-only links, source changes and assigned-team deletion rejection before resuming application writes. Never edit or replay an applied conversion. Guests remain outside the reporting hierarchy and use the selected guest learning group.
+
+## Expanded MCP contract and permissions
+
+Before deploying this MCP version, apply these additive migrations in order to the isolated preview database, rehearse the role/report behavior, then apply them to production:
+
+1. `20261002222314_mcp_catalog.sql`
+2. `20261002222344_mcp_connection_capabilities.sql`
+3. `20261002222355_mcp_scoped_reports.sql`
+
+They add service-only catalog/report functions and explicit connection permissions. They preserve content, saved assignments/deadlines, progress and existing shared functions. Existing administrator grants receive exactly their old permissions; any unexpected legacy non-administrator grant is disabled. Their defaults support the old administrator-only consent writer during a rolling deployment. Code rollback leaves additive functions/columns in place; do not replay or remove applied migrations.
+
+The endpoint and client registration remain unchanged. Approve added permissions in Connections on the same connection. For ChatGPT developer-mode apps, refresh its tool definitions and start a new chat; old chats may retain the previous tools. Named reports and media transfers do not become authorized merely because the server now advertises them. Verify revocation, role downgrade, administrator-promotion reapproval and managed-team removal as well as content/report/upload behavior. See [MCP setup](mcp-setup.md).

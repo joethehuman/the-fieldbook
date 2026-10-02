@@ -12,6 +12,8 @@
     "dev:production": "pnpm dev",
     "check:ui": "node scripts/check-ui.mjs",
     "check:providers": "node scripts/check-providers.mjs",
+    "generate:mcp": "node --import tsx scripts/mcp-contract.ts",
+    "check:mcp": "node --import tsx scripts/mcp-contract.ts --check",
     "test:ui": "playwright test",
     "test:authoring": "playwright test -c playwright.authoring.config.ts",
     "test:accounts": "playwright test -c playwright.accounts.config.ts",

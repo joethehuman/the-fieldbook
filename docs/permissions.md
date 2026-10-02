@@ -32,9 +32,30 @@ Apply all missing migrations in order before assigning contributor accounts, inc
 
 The server checks identity, role and installation access before returning protected data or accepting writes. The governance snapshot scopes reporting data before serialization. Reader content responses exclude quiz answer keys. Draft authoring responses require publishing permission; contributor panel snapshots exclude the roster, report history, group learning rules, unpublished privacy policy and deleted accounts. Governance writes require an administrator, validated input and the current revision; related updates and audit records are transactional.
 
-UI visibility is not a permission check. Changes to roles, groups or reporting must preserve these boundaries and include meaningful authorization checks. Relevant entry points include `server/auth.ts`, `server/snapshot.ts`, `app/api/governance/route.ts`, and the governance server tests. Optional [MCP access](mcp-setup.md) requires an active administrator and an approved connection grant; contributor, learner and manager MCP connections are not implemented by the contributor account change. The contributor MCP tab identifies that limitation; adding a role never grants MCP access by itself. MCP tools must use the same publishing permissions and explicitly managed reporting scope when role-aware connections are added.
+UI visibility is not a permission check. Changes to roles, groups or reporting must preserve these boundaries and include meaningful authorization checks. Relevant entry points include `server/auth.ts`, `server/snapshot.ts`, `app/api/governance/route.ts`, and the governance server tests.
 
 Before using an installation, verify these rules with separate administrator, learner and manager accounts against an isolated backend. Include a manager's sibling team, anonymous/private access, draft content, stale revisions and deactivated accounts. Code inspection and demo tests do not establish that an operator's hosted authentication is configured correctly.
+
+## MCP access and consent
+
+Optional [MCP connections](mcp-setup.md) use each person's verified Fieldbook identity and an explicitly approved connection grant. Learners have no MCP access. Contributors can authorize draft/content authoring, publication, media and feedback tools. Managers can authorize scoped reporting only when assigned as a team's manager; their own team membership grants no extra access. Contributors who explicitly manage teams can additionally authorize the same scoped reports. Administrators can authorize every supported capability.
+
+| Capability | Eligible accounts |
+| --- | --- |
+| `content:read`, `content:write` | Administrators and contributors; draft reading, authoring, explicit publication/unpublication. |
+| `content:assign` | Administrators; course assignment changes remain separate from ordinary authoring. |
+| `media:read`, `media:write` | Administrators and contributors; existing references and authoring uploads. |
+| `feedback:read` | Administrators and contributors; content/general feedback including displayed respondent names, without adding email or learner progress. |
+| `reports:read` | Administrators, explicitly assigned team managers and contributors who manage teams; named learners, assignments, deadlines and progress within current reporting scope. |
+| `reports:aggregate` | Administrators; the original installation-wide aggregate `content_report`. |
+
+Effective permissions are the intersection of the account's current permissions and that connection's approved capabilities. OAuth identity scopes do not grant Fieldbook tools or database access. The server reads the current account, connection grant and team responsibilities on every request. Tool discovery shows permitted operations, and tool calls repeat authorization. Role downgrades, deactivation, loss of a managed branch and connection revocation remove access without relying on stale token claims. Report database functions independently check the current actor and scope before returning protected rows.
+
+Existing administrator connections retain their original approved content, existing-media and aggregate-report capabilities after upgrade. New media-upload, named-report, feedback and course-assignment capabilities require explicit additional consent. Promotion to administrator also requires fresh consent because existing operations would otherwise gain organization-wide scope and protected authoring fields. Additional team responsibilities affect reporting scope under the existing scoped-report capability; groups never expand that scope. Each user manages and revokes their own AI connections; already delivered data cannot be recalled.
+
+MCP does not expose every administrator setting. For example, editing the privacy policy, account roles or reporting hierarchy remains a manual Fieldbook action. Capability guidance identifies unsupported operations and points to maintained installation-independent instructions. A lack of tool support and a lack of account permission are distinct outcomes; no tool should silently substitute a more privileged operation.
+
+Apply all included migrations before deploying matching code, including the connection-capability and scoped-report migrations. Test administrator, contributor, manager, contributor-manager and learner boundaries against an isolated backend, then verify the hosted identity/consent flow separately. See [reporting semantics and pagination](reporting.md#mcp-reports).
 
 ## Guest recommendations
 

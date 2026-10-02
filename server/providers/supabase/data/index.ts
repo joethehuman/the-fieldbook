@@ -5,6 +5,7 @@ import { contentData } from "./content";
 import { learningData } from "./learning";
 import { feedbackData } from "./feedback";
 import { reportingData } from "./reporting";
+import { mcpData } from "./mcp";
 
 export const supabaseData: DataStore = {
   ...configurationData,
@@ -12,4 +13,5 @@ export const supabaseData: DataStore = {
   ...learningData,
   ...feedbackData,
   ...reportingData,
+  ...mcpData,
 };

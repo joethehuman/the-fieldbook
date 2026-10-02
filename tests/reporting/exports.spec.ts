@@ -282,7 +282,7 @@ test("progress filters, keyboard download, member details and empty report", asy
   await setup(page, info);
   await section(page, "Progress");
   await page.getByRole("button", { name: "Filters", exact: true }).click();
-  await select(page, "Reporting team", "Sales team");
+  await select(page, "Reporting team", "Organization / Sales team");
   await page.keyboard.press("Escape");
   await page
     .getByRole("searchbox", { name: "Find a team member" })

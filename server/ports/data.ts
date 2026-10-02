@@ -10,6 +10,8 @@ import type { SiteSettings } from "@/lib/settings";
 import type { SourcePassage } from "@/lib/search";
 import type { LearningAction } from "@/lib/learning";
 import type { governanceSchema, pendingSchema } from "../governance-schema";
+import type { McpDataStore } from "./mcp-data";
+import type { McpReportingDataStore } from "./mcp-reporting";
 
 export type GovernancePayload =
   typeof governanceSchema._output | typeof pendingSchema._output;
@@ -145,7 +147,7 @@ export type DocumentWrite = {
 };
 
 /** Task-level operations; implementations preserve atomic writes and complete reads. */
-export interface DataStore {
+export interface DataStore extends McpDataStore, McpReportingDataStore {
   /** Nonsecret identifier used to partition cached published reads. */
   cacheNamespace(): string;
   readConfiguration(): Promise<ConfigurationRecord>;

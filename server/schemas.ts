@@ -121,7 +121,7 @@ function uniqueContentIds(
 }
 export const contentSchema = contentBaseSchema.superRefine(uniqueContentIds);
 /** Drafts allow unfinished editorial values, retaining structural and media boundaries.
- * MCP's advertised complete-content schema stays unchanged; publication always uses it.
+ * MCP and the editor share this draft schema; publication uses the complete schema.
  */
 export const contentDraftSchema = contentBaseSchema
   .extend({

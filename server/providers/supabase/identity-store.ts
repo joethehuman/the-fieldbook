@@ -5,6 +5,7 @@ import type {
   ProfileRecord,
   ProfileRegistration,
 } from "../../ports/identity";
+import type { McpCapability } from "@/lib/mcp-access";
 
 /** Resolve a verified provider subject to the application person. */
 export async function findProfileBySubject(
@@ -15,7 +16,7 @@ export async function findProfileBySubject(
     .from("fb_profiles")
     .select("*,assignment_context:fb_profile_learning")
     .eq("auth_user_id", subject);
-  if (activeOnly) query = query.eq("active", true);
+  if (activeOnly) query = query.eq("active", true).is("deleted_at", null);
   const { data, error } = await query.maybeSingle();
   check(error);
   return data;
@@ -70,8 +71,26 @@ export async function connectionGrants(
 ): Promise<ConnectionGrant[] | null> {
   const { data, error } = await db()
     .from("fb_mcp_grants")
-    .select("client_id,client_name,enabled,granted_at")
+    .select(
+      "client_id,client_name,enabled,granted_at,capabilities,capability_version,role_at_consent",
+    )
     .eq("user_id", personId);
+  check(error);
+  return data;
+}
+
+export async function connectionGrantForPerson(
+  personId: string,
+  clientId: string,
+): Promise<ConnectionGrant | null> {
+  const { data, error } = await db()
+    .from("fb_mcp_grants")
+    .select(
+      "client_id,client_name,enabled,granted_at,capabilities,capability_version,role_at_consent",
+    )
+    .eq("user_id", personId)
+    .eq("client_id", clientId)
+    .maybeSingle();
   check(error);
   return data;
 }
@@ -80,13 +99,15 @@ export async function enableConnectionGrant(
   personId: string,
   clientId: string,
   clientName: string,
+  capabilities: McpCapability[],
+  requireEnabled = false,
 ): Promise<void> {
-  const { error } = await db().from("fb_mcp_grants").upsert({
-    user_id: personId,
-    client_id: clientId,
-    client_name: clientName,
-    enabled: true,
-    granted_at: new Date().toISOString(),
+  const { error } = await db().rpc("fb_enable_mcp_grant", {
+    p_person: personId,
+    p_client: clientId,
+    p_name: clientName,
+    p_capabilities: capabilities,
+    p_require_enabled: requireEnabled,
   });
   check(error);
 }

@@ -60,6 +60,9 @@ export type ConnectionGrant = {
   client_name: string;
   enabled: boolean;
   granted_at: string;
+  capabilities: import("@/lib/mcp-access").McpCapability[];
+  capability_version: number;
+  role_at_consent: "admin" | "contributor" | "manager";
 };
 
 /** Registration consumes a verified provider subject and returns a Fieldbook person record.

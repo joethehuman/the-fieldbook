@@ -10,7 +10,9 @@ const jwk = {
   kid: "synthetic-reader",
 };
 const file = "00000000-0000-4000-8000-000000000001.png";
+const organization = { id: "account-fixture-organization", name: "Organization", system: "organization" };
 const initial = () => ({
+  organizationTeamId: organization.id,
   name: "Acme Learning",
   welcomeDescription: "Welcome to your learning workspace.",
   tagline: "Learn together",
@@ -48,7 +50,7 @@ let settings = initial(),
   configuredProgress = [],
   configuredFeedback = [],
   configuredUsers = [],
-  configuredTeams = [],
+  configuredTeams = [organization],
   userGroups = [],
   fail = false,
   role = "admin",
@@ -106,7 +108,13 @@ createServer(async (req, res) => {
     configuredProgress = change.progress || [];
     configuredFeedback = change.feedback || [];
     configuredUsers = change.users || [];
-    configuredTeams = change.teams || [];
+    // Model a migrated installation: Organization is the sole root. Supplied
+    // ordinary team fixtures remain descendants without changing their IDs.
+    const supplied = change.teams || [];
+    const root = supplied.find((team) => team.system === "organization") || organization;
+    settings.organizationTeamId = root.id;
+    configuredTeams = [root, ...supplied.filter((team) => team.id !== root.id)
+      .map((team) => team.parentId ? team : { ...team, parentId: root.id })];
     userGroups = change.userGroups || [];
     fail = !!change.fail;
     role = change.role || "admin";

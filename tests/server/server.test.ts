@@ -36,6 +36,8 @@ test("MCP initializes and advertises read and write tools with appropriate annot
         "unpublish_content",
         "content_report",
         "list_media",
+        "get_capabilities",
+        "get_authoring_options",
       ].sort(),
     );
     assert.equal(
@@ -156,5 +158,11 @@ test("MCP's stateless HTTP transport handles initialization and tool discovery",
     params: {},
   });
   assert.equal(list.status, 200);
-  assert.equal(list.data.result.tools.length, 8);
+  assert.equal(list.data.result.tools.length, 10);
+  assert.equal(
+    list.data.result.tools.some(
+      (t: { name: string }) => t.name === "learning_report",
+    ),
+    false,
+  );
 });
