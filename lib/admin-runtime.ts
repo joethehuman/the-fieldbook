@@ -1,3 +1,4 @@
+import { canPublish, canOpenPublishingScope } from "./permissions";
 import type { AdminScope } from "./admin-scope";
 import { request, createWorkspaceSaver, RequestError } from "./workspace-save";
 import type { UploadMedia } from "@/components/MarkdownEditor";
@@ -75,6 +76,11 @@ export function createAdminRuntime(initial: {
     pending.clear();
   }
   async function fresh(target = scope): Promise<Workspace> {
+    if (!canOpenPublishingScope(initial.user, target))
+      throw new RequestError(
+        "Administrator access is required for this section.",
+        403,
+      );
     const version = cacheVersion;
     const state = await request(
       `/api/admin/snapshot?scope=${target}${target === "person" ? `&userId=${encodeURIComponent(personId || "")}` : ""}`,
@@ -82,12 +88,10 @@ export function createAdminRuntime(initial: {
     if (
       !state.user ||
       state.user.id !== initial.user.id ||
-      state.user.role !== "admin"
+      state.user.role !== initial.user.role ||
+      !canPublish(state.user)
     )
-      throw new RequestError(
-        "Administrator access changed. Sign in again.",
-        401,
-      );
+      throw new RequestError("Publishing access changed. Sign in again.", 401);
     let data = state.data as Workspace;
     if (
       openItem &&
@@ -291,7 +295,10 @@ export function createAdminRuntime(initial: {
       prefetch: () => {
         // Warm the lightweight first-visit sections after Content has painted. A tab
         // click shares the same in-flight read instead of starting another.
-        void Promise.allSettled([prepared("people"), prepared("feedback")]);
+        void Promise.allSettled([
+          ...(initial.user.role === "admin" ? [prepared("people")] : []),
+          prepared("feedback"),
+        ]);
       },
       prepare: async (next, userId) => {
         const previousPerson = personId;

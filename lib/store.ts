@@ -32,7 +32,12 @@ export type Workspace = {
 };
 const KEY = "fieldbook.workspace.v1";
 export const SESSION = "fieldbook.profile.v1";
-export const DEMO_PROFILE_IDS = ["demo-learner", "demo-manager", "demo-admin"];
+export const DEMO_PROFILE_IDS = [
+  "demo-learner",
+  "demo-manager",
+  "demo-contributor",
+  "demo-admin",
+];
 const completedCourse = (id: string): Progress => ({
   content_id: id,
   version: 1,
@@ -128,6 +133,14 @@ export function freshWorkspace(): Workspace {
         email: "jordan@example.com",
         role: "manager",
         groups: ["sales"],
+        active: true,
+      },
+      {
+        id: "demo-contributor",
+        name: "Jordan Patel",
+        email: "contributor@example.com",
+        role: "contributor",
+        groups: [],
         active: true,
       },
     ],
@@ -264,6 +277,10 @@ export function loadWorkspace(): Workspace {
   )
     throw new Error(
       "Saved demo data could not be opened. Export or reset this browser’s demo.",
+    );
+  if (!data.users.some((user: User) => user.id === "demo-contributor"))
+    data.users.push(
+      freshWorkspace().users.find((user) => user.id === "demo-contributor")!,
     );
   // Refresh saved default personas without replacing visitors' custom names.
   const renamedProfiles: Record<string, { previous: string[]; name: string }> =

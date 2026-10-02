@@ -47,7 +47,7 @@ export type User = {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "learner" | "manager";
+  role: "admin" | "learner" | "manager" | "contributor";
   groups: string[];
   active: boolean;
   /** False until the preregistered person activates a verified login. */
@@ -180,8 +180,9 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
   };
 }
 export function reportTeamIds(user: User, teams: Team[]) {
+  if (!user.active || user.registered === false) return new Set<string>();
   if (user.role === "admin") return new Set(teams.map((t) => t.id));
-  if (!user.active || user.role !== "manager") return new Set<string>();
+  if (!["manager", "contributor"].includes(user.role)) return new Set<string>();
   const roots = teams.filter((t) => t.managerId === user.id).map((t) => t.id);
   return new Set(
     teams

@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Add contributor accounts with the shared publishing panel, content/feedback editors and exports, authoring uploads, and content recovery. Explicit team management adds scoped reports; administrator accounts retain one organization destination. Course assignments, Docs hierarchy changes and people recovery remain administrator-only. Requires the contributor permissions migration; MCP connections remain administrator-only in this change.
+
 - Let short course lessons and the details card use their natural content height, keep the desktop course panel aligned across lesson/quiz changes, and preserve enough independently scrolling outline space for three lessons plus a quiz on short screens. Restore Previous lesson navigation without changing saved completion, including returning from quiz/finish screens. Place the main scrollbar at the workspace edge while keeping content centered, and use lighter, thinner shared scrollbars. Expand lesson images into a screen-fitting viewer with a visible Close button, Escape/outside dismissal and focus return.
 
 - Preregistered people now appear in the normal roster and can be team members or managers before signing in. Verified first sign-in attaches their login without resetting their stable ID or history. Hire dates start onboarding, with an applied window and automatic New/Existing stage separate from login status. Apply `20261001222227_roster_people.sql` in a coordinated code/database upgrade; see the roster upgrade guidance.

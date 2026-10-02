@@ -33,7 +33,7 @@ export type ProfileRecord = {
   id: string;
   name: string;
   email: string;
-  role: "admin" | "learner" | "manager";
+  role: "admin" | "learner" | "manager" | "contributor";
   active: boolean;
   auth_user_id?: string | null;
   hire_date?: string | null;

@@ -4,7 +4,7 @@ import { data } from "./data";
 import { cleanupData } from "./cleanup-data";
 import { lockIdentity, unlockIdentity } from "./identity";
 import { installation } from "./installation";
-import { HttpError, requireAdmin } from "./auth";
+import { HttpError, requireAdmin, requirePublisher } from "./auth";
 import { document, saveContent } from "./content";
 import { adminSnapshot } from "./admin-snapshot";
 import { metadataPatch, type BulkResult } from "@/lib/bulk-actions";
@@ -14,7 +14,7 @@ export async function bulkAction(
   user: User | null,
   input: unknown,
 ): Promise<BulkResult[]> {
-  requireAdmin(user);
+  requirePublisher(user);
   const parsed = bulkSchema.safeParse(input);
   if (!parsed.success)
     throw new HttpError(
@@ -22,6 +22,7 @@ export async function bulkAction(
       parsed.error.issues.map((i) => i.message).join(" "),
     );
   const request = parsed.data;
+  if (request.entity === "user") requireAdmin(user);
   if (request.entity === "user" && request.operation === "delete") {
     if (!request.governanceExpected)
       throw new HttpError(400, "Reload the People list before deleting users.");
