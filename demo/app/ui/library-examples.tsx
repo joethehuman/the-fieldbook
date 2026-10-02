@@ -223,6 +223,7 @@ export function LibraryExamples() {
           <PublicationStatus published={false} />
           <PublicationStatus published />
           <PublicationStatus published hasUnpublishedChanges />
+          <PublicationStatus published hasUnpublishedChanges layout="inline" />
         </ActionGroup>
         <p className="text-copy text-muted-foreground">
           Badges hold a short, single-line status. Keep details such as draft

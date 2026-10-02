@@ -2279,6 +2279,10 @@ export function Editor({
   }
   const set = (key: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: value }));
+  const saveStatus = saving || busy
+    ? uploadCount ? "Uploading media…" : "Saving…"
+    : queue.current!.blocked ? "Changes not saved"
+    : dirty ? "Saving…" : savedMessage || (existing ? "Saved" : "Not saved yet");
   const details = (
     <FieldGroup disabled={busy} className="editor-details-content">
       <EditorDetailsGroup id="writing-readiness" title="Before publishing">
@@ -2308,9 +2312,6 @@ export function Editor({
         <FieldDescription>
           Drafts save automatically. Publish when ready for readers.
         </FieldDescription>
-        {!!c.publishedRevision && <Button type="button" variant="outline" size="sm"
-          disabled={busy || saving || needsRecovery || !publicationChanged || !onLoadPublished || !onReload}
-          onClick={() => void restorePublished()}>Revert to published version</Button>}
       </EditorDetailsGroup>
       <EditorDetailsGroup id="writing-summary" title="Short description">
         <FormField label="Short description" visuallyHiddenLabel>
@@ -2525,6 +2526,11 @@ export function Editor({
           )}
         </>
       )}
+      {!!c.publishedRevision && <ActionGroup>
+        <Button type="button" variant="outline" size="sm"
+          disabled={busy || saving || needsRecovery || !publicationChanged || !onLoadPublished || !onReload}
+          onClick={() => void restorePublished()}>Revert to published version</Button>
+      </ActionGroup>}
     </FieldGroup>
   );
   return (
@@ -2561,18 +2567,11 @@ export function Editor({
         />
         <div className="editor-heading-actions">
           <div className="editor-save-status">
-            <span role="status">
-              {saving || busy
-                ? uploadCount
-                  ? "Uploading media…"
-                  : "Saving…"
-                : queue.current!.blocked
-                  ? "Changes not saved"
-                  : dirty
-                    ? "Saving…"
-                    : savedMessage || (existing ? "Saved" : "Not saved yet")}
+            <span role="status" title={saveStatus}>
+              {saveStatus}
             </span>
             <PublicationStatus
+              layout="inline"
               published={!!c.publishedRevision}
               hasUnpublishedChanges={
                 !!c.publishedRevision && publicationChanged
@@ -2581,6 +2580,7 @@ export function Editor({
           </div>
           <Button
             type="button"
+            className="shrink-0"
             disabled={
               busy ||
               publishing ||

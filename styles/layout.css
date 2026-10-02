@@ -239,6 +239,7 @@
   }
   .editor-heading {
     display: flex;
+    min-width: 0;
     flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
@@ -251,8 +252,9 @@
     background: var(--background);
   }
   .editor-heading[data-sticky="false"] { position: static; }
-  .editor-heading-actions { display: flex; min-width: 0; max-width: 100%; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-4); margin-inline-start: auto; }
-  .editor-save-status { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: var(--space-2); color: var(--muted-foreground); font-size: var(--type-label); line-height: var(--type-label-leading); }
+  .editor-heading-actions { display: flex; min-width: 0; max-width: 100%; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: var(--space-2); margin-inline-start: auto; }
+  .editor-save-status { display: flex; min-width: 0; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: var(--space-2); color: var(--muted-foreground); font-size: var(--type-label); line-height: var(--type-label-leading); }
+  .editor-save-status > [role="status"] { min-width: 0; max-width: 40%; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .editor-content { gap: var(--space-4); }
   .editor-introduction { display: grid; width: 100%; gap: var(--space-3); padding-block: var(--space-2); }
   .editor-introduction [data-slot="input"], .editor-introduction [data-slot="textarea"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }
