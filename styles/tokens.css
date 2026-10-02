@@ -1,4 +1,18 @@
 /* The sole owner of interface color and sizing values. Branding is a separate token. */
+/* Inline keeps the staggered delay local to each dot. */
+@theme inline {
+  --animate-loading-dot: loading-dot 1.2s ease-in-out var(--loading-dot-delay, 0s) infinite;
+
+  @keyframes loading-dot {
+    0%, 60%, 100% {
+      transform: translateY(0);
+    }
+    30% {
+      transform: translateY(-0.25rem);
+    }
+  }
+}
+
 :root {
   --background: #ffffff;
   --surface: #fafafa;

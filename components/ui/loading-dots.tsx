@@ -11,9 +11,9 @@ export function LoadingDots({ className }: { className?: string }) {
         className,
       )}
     >
-      <span className="size-1 rounded-full bg-current motion-safe:animate-bounce" />
-      <span className="size-1 rounded-full bg-current motion-safe:animate-bounce [animation-delay:150ms]" />
-      <span className="size-1 rounded-full bg-current motion-safe:animate-bounce [animation-delay:300ms]" />
+      <span className="size-1 rounded-full bg-current motion-safe:animate-loading-dot" />
+      <span className="size-1 rounded-full bg-current motion-safe:animate-loading-dot [--loading-dot-delay:200ms]" />
+      <span className="size-1 rounded-full bg-current motion-safe:animate-loading-dot [--loading-dot-delay:400ms]" />
     </span>
   );
 }

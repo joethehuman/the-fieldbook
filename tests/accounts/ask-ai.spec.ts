@@ -589,7 +589,7 @@ test("thinking stays in one assistant position from submission through first str
     .locator("span")
     .first()
     .evaluate((el) => getComputedStyle(el).animationName);
-  expect(animation).toBe("bounce");
+  expect(animation).toBe("loading-dot");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect
     .poll(() =>

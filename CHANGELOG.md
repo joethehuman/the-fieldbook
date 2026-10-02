@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Let Ask AI respond naturally to greetings and clarification when published-content retrieval is empty, regardless of punctuation. Replace the shifting Answering label with reduced-motion-aware thinking dots in the pending assistant position.
+- Let Ask AI respond naturally to greetings and clarification when published-content retrieval is empty, regardless of punctuation. Replace the shifting Answering label with clearly moving, staggered thinking dots in the pending assistant position, static with reduced motion.
 
 - Keep Ask AI answer style under administrator guidance, with a clarity-first concise default and no hardcoded sentence/paragraph rule. Show verified citations as consecutive clickable numbers with a compact expandable source list, combining passages at the same destination. Let responses without citations complete without a warning. Clearing Search closes the panel; focusing an empty field leaves it closed until typing resumes.
 
