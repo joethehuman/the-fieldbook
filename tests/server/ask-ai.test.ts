@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { prepareAskAi } from "../../server/ask-ai";
+import { prepareAskAi, answerPolicy } from "../../server/ask-ai";
 import { askAiResponse } from "../../server/ask-ai-response";
 import { HttpError } from "../../server/errors";
 import {
@@ -130,6 +130,9 @@ function fixture() {
     setAnswer: (value: string) => {
       answer = value;
     },
+    setGuidance: (value: string) => {
+      settings.askAi.guidance = value;
+    },
   };
 }
 const collect = async <T>(events: AsyncIterable<T>) => {
@@ -137,6 +140,47 @@ const collect = async <T>(events: AsyncIterable<T>) => {
   for await (const event of events) result.push(event);
   return result;
 };
+
+test("operator guidance reaches generation without a conflicting fixed length rule", async () => {
+  const f = fixture();
+  const guidance =
+    "Explain clearly in two readable paragraphs. Include useful detail.";
+  f.setGuidance(guidance);
+  const generate = f.provider.streamAnswer;
+  f.provider.streamAnswer = async function* (input) {
+    assert.ok(input.instructions.includes(answerPolicy));
+    assert.ok(input.instructions.endsWith(guidance));
+    assert.ok(input.instructions.includes("Operator answer guidance"));
+    assert.doesNotMatch(answerPolicy, /sentences|paragraphs|three distinct/);
+    yield* generate(input);
+  };
+  await collect(
+    await prepareAskAi(request(), user, new AbortController().signal, f.deps),
+  );
+  assert.equal(f.calls.answer, 1);
+});
+
+test("responses without citations finish normally without extra model calls", async () => {
+  for (const answer of [
+    "Hi! What would you like to know?",
+    "The published content does not answer that question.",
+  ]) {
+    const f = fixture();
+    f.setAnswer(answer);
+    const controller = new AbortController();
+    const response = askAiResponse(
+      await prepareAskAi(request(), user, controller.signal, f.deps),
+      controller,
+    );
+    const wire = await response.text();
+    assert.match(wire, /"type":"finish","finishReason":"stop"/);
+    assert.match(wire, /"type":"data-sources","data":\[\]/);
+    assert.doesNotMatch(wire, /"type":"error"/);
+    assert.equal(f.calls.plan, 1);
+    assert.equal(f.calls.answer, 1);
+    assert.equal(f.calls.current, 2);
+  }
+});
 
 test("AI defaults are off, configuration is bounded, public settings reveal only availability", () => {
   assert.equal(defaultAskAiSettings.enabled, false);
@@ -425,7 +469,7 @@ test("fresh account, settings and source checks guard generation and final citat
 
 test("invalid citations and oversized answers never receive verified source metadata", async () => {
   for (const answer of [
-    "Unknown answer",
+    " ",
     "An invented source. [S99]",
     "One supplied and one invented source. [S1][S99]",
     "x".repeat(12001),

@@ -47,7 +47,7 @@ export const defaultAskAiSettings: AskAiSettings = {
   fallbackModel: "",
   sources: ["doc", "brief", "course"],
   guidance:
-    "Answer directly and briefly. Use one or two sentences when that is enough. Otherwise use at most two short paragraphs, with up to three useful source links. Include only detail needed to answer the question. Say when the available Fieldbook content does not contain the answer.",
+    "Give clear, helpful answers in plain language. Favor brevity without sacrificing useful detail. Use one or two sentences when they fully answer the question; otherwise use up to two concise paragraphs, each with a clear purpose. Avoid dense sentences, repetition and unrelated detail. Cite only the sources needed to support the answer, usually no more than three. Say when the published Fieldbook content does not answer the question.",
 };
 export type AiMessage = { role: "user" | "assistant"; text: string };
 export type AiSourceIdentity = {

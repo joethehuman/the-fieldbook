@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep Ask AI answer style under administrator guidance, with a clarity-first concise default and no hardcoded sentence/paragraph rule. Show verified citations as consecutive clickable numbers with a compact expandable source list, combining passages at the same destination. Let responses without citations complete without a warning. Clearing Search closes the panel; focusing an empty field leaves it closed until typing resumes.
+
 - Let Ask AI answers with more than three valid citations complete and display every verified source link. Keep concise answer guidance and reject unknown or stale sources.
 - Preserve the server-owned Organization identity when saving installation settings. Use a direct settings save with automatic confirmation after a lost response, ordinary retry after failure, and unsaved-navigation warnings only while edits remain. Remove the separate settings recovery action while retaining revision checks against concurrent changes.
 - Make Ask AI administration provider-neutral: off shows only the switch; on shows the server-selected router, primary/fallback models, published sources and answer guidance. Remove manual setup/model-test controls and provider-specific pricing/policy panels. Bind saved models to router identity, allow catalog IDs without vendor prefixes, and enforce declared fallback capability. Vercel remains the only implemented connector.

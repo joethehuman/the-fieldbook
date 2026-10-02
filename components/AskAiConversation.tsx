@@ -2,12 +2,9 @@
 import { useEffect, useRef } from "react";
 import type { AiCitation } from "@/lib/ai";
 import { aiBounds } from "@/lib/ai";
-import { messageSources, messageText } from "@/lib/ai-chat";
-import {
-  Message,
-  MessageContent,
-  MessageResponse,
-} from "./ai-elements/message";
+import { messageText } from "@/lib/ai-chat";
+import { Message, MessageContent } from "./ai-elements/message";
+import { AskAiAnswer } from "./AskAiAnswer";
 import { Button } from "./ui/button";
 import { Alert } from "./ui/alert";
 import { MessageComposer } from "./patterns/message-composer";
@@ -75,14 +72,7 @@ export function AskAiConversation({
           >
             {chat.messages.map((message) => {
               const complete = chat.completed.has(message.id);
-              const sources = complete ? messageSources(message) : [];
-              const text = messageText(message).replace(
-                /\[S(\d+)\]/g,
-                (marker, number) =>
-                  sources.some((source) => source.id === `S${number}`)
-                    ? `[${number}]`
-                    : marker,
-              );
+              const text = messageText(message);
               return (
                 <Message key={message.id} from={message.role}>
                   <span className="sr-only">
@@ -93,50 +83,14 @@ export function AskAiConversation({
                       <p className="whitespace-pre-wrap break-words">{text}</p>
                     ) : (
                       <>
-                        <MessageResponse
-                          isAnimating={
+                        <AskAiAnswer
+                          message={message}
+                          complete={complete}
+                          animating={
                             chat.busy && message === chat.messages.at(-1)
                           }
-                          skipHtml
-                          controls={false}
-                          components={{
-                            a: ({ children }) => <span>{children}</span>,
-                            img: () => null,
-                          }}
-                        >
-                          {text}
-                        </MessageResponse>
-                        {!!sources.length && (
-                          <ul
-                            aria-label="Answer sources"
-                            className="grid gap-1 text-sm"
-                          >
-                            {sources.map((source) => (
-                              <li key={source.id}>
-                                <a
-                                  href={source.href}
-                                  aria-label={`Source ${source.id.slice(1)}: ${source.title}${source.lessonTitle ? ` — ${source.lessonTitle}` : ""}`}
-                                  onClick={(event) => {
-                                    if (
-                                      !event.metaKey &&
-                                      !event.ctrlKey &&
-                                      !event.shiftKey &&
-                                      !event.altKey
-                                    ) {
-                                      event.preventDefault();
-                                      onSource(source);
-                                    }
-                                  }}
-                                >
-                                  [{source.id.slice(1)}] {source.title}
-                                  {source.lessonTitle
-                                    ? ` — ${source.lessonTitle}`
-                                    : ""}
-                                </a>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
+                          onSource={onSource}
+                        />
                         {!!text &&
                           !complete &&
                           (!chat.busy || message !== chat.messages.at(-1)) && (

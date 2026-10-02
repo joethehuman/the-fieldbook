@@ -37,9 +37,7 @@ export function SearchExperience({
   const input = useRef<HTMLInputElement>(null);
   const chat = useAskAi(aiMode);
   const enabled = aiMode !== "off";
-  const visible =
-    open &&
-    (!!query.trim() || (enabled && (view === "ai" || !!chat.messages.length)));
+  const visible = open && !!query.trim();
   useLayoutEffect(() => {
     // Search starts with its first result, independently of chat autoscrolling.
     if (view === "search") {
@@ -74,11 +72,7 @@ export function SearchExperience({
       onOpen={(result) => void openResult(result)}
       onAskAi={enabled ? () => void ask() : undefined}
     />
-  ) : (
-    <p className="p-4 text-sm text-muted-foreground">
-      Type in the search bar to find content.
-    </p>
-  );
+  ) : null;
   return (
     <SearchPanel
       id={id}
@@ -97,12 +91,12 @@ export function SearchExperience({
                 enabled ? "Search Fieldbook or Ask AI" : "Search Fieldbook"
               }
               value={query}
-              onFocus={() => setOpen(true)}
-              onClick={() => setOpen(true)}
+              onFocus={() => setOpen(!!query.trim())}
+              onClick={() => setOpen(!!query.trim())}
               onChange={(event) => {
                 setQuery(event.target.value);
                 setView("search");
-                setOpen(true);
+                setOpen(!!event.target.value.trim());
               }}
               onKeyDown={(event) => {
                 if (event.nativeEvent.isComposing || event.keyCode === 229)
@@ -110,6 +104,7 @@ export function SearchExperience({
                 if (event.key === "Enter") {
                   event.preventDefault();
                   if (event.repeat) return;
+                  if (!query.trim()) return;
                   if (enabled && query.trim().endsWith("?")) void ask();
                   else {
                     setView("search");
@@ -117,6 +112,7 @@ export function SearchExperience({
                   }
                 }
                 if (event.key === "ArrowDown") {
+                  if (!query.trim()) return;
                   setOpen(true);
                   const first = document
                     .getElementById(id)
@@ -140,6 +136,7 @@ export function SearchExperience({
                   setQuery("");
                   setView("search");
                   input.current?.focus();
+                  setOpen(false);
                 }}
               >
                 <X size={14} />

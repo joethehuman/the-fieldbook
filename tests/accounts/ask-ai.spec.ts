@@ -25,7 +25,11 @@ const headers = {
   "x-vercel-ai-ui-message-stream": "v1",
   "Cache-Control": "no-store",
 };
-function stream(text = "Keep the response **brief**. [S1]", fail = false) {
+function stream(
+  text = "Keep the response **brief**. [S1]",
+  fail = false,
+  citations = sources,
+) {
   return (
     [
       { type: "start", messageId: crypto.randomUUID() },
@@ -40,7 +44,7 @@ function stream(text = "Keep the response **brief**. [S1]", fail = false) {
             },
           ]
         : [
-            { type: "data-sources", data: sources },
+            { type: "data-sources", data: citations },
             { type: "text-end", id: "answer" },
             { type: "finish", finishReason: "stop" },
           ]),
@@ -227,6 +231,137 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
     ),
   ).toBe(true);
 });
+test("citations use consecutive clickable numbers, compact titles and safe destinations", async ({
+  page,
+  request,
+}, info) => {
+  await fixture(page, request);
+  const citations = [2, 4, 3, 6, 5].map((id, index) => ({
+    ...sources[0],
+    id: `S${id}`,
+    passageId: `doc:part-${id}`,
+    contentId:
+      id === 5
+        ? docId
+        : `00000000-0000-4000-8000-${String(21 + index).padStart(12, "0")}`,
+    href:
+      id === 5
+        ? `/docs/${docId}`
+        : `/docs/00000000-0000-4000-8000-${String(21 + index).padStart(12, "0")}`,
+    title:
+      index === 0
+        ? "Published reference"
+        : `A helpful published reference with a long title and clear instructions ${index}`,
+  }));
+  await page.route("**/api/ask-ai", (route) =>
+    route.fulfill({
+      headers,
+      body: stream(
+        "Start with the published setup steps. [S2][S4]\n\nApply the required changes and verify the installation. [S3][S5][S6] [fake](/__fieldbook-citation/1) [unsafe](javascript:alert(1)) `literal [S4]`",
+        false,
+        citations,
+      ),
+    }),
+  );
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  await input.fill("How do I set this up?");
+  await input.press("Enter");
+  const chat = page.getByRole("region", { name: "Ask AI conversation" });
+  await expect(chat.getByRole("status")).toContainText("Answer ready");
+  const refs = chat.getByRole("link", { name: /^Source \d+:/ });
+  await expect(refs).toHaveText(["[1]", "[2]", "[3]", "[1]", "[4]"]);
+  await expect(refs.first()).toHaveAttribute("href", `/docs/${docId}`);
+  await expect(
+    chat.getByRole("link", { name: "fake", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    chat.getByRole("link", { name: "unsafe", exact: true }),
+  ).toHaveCount(0);
+  await expect(chat.getByRole("list", { name: "Answer sources" })).toHaveCount(
+    0,
+  );
+  await expect(chat.locator('a[href^="/__fieldbook-citation/"]')).toHaveCount(
+    0,
+  );
+  await page.screenshot({
+    path: info.outputPath("ask-ai-citations-compact.png"),
+  });
+  const toggle = chat.getByRole("button", { name: "4 sources" });
+  await toggle.focus();
+  await toggle.press("Enter");
+  const list = chat.getByRole("list", { name: "Answer sources" });
+  await expect(list.getByRole("link")).toHaveCount(4);
+  await expect(list.getByRole("link").first()).toHaveAttribute(
+    "href",
+    `/docs/${docId}`,
+  );
+  await page.screenshot({
+    path: info.outputPath("ask-ai-citations-expanded.png"),
+  });
+  await toggle.press("Enter");
+  await refs.first().focus();
+  await refs.first().press("Enter");
+  await expect(page).toHaveURL(new RegExp(`/docs/${docId}`));
+  await input.click();
+  await expect(refs).toHaveCount(5);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth + 1,
+    ),
+  ).toBe(true);
+});
+
+test("uncited replies finish quietly and clearing Search closes the panel until typing resumes", async ({
+  page,
+  request,
+}, info) => {
+  await fixture(page, request);
+  await page.route("**/api/ask-ai", (route) =>
+    route.fulfill({
+      headers,
+      body: stream("Hi! What would you like to know?", false, []),
+    }),
+  );
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  const panel = page.locator('[data-slot="search-panel"]');
+  await input.click();
+  await input.press("Enter");
+  await input.press("ArrowDown");
+  await expect(panel).toHaveCount(0);
+  await input.fill("Hi?");
+  await input.press("Enter");
+  const chat = page.getByRole("region", { name: "Ask AI conversation" });
+  await expect(chat.getByRole("status")).toContainText("Answer ready");
+  await expect(chat).toContainText("Hi! What would you like to know?");
+  await expect(chat.getByRole("alert")).toHaveCount(0);
+  await expect(chat.getByText("Response incomplete.")).toHaveCount(0);
+  await expect(chat.getByRole("link")).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("ask-ai-uncited.png") });
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(input).toHaveValue("");
+  await expect(input).toBeFocused();
+  await expect(panel).toHaveCount(0);
+  await input.click();
+  await input.press("Enter");
+  await input.press("ArrowDown");
+  await expect(panel).toHaveCount(0);
+  await input.fill("   ");
+  await expect(panel).toHaveCount(0);
+  await input.fill("reference");
+  await expect(panel).toBeVisible();
+  await page.getByRole("button", { name: "Clear search" }).click();
+  await expect(panel).toHaveCount(0);
+  await input.click();
+  await expect(panel).toHaveCount(0);
+  await input.fill("reopen");
+  await page.getByRole("tab", { name: "Ask AI", exact: true }).click();
+  await expect(chat).toContainText("Hi! What would you like to know?");
+  await input.fill("");
+  await expect(panel).toHaveCount(0);
+  await input.click();
+  await expect(panel).toHaveCount(0);
+});
+
 test("Ask AI failure, explicit retry, stop and new conversation cancel pending work", async ({
   page,
   request,
