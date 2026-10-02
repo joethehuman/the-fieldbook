@@ -70,14 +70,14 @@ import {
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { SelectField } from "./ui/select";
 import LearningGroups from "./LearningGroups";
-import { LearningGroupAssignments } from "./LearningGroupAssignments";
+import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
+import { assignLearningToAudiences } from "@/lib/assignment-audiences";
 import {
   OrganizationChangeCanceledError,
   type OrganizationChangeOptions,
 } from "@/lib/organization-change";
 import { useNestedNavigationGuard } from "./patterns/use-nested-navigation-guard";
 import Curricula from "./Curricula";
-import { groupItems } from "@/lib/learning-groups";
 import { groupPath } from "@/lib/group-hierarchy";
 import { teamPath } from "@/lib/team-hierarchy";
 import { Assignments, type LearningHandler } from "./Assignments";
@@ -608,15 +608,14 @@ export default function Admin({
     const next = structuredClone(data);
     const c = next.content.find((c) => c.id === action.contentId)!;
     if (action.operation === "assign" || action.operation === "unassign") {
-      next.groups = next.groups.map((g) => {
-        if (g.id !== action.groupId) return g;
-        const items = groupItems(g, next.content).filter(
-          (i) => i.kind !== "course" || i.id !== c.id,
-        );
-        if (action.operation === "assign")
-          items.push({ kind: "course", id: c.id });
-        return { ...g, learningItems: items };
-      });
+      const updated = assignLearningToAudiences(
+        next,
+        [{ kind: "course", id: c.id }],
+        [action.teamId ? `team:${action.teamId}` : `group:${action.groupId}`],
+        action.operation === "assign" ? "add" : "remove",
+      );
+      next.groups = updated.groups;
+      next.teams = updated.teams;
     } else {
       const list = next.progress[action.userId!] || [];
       next.progress[action.userId!] = [
@@ -1286,7 +1285,7 @@ export default function Admin({
                                       live.id === c.id &&
                                       live.status === "published",
                                   ) && (
-                                    <LearningGroupAssignments
+                                    <LearningAssignmentPicker
                                       data={data}
                                       item={{ kind: "course", id: c.id }}
                                       title={c.title}
@@ -1889,6 +1888,31 @@ export function Editor({
       },
       failed: (failure) => setError((failure as Error).message),
     });
+  const [assignmentSave, setAssignmentSave] = useState(0);
+  const appliedAssignmentSave = useRef(0);
+  const latestAssignmentContent = data.content.find((item) => item.id === c.id);
+  useEffect(() => {
+    if (
+      assignmentSave === appliedAssignmentSave.current ||
+      !latestAssignmentContent
+    )
+      return;
+    appliedAssignmentSave.current = assignmentSave;
+    // Governance reads may project out lesson/body fields. Refresh assignment
+    // metadata and the save queue's revision without replacing editorial work.
+    const metadata = {
+      revision: latestAssignmentContent.revision,
+      publishedRevision: latestAssignmentContent.publishedRevision,
+      publishedSignature: latestAssignmentContent.publishedSignature,
+      assignments: latestAssignmentContent.assignments,
+      groups: latestAssignmentContent.groups,
+    };
+    baseline.current = { ...baseline.current, ...metadata };
+    original.current = { ...original.current, ...metadata };
+    current.current = { ...current.current, ...metadata };
+    queue.current!.reset(baseline.current);
+    setC(current.current);
+  }, [assignmentSave, latestAssignmentContent]);
   const signature = contentSignature(c);
   const observedSignature = useRef(signature);
   if (observedSignature.current !== signature) {
@@ -1963,11 +1987,11 @@ export function Editor({
     return () => window.removeEventListener("beforeunload", beforeUnload);
   }, [dirty, busy, saving, needsRecovery]);
   const upload: UploadMedia | undefined = onUpload
-    ? async (file) => {
+    ? async (file, onProgress) => {
         pendingUploads.current++;
         setUploadCount(pendingUploads.current);
         try {
-          return await onUpload(file);
+          return await onUpload(file, onProgress);
         } finally {
           pendingUploads.current--;
           setUploadCount(pendingUploads.current);
@@ -2402,19 +2426,22 @@ export function Editor({
           {onLearning && (
             <EditorDetailsGroup
               id="course-assignments"
-              title="Learning groups"
-              description="Groups assign courses; completion windows are managed in organization settings."
+              title="Assignments"
+              description="Assign courses to teams or custom learning groups. Completion windows are managed in organization settings."
             >
               {existing &&
               (data.publishedContent ?? data.content).some(
                 (item) => item.id === c.id && item.status === "published",
               ) &&
               onWorkspaceChange ? (
-                <LearningGroupAssignments
+                <LearningAssignmentPicker
                   data={data}
                   item={{ kind: "course", id: c.id }}
                   title={c.title}
-                  onChange={onWorkspaceChange}
+                  onChange={async (next, options) => {
+                    await onWorkspaceChange(next, options);
+                    setAssignmentSave((count) => count + 1);
+                  }}
                   registerNavigationGuard={registerAssignmentGuard}
                   onPrepare={async () => {
                     if (!(await guard.current())) return null;
@@ -2423,7 +2450,7 @@ export function Editor({
                 />
               ) : (
                 <p className="text-copy text-muted-foreground">
-                  Publish this course to add it to a group’s assigned courses.
+                  Publish this course to assign it to teams or groups.
                 </p>
               )}
             </EditorDetailsGroup>

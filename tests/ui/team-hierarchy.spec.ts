@@ -25,8 +25,11 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   page,
 }, info) => {
   const data = freshWorkspace();
+  const organizationId = data.teams!.find(
+    (team) => team.system === "organization",
+  )!.id;
   data.teams!.push(
-    { id: "other", name: "Customer success" },
+    { id: "other", name: "Customer success", parentId: organizationId },
     {
       id: "child",
       name: "Regional customer success with a long descriptive name",
@@ -86,10 +89,10 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   await page
     .getByRole("searchbox", { name: "Find teams", exact: true })
     .fill("");
-  await page
-    .getByRole("navigation", { name: "Teams path", exact: true })
-    .getByRole("button", { name: "Teams", exact: true })
-    .click();
+  await expect(expand).toHaveAttribute("aria-expanded", "true");
+  await expand.click();
+  await expect(expand).toHaveAttribute("aria-expanded", "false");
+  await expect(expand).toBeFocused();
   await page
     .getByRole("button", { name: "Open Sales team", exact: true })
     .click();
@@ -99,7 +102,7 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   await action(page, "Move existing team here");
   await page
     .getByRole("radio", {
-      name: "Customer success Customer success",
+      name: "Customer success Organization / Customer success",
       exact: true,
     })
     .check();
@@ -142,7 +145,7 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   ).toBeFocused();
   expect(
     (await saved(page)).teams!.find((team) => team.id === "other")!.parentId,
-  ).toBeUndefined();
+  ).toBe(organizationId);
   await movePicker
     .getByRole("button", { name: "Review move", exact: true })
     .click();
@@ -204,7 +207,7 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   await expect(
     page.getByRole("radio", { name: /^Customer success/ }),
   ).toHaveCount(0);
-  await page.getByRole("radio", { name: /^Top-level team/ }).check();
+  await page.getByRole("radio", { name: /^Organization/ }).check();
   await page.getByRole("button", { name: "Review move", exact: true }).click();
   await expect(effects).toContainText("Customer success");
   await effects.getByRole("button", { name: "Move team", exact: true }).click();
@@ -212,9 +215,9 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
     page.getByRole("dialog", { name: "Move Customer success", exact: true }),
   ).toHaveCount(0);
   after = await saved(page);
-  expect(
-    after.teams!.find((team) => team.id === "other")!.parentId,
-  ).toBeUndefined();
+  expect(after.teams!.find((team) => team.id === "other")!.parentId).toBe(
+    organizationId,
+  );
   await action(page, "Delete empty team");
   await expect(page.locator("[data-slot=alert]")).toContainText(
     "1 immediate subteams",
@@ -255,4 +258,73 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
       () => document.documentElement.scrollWidth <= innerWidth + 1,
     ),
   ).toBe(true);
+});
+
+test("direct learning prevents empty-team deletion and survives a team rename", async ({
+  page,
+}, info) => {
+  const data = freshWorkspace();
+  const organization = data.teams!.find(
+    (team) => team.system === "organization",
+  )!;
+  const course = data.content.find(
+    (content) => content.kind === "course" && content.status === "published",
+  )!;
+  data.teams!.push({
+    id: "assigned-empty",
+    name: "Assignment audience",
+    parentId: organization.id,
+    learningItems: [{ kind: "course", id: course.id }],
+  });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript((workspace) => {
+    sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+    localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+  }, data);
+  await page.goto("/#admin");
+  await expect(page.locator(".admin-layout")).toBeVisible();
+  await section(page);
+  const baseline = await saved(page);
+  await page
+    .getByRole("button", { name: "Open Assignment audience", exact: true })
+    .click();
+  await action(page, "Delete empty team");
+  await expect(page.locator("[data-slot=alert]")).toContainText(
+    "1 assigned courses or curricula",
+  );
+  await expect(
+    page.getByRole("dialog", {
+      name: "Delete Assignment audience?",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  expect((await saved(page)).teams).toEqual(baseline.teams);
+  await page
+    .getByRole("button", { name: "Edit team details", exact: true })
+    .click();
+  const editor = page.getByRole("dialog", {
+    name: "Edit Assignment audience",
+    exact: true,
+  });
+  await editor
+    .getByRole("textbox", { name: "Team name", exact: true })
+    .fill("Renamed assignment audience");
+  await editor.getByRole("button", { name: "Save team", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const after = await saved(page);
+  expect(after.teams!.find((team) => team.id === "assigned-empty")).toEqual({
+    ...baseline.teams!.find((team) => team.id === "assigned-empty")!,
+    name: "Renamed assignment audience",
+  });
+  expect(after.groups).toEqual(baseline.groups);
+  expect(after.curricula).toEqual(baseline.curricula);
+  expect(after.progress).toEqual(baseline.progress);
+  await action(page, "Delete empty team");
+  await expect(page.locator("[data-slot=alert]")).toContainText(
+    "1 assigned courses or curricula",
+  );
+  await page.screenshot({
+    path: info.outputPath("team-direct-learning-deletion-guard.png"),
+    fullPage: true,
+  });
 });

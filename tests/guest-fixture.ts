@@ -61,7 +61,11 @@ export function guestFixture() {
       courseIds: [courses[0].id, courses[1].id],
     },
   ];
-  data.settings = { ...defaultSettings, guestGroupId: "visitors" };
+  data.settings = {
+    ...defaultSettings,
+    organizationTeamId: before.settings?.organizationTeamId,
+    guestGroupId: "visitors",
+  };
   data.users = data.users.map((u) => ({
     ...u,
     groups: ["account"],

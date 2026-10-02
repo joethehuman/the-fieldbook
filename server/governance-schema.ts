@@ -105,12 +105,12 @@ export const governanceSchema = z
         (c.status === "published" && !c.courseIds.length)
       )
         fail("Published curricula need unique courses.");
-    for (const g of value.groups) {
-      if (g.parentId)
+    for (const g of [...value.groups, ...value.teams]) {
+      if (value.groups.includes(g) && g.parentId)
         fail(
           "Learning groups are independent audiences and cannot have parents.",
         );
-      if (g.teamLinkScope === "direct")
+      if (value.groups.includes(g) && g.teamLinkScope === "direct")
         fail(
           "Legacy direct team links must be preserved separately. Reload before saving.",
         );

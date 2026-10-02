@@ -48,23 +48,22 @@ export async function uploadMedia(user: User | null, input: unknown) {
         "video/mp4",
         "video/webm",
       ]),
-      size: z
-        .number()
-        .int()
-        .positive()
-        .max(
-          Math.min(
-            Number(process.env.FIELDBOOK_UPLOAD_MAX_BYTES) || 52428800,
-            52428800,
-          ),
-        ),
+      size: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
     })
     .safeParse(input);
   if (!parsed.success)
     throw new HttpError(
       400,
-      "Upload a PNG, JPG, WebP, GIF, MP4, or WebM file of at most 50 MB.",
+      "Upload a non-empty PNG, JPG, WebP, GIF, MP4, or WebM file with a valid size.",
     );
+  const configured = process.env.FIELDBOOK_UPLOAD_MAX_BYTES?.trim();
+  if (configured) {
+    const limit = Number(configured);
+    if (!Number.isSafeInteger(limit) || limit <= 0)
+      throw new HttpError(503, "The installation's upload limit is invalid. Ask an administrator to check FIELDBOOK_UPLOAD_MAX_BYTES.");
+    if (parsed.data.size > limit)
+      throw new HttpError(413, `This file exceeds the installation's configured upload limit (${limit.toLocaleString("en-US")} bytes). Choose a smaller file or ask an administrator to raise the limit.`);
+  }
   if (!(await mediaData().allowUpload(user.id)))
     throw new HttpError(429, "The hourly upload limit has been reached.");
   const id = crypto.randomUUID(),
@@ -77,5 +76,5 @@ export async function uploadMedia(user: User | null, input: unknown) {
     bytes: parsed.data.size,
     owner: user.id,
   });
-  return { id, upload: await storage().createUpload(path, parsed.data.type) };
+  return { id, upload: await storage().createUpload(path, parsed.data.type, parsed.data.size) };
 }

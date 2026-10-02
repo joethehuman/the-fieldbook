@@ -108,7 +108,7 @@ async function start(page: Page) {
 }
 function assignmentDialog(page: Page) {
   return page.getByRole("dialog", {
-    name: "Assign to learning groups",
+    name: "Assign to teams or groups",
     exact: true,
   });
 }
@@ -126,7 +126,7 @@ test("Content course assignment has one final review and keeps choices after can
   await expect(picker).toBeVisible();
   await picker
     .getByRole("checkbox", {
-      name: "Assign directly to Account executives",
+      name: "Assign directly to Group: Account executives",
       exact: true,
     })
     .check();
@@ -144,7 +144,7 @@ test("Content course assignment has one final review and keeps choices after can
   await expect(review).toBeVisible();
   await expect(
     page.getByRole("dialog", {
-      name: "Assign to learning groups",
+      name: "Assign to teams or groups",
       exact: true,
       includeHidden: true,
     }),
@@ -162,7 +162,7 @@ test("Content course assignment has one final review and keeps choices after can
   ).toBeFocused();
   await expect(
     picker.getByRole("checkbox", {
-      name: "Assign directly to Account executives",
+      name: "Assign directly to Group: Account executives",
       exact: true,
     }),
   ).toBeChecked();
@@ -211,10 +211,12 @@ test("course Details edits the same links without replacing the editor or resett
   if ((await details.getAttribute("aria-expanded")) !== "true")
     await details.click();
   await page
-    .getByRole("button", { name: "Assign to learning groups", exact: true })
+    .getByRole("button", { name: "Assign to teams or groups", exact: true })
     .click();
   const picker = assignmentDialog(page);
-  const ae = picker.getByRole("row").filter({ hasText: "Account executives" });
+  const ae = picker
+    .getByRole("row")
+    .filter({ hasText: "Group: Account executives" });
   await expect(ae).toContainText("GTM foundation");
   const source = ae.getByText(/Also included through GTM foundation/);
   await expect(source).toBeVisible();
@@ -225,7 +227,7 @@ test("course Details edits the same links without replacing the editor or resett
   );
   await ae
     .getByRole("checkbox", {
-      name: "Assign directly to Account executives",
+      name: "Assign directly to Group: Account executives",
       exact: true,
     })
     .uncheck();
@@ -237,6 +239,10 @@ test("course Details edits the same links without replacing the editor or resett
     .getByRole("button", { name: "Review assignments", exact: true })
     .click();
   await expect(picker).not.toBeVisible();
+  await page
+    .getByRole("dialog", { name: "Assign Foundation course", exact: true })
+    .getByRole("button", { name: "Apply assignments", exact: true })
+    .click();
   await expect(
     page.getByRole("textbox", { name: "Title", exact: true }),
   ).toHaveValue("Foundation course");
@@ -257,33 +263,33 @@ test("course Details edits the same links without replacing the editor or resett
     dueDate: before.dueDate,
   });
   await page
-    .getByRole("button", { name: "Assign to learning groups", exact: true })
+    .getByRole("button", { name: "Assign to teams or groups", exact: true })
     .click();
   await expect(
     picker.getByRole("checkbox", {
-      name: "Assign directly to Account executives",
+      name: "Assign directly to Group: Account executives",
       exact: true,
     }),
   ).not.toBeChecked();
   await expect(
-    picker.getByRole("row").filter({ hasText: "Account executives" }),
+    picker.getByRole("row").filter({ hasText: "Group: Account executives" }),
   ).toContainText("GTM foundation");
   await picker.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(
     page.getByRole("button", {
-      name: "Assign to learning groups",
+      name: "Assign to teams or groups",
       exact: true,
     }),
   ).toBeFocused();
 });
 
-test("published Curricula assigns its reference through the shared group picker", async ({
+test("published Curricula assigns its reference through the shared audience picker", async ({
   page,
 }, info) => {
   await start(page);
   await section(page, "Curricula");
   await page
-    .getByRole("button", { name: "Assign to learning groups", exact: true })
+    .getByRole("button", { name: "Assign to teams or groups", exact: true })
     .click();
   const picker = assignmentDialog(page);
   await expect(
@@ -293,7 +299,10 @@ test("published Curricula assigns its reference through the shared group picker"
     }),
   ).toHaveCount(0);
   await picker
-    .getByRole("checkbox", { name: "Assign directly to Pilot", exact: true })
+    .getByRole("checkbox", {
+      name: "Assign directly to Group: Pilot",
+      exact: true,
+    })
     .check();
   await page.screenshot({
     path: info.outputPath("curriculum-assignment-dialog.png"),

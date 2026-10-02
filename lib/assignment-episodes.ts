@@ -2,6 +2,7 @@ import type { Workspace } from "./store";
 import type { Content, EffectiveAssignment, User } from "./types";
 import {
   assignedCourses,
+  assignmentInfo,
   effectiveGroups,
   isComplete,
   reportTeamIds,
@@ -9,80 +10,71 @@ import {
   type Team,
 } from "./types";
 import { addDays, assignmentRules, onboardingClockTarget } from "./learning";
-
+import {
+  courseAudienceSources,
+  projectAssignmentTeams,
+  learningChangeImpact,
+} from "./assignment-audiences";
 export function assignmentDeadline(start: string, person: User, days: number) {
   const catchUp = addDays(start, days),
     onboarding = onboardingClockTarget(person);
   return onboarding && onboarding > catchUp ? onboarding : catchUp;
 }
 
-/** Reconcile coverage as one course/version obligation, rather than one per source. */
 export function reconcileAssignments(
   before: Workspace,
   after: Workspace,
   stamp: string,
   baseline = false,
 ) {
-  const courses = after.publishedContent || after.content;
   return after.users.map((person) => {
+    const projected = {
+      ...person,
+      effectiveGroupIds: [
+        ...effectiveGroups(person, after.groups, after.teams || []),
+      ],
+      assignmentTeams: projectAssignmentTeams(person, after),
+    };
     const old = before.users.find((p) => p.id === person.id);
-    const memberships = effectiveGroups(
-      person,
-      after.groups,
-      after.teams || [],
-    );
     const learningAssignments = assignedCourses(
-      courses,
-      {
-        ...person,
-        effectiveGroupIds: [...memberships],
-        effectiveGroupJoinedAt: Object.fromEntries(
-          [...memberships].map((id) => [
-            id,
-            person.effectiveGroupJoinedAt?.[id] || stamp,
-          ]),
-        ),
-      },
+      after.publishedContent || after.content,
+      projected,
       after.groups,
     ).map((course) => {
-      const sources = assignmentRules(course)
-        .filter((a) => a.groupId && memberships.has(a.groupId))
-        .map((a) => a.groupId!);
+      const sourceAudiences = courseAudienceSources(
+        after,
+        projected,
+        course.id,
+      );
+      const sourceGroups = sourceAudiences
+        .filter((a) => a.kind === "group")
+        .map((a) => a.id);
       const previous = old?.learningAssignments?.find(
         (a) => a.contentId === course.id && a.version === course.version,
       );
-      if (previous) return { ...previous, sourceGroups: sources };
-      const days = after.settings?.catchUpDays ?? 30;
-      // Backfill preserves the current derived baseline. New coverage starts when
-      // the change takes effect, even when the account has never signed in.
+      if (previous) return { ...previous, sourceGroups, sourceAudiences };
       const assignedAt = baseline
-        ? assignmentRules(course)
-            .filter((a) => a.groupId && memberships.has(a.groupId))
-            .map((a) => {
-              const joined =
-                person.effectiveGroupJoinedAt?.[a.groupId!] ||
-                person.groupJoinedAt?.[a.groupId!] ||
-                a.assignedAt;
-              return joined > a.assignedAt ? joined : a.assignedAt;
-            })
-            .sort()[0] || stamp
+        ? assignmentInfo(course, projected, after.groups).assignedAt || stamp
         : stamp;
+      const catchUpDays = after.settings?.catchUpDays ?? 30;
+      const catchUp = addDays(assignedAt, catchUpDays),
+        onboardingEnd = onboardingClockTarget(projected, after.settings);
       return {
         episodeId: crypto.randomUUID(),
         contentId: course.id,
         version: course.version,
         assignedAt,
-        dueDate: assignmentDeadline(assignedAt, person, days),
-        catchUpDays: days,
-        onboardingEnd: onboardingClockTarget(person),
-        sourceGroups: sources,
+        dueDate:
+          onboardingEnd && onboardingEnd > catchUp ? onboardingEnd : catchUp,
+        catchUpDays,
+        ...(onboardingEnd ? { onboardingEnd } : {}),
+        sourceGroups,
+        sourceAudiences,
         baseline,
       } satisfies EffectiveAssignment;
     });
     return {
-      ...person,
-      // Readers consume a compact projection without the organization tree.
-      // Recompute team coverage here so a move or unlink cannot leave stale IDs.
+      ...projected,
       effectiveGroupIds: [
         ...effectiveGroups(
           { ...person, groups: [] },
@@ -209,48 +201,22 @@ export type AssignmentImpact = {
   gained: Content[];
   lost: Content[];
 };
-export function assignmentImpact(
-  before: Workspace,
-  after: Workspace,
-): AssignmentImpact[] {
-  const courses = after.publishedContent || after.content;
-  return after.users
-    .filter((person) => person.active)
-    .map((person) => {
-      const old = before.users.find((p) => p.id === person.id);
-      const assigned = (p: User, data: Workspace) => {
-        const groups = effectiveGroups(p, data.groups, data.teams || []);
-        return courses.filter(
-          (c) =>
-            c.kind === "course" &&
-            c.status === "published" &&
-            data.groups.some((g) => {
-              if (!groups.has(g.id)) return false;
-              const items = g.learningItems;
-              return items
-                ? items.some((i) =>
-                    i.kind === "course"
-                      ? i.id === c.id
-                      : data.curricula?.some(
-                          (playlist) =>
-                            playlist.id === i.id &&
-                            playlist.status === "published" &&
-                            playlist.courseIds.includes(c.id),
-                        ),
-                  )
-                : g.requiredCourseIds?.includes(c.id) ||
-                    assignmentRules(c).some((a) => a.groupId === g.id);
-            }),
-        );
-      };
-      const was = old ? assigned(old, before) : [],
-        now = assigned(person, after);
-      return {
-        person,
-        gained: now.filter((c) => !was.some((p) => p.id === c.id)),
-        lost: was.filter((c) => !now.some((p) => p.id === c.id)),
-      };
-    })
+export function assignmentImpact(before: Workspace, after: Workspace) {
+  const content = after.publishedContent || after.content;
+  return learningChangeImpact(before, after)
+    .map(({ person, gained, lost }) => ({
+      person,
+      gained: gained.flatMap((id) =>
+        content.filter(
+          (c) => c.id === id && c.kind === "course" && c.status === "published",
+        ),
+      ),
+      lost: lost.flatMap((id) =>
+        (before.publishedContent || before.content).filter(
+          (c) => c.id === id && c.kind === "course" && c.status === "published",
+        ),
+      ),
+    }))
     .filter((row) => row.gained.length || row.lost.length);
 }
 /** Exact people exposed or removed from each manager's authorized reporting scope. */

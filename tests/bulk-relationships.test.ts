@@ -21,7 +21,7 @@ test("course group batches deduplicate direct links and preserve unrelated data 
     },
     async () => {},
   );
-  await commands.find((c) => c.id === "group-add")!.apply([group.id]);
+  await commands.find((c) => c.id === "group-add")!.apply([`group:${group.id}`]);
   assert.equal(
     groupItems(saved.groups[0], saved.content).filter(
       (i) => i.kind === "course" && i.id === course.id,
@@ -40,7 +40,7 @@ test("course group batches deduplicate direct links and preserve unrelated data 
     async () => {},
   )
     .find((c) => c.id === "group-remove")!
-    .apply([group.id]);
+    .apply([`group:${group.id}`]);
   assert(
     !groupItems(saved.groups[0], saved.content).some(
       (i) => i.kind === "course" && i.id === course.id,

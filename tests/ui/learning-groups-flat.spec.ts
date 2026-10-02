@@ -486,7 +486,7 @@ test("People filters and bulk direct removal preserve team membership and cancel
     );
   for (const [label, choice, reset] of [
     ["Person status", "Inactive", "All statuses"],
-    ["Reporting team", "No reporting team", "All teams"],
+    ["Reporting team", "Organization", "All teams"],
   ]) {
     await page.getByRole("button", { name: /^Filters/ }).click();
     await page.getByRole("combobox", { name: label, exact: true }).click();

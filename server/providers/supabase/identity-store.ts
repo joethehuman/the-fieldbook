@@ -13,11 +13,8 @@ export async function findProfileBySubject(
 ): Promise<ProfileRecord | null> {
   let query = db()
     .from("fb_profiles")
-    .select(
-      "*,learning_assignments:fb_assignment_episodes(episodeId:id,contentId:content_id,version,assignedAt:started_at,dueDate:due_date,catchUpDays:catch_up_days,onboardingEnd:onboarding_end,sourceGroups:source_groups,baseline,ended_at)",
-    )
-    .eq("auth_user_id", subject)
-    .is("learning_assignments.ended_at", null);
+    .select("*,assignment_context:fb_profile_learning")
+    .eq("auth_user_id", subject);
   if (activeOnly) query = query.eq("active", true);
   const { data, error } = await query.maybeSingle();
   check(error);

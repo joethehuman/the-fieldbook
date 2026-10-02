@@ -1,3 +1,4 @@
+import { reconcileLearning } from "./learning-groups";
 import { reconcileAssignments } from "./assignment-episodes";
 import { flattenLearningGroups } from "./group-conversion";
 import {
@@ -274,14 +275,9 @@ export function loadWorkspace(): Workspace {
   const raw = localStorage.getItem(KEY);
   if (!raw) {
     const fresh = withPublishedSnapshots(freshWorkspace());
-    fresh.users = reconcileAssignments(
-      fresh,
-      fresh,
-      new Date().toISOString(),
-      true,
-    );
-    saveWorkspace(fresh);
-    return fresh;
+    const saved = reconcileLearning(fresh, fresh);
+    saveWorkspace(saved);
+    return saved;
   }
   const data = JSON.parse(raw);
   if (
@@ -341,7 +337,10 @@ export function loadWorkspace(): Workspace {
     saveWorkspace(current);
   }
   if (current !== upgraded) saveWorkspace(current);
-  return current;
+  const reconciled = reconcileLearning(current, current);
+  if (JSON.stringify(reconciled) !== JSON.stringify(current))
+    saveWorkspace(reconciled);
+  return reconciled;
 }
 export function saveWorkspace(data: Workspace) {
   const previous = localStorage.getItem(KEY);

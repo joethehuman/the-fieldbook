@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Make Organization visible on Teams. People without a named team automatically appear there for membership, reporting and Organization-linked learning groups; moving or removing a team membership keeps saved learning history and deadlines. Public guests are identified separately from roster counts. Existing installations require `20261002184642_organization_membership.sql` after the built-in Organization migration.
+- Make Organization visible on Teams. People without a named team automatically appear there for membership, reporting and Organization-linked learning groups; moving or removing a team membership keeps saved learning history and deadlines. Guests use the configured guest learning group and stay outside the reporting hierarchy. Existing installations require `20261002184642_organization_membership.sql` after the built-in Organization migration.
 
 - Browse reporting teams in compact connected columns that scroll horizontally through every depth, following one branch with explicit Open/Edit actions. New teams return to their parent list. Organization is a built-in reporting root with a manager and direct-member page; upgrading preserves existing team IDs, members and saved learning. Assignment pickers use full-content relevance search with highlighted excerpts, independent category/type filters and pagination in a stable-size dialog. Learning-group People adds shared filters, sorting and reviewed bulk removal of direct memberships.
 
@@ -13,6 +13,9 @@ No versions have been released. Package and MCP version strings do not constitut
 - Make learning groups independent overlapping audiences with a searchable index and focused People, Assigned Courses and Assigned Updates views. Teams retain their reporting hierarchy in a compact tree/detail workspace with one source-aware people roster. Search and primary assignment/member actions share a row; parent-team menus remain anchored inside dialogs. Assign learning from a group or from existing Content/Curricula controls, using one contextual consequence review. The flat-group upgrade preserves current memberships, learning, deadlines, history and guest relevance while ending future parent-group propagation.
 
 - Save one continuous course-version assignment and deadline per person across overlapping sources. Team links include subteams, with explicit impact review for older direct-only links and organizational changes. Timing defaults affect future work; administrators can review and recalculate existing clocks and unfinished deadlines. Requires the stable-assignment migration.
+- Assign published courses and curricula directly to teams or learning groups from one picker. Show all assignment sources and preserve saved deadlines across overlapping coverage. Requires the assignment-episode and team/group migrations.
+
+- Remove the fixed 50 MB application/card-art upload ceiling while respecting optional operator and storage limits. Show upload progress, use signed chunked transfers with bounded retries for large files, and explain signing, storage and verification failures without losing draft text or inserting failed media. Existing storage limits require separate operator configuration.
 
 - Add contributor accounts with the shared publishing panel, content/feedback editors and exports, authoring uploads, and content recovery. Explicit team management adds scoped reports; administrator accounts retain one organization destination. Course assignments, Docs hierarchy changes and people recovery remain administrator-only. Requires the contributor permissions migration; MCP connections remain administrator-only in this change.
 

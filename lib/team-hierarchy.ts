@@ -1,3 +1,5 @@
+import { teamItems } from "./learning-groups";
+import { learningChangeImpact } from "./assignment-audiences";
 import type { Workspace } from "./store";
 import { organizationParent, organizationTeam } from "./organization-team";
 import {
@@ -64,6 +66,7 @@ export function teamMoveImpact(data: Workspace, id: string, parentId: string) {
     .filter(({ gained, lost }) => gained.length || lost.length);
   return {
     next,
+    learning: learningChangeImpact(data, { ...data, teams: next }),
     branch,
     people,
     managers,
@@ -79,6 +82,7 @@ export function teamDeletionBlockers(data: Workspace, id: string) {
       data.teams?.some(
         (team) => team.id === id && team.system === "organization",
       ) || false,
+    learning: teamItems(data.teams?.find((t) => t.id === id) || {}),
     members: data.users.filter((user) => user.teamId === id),
     pending: (data.pendingUsers || []).filter((user) => user.teamId === id),
     children: (data.teams || []).filter((team) => team.parentId === id),

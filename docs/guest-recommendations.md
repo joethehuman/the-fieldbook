@@ -8,7 +8,7 @@ In **Organization Settings → Access**, choose public browsing. **Guest recomme
 
 - Select an existing learning group, then **Save settings**. A group already used by members is valid; Fieldbook does not require or create an “All organization” group.
 - Or select **Create guest group**, name it and choose **Create group**. This explicitly saves an empty learning group and selects it in the form. Choose **Save settings** to apply the selection. Leaving without saving keeps the new group but leaves the previous guest selection unchanged.
-- In **Learning groups**, open that group’s **Learning** view to add published courses/curricula and **Updates** to choose relevant Updates. An empty group provides no recommendations until it has learning or Update targets.
+- In **Learning groups**, open that group’s **Assigned Courses** view to add published courses/curricula and **Assigned Updates** to choose relevant Updates. An empty group provides no recommendations until it has learning or Update targets.
 - Choose **None — no personalized recommendations.** to remove the selection. Public browsing remains available, with quiet empty states in For you.
 
 Recommendations come from the selected flat group alone, following its saved learning order. Other learning groups are independent. Reporting-team links and individual membership do not enroll guests in anything. Published curricula expand to courses; overlapping assignments count each course once. Optional learning does not reduce assigned completion.

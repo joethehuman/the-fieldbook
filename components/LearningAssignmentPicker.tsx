@@ -2,12 +2,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { Workspace } from "@/lib/store";
 import type { LearningItem } from "@/lib/types";
-import { effectiveGroups } from "@/lib/types";
+import { effectiveGroups, ancestorIds, reportingTeamId } from "@/lib/types";
 import {
-  assignLearningToGroups,
-  curriculumSources,
-  directlyAssignedGroups,
-} from "@/lib/group-assignment";
+  assignLearningToAudiences,
+  curriculumAudienceSources,
+  directlyAssignedAudiences,
+  assignmentAudiences,
+  audienceKey,
+} from "@/lib/assignment-audiences";
+import { SaveRecoveryError } from "@/lib/save-recovery";
 import {
   isOrganizationChangeCanceled,
   type OrganizationChangeOptions,
@@ -38,15 +41,14 @@ import { Pagination } from "./patterns/pagination";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 
-export function LearningGroupAssignments({
+export function LearningAssignmentPicker({
   data,
   item,
   title,
   onChange,
   registerNavigationGuard,
-  onOpenGroup,
   onPrepare,
-  triggerLabel = "Assign to learning groups",
+  triggerLabel = "Assign to teams or groups",
   compact = false,
 }: {
   onPrepare?: () => Promise<Workspace | null>;
@@ -60,7 +62,6 @@ export function LearningGroupAssignments({
     options?: OrganizationChangeOptions,
   ) => void | Promise<void>;
   registerNavigationGuard?: RegisterNavigationGuard;
-  onOpenGroup?: (id: string) => void | Promise<void>;
 }) {
   const [open, setOpen] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
@@ -80,6 +81,7 @@ export function LearningGroupAssignments({
   }, []);
   const initial = useRef<string[]>([]),
     revision = useRef<number | undefined>(undefined),
+    snapshot = useRef(""),
     running = useRef(false);
   const { confirm } = useInteractionDialog();
   const notify = useToast();
@@ -108,30 +110,61 @@ export function LearningGroupAssignments({
       window.removeEventListener("beforeunload", unload);
     };
   }, [open, dirty, busy, registerNavigationGuard]);
-  const groups = data.groups
-    .filter((g) => g.name.toLowerCase().includes(query.trim().toLowerCase()))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const allAudiences = assignmentAudiences(data);
+  const audiences = allAudiences.filter((audience) =>
+    `${audience.kind}: ${audience.name}`
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
+  );
   const currentPage = Math.min(
     page,
-    Math.max(1, Math.ceil(groups.length / 10)),
+    Math.max(1, Math.ceil(audiences.length / 10)),
   );
-  const effectiveSelected = new Set(
-    data.groups
-      .filter(
-        (g) =>
-          selected.includes(g.id) ||
-          curriculumSources(data, g.id, item).length > 0,
-      )
-      .map((g) => g.id),
+  const hasPerson = (
+    person: Workspace["users"][number],
+    audience: (typeof allAudiences)[number],
+  ) =>
+    audience.kind === "group"
+      ? effectiveGroups(person, data.groups, data.teams || []).has(audience.id)
+      : ancestorIds(
+          reportingTeamId(person.teamId, data.teams || []) || "",
+          data.teams || [],
+        ).has(audience.id);
+  const covered = allAudiences.filter(
+    (audience) =>
+      selected.includes(audienceKey(audience)) ||
+      curriculumAudienceSources(data, audienceKey(audience), item).length > 0,
   );
   const audience = data.users.filter(
-    (u) =>
-      u.active &&
-      [...effectiveGroups(u, data.groups, data.teams || [])].some((id) =>
-        effectiveSelected.has(id),
-      ),
+    (person) =>
+      person.active &&
+      covered.some((candidate) => hasPerson(person, candidate)),
   ).length;
-  const initialCount = directlyAssignedGroups(data, item).length;
+  const initialCount = directlyAssignedAudiences(data, item).length;
+  const assignmentSnapshot = (workspace: Workspace) =>
+    JSON.stringify([
+      workspace.groups,
+      workspace.teams,
+      workspace.users,
+      workspace.curricula,
+      workspace.content,
+      workspace.publishedContent,
+      workspace.progress,
+      workspace.settings,
+      workspace.revision,
+      workspace.governanceRevision,
+    ]);
+  const validateCurrent = () => {
+    if (
+      dataRef.current.governanceRevision !== revision.current ||
+      assignmentSnapshot(dataRef.current) !== snapshot.current
+    ) {
+      setStale(true);
+      throw new Error(
+        "Teams, groups, membership or learning changed. Close this dialog and review the current list.",
+      );
+    }
+  };
   async function close() {
     if (await guard.current()) {
       setOpen(false);
@@ -143,7 +176,7 @@ export function LearningGroupAssignments({
     if (data.governanceRevision !== revision.current) {
       setStale(true);
       setError(
-        "Groups or membership changed. Close this dialog and review the current list.",
+        "Teams, groups or membership changed. Close this dialog and review the current list.",
       );
       return;
     }
@@ -151,14 +184,27 @@ export function LearningGroupAssignments({
     setBusy(true);
     setError("");
     try {
-      await onChange(assignLearningToGroups(data, item, selected), {
-        review: { title: `Assign ${title}`, confirmLabel: "Apply assignments" },
-      });
+      validateCurrent();
+      await onChange(
+        assignLearningToAudiences(dataRef.current, [item], selected),
+        {
+          locallyHandled: true,
+          validateCurrent,
+          review: {
+            title: `Assign ${title}`,
+            confirmLabel: "Apply assignments",
+            always: true,
+          },
+        },
+      );
       initial.current = selected;
       setOpen(false);
-      notify("Learning-group assignments saved.");
+      notify("Assignments saved. Existing history and deadlines preserved.");
     } catch (e) {
-      if (!isOrganizationChangeCanceled(e)) setError((e as Error).message);
+      if (!isOrganizationChangeCanceled(e)) {
+        if (e instanceof SaveRecoveryError) setStale(true);
+        setError((e as Error).message);
+      }
     } finally {
       running.current = false;
       setBusy(false);
@@ -173,9 +219,10 @@ export function LearningGroupAssignments({
     try {
       const prepared = onPrepare ? await onPrepare() : dataRef.current;
       if (!prepared || !mounted.current) return;
-      const ids = directlyAssignedGroups(prepared, item);
+      const ids = directlyAssignedAudiences(prepared, item);
       initial.current = ids;
       revision.current = prepared.governanceRevision;
+      snapshot.current = assignmentSnapshot(prepared);
       setSelected(ids);
       setQuery("");
       setPage(1);
@@ -202,9 +249,13 @@ export function LearningGroupAssignments({
       {!compact && (
         <p className="text-sm text-muted-foreground">
           {initialCount} direct{" "}
-          {initialCount === 1 ? "group assignment" : "group assignments"}
+          {initialCount === 1 ? "audience assignment" : "audience assignments"}
           {item.kind === "course" &&
-          data.groups.some((g) => curriculumSources(data, g.id, item).length)
+          allAudiences.some(
+            (candidate) =>
+              curriculumAudienceSources(data, audienceKey(candidate), item)
+                .length,
+          )
             ? " · also included through curricula"
             : ""}
         </p>
@@ -216,9 +267,10 @@ export function LearningGroupAssignments({
         }}
       >
         <DialogContent className="max-w-4xl">
-          <DialogTitle>Assign to learning groups</DialogTitle>
+          <DialogTitle>Assign to teams or groups</DialogTitle>
           <DialogDescription>
-            {title}. Choose which groups receive it directly.
+            {title}. Choose which teams or groups receive it directly. Teams
+            include their subteams.
             {item.kind === "course"
               ? " Existing curriculum assignments stay attached."
               : ""}
@@ -232,81 +284,89 @@ export function LearningGroupAssignments({
                 setQuery(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search learning groups"
-              aria-label="Find a learning group"
+              placeholder="Search teams or groups"
+              aria-label="Find a team or group"
               disabled={busy}
             />
           </SearchField>
           <TableContainer>
             <DataTable
               layout="assignmentGroups"
-              aria-label="Learning-group assignments"
+              aria-label="Team and group assignments"
             >
               <TableHeader>
                 <TableRow>
                   <TableHead>
                     <span className="sr-only">Assign</span>
                   </TableHead>
-                  <TableHead>Group</TableHead>
+                  <TableHead>Team or group</TableHead>
                   <TableHead>People</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groups
+                {audiences
                   .slice((currentPage - 1) * 10, currentPage * 10)
-                  .map((group) => {
-                    const through = curriculumSources(data, group.id, item);
+                  .map((candidate) => {
+                    const key = audienceKey(candidate);
+                    const label = `${candidate.kind === "team" ? "Team" : "Group"}: ${candidate.name}`;
+                    const through = curriculumAudienceSources(data, key, item);
+                    const parents =
+                      candidate.kind === "team"
+                        ? allAudiences.filter(
+                            (parent) =>
+                              parent.kind === "team" &&
+                              parent.id !== candidate.id &&
+                              ancestorIds(candidate.id, data.teams || []).has(
+                                parent.id,
+                              ) &&
+                              (selected.includes(audienceKey(parent)) ||
+                                curriculumAudienceSources(
+                                  data,
+                                  audienceKey(parent),
+                                  item,
+                                ).length > 0),
+                          )
+                        : [];
                     return (
-                      <TableRow key={group.id}>
+                      <TableRow key={key}>
                         <TableCell>
                           <Checkbox
-                            aria-label={`Assign directly to ${group.name}`}
+                            aria-label={`Assign directly to ${label}`}
                             disabled={busy}
-                            checked={selected.includes(group.id)}
+                            checked={selected.includes(key)}
                             onCheckedChange={(checked) =>
                               setSelected((ids) =>
                                 checked === true
-                                  ? [...new Set([...ids, group.id])]
-                                  : ids.filter((id) => id !== group.id),
+                                  ? [...new Set([...ids, key])]
+                                  : ids.filter((id) => id !== key),
                               )
                             }
                           />
                         </TableCell>
                         <TableCell>
-                          {group.name}
+                          {label}
                           {!!through.length && (
                             <p className="text-xs text-muted-foreground">
                               Also included through {through.join(", ")}. This
                               course stays assigned through these curricula.
                             </p>
                           )}
-                          {onOpenGroup && (
-                            <Button
-                              type="button"
-                              variant="link"
-                              size="sm"
-                              disabled={busy}
-                              onClick={async () => {
-                                if (await guard.current()) {
-                                  setOpen(false);
-                                  await onOpenGroup(group.id);
-                                }
-                              }}
-                            >
-                              Open group learning
-                            </Button>
+                          {!!parents.length && (
+                            <p className="text-xs text-muted-foreground">
+                              Also included through{" "}
+                              {parents
+                                .map((parent) => `Team: ${parent.name}`)
+                                .join(", ")}
+                              . Removing this direct link keeps parent-team
+                              assignments.
+                            </p>
                           )}
                         </TableCell>
                         <TableCell>
                           {
                             data.users.filter(
-                              (u) =>
-                                u.active &&
-                                effectiveGroups(
-                                  u,
-                                  data.groups,
-                                  data.teams || [],
-                                ).has(group.id),
+                              (person) =>
+                                person.active && hasPerson(person, candidate),
                             ).length
                           }
                         </TableCell>
@@ -316,25 +376,25 @@ export function LearningGroupAssignments({
               </TableBody>
             </DataTable>
           </TableContainer>
-          {!groups.length && (
+          {!audiences.length && (
             <p className="text-copy text-muted-foreground">
-              {data.groups.length
-                ? "No matching groups."
-                : "Create a learning group before assigning learning."}
+              {allAudiences.length
+                ? "No matching teams or groups."
+                : "Create a team or group before assigning learning."}
             </p>
           )}
           <Pagination
             page={currentPage}
             pageSize={10}
-            total={groups.length}
+            total={audiences.length}
             onPageChange={setPage}
-            label="Learning groups"
+            label="Teams and groups"
           />
           <p className="text-sm text-muted-foreground">
             {selected.length} direct{" "}
-            {selected.length === 1 ? "group" : "groups"} selected · {audience}{" "}
-            active {audience === 1 ? "person" : "people"} across direct and
-            curriculum assignments. Overlapping courses count once.
+            {selected.length === 1 ? "audience" : "audiences"} selected ·{" "}
+            {audience} active {audience === 1 ? "person" : "people"} across
+            direct and curriculum assignments. Overlapping courses count once.
           </p>
           <DialogFooter>
             <Button

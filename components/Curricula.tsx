@@ -35,7 +35,8 @@ import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
 import type { UploadMedia } from "./MarkdownEditor";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Plus } from "lucide-react";
-import { LearningGroupAssignments } from "./LearningGroupAssignments";
+import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
+import { assignmentAudiences } from "@/lib/assignment-audiences";
 import { useNestedNavigationGuard } from "./patterns/use-nested-navigation-guard";
 import {
   isOrganizationChangeCanceled,
@@ -111,9 +112,9 @@ export default function Curricula({
   );
   const content = data.publishedContent || data.content;
   const linked = (id: string) =>
-    data.groups.filter((g) =>
-      groupItems(g, content).some(
-        (i) => i.kind === "curriculum" && i.id === id,
+    assignmentAudiences(data).filter((audience) =>
+      audience.items.some(
+        (item) => item.kind === "curriculum" && item.id === id,
       ),
     );
   async function closeEditor() {
@@ -187,6 +188,12 @@ export default function Curricula({
       await onChange(
         {
           ...data,
+          teams: data.teams?.map((team) => ({
+            ...team,
+            learningItems: team.learningItems?.filter(
+              (item) => item.kind !== "curriculum" || item.id !== c.id,
+            ),
+          })),
           curricula: all.filter((x) => x.id !== c.id),
           groups: data.groups.map((g) => ({
             ...g,
@@ -199,7 +206,7 @@ export default function Curricula({
           review: {
             title: `Delete ${c.name}?`,
             description:
-              "Its group links are removed. Course content and saved completion stay available.",
+              "Its team and group links are removed. Course content and saved completion stay available.",
             confirmLabel: "Delete curriculum",
             always: true,
           },
@@ -353,7 +360,7 @@ export default function Curricula({
             />
             <FormField
               label="Status"
-              description="Published curricula are available in the library and can be added to learning groups."
+              description="Published curricula are available in the library and can be added to teams or groups."
             >
               <SelectField
                 disabled={busy}
@@ -373,9 +380,9 @@ export default function Curricula({
             </FormField>
             {!!linked(editing.id).length && (
               <Note>
-                Saving updates {linked(editing.id).length} learning groups. New
+                Saving updates {linked(editing.id).length} teams or groups. New
                 courses join their assigned learning lists; existing completions
-                are preserved. Remove group links before returning this
+                are preserved. Remove assignment links before returning this
                 curriculum to draft.
               </Note>
             )}
@@ -387,7 +394,7 @@ export default function Curricula({
             variant="page"
             title={<h2>Curricula</h2>}
             description={
-              <>Create reusable playlists, then add them to learning groups.</>
+              <>Create reusable playlists, then add them to teams or groups.</>
             }
           />
           <CollectionControls
@@ -477,7 +484,7 @@ export default function Curricula({
                 label: published ? "Publish selected" : "Unpublish selected",
                 description: published
                   ? "Make these curricula available in the library. Each must contain published courses."
-                  : "Return these curricula to draft. Remove their learning-group links first. Course history is preserved.",
+                  : "Return these curricula to draft. Remove their team and group links first. Course history is preserved.",
                 apply: async () => {
                   if (
                     published &&
@@ -501,7 +508,7 @@ export default function Curricula({
                     selection.actionIds.some((id) => linked(id).length)
                   )
                     throw new Error(
-                      "Remove learning-group links before unpublishing these curricula.",
+                      "Remove team and group links before unpublishing these curricula.",
                     );
                   await onChange({
                     ...data,
@@ -552,12 +559,12 @@ export default function Curricula({
                 </CardContent>
                 <CardFooter className="mt-auto">
                   <p className="text-copy text-muted-foreground">
-                    {c.courseIds.length} courses · {linked(c.id).length}{" "}
-                    learning groups
+                    {c.courseIds.length} courses · {linked(c.id).length} teams
+                    or groups
                   </p>
                   <div className="grid gap-3">
                     {c.status === "published" && (
-                      <LearningGroupAssignments
+                      <LearningAssignmentPicker
                         data={data}
                         item={{ kind: "curriculum", id: c.id }}
                         title={c.name}

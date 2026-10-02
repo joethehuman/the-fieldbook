@@ -127,7 +127,7 @@ export async function adminSnapshot(
           name: group.name,
         })),
     curricula: admin ? config.curricula || [] : [],
-    teams: [],
+    teams: admin ? config.teams || [] : [],
     pendingUsers: [],
     progress: {},
     feedback: [],

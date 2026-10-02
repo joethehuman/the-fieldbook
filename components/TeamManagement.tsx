@@ -83,6 +83,14 @@ const byName = (
   a: { name: string; id: string },
   b: { name: string; id: string },
 ) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+const teamMutationSnapshot = (data: Workspace) =>
+  JSON.stringify([
+    data.governanceRevision,
+    data.teams,
+    data.groups,
+    data.curricula,
+    data.users,
+  ]);
 
 export function TeamsAdmin({
   data,
@@ -155,6 +163,7 @@ export function TeamsAdmin({
       teams: [
         ...(data.teams || []).filter((value) => value.id !== editId),
         {
+          ...teams.find((value) => value.id === editId),
           id: editId,
           name: "",
           parentId: editParentId,
@@ -238,7 +247,7 @@ export function TeamsAdmin({
     if (!(await guard.current())) return;
     resetDraft();
     baseline.current = { ...value };
-    editSnapshot.current = JSON.stringify([data.teams, data.users]);
+    editSnapshot.current = teamMutationSnapshot(data);
     setEditing({ ...value });
   }
   async function closeEditor(discard = false) {
@@ -284,9 +293,9 @@ export function TeamsAdmin({
   async function saveTeam(event: React.FormEvent) {
     event.preventDefault();
     if (!editing || saving.current) return;
-    if (editSnapshot.current !== JSON.stringify([data.teams, data.users])) {
+    if (editSnapshot.current !== teamMutationSnapshot(data)) {
       setNotice(
-        "Teams or people changed while this editor was open. Close it and reopen the team before saving.",
+        "Organization data changed while this editor was open. Close it and reopen the team before saving.",
       );
       return;
     }
@@ -347,7 +356,7 @@ export function TeamsAdmin({
       mode,
       id,
       choice: null,
-      snapshot: JSON.stringify([data.teams, data.users]),
+      snapshot: teamMutationSnapshot(data),
     });
   }
   const moveSource = moving?.mode === "into" ? moving.choice : moving?.id;
@@ -370,10 +379,10 @@ export function TeamsAdmin({
       saving.current
     )
       return;
-    if (moving.snapshot !== JSON.stringify([data.teams, data.users])) {
+    if (moving.snapshot !== teamMutationSnapshot(data)) {
       setMoving({ ...moving, snapshot: undefined });
       setNotice(
-        "Teams or people changed. Close this move and reopen it to choose from the current hierarchy.",
+        "Organization data changed. Close this move and reopen it to choose from the current hierarchy.",
       );
       return;
     }
@@ -409,6 +418,8 @@ export function TeamsAdmin({
     resetDraft();
     const blockers = teamDeletionBlockers(data, value.id);
     const reasons = [
+      blockers.learning.length &&
+        `${blockers.learning.length} assigned courses or curricula`,
       blockers.members.length &&
         `${blockers.members.length} direct members (including inactive accounts)`,
       blockers.pending.length &&
@@ -713,11 +724,16 @@ export function TeamsAdmin({
                       description:
                         "Move each selected team with its subteams. Direct members, learning-group links, and history stay attached; manager reporting access follows the new hierarchy.",
                       options: [
-                        { id: "root", label: "Top level" },
-                        ...teams.map((t) => ({
-                          id: t.id,
-                          label: teamPath(t.id, teams),
-                        })),
+                        {
+                          id: "root",
+                          label: organization?.name || "Top level",
+                        },
+                        ...teams
+                          .filter((t) => t.id !== organization?.id)
+                          .map((t) => ({
+                            id: t.id,
+                            label: teamPath(t.id, teams),
+                          })),
                       ],
                       selectionMode: "single" as const,
                       review: (values: string[], ids: string[]) => {
@@ -1252,12 +1268,6 @@ export function TeamsAdmin({
                 }}
                 disabled={busy}
               />
-              {managingOrganization && data.settings?.access === "public" && (
-                <SectionHeader
-                  title={<h3>Guests</h3>}
-                  description="Public visitors are part of Organization. Their learning progress stays in their browser and is excluded from people counts and manager reports."
-                />
-              )}
             </TabsContent>
             {!managingOrganization && children.length > 0 && (
               <TabsContent value="subteams" className="grid gap-6">
@@ -1345,7 +1355,7 @@ export function TeamsAdmin({
                         description: teamPath(item.id, teams),
                       }))
                   : [
-                      ...(team.parentId
+                      ...(team.parentId && !organization
                         ? [
                             {
                               id: "",

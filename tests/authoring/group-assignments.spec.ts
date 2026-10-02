@@ -52,13 +52,13 @@ test("installed Content prepares the full audience and saves only after final as
     .getByRole("button", { name: "Assign", exact: true })
     .click();
   const picker = page.getByRole("dialog", {
-    name: "Assign to learning groups",
+    name: "Assign to teams or groups",
     exact: true,
   });
   await expect(picker).toBeVisible();
   expect(prepares).toBeGreaterThan(0);
   await picker
-    .getByRole("checkbox", { name: "Assign directly to Pilot", exact: true })
+    .getByRole("checkbox", { name: "Assign directly to Group: Pilot", exact: true })
     .check();
   await picker
     .getByRole("button", { name: "Review assignments", exact: true })
@@ -74,7 +74,7 @@ test("installed Content prepares the full audience and saves only after final as
   await expect(picker).toBeVisible();
   await expect(
     picker.getByRole("checkbox", {
-      name: "Assign directly to Pilot",
+      name: "Assign directly to Group: Pilot",
       exact: true,
     }),
   ).toBeChecked();

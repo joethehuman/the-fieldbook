@@ -49,9 +49,17 @@ The AI can edit Markdown, lessons, and quizzes through the same service as the a
 
 ## Media and free-plan boundaries
 
-Uploads go directly from an authorized administrator's browser to the private `fieldbook-media` bucket. The app issues a token for one random path, then verifies the uploaded object's metadata before accepting it. Supported formats: JPG, PNG, WebP, GIF, MP4, WebM. The initial per-file ceiling is 50 MB. There is no transcoding, automatic captioning, or adaptive streaming; use browser-compatible H.264/AAC MP4 or WebM files.
+Uploads go directly from an authorized publisher's browser to the private `fieldbook-media` bucket. The app issues a token for one random path, then verifies the uploaded object's metadata before accepting it. Supported formats: JPG, PNG, WebP, GIF, MP4, WebM. Fieldbook has no fixed per-file ceiling. The optional `FIELDBOOK_UPLOAD_MAX_BYTES` application limit and Supabase's global/bucket limits apply independently. The historical initial migration creates a 50 MB bucket limit; configure storage limits deliberately as described below. There is no transcoding, automatic captioning, or adaptive streaming; use browser-compatible H.264/AAC MP4 or WebM files.
 
-Published content may reference uploaded media. Guests receive short-lived signed URLs only for files referenced by published content; drafts require admin access. Unpublishing stops new signed URLs, but an already-issued link can work for up to five minutes. Treat media published to a public site as public.
+### Configure upload limits
+
+In Supabase **Storage settings**, choose the global file-size limit supported by your plan. In the private `fieldbook-media` bucket settings, raise its explicit file-size limit to the intended value or clear it to inherit the global limit. Keep the bucket private and its existing MIME restrictions. Free projects permit up to 50 MB globally; paid plans allow higher configured limits. Upgrading the account alone does not change an existing global or bucket limit. See [Supabase file limits](https://supabase.com/docs/guides/storage/uploads/file-limits).
+
+For fresh installations, perform this storage configuration after applying the migration sequence. For existing installations, change these operator settings deliberately; no automatic limit change or new database migration is included in the upload code upgrade. Do not modify applied historical migration files. If `FIELDBOOK_UPLOAD_MAX_BYTES` is set, it remains an independent application restriction and must also allow the intended size. Leave it unset to rely on storage limits alone.
+
+Files above 6 MiB use Supabase's signed TUS endpoint on the direct storage hostname and 6 MiB chunks; smaller files use direct signed PUTs. File bytes do not pass through a Vercel function. The current large-file transfer retries temporary failures from its confirmed offset, with bounded retry delays and no overwrite; it does not persist a resumable credential after the page closes. The server accepts a media reference only after verifying ownership and exact object size/MIME metadata. Test a representative larger file, storage rejection and interruption against an isolated Preview backend before production rollout. See [Supabase resumable uploads](https://supabase.com/docs/guides/storage/uploads/resumable-uploads).
+
+Published content may reference uploaded media. Guests receive short-lived signed URLs only for files referenced by published content; drafts require publishing access. Unpublishing stops new signed URLs, but an already-issued link can work for up to five minutes. Treat media published to a public site as public.
 
 Check [current Supabase plan limits](https://supabase.com/pricing) and your host's limits before launch; free tiers are provider policies, not application guarantees. Free plans may pause inactive projects and do not supply the same backup/recovery guarantees as paid plans. Choose your own budget and alert settings. Arrange database exports and separate media backups before relying on the instance for important content; verify recovery rather than assuming a database export includes stored files.
 
@@ -82,7 +90,7 @@ Copy [`.env.example`](../.env.example). These values belong to your deployment, 
 | `SUPABASE_SECRET_KEY`                  | Server-only project secret; never expose in browser code or an AI prompt                |
 | `FIELDBOOK_URL`                        | One canonical origin, e.g. `https://learn.example.org`; no path                         |
 | `FIELDBOOK_OWNER_EMAIL`                | Exact verified Google email that bootstraps the first administrator                     |
-| `FIELDBOOK_UPLOAD_MAX_BYTES`           | Optional upload limit; keep at or below the bucket's configured limit (initially 50 MB) |
+| `FIELDBOOK_UPLOAD_MAX_BYTES`           | Optional positive integer limit in bytes; blank/unset uses storage limits only. Invalid values reject signing. Configure global/bucket storage limits separately. |
 
 Redeploy after changing deployment environment variables. The owner setting bootstraps a new profile; changing it does not transfer an existing administrator role or demote a previous administrator.
 

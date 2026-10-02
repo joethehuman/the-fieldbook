@@ -125,7 +125,7 @@ export function AdminWorkspace({
           }}
           onOpenTab={async (next) => {
             const scope =
-              next === "people" || next === "teams"
+              next === "people" || next === "teams" || next === "curricula"
                 ? "people"
                 : next === "deleted"
                   ? "maintenance"

@@ -758,10 +758,13 @@ test("Organization automatically includes people without teams and supports a re
   const admin = data.users.find((person) => person.id === "demo-admin")!;
   expect(admin.teamId).toBeUndefined();
   await seed(page, data);
+  const beforeTeams = (await saved(page)).teams;
   await page.getByRole("button", { name: "Organization", exact: true }).click();
   const table = page.getByRole("table", { name: "Team members", exact: true });
   await expect(table).toContainText(admin.name);
-  await expect(page.getByText("Guests", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Guests", exact: true }),
+  ).toHaveCount(0);
   await table
     .getByRole("checkbox", { name: `Select ${admin.name}`, exact: true })
     .check();
@@ -820,7 +823,8 @@ test("Organization automatically includes people without teams and supports a re
     after.users.find((person) => person.id === admin.id)!.teamId,
   ).toBeUndefined();
   expect(after.progress).toEqual(data.progress);
-  expect(after.teams).toEqual(data.teams);
+  expect(after.teams).toEqual(beforeTeams);
+  expect(after.settings?.guestGroupId).toBe(data.settings?.guestGroupId);
   await page.screenshot({
     path: info.outputPath("organization-fallback-round-trip.png"),
     fullPage: true,

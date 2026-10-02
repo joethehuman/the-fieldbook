@@ -313,8 +313,9 @@ export default function SiteSettingsPanel({
             <div id="due-dates-help">
               Due dates add an overdue flag; completion always includes all assigned courses.
               Turning dates off hides deadlines without resetting them or changing New/Existing stage.
-              These defaults apply to future clocks and assignments. Existing dates stay fixed;
-              save the defaults, then review recalculation to change existing dates.
+              Defaults apply to future onboarding clocks and assignment episodes. Existing onboarding
+              windows and saved course deadlines stay fixed; save the defaults, then review recalculation
+              to change existing dates.
             </div>
           }
         >

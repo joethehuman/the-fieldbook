@@ -4,7 +4,7 @@ These rules describe the server application. The browser-local demo simulates id
 
 ## Installation access
 
-An installation can allow public browsing or require membership. Everyone with access can browse its published library. Learning groups personalize recommendations and assign learning; they do not restrict content visibility. Draft content is available to administrators and contributors. Unpublished curricula remain administrator-only.
+An installation can allow public browsing or require membership. Everyone with access can browse its published library. Teams and learning groups assign learning; groups also personalize Update recommendations; they do not restrict content visibility. Draft content is available to administrators and contributors. Unpublished curricula remain administrator-only.
 
 Guests keep learning progress in their browser. Signed-in learners have account-backed progress. Importing browser progress rechecks answers against the current course version; local records are not trusted completion evidence.
 

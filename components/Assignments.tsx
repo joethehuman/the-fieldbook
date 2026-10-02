@@ -1,6 +1,11 @@
 "use client";
+import {
+  assignmentSourcePaths,
+  projectAssignmentTeams,
+} from "@/lib/assignment-audiences";
 import { FormField } from "@/components/patterns/form-field";
 import { Alert } from "./ui/alert";
+import { isOrganizationChangeCanceled } from "@/lib/organization-change";
 import { useToast } from "./ui/toast";
 import { CsvExport } from "./patterns/csv-export";
 import { courseProgressRow, courseProgressCsv } from "@/lib/reporting";
@@ -30,6 +35,7 @@ import type { Workspace } from "@/lib/store";
 import { groupPath } from "@/lib/group-hierarchy";
 import {
   ancestorIds,
+  assignmentMatches,
   effectiveGroups,
   isComplete,
   type Content,
@@ -75,10 +81,20 @@ export function Assignments({
   const courses = (data.publishedContent ?? data.content).filter(
     (c) => c.kind === "course" && c.status === "published",
   );
+  const projectedPerson = person
+    ? {
+        ...person,
+        assignmentTeams:
+          person.assignmentTeams || projectAssignmentTeams(person, data),
+        effectiveGroupIds: person.effectiveGroupIds || [
+          ...effectiveGroups(person, data.groups, data.teams || []),
+        ],
+      }
+    : undefined;
   const state = person
     ? learningState(
         courses,
-        person,
+        projectedPerson!,
         data.groups,
         data.progress[person.id] || [],
         data.settings,
@@ -134,6 +150,7 @@ export function Assignments({
               : "Progress reset.",
       );
     } catch (e) {
+      if (isOrganizationChangeCanceled(e)) return;
       setReportError(true);
       setNotice((e as Error).message);
     } finally {
@@ -157,6 +174,7 @@ export function Assignments({
       setNotice("");
       notify("Recommended order saved.");
     } catch (e) {
+      if (isOrganizationChangeCanceled(e)) return;
       setReportError(true);
       setNotice((e as Error).message);
     } finally {
@@ -168,10 +186,19 @@ export function Assignments({
       ? [person]
       : data.users.filter(
           (u) =>
-            effectiveGroups(u, data.groups).has(groupId) &&
+            effectiveGroups(
+              u,
+              data.groups,
+              u.effectiveGroupIds ? undefined : data.teams || [],
+            ).has(groupId) &&
             assignmentRules(c).some(
               (a) =>
-                a.groupId && effectiveGroups(u, data.groups).has(a.groupId),
+                a.groupId &&
+                effectiveGroups(
+                  u,
+                  data.groups,
+                  u.effectiveGroupIds ? undefined : data.teams || [],
+                ).has(a.groupId),
             ),
         );
   const disabledReason = busy
@@ -186,12 +213,10 @@ export function Assignments({
         c.title.toLowerCase().includes(query.toLowerCase()),
     )
     .map((c) => {
-      const sources = assignmentRules(c).filter(
-        (a) =>
-          a.groupId &&
-          (person
-            ? effectiveGroups(person, data.groups).has(a.groupId)
-            : ancestorIds(groupId, data.groups).has(a.groupId)),
+      const sources = assignmentRules(c).filter((a) =>
+        person
+          ? assignmentMatches(a, projectedPerson!, data.groups)
+          : !!a.groupId && ancestorIds(groupId, data.groups).has(a.groupId),
       );
       const people = peopleFor(c);
       return {
@@ -201,10 +226,12 @@ export function Assignments({
         completed: people.filter((u) =>
           isComplete(c, data.progress[u.id] || []),
         ).length,
-        sourceLabels: sources.map(
-          (a) =>
-            `${data.groups.find((g) => g.id === a.groupId)?.name || ""}${a.groupId !== groupId && !person ? " · inherited" : ""}`,
-        ),
+        sourceLabels: person
+          ? assignmentSourcePaths(data, person, c.id)
+          : sources.map(
+              (a) =>
+                `${a.teamId ? "Team" : "Group"}: ${a.teamId ? data.teams?.find((t) => t.id === a.teamId)?.name || "Removed team" : data.groups.find((g) => g.id === a.groupId)?.name || "Removed group"}${a.groupId !== groupId && !person ? " · inherited" : ""}`,
+            ),
       };
     });
   const progressTable = (c: Content, optional = false) => {
@@ -306,8 +333,8 @@ export function Assignments({
         description={
           <>
             {person
-              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Assigned courses come from group membership.`
-              : "Choose the courses each group needs, then put it in a recommended order. Parent-group foundations come first; courses are never locked."}
+              ? `${state!.status}${state!.onboarding ? ` · Onboarding target ${state!.target}` : ""}. Assigned courses come from team and group membership.`
+              : "Choose the courses each group needs, then put them in a recommended order. Overlapping assignments count once; courses are never locked."}
           </>
         }
       >

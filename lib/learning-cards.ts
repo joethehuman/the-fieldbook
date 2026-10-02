@@ -40,9 +40,12 @@ export function assignedLearningCards(
 ): LearningCardItem[] {
   const memberships = effectiveGroups(user, groups);
   const linked = new Set(
-    groups
-      .filter((g) => memberships.has(g.id))
-      .flatMap((g) => groupItems(g, sequence))
+    [
+      ...groups
+        .filter((g) => memberships.has(g.id))
+        .flatMap((g) => groupItems(g, sequence)),
+      ...(user.assignmentTeams || []).flatMap((t) => t.learningItems || []),
+    ]
       .filter((i) => i.kind === "curriculum")
       .map((i) => i.id),
   );

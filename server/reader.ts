@@ -293,6 +293,7 @@ export const readerTeam = cache(async () => {
       assignments: course.assignments?.filter(
         (assignment) =>
           (assignment.groupId && groupIds.has(assignment.groupId)) ||
+          (assignment.teamId && people.some(person => person.assignmentTeams?.some(t => t.id === assignment.teamId))) ||
           (assignment.userId && peopleIds.has(assignment.userId)),
       ),
     }));
@@ -401,7 +402,7 @@ export const readerCourses = cache(async () => {
     assignments: course.assignments?.filter(
       (assignment) =>
         (assignment.groupId && groupIds.has(assignment.groupId)) ||
-        assignment.userId === user.id,
+        (assignment.teamId && user.assignmentTeams?.some(t => t.id === assignment.teamId)) || assignment.userId === user.id,
     ),
   }));
   const ids = new Set(courses.map(({ id }) => id));

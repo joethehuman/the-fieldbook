@@ -24,9 +24,9 @@ Section IDs and order live in optional `docSections` settings JSON; documents ma
 
 ## Course covers
 
-In the course editor, **Details → Card artwork** lets an admin upload or replace an image. **Remove image** restores generated artwork. Draft autosave keeps the choice; publish it to change the public card. A saved draft does not replace the published cover.
+In the course editor, **Details → Card artwork** lets an administrator or contributor upload or replace an image. **Remove image** restores generated artwork. Draft autosave keeps the choice; publish it to change the public card. A saved draft does not replace the published cover.
 
-Accepted formats are JPG, PNG, WebP and GIF. The upload limit is 50 MB or the installation's lower configured limit. Wide images are recommended: covers crop from the center to fill the card. Category, play indicator and duration remain overlaid. A failed image load falls back to generated artwork.
+Accepted formats are JPG, PNG, WebP and GIF. The installation's optional application limit and storage limits apply. Wide images are recommended: covers crop from the center to fill the card. Category, play indicator and duration remain overlaid. A failed image load falls back to generated artwork.
 
 The optional `coverImageUrl` field references existing private `fieldbook-media` storage. Production rejects external cover URLs, unfinished uploads and video files used as covers. Existing short-lived media URLs and published-content access checks apply. Removing or replacing a cover changes the course reference; it does not delete the storage object, which could be used elsewhere. Installation operators remain responsible for storage management.
 
