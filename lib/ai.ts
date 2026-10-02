@@ -1,3 +1,6 @@
+export const aiUnavailableMessage =
+  "Ask AI is temporarily unavailable. Try again later or use Search.";
+
 import type { SearchKind } from "./search";
 
 /** Nonsecret, installation-owned configuration. Credentials never belong here. */

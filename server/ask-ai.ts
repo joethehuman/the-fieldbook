@@ -10,6 +10,7 @@ import { destination, plainText } from "@/lib/search";
 import type { DataStore } from "./ports/data";
 import type { AiProvider } from "./ports/ai";
 import { HttpError } from "./errors";
+import { assertCanRead } from "./content";
 import {
   askAiSettingsSchema,
   aiSearchPlanSchema,
@@ -24,8 +25,10 @@ type Dependencies = {
   provider: () => AiProvider;
   currentUser: () => Promise<User | null>;
 };
-export function requireAiReader(user: User | null): asserts user is User {
-  if (!user || !user.registered)
+export function requireAiReader(user: User | null) {
+  // Guest admission depends on fresh installation access, checked below.
+  if (!user) return;
+  if (!user.registered)
     throw new HttpError(401, "Sign in to ask Fieldbook a question.");
   if (!user.active) throw new HttpError(403, "This account is inactive.");
 }
@@ -51,10 +54,15 @@ export async function prepareAskAi(
     signal.throwIfAborted();
     const current = await dependencies.currentUser();
     requireAiReader(current);
-    if (current.id !== user!.id)
-      throw new HttpError(401, "Sign in again before asking a question.");
+    if ((current?.id ?? null) !== (user?.id ?? null))
+      throw new HttpError(
+        401,
+        "Your session changed. Reload before asking a question.",
+      );
     const record = await store.readSettings();
     if (!record) throw new HttpError(503, "Ask AI settings are unavailable.");
+    // Same public/private rule as reading, with fresh installation settings.
+    assertCanRead(current, record);
     const parsed = askAiSettingsSchema.safeParse(
       record.settings.askAi ?? defaultAskAiSettings,
     );

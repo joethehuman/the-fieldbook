@@ -5,7 +5,7 @@ import {
   type APIRequestContext,
 } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
-import { defaultAskAiSettings } from "../../lib/ai";
+import { defaultAskAiSettings, aiUnavailableMessage } from "../../lib/ai";
 const docId = "00000000-0000-4000-8000-000000000021";
 const sources = [
   {
@@ -54,6 +54,7 @@ async function fixture(
   request: APIRequestContext,
   enabled = true,
   signedIn = true,
+  aiFailure = "",
 ) {
   const course = freshWorkspace().content.find(
     (item) => item.kind === "course",
@@ -73,6 +74,20 @@ async function fixture(
         access: "public",
         askAi: { ...defaultAskAiSettings, enabled, model: "test/primary" },
       },
+      aiFailure,
+      aiPassages: [
+        {
+          content_id: docId,
+          passage_id: "doc:body",
+          kind: "doc",
+          title: doc.title,
+          lesson_id: null,
+          lesson_title: null,
+          source_text: "The setup check code is ready.",
+          published_revision: 1,
+          content_date: null,
+        },
+      ],
       documents: [doc, course].map((item) => ({
         id: item.id,
         draft: item,
@@ -283,7 +298,7 @@ test("Ask AI failure, explicit retry, stop and new conversation cancel pending w
     0,
   );
 });
-test("Ask AI disabled and guest behavior preserve basic search and avoid inference", async ({
+test("Ask AI public guests receive answers; disabled and private requests make no model call", async ({
   page,
   request,
 }) => {
@@ -308,8 +323,71 @@ test("Ask AI disabled and guest behavior preserve basic search and avoid inferen
     page
       .getByRole("region", { name: "Ask AI conversation" })
       .getByRole("status"),
-  ).toContainText("Sign in");
-  expect(calls).toBe(0);
+  ).toContainText("Answer ready");
+  await expect(
+    page.getByRole("link", { name: /Source 1: Published reference/ }),
+  ).toBeVisible();
+  expect(calls).toBe(1);
+  expect(
+    (await (await request.get("http://127.0.0.1:3130/reads")).json())
+      .aiGenerations,
+  ).toBe(2);
+  const data = {
+    messages: [
+      { role: "user", parts: [{ type: "text", text: "What is ready?" }] },
+    ],
+  };
+  for (const mode of ["private", "off"] as const) {
+    await request.post("http://127.0.0.1:3130/fixture", {
+      data: {
+        settings: {
+          access: mode === "private" ? "private" : "public",
+          askAi: {
+            ...defaultAskAiSettings,
+            enabled: mode !== "off",
+            model: "test/primary",
+          },
+        },
+      },
+    });
+    const rejected = await page.request.post("/api/ask-ai", {
+      data,
+      headers: { Origin: "http://localhost:3131" },
+    });
+    expect(rejected.status()).toBe(mode === "private" ? 401 : 403);
+    expect(
+      (await (await request.get("http://127.0.0.1:3130/reads")).json())
+        .aiGenerations,
+    ).toBe(0);
+  }
+});
+test("Gateway budget refusals show safe unavailable feedback and preserve Search for guests", async ({
+  page,
+  request,
+}) => {
+  for (const failure of ["budget-planning", "budget-answer"]) {
+    await fixture(page, request, true, false, failure);
+    const input = page.getByRole("textbox", { name: "Search all content" });
+    await input.fill("What is ready?");
+    await input.press("Enter");
+    await expect(
+      page
+        .getByRole("region", { name: "Ask AI conversation" })
+        .getByRole("alert"),
+    ).toContainText(aiUnavailableMessage);
+    await expect(page.getByRole("link", { name: /Source 1/ })).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Ask AI conversation" }),
+    ).not.toContainText("PRIVATE");
+    await page.getByRole("tab", { name: "Search", exact: true }).click();
+    await expect(
+      page.getByRole("tab", { name: "Search", exact: true }),
+    ).toHaveAttribute("data-state", "active");
+    expect(
+      (await (await request.get("http://127.0.0.1:3130/reads")).json())
+        .aiGenerations,
+    ).toBe(failure === "budget-planning" ? 1 : 2);
+  }
 });
 test("Ask AI demo responds locally, respects composition and clears on profile change", async ({
   page,

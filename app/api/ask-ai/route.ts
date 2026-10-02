@@ -4,7 +4,8 @@ import { readAiRequest } from "@server/ai-schema";
 import { askAiResponse } from "@server/ask-ai-response";
 import { ai } from "@server/ai";
 import { data } from "@server/data";
-import { aiBounds } from "@/lib/ai";
+import { aiBounds, aiUnavailableMessage } from "@/lib/ai";
+import { HttpError } from "@server/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,6 +29,11 @@ export async function POST(request: Request) {
     return askAiResponse(events, cancellation, signal);
   } catch (error) {
     cancellation.abort();
-    return errorResponse(error, "api/ask-ai");
+    return errorResponse(
+      error instanceof HttpError && error.status < 500
+        ? error
+        : new HttpError(503, aiUnavailableMessage),
+      "api/ask-ai",
+    );
   }
 }

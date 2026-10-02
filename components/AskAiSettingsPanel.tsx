@@ -212,7 +212,9 @@ export function AskAiSettingsPanel({
       >
         <SelectField
           value={selected}
-          disabled={busy || working !== null || !setup?.catalog.ready}
+          disabled={
+            !value.enabled || busy || working !== null || !setup?.catalog.ready
+          }
           onValueChange={(id) =>
             onChange(
               backup
@@ -268,8 +270,8 @@ export function AskAiSettingsPanel({
           Enable Ask AI
         </Field>
         <FieldDescription>
-          Signed-in readers can ask questions from Search. Off restores basic
-          search.
+          Visitors with access to this Fieldbook can ask questions from Search,
+          including guests on public sites. Off restores basic search.
         </FieldDescription>
       </FieldGroup>
       <FieldGroup>
@@ -527,8 +529,8 @@ export function AskAiSettingsPanel({
                 database, following the source’s installation guide.
               </li>
               <li>
-                Choose a primary and optional fallback, test each, then save
-                settings with Ask AI enabled.
+                Switch Enable Ask AI on, choose a primary and optional fallback,
+                test each, then save settings with Ask AI enabled.
               </li>
             </ol>
             <Button type="button" variant="link" asChild>

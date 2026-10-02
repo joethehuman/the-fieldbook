@@ -2,12 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { prepareAskAi } from "../../server/ask-ai";
 import { askAiResponse } from "../../server/ask-ai-response";
+import { HttpError } from "../../server/errors";
 import {
   parseAiMessages,
   readAiRequest,
   askAiSettingsSchema,
 } from "../../server/ai-schema";
-import { defaultAskAiSettings, aiBounds } from "../../lib/ai";
+import {
+  defaultAskAiSettings,
+  aiBounds,
+  aiUnavailableMessage,
+} from "../../lib/ai";
 import { defaultSettings, publicSettings } from "../../lib/settings";
 import type { User } from "../../lib/types";
 import type { SourcePassage } from "../../lib/search";
@@ -41,8 +46,8 @@ function fixture() {
     ...defaultSettings,
     askAi: { ...defaultAskAiSettings, enabled: true, model: "test/primary" },
   };
-  let current = { ...user },
-    fresh = true,
+  let current: User | null = { ...user };
+  let fresh = true,
     passages = [passage];
   const calls = { retrieval: 0, plan: 0, answer: 0, validation: 0, current: 0 };
   let answer = "A quorum elects a leader. [S1]";
@@ -99,10 +104,13 @@ function fixture() {
     deps,
     calls,
     provider,
+    setAccess: (access: "public" | "private") => {
+      settings.access = access;
+    },
     setEnabled: (enabled: boolean) => {
       settings.askAi.enabled = enabled;
     },
-    setCurrent: (value: User) => {
+    setCurrent: (value: User | null) => {
       current = value;
     },
     setFresh: (value: boolean) => {
@@ -159,9 +167,8 @@ test("AI defaults are off, configuration is bounded, public settings reveal only
   assert.equal(publicSettings(defaultSettings).askAiEnabled, false);
 });
 
-test("anonymous, unregistered, inactive and disabled requests make no model call", async () => {
+test("unregistered, inactive and disabled requests make no model call", async () => {
   for (const denied of [
-    null,
     { ...user, registered: false },
     { ...user, active: false },
   ]) {
@@ -186,6 +193,80 @@ test("anonymous, unregistered, inactive and disabled requests make no model call
   );
   assert.equal(f.calls.plan, 0);
   assert.equal(f.calls.retrieval, 0);
+});
+
+test("public guests use published evidence; private guests and disabled AI make no model call", async () => {
+  const publicSite = fixture();
+  publicSite.setAccess("public");
+  publicSite.setCurrent(null);
+  const events = await collect(
+    await prepareAskAi(
+      request(),
+      null,
+      new AbortController().signal,
+      publicSite.deps,
+    ),
+  );
+  assert.equal(events.at(-1)?.type, "sources");
+  assert.equal(publicSite.calls.plan, 1);
+  assert.equal(publicSite.calls.answer, 1);
+  for (const mode of ["private", "off"] as const) {
+    const f = fixture();
+    f.setCurrent(null);
+    f.setAccess(mode === "private" ? "private" : "public");
+    if (mode === "off") f.setEnabled(false);
+    await assert.rejects(
+      prepareAskAi(request(), null, new AbortController().signal, f.deps),
+      { status: mode === "private" ? 401 : 403 },
+    );
+    assert.deepEqual(f.calls, {
+      retrieval: 0,
+      plan: 0,
+      answer: 0,
+      validation: 0,
+      current: 0,
+    });
+  }
+});
+test("guest access and session changes are rechecked before answers and final citations", async () => {
+  for (const stage of ["before-answer", "before-citations"] as const) {
+    for (const change of ["private", "sign-in", "off"] as const) {
+      const f = fixture();
+      f.setAccess("public");
+      f.setCurrent(null);
+      const revoke = () => {
+        if (change === "private") f.setAccess("private");
+        if (change === "sign-in") f.setCurrent(user);
+        if (change === "off") f.setEnabled(false);
+      };
+      if (stage === "before-citations")
+        f.provider.streamAnswer = async function* () {
+          yield "A quorum elects a leader. [S1]";
+          revoke();
+        };
+      const events = await prepareAskAi(
+        request(),
+        null,
+        new AbortController().signal,
+        f.deps,
+      );
+      if (stage === "before-answer") revoke();
+      await assert.rejects(collect(events), {
+        status: change === "off" ? 403 : 401,
+      });
+      if (stage === "before-answer") assert.equal(f.calls.answer, 0);
+    }
+  }
+  const f = fixture();
+  const events = await prepareAskAi(
+    request(),
+    user,
+    new AbortController().signal,
+    f.deps,
+  );
+  f.setCurrent(null);
+  await assert.rejects(collect(events), { status: 401 });
+  assert.equal(f.calls.answer, 0);
 });
 
 test("migration preflight fails before any model generation", async () => {
@@ -394,8 +475,17 @@ test("AI SDK transport streams typed sources, sanitizes failures and forwards ca
     c2,
   );
   const errorBody = await failed.text();
-  assert.ok(errorBody.includes("Ask AI is unavailable"));
+  assert.ok(errorBody.includes(aiUnavailableMessage));
   assert.ok(!errorBody.includes("secret"));
+  const safe = askAiResponse(
+    (async function* () {
+      throw new HttpError(503, "PRIVATE adapter setup detail");
+    })(),
+    new AbortController(),
+  );
+  const safeBody = await safe.text();
+  assert.ok(safeBody.includes(aiUnavailableMessage));
+  assert.ok(!safeBody.includes("PRIVATE"));
   const c3 = new AbortController();
   const pending = askAiResponse(
     (async function* () {

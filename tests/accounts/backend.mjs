@@ -41,7 +41,9 @@ let documents = [],
   reads = 0,
   authReads = 0;
 let fixtureGeneration = Date.now();
-let aiGenerations = 0;
+let aiGenerations = 0,
+  aiFailure = "",
+  aiPassages = [];
 let readQueries = [];
 let settings = initial(),
   configuredGroups = [],
@@ -119,6 +121,8 @@ createServer(async (req, res) => {
     role = change.role || "admin";
     revision = 1;
     aiGenerations = 0;
+    aiFailure = change.aiFailure || "";
+    aiPassages = change.aiPassages || [];
     return send(res, { ok: true });
   }
   if (url.pathname === "/reads")
@@ -126,6 +130,16 @@ createServer(async (req, res) => {
   if (url.pathname === "/gateway/v1/models")
     return send(res, {
       data: [
+        ...Array.from({ length: 8 }, (_, i) => ({
+          id: `catalog/model-${i}`,
+          name: `Synthetic compatible ${i + 1}`,
+          type: "language",
+          tags: ["tool-use"],
+          pricing: {
+            input: String((i + 1) / 1000000),
+            output: String((i + 1) / 1000000),
+          },
+        })),
         {
           id: "test/primary",
           name: "Synthetic free model",
@@ -151,6 +165,22 @@ createServer(async (req, res) => {
     url.pathname.endsWith("/language-model")
   ) {
     aiGenerations++;
+    if (
+      aiFailure === "budget-planning" ||
+      (aiFailure === "budget-answer" &&
+        req.headers["ai-language-model-streaming"] !== "false")
+    )
+      return send(
+        res,
+        {
+          error: {
+            type: "quota_for_entity_exceeded",
+            message: "PRIVATE synthetic spend and credentials",
+          },
+        },
+        402,
+      );
+
     const usage = {
       inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
       outputTokens: { total: 8, text: 8, reasoning: 0 },
@@ -189,7 +219,15 @@ createServer(async (req, res) => {
         .join(""),
     );
   }
-  if (url.pathname === "/rest/v1/rpc/fb_ai_passages") return send(res, []);
+  if (url.pathname === "/rest/v1/rpc/fb_ai_passages") {
+    const query = JSON.parse(body);
+    return send(
+      res,
+      query.p_queries.length
+        ? aiPassages.filter((p) => query.p_kinds.includes(p.kind))
+        : [],
+    );
+  }
   if (url.pathname === "/rest/v1/rpc/fb_ai_sources_current")
     return send(res, true);
   if (url.pathname === "/health") return send(res, { ok: true });

@@ -21,7 +21,6 @@ export function SearchExperience({
   searchProvider,
   clientNavigation = false,
   aiMode,
-  signedIn,
   onOpen,
 }: {
   id: string;
@@ -29,7 +28,6 @@ export function SearchExperience({
   searchProvider?: SearchProvider;
   clientNavigation?: boolean;
   aiMode: "installed" | "demo" | "off";
-  signedIn: boolean;
   onOpen: (result: SearchResult) => void | Promise<boolean | void>;
 }) {
   const [query, setQuery] = useState("");
@@ -37,7 +35,7 @@ export function SearchExperience({
   const [view, setView] = useState("search");
   const [draft, setDraft] = useState("");
   const input = useRef<HTMLInputElement>(null);
-  const chat = useAskAi(aiMode, signedIn);
+  const chat = useAskAi(aiMode);
   const enabled = aiMode !== "off";
   const visible =
     open &&

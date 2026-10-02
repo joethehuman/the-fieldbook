@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type ChatTransport } from "ai";
-import { aiBounds } from "@/lib/ai";
+import { aiBounds, aiUnavailableMessage } from "@/lib/ai";
 import {
   demoAiReply,
   messageText,
@@ -32,10 +32,7 @@ const demoTransport: ChatTransport<AskAiMessage> = {
   },
 };
 
-export function useAskAi(
-  mode: "demo" | "installed" | "off",
-  signedIn: boolean,
-) {
+export function useAskAi(mode: "demo" | "installed" | "off") {
   const completed = useRef(new Set<string>());
   const sending = useRef(false);
   const request = useRef<Promise<void> | null>(null);
@@ -51,18 +48,19 @@ export function useAskAi(
               body: { messages: recentAiMessages(messages, completed.current) },
             }),
             async fetch(input, init) {
-              const response = await fetch(input, {
-                ...init,
-                cache: "no-store",
-              });
+              let response: Response;
+              try {
+                response = await fetch(input, { ...init, cache: "no-store" });
+              } catch (error) {
+                if (init?.signal?.aborted) throw error;
+                throw new Error(aiUnavailableMessage);
+              }
               if (!response.ok) {
                 const payload = await response.json().catch(() => null);
                 throw new Error(
-                  response.status === 401
-                    ? "Sign in to ask Fieldbook a question."
-                    : typeof payload?.error === "string"
-                      ? payload.error
-                      : "Ask AI is unavailable. Try again or use Search.",
+                  typeof payload?.error === "string"
+                    ? payload.error
+                    : aiUnavailableMessage,
                 );
               }
               return response;
@@ -96,10 +94,6 @@ export function useAskAi(
     if (!text || sending.current || busy || mode === "off") return false;
     if (text.length > aiBounds.questionCharacters) {
       setNotice("Use a question of up to 2,000 characters.");
-      return false;
-    }
-    if (mode === "installed" && !signedIn) {
-      setNotice("Sign in to ask Fieldbook a question.");
       return false;
     }
     sending.current = true;

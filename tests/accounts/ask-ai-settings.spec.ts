@@ -70,6 +70,11 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
     "Published-content retrieval",
   );
   expect(await setupCalls(request)).toBe(0);
+  for (const name of ["Primary model", "Fallback model"])
+    await expect(
+      page.getByRole("combobox", { name, exact: true }),
+    ).toBeDisabled();
+
   await expect(
     page.getByRole("combobox", { name: "Primary model", exact: true }),
   ).toContainText("Choose a primary model");
@@ -86,6 +91,9 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await page
     .getByRole("combobox", { name: "Primary model", exact: true })
     .click();
+  await expect(
+    page.getByRole("option", { name: "Synthetic compatible 8", exact: true }),
+  ).toHaveCount(1);
   await page
     .getByRole("option", { name: "Synthetic free model", exact: true })
     .click();
@@ -218,6 +226,10 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
+  for (const name of ["Primary model", "Fallback model"])
+    await expect(
+      page.getByRole("combobox", { name, exact: true }),
+    ).toBeDisabled();
   const guidance = page.getByLabel("Answer guidance", { exact: true });
   await guidance.fill("Keep this unsaved draft.");
   await page.route("**/api/settings", (route) =>
@@ -234,14 +246,41 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   ).toBeVisible();
   await expect(guidance).toHaveValue("Keep this unsaved draft.");
   await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Refresh and review" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Review saved copy", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(guidance).toHaveValue("Keep this unsaved draft.");
+  await page.screenshot({ path: info.outputPath("ask-ai-save-recovery.png"), fullPage: true });
+  await page
+    .getByRole("button", { name: "Review saved copy", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(guidance).toHaveValue(defaultAskAiSettings.guidance);
+  await page.unroute("**/api/settings");
+  await guidance.fill("A recovered setting saves normally.");
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
+    0,
+  );
+  await guidance.fill("Keep this unsaved draft.");
+
+  await page
     .getByRole("button", { name: "Discard changes", exact: true })
     .click();
-  await expect(guidance).toHaveValue(defaultAskAiSettings.guidance);
+  await expect(guidance).toHaveValue("A recovered setting saves normally.");
   await guidance.fill("Discard on confirmed navigation.");
   await section(page, "Identity");
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await section(page, "Ask AI");
-  await expect(guidance).toHaveValue(defaultAskAiSettings.guidance);
+  await expect(guidance).toHaveValue("A recovered setting saves normally.");
   await page.goto("/courses");
   await expect(
     page.getByPlaceholder("Search Fieldbook", { exact: true }),

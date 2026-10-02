@@ -351,7 +351,7 @@ export default function ComponentCatalog() {
           respect reduced motion.
         </p>
         <SearchPanelExample />
-        <SearchExperience id="catalog-ask-ai" content={seedContent} aiMode="demo" signedIn onOpen={() => {}} />
+        <SearchExperience id="catalog-ask-ai" content={seedContent} aiMode="demo" onOpen={() => {}} />
         <AskAiSettingsExample />
         <SearchResultSkeleton />
         <SearchResultCard

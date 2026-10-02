@@ -57,7 +57,7 @@ export async function aiSetup(
     checkedAt: new Date().toISOString(),
     models:
       catalog.status === "fulfilled"
-        ? aiModelChoices(catalog.value, settings.model, settings.fallbackModel)
+        ? aiModelChoices(catalog.value)
         : [],
     catalog: {
       ready: catalog.status === "fulfilled",

@@ -219,7 +219,7 @@ test("Revoking the administrator after planning prevents the second generation",
   assert.equal(f.calls.planning, 1);
   assert.equal(f.calls.answer, 0);
 });
-test("Short model menu orders prices and preserves saved primary/backup choices without inventing unavailable models", () => {
+test("Full model menu orders prices and includes every compatible choice without changing the catalog", () => {
   const models: AiModel[] = Array.from({ length: 10 }, (_, i) => ({
     ...model,
     id: `test/model-${i}`,
@@ -232,11 +232,15 @@ test("Short model menu orders prices and preserves saved primary/backup choices 
     inputPerMillion: null,
     outputPerMillion: null,
   });
-  const choices = aiModelChoices(models, "test/unknown", "test/model-9");
-  assert.equal(choices.length, 8);
+  const choices = aiModelChoices(models);
+  assert.equal(choices.length, 11);
   assert.equal(choices[0].id, "test/model-0");
-  assert.equal(choices.at(-2)?.id, "test/unknown");
-  assert.equal(choices.at(-1)?.id, "test/model-9");
+  assert.equal(choices.at(-2)?.id, "test/model-9");
+  assert.equal(choices.at(-1)?.id, "test/unknown");
+  assert.deepEqual(
+    models.slice(0, 10).map((m) => m.id),
+    Array.from({ length: 10 }, (_, i) => `test/model-${i}`),
+  );
   assert.ok(
     !choices.some((choice) => choice.id === defaultAskAiSettings.model),
   );

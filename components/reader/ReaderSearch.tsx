@@ -32,7 +32,6 @@ export function ReaderSearch({
       searchProvider={searchReader}
       clientNavigation
       aiMode={enabled ? "installed" : "off"}
-      signedIn={!!userId}
       onOpen={onOpen}
     />
   );

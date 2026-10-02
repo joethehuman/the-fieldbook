@@ -591,7 +591,6 @@ export default function Fieldbook() {
             id="global-search-results"
             content={data.publishedContent || data.content}
             aiMode={data.settings?.askAi?.enabled === false ? "off" : "demo"}
-            signedIn
             onOpen={async (r) => {
               return navigate(
                 r.kind === "course" ? "learn" : r.kind === "doc" ? "docs" : "briefs",

@@ -29,6 +29,7 @@ import { defaultSettings, privacyHref } from "@/lib/settings";
 import { equalJson } from "@/lib/equal-json";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
+import { SaveRecoveryError } from "@/lib/save-recovery";
 export type SettingsSection =
   "identity" | "links" | "docs" | "courses" | "access" | "privacy" | "mcp" | "ai";
 export default function SiteSettingsPanel({
@@ -38,6 +39,7 @@ export default function SiteSettingsPanel({
   contributor = false,
   section,
   registerNavigationGuard,
+  onReload,
 }: {
   data: Workspace;
   onChange: (next: Workspace) => void | Promise<void>;
@@ -45,24 +47,27 @@ export default function SiteSettingsPanel({
   contributor?: boolean;
   section: SettingsSection;
   registerNavigationGuard?: RegisterNavigationGuard;
+  onReload?: () => Promise<Workspace>;
 }) {
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
-  const [settings, setSettings] = useState(() => {
-      const saved = (data.settings || {}) as Partial<typeof defaultSettings> & {
-        logoUrl?: string;
-      };
-      const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
-      return {
-        ...defaultSettings, ...withoutLogo,
-        ...(withoutLogo.askAi ? { askAi: { ...defaultAskAiSettings, ...withoutLogo.askAi } } : {}),
-        ...(section === "ai" && !withoutLogo.askAi ? {
-          askAi: { ...defaultAskAiSettings, enabled: !production },
-        } : {}),
-      };
-    }),
+  const loadedSettings = (workspace: Workspace) => {
+    const saved = (workspace.settings || {}) as Partial<typeof defaultSettings> & {
+      logoUrl?: string;
+    };
+    const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
+    return {
+      ...defaultSettings, ...withoutLogo,
+      ...(withoutLogo.askAi ? { askAi: { ...defaultAskAiSettings, ...withoutLogo.askAi } } : {}),
+      ...(section === "ai" && !withoutLogo.askAi ? {
+        askAi: { ...defaultAskAiSettings, enabled: !production },
+      } : {}),
+    };
+  };
+  const [settings, setSettings] = useState(() => loadedSettings(data)),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
+  const [recoveryRequired, setRecoveryRequired] = useState(false);
   const savedSettings = useRef(settings);
   const dirty = !equalJson(settings, savedSettings.current);
   const guard = useRef(async () => true);
@@ -91,6 +96,22 @@ export default function SiteSettingsPanel({
   );
   const [nameError, setNameError] = useState("");
   const [linkErrors, setLinkErrors] = useState(false);
+  async function reviewSavedCopy() {
+    if (busy || !onReload) return;
+    if (dirty && !(await confirm("Load the latest saved settings? Your unsaved changes will be discarded."))) return;
+    setBusy(true);
+    try {
+      const latest = loadedSettings(await onReload());
+      savedSettings.current = latest;
+      setSettings(latest);
+      setRecoveryRequired(false);
+      setNotice("Latest saved settings loaded. Review before saving.");
+    } catch (error) {
+      setNotice((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   const saveAction = (
     <ActionGroup>
       {dirty && <span role="status" className="text-caption text-muted-foreground">Unsaved changes</span>}
@@ -147,8 +168,10 @@ export default function SiteSettingsPanel({
           savedSettings.current = next;
           setSettings(next);
           notify("Settings saved.");
+          setRecoveryRequired(false);
         } catch (e) {
           setNotice((e as Error).message);
+          if (e instanceof SaveRecoveryError) setRecoveryRequired(true);
         } finally {
           setBusy(false);
         }
@@ -558,7 +581,16 @@ export default function SiteSettingsPanel({
       />}
       {section !== "mcp" && notice && (
         <div className="settings-save-bar">
-          <Alert role="status">{notice}</Alert>
+          <Alert role="status">
+            {notice}
+            {recoveryRequired && onReload && (
+              <ActionGroup>
+                <Button type="button" variant="outline" disabled={busy} onClick={() => void reviewSavedCopy()}>
+                  Review saved copy
+                </Button>
+              </ActionGroup>
+            )}
+          </Alert>
         </div>
       )}
     </form>

@@ -1,7 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { vercelAi } from "../../server/providers/vercel/ai";
-import { aiBounds, defaultAskAiSettings } from "../../lib/ai";
+import {
+  aiBounds,
+  defaultAskAiSettings,
+  aiUnavailableMessage,
+} from "../../lib/ai";
 
 test("Gateway adapter uses the installed SDK protocol, forced bounded planning, plain streams and redacted failures", async () => {
   const oldFetch = globalThis.fetch,
@@ -82,7 +86,12 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
     assert.equal(headers.get("ai-language-model-id"), expectedModel);
     assert.equal(headers.get("authorization"), "Bearer synthetic-server-key");
     calls.push(body);
-    if (mode === "http-error")
+    if (
+      mode === "http-error" ||
+      mode === "budget-error" ||
+      (mode === "answer-budget-error" &&
+        headers.get("ai-language-model-streaming") !== "false")
+    )
       return Response.json(
         {
           error: {
@@ -90,7 +99,7 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
             message: "secret credential and source text",
           },
         },
-        { status: 400 },
+        { status: mode === "http-error" ? 400 : 402 },
       );
     if (headers.get("ai-language-model-streaming") === "false") {
       assert.deepEqual(body.toolChoice, {
@@ -194,6 +203,21 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
       (error: any) => error.status === 503 && !error.message.includes("secret"),
     );
     assert.equal(calls.length, count + 1); // maxRetries=0
+    mode = "budget-error";
+    await assert.rejects(vercelAi.planSearch(input), {
+      status: 503,
+      message: aiUnavailableMessage,
+    });
+    await assert.rejects(answer(), {
+      status: 503,
+      message: aiUnavailableMessage,
+    });
+    mode = "answer-budget-error";
+    await vercelAi.planSearch(input);
+    await assert.rejects(answer(), {
+      status: 503,
+      message: aiUnavailableMessage,
+    });
     mode = "stream-error";
     await assert.rejects(
       answer(),

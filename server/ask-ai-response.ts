@@ -1,6 +1,7 @@
 import "server-only";
 import { createUIMessageStream, createUIMessageStreamResponse } from "ai";
 import type { AiEvent } from "./ask-ai";
+import { aiUnavailableMessage } from "@/lib/ai";
 import { HttpError } from "./errors";
 
 /** Generic AI SDK UI transport; provider-specific streams never escape the port. */
@@ -36,9 +37,9 @@ export function askAiResponse(
     onError: (error) =>
       signal.reason?.name === "TimeoutError"
         ? "Ask AI took too long. Try again or use Search."
-        : error instanceof HttpError
+        : error instanceof HttpError && error.status !== 503
           ? error.message
-          : "Ask AI is unavailable. Try again or use Search.",
+          : aiUnavailableMessage,
   });
   const response = createUIMessageStreamResponse({
     stream,

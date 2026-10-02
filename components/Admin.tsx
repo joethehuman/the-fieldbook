@@ -806,6 +806,7 @@ export default function Admin({
               data={data}
               onChange={onChange}
               production={production}
+              onReload={onReload}
             />
           ) : tab === "feedback" ? (
             <FeedbackAdmin data={data} />

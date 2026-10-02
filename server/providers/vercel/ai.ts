@@ -1,7 +1,7 @@
 import "server-only";
 import { gateway, generateText, streamText, tool } from "ai";
 import { z } from "zod";
-import { aiBounds, type AiModel } from "@/lib/ai";
+import { aiBounds, aiUnavailableMessage, type AiModel } from "@/lib/ai";
 import type { AiProvider } from "../../ports/ai";
 import { aiSearchPlanSchema } from "../../ai-schema";
 import { HttpError } from "../../errors";
@@ -9,11 +9,7 @@ import { HttpError } from "../../errors";
 // Provider warning/error payloads can contain prompts or source text.
 // Use only Fieldbook's redacted error handling, with no SDK telemetry callbacks.
 globalThis.AI_SDK_LOG_WARNINGS = false;
-const unavailable = () =>
-  new HttpError(
-    503,
-    "Ask AI could not connect. Check the Gateway account, selected model and credentials, then try again.",
-  );
+const unavailable = () => new HttpError(503, aiUnavailableMessage);
 const modelSchema = z.object({
   id: z.string(),
   name: z.string().optional(),
@@ -64,7 +60,7 @@ function connection() {
 }
 function credentialCheck() {
   const status = connection();
-  if (!status.configured) throw new HttpError(503, status.message);
+  if (!status.configured) throw unavailable();
 }
 function compatible(entry: z.infer<typeof modelSchema>) {
   return entry.type === "language" && entry.tags.includes("tool-use");
