@@ -186,6 +186,7 @@ export interface DataStore {
       path: string;
     }[]
   >;
+  reviewDeadlines(actorId: string, apply: boolean, token?: string): Promise<import("@/lib/assignment-episodes").DeadlineReview>;
   readGovernanceSnapshot(actorId: string): Promise<GovernanceRecord>;
   /** Complete account list, with progress restricted to a requested person. */
   readAdminPeopleSnapshot(

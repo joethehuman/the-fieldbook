@@ -1,3 +1,4 @@
+import { reconcileAssignments } from "./assignment-episodes";
 import { expireDemoDeleted } from "./bulk-actions";
 import { withPublishedSnapshots } from "./demo-publication";
 import { defaultSettings } from "./settings";
@@ -253,7 +254,12 @@ function repairHooliSecurityAssignment(data: Workspace): Workspace {
 }
 export function loadWorkspace(): Workspace {
   const raw = localStorage.getItem(KEY);
-  if (!raw) return withPublishedSnapshots(freshWorkspace());
+  if (!raw) {
+    const fresh = withPublishedSnapshots(freshWorkspace());
+    fresh.users = reconcileAssignments(fresh, fresh, new Date().toISOString(), true);
+    saveWorkspace(fresh);
+    return fresh;
+  }
   const data = JSON.parse(raw);
   if (
     data.schema !== 1 ||
@@ -286,6 +292,11 @@ export function loadWorkspace(): Workspace {
   }
   const upgraded = withPublishedSnapshots(data);
   const current = expireDemoDeleted(repairHooliSecurityAssignment(upgraded));
+  if (current.users.some((p) => !p.learningAssignments)) {
+    current.groups = current.groups.map((g) => ({ ...g, teamLinkScope: g.teamLinkScope || (g.teamIds?.length ? "direct" : "subtree") }));
+    current.users = reconcileAssignments(current, current, new Date().toISOString(), true);
+    saveWorkspace(current);
+  }
   if (current !== upgraded) saveWorkspace(current);
   return current;
 }

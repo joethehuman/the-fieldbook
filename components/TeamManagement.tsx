@@ -460,7 +460,7 @@ export function TeamsAdmin({
                     ? "Add to learning groups"
                     : "Remove from learning groups",
                   description:
-                    "Change direct team links. Subteams are not included automatically. People and saved progress are preserved.",
+                    "Linked teams include all subteams. Review assignment changes before saving; accounts and saved progress are preserved.",
                   options: data.groups.map((g) => ({
                     id: g.id,
                     label: groupPath(g.id, data.groups),
@@ -474,6 +474,7 @@ export function TeamsAdmin({
                             ids.includes(g.id)
                               ? {
                                   ...g,
+                                  teamLinkScope: add ? "subtree" : g.teamLinkScope,
                                   teamIds: add
                                     ? [
                                         ...new Set([

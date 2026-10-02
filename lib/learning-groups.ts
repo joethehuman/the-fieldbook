@@ -1,3 +1,4 @@
+import { reconcileAssignments } from "./assignment-episodes";
 import type { Workspace } from "./store";
 import {
   effectiveGroups,
@@ -100,17 +101,19 @@ export function reconcileLearning(
   }));
   next.users = next.users.map((u) => {
     const old = before.users.find((p) => p.id === u.id);
-    const was = old ? effectiveGroups(old, before.groups) : new Set<string>();
+    const was = old ? effectiveGroups(old, before.groups, before.teams || []) : new Set<string>();
     return {
       ...u,
+      onboardingDays: (u.hireDate || u.onboardingStart) ? u.onboardingDays ?? next.settings?.onboardingDays ?? 90 : undefined,
       groupJoinedAt: Object.fromEntries(
         u.groups.map((id) => [
           id,
           old?.groups.includes(id) ? old.groupJoinedAt?.[id] || stamp : stamp,
         ]),
       ),
+      effectiveGroupIds: undefined,
       effectiveGroupJoinedAt: Object.fromEntries(
-        [...effectiveGroups(u, next.groups)].map((id) => [
+        [...effectiveGroups(u, next.groups, next.teams || [])].map((id) => [
           id,
           was.has(id)
             ? old?.effectiveGroupJoinedAt?.[id] ||
@@ -152,5 +155,6 @@ export function reconcileLearning(
   next.content = next.content.map(sync);
   if (next.publishedContent)
     next.publishedContent = next.publishedContent.map(sync);
+  next.users = reconcileAssignments(before, next, stamp);
   return next;
 }

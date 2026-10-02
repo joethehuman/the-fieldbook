@@ -134,7 +134,7 @@ export default function LearningGroups({
     });
   async function deleteGroup(g: Group) {
     const members = data.users.filter((u) =>
-      effectiveGroups(u, data.groups).has(g.id),
+      effectiveGroups(u, data.groups, data.teams || []).has(g.id),
     ).length;
     if (
       !(await confirm(
@@ -170,7 +170,7 @@ export default function LearningGroups({
   const groupMembers = data.users.filter(
     (u) =>
       group &&
-      effectiveGroups(u, data.groups).has(group.id) &&
+      effectiveGroups(u, data.groups, data.teams || []).has(group.id) &&
       matches(u.name + " " + u.email),
   ).sort((a, b) => (memberSort === "reverse" ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id));
   const groupUpdates = sortGroupBrowseItems(
@@ -206,7 +206,7 @@ export default function LearningGroups({
               parentId: g.parentId,
               label: g.name,
               description: groupPath(g.id, data.groups),
-              meta: `${data.users.filter((u) => u.active && effectiveGroups(u, data.groups).has(g.id)).length} active people · ${data.groups.filter((child) => child.parentId === g.id).length} child groups · ${expandLearning(groupItems(g, content), curricula).filter((id) => published.some((c) => c.id === id)).length} direct assigned courses`,
+              meta: `${data.users.filter((u) => u.active && effectiveGroups(u, data.groups, data.teams || []).has(g.id)).length} active people · ${data.groups.filter((child) => child.parentId === g.id).length} child groups · ${expandLearning(groupItems(g, content), curricula).filter((id) => published.some((c) => c.id === id)).length} direct assigned courses`,
             }));
   const overviewSelection = useBulkSelection(
     selected + hierarchyQuery,
@@ -437,19 +437,20 @@ export default function LearningGroups({
                     <p className="text-copy text-muted-foreground">Parent: {group.parentId ? groupPath(group.parentId, data.groups) : "Top level"}. Child-group members are included here; this group’s direct members do not automatically join its children.</p>
                     <div className="flex items-center gap-2"><Button type="button" variant="ghost" size="icon" aria-label={`${linkedOpen ? "Collapse" : "Expand"} linked teams`} aria-expanded={linkedOpen} onClick={() => setLinkedOpen((value) => !value)}><ChevronRight className={linkedOpen ? "rotate-90" : ""} aria-hidden="true" /></Button><h3>Linked teams · {linkedTeams.length}</h3></div>
                     <FieldDescription>
-                      Linked teams supply their direct members. Child teams must
-                      be linked separately.
+                      New links include current and future subteams. Older direct-only links stay limited until reviewed. Overlapping assignments count once.
                     </FieldDescription>
+                    {group.teamLinkScope === "direct" && <Alert><p>These older links currently include direct members only. Review expansion to include all subteams.</p><Button type="button" variant="outline" onClick={() => changeGroup({ teamLinkScope: "subtree" })}>Include subteams</Button></Alert>}
                     <ActionGroup>
                       <BulkPicker
                         title="Add teams"
-                        description="Link the selected teams to this learning group. Their direct members receive its assignments and updates."
+                        description="Link the selected teams to this learning group. Their members and all subteams receive its assignments and updates."
                         options={(data.teams || [])
                           .filter((t) => !group.teamIds?.includes(t.id))
                           .map((t) => ({ id: t.id, label: teamPath(t.id, data.teams || []) }))}
                         onApply={async (ids) => {
                           if (
                             !(await bulkChangeGroup({
+                              teamLinkScope: "subtree",
                               teamIds: [
                                 ...new Set([...(group.teamIds || []), ...ids]),
                               ],
@@ -490,7 +491,7 @@ export default function LearningGroups({
                       rows={linkedTeams.map((t) => ({
                         id: t.id,
                         label: teamPath(t.id, data.teams || []),
-                        detail: `${data.users.filter((u) => u.teamId === t.id && u.active).length} direct active people. Child teams are linked separately.`,
+                        detail: `${data.users.filter((u) => u.active && u.teamId && (u.teamId === t.id || (group.teamLinkScope !== "direct" && ancestorIds(u.teamId, data.teams || []).has(t.id)))).length} active people ${group.teamLinkScope === "direct" ? "(direct members only)" : "including subteams"}.`,
                       }))}
                       selected={teamSelection.selected}
                       onChange={teamSelection.setSelected}
@@ -573,7 +574,7 @@ export default function LearningGroups({
                     />
                     <SelectableRows
                       label="Group members"
-                      empty={<CollectionEmpty count={groupMembers.length} total={data.users.filter((u) => effectiveGroups(u, data.groups).has(group.id)).length} noun="group members" onClear={() => setQuery("")} />}
+                      empty={<CollectionEmpty count={groupMembers.length} total={data.users.filter((u) => effectiveGroups(u, data.groups, data.teams || []).has(group.id)).length} noun="group members" onClear={() => setQuery("")} />}
                       scope={query + memberSort}
                       selected={peopleSelection.selected}
                       onChange={peopleSelection.setSelected}
@@ -586,7 +587,7 @@ export default function LearningGroups({
                           : undefined,
                       }))}
                     />
-                    <p className="text-copy text-muted-foreground">{groupMembers.filter((u) => u.active).length} active · {groupMembers.filter((u) => !u.active).length} inactive · {(data.pendingUsers || []).filter((u) => u.groups.includes(group.id) || (!!u.teamId && !!group.teamIds?.includes(u.teamId))).length} pending direct memberships</p>
+                    <p className="text-copy text-muted-foreground">{groupMembers.filter((u) => u.active).length} active · {groupMembers.filter((u) => !u.active).length} inactive · {groupMembers.filter((u) => u.registered === false).length} not signed in</p>
                   </>
                 ) : tab === "learning" ? (
                   <>

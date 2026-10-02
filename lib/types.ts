@@ -43,6 +43,17 @@ export type Content = {
   /** Missing on older published courses, which retain the original passing rule. */
   requirePassing?: boolean;
 };
+export type EffectiveAssignment = {
+  episodeId: string;
+  contentId: string;
+  version: number;
+  assignedAt: string;
+  dueDate: string;
+  catchUpDays: number;
+  onboardingEnd?: string;
+  sourceGroups: string[];
+  baseline?: boolean;
+};
 export type User = {
   id: string;
   name: string;
@@ -52,6 +63,7 @@ export type User = {
   active: boolean;
   /** False until the preregistered person activates a verified login. */
   registered?: boolean;
+  learningAssignments?: EffectiveAssignment[];
   hireDate?: string;
   /** Applied clock window; changing organization defaults does not replace it. */
   onboardingDays?: number;
@@ -60,6 +72,8 @@ export type User = {
   teamId?: string;
   groupJoinedAt?: Record<string, string>;
   effectiveGroupJoinedAt?: Record<string, string>;
+  /** Server projection for memberships rooted outside a scoped reporting tree. */
+  effectiveGroupIds?: string[];
 };
 export type Progress = {
   revision?: number;
@@ -91,6 +105,8 @@ export type Group = {
   requiredCourseIds?: string[];
   learningItems?: LearningItem[];
   teamIds?: string[];
+  /** Legacy direct links stay limited until an administrator reviews expansion. */
+  teamLinkScope?: "direct" | "subtree";
 };
 export type Team = {
   id: string;
@@ -136,13 +152,18 @@ export function canParent(
 ) {
   return !parentId || !ancestorIds(parentId, nodes).has(id);
 }
-export function effectiveGroups(user: User, groups: Group[]) {
+export function effectiveGroups(user: User, groups: Group[], teams?: Team[]) {
   const direct = [
     ...user.groups,
     ...groups
-      .filter((g) => user.teamId && g.teamIds?.includes(user.teamId))
+      .filter((g) => user.teamId && g.teamIds?.some((id) =>
+        id === user.teamId || (g.teamLinkScope !== "direct" && teams && ancestorIds(user.teamId!, teams).has(id)),
+      ))
       .map((g) => g.id),
   ];
+  // Scoped server reads carry the database-reconciled memberships, including
+  // links rooted above the reporting branches a manager is allowed to see.
+  if (!teams) direct.push(...(user.effectiveGroupIds || []).filter((id) => groups.some((g) => g.id === id)));
   return new Set(direct.flatMap((id) => [...ancestorIds(id, groups)]));
 }
 export function assignmentInfo(c: Content, user: User, groups: Group[]) {
@@ -175,7 +196,7 @@ export function assignmentInfo(c: Content, user: User, groups: Group[]) {
       return { assignedAt, dueDate };
     });
   return {
-    assignedAt: matches.map((m) => m.assignedAt).sort()[0],
+    assignedAt: user.learningAssignments?.find((a) => a.contentId === c.id && a.version === c.version)?.assignedAt || matches.map((m) => m.assignedAt).sort()[0],
     dueDate: matches.flatMap((m) => (m.dueDate ? [m.dueDate] : [])).sort()[0],
   };
 }

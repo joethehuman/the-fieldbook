@@ -83,6 +83,8 @@ export function learningTarget(
 ) {
   if (user.id === "guest" || settings?.dueDatesEnabled === false)
     return undefined;
+  const saved = user.learningAssignments?.find((a) => a.contentId === c.id && a.version === c.version);
+  if (saved) return saved.dueDate;
   const started = assignmentInfo(c, user, groups).assignedAt;
   if (!started) return undefined;
   const catchUp = addDays(started, settings?.catchUpDays ?? 30),

@@ -87,7 +87,9 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await expect(
     page.getByRole("heading", { name: "Grandchild team", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Parent: Sales team / Child team" }).click();
+  await page
+    .getByRole("button", { name: "Parent: Sales team / Child team" })
+    .click();
   await page.getByRole("tab", { name: "Subteams", exact: true }).click();
   await expect(
     page.getByRole("table", { name: "Subteams", exact: true }),
@@ -123,6 +125,15 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
   await review
     .getByRole("button", { name: "Add members 2", exact: true })
     .click();
+  const effects = page.getByRole("dialog", {
+    name: "Review organization changes",
+    exact: true,
+  });
+  await expect(effects).toContainText("Person 150");
+  await expect(effects).toContainText("Person 151");
+  await effects
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
   await expect(review).toHaveCount(0);
   const confirm = page.getByRole("alertdialog");
   const after = await saved(page);
@@ -140,6 +151,11 @@ test("large team: hierarchy, pagination, reviewed moves, retry, removal and guar
     .getByRole("button", { name: "Remove Person 150 from team", exact: true })
     .click();
   await confirm.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect(effects).toContainText("Person 150");
+  await expect(effects).toContainText("Reporting access removed");
+  await effects
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
   await expect(members).toHaveCount(0);
   const removed = await saved(page);
   expect(

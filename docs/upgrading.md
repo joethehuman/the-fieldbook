@@ -95,3 +95,11 @@ Apply `supabase/migrations/20260923180607_guarded_team_deletion.sql` after the e
 ## Learning-group save repair
 
 Apply `supabase/migrations/20260923230000_scope_pending_group_cleanup.sql` after guarded team deletion and before using group administration on this version. It replaces `fb_save_governance` to update only pending accounts whose group references need cleanup; it does not change existing data when applied. This fixes saves on installations with `safeupdate` enabled. Rehearse the migration and a group save in an isolated backend, then back up and apply it to each production installation before deploying the matching code.
+
+## Stable assignment upgrade
+
+`20261001232329_stable_assignment_episodes.sql` requires the roster migration and every earlier migration. Back up and rehearse on isolated non-production, comparing current derived targets with the backfilled baseline and preserving progress, content and identity links. Pause old writers/cleanup, apply the migration, deploy matching code and reload clients before resuming writes. This version adds private episode storage and changes registration’s internal RPC result to include saved assignments; old code cannot provide its deadline/legacy-link review controls. Prefer a forward fix; a code rollback does not undo episodes or explicit subtree/recalculation changes. A restore must account for later writes.
+
+Schema application preserves the reach of every existing direct team link. In Learning groups → Members, choose **Include subteams** and review the exact courses and reporting access affected before applying. New team links include descendants. In Organization Settings → Due dates, save defaults first; **Review existing deadlines** is a separate, explicit operation. It previews active onboarding clocks and unfinished obligations, keeps assignment start dates fixed, excludes completed courses, and rejects stale reviews. A migration alone never performs either operation.
+
+Verify overlap/source removal/rejoin, day 83/84/90 boundaries, old overdue work after onboarding, new course versions, pending activation, descendant moves and scoped manager reads. Verify date changes remain future-only until reviewed recalculation; turning deadlines off/on preserves targets and completion. New episode tables/functions are service-only; browser sessions cannot query them directly.

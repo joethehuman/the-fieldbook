@@ -43,6 +43,7 @@ export type ProfileRecord = {
   onboarding_start?: string | null;
   group_joined_at?: Record<string, string>;
   effective_group_joined_at?: Record<string, string>;
+  learning_assignments?: (import("@/lib/types").EffectiveAssignment & { ended_at?: string | null })[];
 };
 
 export type ConnectionGrant = {

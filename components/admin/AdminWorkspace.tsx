@@ -142,6 +142,11 @@ export function AdminWorkspace({
           onUnpublish={async (id) => {
             setData(await runtime.admin.unpublish(id));
           }}
+          onReviewDeadlines={async (token) => {
+            const result = await runtime.reviewDeadlines(token);
+            if (token) setData(await runtime.refresh());
+            return result;
+          }}
           onLearning={async (action) => {
             setReportIssue("Updating report…");
             try {

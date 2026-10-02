@@ -12,6 +12,7 @@ export type AdminRuntime = {
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
   saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
   refresh: () => Promise<Workspace>;
+  reviewDeadlines: (token?: string) => Promise<import("./assignment-episodes").DeadlineReview>;
   manageLearning: (action: LearningAction) => Promise<Workspace>;
   upload: UploadMedia;
   admin: {
@@ -250,6 +251,11 @@ export function createAdminRuntime(initial: {
         cached.set(scope, latest);
         return latest;
       }),
+    reviewDeadlines: (token) => mutate(async () => {
+      const review = await request("/api/admin/deadlines", { token });
+      if (token) clearCached();
+      return review;
+    }),
     manageLearning: async (action) => {
       await request("/api/assignments", action);
       clearCached();

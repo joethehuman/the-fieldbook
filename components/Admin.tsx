@@ -1,4 +1,5 @@
 "use client";
+import { useOrganizationChangeReview } from "./OrganizationChangeReview";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { Badge } from "./ui/badge";
 import { Spinner } from "./ui/spinner";
@@ -242,6 +243,7 @@ type Props = {
   registerNavigationGuard?: RegisterNavigationGuard;
   registerLandingNavigation?: RegisterLandingNavigation;
   onReload?: () => Promise<Workspace>;
+  onReviewDeadlines?: (token?: string) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
 };
 const id = () => crypto.randomUUID();
 export default function Admin({
@@ -253,16 +255,22 @@ export default function Admin({
   onEdit,
   onSaveContent,
   onUnpublish,
-  onChange,
+  onChange: persist,
   production = false,
   onUpload,
   onLearning,
   registerNavigationGuard,
   registerLandingNavigation,
   onReload,
+  onReviewDeadlines,
 }: Props) {
   const notify = useToast();
   const { confirm } = useInteractionDialog();
+  const organizationReview = useOrganizationChangeReview();
+  async function onChange(next: Workspace, options?: { locallyHandled?: boolean }) {
+    if (!(await organizationReview.review(data, next))) throw new Error("Change canceled. Nothing saved.");
+    await persist(next, options);
+  }
   const adminPanel = useRevealTarget();
   const adminGuard = useRef<NavigationGuard | null>(null);
   const profileNavigationGuard = useRef<NavigationGuard | null>(null);
@@ -678,6 +686,7 @@ export default function Admin({
   }
   return (
     <div className="admin-workspace" aria-busy={!!openingTab || !!openingItem}>
+      {organizationReview.dialog}
       <h1 className="sr-only">Administration</h1>
       {openingTab && (
         <span className="sr-only" role="status">
@@ -790,6 +799,7 @@ export default function Admin({
               }
               registerNavigationGuard={registerAdminGuard}
               data={data}
+              onReviewDeadlines={onReviewDeadlines}
               onChange={onChange}
               production={production}
             />

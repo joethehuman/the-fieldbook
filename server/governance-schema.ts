@@ -7,6 +7,7 @@ const node = z.object({
   parentId: id.optional(),
   requiredCourseIds: z.array(z.uuid()).max(1000).optional(),
   teamIds: z.array(id).max(1000).optional(),
+  teamLinkScope: z.enum(["direct", "subtree"]).optional(),
   learningItems: z
     .array(z.object({ kind: z.enum(["course", "curriculum"]), id }))
     .max(1000)

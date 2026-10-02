@@ -18,7 +18,7 @@ export function groupMembershipSources(user: User, targetId: string, data: Works
   }
   if (user.teamId) {
     for (const group of data.groups) {
-      if (group.teamIds?.includes(user.teamId) && ancestorIds(group.id, data.groups).has(targetId)) {
+      if (group.teamIds?.some((id) => id === user.teamId || (group.teamLinkScope !== "direct" && ancestorIds(user.teamId!, data.teams || []).has(id))) && ancestorIds(group.id, data.groups).has(targetId)) {
         const source = `Via team ${teamPath(user.teamId, data.teams || [])}`;
         sources.push(group.id === targetId ? source : `${source} linked to ${groupPath(group.id, data.groups)}`);
       }
@@ -54,8 +54,8 @@ export function groupMoveImpact(data: Workspace, id: string, parentId?: string) 
   });
   let gainedMembers = 0, lostMembers = 0, gainedCourses = 0, lostCourses = 0, gainedUpdates = 0, lostUpdates = 0;
   for (const user of data.users) {
-    const before = effectiveGroups(user, data.groups);
-    const after = effectiveGroups(user, next);
+    const before = effectiveGroups(user, data.groups, data.teams || []);
+    const after = effectiveGroups(user, next, data.teams || []);
     if ([...after].some((groupId) => !before.has(groupId))) gainedMembers++;
     if ([...before].some((groupId) => !after.has(groupId))) lostMembers++;
     const old = offered(before), fresh = offered(after);

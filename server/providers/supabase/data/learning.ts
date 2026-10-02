@@ -20,6 +20,7 @@ export const learningData: Pick<
   | "findOwnerProfile"
   | "saveGovernance"
   | "manageLearning"
+  | "reviewDeadlines"
   | "consumeRateLimit"
   | "readCourseProgress"
   | "listUserProgress"
@@ -84,6 +85,11 @@ export const learningData: Pick<
       throw new Error("Governance save failed.");
     }
     return data as { revision: number };
+  },
+  async reviewDeadlines(actorId, apply, token) {
+    const { data, error } = await db().rpc("fb_review_deadlines", { p_actor: actorId, p_apply: apply, p_token: token || null });
+    if (error) throw new HttpError(error.message.includes("changed") ? 409 : 400, error.code === "P0001" ? error.message : "Deadline review failed. Try again.");
+    return data;
   },
   async manageLearning(actorId, payload) {
     const { data, error } = await db().rpc("fb_manage_learning", {

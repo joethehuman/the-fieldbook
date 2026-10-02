@@ -51,6 +51,7 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   }, data);
   await page.goto("/#admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
+  const baseline = await saved(page);
   await section(page);
   const expand = page.getByRole("button", {
     name: "Expand Customer success",
@@ -106,6 +107,15 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
     fullPage: true,
   });
   await review.getByRole("button", { name: "Move team", exact: true }).click();
+  const effects = page.getByRole("dialog", {
+    name: "Review organization changes",
+    exact: true,
+  });
+  await expect(effects).toContainText("Alex Edwards");
+  await expect(effects).toContainText("Reporting access added");
+  await effects
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
   await expect(review).toHaveCount(0);
   let after = await saved(page);
   expect(after.teams!.find((team) => team.id === "other")!.parentId).toBe(
@@ -114,9 +124,9 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   expect(after.teams!.find((team) => team.id === "child")!.parentId).toBe(
     "other",
   );
-  expect(after.users).toEqual(data.users);
-  expect(after.progress).toEqual(data.progress);
-  expect(after.groups).toEqual(data.groups);
+  expect(after.users).toEqual(baseline.users);
+  expect(after.progress).toEqual(baseline.progress);
+  expect(after.groups).toEqual(baseline.groups);
   await page
     .getByRole("button", { name: "Manage Customer success", exact: true })
     .click();
@@ -131,6 +141,10 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   await page.getByRole("button", { name: "Review move", exact: true }).click();
   await expect(review).toContainText("Loses 2 teams / 1 active person.");
   await review.getByRole("button", { name: "Move team", exact: true }).click();
+  await expect(effects).toContainText("Reporting access removed");
+  await effects
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
   await expect(review).toHaveCount(0);
   after = await saved(page);
   expect(
