@@ -44,13 +44,14 @@ function connection() {
   if (process.env.AI_GATEWAY_API_KEY)
     return {
       configured: true,
-      message: "Server API key configured. Model tests verify access.",
+      message:
+        "Server API key configured. Authentication and credit are not verified.",
     };
   if (process.env.VERCEL_OIDC_TOKEN || process.env.VERCEL)
     return {
       configured: true,
       message:
-        "Vercel project authentication expected. Model tests verify access.",
+        "Vercel project authentication configured. Authentication and credit are not verified.",
     };
   return {
     configured: false,
@@ -111,7 +112,9 @@ async function modelOptions(
 }
 
 export const vercelAi: AiProvider = {
+  id: "vercel",
   name: "Vercel AI Gateway",
+  supportsFallback: true,
   connection,
   async models(signal) {
     try {

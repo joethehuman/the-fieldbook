@@ -4,6 +4,7 @@ import { requireAdmin, HttpError } from "./auth";
 import { data as dataStore } from "./data";
 import { settingsSchema } from "./schemas";
 import { ai } from "./ai";
+import { requireAiRouter, selectionRouter } from "./ai-router";
 import { defaultAskAiSettings } from "@/lib/ai";
 import {
   availableDocSections,
@@ -27,18 +28,24 @@ export async function saveSettings(
   const config = await dataStore().readSettingsContext();
   if (!config) throw new HttpError(503, "Settings are unavailable. Try again.");
   const previousAi = config.settings.askAi ?? defaultAskAiSettings;
-  const nextAi = parsed.data.askAi;
-  // Disabling and unrelated saves must work even when Gateway is unavailable.
+  let nextAi = parsed.data.askAi;
+  const provider = nextAi?.enabled ? ai() : null;
+  if (nextAi?.enabled && provider) {
+    requireAiRouter(nextAi, provider);
+    nextAi = { ...nextAi, router: provider.id };
+  }
+  // Disabling and unrelated saves must work when the AI service is unavailable.
   if (
     nextAi?.enabled &&
     (!previousAi.enabled ||
+      selectionRouter(nextAi) !== selectionRouter(previousAi) ||
       nextAi.model !== previousAi.model ||
       nextAi.fallbackModel !== (previousAi.fallbackModel ?? ""))
   ) {
     const signal = AbortSignal.timeout(10_000);
-    await ai().validateModel(nextAi.model, signal);
+    await provider!.validateModel(nextAi.model, signal);
     if (nextAi.fallbackModel)
-      await ai().validateModel(nextAi.fallbackModel, signal);
+      await provider!.validateModel(nextAi.fallbackModel, signal);
     await Promise.all([
       dataStore().searchAiPassages([], nextAi.sources, signal),
       dataStore().areAiSourcesCurrent([], signal),
@@ -110,6 +117,7 @@ export async function saveSettings(
   }
   const settings = {
     ...parsed.data,
+    ...(nextAi ? { askAi: nextAi } : {}),
     // Some installations already enforce this identity in database triggers.
     // It is not an editable setting and must come from the saved configuration.
     ...(config.settings.organizationTeamId

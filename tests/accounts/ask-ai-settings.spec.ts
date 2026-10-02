@@ -31,7 +31,13 @@ async function signedIn(
   role = "admin",
 ) {
   await request.post("http://127.0.0.1:3130/fixture", {
-    data: { settings: { access: "public", organizationTeamId: "00000000-0000-4000-8000-000000000090" }, role },
+    data: {
+      settings: {
+        access: "public",
+        organizationTeamId: "00000000-0000-4000-8000-000000000090",
+      },
+      role,
+    },
   });
   const token = await (
     await request.post("http://127.0.0.1:3130/auth/v1/token", { data: {} })
@@ -56,7 +62,23 @@ const setupCalls = async (request: APIRequestContext) =>
   (await (await request.get("http://127.0.0.1:3130/reads")).json())
     .aiGenerations;
 
-test("Admin configures, tests and saves AI; toggles restore search and draft guards preserve edits", async ({
+async function picture(
+  page: Page,
+  options: { path: string; fullPage?: boolean },
+) {
+  await page
+    .getByRole("switch", { name: "Enable Ask AI" })
+    .evaluate(async (element) => {
+      await Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .map((animation) => animation.finished.catch(() => {})),
+      );
+    });
+  await page.screenshot(options);
+}
+
+test("Admin configures and saves AI without generation; toggles restore search and draft guards preserve edits", async ({
   page,
   request,
 }, info) => {
@@ -66,21 +88,15 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await expect(
     page.getByRole("switch", { name: "Enable Ask AI" }),
   ).not.toBeChecked();
-  await expect(page.getByLabel("Setup status")).toContainText(
-    "Published-content retrieval",
-  );
   expect(await setupCalls(request)).toBe(0);
   for (const name of ["Primary model", "Fallback model"])
-    await expect(
-      page.getByRole("combobox", { name, exact: true }),
-    ).toBeDisabled();
-
+    await expect(page.getByRole("combobox", { name, exact: true })).toHaveCount(
+      0,
+    );
+  await expect(page.getByLabel("Model router")).toHaveCount(0);
   await expect(
-    page.getByRole("combobox", { name: "Primary model", exact: true }),
-  ).toContainText("Choose a primary model");
-  await expect(
-    page.getByRole("button", { name: "Test primary", exact: true }),
-  ).toBeDisabled();
+    page.getByRole("button", { name: "Check setup", exact: true }),
+  ).toHaveCount(0);
   await page.getByRole("switch", { name: "Enable Ask AI" }).check();
   await expect(
     page.getByRole("button", { name: "Save settings", exact: true }),
@@ -97,42 +113,22 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await page
     .getByRole("option", { name: "Synthetic free model", exact: true })
     .click();
-  await page.getByRole("button", { name: "Test primary", exact: true }).click();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Test answer received" }),
-  ).toContainText("setup check code is ready");
-  expect(await setupCalls(request)).toBe(2);
+  await expect(page.getByLabel("Model router")).toContainText(
+    "Vercel AI Gateway",
+  );
+  await expect(page.getByLabel("Model router")).toContainText("Configured");
+  expect(await setupCalls(request)).toBe(0);
   const model = page.getByRole("combobox", {
     name: "Primary model",
     exact: true,
   });
   await model.click();
   await page.getByRole("option", { name: /Synthetic paid model/ }).click();
-  await expect(page.getByText(/Input \$0.02/)).toContainText("$0.02");
-  await expect(
-    page.getByText("Test answer received.", { exact: false }),
-  ).toHaveCount(0);
   await page
     .getByRole("combobox", { name: "Fallback model", exact: true })
     .click();
   await page
     .getByRole("option", { name: "Synthetic free model", exact: true })
-    .click();
-  await page
-    .getByRole("button", { name: "Test fallback", exact: true })
-    .click();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Test answer received" }),
-  ).toContainText("test/primary");
-  expect(await setupCalls(request)).toBe(4);
-  await page
-    .getByRole("button", { name: "Model details and data policies" })
-    .click();
-  await expect(page.getByLabel("Fallback model details")).toContainText(
-    "test/primary",
-  );
-  await page
-    .getByRole("button", { name: "Model details and data policies" })
     .click();
   await page
     .getByLabel("Answer guidance", { exact: true })
@@ -162,7 +158,7 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
     0,
   );
-  expect(await setupCalls(request)).toBe(4); // save/check never generate
+  expect(await setupCalls(request)).toBe(0); // Opening Admin and saving never generate
   await expect(
     page.getByPlaceholder("Search Fieldbook or Ask AI", { exact: true }),
   ).toBeVisible();
@@ -183,23 +179,20 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await expect(
     page.getByRole("combobox", { name: "Fallback model", exact: true }),
   ).toContainText("Synthetic free model");
-  await expect(
-    page.getByRole("button", { name: "Check setup", exact: true }),
-  ).toBeEnabled();
-  await page.screenshot({
+  await expect(page.getByLabel("Model router")).toContainText("Configured");
+  await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
+    0,
+  );
+  await picture(page, {
     path: info.outputPath("ask-ai-admin.png"),
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "Check setup", exact: true })
-    .scrollIntoViewIfNeeded();
-  await page.screenshot({ path: info.outputPath("ask-ai-admin-setup.png") });
   if (info.project.name === "desktop") {
     await page.setViewportSize({ width: 1024, height: 768 });
-    await page
-      .getByRole("button", { name: "Check setup", exact: true })
-      .scrollIntoViewIfNeeded();
-    await page.screenshot({ path: info.outputPath("ask-ai-admin-tablet.png") });
+    await picture(page, {
+      path: info.outputPath("ask-ai-admin-tablet.png"),
+      fullPage: true,
+    });
     await page.setViewportSize({ width: 1440, height: 1000 });
   }
   await page.getByRole("switch", { name: "Enable Ask AI" }).uncheck();
@@ -230,9 +223,10 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
   for (const name of ["Primary model", "Fallback model"])
-    await expect(
-      page.getByRole("combobox", { name, exact: true }),
-    ).toBeDisabled();
+    await expect(page.getByRole("combobox", { name, exact: true })).toHaveCount(
+      0,
+    );
+  await page.getByRole("switch", { name: "Enable Ask AI" }).check();
   const guidance = page.getByLabel("Answer guidance", { exact: true });
   await guidance.fill("Keep this unsaved draft.");
   await page.route("**/api/settings", (route) =>
@@ -247,10 +241,17 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await expect(
     page.getByRole("alert").filter({ hasText: "database operation failed" }),
   ).toBeVisible();
-  await expect(page.getByRole("alert").filter({ hasText: "database operation failed" })).toBeInViewport();
-  await page.screenshot({ path: info.outputPath("ask-ai-save-failure.png"), fullPage: true });
+  await expect(
+    page.getByRole("alert").filter({ hasText: "database operation failed" }),
+  ).toBeInViewport();
+  await picture(page, {
+    path: info.outputPath("ask-ai-save-failure.png"),
+    fullPage: true,
+  });
   await expect(guidance).toHaveValue("Keep this unsaved draft.");
-  await expect(page.getByRole("button", { name: "Review saved copy", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Review saved copy", exact: true }),
+  ).toHaveCount(0);
   await section(page, "Identity");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(guidance).toHaveValue("Keep this unsaved draft.");
@@ -272,8 +273,12 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
     expect(response.ok()).toBe(true);
     await route.abort("failed");
   });
-  await page.getByRole("button", { name: "Save settings", exact: true }).click();
-  await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
+    0,
+  );
   await page.unroute("**/api/settings");
   await section(page, "Identity");
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
@@ -283,15 +288,19 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await page
     .getByRole("button", { name: "Discard changes", exact: true })
     .click();
-  await expect(guidance).toHaveValue("A lost response is confirmed automatically.");
+  await expect(guidance).toHaveValue(
+    "A lost response is confirmed automatically.",
+  );
   await guidance.fill("Discard on confirmed navigation.");
   await section(page, "Identity");
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await section(page, "Ask AI");
-  await expect(guidance).toHaveValue("A lost response is confirmed automatically.");
+  await expect(guidance).toHaveValue(
+    "A lost response is confirmed automatically.",
+  );
   await page.goto("/courses");
   await expect(
-    page.getByPlaceholder("Search Fieldbook", { exact: true }),
+    page.getByPlaceholder("Search Fieldbook or Ask AI", { exact: true }),
   ).toBeVisible();
 });
 
@@ -321,7 +330,7 @@ test("Admin setup API enforces origin, role and bounded input; learner data hide
   expect(
     (
       await page.request.post("/api/admin/ask-ai", {
-        data: { ...data, action: "test" },
+        data,
         headers: { Origin: "http://localhost:3131" },
       })
     ).status(),
@@ -333,7 +342,7 @@ test("Admin setup API enforces origin, role and bounded input; learner data hide
   expect(await setupCalls(request)).toBe(0);
 });
 
-test("Demo Admin controls and test answer stay local; saved off state restores basic search", async ({
+test("Demo Admin controls stay local; saved off state restores basic search", async ({
   page,
 }, info) => {
   const data = freshWorkspace();
@@ -351,12 +360,10 @@ test("Demo Admin controls and test answer stay local; saved off state restores b
   await expect(
     page.getByRole("switch", { name: "Enable Ask AI" }),
   ).toBeChecked();
-  await page.getByRole("button", { name: "Test primary", exact: true }).click();
+  await expect(page.getByLabel("Model router")).toContainText("Demo only");
   await expect(
-    page
-      .getByRole("status")
-      .filter({ hasText: "This feature is not available in the demo site." }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Test primary", exact: true }),
+  ).toHaveCount(0);
   await page
     .getByRole("combobox", { name: "Primary model", exact: true })
     .click();
@@ -369,14 +376,10 @@ test("Demo Admin controls and test answer stay local; saved off state restores b
   await page
     .getByRole("option", { name: "Example backup model", exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Test fallback", exact: true })
-    .click();
-  await expect(
-    page
-      .getByRole("status")
-      .filter({ hasText: "This feature is not available in the demo site." }),
-  ).toBeVisible();
+  await picture(page, {
+    path: info.outputPath("ask-ai-admin-demo-on.png"),
+    fullPage: true,
+  });
   await page.getByRole("switch", { name: "Enable Ask AI" }).uncheck();
   await page
     .getByRole("button", { name: "Save settings", exact: true })
@@ -385,8 +388,178 @@ test("Demo Admin controls and test answer stay local; saved off state restores b
     page.getByPlaceholder("Search Fieldbook", { exact: true }),
   ).toBeVisible();
   expect(calls).toBe(0);
-  await page.screenshot({
+  await picture(page, {
     path: info.outputPath("ask-ai-admin-demo.png"),
     fullPage: true,
   });
+});
+
+test("Admin uses neutral router metadata and opaque model IDs; changing routers requires selection", async ({
+  page,
+  request,
+}, info) => {
+  await signedIn(page, request);
+  await request.post("http://127.0.0.1:3130/fixture", {
+    data: {
+      settings: {
+        access: "public",
+        askAi: {
+          ...defaultAskAiSettings,
+          enabled: true,
+          model: "test/primary",
+          fallbackModel: "test/backup",
+        },
+      },
+      role: "admin",
+    },
+  });
+  await page.route("**/api/admin/ask-ai", (route) =>
+    route.fulfill({
+      json: {
+        setup: {
+          router: {
+            id: "synthetic",
+            name: "Independent model router",
+            supportsFallback: false,
+          },
+          selectionRouter: "vercel",
+          checkedAt: "",
+          models: [{ id: "local-model:version", name: "Local catalog model" }],
+          catalog: { ready: true, message: "" },
+          connection: { configured: true, message: "" },
+          retrieval: { ready: true, message: "" },
+        },
+      },
+    }),
+  );
+  await page.goto("/admin");
+  await section(page, "Ask AI");
+  await page.getByRole("switch", { name: "Enable Ask AI" }).check();
+  await expect(page.getByLabel("Model router")).toContainText(
+    "Independent model router",
+  );
+  await expect(
+    page.getByText("The model router changed.", { exact: false }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Primary model", exact: true }),
+  ).toContainText("Choose a primary model");
+  await page
+    .getByRole("combobox", { name: "Primary model", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Local catalog model", exact: true })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Fallback model", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    page.getByText("This router does not support a fallback."),
+  ).toBeVisible();
+  const rejected = await page.request.post("/api/settings", {
+    data: {
+      settings: {
+        ...freshWorkspace().settings,
+        askAi: {
+          ...defaultAskAiSettings,
+          enabled: true,
+          router: "synthetic",
+          model: "local-model:version",
+        },
+      },
+      expected: 1,
+    },
+    headers: { Origin: "http://localhost:3131" },
+  });
+  expect(rejected.status()).toBe(409);
+  expect(await setupCalls(request)).toBe(0);
+  await picture(page, {
+    path: info.outputPath("ask-ai-neutral-router.png"),
+    fullPage: true,
+  });
+  await page.getByRole("switch", { name: "Enable Ask AI" }).uncheck();
+  await expect(
+    page.getByRole("combobox", { name: "Primary model", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("switch", { name: "Enable Ask AI" }).check();
+  await expect(
+    page.getByText("The model router changed.", { exact: false }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("combobox", { name: "Primary model", exact: true }),
+  ).toContainText("Local catalog model");
+});
+
+test("Missing router warns inline; late metadata cannot reveal controls after switching off", async ({
+  page,
+  request,
+}, info) => {
+  await signedIn(page, request);
+  await page.route("**/api/admin/ask-ai", (route) =>
+    route.fulfill({
+      json: {
+        setup: {
+          router: null,
+          selectionRouter: "vercel",
+          checkedAt: "",
+          models: [],
+          catalog: { ready: false, message: "Model list unavailable." },
+          connection: {
+            configured: false,
+            message:
+              "Connect a supported model router in the installation configuration.",
+          },
+          retrieval: { ready: false, message: "" },
+        },
+      },
+    }),
+  );
+  await page.goto("/admin");
+  await section(page, "Ask AI");
+  await page.getByRole("switch", { name: "Enable Ask AI" }).check();
+  await expect(page.getByLabel("Model router")).toContainText(
+    "No router available",
+  );
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Connect a supported model router" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Primary model", exact: true }),
+  ).toBeDisabled();
+  await picture(page, {
+    path: info.outputPath("ask-ai-missing-router.png"),
+    fullPage: true,
+  });
+  await page.getByRole("switch", { name: "Enable Ask AI" }).uncheck();
+  await page.unroute("**/api/admin/ask-ai");
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/admin/ask-ai", async (route) => {
+    await waiting;
+    await route.fulfill({
+      json: {
+        setup: {
+          router: { id: "vercel", name: "Late router", supportsFallback: true },
+          catalog: { ready: true },
+          connection: { configured: true },
+          retrieval: { ready: true },
+          models: [],
+        },
+      },
+    });
+  });
+  const sent = page.waitForRequest("**/api/admin/ask-ai");
+  await page.getByRole("switch", { name: "Enable Ask AI" }).check();
+  await sent;
+  await page.getByRole("switch", { name: "Enable Ask AI" }).uncheck();
+  release();
+  await expect(page.getByLabel("Model router")).toHaveCount(0);
+  await expect(
+    page.getByRole("combobox", { name: "Primary model", exact: true }),
+  ).toHaveCount(0);
+  expect(await setupCalls(request)).toBe(0);
 });

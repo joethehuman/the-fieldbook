@@ -3,6 +3,7 @@ import type { User } from "@/lib/types";
 import {
   aiBounds,
   defaultAskAiSettings,
+  aiUnavailableMessage,
   type AiCitation,
   type AiSource,
 } from "@/lib/ai";
@@ -10,6 +11,7 @@ import { destination, plainText } from "@/lib/search";
 import type { DataStore } from "./ports/data";
 import type { AiProvider } from "./ports/ai";
 import { HttpError } from "./errors";
+import { requireAiRouter } from "./ai-router";
 import { assertCanRead } from "./content";
 import {
   askAiSettingsSchema,
@@ -76,9 +78,14 @@ export async function prepareAskAi(
     return parsed.data;
   }
   const settings = await admission();
+  const provider = dependencies.provider();
+  try {
+    requireAiRouter(settings, provider);
+  } catch {
+    throw new HttpError(503, aiUnavailableMessage);
+  }
   // Prove retrieval setup exists before the first generation. Empty queries read no content.
   await store.searchAiPassages([], settings.sources, signal);
-  const provider = dependencies.provider();
   try {
     await provider.validateModel(settings.model, signal);
   } catch (error) {

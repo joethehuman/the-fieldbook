@@ -8,7 +8,7 @@ This guide supports **Vercel and hosted Supabase, with Google sign-in**. Supabas
 
 You need your own GitHub repository, Vercel account, Supabase project, and Google Cloud OAuth configuration. MCP is optional and may require an eligible AI-client plan. A custom domain and support mailbox are optional operator services.
 
-The optional [Ask AI feature](ask-ai.md) is disabled by default and has separate Gateway setup.
+The optional [Ask AI feature](ask-ai.md) is disabled by default and has separate model-router setup.
 
 The [Vercel recipe](../deployment/vercel/README.md) summarizes host settings. Read [hosting and service providers](providers.md) for the code boundaries and contribution requirements. `FIELDBOOK_HOST` is optional: Vercel is detected automatically; ordinary local execution uses Node configuration. The backing services and Google sign-in remain the same.
 

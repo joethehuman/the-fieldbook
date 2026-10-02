@@ -1,17 +1,17 @@
 import "server-only";
 import { z } from "zod";
 import { aiModelChoices } from "@/lib/ai-models";
-import type { AiSetup, AskAiSettings, AiSource } from "@/lib/ai";
+import type { AiSetup } from "@/lib/ai";
 import type { User } from "@/lib/types";
 import type { AiProvider } from "./ports/ai";
 import type { DataStore } from "./ports/data";
 import { requireAdmin, HttpError } from "./auth";
-import { askAiSettingsSchema, aiSearchPlanSchema } from "./ai-schema";
-import { answerPolicy, planningInstructions } from "./ask-ai";
+import { askAiSettingsSchema } from "./ai-schema";
+import { selectionRouter } from "./ai-router";
 
 const setupSchema = z
   .object({
-    action: z.enum(["check", "test", "test-fallback"]),
+    action: z.literal("check"),
     settings: askAiSettingsSchema,
   })
   .strict();
@@ -21,19 +21,7 @@ type Dependencies = {
   currentUser: () => Promise<User | null>;
 };
 
-async function retrievalReady(
-  store: Dependencies["store"],
-  settings: AskAiSettings,
-  signal: AbortSignal,
-) {
-  // Both migration functions must exist. Empty inputs read no published text.
-  await Promise.all([
-    store.searchAiPassages([], settings.sources, signal),
-    store.areAiSourcesCurrent([], signal),
-  ]);
-}
-
-/** Catalog/retrieval checks never generate text or write settings. */
+/** Read-only metadata. Never generates text or writes settings. */
 export async function aiSetup(
   input: unknown,
   user: User | null,
@@ -43,115 +31,68 @@ export async function aiSetup(
   requireAdmin(user);
   const parsed = setupSchema.safeParse(input);
   if (!parsed.success)
-    throw new HttpError(400, "Use valid Ask AI settings and a setup action.");
+    throw new HttpError(400, "Use valid Ask AI settings and a metadata check.");
   signal.throwIfAborted();
-  const { action, settings } = parsed.data;
-  const provider = deps.provider();
-  const [catalog, retrieval] = await Promise.allSettled([
-    provider.models(signal),
-    retrievalReady(deps.store, settings, signal),
-  ]);
-  signal.throwIfAborted();
+  const { settings } = parsed.data;
   const status: AiSetup = {
-    provider: provider.name,
+    router: null,
+    selectionRouter: selectionRouter(settings),
     checkedAt: new Date().toISOString(),
-    models:
-      catalog.status === "fulfilled"
-        ? aiModelChoices(catalog.value)
-        : [],
-    catalog: {
+    models: [],
+    catalog: { ready: false, message: "The model list is unavailable." },
+    connection: {
+      configured: false,
+      message:
+        "Connect a supported model router in the installation configuration.",
+    },
+    retrieval: {
+      ready: false,
+      message: "Published content has not been checked.",
+    },
+  };
+  let provider: AiProvider | null = null;
+  try {
+    provider = deps.provider();
+  } catch {
+    // Missing/unsupported deployment configuration is a setup warning, not a
+    // claimed connection. Never expose raw configuration or credential errors.
+  }
+  if (provider) {
+    status.router = {
+      id: provider.id,
+      name: provider.name,
+      supportsFallback: provider.supportsFallback,
+    };
+    status.connection = provider.connection();
+    const [catalog, retrieval] = await Promise.allSettled([
+      provider.models(signal),
+      // Both functions must exist. Empty inputs read no published text.
+      Promise.all([
+        deps.store.searchAiPassages([], settings.sources, signal),
+        deps.store.areAiSourcesCurrent([], signal),
+      ]),
+    ]);
+    status.models =
+      catalog.status === "fulfilled" ? aiModelChoices(catalog.value) : [];
+    status.catalog = {
       ready: catalog.status === "fulfilled",
       message:
         catalog.status === "fulfilled"
-          ? "Compatible models and prices loaded. Authentication has not been tested."
-          : "Model list unavailable. Check the Gateway service and try again.",
-    },
-    connection: provider.connection(),
-    retrieval: {
+          ? "Available models loaded. Authentication and credit have not been verified."
+          : "The model list is unavailable. Check the model router configuration.",
+    };
+    status.retrieval = {
       ready: retrieval.status === "fulfilled",
       message:
         retrieval.status === "fulfilled"
-          ? "Published-content retrieval is ready."
-          : "Published-content retrieval is unavailable. Check Supabase and apply the Ask AI migration before enabling it.",
-    },
-  };
-  if (action === "check") return { setup: status };
-  const selectedModel =
-    action === "test-fallback" ? settings.fallbackModel : settings.model;
-  if (!selectedModel)
-    throw new HttpError(400, "Choose the model before testing an answer.");
-  if (
-    !status.catalog.ready ||
-    !status.retrieval.ready ||
-    !status.connection.configured
-  )
-    throw new HttpError(
-      503,
-      "Setup is incomplete. Run Check setup and resolve its messages before testing an answer.",
-    );
-  async function admission() {
-    signal.throwIfAborted();
-    const current = await deps.currentUser();
-    requireAdmin(current);
-    if (current.id !== user!.id)
-      throw new HttpError(401, "Sign in again before testing an answer.");
-  }
-  await admission();
-  await provider.validateModel(selectedModel, signal);
-  const messages = [
-    { role: "user" as const, text: "What is the Fieldbook setup check code?" },
-  ];
-  aiSearchPlanSchema.parse({
-    queries: await provider.planSearch({
-      model: selectedModel,
-      messages,
-      instructions: planningInstructions,
-      signal,
-    }),
-  });
-  await admission();
-  const sources: AiSource[] = [
-    {
-      id: "S1",
-      contentId: "setup-check",
-      passageId: "setup-check",
-      publishedRevision: 1,
-      kind: "doc",
-      title: "Synthetic setup check",
-      lessonId: null,
-      lessonTitle: null,
-      href: "",
-      text: "The Fieldbook setup check code is ready. This is synthetic test data, not installation content.",
-    },
-  ];
-  let answer = "";
-  for await (const text of provider.streamAnswer({
-    model: selectedModel,
-    messages,
-    sources,
-    instructions:
-      answerPolicy + "\nSupplemental operator guidance:\n" + settings.guidance,
-    signal,
-  })) {
-    signal.throwIfAborted();
-    answer += text;
-    if (answer.length > 12_000)
-      throw new HttpError(
-        502,
-        "The test answer was too long. Try another model.",
-      );
+          ? "Published content is ready for Ask AI."
+          : "Published content is not ready for Ask AI. Complete the installation database setup.",
+    };
   }
   signal.throwIfAborted();
-  await admission();
-  const citations = [...answer.matchAll(/\[S(\d+)\]/g)];
-  if (
-    !answer.trim() ||
-    !citations.length ||
-    citations.some((match) => match[1] !== "1")
-  )
-    throw new HttpError(
-      502,
-      "The model did not return a verifiable test answer. Try again or choose another model.",
-    );
-  return { setup: status, answer, model: selectedModel };
+  const current = await deps.currentUser();
+  requireAdmin(current);
+  if (current.id !== user!.id)
+    throw new HttpError(401, "Sign in again before checking Ask AI settings.");
+  return { setup: status };
 }

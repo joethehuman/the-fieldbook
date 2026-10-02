@@ -14,6 +14,7 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
     FIELDBOOK_URL: "https://example.test",
     FIELDBOOK_OWNER_EMAIL: "admin@example.test",
   });
+  delete process.env.FIELDBOOK_AI_ROUTER;
   delete process.env.VERCEL_ENV;
   delete process.env.FIELDBOOK_ENVIRONMENT;
   const configured = {
@@ -29,7 +30,10 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
     assert.ok(url.pathname.endsWith("fb_config"));
     if (init?.method === "PATCH") {
       writes.push(JSON.parse(String(init.body)));
-      assert.equal(writes.at(-1).settings.organizationTeamId, organizationTeamId);
+      assert.equal(
+        writes.at(-1).settings.organizationTeamId,
+        organizationTeamId,
+      );
       assert.equal(url.searchParams.get("governance_revision"), "eq.9");
       return Response.json(
         url.searchParams.get("revision") === "eq.7" ? { revision: 8 } : null,
@@ -62,7 +66,10 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
     });
     assert.equal(writes[1].settings.askAi.enabled, false);
     const saved = await saveSettings(admin, {
-      settings: { ...defaultSettings, organizationTeamId: "client-cannot-replace-it" },
+      settings: {
+        ...defaultSettings,
+        organizationTeamId: "client-cannot-replace-it",
+      },
       expected: 7,
     });
     assert.equal(saved.settings.organizationTeamId, organizationTeamId);
@@ -87,6 +94,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     FIELDBOOK_OWNER_EMAIL: "admin@example.test",
   });
   for (const key of [
+    "FIELDBOOK_AI_ROUTER",
     "AI_GATEWAY_API_KEY",
     "VERCEL_OIDC_TOKEN",
     "VERCEL",
@@ -195,10 +203,21 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     );
     assert.equal(writes, 0);
     ready = true;
-    await saveSettings(admin, {
+    await assert.rejects(
+      saveSettings(admin, {
+        settings: {
+          ...defaultSettings,
+          askAi: { ...enabled, router: "different" },
+        },
+        expected: 7,
+      }),
+      { status: 409 },
+    );
+    const saved = await saveSettings(admin, {
       settings: { ...defaultSettings, askAi: enabled },
       expected: 7,
     });
+    assert.equal(saved.settings.askAi?.router, "vercel");
     assert.equal(writes, 1);
     await assert.rejects(
       saveSettings(admin, {
@@ -209,6 +228,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     );
     assert.equal(writes, 1);
     delete process.env.AI_GATEWAY_API_KEY;
+    process.env.FIELDBOOK_AI_ROUTER = "none";
     await saveSettings(admin, {
       settings: { ...defaultSettings, askAi: { ...enabled, enabled: false } },
       expected: 7,

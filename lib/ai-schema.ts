@@ -5,12 +5,18 @@ const modelId = z
   .string()
   .trim()
   .max(160)
-  .regex(/^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i)
+  // IDs are opaque catalog values, not URLs or vendor/model assumptions.
+  .regex(/^[a-z0-9][a-z0-9._:/-]*$/i)
+  .refine((value) => !value.includes("://"))
   .or(z.literal(""));
 
 export const askAiSettingsSchema = z
   .object({
     enabled: z.boolean(),
+    router: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9-]{0,79}$/)
+      .optional(),
     model: modelId.default(""),
     fallbackModel: modelId.default(""),
     sources: z

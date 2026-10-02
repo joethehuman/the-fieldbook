@@ -45,7 +45,12 @@ const passage: SourcePassage = {
 function fixture() {
   let settings = {
     ...defaultSettings,
-    askAi: { ...defaultAskAiSettings, enabled: true, model: "test/primary" },
+    askAi: {
+      ...defaultAskAiSettings,
+      enabled: true,
+      router: "synthetic",
+      model: "test/primary",
+    },
   };
   let current: User | null = { ...user };
   let fresh = true,
@@ -53,7 +58,9 @@ function fixture() {
   const calls = { retrieval: 0, plan: 0, answer: 0, validation: 0, current: 0 };
   let answer = "A quorum elects a leader. [S1]";
   const provider: AiProvider = {
+    id: "synthetic",
     name: "Synthetic",
+    supportsFallback: true,
     connection: () => ({ configured: true, message: "Synthetic" }),
     async models() {
       return [];
@@ -270,6 +277,35 @@ test("guest access and session changes are rechecked before answers and final ci
   assert.equal(f.calls.answer, 0);
 });
 
+test("Changing routers or unsupported fallback blocks retrieval and generation until configuration is reviewed", async () => {
+  for (const change of ["router", "fallback"]) {
+    const f = fixture();
+    if (change === "router")
+      f.deps.provider = () => ({ ...f.provider, id: "different" });
+    else {
+      f.deps.provider = () => ({ ...f.provider, supportsFallback: false });
+      const read = f.deps.store.readSettings;
+      f.deps.store.readSettings = async () => {
+        const config = await read();
+        return {
+          ...config,
+          settings: {
+            ...config.settings,
+            askAi: { ...config.settings.askAi, fallbackModel: "backup" },
+          },
+        };
+      };
+    }
+    await assert.rejects(
+      prepareAskAi(request(), user, new AbortController().signal, f.deps),
+      { status: 503 },
+    );
+    assert.equal(f.calls.retrieval, 0);
+    assert.equal(f.calls.plan, 0);
+    assert.equal(f.calls.answer, 0);
+  }
+});
+
 test("migration preflight fails before any model generation", async () => {
   const f = fixture();
   f.deps.store.searchAiPassages = async () => {
@@ -335,12 +371,16 @@ test("four supplied citations complete the SDK stream and retain every internal 
     .split("\n")
     .filter((line) => line.startsWith("data: ") && line !== "data: [DONE]")
     .map((line) => JSON.parse(line.slice(6)));
-  assert.equal(chunks.some((chunk) => chunk.type === "error"), false);
+  assert.equal(
+    chunks.some((chunk) => chunk.type === "error"),
+    false,
+  );
   assert.deepEqual(chunks.at(-1), { type: "finish", finishReason: "stop" });
   const sources = chunks.find((chunk) => chunk.type === "data-sources")?.data;
-  assert.deepEqual(sources?.map((source: { id: string }) => source.id), [
-    "S2", "S4", "S3", "S5",
-  ]);
+  assert.deepEqual(
+    sources?.map((source: { id: string }) => source.id),
+    ["S2", "S4", "S3", "S5"],
+  );
   assert.ok(sources.every((source: object) => !("text" in source)));
   const message: AskAiMessage = {
     id: "answer",

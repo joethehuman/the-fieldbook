@@ -6,6 +6,8 @@ import type { SearchKind } from "./search";
 /** Nonsecret, installation-owned configuration. Credentials never belong here. */
 export type AskAiSettings = {
   enabled: boolean;
+  /** Router identity for these model choices; omitted only by older settings. */
+  router?: string;
   model: string;
   fallbackModel: string;
   sources: SearchKind[];
@@ -24,8 +26,14 @@ export type AiConnection = {
   configured: boolean;
   message: string;
 };
+export type AiRouter = {
+  id: string;
+  name: string;
+  supportsFallback: boolean;
+};
 export type AiSetup = {
-  provider: string;
+  router: AiRouter | null;
+  selectionRouter: string;
   checkedAt: string;
   models: AiModel[];
   catalog: { ready: boolean; message: string };
