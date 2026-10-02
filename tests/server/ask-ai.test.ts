@@ -14,6 +14,7 @@ import {
   aiUnavailableMessage,
 } from "../../lib/ai";
 import { defaultSettings, publicSettings } from "../../lib/settings";
+import { messageSources, type AskAiMessage } from "../../lib/ai-chat";
 import type { User } from "../../lib/types";
 import type { SourcePassage } from "../../lib/search";
 import type { AiProvider } from "../../server/ports/ai";
@@ -313,6 +314,48 @@ test("no matching evidence returns a restrained answer without a second model ca
   assert.equal(f.calls.answer, 0);
 });
 
+test("four supplied citations complete the SDK stream and retain every internal source link", async () => {
+  const f = fixture(),
+    controller = new AbortController();
+  f.setPassages(
+    Array.from({ length: 5 }, (_, index) => ({
+      ...passage,
+      passageId: `lesson:${index ? `topic-${index}` : "quorum"}`,
+      lessonId: index ? `topic-${index}` : "quorum",
+    })),
+  );
+  // Match the reported shape: four distinct sources, repeated across paragraphs.
+  const answer = "Use the published setup. [S2][S4]\n\nVerify it. [S3][S4][S5]";
+  f.setAnswer(answer);
+  const response = askAiResponse(
+    await prepareAskAi(request(), user, controller.signal, f.deps),
+    controller,
+  );
+  const chunks = (await response.text())
+    .split("\n")
+    .filter((line) => line.startsWith("data: ") && line !== "data: [DONE]")
+    .map((line) => JSON.parse(line.slice(6)));
+  assert.equal(chunks.some((chunk) => chunk.type === "error"), false);
+  assert.deepEqual(chunks.at(-1), { type: "finish", finishReason: "stop" });
+  const sources = chunks.find((chunk) => chunk.type === "data-sources")?.data;
+  assert.deepEqual(sources?.map((source: { id: string }) => source.id), [
+    "S2", "S4", "S3", "S5",
+  ]);
+  assert.ok(sources.every((source: object) => !("text" in source)));
+  const message: AskAiMessage = {
+    id: "answer",
+    role: "assistant",
+    parts: [
+      { type: "text", text: answer },
+      { type: "data-sources", data: sources },
+    ],
+  };
+  assert.deepEqual(messageSources(message), sources);
+  assert.equal(f.calls.plan, 1);
+  assert.equal(f.calls.answer, 1);
+  assert.equal(f.calls.current, 2);
+});
+
 test("fresh account, settings and source checks guard generation and final citations", async () => {
   for (const change of ["off", "inactive", "content"] as const) {
     const f = fixture();
@@ -344,6 +387,7 @@ test("invalid citations and oversized answers never receive verified source meta
   for (const answer of [
     "Unknown answer",
     "An invented source. [S99]",
+    "One supplied and one invented source. [S1][S99]",
     "x".repeat(12001),
   ]) {
     const f = fixture();

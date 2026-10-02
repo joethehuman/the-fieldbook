@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { aiBounds } from "../lib/ai";
 import {
   messageSources,
   recentAiMessages,
@@ -70,4 +71,33 @@ test("source navigation requires an exact internal destination matching its iden
     ];
     assert.deepEqual(messageSources(answer), []);
   }
+});
+
+test("source links retain four verified citations while excluding unsafe destinations", () => {
+  const source = (index: number) => ({
+    id: `S${index}`,
+    contentId: `reference-${index}`,
+    passageId: "doc",
+    publishedRevision: 1,
+    kind: "doc" as const,
+    title: `Reference ${index}`,
+    href: `/docs/reference-${index}`,
+    lessonId: null,
+    lessonTitle: null,
+  });
+  const sources = [source(2), source(4), source(3), source(5)];
+  const answer = message("a", "assistant", "Answer [S2][S4][S3][S5]");
+  answer.parts.push({
+    type: "data-sources",
+    data: [
+      { ...source(1), href: "https://external.example" },
+      ...sources,
+    ],
+  });
+  assert.deepEqual(messageSources(answer), sources);
+  answer.parts = [{
+    type: "data-sources",
+    data: Array.from({ length: 20 }, (_, index) => source(index + 1)),
+  }];
+  assert.equal(messageSources(answer).length, aiBounds.sourceCount);
 });

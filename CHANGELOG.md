@@ -4,6 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Let Ask AI answers with more than three valid citations complete and display every verified source link. Keep concise answer guidance and reject unknown or stale sources.
 - Preserve the server-owned Organization identity when saving installation settings. Use a direct settings save with automatic confirmation after a lost response, ordinary retry after failure, and unsaved-navigation warnings only while edits remain. Remove the separate settings recovery action while retaining revision checks against concurrent changes.
 - Refine Ask AI administration with aligned model fields, stable pricing/validation space, persistent setup actions and loading rows, and tighter responsive spacing.
 

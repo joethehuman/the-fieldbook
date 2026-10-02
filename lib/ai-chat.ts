@@ -69,5 +69,5 @@ export function messageSources(message: AskAiMessage): AiCitation[] {
       const href = `/${section}/${encodeURIComponent(source.contentId)}${source.lessonId ? `?lesson=${encodeURIComponent(source.lessonId)}` : ""}`;
       return source.href === href;
     })
-    .slice(0, 3);
+    .slice(0, aiBounds.sourceCount);
 }

@@ -72,6 +72,8 @@ Clients must send only recent text context. The final message must be a nonempty
 
 The response uses the AI SDK UI message stream protocol: `text-start`, `text-delta`, `text-end`, and a final `data-sources` part containing validated internal source metadata. Metadata includes the content ID, passage/lesson identity, published revision, title and an application-generated internal `href`; it excludes source bodies. Answers refer to `[S1]` IDs. Clients should build source links exclusively from final metadata, treat streamed text as untrusted plain text, and mark an interrupted/error response incomplete. Do not render model-generated HTML, images or arbitrary URLs as trusted links.
 
+Answer guidance prefers up to three source links. This is a brevity preference: an answer citing additional supplied sources still completes and retains all verified links. Sources remain bounded by the evidence supplied for the answer (at most 12 passages); unknown IDs or changed publication revisions fail verification.
+
 Client cancellation aborts generation. Errors contain safe messages rather than provider payloads. Responses are private and uncached. No resumable stream or transcript/usage database write is implemented.
 
 ## Evidence and privacy

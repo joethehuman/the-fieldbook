@@ -63,6 +63,7 @@ export const aiBounds = {
   requestBytes: 32_768,
   questionCharacters: 2_000,
   historyCharacters: 4_000,
+  sourceCount: 12,
   sourceCharacters: 9_600,
   planningOutputTokens: 256,
   answerOutputTokens: 600,
