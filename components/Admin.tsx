@@ -1,6 +1,7 @@
 "use client";
 import { useOrganizationChangeReview } from "./OrganizationChangeReview";
 import { DetailNavigation } from "./patterns/detail-navigation";
+import { EditorSaveStatus } from "./patterns/editor-save-status";
 import { Badge } from "./ui/badge";
 import { Spinner } from "./ui/spinner";
 import { Pagination } from "./patterns/pagination";
@@ -23,6 +24,7 @@ import { revealEditorTarget } from "./patterns/reveal-editor-target";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
 import { contentSignature, hasUnpublishedEdits } from "@/lib/demo-publication";
+import { resumeDraft, revertToPublished } from "@/lib/draft-recovery";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -37,11 +39,6 @@ import { FilterOptions } from "./patterns/filter-options";
 import { useToast } from "./ui/toast";
 import { DataTable } from "./patterns/data-table";
 import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "./ui/collapsible";
 import {
   CollectionControls,
   CollectionEmpty,
@@ -271,6 +268,7 @@ type Props = {
   onReviewDeadlines?: (
     token?: string,
   ) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
+  onLoadPublished?: (id: string) => Promise<Content>;
 };
 const id = () => crypto.randomUUID();
 export default function Admin({
@@ -291,6 +289,7 @@ export default function Admin({
   registerLandingNavigation,
   onReload,
   onReviewDeadlines,
+  onLoadPublished,
 }: Props) {
   const notify = useToast();
   const { confirm } = useInteractionDialog();
@@ -800,6 +799,7 @@ export default function Admin({
           onWorkspaceChange={admin ? onChange : undefined}
           registerNavigationGuard={registerNavigationGuard}
           onReload={onReload}
+          onLoadPublished={onLoadPublished}
           onPrepareAssignments={onPrepareAssignments}
         />
         {organizationReview.dialog}
@@ -1774,11 +1774,13 @@ export function Editor({
   onUpload,
   registerNavigationGuard,
   onReload,
+  onLoadPublished,
 }: {
   onPrepareAssignments?: () => Promise<Workspace>;
   onUpload?: UploadMedia;
   registerNavigationGuard?: RegisterNavigationGuard;
   onReload?: () => Promise<Workspace>;
+  onLoadPublished?: (id: string) => Promise<Content>;
   production?: boolean;
   content: Content;
   data: Workspace;
@@ -1831,6 +1833,8 @@ export function Editor({
   const publishingNow = useRef(false);
   const [publishing, setPublishing] = useState(false);
   const [recovering, setRecovering] = useState(false);
+  const recoveringNow = useRef(false);
+  const attemptedSave = useRef<Content | undefined>(undefined);
   const busy = uploadCount > 0 || recovering;
   const current = useRef(c);
   current.current = c;
@@ -1861,6 +1865,7 @@ export function Editor({
         };
         savingNow.current = true;
         setSaving(true);
+        attemptedSave.current = saved;
         return (await callbacks.current.onSave(saved, intent)) || saved;
       },
       acknowledge: (persisted, snapshot, intent) => {
@@ -1923,7 +1928,7 @@ export function Editor({
   const dirty = signature !== contentSignature(baseline.current);
   const needsRecovery = queue.current.blocked;
   async function flushDraft(intent: SaveIntent = "draft") {
-    if (pendingUploads.current || recovering) return false;
+    if (pendingUploads.current || recoveringNow.current) return false;
     const result = await queue.current!.flush(intent);
     savingNow.current = false;
     setSaving(false);
@@ -1958,7 +1963,7 @@ export function Editor({
   }, []);
   const guard = useRef(async () => true);
   guard.current = async () => {
-    if (pendingUploads.current || recovering) return false;
+    if (pendingUploads.current || recoveringNow.current) return false;
     if (
       !queue.current!.blocked &&
       (queue.current!.dirty() || savingNow.current)
@@ -2022,21 +2027,19 @@ export function Editor({
     URL.revokeObjectURL(url);
   }
   async function reloadSaved() {
-    if (!onReload || busy || savingNow.current) return;
+    if (!onReload || busy || recoveringNow.current || savingNow.current) return;
+    recoveringNow.current = true;
     setRecovering(true);
     try {
       const latest = (await onReload()).content.find(
         (item) => item.id === c.id,
       );
       if (!latest) {
-        queue.current!.reset(original.current);
-        setError("");
-        setSavedMessage("No saved copy found. Saving your draft again.");
-        return;
+        throw new Error("No saved draft is available. Your changes remain open. Try saving again or download your changes.");
       }
       if (
         !(await confirm(
-          "Replace the open edits with the latest saved copy? Cancel to keep your edits. Download your draft first if you need to compare or reapply changes.",
+          "Replace your open changes with the latest saved draft? Your open changes will be discarded. Cancel to keep them or download your changes first.",
         ))
       )
         return;
@@ -2047,9 +2050,72 @@ export function Editor({
       setC(latest);
       setRefresh(false);
       setError("");
+      setSavedMessage("Saved");
     } catch (error) {
       setError((error as Error).message);
     } finally {
+      recoveringNow.current = false;
+      setRecovering(false);
+    }
+  }
+  async function retrySaving() {
+    if (!onReload || busy || recoveringNow.current || savingNow.current) return;
+    recoveringNow.current = true;
+    setRecovering(true);
+    let ready = false;
+    try {
+      const latest = (await onReload()).content.find((item) => item.id === current.current.id);
+      const next = resumeDraft(current.current, baseline.current, attemptedSave.current, latest);
+      if (latest) {
+        original.current = latest;
+        baseline.current = latest;
+      }
+      queue.current!.reset(latest || baseline.current);
+      // A lost Publish acknowledgement must never cause another publication or version bump.
+      if (latest?.publishedSignature === contentSignature(attemptedSave.current || baseline.current))
+        setRefresh(false);
+      current.current = next;
+      setC(next);
+      setError("");
+      ready = true;
+    } catch (failure) {
+      setError((failure as Error).message);
+    } finally {
+      recoveringNow.current = false;
+      setRecovering(false);
+    }
+    if (ready && await flushDraft()) setSavedMessage("Saved");
+  }
+  async function restorePublished() {
+    if (!onReload || !onLoadPublished || busy || recoveringNow.current || savingNow.current || queue.current!.blocked) return;
+    recoveringNow.current = true;
+    setRecovering(true);
+    try {
+      if (!await confirm("Discard your unpublished changes and restore the published version? The restored draft will save automatically. Readers will continue seeing the same published content.")) return;
+      const latest = (await onReload()).content.find((item) => item.id === current.current.id);
+      if (!latest || latest.revision !== baseline.current.revision) {
+        queue.current!.block();
+        throw new Error("The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.");
+      }
+      const published = await onLoadPublished(latest.id);
+      // Check the publication and write revision together; never overwrite a concurrent edit.
+      if (published.revision !== latest.revision ||
+          published.publishedRevision !== latest.publishedRevision) {
+        queue.current!.block();
+        throw new Error("The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.");
+      }
+      const next = revertToPublished(latest, published, !!onWorkspaceChange);
+      original.current = latest;
+      baseline.current = latest;
+      queue.current!.reset(latest);
+      current.current = next;
+      setC(next);
+      setRefresh(false);
+      setError("");
+    } catch (failure) {
+      setError((failure as Error).message);
+    } finally {
+      recoveringNow.current = false;
       setRecovering(false);
     }
   }
@@ -2215,6 +2281,10 @@ export function Editor({
   }
   const set = (key: string, value: unknown) =>
     setC((prev) => ({ ...prev, [key]: value }));
+  const saveStatus = saving || busy
+    ? uploadCount ? "Uploading…" : "Saving…"
+    : queue.current!.blocked ? "Changes not saved"
+    : dirty ? "Saving…" : savedMessage || (existing ? "Saved" : "Not saved");
   const details = (
     <FieldGroup disabled={busy} className="editor-details-content">
       <EditorDetailsGroup id="writing-readiness" title="Before publishing">
@@ -2480,43 +2550,11 @@ export function Editor({
           )}
         </>
       )}
-      <Collapsible>
-        <CollapsibleTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="justify-start"
-          >
-            Draft recovery
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="grid gap-3 pt-3">
-          <FieldDescription>
-            Download a recovery copy or review the latest saved draft before
-            replacing your open edits.
-          </FieldDescription>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={downloadDraft}
-          >
-            Download draft
-          </Button>
-          {onReload && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={busy || saving}
-              onClick={() => void reloadSaved()}
-            >
-              Review saved copy
-            </Button>
-          )}
-        </CollapsibleContent>
-      </Collapsible>
+      {!!c.publishedRevision && <ActionGroup>
+        <Button type="button" variant="outline" size="sm"
+          disabled={busy || saving || needsRecovery || !publicationChanged || !onLoadPublished || !onReload}
+          onClick={() => void restorePublished()}>Revert to published version</Button>
+      </ActionGroup>}
     </FieldGroup>
   );
   return (
@@ -2541,6 +2579,7 @@ export function Editor({
         </h1>
         <DetailNavigation
           flush
+          compact
           disabled={busy}
           items={[
             {
@@ -2552,27 +2591,16 @@ export function Editor({
           ]}
         />
         <div className="editor-heading-actions">
-          <div className="editor-save-status">
-            <span role="status">
-              {saving || busy
-                ? uploadCount
-                  ? "Uploading media…"
-                  : "Saving…"
-                : queue.current!.blocked
-                  ? "Save failed"
-                  : dirty
-                    ? "Saving…"
-                    : savedMessage || (existing ? "Saved" : "Not saved yet")}
-            </span>
-            <PublicationStatus
-              published={!!c.publishedRevision}
-              hasUnpublishedChanges={
-                !!c.publishedRevision && publicationChanged
-              }
-            />
-          </div>
+          <EditorSaveStatus
+            status={saveStatus}
+            published={!!c.publishedRevision}
+            hasUnpublishedChanges={!!c.publishedRevision && publicationChanged}
+            failed={needsRecovery}
+          />
           <Button
             type="button"
+            size="sm"
+            className="shrink-0"
             disabled={
               busy ||
               publishing ||
@@ -2582,32 +2610,36 @@ export function Editor({
             }
             onClick={(event) => void submit(event, "published")}
           >
-            {!publicationChanged
-              ? "Published"
-              : c.publishedRevision
-                ? "Publish changes"
-                : "Publish"}
+            Publish
           </Button>
         </div>
       </div>
       {error && (
-        <Alert variant="destructive" role="alert">
-          <p>{error}</p>
-          <ActionGroup className="mt-3">
-            <Button type="button" variant="outline" onClick={downloadDraft}>
-              Download draft
+        <Alert variant="destructive" role="alert" className={needsRecovery ? "text-foreground" : undefined}>
+          {needsRecovery && <>
+            <p className="font-medium text-copy">We couldn’t confirm your latest changes were saved.</p>
+            <p className="text-xs text-muted-foreground">Your work is still here. Keep this page open.</p>
+          </>}
+          <p className={needsRecovery ? "text-xs text-muted-foreground" : undefined}>{error}</p>
+          {needsRecovery && <ActionGroup className="mt-1 gap-x-4 gap-y-2">
+            {onReload && <Button type="button" size="sm" disabled={busy || saving}
+              onClick={() => void retrySaving()}>Retry saving</Button>}
+            <Button type="button" variant="link" size="sm" className="text-xs text-muted-foreground underline" onClick={downloadDraft}>
+              Download your changes
             </Button>
             {onReload && (
               <Button
                 type="button"
-                variant="outline"
+                variant="link"
+                size="sm"
+                className="text-xs text-muted-foreground underline"
                 disabled={busy}
                 onClick={reloadSaved}
               >
-                Review saved copy
+                Load saved draft
               </Button>
             )}
-          </ActionGroup>
+          </ActionGroup>}
         </Alert>
       )}
       {busy && (

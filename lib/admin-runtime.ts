@@ -13,6 +13,7 @@ import { uploadMediaFile } from "./upload-media";
 export type AdminRuntime = {
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
   saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
+  publishedContent: (id: string) => Promise<Content>;
   refresh: () => Promise<Workspace>;
   reviewDeadlines: (
     token?: string,
@@ -25,6 +26,7 @@ export type AdminRuntime = {
     ) => Promise<{ data: Workspace; results: BulkResult[] }>;
     prefetch: () => void;
     prepare: (scope: AdminScope, userId?: string) => Promise<Workspace>;
+    prepareAssignments: () => Promise<Workspace>;
     edit: (id: string) => Promise<{ data: Workspace; item: Content }>;
     unpublish: (id: string) => Promise<Workspace>;
   };
@@ -80,7 +82,7 @@ export function createAdminRuntime(initial: {
     let data = state.data as Workspace;
     if (
       openItem &&
-      (target === "content" || target === "people") &&
+      (target === "content" || target === "people" || target === "governance") &&
       data.content.some((entry) => entry.id === openItem)
     ) {
       const item = await request(
@@ -111,13 +113,14 @@ export function createAdminRuntime(initial: {
   const saver = createWorkspaceSaver(request, fresh);
   return {
     upload: uploadMediaFile,
+    publishedContent: (id) => request(`/api/content?id=${encodeURIComponent(id)}&snapshot=published`),
     saveContent: (content, intent) =>
       mutate(async () => {
         if (contentSaveInFlight)
           throw new Error("Wait for the current save to finish.");
         if (contentRecoveryRequired)
           throw new SaveRecoveryError(
-            "Refresh and review the saved copy before saving again. Your edits remain open.",
+            "Saving is paused. Retry saving to check the saved draft. Your changes remain open.",
           );
         contentSaveInFlight = true;
         openItem = content.id;
@@ -160,10 +163,7 @@ export function createAdminRuntime(initial: {
               (rejected
                 ? "This change was not saved. "
                 : "This change may have been saved. ") +
-              (snapshot
-                ? "The latest saved state is available. "
-                : "The latest saved state is unavailable. ") +
-              "Refresh and review before retrying. Your edits remain open.",
+              "Your changes remain open. Retry saving to check the saved draft.",
             snapshot,
           );
         } finally {
@@ -290,6 +290,12 @@ export function createAdminRuntime(initial: {
           ...(initial.user.role === "admin" ? [prepared("people")] : []),
           prepared("feedback"),
         ]);
+      },
+      prepareAssignments: async () => {
+        const data = await prepared("governance");
+        scope = "governance";
+        // Audience selection belongs to the open editor; retain its full-draft refresh.
+        return data;
       },
       prepare: async (next, userId) => {
         const previousPerson = personId;

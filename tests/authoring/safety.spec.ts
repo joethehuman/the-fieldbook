@@ -335,10 +335,10 @@ test("failed save preserves downloadable text and does not show success", async 
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Recover my draft",
   );
-  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Save failed");
+  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Changes not saved");
   await expect(page.locator('[data-slot="toast"]')).toHaveCount(0);
   const download = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download draft" }).click();
+  await page.getByRole("button", { name: "Download your changes" }).click();
   const downloaded = await download;
   expect(downloaded.suggestedFilename()).toBe("fieldbook-unsaved-draft.json");
   expect(JSON.parse(await readFile((await downloaded.path())!, "utf8")).title).toBe("Recover my draft");
@@ -500,7 +500,7 @@ for (const mode of ["recovery-unavailable", "lost-response", "conflict"] as cons
       page.locator("form.editor").getByRole("alert").first(),
     ).toContainText(
       mode === "recovery-unavailable"
-        ? "The latest saved state is unavailable"
+        ? "Database unavailable"
         : mode === "lost-response"
           ? "may have been saved"
           : "This change was not saved",
@@ -510,12 +510,12 @@ for (const mode of ["recovery-unavailable", "lost-response", "conflict"] as cons
     );
     control.failRefresh = false;
     control.failSave = false;
-    await page.getByRole("button", { name: "Review saved copy" }).click();
+    await page.getByRole("button", { name: "Load saved draft" }).click();
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
       "My local edit",
     );
-    await page.getByRole("button", { name: "Review saved copy" }).click();
+    await page.getByRole("button", { name: "Load saved draft" }).click();
     await page.getByRole("button", { name: "Confirm", exact: true }).click();
     await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
       mode === "conflict" ? "Another author's change" : mode === "recovery-unavailable" ? "Safety fixture" : "My local edit",
@@ -584,14 +584,14 @@ test("session expiration during recovery cannot replace the editor with a guest 
     .fill("Keep this after expiry");
   await page.keyboard.press("ControlOrMeta+s");
   await expect(page.locator("form.editor").getByRole("alert")).toContainText(
-    "The latest saved state is unavailable",
+    "Database unavailable",
   );
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep this after expiry",
   );
-  await page.getByRole("button", { name: "Review saved copy" }).click();
+  await page.getByRole("button", { name: "Load saved draft" }).click();
   await expect(page.locator("form.editor").getByRole("alert")).toContainText(
-    "Administrator access changed",
+    "Publishing access changed",
   );
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep this after expiry",

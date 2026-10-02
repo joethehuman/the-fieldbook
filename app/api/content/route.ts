@@ -15,6 +15,7 @@ export async function GET(req: Request) {
         url.searchParams.get("id") || "",
         await actor(),
         url.searchParams.get("draft") === "true",
+        url.searchParams.get("snapshot") === "published",
       ),
       { headers: { "Cache-Control": "no-store" } },
     );

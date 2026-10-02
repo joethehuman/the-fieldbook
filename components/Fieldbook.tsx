@@ -769,6 +769,13 @@ export default function Fieldbook() {
               setError("");
               return latest;
             }}
+            onLoadPublished={async (id) => {
+              const latest = loadWorkspace();
+              const draft = latest.content.find((item) => item.id === id);
+              const published = latest.publishedContent?.find((item) => item.id === id);
+              if (!draft || !published) throw new Error("The published version is unavailable. Your changes remain open.");
+              return { ...published, revision: draft.revision, publishedRevision: draft.publishedRevision };
+            }}
           />
         </ReportAvailability.Provider>
       ) : view === "team" ? (

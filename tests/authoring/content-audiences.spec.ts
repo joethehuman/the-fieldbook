@@ -239,7 +239,23 @@ test("Update picker applies to the draft, saves team/guest audiences, then publi
   expect((await read(true)).updateTeams).toBeUndefined();
   expect((await read(true)).groups).toEqual([]);
   await page
-    .getByRole("button", { name: "Publish changes", exact: true })
+    .getByRole("button", { name: "Revert to published version", exact: true })
+    .click();
+  const restore = page.getByRole("alertdialog", { name: "Confirm action", exact: true });
+  await restore.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect((await read()).updateTeams).toEqual(["org"]);
+  await page.getByRole("button", { name: "Revert to published version", exact: true }).click();
+  await restore.getByRole("button", { name: "Confirm", exact: true }).click();
+  await expect.poll(async () => (await read()).updateTeams).toBeUndefined();
+  expect((await read()).groups).toEqual([]);
+  expect((await read(true)).groups).toEqual([]);
+  await page.getByRole("button", { name: "Assign to teams or groups", exact: true }).click();
+  await panel.getByRole("checkbox", { name: "Assign directly to Team: Organization", exact: true }).check();
+  await panel.getByRole("checkbox", { name: "Public guests", exact: true }).check();
+  await panel.getByRole("button", { name: "Apply to draft", exact: true }).click();
+  await expect.poll(async () => (await read()).updateTeams).toEqual(["org"]);
+  await page
+    .getByRole("button", { name: "Publish", exact: true })
     .click();
   await expect
     .poll(async () => (await read(true)).updateTeams)
