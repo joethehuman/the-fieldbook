@@ -23,18 +23,20 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
     guidance: "Operator guidance",
   };
   const writes: any[] = [];
+  const organizationTeamId = "00000000-0000-4000-8000-000000000090";
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     assert.ok(url.pathname.endsWith("fb_config"));
     if (init?.method === "PATCH") {
       writes.push(JSON.parse(String(init.body)));
+      assert.equal(writes.at(-1).settings.organizationTeamId, organizationTeamId);
       assert.equal(url.searchParams.get("governance_revision"), "eq.9");
       return Response.json(
         url.searchParams.get("revision") === "eq.7" ? { revision: 8 } : null,
       );
     }
     return Response.json({
-      settings: { ...defaultSettings, askAi: configured },
+      settings: { ...defaultSettings, askAi: configured, organizationTeamId },
       revision: 7,
       governance_revision: 9,
       groups: [],
@@ -59,6 +61,11 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
       expected: 7,
     });
     assert.equal(writes[1].settings.askAi.enabled, false);
+    const saved = await saveSettings(admin, {
+      settings: { ...defaultSettings, organizationTeamId: "client-cannot-replace-it" },
+      expected: 7,
+    });
+    assert.equal(saved.settings.organizationTeamId, organizationTeamId);
     await assert.rejects(
       saveSettings(admin, { settings: defaultSettings, expected: 6 }),
       { status: 409 },

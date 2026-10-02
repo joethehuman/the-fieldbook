@@ -108,18 +108,24 @@ export async function saveSettings(
         );
     }
   }
+  const settings = {
+    ...parsed.data,
+    // Some installations already enforce this identity in database triggers.
+    // It is not an editable setting and must come from the saved configuration.
+    ...(config.settings.organizationTeamId
+      ? { organizationTeamId: config.settings.organizationTeamId }
+      : {}),
+    // Older loaded Admin clients must not erase a new optional configuration.
+    ...(parsed.data.askAi === undefined && config.settings.askAi
+      ? { askAi: config.settings.askAi }
+      : {}),
+  };
   const data = await dataStore().updateSettings(
-    {
-      ...parsed.data,
-      // Older loaded Admin clients must not erase a new optional configuration.
-      ...(parsed.data.askAi === undefined && config.settings.askAi
-        ? { askAi: config.settings.askAi }
-        : {}),
-    },
+    settings,
     a.expected,
     config.governance_revision,
   );
   if (!data)
     throw new HttpError(409, "Settings changed. Reload before saving.");
-  return data;
+  return { ...data, settings };
 }

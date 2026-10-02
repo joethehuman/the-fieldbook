@@ -249,6 +249,7 @@ type Props = {
   registerNavigationGuard?: RegisterNavigationGuard;
   registerLandingNavigation?: RegisterLandingNavigation;
   onReload?: () => Promise<Workspace>;
+  onSaveSettings?: (before: Workspace, settings: import("@/lib/settings").SiteSettings) => Promise<Workspace>;
 };
 const id = () => crypto.randomUUID();
 export default function Admin({
@@ -267,6 +268,7 @@ export default function Admin({
   registerNavigationGuard,
   registerLandingNavigation,
   onReload,
+  onSaveSettings,
 }: Props) {
   const notify = useToast();
   const { confirm } = useInteractionDialog();
@@ -806,7 +808,7 @@ export default function Admin({
               data={data}
               onChange={onChange}
               production={production}
-              onReload={onReload}
+              onSaveSettings={onSaveSettings}
             />
           ) : tab === "feedback" ? (
             <FeedbackAdmin data={data} />

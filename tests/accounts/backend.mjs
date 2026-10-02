@@ -248,6 +248,9 @@ createServer(async (req, res) => {
   if (url.pathname === "/rest/v1/fb_config") {
     if (req.method === "PATCH") {
       const parsed = JSON.parse(body);
+      // Preview's Organization trigger rejects losing this server-owned identity.
+      if (settings.organizationTeamId && parsed.settings.organizationTeamId !== settings.organizationTeamId)
+        return send(res, { code: "P0001", message: "Keep the built-in Organization team as the only top-level team" }, 400);
       if (url.searchParams.get("revision") !== `eq.${revision}`)
         return send(res, null);
       settings = parsed.settings;

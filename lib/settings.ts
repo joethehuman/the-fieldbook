@@ -28,6 +28,8 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
+  /** Server-owned identity of the built-in team; settings forms cannot replace it. */
+  organizationTeamId?: string;
   askAi?: import("./ai").AskAiSettings;
   /** Availability only; internal model/guidance settings stay on the server. */
   askAiEnabled?: boolean;

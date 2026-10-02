@@ -10,8 +10,11 @@ import type { SaveIntent } from "./draft-save-queue";
 import { mergeSavedContent } from "./content-save";
 import { SaveRecoveryError } from "./save-recovery";
 import { uploadMediaFile } from "./upload-media";
+import { createSettingsSaver } from "./settings-save";
+import type { SiteSettings } from "./settings";
 export type AdminRuntime = {
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
+  saveSettings: (before: Workspace, settings: SiteSettings) => Promise<Workspace>;
   saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
   refresh: () => Promise<Workspace>;
   manageLearning: (action: LearningAction) => Promise<Workspace>;
@@ -106,8 +109,15 @@ export function createAdminRuntime(initial: {
     return load;
   }
   const saver = createWorkspaceSaver(request, fresh);
+  const settingsSaver = createSettingsSaver(request, fresh);
   return {
     upload: uploadMediaFile,
+    saveSettings: (before, settings) => mutate(async () => {
+      const saved = await settingsSaver(before, settings);
+      clearCached();
+      cached.set(scope, saved);
+      return saved;
+    }),
     saveContent: (content, intent) =>
       mutate(async () => {
         if (contentSaveInFlight)

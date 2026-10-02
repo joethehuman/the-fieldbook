@@ -27,9 +27,9 @@ import { availableDocSections } from "@/lib/docs-navigation";
 import { groupPath } from "@/lib/group-hierarchy";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import { equalJson } from "@/lib/equal-json";
+import { useRevealTarget } from "./patterns/use-reveal-target";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
-import { SaveRecoveryError } from "@/lib/save-recovery";
 export type SettingsSection =
   "identity" | "links" | "docs" | "courses" | "access" | "privacy" | "mcp" | "ai";
 export default function SiteSettingsPanel({
@@ -39,7 +39,7 @@ export default function SiteSettingsPanel({
   contributor = false,
   section,
   registerNavigationGuard,
-  onReload,
+  onSaveSettings,
 }: {
   data: Workspace;
   onChange: (next: Workspace) => void | Promise<void>;
@@ -47,10 +47,11 @@ export default function SiteSettingsPanel({
   contributor?: boolean;
   section: SettingsSection;
   registerNavigationGuard?: RegisterNavigationGuard;
-  onReload?: () => Promise<Workspace>;
+  onSaveSettings?: (before: Workspace, settings: import("@/lib/settings").SiteSettings) => Promise<Workspace>;
 }) {
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
+  const saveError = useRevealTarget();
   const loadedSettings = (workspace: Workspace) => {
     const saved = (workspace.settings || {}) as Partial<typeof defaultSettings> & {
       logoUrl?: string;
@@ -67,7 +68,7 @@ export default function SiteSettingsPanel({
   const [settings, setSettings] = useState(() => loadedSettings(data)),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
-  const [recoveryRequired, setRecoveryRequired] = useState(false);
+  const saveBase = useRef(data);
   const savedSettings = useRef(settings);
   const dirty = !equalJson(settings, savedSettings.current);
   const guard = useRef(async () => true);
@@ -96,21 +97,17 @@ export default function SiteSettingsPanel({
   );
   const [nameError, setNameError] = useState("");
   const [linkErrors, setLinkErrors] = useState(false);
-  async function reviewSavedCopy() {
-    if (busy || !onReload) return;
-    if (dirty && !(await confirm("Load the latest saved settings? Your unsaved changes will be discarded."))) return;
-    setBusy(true);
-    try {
-      const latest = loadedSettings(await onReload());
-      savedSettings.current = latest;
-      setSettings(latest);
-      setRecoveryRequired(false);
-      setNotice("Latest saved settings loaded. Review before saving.");
-    } catch (error) {
-      setNotice((error as Error).message);
-    } finally {
-      setBusy(false);
+  async function persistSettings(next: typeof settings) {
+    let saved: Workspace;
+    if (onSaveSettings) saved = await onSaveSettings(saveBase.current, next);
+    else {
+      await onChange({ ...data, settings: next });
+      saved = { ...data, settings: next };
     }
+    saveBase.current = saved;
+    const latest = loadedSettings(saved);
+    savedSettings.current = latest;
+    setSettings(latest);
   }
   const saveAction = (
     <ActionGroup>
@@ -164,14 +161,11 @@ export default function SiteSettingsPanel({
                     ),
                   }
                 : settings;
-          await onChange({ ...data, settings: next });
-          savedSettings.current = next;
-          setSettings(next);
+          await persistSettings(next);
           notify("Settings saved.");
-          setRecoveryRequired(false);
         } catch (e) {
           setNotice((e as Error).message);
-          if (e instanceof SaveRecoveryError) setRecoveryRequired(true);
+          saveError.reveal();
         } finally {
           setBusy(false);
         }
@@ -560,12 +554,11 @@ export default function SiteSettingsPanel({
               setBusy(true);
               setNotice("");
               try {
-                await onChange({ ...data, settings: next });
-                savedSettings.current = next;
-                setSettings(next);
+                await persistSettings(next);
                 notify("Privacy policy published.");
               } catch (e) {
                 setNotice((e as Error).message);
+                saveError.reveal();
               } finally {
                 setBusy(false);
               }
@@ -580,16 +573,9 @@ export default function SiteSettingsPanel({
         onChange={(askAi) => setSettings({ ...settings, askAi })}
       />}
       {section !== "mcp" && notice && (
-        <div className="settings-save-bar">
-          <Alert role="status">
+        <div className="settings-save-bar" {...saveError.targetProps}>
+          <Alert variant="destructive" role="alert">
             {notice}
-            {recoveryRequired && onReload && (
-              <ActionGroup>
-                <Button type="button" variant="outline" disabled={busy} onClick={() => void reviewSavedCopy()}>
-                  Review saved copy
-                </Button>
-              </ActionGroup>
-            )}
           </Alert>
         </div>
       )}

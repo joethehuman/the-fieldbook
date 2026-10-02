@@ -31,7 +31,7 @@ async function signedIn(
   role = "admin",
 ) {
   await request.post("http://127.0.0.1:3130/fixture", {
-    data: { settings: { access: "public" }, role },
+    data: { settings: { access: "public", organizationTeamId: "00000000-0000-4000-8000-000000000090" }, role },
   });
   const token = await (
     await request.post("http://127.0.0.1:3130/auth/v1/token", { data: {} })
@@ -166,6 +166,9 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await expect(
     page.getByPlaceholder("Search Fieldbook or Ask AI", { exact: true }),
   ).toBeVisible();
+  await section(page, "Identity");
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await section(page, "Ask AI");
   await page.reload();
   await section(page, "Ask AI");
   await expect(
@@ -234,34 +237,23 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await guidance.fill("Keep this unsaved draft.");
   await page.route("**/api/settings", (route) =>
     route.fulfill({
-      status: 409,
-      json: { error: "Settings changed. Reload before saving." },
+      status: 503,
+      json: { error: "The database operation failed. Try again." },
     }),
   );
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Settings changed" }),
+    page.getByRole("alert").filter({ hasText: "database operation failed" }),
   ).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "database operation failed" })).toBeInViewport();
+  await page.screenshot({ path: info.outputPath("ask-ai-save-failure.png"), fullPage: true });
   await expect(guidance).toHaveValue("Keep this unsaved draft.");
-  await page
-    .getByRole("button", { name: "Save settings", exact: true })
-    .click();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Refresh and review" }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Review saved copy", exact: true })
-    .click();
+  await expect(page.getByRole("button", { name: "Review saved copy", exact: true })).toHaveCount(0);
+  await section(page, "Identity");
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(guidance).toHaveValue("Keep this unsaved draft.");
-  await page.screenshot({ path: info.outputPath("ask-ai-save-recovery.png"), fullPage: true });
-  await page
-    .getByRole("button", { name: "Review saved copy", exact: true })
-    .click();
-  await page.getByRole("button", { name: "Confirm", exact: true }).click();
-  await expect(guidance).toHaveValue(defaultAskAiSettings.guidance);
   await page.unroute("**/api/settings");
   await guidance.fill("A recovered setting saves normally.");
   await page
@@ -270,17 +262,33 @@ test("Admin configures, tests and saves AI; toggles restore search and draft gua
   await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
     0,
   );
+  await section(page, "Identity");
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await section(page, "Ask AI");
+  await expect(guidance).toHaveValue("A recovered setting saves normally.");
+  await guidance.fill("A lost response is confirmed automatically.");
+  await page.route("**/api/settings", async (route) => {
+    const response = await route.fetch();
+    expect(response.ok()).toBe(true);
+    await route.abort("failed");
+  });
+  await page.getByRole("button", { name: "Save settings", exact: true }).click();
+  await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(0);
+  await page.unroute("**/api/settings");
+  await section(page, "Identity");
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  await section(page, "Ask AI");
   await guidance.fill("Keep this unsaved draft.");
 
   await page
     .getByRole("button", { name: "Discard changes", exact: true })
     .click();
-  await expect(guidance).toHaveValue("A recovered setting saves normally.");
+  await expect(guidance).toHaveValue("A lost response is confirmed automatically.");
   await guidance.fill("Discard on confirmed navigation.");
   await section(page, "Identity");
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await section(page, "Ask AI");
-  await expect(guidance).toHaveValue("A recovered setting saves normally.");
+  await expect(guidance).toHaveValue("A lost response is confirmed automatically.");
   await page.goto("/courses");
   await expect(
     page.getByPlaceholder("Search Fieldbook", { exact: true }),
