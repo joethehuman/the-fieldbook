@@ -188,3 +188,10 @@ test("preview configuration fails closed if backend identity is missing or diffe
     process.env = saved;
   }
 });
+
+test("governance retains an installed system Organization marker while adding learning", async () => {
+  const { governanceSchema } = await import("../../server/governance-schema");
+  const parsed = governanceSchema.parse({expected: 1, groups: [], users: [], teams: [{id: "root", name: "Organization", system: "organization", learningItems: [{kind: "course", id: "00000000-0000-4000-8000-000000000010"}]}]});
+  assert.equal(parsed.teams[0].system, "organization");
+  assert.equal(parsed.teams[0].learningItems?.length, 1);
+});

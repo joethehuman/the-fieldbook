@@ -2,10 +2,12 @@ import type { Workspace } from "./store";
 import {
   effectiveGroups,
   type Content,
+  type Assignment,
   type Group,
   type Curriculum,
   type LearningItem,
 } from "./types";
+import { reconcileAssignments } from "./assignment-episodes";
 import { assignmentRules } from "./learning";
 
 export function groupItems(group: Group, content: Content[]): LearningItem[] {
@@ -98,9 +100,16 @@ export function reconcileLearning(
     ...g,
     requiredCourseIds: expandLearning(g.learningItems!, next.curricula!),
   }));
+  next.teams = (next.teams || []).map((t) => ({
+    ...t,
+    learningItems: t.learningItems || [],
+    requiredCourseIds: expandLearning(t.learningItems || [], next.curricula!),
+  }));
   next.users = next.users.map((u) => {
     const old = before.users.find((p) => p.id === u.id);
-    const was = old ? effectiveGroups(old, before.groups) : new Set<string>();
+    const was = old
+      ? effectiveGroups(old, before.groups, before.teams || [])
+      : new Set<string>();
     return {
       ...u,
       groupJoinedAt: Object.fromEntries(
@@ -110,7 +119,7 @@ export function reconcileLearning(
         ]),
       ),
       effectiveGroupJoinedAt: Object.fromEntries(
-        [...effectiveGroups(u, next.groups)].map((id) => [
+        [...effectiveGroups(u, next.groups, next.teams || [])].map((id) => [
           id,
           was.has(id)
             ? old?.effectiveGroupJoinedAt?.[id] ||
@@ -132,18 +141,39 @@ export function reconcileLearning(
         assignments: [],
       };
     const prior = before.content.find((x) => x.id === c.id);
-    const assignments = next.groups
-      .filter((g) => g.requiredCourseIds?.includes(c.id))
-      .map((g) => ({
+    const audiences = [
+      ...next.groups.map((g) => ({
         groupId: g.id,
+        teamId: undefined,
+        ids: g.requiredCourseIds,
+      })),
+      ...(next.teams || []).map((t) => ({
+        groupId: undefined,
+        teamId: t.id,
+        ids: t.requiredCourseIds,
+      })),
+    ];
+    const assignments: Assignment[] = audiences
+      .filter((a) => a.ids?.includes(c.id))
+      .map((audience) => ({
+        ...(audience.groupId
+          ? { groupId: audience.groupId }
+          : { teamId: audience.teamId }),
         due: { type: "none" as const },
         assignedAt:
           prior?.version === c.version
-            ? assignmentRules(prior).find((a) => a.groupId === g.id)
-                ?.assignedAt || stamp
+            ? assignmentRules(prior).find(
+                (a) =>
+                  a.groupId === audience.groupId &&
+                  a.teamId === audience.teamId,
+              )?.assignedAt || stamp
             : stamp,
       }));
-    return { ...c, assignments, groups: assignments.map((a) => a.groupId) };
+    return {
+      ...c,
+      assignments,
+      groups: assignments.flatMap((a) => (a.groupId ? [a.groupId] : [])),
+    };
   };
   next.pendingUsers = next.pendingUsers?.map((p) => ({
     ...p,
@@ -152,5 +182,11 @@ export function reconcileLearning(
   next.content = next.content.map(sync);
   if (next.publishedContent)
     next.publishedContent = next.publishedContent.map(sync);
+  next.users = reconcileAssignments(
+    before,
+    next,
+    stamp,
+    before.users.every((u) => !u.learningAssignments),
+  );
   return next;
 }

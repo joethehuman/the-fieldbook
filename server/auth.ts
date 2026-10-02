@@ -13,6 +13,9 @@ import { HttpError } from "./errors";
 export { HttpError, errorResponse } from "./errors";
 export function profile(row: ProfileRecord): User {
   return {
+    learningAssignments: row.learning_assignments || row.assignment_context?.learning_assignments,
+    assignmentTeams: row.assignment_teams || row.assignment_context?.assignment_teams,
+    effectiveGroupIds: row.effective_group_ids || row.assignment_context?.effective_group_ids,
     id: row.id,
     name: row.name,
     email: row.email,

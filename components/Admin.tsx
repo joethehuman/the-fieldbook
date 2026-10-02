@@ -1,4 +1,6 @@
 "use client";
+import { assignLearningToAudiences } from "@/lib/assignment-audiences";
+import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { Badge } from "./ui/badge";
 import { Spinner } from "./ui/spinner";
@@ -229,6 +231,7 @@ type Props = {
   data: Workspace;
   user: User;
   onOpenTab?: (tab: string) => Promise<void>;
+  onPrepareAssignments?: (id?: string) => Promise<void>;
   onOpenPersonProgress?: (id: string) => Promise<void>;
   onEdit?: (id: string) => Promise<Content>;
   onSaveContent?: (content: Content, intent: SaveIntent) => Promise<Content>;
@@ -251,6 +254,7 @@ export default function Admin({
   user,
   onOpenTab,
   onOpenPersonProgress,
+  onPrepareAssignments,
   onEdit,
   onSaveContent,
   onUnpublish,
@@ -262,6 +266,7 @@ export default function Admin({
   registerLandingNavigation,
   onReload,
 }: Props) {
+  const [assigningCourse, setAssigningCourse] = useState<string | null>(null);
   const notify = useToast();
   const { confirm } = useInteractionDialog();
   const adminPanel = useRevealTarget();
@@ -452,15 +457,9 @@ export default function Admin({
       action.operation === "assign" ||
       action.operation === "unassign"
     ) {
-      next.groups = next.groups.map((g) => {
-        if (g.id !== action.groupId) return g;
-        const items = groupItems(g, next.content).filter(
-          (i) => i.kind !== "course" || i.id !== c.id,
-        );
-        if (action.operation === "assign")
-          items.push({ kind: "course", id: c.id });
-        return { ...g, learningItems: items };
-      });
+      const updated = assignLearningToAudiences(next, [{ kind: "course", id: c.id }], [action.teamId ? `team:${action.teamId}` : `group:${action.groupId}`], action.operation === "assign" ? "add" : "remove");
+      next.groups = updated.groups;
+      next.teams = updated.teams;
     } else {
       const list = next.progress[action.userId!] || [];
       next.progress[action.userId!] = [
@@ -609,10 +608,11 @@ export default function Admin({
   }
   useEffect(() => {
     registerLandingNavigation?.({
-      isCurrent: tab === "content" && !editing && !detailScope && !person,
+      isCurrent: tab === "content" && !editing && !detailScope && !person && !assigningCourse,
       // The shell has already accepted the editor/settings/profile guard.
       open: async () => {
         if (await changeAdminTab("content", true)) {
+          setAssigningCourse(null);
           setEditing(null);
           setPerson(null);
         }
@@ -633,6 +633,7 @@ export default function Admin({
         onLearning={admin ? manageLearning : undefined}
         onLearningMany={admin ? manageLearningMany : undefined}
         onWorkspaceChange={admin ? onChange : undefined}
+        onPrepareAssignments={onPrepareAssignments}
         registerNavigationGuard={registerNavigationGuard}
         onReload={onReload}
       />
@@ -660,7 +661,7 @@ export default function Admin({
   async function changeAdminTab(next: string, approved = false) {
     if (!canOpenAdminTab(user, next)) return false;
     if (
-      (next === tab && !detailScope && !editing && !person) ||
+      (next === tab && !detailScope && !editing && !person && !assigningCourse) ||
       (!approved && adminGuard.current && !(await adminGuard.current()))
     )
       return false;
@@ -676,6 +677,7 @@ export default function Admin({
       }
       setOpeningTab(null);
     }
+    setAssigningCourse(null);
     setTab(next);
     setDetailScope(null);
     adminPanel.reveal(false);
@@ -787,7 +789,7 @@ export default function Admin({
             </SectionHeader>
           )}
           {notice && <Alert variant="destructive">{notice}</Alert>}
-          {detailView ? detailView : tab === "deleted" ? (
+          {assigningCourse ? <LearningAssignmentPicker data={data} item={{kind: "course", id: assigningCourse}} registerNavigationGuard={registerAdminGuard} onChange={onChange} onCancel={() => setAssigningCourse(null)} /> : detailView ? detailView : tab === "deleted" ? (
             <RecentlyDeleted data={data} onBulk={onBulk} contentOnly={!admin} />
           ) : tab.startsWith("settings-") ? (
             <SiteSettingsPanel
@@ -1022,6 +1024,7 @@ export default function Admin({
                         <TableCell>v{c.version}</TableCell>
                         <TableCell>
                           <ActionGroup variant="text">
+                            {admin && c.kind === "course" && (data.publishedContent || data.content).some(p => p.id === c.id && p.status === "published") && <Button variant="link" onClick={async () => { try { await onPrepareAssignments?.(); setAssigningCourse(c.id); } catch(e) { setNotice((e as Error).message); } }}>Assign</Button>}
                             <Button
                               variant="link"
                               disabled={openingItem === c.id}
@@ -1464,6 +1467,7 @@ export default function Admin({
 export function Editor({
   onLearningMany,
   onWorkspaceChange,
+  onPrepareAssignments,
   onLearning,
   content,
   data,
@@ -1485,6 +1489,7 @@ export function Editor({
   onLearningMany?: (
     actions: import("@/lib/learning").LearningAction[],
   ) => Promise<void>;
+  onPrepareAssignments?: (id?: string) => Promise<void>;
   onWorkspaceChange?: (
     data: Workspace,
     options?: { locallyHandled?: boolean },
@@ -1563,6 +1568,18 @@ export function Editor({
     },
     failed: (failure) => setError((failure as Error).message),
   });
+  const assignmentRefreshPending = useRef(false);
+  const latestAssignmentContent = data.content.find(item => item.id === c.id);
+  useEffect(() => {
+    if ((editorTab !== "assignments" && !assignmentRefreshPending.current) || !latestAssignmentContent) return;
+    assignmentRefreshPending.current = false;
+    if (latestAssignmentContent.revision === baseline.current.revision) return;
+    baseline.current = latestAssignmentContent;
+    original.current = latestAssignmentContent;
+    current.current = latestAssignmentContent;
+    queue.current!.reset(latestAssignmentContent);
+    setC(latestAssignmentContent);
+  }, [editorTab, latestAssignmentContent]);
   const signature = contentSignature(c);
   const observedSignature = useRef(signature);
   if (observedSignature.current !== signature) {
@@ -1610,11 +1627,12 @@ export function Editor({
     );
   };
   useEffect(() => {
+    if (editorTab === "assignments") return;
     registerNavigationGuard?.(() => guard.current(), {
       protected: dirty || busy || saving || needsRecovery,
     });
     return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard, dirty, busy, saving, needsRecovery]);
+  }, [registerNavigationGuard, dirty, busy, saving, needsRecovery, editorTab]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty || busy || saving || needsRecovery) {
@@ -1895,13 +1913,13 @@ export function Editor({
           </Field>
           <FieldDescription id="course-version-help">Current version: {c.version}. Keep this unchecked for minor corrections.</FieldDescription>
         </EditorDetailsGroup>}
-        {onLearning && <EditorDetailsGroup id="course-assignments" title="Learning groups"
-          description="Groups assign courses; completion windows are managed in organization settings.">
+        {onLearning && <EditorDetailsGroup id="course-assignments" title="Assignments"
+          description="Assign courses to teams or custom learning groups. Completion windows are managed in organization settings.">
           {existing && (data.publishedContent ?? data.content).some((item) => item.id === c.id && item.status === "published")
             ? <Button type="button" variant="outline" size="sm" onClick={async () => {
-                if (await guard.current()) setEditorTab("assignments");
-              }}>Manage learning groups</Button>
-            : <p className="text-copy text-muted-foreground">Publish this course to add it to a group’s assigned courses.</p>}
+                if (await guard.current()) { try { await onPrepareAssignments?.(c.id); setEditorTab("assignments"); } catch(e) { setError((e as Error).message); } }
+              }}>Assign to teams or groups</Button>
+            : <p className="text-copy text-muted-foreground">Publish this course to assign it to teams or groups.</p>}
         </EditorDetailsGroup>}
       </>}
       <Collapsible>
@@ -1917,18 +1935,12 @@ export function Editor({
   if (editorTab === "assignments" && onLearning)
     return (
       <>
-        <Button variant="link" onClick={() => setEditorTab("content")}>
-          <ArrowLeft size={16} />
-          Back to course builder
-        </Button>
         <h1>{c.title}</h1>
         {onWorkspaceChange && (
-          <LearningGroups
-            data={data}
-            onChange={onWorkspaceChange}
-            onLearningMany={onLearningMany}
-            onLearning={onLearning}
-          />
+          <LearningAssignmentPicker data={data} item={{kind: "course", id: c.id}} registerNavigationGuard={registerNavigationGuard} onChange={async (next) => {
+            await onWorkspaceChange(next);
+            assignmentRefreshPending.current = true;
+          }} onCancel={() => setEditorTab("content")} />
         )}
       </>
     );

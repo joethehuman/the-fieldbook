@@ -48,9 +48,10 @@ test("For you has zero, one and two results without hiding the published library
     const workspace = JSON.parse(
       localStorage.getItem("fieldbook.workspace.v1")!,
     );
-    workspace.content.find(
-      (item: { id: string }) => item.id === "update-03",
-    ).groups = ["sales"];
+    for (const content of [workspace.content, workspace.publishedContent])
+      content.find((item: { id: string }) => item.id === "update-03").groups = [
+        "sales",
+      ];
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   });
   await page.reload();
@@ -65,9 +66,10 @@ test("For you has zero, one and two results without hiding the published library
     const workspace = JSON.parse(
       localStorage.getItem("fieldbook.workspace.v1")!,
     );
-    workspace.content.find(
-      (item: { id: string }) => item.id === "update-00",
-    ).groups = ["sales"];
+    for (const content of [workspace.content, workspace.publishedContent])
+      content.find((item: { id: string }) => item.id === "update-00").groups = [
+        "sales",
+      ];
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   });
   await page.reload();

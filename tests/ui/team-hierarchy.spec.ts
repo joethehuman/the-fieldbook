@@ -51,6 +51,7 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   }, data);
   await page.goto("/#admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
+  const baseline = await saved(page);
   await section(page);
   const expand = page.getByRole("button", {
     name: "Expand Customer success",
@@ -114,9 +115,9 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   expect(after.teams!.find((team) => team.id === "child")!.parentId).toBe(
     "other",
   );
-  expect(after.users).toEqual(data.users);
-  expect(after.progress).toEqual(data.progress);
-  expect(after.groups).toEqual(data.groups);
+  expect(after.users).toEqual(baseline.users);
+  expect(after.progress).toEqual(baseline.progress);
+  expect(after.groups).toEqual(baseline.groups);
   await page
     .getByRole("button", { name: "Manage Customer success", exact: true })
     .click();

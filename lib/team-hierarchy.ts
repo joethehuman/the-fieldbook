@@ -1,3 +1,4 @@
+import { learningChangeImpact } from "./assignment-audiences";
 import type { Workspace } from "./store";
 import { ancestorIds, canParent, reportTeamIds, type Team } from "./types";
 
@@ -52,6 +53,7 @@ export function teamMoveImpact(data: Workspace, id: string, parentId: string) {
     .filter(({ gained, lost }) => gained.length || lost.length);
   return {
     next,
+    learning: learningChangeImpact(data, { ...data, teams: next }),
     branch,
     people,
     managers,
@@ -63,6 +65,7 @@ export function teamMoveImpact(data: Workspace, id: string, parentId: string) {
 /** Include inactive and pending accounts; removing references is a separate save. */
 export function teamDeletionBlockers(data: Workspace, id: string) {
   return {
+    learning: data.teams?.find(t => t.id === id)?.learningItems || [],
     members: data.users.filter((user) => user.teamId === id),
     pending: (data.pendingUsers || []).filter((user) => user.teamId === id),
     children: (data.teams || []).filter((team) => team.parentId === id),

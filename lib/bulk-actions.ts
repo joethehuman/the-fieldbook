@@ -1,3 +1,4 @@
+import { reconcileAssignments } from "./assignment-episodes";
 import type { Workspace } from "./store";
 import type { Content, User } from "./types";
 import { availableDocSections } from "./docs-navigation";
@@ -94,6 +95,7 @@ export function expireDemoDeleted(
         ...c,
         courseIds: c.courseIds.filter((id) => id !== item.id),
       }));
+      next.teams = next.teams?.map(t => ({ ...t, requiredCourseIds: t.requiredCourseIds?.filter(id => id !== item.id), learningItems: t.learningItems?.filter(i => i.kind !== "course" || i.id !== item.id) }));
       next.groups = next.groups.map((g) => ({
         ...g,
         requiredCourseIds: g.requiredCourseIds?.filter((id) => id !== item.id),
@@ -280,5 +282,5 @@ export function applyDemoBulk(
       });
     }
   }
-  return { data, results };
+  return { data: { ...data, users: reconcileAssignments(before, data, new Date(now).toISOString(), before.users.every(u => !u.learningAssignments)) }, results };
 }

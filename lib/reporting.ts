@@ -25,6 +25,7 @@ export function teamProgressRows(
 ) {
   const teams = data.teams || [],
     allowed = reportTeamIds(viewer, teams);
+  const effectiveTeam = (u: User) => u.teamId || teams.find(t => t.system === "organization")?.id;
   if (!viewer.active || viewer.registered === false) return [];
   return data.users
     .filter(
@@ -32,10 +33,10 @@ export function teamProgressRows(
         u.active &&
         (viewer.role === "admin" ||
           (["manager", "contributor"].includes(viewer.role) &&
-            !!u.teamId &&
-            allowed.has(u.teamId))) &&
+            !!effectiveTeam(u) &&
+            allowed.has(effectiveTeam(u)!))) &&
         (teamId === "all" ||
-          (!!u.teamId && ancestorIds(u.teamId, teams).has(teamId))) &&
+          (!!effectiveTeam(u) && ancestorIds(effectiveTeam(u)!, teams).has(teamId))) &&
         `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()),
     )
     .map((u) => {
@@ -51,7 +52,7 @@ export function teamProgressRows(
         u,
         assigned,
         completed,
-        team: teams.find((t) => t.id === u.teamId)?.name || "No team",
+        team: teams.find((t) => t.id === effectiveTeam(u))?.name || "No team",
         percent: assigned.length
           ? completionPercent(completed, assigned.length)
           : null,
