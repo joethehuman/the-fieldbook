@@ -235,6 +235,10 @@ export function ReaderShell({
         menu={menu}
         pending={navigationPending && showNavigationProgress}
         admin={section === "admin"}
+        nativeOverscroll={
+          ["docs", "updates", "curricula"].includes(section) ||
+          (section === "courses" && !selected)
+        }
         alert={
           accountError && (
             <Alert variant="destructive" role="alert">

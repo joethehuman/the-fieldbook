@@ -16,6 +16,7 @@ export default function Page() {
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState(false);
   const [pending, setPending] = useState(false);
+  const [nativeOverscroll, setNativeOverscroll] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   return (
     <WorkspaceFrame
@@ -23,6 +24,7 @@ export default function Page() {
       collapsed={collapsed}
       menu={menu}
       pending={pending}
+      nativeOverscroll={nativeOverscroll}
       onDismiss={() => setMenu(false)}
       sidebar={
         <>
@@ -84,6 +86,10 @@ export default function Page() {
         <Button variant="outline" onClick={() => setPending(!pending)}>
           {pending ? "Hide pending indicator" : "Show pending indicator"}
         </Button>
+        <Button variant="outline" aria-pressed={nativeOverscroll} onClick={() => setNativeOverscroll(!nativeOverscroll)}>
+          {nativeOverscroll ? "Disable native edge bounce" : "Try native edge bounce"}
+        </Button>
+        <p>Edge bounce follows the browser and device. Reduced motion disables the effect.</p>
         {Array.from({ length: 12 }, (_, index) => (
           <Card key={index}>
             <h2>Example section {index + 1}</h2>

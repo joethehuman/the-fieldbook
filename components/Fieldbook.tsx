@@ -405,6 +405,9 @@ export default function Fieldbook() {
       menu={menu}
       pending={false}
       admin={view === "admin" && canPublish(user)}
+      nativeOverscroll={
+        ["docs", "briefs", "learn"].includes(view) && item?.kind !== "course"
+      }
       onDismiss={() => setMenu(false)}
       sidebar={
         <>

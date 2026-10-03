@@ -17,6 +17,7 @@ export function WorkspaceFrame({
   alert,
   overlays,
   admin = false,
+  nativeOverscroll = false,
   onDismiss,
   onClickCapture,
 }: {
@@ -30,6 +31,7 @@ export function WorkspaceFrame({
   alert?: ReactNode;
   overlays?: ReactNode;
   admin?: boolean;
+  nativeOverscroll?: boolean;
   onDismiss: () => void;
   onClickCapture?: MouseEventHandler<HTMLDivElement>;
 }) {
@@ -70,6 +72,7 @@ export function WorkspaceFrame({
         <main
           id="main-content"
           className={`main-content${admin ? " admin-content" : ""}`}
+          data-native-overscroll={(nativeOverscroll && !admin) || undefined}
           tabIndex={-1}
         >
           {children}

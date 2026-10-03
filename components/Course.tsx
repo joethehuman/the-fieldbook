@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ArrowRight, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, Minus, Plus } from "lucide-react";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -13,6 +13,7 @@ import { ActionGroup } from "./ui/action-group";
 import { ImageViewer } from "./patterns/image-viewer";
 import { NavigationButton } from "./patterns/navigation-button";
 import { CourseVideo } from "./patterns/course-video";
+import { useCourseReaderLayout } from "./patterns/use-course-reader-layout";
 import Markdown from "./Markdown";
 import { correctOptionIds, optionIds, quizUnlocked, requiresPassing, type QuizAnswers } from "@/lib/course-quiz";
 import { isComplete, type Content, type Progress } from "@/lib/types";
@@ -47,8 +48,10 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const [saveError, setSaveError] = useState("");
   const [image, setImage] = useState<{ src: string; alt: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const courseRoot = useRef<HTMLDivElement>(null);
+  const reader = useRef<HTMLDivElement>(null);
   const activeCard = useRef<HTMLElement>(null);
-  const sidebarPanel = useRef<HTMLElement>(null);
+  useCourseReaderLayout(courseRoot);
   const mounted = useRef(false);
   const didResume = useRef(false);
   const lesson = course.lessons[step];
@@ -61,30 +64,6 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   const question = course.questions[questionIndex];
   const score = latestAttempt?.answers?.filter((answer) => answer.correct).length;
   const multi = (index: number) => course.questions[index].multiple ?? correctOptionIds(course.questions[index]).length > 1;
-  useLayoutEffect(() => {
-    const panel = sidebarPanel.current;
-    const details = panel?.querySelector<HTMLElement>(".course-detail-heading");
-    const exit = panel?.querySelector<HTMLElement>(".course-sidebar-exit");
-    if (!panel || !details || !exit) return;
-    // Only the outline has a minimum. Measure the surrounding content so a
-    // short viewport cannot clip it, without making the card fill a tall one.
-    const measure = () => {
-      const style = getComputedStyle(panel);
-      const chrome = details.getBoundingClientRect().height + exit.getBoundingClientRect().height
-        + 2 * parseFloat(style.rowGap)
-        + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
-        + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-      const value = `${chrome}px`;
-      if (panel.style.getPropertyValue("--course-sidebar-chrome-height") !== value)
-        panel.style.setProperty("--course-sidebar-chrome-height", value);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(panel);
-    observer.observe(details);
-    observer.observe(exit);
-    return () => observer.disconnect();
-  }, []);
   useEffect(() => {
     if (!guest || initialLessonId || !p || didResume.current) return;
     didResume.current = true;
@@ -98,10 +77,14 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
   }, [guest, initialLessonId, p, step, course.lessons]);
   useEffect(() => {
     if (!mounted.current) { mounted.current = true; return; }
-    requestAnimationFrame(() => {
+    const request = requestAnimationFrame(() => {
       heading.current?.focus({ preventScroll: true });
-      activeCard.current?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
+      const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth";
+      if (courseRoot.current?.dataset.scrollLayout === "workspace")
+        reader.current?.scrollTo({ top: 0, behavior });
+      else activeCard.current?.scrollIntoView({ behavior, block: "start" });
     });
+    return () => cancelAnimationFrame(request);
   }, [step, questionIndex, showResults]);
   async function record(lessonId?: string, selections?: QuizAnswers, finish?: boolean) {
     return onProgress ? onProgress(lessonId, selections, finish) : onDemoProgress?.(lessonId, selections, finish);
@@ -149,10 +132,10 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
     catch (error) { setSaveError((error as Error).message); }
     finally { setBusy(false); }
   }
-  return <div className="course-detail course-player">
+  return <div ref={courseRoot} className="course-detail course-player">
     <div className="lesson-layout">
       <aside className="course-sidebar">
-        <Card ref={sidebarPanel} className="course-sidebar-panel">
+        <Card className="course-sidebar-panel">
           <div className="course-detail-heading">
             <span className="eyebrow">{curriculumTitle || course.category}</span>
             <h1>{course.title}</h1>
@@ -179,7 +162,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
           </div>
         </Card>
       </aside>
-      <div className="course-reader">
+      <div ref={reader} className="course-reader focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-[-2px]" role="region" aria-label={lesson ? "Lesson content" : "Course activity"} data-native-overscroll={!!lesson || undefined}>
         {saveError && <Alert variant="destructive" role="alert">{saveError}</Alert>}
         {lesson ? <>
           <section ref={activeCard} className="course-lesson grid gap-6">

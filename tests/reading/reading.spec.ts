@@ -3,6 +3,7 @@ import { freshWorkspace } from "../../lib/store";
 import type { Content } from "../../lib/types";
 import { courseSidebarGap, expectDesktopOutlineMinimum, expectContentSizedCourseSidebar, exercisePreviousLessons } from "../fixtures/course-layout";
 import { expectShortLessonFits, exerciseImageViewer, readerImageAlt, readerImageUrl, serveReaderImage } from "../fixtures/reader-layout";
+import { exerciseLessonScrollOwner, expectNativePageOverscroll } from "../fixtures/native-overscroll";
 const backend = "http://127.0.0.1:3130";
 const ids = [
   "00000000-0000-4000-8000-000000000021",
@@ -71,6 +72,48 @@ async function fixture(request: any, extra = {}) {
   });
 }
 test.beforeEach(async ({ request }) => fixture(request));
+
+test("installed learner pages allow native edge bounce with a reduced-motion opt-out", async ({ page, request }) => {
+  await fixture(request, { settings: { access: "public", homePage: "courses" } });
+  for (const path of ["/", "/courses", "/updates", `/updates/${ids[1]}`, `/docs/${ids[0]}`, "/curricula"]) {
+    await page.goto(path);
+    await expectNativePageOverscroll(page);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await expectNativePageOverscroll(page, false);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+  }
+});
+
+test("installed lesson pane keeps native input and final actions inside the usable workspace", async ({ page, request }, info) => {
+  test.skip(info.project.name !== "desktop", "This story resizes desktop through short and enlarged-phone layouts.");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  const course = { ...items[2], lessons: items[2].lessons.map((lesson, index) => ({
+    ...lesson, body: index === 0 ? "An extended lesson explanation.\n\n".repeat(80) : "A concise explanation.",
+  })) };
+  await fixture(request, { documents: documents([items[0], items[1], course]) });
+  await page.goto(`/courses/${ids[2]}?lesson=first`);
+  await exerciseLessonScrollOwner(page, "Second lesson", (name) => info.outputPath(name));
+});
+
+test("video theater view leaves the bounded lesson pane without remounting the player", async ({ page, request }, info) => {
+  test.skip(info.project.name !== "desktop", "Narrow layouts already use the natural page.");
+  const course = { ...items[2], lessons: items[2].lessons.map((lesson, index) => ({
+    ...lesson, videoUrl: index === 0 ? "https://www.youtube.com/watch?v=example1234" : undefined,
+  })) };
+  await page.route(/youtube.*\/embed\//, (route) => route.fulfill({ contentType: "text/html", body: "<p>Synthetic video player</p>" }));
+  await fixture(request, { documents: documents([course]) });
+  await page.goto(`/courses/${ids[2]}?lesson=first`);
+  const player = page.locator(".course-video iframe");
+  await expect(player).toBeVisible();
+  await player.evaluate((element) => { element.setAttribute("data-preserved-player", "true"); });
+  await expect(page.locator(".course-player")).toHaveAttribute("data-scroll-layout", "workspace");
+  await page.getByRole("button", { name: "Theater view", exact: true }).click();
+  await expect(page.locator(".course-player")).toHaveAttribute("data-scroll-layout", "page");
+  await expect(player).toHaveAttribute("data-preserved-player", "true");
+  await page.getByRole("button", { name: "Exit theater", exact: true }).click();
+  await expect(page.locator(".course-player")).toHaveAttribute("data-scroll-layout", "workspace");
+  await expect(player).toHaveAttribute("data-preserved-player", "true");
+});
 
 test("installed course sidebar preserves header spacing across lessons and quiz", async ({ page, request }, info) => {
   test.skip(info.project.name !== "desktop", "The course panel stacks on narrow screens.");

@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Allow native browser edge bounce on learner course browsing, Docs and Updates. On roomy desktop screens, the course player scrolls its lesson content independently; narrow or short layouts retain a reachable page. Administration stays unchanged, and reduced motion disables the added bounce. The effect follows browser and device support.
+
 - Fit desktop content editors to the available workspace, keeping titles and controls visible while overflowing writing, Outline, Details or Quiz panes scroll independently. Use natural page scrolling on narrow or short screens so every control stays reachable.
 
 - Keep independent navigation, outlines and picker lists from scrolling their surroundings at either end. Preserve compact popup sizing, keep picker search/actions visible, and cap searchable popups to their actual available space.

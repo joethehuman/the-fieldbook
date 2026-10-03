@@ -316,6 +316,7 @@ for (const app of ["demo", "production"] as const) {
       data.content = docs;
       data.settings = {
         ...defaultSettings,
+        ...data.settings,
         docCategoryOrder: ["Getting started", "Reference"],
       };
       await page.addInitScript((data) => {
