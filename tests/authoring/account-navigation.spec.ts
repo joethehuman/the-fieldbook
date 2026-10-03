@@ -246,7 +246,7 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
     await select();
     await expect(details).toHaveCount(0);
     await expect(
-      page.getByRole("heading", { name: "People & completion", exact: true }),
+      page.getByRole("heading", { name: "Progress", exact: true }),
     ).toBeVisible();
     if (entry === "account menu") {
       await navigation(page);
@@ -310,7 +310,7 @@ test("Contributor team progress keeps a failed editor on Cancel and opens the ma
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page).toHaveURL(installed ? /\/team$/ : /#team$/);
   await expect(
-    page.getByRole("heading", { name: "People & completion", exact: true }),
+    page.getByRole("heading", { name: "Progress", exact: true }),
   ).toBeVisible();
   await expect(title).toHaveCount(0);
 });

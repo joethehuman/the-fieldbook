@@ -52,7 +52,11 @@ export function TeamProgress({
   data: sourceData,
   user,
   registerLandingNavigation,
+  initialPerson,
+  onDestinationChange,
 }: {
+  initialPerson?: string;
+  onDestinationChange?: (id?: string) => Promise<boolean>;
   data: Workspace;
   user: User;
   registerLandingNavigation?: RegisterLandingNavigation;
@@ -130,7 +134,8 @@ export function TeamProgress({
       ?.querySelector<HTMLButtonElement>(`[data-person-id="${personId}"]`)
       ?.focus({ preventScroll: true });
   }, [person]);
-  function back() {
+  function back(restoring = false) {
+    if (onDestinationChange && !restoring) { void onDestinationChange(); return; }
     detailEpoch.current++;
     returnToPerson.current = person?.u.id || null;
     setPerson(null);
@@ -138,7 +143,7 @@ export function TeamProgress({
     setError("");
   }
   useEffect(() => {
-    registerLandingNavigation?.({ isCurrent: !person, open: back });
+    registerLandingNavigation?.({ isCurrent: !person, open: () => back() });
     return () => registerLandingNavigation?.(null);
   });
   useEffect(
@@ -158,7 +163,16 @@ export function TeamProgress({
     setFilters({ ...emptyProgressFilters });
     setPage(1);
   };
-  async function open(row: ProgressRow) {
+  useEffect(() => {
+    if (!initialPerson) {
+      if (onDestinationChange && person) back(true);
+      return;
+    }
+    const row = all.find((entry) => entry.u.id === initialPerson);
+    if (row) void open(row, true);
+  }, [initialPerson]);
+  async function open(row: ProgressRow, restoring = false) {
+    if (onDestinationChange && !restoring) { await onDestinationChange(row.u.id); return; }
     if (!person) savedScroll.current = scrollOwner()?.scrollTop || 0;
     setPerson(row);
     setDetail(null);
@@ -554,7 +568,7 @@ export function TeamProgress({
       {person && (
         <div className="grid min-w-0 gap-6">
           <DetailNavigation
-            items={[{ label: "Back to progress", onSelect: back }]}
+            items={[{ label: "Back to progress", onSelect: () => back() }]}
             current={person.u.name}
           />
           <SectionHeader

@@ -99,7 +99,7 @@ export function ReaderCoursePlayer({
 
   const back = curriculum
     ? `/curricula/${encodeURIComponent(curriculum)}?from=${encodeURIComponent(safeReturnPath(from))}`
-    : "/courses";
+    : safeReturnPath(from);
   return (
     <Course
       key={`${course.id}:${lessonId}`}
@@ -110,7 +110,7 @@ export function ReaderCoursePlayer({
       onProgress={record}
       onBack={() => router.push(back)}
       backHref={back}
-      lessonBaseHref={`/courses/${encodeURIComponent(course.id)}${curriculum ? `?curriculum=${encodeURIComponent(curriculum)}&from=${encodeURIComponent(safeReturnPath(from))}` : ""}`}
+      lessonBaseHref={`/courses/${encodeURIComponent(course.id)}?from=${encodeURIComponent(safeReturnPath(from))}${curriculum ? `&curriculum=${encodeURIComponent(curriculum)}` : ""}`}
       backLabel={curriculum ? "Back to curriculum" : "Back to courses"}
       guest={!signedIn}
       onSignIn={() =>

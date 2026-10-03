@@ -94,10 +94,16 @@ const teamMutationSnapshot = (data: Workspace) =>
   ]);
 
 export function TeamsAdmin({
+  initialTeam,
+  initialTab,
+  onDestinationChange,
   data,
   onChange,
   registerNavigationGuard,
 }: {
+  initialTeam?: string;
+  initialTab?: import("@/lib/admin-destination").AdminDestination["panel"];
+  onDestinationChange?: (id?: string, panel?: import("@/lib/admin-destination").AdminDestination["panel"]) => Promise<boolean>;
   data: Workspace;
   onChange: (
     data: Workspace,
@@ -117,8 +123,8 @@ export function TeamsAdmin({
     token: number;
   }>();
   const browserRevealCount = useRef(0);
-  const [selected, setSelected] = useState("");
-  const [tab, setTab] = useState("members");
+  const [selected, setSelected] = useState(initialTeam || "");
+  const [tab, setTab] = useState<string>(initialTab || "members");
   const [query, setQuery] = useState("");
   const [selectTeams, setSelectTeams] = useState(false);
   const [memberSort, setMemberSort] = useState("name");
@@ -209,6 +215,10 @@ export function TeamsAdmin({
   }
   async function openTeam(id: string) {
     if (!(await guard.current())) return;
+    if (onDestinationChange) {
+      await onDestinationChange(id || undefined);
+      return;
+    }
     resetDraft();
     setSelected(id);
     setTab("members");
@@ -452,6 +462,7 @@ export function TeamsAdmin({
         },
       )
     ) {
+      if (onDestinationChange) await onDestinationChange();
       setSelected("");
       setBrowseId(
         value.parentId === organization?.id ? "" : value.parentId || "",
@@ -918,6 +929,7 @@ export function TeamsAdmin({
             }
             onValueChange={async (value) => {
               if (!(await guard.current())) return;
+              if (onDestinationChange) { await onDestinationChange(selected, value as "members" | "subteams"); return; }
               resetDraft();
               setTab(value);
               destination.reveal(false);

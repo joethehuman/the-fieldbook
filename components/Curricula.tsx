@@ -45,12 +45,18 @@ import {
 } from "@/lib/organization-change";
 
 export default function Curricula({
+  initialCurriculum,
+  createNew,
+  onDestinationChange,
   data,
   onChange,
   onUpload,
   registerNavigationGuard,
   onPrepareAssignments,
 }: {
+  initialCurriculum?: string;
+  createNew?: boolean;
+  onDestinationChange?: (id?: string, create?: boolean) => Promise<boolean>;
   registerNavigationGuard?: RegisterNavigationGuard;
   onPrepareAssignments?: () => Promise<Workspace>;
   data: Workspace;
@@ -62,7 +68,19 @@ export default function Curricula({
 }) {
   const destination = useRevealTarget<HTMLElement>();
   const notify = useToast();
-  const [editing, setEditing] = useState<Curriculum | null>(null);
+  const [editing, setEditing] = useState<Curriculum | null>(() =>
+    createNew
+      ? {
+          id: crypto.randomUUID(),
+          name: "",
+          description: "",
+          courseIds: [],
+          status: "draft",
+        }
+      : structuredClone(
+          data.curricula?.find((item) => item.id === initialCurriculum) || null,
+        ),
+  );
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -73,7 +91,9 @@ export default function Curricula({
     setStatus("all");
   };
   const { confirm } = useInteractionDialog();
-  const savedCurriculum = useRef<Curriculum | null>(null);
+  const savedCurriculum = useRef<Curriculum | null>(
+    editing ? structuredClone(editing) : null,
+  );
   const dirty = !!editing && !equalJson(editing, savedCurriculum.current);
   const guard = useRef(async () => true);
   guard.current = async () =>
@@ -129,6 +149,10 @@ export default function Curricula({
     );
   async function closeEditor() {
     if (await guard.current()) {
+      if (onDestinationChange) {
+        await onDestinationChange();
+        return;
+      }
       setEditing(null);
       destination.reveal();
       setNotice("");
@@ -182,6 +206,7 @@ export default function Curricula({
             : [...all, updated];
         })(),
       });
+      if (onDestinationChange) await onDestinationChange();
       setEditing(null);
       destination.reveal();
       setNotice("");
@@ -427,6 +452,10 @@ export default function Curricula({
               <Button
                 type="button"
                 onClick={() => {
+                  if (onDestinationChange) {
+                    void onDestinationChange(undefined, true);
+                    return;
+                  }
                   const draft: Curriculum = {
                     id: crypto.randomUUID(),
                     name: "",
@@ -594,6 +623,10 @@ export default function Curricula({
                         variant="outline"
                         disabled={busy}
                         onClick={() => {
+                          if (onDestinationChange) {
+                            void onDestinationChange(c.id);
+                            return;
+                          }
                           savedCurriculum.current = structuredClone(c);
                           setEditing(structuredClone(c));
                           destination.reveal();
