@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { organizationHomePath } from "../../lib/navigation";
+import { MCP_CAPABILITY_DESCRIPTIONS } from "../../lib/mcp-access";
 const backend = "http://127.0.0.1:3130/fixture";
 const file = "00000000-0000-4000-8000-000000000001.png";
 async function bounds(page: Page) {
@@ -361,6 +362,8 @@ test("consent and connection identity preserve purpose and demo stays simulated"
         client: { name: "Synthetic AI" },
         user: { email: "admin@example.test" },
         scope: "openid email",
+        capabilities: ["content:read", "content:write"],
+        capabilityDescriptions: MCP_CAPABILITY_DESCRIPTIONS,
       },
     }),
   );
@@ -368,11 +371,11 @@ test("consent and connection identity preserve purpose and demo stays simulated"
   await expect(page.locator(".logo")).toContainText("Acme Learning");
   await expect(
     page.getByRole("heading", {
-      name: "Allow Synthetic AI to manage content?",
+      name: "Allow Synthetic AI to use Fieldbook?",
     }),
   ).toBeVisible();
   await expect(
-    page.getByText("Read published content and drafts."),
+    page.getByText("Read published content and unpublished drafts."),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Allow connection" }),
@@ -381,9 +384,7 @@ test("consent and connection identity preserve purpose and demo stays simulated"
     page.getByRole("button", { name: "Deny", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Tab");
-  await expect(
-    page.getByRole("button", { name: "Allow connection" }),
-  ).toBeFocused();
+  await expect(page.getByRole("checkbox").first()).toBeFocused();
   await bounds(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
@@ -463,6 +464,8 @@ test("signed-out consent and connections preserve destinations and consent decis
         client: { name: "Synthetic AI" },
         user: { email: "admin@example.test" },
         scope: "openid email",
+        capabilities: ["content:read", "content:write"],
+        capabilityDescriptions: MCP_CAPABILITY_DESCRIPTIONS,
       },
     }),
   );
@@ -484,9 +487,80 @@ test("signed-out consent and connections preserve destinations and consent decis
     await expect(page).toHaveURL("/sign-in");
   }
   expect(decisions).toEqual([
-    { id: "synthetic-return", allow: false },
-    { id: "synthetic-return", allow: true },
+    {
+      id: "synthetic-return",
+      allow: false,
+      capabilities: ["content:read", "content:write"],
+    },
+    {
+      id: "synthetic-return",
+      allow: true,
+      capabilities: ["content:read", "content:write"],
+    },
   ]);
+});
+
+test("existing AI connections require explicit permission approval and keep their client identity", async ({
+  page,
+}, info) => {
+  let approved = ["content:read"];
+  const changes: unknown[] = [];
+  await page.route("**/api/connections", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON();
+      changes.push(body);
+      approved = body.capabilities;
+      return route.fulfill({ json: { approved: true } });
+    }
+    return route.fulfill({
+      json: [
+        {
+          client_id: "existing-client",
+          client_name: "Trusted AI",
+          enabled: true,
+          capabilities: approved,
+          capability_version: 1,
+          access: {
+            capabilities: approved,
+            availableCapabilities: [
+              "content:read",
+              "media:write",
+              "reports:read",
+            ],
+          },
+          capabilityDescriptions: MCP_CAPABILITY_DESCRIPTIONS,
+        },
+      ],
+    });
+  });
+  await page.goto("/connections");
+  await expect(page.getByRole("heading", { name: "Trusted AI" })).toBeVisible();
+  await page.getByRole("button", { name: "Review permissions" }).click();
+  const media = page.getByRole("checkbox", {
+    name: MCP_CAPABILITY_DESCRIPTIONS["media:write"],
+  });
+  await expect(media).not.toBeChecked();
+  await media.check();
+  await page
+    .getByRole("button", { name: "Approve selected permissions" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Review permissions" }),
+  ).toBeVisible();
+  expect(changes).toEqual([
+    {
+      clientId: "existing-client",
+      capabilities: ["content:read", "media:write"],
+    },
+  ]);
+  await expect(
+    page.getByText(MCP_CAPABILITY_DESCRIPTIONS["media:write"]),
+  ).toBeVisible();
+  await bounds(page);
+  await page.screenshot({
+    path: info.outputPath("connections-permissions.png"),
+    fullPage: true,
+  });
 });
 
 test("expired, denied and provider-failed callback outcomes remain distinct", async ({
@@ -743,7 +817,9 @@ test("shared settings library and connection states work in the server app", asy
   await section("Due dates");
   await expect(
     page.getByRole("spinbutton", { name: "New user onboarding window (days)" }),
-  ).toHaveAccessibleDescription(/existing onboarding windows stay fixed.*Changes to the catch-up window still update course targets/);
+  ).toHaveAccessibleDescription(
+    /Defaults apply to future onboarding clocks.*Existing onboarding windows and saved course deadlines stay fixed.*review recalculation/,
+  );
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("server-settings-window.png"),
@@ -762,9 +838,13 @@ test("shared settings library and connection states work in the server app", asy
   await page.keyboard.press("Enter");
   const menu = page.getByRole("menu", { name: /^Insert content/ });
   await expect(menu).toBeVisible();
-  await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();
+  await expect(
+    menu.getByRole("menuitem", { name: "Normal Text", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("ArrowDown");
-  await expect(menu.getByRole("menuitem", { name: "Heading 1", exact: true })).toBeFocused();
+  await expect(
+    menu.getByRole("menuitem", { name: "Heading 1", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(commands).toBeFocused();

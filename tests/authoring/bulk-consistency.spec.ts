@@ -78,10 +78,10 @@ test("bulk group edits preserve the organization and preregistered people use th
     .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await page
-    .getByRole("menuitem", { name: "Add to learning groups", exact: true })
+    .getByRole("menuitem", { name: "Assign to teams or groups", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("checkbox", { name: group.name, exact: true }).check();
+  await dialog.getByRole("checkbox", { name: `Group: ${group.name}`, exact: true }).check();
   await dialog
     .getByRole("button", { name: "Apply changes", exact: true })
     .click();

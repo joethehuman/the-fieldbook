@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { cardArtSchema } from "./schemas";
+import { validateOrganizationTeams } from "@/lib/organization-team";
 const id = z.string().min(1).max(80);
 const node = z.object({
   id,
@@ -7,6 +8,8 @@ const node = z.object({
   parentId: id.optional(),
   requiredCourseIds: z.array(z.uuid()).max(1000).optional(),
   teamIds: z.array(id).max(1000).optional(),
+  legacyDirectTeamIds: z.array(id).max(1000).optional(),
+  teamLinkScope: z.enum(["direct", "subtree"]).optional(),
   learningItems: z
     .array(z.object({ kind: z.enum(["course", "curriculum"]), id }))
     .max(1000)
@@ -29,7 +32,14 @@ export const governanceSchema = z
       .max(1000)
       .optional(),
     groups: z.array(node).max(1000),
-    teams: z.array(node.extend({ managerId: z.uuid().optional() })).max(1000),
+    teams: z
+      .array(
+        node.extend({
+          managerId: z.uuid().optional(),
+          system: z.literal("organization").optional(),
+        }),
+      )
+      .max(1000),
     users: z
       .array(
         z.object({
@@ -48,6 +58,14 @@ export const governanceSchema = z
   })
   .superRefine((value, ctx) => {
     const fail = (message: string) => ctx.addIssue({ code: "custom", message });
+    try {
+      validateOrganizationTeams(
+        value.teams,
+        value.teams.find((team) => team.system === "organization")?.id,
+      );
+    } catch (error) {
+      fail((error as Error).message);
+    }
     for (const nodes of [value.groups, value.teams]) {
       const map = new Map(nodes.map((n) => [n.id, n]));
       if (
@@ -87,10 +105,22 @@ export const governanceSchema = z
         (c.status === "published" && !c.courseIds.length)
       )
         fail("Published curricula need unique courses.");
-    for (const g of value.groups) {
+    for (const g of [...value.groups, ...value.teams]) {
+      if (value.groups.includes(g) && g.parentId)
+        fail(
+          "Learning groups are independent audiences and cannot have parents.",
+        );
+      if (value.groups.includes(g) && g.teamLinkScope === "direct")
+        fail(
+          "Legacy direct team links must be preserved separately. Reload before saving.",
+        );
       if (
-        g.teamIds?.some((id) => !teams.has(id)) ||
-        new Set(g.teamIds).size !== (g.teamIds?.length || 0)
+        [...(g.teamIds || []), ...(g.legacyDirectTeamIds || [])].some(
+          (id) => !teams.has(id),
+        ) ||
+        new Set([...(g.teamIds || []), ...(g.legacyDirectTeamIds || [])])
+          .size !==
+          (g.teamIds?.length || 0) + (g.legacyDirectTeamIds?.length || 0)
       )
         fail("Invalid team link.");
       if (

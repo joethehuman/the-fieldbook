@@ -42,6 +42,13 @@ export function BulkExamples() {
         onSelectionChange={selection.setSelected}
         commands={[
           {
+            id: "assign",
+            label: "Assign to teams or groups",
+            description: "One picker uses typed labels and retains selections while searching.",
+            options: [{id:"team:sales",label:"Team: Sales"},{id:"group:sales",label:"Group: Sales"}],
+            apply: (ids) => setMoveNotice(`Assignment audiences: ${ids.join(", ")}`),
+          },
+          {
             id: "move",
             label: "Move to example section",
             description:

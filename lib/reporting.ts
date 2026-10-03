@@ -4,6 +4,7 @@ import {
   assignedCourses,
   isComplete,
   reportTeamIds,
+  reportingTeamId,
   type Content,
   type User,
 } from "./types";
@@ -32,10 +33,11 @@ export function teamProgressRows(
         u.active &&
         (viewer.role === "admin" ||
           (["manager", "contributor"].includes(viewer.role) &&
-            !!u.teamId &&
-            allowed.has(u.teamId))) &&
+            allowed.has(reportingTeamId(u.teamId, teams) || ""))) &&
         (teamId === "all" ||
-          (!!u.teamId && ancestorIds(u.teamId, teams).has(teamId))) &&
+          ancestorIds(reportingTeamId(u.teamId, teams) || "", teams).has(
+            teamId,
+          )) &&
         `${u.name} ${u.email}`.toLowerCase().includes(query.toLowerCase()),
     )
     .map((u) => {
@@ -51,7 +53,9 @@ export function teamProgressRows(
         u,
         assigned,
         completed,
-        team: teams.find((t) => t.id === u.teamId)?.name || "No team",
+        team:
+          teams.find((t) => t.id === reportingTeamId(u.teamId, teams))?.name ||
+          "No team",
         percent: assigned.length
           ? completionPercent(completed, assigned.length)
           : null,
@@ -118,7 +122,9 @@ export function courseProgressRow(
     done,
     target,
     status,
-    team: data.teams?.find((t) => t.id === u.teamId)?.name || "No team",
+    team:
+      data.teams?.find((t) => t.id === reportingTeamId(u.teamId, data.teams))
+        ?.name || "No team",
     assignment: assignedCourses(
       data.publishedContent || data.content,
       u,

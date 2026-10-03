@@ -125,9 +125,14 @@ export function AdminWorkspace({
             setData(result.data);
             return result.results;
           }}
+          onPrepareAssignments={async () => {
+            const next = await runtime.admin.prepare("governance");
+            setData(next);
+            return next;
+          }}
           onOpenTab={async (next) => {
             const scope =
-              next === "people" || next === "teams"
+              next === "people" || next === "teams" || next === "curricula"
                 ? "people"
                 : next === "deleted"
                   ? "maintenance"
@@ -148,6 +153,11 @@ export function AdminWorkspace({
           }}
           onUnpublish={async (id) => {
             setData(await runtime.admin.unpublish(id));
+          }}
+          onReviewDeadlines={async (token) => {
+            const result = await runtime.reviewDeadlines(token);
+            if (token) setData(await runtime.refresh());
+            return result;
           }}
           onLearning={async (action) => {
             setReportIssue("Updating report…");
@@ -172,6 +182,7 @@ export function AdminWorkspace({
             setError("");
             return latest;
           }}
+          onLoadPublished={runtime.publishedContent}
         />
       </ReportAvailability.Provider>
     </>

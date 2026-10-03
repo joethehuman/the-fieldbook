@@ -1,4 +1,5 @@
 "use client";
+import { DeadlineReview } from "./DeadlineReview";
 import { FormField } from "@/components/patterns/form-field";
 import { TextField } from "./patterns/text-field";
 import { SettingsSection as SettingsGroup } from "./patterns/settings-section";
@@ -40,7 +41,9 @@ export default function SiteSettingsPanel({
   section,
   registerNavigationGuard,
   onSaveSettings,
+  onReviewDeadlines,
 }: {
+  onReviewDeadlines?: (token?: string) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
   data: Workspace;
   onChange: (next: Workspace) => void | Promise<void>;
   production: boolean;
@@ -337,11 +340,11 @@ export default function SiteSettingsPanel({
           description="Set the number of days for new users and ongoing catch-up."
           guidance={
             <div id="due-dates-help">
-              When off, learners see these courses as recommendations without
-              deadlines. Turning due dates on uses the windows below to set
-              targets. The onboarding default applies when a person's clock is
-              first set; existing onboarding windows stay fixed. Changes to the
-              catch-up window still update course targets.
+              Due dates add an overdue flag; completion always includes all assigned courses.
+              Turning dates off hides deadlines without resetting them or changing New/Existing stage.
+              Defaults apply to future onboarding clocks and assignment episodes. Existing onboarding
+              windows and saved course deadlines stay fixed; save the defaults, then review recalculation
+              to change existing dates.
             </div>
           }
         >
@@ -359,7 +362,7 @@ export default function SiteSettingsPanel({
               aria-describedby="due-dates-help"
               type="number"
               required
-              disabled={busy || settings.dueDatesEnabled === false}
+              disabled={busy}
               min={1}
               max={365}
               value={settings.onboardingDays ?? 90}
@@ -376,7 +379,7 @@ export default function SiteSettingsPanel({
               aria-describedby="due-dates-help"
               type="number"
               required
-              disabled={busy || settings.dueDatesEnabled === false}
+              disabled={busy}
               min={1}
               max={365}
               value={settings.catchUpDays ?? 30}
@@ -388,6 +391,7 @@ export default function SiteSettingsPanel({
               }
             />
           </FormField>
+          {onReviewDeadlines && <><FieldDescription>Save any changed defaults before reviewing existing deadlines.</FieldDescription><DeadlineReview onReview={onReviewDeadlines} disabled={busy || dirty} /></>}
         </SettingsGroup>
       )}
       {section === "access" && (
@@ -589,12 +593,6 @@ function McpSettings({ production, contributor }: { production: boolean; contrib
   useEffect(() => {
     setAddress(`${window.location.origin}/api/mcp`);
   }, []);
-  if (contributor && production) return (
-    <SettingsGroup id="mcp-contributor" title={<h3>Connect an AI tool</h3>}
-      guidance="MCP connections currently require an administrator account.">
-      <p>Use the publishing panel to manage content and feedback. Contributor MCP connections are not enabled in this version.</p>
-    </SettingsGroup>
-  );
   if (!production)
     return (
       <SettingsGroup
@@ -613,7 +611,9 @@ function McpSettings({ production, contributor }: { production: boolean; contrib
       id="mcp-connection"
       title={<h3>Connect an AI tool</h3>}
       description="Add Fieldbook as a custom MCP server in ChatGPT, Claude, or another compatible tool."
-      guidance="Review or revoke access from connected AI tools."
+      guidance={contributor
+        ? "Contributors can author and publish content, upload media and review feedback. Reporting requires an explicitly managed team."
+        : "Review, approve added permissions or revoke access from connected AI tools. Managers report only on explicitly managed teams and descendants."}
       actions={
         <Button asChild variant="outline">
           <a href="/connections">Manage connections →</a>
@@ -649,8 +649,9 @@ function McpSettings({ production, contributor }: { production: boolean; contrib
       <FieldDescription role="status">{copied}</FieldDescription>
       <ol className="mcp-steps">
         <li>Add the server address in your AI tool’s connection settings.</li>
-        <li>Sign in to Fieldbook as an administrator.</li>
-        <li>Review and approve the requested connection.</li>
+        <li>Sign in with your administrator, contributor or team manager account.</li>
+        <li>Review and approve the requested tool permissions.</li>
+        <li>For an existing connection, review added permissions in Manage connections, refresh its tools and start a new conversation.</li>
       </ol>
     </SettingsGroup>
   );

@@ -20,6 +20,10 @@ Routes validate requests and call Fieldbook services. Adapters translate provide
 
 These are interfaces for operations the application already needs. Each service currently has one supported implementation; small server composition modules select it. There is no dynamic plugin registry or alternate-provider stub.
 
+## MCP contract
+
+`lib/mcp-contract.ts` defines provider-neutral tool inputs, outputs, annotations and errors. `lib/mcp-access.ts` defines role and connection permissions. The generated `docs/mcp-contract.json` is checked with `pnpm check:mcp`. Catalog/media operations use `server/ports/mcp-data.ts`; scoped reports use `server/ports/mcp-reporting.ts`; identity and private transfers use the existing identity/storage ports. All clients call the same contract regardless of provider. A new adapter must preserve fresh authorization, explicit consent, atomic revisions, complete pagination and verified private uploads. It must translate its own provider errors and pass the SDK contract/security tests plus real hosted acceptance. No alternative provider is supplied by this change.
+
 ## Current deployment configuration
 
 Follow the [installation guide](installation.md) and [Vercel recipe](../deployment/vercel/README.md).
@@ -51,7 +55,7 @@ PostgreSQL is required. Preserve atomic revision comparisons, progress merges, a
 
 Private storage must support temporary non-upserting uploads, exact object metadata verification, temporary reads and idempotent removal. Respect an optional positive `FIELDBOOK_UPLOAD_MAX_BYTES` application limit and the provider's global/bucket limits; there is no fixed application ceiling. Return direct PUT instructions for small files or path-scoped TUS instructions for resumable transfers, with no server secret in either. The Supabase adapter uses its signed resumable endpoint for files above 6 MiB and 6 MiB chunks, with no upsert. Protect draft, published, artwork, settings and recovery references before deleting objects. An upload is not ready until the server verifies its exact owner, path, size and MIME type.
 
-Identity verification must distinguish an absent session from provider failure, confirm the identity required for registration, refresh cookies safely and support active-account checks. MCP additionally requires verified issuer, resource audience and client identity plus fresh Fieldbook grants and administrator status. Login and authorization of an external MCP client are separate flows. Google is the sole supported sign-in option; email/password and an email delivery service are not part of this setup.
+Identity verification must distinguish an absent session from provider failure, confirm the identity required for registration, refresh cookies safely and support active-account checks. MCP additionally requires verified issuer, resource audience and client identity plus fresh Fieldbook grants, roles, approved capabilities and managed-team scope. Login and authorization of an external MCP client are separate flows. Google is the sole supported sign-in option; email/password and an email delivery service are not part of this setup.
 
 ## Database and identity limits
 
@@ -59,7 +63,7 @@ The current migrations remain Supabase-specific. They combine ordinary PostgreSQ
 
 A plain PostgreSQL database or Neon is not a drop-in replacement for the current recipe. A new recipe needs its own reviewed PostgreSQL provisioning for the application schema, privileges, atomic operations and provider-specific services. Keep shared application SQL in one maintained source when extracting reusable setup, and verify each recipe's resulting schema. Existing Supabase installations must continue to follow their immutable migration lineage. The cleanup worker's authenticated HTTP endpoint can be invoked by another scheduler, but changing the current scheduling setup still needs explicit provisioning and verified retries.
 
-Current Supabase person IDs equal identity subjects, and its schema references `auth.users`. A fresh recipe for another identity service supplies suitable identity mapping and PostgreSQL provisioning instead of replaying Supabase-specific setup. It does not need to import or migrate any Supabase users. Preserve Fieldbook-owned roles, active status, stable person IDs and erasure/recovery rules.
+Fieldbook person IDs are stable roster IDs and can differ from the attached identity subject. The Supabase adapter maps `auth_user_id` to the person; its schema references `auth.users`. A fresh recipe for another identity service supplies suitable identity mapping and PostgreSQL provisioning instead of replaying Supabase-specific setup. It does not need to import or migrate any Supabase users. Preserve Fieldbook-owned roles, active status, stable person IDs and erasure/recovery rules.
 
 Moving an existing installation between stacks is separate and currently unsupported. A contributor can deliver a fresh-install recipe without building that transfer path. See [versions and upgrades](upgrading.md) for the responsibilities when updating an existing installation.
 

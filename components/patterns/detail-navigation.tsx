@@ -8,14 +8,16 @@ export function DetailNavigation({
   current,
   disabled,
   flush = false,
+  compact = false,
 }: {
   items: { label: string; onSelect: () => void | Promise<void> }[];
   current?: ReactNode;
   disabled?: boolean;
   flush?: boolean;
+  compact?: boolean;
 }) {
   return (
-    <nav aria-label="Navigation context" data-slot="detail-navigation">
+    <nav aria-label="Navigation context" data-slot="detail-navigation" data-compact={compact || undefined}>
       <ol className="flex min-w-0 flex-wrap items-center gap-x-1 gap-y-2 text-sm text-muted-foreground">
         {items.map((item, index) => (
           <li
@@ -31,12 +33,13 @@ export function DetailNavigation({
               size="sm"
               className={`min-w-0 max-w-full text-left${flush && index === 0 ? " px-0" : ""}`}
               disabled={disabled}
+              aria-label={compact && index === 0 ? item.label : undefined}
               onClick={item.onSelect}
             >
               {index === 0 && (
                 <ArrowLeft className="size-4" aria-hidden="true" />
               )}
-              <span className="[overflow-wrap:anywhere]">{item.label}</span>
+              <span className="detail-navigation-label [overflow-wrap:anywhere]">{item.label}</span>
             </Button>
           </li>
         ))}

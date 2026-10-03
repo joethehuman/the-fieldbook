@@ -1,10 +1,37 @@
 "use client";
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
+import { HierarchyPicker } from "@/components/patterns/hierarchy-picker";
+import { HierarchyBrowser } from "@/components/patterns/hierarchy-browser";
+import {
+  Dialog,
+  DialogContent,
+  DialogBody,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { BulkActions } from "@/components/patterns/bulk-actions";
+import {
+  SelectRows,
+  useBulkSelection,
+} from "@/components/patterns/bulk-selection";
+import { DataTable } from "@/components/patterns/data-table";
+import {
+  TableContainer,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ContentSelectionList } from "@/components/patterns/content-selection-list";
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
-import { Settings } from "lucide-react";
+import { Settings, Plus } from "lucide-react";
+import { CollectionControls } from "@/components/patterns/collection-controls";
+import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/patterns/form-field";
 import { SettingsSection } from "@/components/patterns/settings-section";
 import { LoadMore } from "@/components/patterns/load-more";
@@ -19,6 +46,7 @@ import { Note } from "@/components/ui/note";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { PublicationStatus } from "@/components/patterns/publication-status";
+import { EditorSaveStatus } from "@/components/patterns/editor-save-status";
 import {
   Progress,
   ProgressRing,
@@ -37,6 +65,31 @@ import { ActionGroup } from "@/components/ui/action-group";
 
 export function LibraryExamples() {
   const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
+  const [browserBranch, setBrowserBranch] = useState("");
+  const [browserQuery, setBrowserQuery] = useState("");
+  const [browserSelection, setBrowserSelection] = useState<string[]>([]);
+  const [selectBrowserTeams, setSelectBrowserTeams] = useState(false);
+  const [selectedContent, setSelectedContent] = useState<string[]>([]);
+  const [contentPickerOpen, setContentPickerOpen] = useState(false);
+  const [contentDraft, setContentDraft] = useState<string[]>([]);
+  const contentOptions = Array.from({ length: 100 }, (_, index) => ({
+    id: `catalog-content-${index}`,
+    label: `${["Discovery", "Security", "Customer success", "Product knowledge"][index % 4]} ${String(index + 1).padStart(3, "0")}`,
+    type: index % 10 === 0 ? ("curriculum" as const) : ("course" as const),
+    category:
+      index % 10 === 0
+        ? undefined
+        : ["Sales", "Operations", "Customer success", "Product"][index % 4],
+    description:
+      index % 10 === 0
+        ? "A collection of related courses"
+        : "A concise introduction for new and experienced learners",
+    searchText: `Published lesson about product discovery scenario ${index + 1}`,
+    updatedAt:
+      index % 10 === 0
+        ? undefined
+        : new Date(Date.UTC(2026, 8, 1 + index)).toISOString(),
+  }));
   const [selectedPeople, setSelectedPeople] = useState<string[]>([]);
   const progressTarget = useRevealTarget<HTMLElement>();
   const [feedback, setFeedback] = useState<{
@@ -171,7 +224,16 @@ export function LibraryExamples() {
           <PublicationStatus published={false} />
           <PublicationStatus published />
           <PublicationStatus published hasUnpublishedChanges />
+          <PublicationStatus published hasUnpublishedChanges layout="inline" />
         </ActionGroup>
+        <div className="grid gap-3" aria-label="Editor save status examples">
+          <EditorSaveStatus status="Not saved" published={false} />
+          <EditorSaveStatus status="Saved" published={false} />
+          <EditorSaveStatus status="Saved" published />
+          <EditorSaveStatus status="Saved" published hasUnpublishedChanges />
+          <EditorSaveStatus status="Saving…" published hasUnpublishedChanges />
+          <EditorSaveStatus status="Changes not saved" published failed />
+        </div>
         <p className="text-copy text-muted-foreground">
           Badges hold a short, single-line status. Keep details such as draft
           changes outside the pill.
@@ -219,10 +281,174 @@ export function LibraryExamples() {
         />
       </SettingsSection>
       <SettingsSection
+        id="catalog-content-selection"
+        title={<h3>Content assignment picker</h3>}
+        guidance="Browse 100 items by recent updates, category and content type, or search across published content. Selections stay checked across filters, sorting and pages."
+      >
+        <ContentSelectionList
+          value={selectedContent}
+          onChange={setSelectedContent}
+          showTypeFilter
+          options={contentOptions}
+        />
+        <Button
+          variant="outline"
+          onClick={() => {
+            setContentDraft(selectedContent);
+            setContentPickerOpen(true);
+          }}
+        >
+          Open assignment picker
+        </Button>
+        <Dialog open={contentPickerOpen} onOpenChange={setContentPickerOpen}>
+          <DialogContent size="selection">
+            <DialogTitle>Assign example content</DialogTitle>
+            <DialogDescription>
+              Search published content. The result area scrolls while controls
+              and actions stay in place.
+            </DialogDescription>
+            <DialogBody>
+              <ContentSelectionList
+                bounded
+                showTypeFilter
+                options={contentOptions}
+                value={contentDraft}
+                onChange={setContentDraft}
+              />
+            </DialogBody>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setContentPickerOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedContent(contentDraft);
+                  setContentPickerOpen(false);
+                }}
+              >
+                Apply selection
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </SettingsSection>
+      <GroupIndexExample />
+      <GroupRosterExample />
+      <HierarchyPickerExample />
+      <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
-        guidance="Use a disclosure list for nested teams. Search retains ancestor context; Tab and Enter operate ordinary buttons. Use single selection for branch moves, then review their reporting impact before saving."
+        guidance="Compact teams form one horizontal chart across every explored level. Choose a sibling to replace the downstream branch; scroll back to any earlier level. Open and Edit are explicit actions. Search and bulk selection use a flat list."
       >
+        <HierarchyBrowser
+          label="Example reporting teams"
+          branchId={browserBranch}
+          onBrowse={(id) => {
+            setBrowserBranch(id);
+            setBrowserQuery("");
+            setSelectBrowserTeams(false);
+            setBrowserSelection([]);
+          }}
+          onOpen={(id) => setMessage(`Open team roster: ${id}`)}
+          onEdit={(id) => setMessage(`Edit team: ${id}`)}
+          query={browserQuery}
+          onQueryChange={setBrowserQuery}
+          primaryAction={
+            <Button
+              onClick={() => setMessage("Create a team in this example.")}
+            >
+              <Plus aria-hidden="true" /> Add team
+            </Button>
+          }
+          secondaryActions={
+            <Button
+              variant="ghost"
+              onClick={() => setSelectBrowserTeams(!selectBrowserTeams)}
+            >
+              {selectBrowserTeams ? "Done selecting" : "Select teams"}
+            </Button>
+          }
+          selected={selectBrowserTeams ? browserSelection : undefined}
+          onSelectionChange={setBrowserSelection}
+          selectionActions={
+            selectBrowserTeams ? (
+              <p role="status">{browserSelection.length} selected</p>
+            ) : undefined
+          }
+          items={[
+            {
+              id: "revenue",
+              label: "Revenue",
+              description: "Manager: Alex Morgan",
+              directMemberCount: 120,
+            },
+            {
+              id: "success",
+              label: "Customer success",
+              description: "Manager: Sam Lee",
+              directMemberCount: 45,
+            },
+            {
+              id: "emea",
+              parentId: "revenue",
+              label: "Europe, Middle East and Africa",
+              description: "Manager: Jordan Lee",
+              directMemberCount: 52,
+            },
+            {
+              id: "emea-enterprise",
+              parentId: "emea",
+              label: "Enterprise customer teams across Europe",
+              description: "Manager: Jordan Lee",
+              directMemberCount: 18,
+            },
+            ...Array.from({ length: 12 }, (_, index) => ({
+              id: `level-${index + 1}`,
+              parentId: index ? `level-${index}` : "revenue",
+              label:
+                index === 0
+                  ? "North America"
+                  : `Level ${index + 1} regional team`,
+              description: "Manager: Casey Rivera",
+              directMemberCount: index === 11 ? 6 : 68,
+            })),
+            ...Array.from({ length: 18 }, (_, index) => ({
+              id: `sibling-${index}`,
+              parentId: "level-2",
+              label: `Enterprise territory ${index + 1}`,
+              description: "Manager: Unassigned",
+              directMemberCount: 4,
+            })),
+          ]}
+        />
+        <CollectionControls
+          search={
+            <FormField
+              label="Find a person in the example team"
+              visuallyHiddenLabel
+            >
+              <Input type="search" placeholder="Find a person in this team" />
+            </FormField>
+          }
+          primaryAction={
+            <Button
+              onClick={() => setMessage("Add members to this example team.")}
+            >
+              <Plus aria-hidden="true" /> Add Members
+            </Button>
+          }
+          sortLabel="Name A–Z"
+          sort={
+            <FormField label="Example member order">
+              <SelectField value="name" onValueChange={() => {}}>
+                <option value="name">Name A–Z</option>
+              </SelectField>
+            </FormField>
+          }
+        />
         <HierarchyList
           label="Example teams"
           onOpen={(id) => setMessage(`Open example team: ${id}`)}
@@ -289,7 +515,9 @@ export function LibraryExamples() {
             setFeedback({ rating, comment });
           }}
         />
-        <p className="text-copy text-muted-foreground">Expanded course finish example</p>
+        <p className="text-copy text-muted-foreground">
+          Expanded course finish example
+        </p>
         <ContentFeedback expanded onSave={async () => {}} />
         <p className="text-copy text-muted-foreground">Disabled example</p>
         <ContentFeedback disabled onSave={() => {}} />
@@ -324,5 +552,351 @@ export function LibraryExamples() {
         />
       </SettingsSection>
     </section>
+  );
+}
+
+/** Synthetic relationship roster: direct removal preserves linked-team inclusion. */
+function GroupRosterExample() {
+  const [rows, setRows] = useState([
+    { id: "one", name: "Alex Example", direct: true, team: true },
+    { id: "two", name: "Blair Example", direct: true, team: false },
+    { id: "three", name: "Casey Example", direct: false, team: true },
+  ]);
+  const [query, setQuery] = useState("");
+  const [source, setSource] = useState("");
+  const [reverse, setReverse] = useState(false);
+  const matches = rows
+    .filter(
+      (row) =>
+        row.name.toLowerCase().includes(query.toLowerCase()) &&
+        (!source || (source === "direct" ? row.direct : row.team)),
+    )
+    .sort((a, b) =>
+      reverse ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name),
+    );
+  const selection = useBulkSelection(
+    JSON.stringify([query, source]),
+    matches.map((row) => row.id),
+  );
+  return (
+    <SettingsSection
+      id="catalog-group-roster"
+      title={<h3>Group People selection</h3>}
+      guidance="Filter before paging. Only direct membership can be removed; linked-team inclusion remains. The feature owns its final consequence review."
+    >
+      <CollectionControls
+        search={
+          <FormField label="Find example group members">
+            <Input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </FormField>
+        }
+        sortLabel={reverse ? "Name Z–A" : "Name A–Z"}
+        sort={
+          <FormField label="Sort example members">
+            <SelectField
+              value={reverse ? "reverse" : "name"}
+              onValueChange={(value) => setReverse(value === "reverse")}
+            >
+              <option value="name">Name A–Z</option>
+              <option value="reverse">Name Z–A</option>
+            </SelectField>
+          </FormField>
+        }
+        filters={
+          source
+            ? [
+                {
+                  id: "source",
+                  label: source === "direct" ? "Direct" : "Team",
+                  onRemove: () => setSource(""),
+                },
+              ]
+            : []
+        }
+        onClear={() => {
+          setQuery("");
+          setSource("");
+        }}
+      >
+        <FormField label="Example membership source">
+          <SelectField value={source} onValueChange={setSource}>
+            <option value="">All sources</option>
+            <option value="direct">Direct</option>
+            <option value="team">Team</option>
+          </SelectField>
+        </FormField>
+      </CollectionControls>
+      <BulkActions
+        selected={selection.actionIds}
+        collectionSize={matches.length}
+        singleItemActions={false}
+        noun="people"
+        onSelectionChange={selection.setSelected}
+        commands={[
+          {
+            id: "remove",
+            label: "Remove direct members",
+            description:
+              "Linked-team inclusion remains after removing a direct link.",
+            destructive: true,
+            disabledReason: selection.actionIds.some(
+              (id) => !rows.find((row) => row.id === id)?.direct,
+            )
+              ? "Select only people with Direct membership."
+              : undefined,
+            apply: (_, ids = []) =>
+              setRows((current) =>
+                current.flatMap((row) =>
+                  !ids.includes(row.id)
+                    ? [row]
+                    : row.team
+                      ? [{ ...row, direct: false }]
+                      : [],
+                ),
+              ),
+          },
+        ]}
+      />
+      <TableContainer>
+        <DataTable
+          layout="groupMembersSelectable"
+          aria-label="Example group members"
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                {selection.canSelect && (
+                  <SelectRows
+                    ids={matches.map((row) => row.id)}
+                    value={selection.selected}
+                    onChange={selection.setSelected}
+                  />
+                )}
+              </TableHead>
+              <TableHead>Person</TableHead>
+              <TableHead>Reporting team</TableHead>
+              <TableHead>Included through</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {matches.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  {selection.canSelect && (
+                    <Checkbox
+                      aria-label={`Select ${row.name}`}
+                      checked={selection.selected.includes(row.id)}
+                      onCheckedChange={(checked) =>
+                        selection.toggle(row.id, checked === true)
+                      }
+                    />
+                  )}
+                </TableCell>
+                <TableCell>{row.name}</TableCell>
+                <TableCell>
+                  {row.team ? "Example team" : "No reporting team"}
+                </TableCell>
+                <TableCell>
+                  {[row.direct ? "Direct" : "", row.team ? "Team" : ""]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </DataTable>
+      </TableContainer>
+    </SettingsSection>
+  );
+}
+
+function HierarchyPickerExample() {
+  const [parent, setParent] = useState("territory");
+  const path = [
+    "Organization",
+    "Revenue",
+    "Sales",
+    "North America",
+    "Enterprise",
+    "West",
+    "Pacific",
+    "Territory",
+  ];
+  return (
+    <SettingsSection
+      id="catalog-hierarchy-picker"
+      title={<h3>Searchable parent team</h3>}
+      guidance="Search team names and every ancestor. Long paths keep the root and final segments; the complete hierarchy can be read in the picker or expanded below the selected parent."
+    >
+      <FormField label="Example parent team">
+        <HierarchyPicker
+          value={parent}
+          onValueChange={setParent}
+          searchLabel="Find an example parent team"
+          options={[
+            {
+              id: "organization",
+              label: "Organization",
+              path: ["Organization"],
+            },
+            {
+              id: "revenue",
+              label: "Revenue",
+              path: ["Organization", "Revenue"],
+            },
+            { id: "territory", label: "Territory", path },
+            {
+              id: "success",
+              label: "Customer success",
+              path: ["Organization", "Customer success"],
+            },
+          ]}
+        />
+      </FormField>
+    </SettingsSection>
+  );
+}
+
+function GroupIndexExample() {
+  const [rows, setRows] = useState([
+    { id: "ae", name: "Account executives", people: 120, courses: 8 },
+    { id: "segment", name: "Startup segment", people: 45, courses: 4 },
+    { id: "draft-audience", name: "New audience", people: 0, courses: 0 },
+  ]);
+  const [query, setQuery] = useState("");
+  const [people, setPeople] = useState("");
+  const [sort, setSort] = useState("name");
+  const matches = rows
+    .filter(
+      (row) =>
+        row.name.toLowerCase().includes(query.toLowerCase()) &&
+        (!people || (people === "with" ? row.people > 0 : row.people === 0)),
+    )
+    .sort(
+      (a, b) =>
+        (sort === "people" ? b.people - a.people : 0) ||
+        a.name.localeCompare(b.name),
+    );
+  const selection = useBulkSelection(
+    query + people,
+    matches.map((row) => row.id),
+  );
+  return (
+    <SettingsSection
+      id="catalog-group-index"
+      title={<h3>Learning-group directory</h3>}
+      guidance="Filter and sort real audience counts before paging. Selection survives sort and page changes; discovery changes clear it. Deletion uses one consequence review, with saved learning history retained by the owner."
+    >
+      <CollectionControls
+        search={
+          <FormField label="Find an example group" visuallyHiddenLabel>
+            <Input
+              type="search"
+              placeholder="Find a group"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </FormField>
+        }
+        sortLabel={sort === "people" ? "People: most first" : "Name A–Z"}
+        sort={
+          <FormField label="Sort example groups">
+            <SelectField value={sort} onValueChange={setSort}>
+              <option value="name">Name A–Z</option>
+              <option value="people">People: most first</option>
+            </SelectField>
+          </FormField>
+        }
+        filters={
+          people
+            ? [
+                {
+                  id: "people",
+                  label: people === "with" ? "With people" : "No people",
+                  onRemove: () => setPeople(""),
+                },
+              ]
+            : []
+        }
+        onClear={() => {
+          setQuery("");
+          setPeople("");
+        }}
+      >
+        <FormField label="Example group membership">
+          <SelectField value={people} onValueChange={setPeople}>
+            <option value="">Any membership</option>
+            <option value="with">With people</option>
+            <option value="without">No people</option>
+          </SelectField>
+        </FormField>
+      </CollectionControls>
+      <BulkActions
+        selected={selection.actionIds}
+        collectionSize={matches.length}
+        singleItemActions={false}
+        noun="groups"
+        onSelectionChange={selection.setSelected}
+        commands={[
+          {
+            id: "delete",
+            label: "Delete example groups",
+            description: "Remove selected example audiences.",
+            destructive: true,
+            apply: (_, ids = []) =>
+              setRows((current) =>
+                current.filter((row) => !ids.includes(row.id)),
+              ),
+          },
+        ]}
+      />
+      <TableContainer>
+        <DataTable
+          layout="learningGroupsSelectable"
+          aria-label="Example learning groups"
+        >
+          <TableHeader>
+            <TableRow>
+              <TableHead>
+                {selection.canSelect && (
+                  <SelectRows
+                    ids={matches.map((row) => row.id)}
+                    value={selection.selected}
+                    onChange={selection.setSelected}
+                  />
+                )}
+              </TableHead>
+              <TableHead>Group</TableHead>
+              <TableHead align="right">People</TableHead>
+              <TableHead align="right">Courses</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {matches.map((row) => (
+              <TableRow key={row.id}>
+                <TableCell>
+                  {selection.canSelect && (
+                    <Checkbox
+                      aria-label={`Select example ${row.name}`}
+                      checked={selection.selected.includes(row.id)}
+                      onCheckedChange={(checked) =>
+                        selection.toggle(row.id, checked === true)
+                      }
+                    />
+                  )}
+                </TableCell>
+                <TableCell>{row.name}</TableCell>
+                <TableCell align="right">{row.people}</TableCell>
+                <TableCell align="right">{row.courses}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </DataTable>
+      </TableContainer>
+    </SettingsSection>
   );
 }

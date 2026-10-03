@@ -81,7 +81,11 @@ function fixture(): Workspace {
   data.users[0].email = "zoe@example.test";
   data.teams!.push(
     { id: "child", name: "Subteam", parentId: "sales-team" },
-    { id: "other", name: "Sibling team" },
+    {
+      id: "other",
+      name: "Sibling team",
+      parentId: data.settings!.organizationTeamId!,
+    },
   );
   data.users[0].teamId = "child";
   data.users.push({
@@ -278,7 +282,7 @@ test("progress filters, keyboard download, member details and empty report", asy
   await setup(page, info);
   await section(page, "Progress");
   await page.getByRole("button", { name: "Filters", exact: true }).click();
-  await select(page, "Reporting team", "Sales team");
+  await select(page, "Reporting team", "Organization / Sales team");
   await page.keyboard.press("Escape");
   await page
     .getByRole("searchbox", { name: "Find a team member" })
@@ -707,17 +711,31 @@ test("app bar stays visible over long administration reports", async ({
   await page.screenshot({ path: info.outputPath("bar-report-search.png") });
 });
 
-test("People connects hire-date guidance and preregistration to the shared roster", async ({ page }, info) => {
+test("People connects hire-date guidance and preregistration to the shared roster", async ({
+  page,
+}, info) => {
   const { data, production } = await setup(page, info);
   await section(page, production ? "People" : "Demo profiles");
-  await expect(page.getByRole("button", { name: "New user defaults", exact: true })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "New user defaults", exact: true }),
+  ).toHaveCount(0);
   if (production) {
     const add = page.getByRole("region", { name: "Add people", exact: true });
-    await expect(add.locator('[data-slot="card-footer"]')).toContainText("No email is sent.");
-    await expect(add.getByRole("button", { name: "Pre-register person" })).toBeVisible();
+    await expect(add.locator('[data-slot="card-footer"]')).toContainText(
+      "No email is sent.",
+    );
+    await expect(
+      add.getByRole("button", { name: "Pre-register person" }),
+    ).toBeVisible();
   }
-  await page.getByRole("row").filter({ hasText: data.users[0].email }).getByRole("button", { name: "Edit", exact: true }).click();
+  await page
+    .getByRole("row")
+    .filter({ hasText: data.users[0].email })
+    .getByRole("button", { name: "Edit", exact: true })
+    .click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByLabel("Hire date", { exact: true })).toHaveAccessibleDescription(/First sign-in does not start it/);
+  await expect(
+    dialog.getByLabel("Hire date", { exact: true }),
+  ).toHaveAccessibleDescription(/First sign-in does not start it/);
   await screenshot(page, info, "people-hire-date-guidance");
 });

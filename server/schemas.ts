@@ -60,7 +60,7 @@ export const contentBaseSchema = z.object({
   cardArt: cardArtSchema.optional(),
   duration: z.number().int().min(0).max(10000),
   requirePassing: z.boolean().optional(),
-  groups: z.array(text(80)).max(100),
+  groups: z.array(text(80)).max(1000),
   lessons: z
     .array(
       z.object({
@@ -88,6 +88,7 @@ export const contentBaseSchema = z.object({
     .array(
       z.object({
         groupId: text(80).optional(),
+        teamId: text(80).optional(),
         userId: z.uuid().optional(),
         assignedAt: z.iso.datetime(),
         due: z.discriminatedUnion("type", [
@@ -100,7 +101,7 @@ export const contentBaseSchema = z.object({
         ]),
       }),
     )
-    .max(100)
+    .max(2000)
     .optional(),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime(),
@@ -121,7 +122,7 @@ function uniqueContentIds(
 }
 export const contentSchema = contentBaseSchema.superRefine(uniqueContentIds);
 /** Drafts allow unfinished editorial values, retaining structural and media boundaries.
- * MCP's advertised complete-content schema stays unchanged; publication always uses it.
+ * MCP and the editor share this draft schema; publication uses the complete schema.
  */
 export const contentDraftSchema = contentBaseSchema
   .extend({
@@ -195,6 +196,7 @@ export const settingsSchema = z
       .default([]),
     homePage: z.enum(["updates", "courses", "docs"]).default("courses"),
     guestGroupId: text(80).min(1).nullable().optional(),
+    organizationTeamId: text(80).min(1).nullable().optional(),
     docCategoryOrder: z
       .array(text(80).trim().min(1))
       .max(500)

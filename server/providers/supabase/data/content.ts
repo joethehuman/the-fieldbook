@@ -3,6 +3,7 @@ import type { Content } from "@/lib/types";
 import type {
   DataStore,
   DocumentRecord,
+  PublishedAssignmentRecord,
   WorkspaceDocumentRecord,
   DraftIndexRecord,
   ReaderIndexRecord,
@@ -22,6 +23,7 @@ export const contentData: Pick<
   | "listDocumentPlacements"
   | "listDraftIndex"
   | "listDraftCourses"
+  | "listPublishedAssignmentContent"
   | "listPublishedReaderIndex"
   | "listPublishedCourseIndex"
   | "listRecentMcpDocuments"
@@ -129,6 +131,19 @@ export const contentData: Pick<
         })
         .is("deleted_at", null)
         .eq("draft->>kind", "course")
+        .order("id")
+        .range(from, to),
+    );
+  },
+  async listPublishedAssignmentContent() {
+    return await readAll<PublishedAssignmentRecord>((from, to) =>
+      db()
+        .from("fb_documents")
+        .select("id,published,revision,published_revision,updated_at", {
+          count: "exact",
+        })
+        .is("deleted_at", null)
+        .in("published->>kind", ["course", "brief"])
         .order("id")
         .range(from, to),
     );

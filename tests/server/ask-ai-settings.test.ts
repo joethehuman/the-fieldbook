@@ -4,6 +4,13 @@ import { saveSettings } from "../../server/save-settings";
 import { defaultSettings } from "../../lib/settings";
 import { defaultAskAiSettings } from "../../lib/ai";
 
+const organization = {
+  id: "00000000-0000-4000-8000-000000000090",
+  name: "Organization",
+  system: "organization",
+};
+const installedSettings = { ...defaultSettings, organizationTeamId: organization.id };
+
 test("revision-checked Admin settings preserve omitted AI configuration and permit explicit disable", async () => {
   const oldFetch = globalThis.fetch,
     oldEnv = { ...process.env };
@@ -24,7 +31,7 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
     guidance: "Operator guidance",
   };
   const writes: any[] = [];
-  const organizationTeamId = "00000000-0000-4000-8000-000000000090";
+  const organizationTeamId = organization.id;
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     assert.ok(url.pathname.endsWith("fb_config"));
@@ -40,10 +47,11 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
       );
     }
     return Response.json({
-      settings: { ...defaultSettings, askAi: configured, organizationTeamId },
+      settings: { ...installedSettings, askAi: configured, organizationTeamId },
       revision: 7,
       governance_revision: 9,
       groups: [],
+      teams: [organization],
     });
   };
   const admin: any = { id: "admin", role: "admin", active: true, groups: [] };
@@ -51,30 +59,34 @@ test("revision-checked Admin settings preserve omitted AI configuration and perm
     await assert.rejects(
       saveSettings(
         { ...admin, role: "learner" },
-        { settings: { ...defaultSettings, askAi: configured }, expected: 7 },
+        { settings: { ...installedSettings, askAi: configured }, expected: 7 },
       ),
       { status: 403 },
     );
-    await saveSettings(admin, { settings: defaultSettings, expected: 7 });
+    await saveSettings(admin, { settings: installedSettings, expected: 7 });
     assert.deepEqual(writes[0].settings.askAi, configured);
     await saveSettings(admin, {
       settings: {
-        ...defaultSettings,
+        ...installedSettings,
         askAi: { ...configured, enabled: false },
       },
       expected: 7,
     });
     assert.equal(writes[1].settings.askAi.enabled, false);
-    const saved = await saveSettings(admin, {
-      settings: {
-        ...defaultSettings,
-        organizationTeamId: "client-cannot-replace-it",
-      },
-      expected: 7,
-    });
-    assert.equal(saved.settings.organizationTeamId, organizationTeamId);
     await assert.rejects(
-      saveSettings(admin, { settings: defaultSettings, expected: 6 }),
+      saveSettings(admin, {
+        settings: {
+          ...installedSettings,
+          organizationTeamId: "client-cannot-replace-it",
+        },
+        expected: 7,
+      }),
+      { status: 400 },
+    );
+    assert.equal(writes.length, 2);
+    assert.equal(writes[1].settings.organizationTeamId, organizationTeamId);
+    await assert.rejects(
+      saveSettings(admin, { settings: installedSettings, expected: 6 }),
       { status: 409 },
     );
   } finally {
@@ -135,8 +147,9 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
       return Response.json({ revision: 8 });
     }
     return Response.json({
-      settings: defaultSettings,
+      settings: installedSettings,
       groups: [],
+      teams: [organization],
       governance_revision: 9,
     });
   };
@@ -149,7 +162,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
   try {
     await assert.rejects(
       saveSettings(admin, {
-        settings: { ...defaultSettings, askAi: enabled },
+        settings: { ...installedSettings, askAi: enabled },
         expected: 7,
       }),
       { status: 503 },
@@ -159,7 +172,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     await assert.rejects(
       saveSettings(admin, {
         settings: {
-          ...defaultSettings,
+          ...installedSettings,
           askAi: { ...enabled, model: "test/unavailable" },
         },
         expected: 7,
@@ -168,7 +181,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     );
     await assert.rejects(
       saveSettings(admin, {
-        settings: { ...defaultSettings, askAi: enabled },
+        settings: { ...installedSettings, askAi: enabled },
         expected: 7,
       }),
       { status: 503 },
@@ -177,7 +190,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     await assert.rejects(
       saveSettings(admin, {
         settings: {
-          ...defaultSettings,
+          ...installedSettings,
           askAi: { ...enabled, fallbackModel: "test/unavailable" },
         },
         expected: 7,
@@ -187,7 +200,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     await assert.rejects(
       saveSettings(admin, {
         settings: {
-          ...defaultSettings,
+          ...installedSettings,
           askAi: { ...enabled, fallbackModel: enabled.model },
         },
         expected: 7,
@@ -196,7 +209,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     );
     await assert.rejects(
       saveSettings(admin, {
-        settings: { ...defaultSettings, askAi: { ...enabled, model: "" } },
+        settings: { ...installedSettings, askAi: { ...enabled, model: "" } },
         expected: 7,
       }),
       { status: 400 },
@@ -206,7 +219,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     await assert.rejects(
       saveSettings(admin, {
         settings: {
-          ...defaultSettings,
+          ...installedSettings,
           askAi: { ...enabled, router: "different" },
         },
         expected: 7,
@@ -214,14 +227,14 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
       { status: 409 },
     );
     const saved = await saveSettings(admin, {
-      settings: { ...defaultSettings, askAi: enabled },
+      settings: { ...installedSettings, askAi: enabled },
       expected: 7,
     });
     assert.equal(saved.settings.askAi?.router, "vercel");
     assert.equal(writes, 1);
     await assert.rejects(
       saveSettings(admin, {
-        settings: { ...defaultSettings, askAi: enabled },
+        settings: { ...installedSettings, askAi: enabled },
         expected: 6,
       }),
       { status: 409 },
@@ -230,7 +243,7 @@ test("Enabling validates model and both retrieval functions; disabling needs no 
     delete process.env.AI_GATEWAY_API_KEY;
     process.env.FIELDBOOK_AI_ROUTER = "none";
     await saveSettings(admin, {
-      settings: { ...defaultSettings, askAi: { ...enabled, enabled: false } },
+      settings: { ...installedSettings, askAi: { ...enabled, enabled: false } },
       expected: 7,
     });
     assert.equal(writes, 2);

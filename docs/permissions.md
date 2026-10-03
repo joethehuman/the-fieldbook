@@ -4,7 +4,7 @@ These rules describe the server application. The browser-local demo simulates id
 
 ## Installation access
 
-An installation can allow public browsing or require membership. Everyone with access can browse its published library. Learning groups personalize recommendations and assign learning; they do not restrict content visibility. Draft content is available to administrators and contributors. Unpublished curricula remain administrator-only.
+An installation can allow public browsing or require membership. Everyone with access can browse its published library. Teams and learning groups assign learning; groups also personalize Update recommendations; they do not restrict content visibility. Draft content is available to administrators and contributors. Unpublished curricula remain administrator-only.
 
 Guests keep learning progress in their browser. Signed-in learners have account-backed progress. Importing browser progress rechecks answers against the current course version; local records are not trusted completion evidence.
 
@@ -18,7 +18,7 @@ Guests keep learning progress in their browser. Signed-in learners have account-
 
 CSV exports use the same authorized report data and do not broaden server scope. Managers can export their team progress and person assignment details; feedback exports are available to administrators and contributors, while person-management details remain administrator-only. See [report exports](reporting.md).
 
-A person has one optional reporting team. Learning-group membership is separate and can come from individual membership, parent groups or live links to teams. See [groups and curricula](learning-groups.md).
+A person has one optional direct reporting team. Teams form the reporting hierarchy. Learning groups are separate, flat audiences whose membership comes from individuals or live links to team branches. A new team link includes all current and future subteams; converted direct-only links keep their previous reach until explicitly expanded. Learning-group membership never grants reporting access. See [groups and curricula](learning-groups.md).
 
 Administrators can pre-register a Google email without sending an invitation email. The person appears immediately in the People roster and team member/manager selectors, with a stable ID and separate **Not signed in** status. Verified first sign-in attaches the login to that person even when general registration is closed, preserving memberships, hire/clock dates and progress. A preregistered manager has no reporting access until that sign-in. Existing authenticated identities are never merged by email. Login emails cannot be changed through people administration. Account deactivation is distinct from deletion; hard account deletion is not exposed. Self-demotion/deactivation and removing the last active signed-in administrator are rejected.
 
@@ -26,15 +26,36 @@ Administrators can pre-register a Google email without sending an invitation ema
 
 Administrators see **Manage organization** in the account menu. Contributors see **Manage content**, opening the same panel shell, Content/Feedback tabs and editors. Its Organization Settings section contains only MCP and Recently deleted. Managers see **My team’s progress**; a contributor with a managed team sees both content and team destinations. An administrator sees the single organization destination. Direct requests repeat these permissions on the server.
 
-Apply `20261001234401_contributor_permissions.sql` after the roster migration before assigning contributor accounts. The migration expands the role constraint and publishing/recovery routines, preserves existing records and team responsibilities, and retains service-role-only database access. Rehearse upgrades in an isolated backend before applying them to an installation.
+Apply all missing migrations in order before assigning contributor accounts, including `20261001232329_stable_assignment_episodes.sql`, `20261001234401_contributor_permissions.sql` and then `20261002022921_flat_learning_groups.sql`. The contributor migration expands the role constraint and publishing/recovery routines, preserves existing records and team responsibilities, and retains service-role-only database access. The flat migration combines those permissions with saved assignment episodes and scoped reporting. Never replay an applied migration; see the [coordinated upgrade instructions](upgrading.md#flat-learning-group-upgrade).
 
 ## Enforcement and contributor guidance
 
 The server checks identity, role and installation access before returning protected data or accepting writes. The governance snapshot scopes reporting data before serialization. Reader content responses exclude quiz answer keys. Draft authoring responses require publishing permission; contributor panel snapshots exclude the roster, report history, group learning rules, unpublished privacy policy and deleted accounts. Governance writes require an administrator, validated input and the current revision; related updates and audit records are transactional.
 
-UI visibility is not a permission check. Changes to roles, groups or reporting must preserve these boundaries and include meaningful authorization checks. Relevant entry points include `server/auth.ts`, `server/snapshot.ts`, `app/api/governance/route.ts`, and the governance server tests. Optional [MCP access](mcp-setup.md) requires an active administrator and an approved connection grant; contributor, learner and manager MCP connections are not implemented by the contributor account change. The contributor MCP tab identifies that limitation; adding a role never grants MCP access by itself. MCP tools must use the same publishing permissions and explicitly managed reporting scope when role-aware connections are added.
+UI visibility is not a permission check. Changes to roles, groups or reporting must preserve these boundaries and include meaningful authorization checks. Relevant entry points include `server/auth.ts`, `server/snapshot.ts`, `app/api/governance/route.ts`, and the governance server tests.
 
 Before using an installation, verify these rules with separate administrator, learner and manager accounts against an isolated backend. Include a manager's sibling team, anonymous/private access, draft content, stale revisions and deactivated accounts. Code inspection and demo tests do not establish that an operator's hosted authentication is configured correctly.
+
+## MCP access and consent
+
+Optional [MCP connections](mcp-setup.md) use each person's verified Fieldbook identity and an explicitly approved connection grant. Learners have no MCP access. Contributors can authorize draft/content authoring, publication, media and feedback tools. Managers can authorize scoped reporting only when assigned as a team's manager; their own team membership grants no extra access. Contributors who explicitly manage teams can additionally authorize the same scoped reports. Administrators can authorize every supported capability.
+
+| Capability | Eligible accounts |
+| --- | --- |
+| `content:read`, `content:write` | Administrators and contributors; draft reading, authoring, explicit publication/unpublication. |
+| `content:assign` | Administrators; course assignment changes remain separate from ordinary authoring. |
+| `media:read`, `media:write` | Administrators and contributors; existing references and authoring uploads. |
+| `feedback:read` | Administrators and contributors; content/general feedback including displayed respondent names, without adding email or learner progress. |
+| `reports:read` | Administrators, explicitly assigned team managers and contributors who manage teams; named learners, assignments, deadlines and progress within current reporting scope. |
+| `reports:aggregate` | Administrators; the original installation-wide aggregate `content_report`. |
+
+Effective permissions are the intersection of the account's current permissions and that connection's approved capabilities. OAuth identity scopes do not grant Fieldbook tools or database access. The server reads the current account, connection grant and team responsibilities on every request. Tool discovery shows permitted operations, and tool calls repeat authorization. Role downgrades, deactivation, loss of a managed branch and connection revocation remove access without relying on stale token claims. Report database functions independently check the current actor and scope before returning protected rows.
+
+Existing administrator connections retain their original approved content, existing-media and aggregate-report capabilities after upgrade. New media-upload, named-report, feedback and course-assignment capabilities require explicit additional consent. Promotion to administrator also requires fresh consent because existing operations would otherwise gain organization-wide scope and protected authoring fields. Additional team responsibilities affect reporting scope under the existing scoped-report capability; groups never expand that scope. Each user manages and revokes their own AI connections; already delivered data cannot be recalled.
+
+MCP does not expose every administrator setting. For example, editing the privacy policy, account roles or reporting hierarchy remains a manual Fieldbook action. Capability guidance identifies unsupported operations and points to maintained installation-independent instructions. A lack of tool support and a lack of account permission are distinct outcomes; no tool should silently substitute a more privileged operation.
+
+Apply all included migrations before deploying matching code, including the connection-capability and scoped-report migrations. Test administrator, contributor, manager, contributor-manager and learner boundaries against an isolated backend, then verify the hosted identity/consent flow separately. See [reporting semantics and pagination](reporting.md#mcp-reports).
 
 ## Guest recommendations
 
@@ -45,10 +66,10 @@ On public installations, visitors can rate and comment on published content. A r
 
 ## Managing the reporting hierarchy
 
-Administrators use **Teams** to search and expand the hierarchy, then open a team’s **Members** or **Subteams** view. Each person has one optional direct team; including subteams shows each person once. Preregistered people use the same roster and team controls. Team membership does not grant management access.
+Administrators use **Teams** to search and expand a compact hierarchy beside the selected team’s detail. The layout stacks on narrow screens. The **Members** view defaults to **All people**, including subteams; **Direct members** limits it to the selected team’s own roster. **Subteams** lists immediate children. Each person has one optional direct team and appears once. Preregistered people use the same roster and team controls. Team membership does not grant management access.
 
-**Create subteam** creates a new team. **Move existing team here** selects an existing branch. **Team actions → Move team** chooses a different parent or **Top-level team** to detach the branch. The review shows old/new paths, the number of teams and registered people involved, and the active managers who actually gain or lose scope. Overlapping management roots are accounted for; administrators retain organization-wide access. Self/descendant moves are rejected.
+**Create subteam** creates a new team. **Move existing team here** selects an existing branch. **Team actions → Move team** chooses a different parent or **Top-level team** to detach the branch. One consequence review shows old/new paths, the teams and people involved, changes to course coverage, and the active managers or contributors who gain or lose reporting scope. Overlapping assignment sources and management roots are counted once; administrators retain organization-wide access. Self/descendant moves are rejected.
 
-Only the branch root’s parent changes. Subteams, managers and direct memberships stay attached to their stable team IDs. Learning-group links and saved course progress are unchanged by a hierarchy move. Adding an individual to a different direct team is a separate operation and can change team-linked learning assignments.
+Only the branch root’s parent changes. Subteams, managers and direct memberships stay attached to their stable team IDs. Learning-group links keep their selected team IDs, but moving a branch can change which people those links include. Saved course progress remains intact, and continuously assigned course versions keep their deadlines. Moving an individual to another direct team similarly reviews changes to learning coverage and reporting scope.
 
-**Delete empty team** is available only after direct members (including inactive accounts), pending-account assignments, immediate subteams and learning-group links have been removed or moved in separate saved changes. A manager assigned to an otherwise empty team does not block deletion. Deleting a team is different from detaching it. The server repeats these checks under the governance lock and retains administrator authorization, revision checks and audit history. Apply `20260923180607_guarded_team_deletion.sql` before using deletion in the server application.
+**Delete empty team** is available only after direct members (including inactive and preregistered people), immediate subteams and all learning-group links have been removed or moved in separate saved changes. Both subtree links and converted direct-only links block deletion. A manager assigned to an otherwise empty team does not block it. Deleting a team is different from detaching it. The server repeats these checks under the governance lock and retains administrator authorization, revision checks and audit history. Apply all required migrations through the [flat learning-group upgrade](upgrading.md#flat-learning-group-upgrade) before using the matching server application.

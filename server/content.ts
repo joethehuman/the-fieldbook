@@ -56,12 +56,14 @@ export const canRead = cache(async (user: User | null) => {
   assertCanRead(user, config);
   return config;
 });
-export async function getContent(id: string, user: User | null, draft = false) {
+export async function getContent(id: string, user: User | null, draft = false, publishedForEditing = false) {
   await canRead(user);
-  if (draft) requirePublisher(user);
+  if (draft || publishedForEditing) requirePublisher(user);
   const data = await dataStore().findDocument(id);
-  if (!data || data.deleted_at || (!draft && !data.published))
+  if (!data || data.deleted_at || ((!draft || publishedForEditing) && !data.published))
     throw new HttpError(404, "Content not found.");
+  if (publishedForEditing)
+    return document({ ...data, draft: data.published }, true);
   const c = document(data, draft);
   return draft ? c : redact(c);
 }
@@ -127,11 +129,11 @@ export async function saveContent(
     }
   }
   if (
-    c.assignments?.some((a) => !a.groupId || a.userId || a.due.type !== "none")
+    c.assignments?.some((a) => (!a.groupId && !a.teamId) || (!!a.groupId && !!a.teamId) || a.userId || a.due.type !== "none")
   )
     throw new HttpError(
       400,
-      "Assigned courses use learning groups and organization windows.",
+      "Assigned courses use teams or learning groups and organization windows.",
     );
   const old = await dataStore().findDocument(c.id);
   if (old?.deleted_at)
@@ -184,12 +186,12 @@ export async function saveContent(
     const audience = (groups: string[] = []) =>
       JSON.stringify([...groups].sort());
     const rules = (value: Content["assignments"] = []) =>
-      JSON.stringify(value.map((a) => a.groupId).sort());
+      JSON.stringify(value.map(a => a.groupId ? `group:${a.groupId}` : `team:${a.teamId}`).sort());
     if (
       audience(c.groups) !== audience(old?.draft.groups) ||
       rules(c.assignments) !== rules(old?.draft.assignments)
     )
-      throw new HttpError(400, "Manage assigned courses in Learning groups.");
+      throw new HttpError(400, "Use the assignment picker to manage course audiences.");
   }
   if (
     old &&

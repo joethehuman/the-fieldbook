@@ -12,6 +12,8 @@ import type { AiSourceIdentity } from "@/lib/ai";
 import type { SearchKind } from "@/lib/search";
 import type { LearningAction } from "@/lib/learning";
 import type { governanceSchema, pendingSchema } from "../governance-schema";
+import type { McpDataStore } from "./mcp-data";
+import type { McpReportingDataStore } from "./mcp-reporting";
 
 export type GovernancePayload =
   typeof governanceSchema._output | typeof pendingSchema._output;
@@ -31,6 +33,11 @@ export type WorkspaceDocumentRecord = Pick<
   "id" | "revision" | "published" | "published_revision" | "updated_at"
 > &
   Partial<Pick<DocumentRecord, "draft" | "deleted_at">>;
+/** Assignment discovery loads published text without unpublished drafts. */
+export type PublishedAssignmentRecord = Pick<
+  DocumentRecord,
+  "id" | "published" | "revision" | "published_revision" | "updated_at"
+>;
 export type ConfigurationRecord = {
   settings: SiteSettings;
   revision: number;
@@ -142,14 +149,14 @@ export type DocumentWrite = {
 };
 
 /** Task-level operations; implementations preserve atomic writes and complete reads. */
-export interface DataStore {
+export interface DataStore extends McpDataStore, McpReportingDataStore {
   /** Nonsecret identifier used to partition cached published reads. */
   cacheNamespace(): string;
   readConfiguration(): Promise<ConfigurationRecord>;
   readSettings(): Promise<Pick<ConfigurationRecord, "settings"> | null>;
   readSettingsContext(): Promise<Pick<
     ConfigurationRecord,
-    "settings" | "groups" | "governance_revision"
+    "settings" | "groups" | "teams" | "governance_revision"
   > | null>;
   readPublicBranding(): Promise<PublicBrandingRecord | null>;
   updateSettings(
@@ -174,6 +181,7 @@ export interface DataStore {
   >;
   listDraftIndex(): Promise<DraftIndexRecord[]>;
   listDraftCourses(): Promise<DocumentRecord[]>;
+  listPublishedAssignmentContent(): Promise<PublishedAssignmentRecord[]>;
   listPublishedReaderIndex(): Promise<ReaderIndexRecord[]>;
   listPublishedCourseIndex(): Promise<CourseIndexRecord[]>;
   listRecentMcpDocuments(): Promise<DocumentRecord[]>;
@@ -188,6 +196,11 @@ export interface DataStore {
       path: string;
     }[]
   >;
+  reviewDeadlines(
+    actorId: string,
+    apply: boolean,
+    token?: string,
+  ): Promise<import("@/lib/assignment-episodes").DeadlineReview>;
   readGovernanceSnapshot(actorId: string): Promise<GovernanceRecord>;
   /** Complete account list, with progress restricted to a requested person. */
   readAdminPeopleSnapshot(

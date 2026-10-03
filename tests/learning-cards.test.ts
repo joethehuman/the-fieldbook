@@ -53,10 +53,10 @@ test("unassigned and draft curricula cannot hide assigned courses", () => {
     3,
   );
 });
-test("inherited and overlapping curriculum assignments show once per curriculum without duplicate course cards", () => {
+test("overlapping independent curriculum assignments show once per curriculum without duplicate course cards", () => {
   const { data, user, sequence } = fixture();
   const parent = data.groups[0];
-  const child = { ...parent, id: "child", parentId: parent.id };
+  const child = { ...parent, id: "child" };
   const overlap = {
     ...data.curricula![0],
     id: "overlap",
@@ -69,7 +69,7 @@ test("inherited and overlapping curriculum assignments show once per curriculum 
   const cards = assignedLearningCards(
     sequence,
     [...data.curricula!, overlap],
-    { ...user, groups: ["child"] },
+    { ...user, groups: [parent.id, "child"] },
     [parent, child],
   );
   assert.equal(cards.length, 2);

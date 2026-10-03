@@ -1,4 +1,9 @@
-import { actor, errorResponse, HttpError, requirePublisher } from "@server/auth";
+import {
+  actor,
+  errorResponse,
+  HttpError,
+  requirePublisher,
+} from "@server/auth";
 import { adminSnapshot, type AdminScope } from "@server/admin-snapshot";
 
 export const dynamic = "force-dynamic";

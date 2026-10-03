@@ -15,6 +15,8 @@ export function CollectionControls({
   filters = [],
   onClear,
   actions,
+  primaryAction,
+  secondaryRow = false,
 }: {
   search: ReactNode;
   children?: ReactNode;
@@ -23,47 +25,75 @@ export function CollectionControls({
   filters?: AppliedFilter[];
   onClear?: () => void;
   actions?: ReactNode;
+  /** Primary collection action beside search; secondary controls get their own row. */
+  primaryAction?: ReactNode;
+  /** Keep discovery controls beneath search, including inside bounded pickers. */
+  secondaryRow?: boolean;
 }) {
+  const secondary = (
+    <>
+      {children && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button type="button" variant="outline">
+              <SlidersHorizontal aria-hidden="true" />
+              Filters{filters.length > 0 ? ` (${filters.length})` : ""}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            className="grid gap-4 p-4"
+            aria-label="Collection filters"
+          >
+            {children}
+          </PopoverContent>
+        </Popover>
+      )}
+      {sort && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button type="button" variant="outline">
+              <ArrowDownWideNarrow aria-hidden="true" />
+              Sort: {sortLabel}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent
+            align="end"
+            className="grid gap-4 p-4"
+            aria-label="Collection sort"
+          >
+            {sort}
+          </PopoverContent>
+        </Popover>
+      )}
+      {actions}
+    </>
+  );
   return (
     <div data-slot="collection-controls" className="grid min-w-0 gap-3">
-      <div className="flex min-w-0 flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1 basis-56">{search}</div>
-        {children && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline">
-                <SlidersHorizontal aria-hidden="true" />
-                Filters{filters.length > 0 ? ` (${filters.length})` : ""}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="grid gap-4 p-4"
-              aria-label="Collection filters"
-            >
-              {children}
-            </PopoverContent>
-          </Popover>
-        )}
-        {sort && (
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button type="button" variant="outline">
-                <ArrowDownWideNarrow aria-hidden="true" />
-                Sort: {sortLabel}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="grid gap-4 p-4"
-              aria-label="Collection sort"
-            >
-              {sort}
-            </PopoverContent>
-          </Popover>
-        )}
-        {actions}
+      <div
+        data-slot="collection-primary-row"
+        className="flex min-w-0 flex-wrap items-center gap-3"
+      >
+        <div
+          className={
+            primaryAction
+              ? "min-w-0 flex-1 basis-32"
+              : "min-w-0 flex-1 basis-56"
+          }
+        >
+          {search}
+        </div>
+        {primaryAction || (!secondaryRow && secondary)}
       </div>
+      {(primaryAction || secondaryRow) && (children || sort || actions) && (
+        <div
+          data-slot="collection-secondary-row"
+          className="flex min-w-0 flex-wrap items-center gap-3"
+        >
+          {secondary}
+        </div>
+      )}
       {filters.length > 0 && (
         <div
           className="flex flex-wrap items-center gap-2"

@@ -13,12 +13,19 @@ import { HttpError } from "./errors";
 export { HttpError, errorResponse } from "./errors";
 export function profile(row: ProfileRecord): User {
   return {
+    assignmentTeams:
+      row.assignment_teams || row.assignment_context?.assignment_teams,
     id: row.id,
     name: row.name,
     email: row.email,
     role: row.role,
     active: row.active,
     registered: row.auth_user_id !== null,
+    learningAssignments: (
+      row.learning_assignments || row.assignment_context?.learning_assignments
+    )
+      ?.filter((a) => !("ended_at" in a) || !a.ended_at)
+      .map((a) => ({ ...a, onboardingEnd: a.onboardingEnd || undefined })),
     hireDate: row.hire_date || undefined,
     onboardingDays: row.onboarding_days ?? undefined,
     groups: row.groups,
@@ -26,6 +33,12 @@ export function profile(row: ProfileRecord): User {
     onboardingStart: row.onboarding_start || undefined,
     groupJoinedAt: row.group_joined_at,
     effectiveGroupJoinedAt: row.effective_group_joined_at,
+    effectiveGroupIds:
+      row.effective_group_ids ||
+      row.assignment_context?.effective_group_ids ||
+      (row.effective_group_joined_at
+        ? Object.keys(row.effective_group_joined_at)
+        : undefined),
   };
 }
 export async function actor(
@@ -88,5 +101,9 @@ export function sameOrigin(req: Request) {
 
 export function requirePublisher(user: User | null): asserts user is User {
   if (!user) throw new HttpError(401, "Sign in to publish content.");
-  if (!canPublish(user)) throw new HttpError(403, "Administrator or contributor publishing access is required.");
+  if (!canPublish(user))
+    throw new HttpError(
+      403,
+      "Administrator or contributor publishing access is required.",
+    );
 }

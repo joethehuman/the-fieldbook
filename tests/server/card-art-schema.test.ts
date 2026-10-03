@@ -106,7 +106,9 @@ test("curriculum schema keeps artwork optional for older MCP clients", () => {
       },
     ],
     groups: [],
-    teams: [],
+    teams: [
+      { id: "organization", name: "Organization", system: "organization" },
+    ],
     users: [],
   };
   assert.equal(governanceSchema.safeParse(base).success, true);

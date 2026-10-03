@@ -156,6 +156,7 @@ export async function verifyMcpIdentity(
     const { payload } = await jwtVerify(token, jwks, {
       issuer: authorizationServer(),
       audience: resource,
+      requiredClaims: ["sub", "client_id", "exp"],
     });
     if (!payload.sub || typeof payload.client_id !== "string") return null;
     return { subject: payload.sub, clientId: payload.client_id };

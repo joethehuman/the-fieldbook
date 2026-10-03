@@ -1,6 +1,6 @@
 import { defaultSettings, publicSettings } from "./settings";
 import type { Workspace } from "./store";
-import { ancestorIds, effectiveGroups, type User, type Group } from "./types";
+import { effectiveGroups, type User, type Group } from "./types";
 import { requiredSequence } from "./learning";
 import { groupItems } from "./learning-groups";
 
@@ -14,7 +14,7 @@ export const guest: User = {
 };
 
 /** A recommendation projection, never an account or governance membership.
- * Resolve real hierarchy on the server, then discard its identity and timing data.
+ * Resolve the chosen audience on the server, then discard its identity and timing data.
  * The demo uses the same projection without persisting its synthetic group/user.
  */
 export function guestRecommendations(
@@ -50,11 +50,6 @@ export function guestRecommendations(
   const courseIds = new Set(sequence.map((c) => c.id));
   const items = data.groups
     .filter((g) => effective.has(g.id))
-    .sort(
-      (a, b) =>
-        ancestorIds(a.id, data.groups).size -
-          ancestorIds(b.id, data.groups).size || a.name.localeCompare(b.name),
-    )
     .flatMap((g) => groupItems(g, published))
     .filter((i) =>
       i.kind === "course"

@@ -1,0 +1,2433 @@
+{
+  "contractVersion": "1.0.0",
+  "transport": {
+    "path": "/api/mcp",
+    "protocol": "MCP Streamable HTTP",
+    "requests": "POST",
+    "authentication": "OAuth resource-bound bearer token plus fresh Fieldbook account and connection grant"
+  },
+  "capabilities": [
+    {
+      "name": "content:read",
+      "description": "Read published content and unpublished drafts."
+    },
+    {
+      "name": "content:write",
+      "description": "Create and edit Docs, Updates, Courses, lessons and quizzes; publish or unpublish when requested."
+    },
+    {
+      "name": "content:assign",
+      "description": "Manage course assignments to learning groups and teams."
+    },
+    {
+      "name": "media:read",
+      "description": "List existing private media and use its content references."
+    },
+    {
+      "name": "media:write",
+      "description": "Upload images and videos to this installation."
+    },
+    {
+      "name": "reports:aggregate",
+      "description": "Read organization-wide aggregate course progress and feedback counts."
+    },
+    {
+      "name": "reports:read",
+      "description": "Read individual learners, course progress, assignments and due dates in your currently managed teams and descendants (all teams for administrators)."
+    },
+    {
+      "name": "feedback:read",
+      "description": "Read content and general feedback, including comments and respondent names."
+    }
+  ],
+  "legacyCapabilities": [
+    "content:read",
+    "content:write",
+    "media:read",
+    "reports:aggregate"
+  ],
+  "errors": [
+    "permission_denied",
+    "reconsent_required",
+    "revision_conflict",
+    "report_changed",
+    "not_found",
+    "validation_error",
+    "unsupported",
+    "rate_limited",
+    "unavailable"
+  ],
+  "manualOperations": [
+    {
+      "operation": "privacy_policy",
+      "terms": [
+        "privacy",
+        "policy"
+      ],
+      "path": "/admin",
+      "location": "Organization Settings → Privacy",
+      "instruction": "An administrator must edit and publish the privacy policy in Fieldbook. MCP cannot read or change privacy settings."
+    },
+    {
+      "operation": "accounts_and_roles",
+      "terms": [
+        "user",
+        "account",
+        "role",
+        "people",
+        "import"
+      ],
+      "path": "/admin",
+      "location": "People",
+      "instruction": "An administrator must manage accounts, roles and roster imports in Fieldbook. Reports never grant account-editing access."
+    },
+    {
+      "operation": "teams_and_groups",
+      "terms": [
+        "team",
+        "group",
+        "curricul"
+      ],
+      "path": "/admin",
+      "location": "Teams / Learning groups / Curricula",
+      "instruction": "An administrator must manage teams, learning-group membership and curricula in Fieldbook. MCP course assignments use existing audiences only."
+    },
+    {
+      "operation": "docs_hierarchy",
+      "terms": [
+        "section",
+        "hierarchy",
+        "reorder",
+        "folder"
+      ],
+      "path": "/admin",
+      "location": "Organization Settings → Docs",
+      "instruction": "An administrator must create or reorder Docs sections in Fieldbook. Publishers can place content in existing sections."
+    },
+    {
+      "operation": "installation_settings",
+      "terms": [
+        "setting",
+        "brand",
+        "identity",
+        "access",
+        "delete",
+        "restore",
+        "progress reset",
+        "complete user"
+      ],
+      "path": "/admin",
+      "location": "Organization Settings",
+      "instruction": "An administrator must manage installation settings, content recovery or learner completion overrides manually. These operations are outside this MCP contract."
+    }
+  ],
+  "tools": [
+    {
+      "name": "get_capabilities",
+      "description": "Discover this connection's allowed tools, missing consent, reporting scope, contract and editor formats, and unsupported operations with manual guidance. Use first, or when a request is outside the available tools.",
+      "capability": null,
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "maxLength": 200
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "contractVersion": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "tools": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "capability": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "available": {
+                  "type": "boolean"
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name",
+                "description",
+                "capability",
+                "available",
+                "reason"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "consentRequired": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reporting": {
+            "type": "object",
+            "properties": {
+              "allTeams": {
+                "type": "boolean"
+              },
+              "teamIds": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "allTeams",
+              "teamIds"
+            ],
+            "additionalProperties": false
+          },
+          "unsupported": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "type": "string"
+                },
+                "instruction": {
+                  "type": "string"
+                },
+                "location": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "operation",
+                "instruction",
+                "location",
+                "url"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "contractVersion",
+          "role",
+          "tools",
+          "capabilities",
+          "consentRequired",
+          "reporting",
+          "unsupported"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "search",
+      "description": "Search all non-deleted drafts and published items, including course lesson prose. Empty query lists content. Follow nextCursor until complete; drafts require publishing access.",
+      "capability": "content:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "query": {
+            "default": "",
+            "type": "string",
+            "maxLength": 200
+          },
+          "kind": {
+            "default": "all",
+            "type": "string",
+            "enum": [
+              "all",
+              "doc",
+              "brief",
+              "course"
+            ]
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "doc",
+                    "brief",
+                    "course"
+                  ]
+                },
+                "revision": {
+                  "type": "number"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "draft",
+                    "published"
+                  ]
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "kind",
+                "revision",
+                "status",
+                "url"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "results",
+          "nextCursor",
+          "complete"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "fetch",
+      "description": "Read the complete current draft, including Markdown, lessons, quiz answer keys, artwork and revision. Preserve unrelated fields before editing. Requires publishing access.",
+      "capability": "content:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "title": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "revision": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "text",
+          "url",
+          "metadata"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_content",
+      "description": "Create a Docs, Update (brief), or Course draft. Only kind is required; unfinished editor fields are allowed. Does not publish. Supply a fresh request_id UUID and reuse it on retry to avoid a duplicate draft.",
+      "capability": "content:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "doc",
+                  "brief",
+                  "course"
+                ]
+              },
+              "title": {
+                "default": "",
+                "type": "string",
+                "maxLength": 160
+              },
+              "summary": {
+                "default": "",
+                "type": "string",
+                "maxLength": 300
+              },
+              "body": {
+                "default": "",
+                "type": "string",
+                "maxLength": 200000
+              },
+              "category": {
+                "default": "",
+                "type": "string",
+                "maxLength": 80
+              },
+              "folder": {
+                "default": "",
+                "type": "string",
+                "maxLength": 300
+              },
+              "sectionId": {
+                "type": "string",
+                "maxLength": 1500
+              },
+              "sectionOrder": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "coverImageUrl": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "cardArt": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "generated",
+                      "upload"
+                    ]
+                  },
+                  "shortTitle": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "version": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "const": 1
+                      },
+                      {
+                        "type": "number",
+                        "const": 2
+                      }
+                    ]
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "imageUrl": {
+                    "type": "string",
+                    "pattern": "^\\/api\\/media\\/[a-f0-9-]{36}\\.(png|jpg|webp|gif)$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "shortTitle",
+                  "version",
+                  "seed"
+                ]
+              },
+              "duration": {
+                "default": 0,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "requirePassing": {
+                "type": "boolean"
+              },
+              "groups": {
+                "default": [],
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 80
+                }
+              },
+              "lessons": {
+                "default": [],
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "title": {
+                      "type": "string",
+                      "maxLength": 160
+                    },
+                    "body": {
+                      "type": "string",
+                      "maxLength": 200000
+                    },
+                    "videoUrl": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "body"
+                  ]
+                }
+              },
+              "questions": {
+                "default": [],
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "options": {
+                      "minItems": 2,
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 1000
+                      }
+                    },
+                    "optionIds": {
+                      "minItems": 2,
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "correctOptionIds": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "answer": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "prompt",
+                    "options"
+                  ]
+                }
+              },
+              "assignments": {
+                "maxItems": 2000,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupId": {
+                      "type": "string",
+                      "maxLength": 80
+                    },
+                    "teamId": {
+                      "type": "string",
+                      "maxLength": 80
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "assignedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "due": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "none"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "date"
+                            },
+                            "date": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "date"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "days"
+                            },
+                            "days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 3650
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "days"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "assignedAt",
+                    "due"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "request_id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "content"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "doc",
+              "brief",
+              "course"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "kind",
+          "version",
+          "status"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "update_content",
+      "description": "Replace an existing draft using expected_revision. Fetch first and preserve untouched fields. Markdown supports editor formatting, images and links; lessons use videoUrl. Published content stays unchanged. Course audiences use manage_course_assignment; contributors cannot reorder Docs or create sections.",
+      "capability": "content:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid",
+                "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "doc",
+                  "brief",
+                  "course"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 160
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "body": {
+                "type": "string",
+                "maxLength": 200000
+              },
+              "category": {
+                "type": "string",
+                "maxLength": 80
+              },
+              "folder": {
+                "type": "string",
+                "maxLength": 300
+              },
+              "sectionId": {
+                "type": "string",
+                "maxLength": 1500
+              },
+              "sectionOrder": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "published"
+                ]
+              },
+              "version": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9007199254740991
+              },
+              "coverImageUrl": {
+                "type": "string",
+                "maxLength": 2000
+              },
+              "cardArt": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "generated",
+                      "upload"
+                    ]
+                  },
+                  "shortTitle": {
+                    "type": "string",
+                    "maxLength": 160
+                  },
+                  "version": {
+                    "anyOf": [
+                      {
+                        "type": "number",
+                        "const": 1
+                      },
+                      {
+                        "type": "number",
+                        "const": 2
+                      }
+                    ]
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 4294967295
+                  },
+                  "imageUrl": {
+                    "type": "string",
+                    "pattern": "^\\/api\\/media\\/[a-f0-9-]{36}\\.(png|jpg|webp|gif)$"
+                  }
+                },
+                "required": [
+                  "source",
+                  "shortTitle",
+                  "version",
+                  "seed"
+                ]
+              },
+              "duration": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "requirePassing": {
+                "type": "boolean"
+              },
+              "groups": {
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "maxLength": 80
+                }
+              },
+              "lessons": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "title": {
+                      "type": "string",
+                      "maxLength": 160
+                    },
+                    "body": {
+                      "type": "string",
+                      "maxLength": 200000
+                    },
+                    "videoUrl": {
+                      "type": "string",
+                      "maxLength": 2000
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "body"
+                  ]
+                }
+              },
+              "questions": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "prompt": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "options": {
+                      "minItems": 2,
+                      "maxItems": 10,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 1000
+                      }
+                    },
+                    "optionIds": {
+                      "minItems": 2,
+                      "maxItems": 5,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "correctOptionIds": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "maxLength": 100
+                      }
+                    },
+                    "explanation": {
+                      "type": "string",
+                      "maxLength": 2000
+                    },
+                    "answer": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "prompt",
+                    "options"
+                  ]
+                }
+              },
+              "assignments": {
+                "maxItems": 2000,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "groupId": {
+                      "type": "string",
+                      "maxLength": 80
+                    },
+                    "teamId": {
+                      "type": "string",
+                      "maxLength": 80
+                    },
+                    "userId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "assignedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+                    },
+                    "due": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "none"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "date"
+                            },
+                            "date": {
+                              "type": "string",
+                              "format": "date",
+                              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "date"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "days"
+                            },
+                            "days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 3650
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "days"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "assignedAt",
+                    "due"
+                  ]
+                }
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "feedAt": {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+              },
+              "revision": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "publishedRevision": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "summary",
+              "body",
+              "category",
+              "folder",
+              "status",
+              "version",
+              "duration",
+              "groups",
+              "lessons",
+              "questions",
+              "updatedAt"
+            ]
+          },
+          "expected_revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "content",
+          "expected_revision"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "doc",
+              "brief",
+              "course"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "kind",
+          "version",
+          "status"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "publish_content",
+      "description": "Publish the current draft only on explicit user intent. Validates complete lessons, image alternative text and quizzes. Set new_course_version=true only for a substantive course change that starts a new completion requirement; minor corrections preserve the version.",
+      "capability": "content:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "new_course_version": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "expected_revision"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "doc",
+              "brief",
+              "course"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "kind",
+          "version",
+          "status"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "unpublish_content",
+      "description": "Remove a publication while preserving its draft and history. Requires explicit user intent and current expected_revision.",
+      "capability": "content:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "id",
+          "expected_revision"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "title": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "doc",
+              "brief",
+              "course"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "draft",
+              "published"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "revision",
+          "title",
+          "kind",
+          "version",
+          "status"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "content_report",
+      "description": "Legacy administrator report: organization-wide aggregate current-course activity and feedback counts. No named learner records. Use learning_report for filtered named reports after approving that capability.",
+      "capability": "reports:aggregate",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "courses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "number"
+                },
+                "started": {
+                  "type": "number"
+                },
+                "completed": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "version",
+                "started",
+                "completed"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "feedback": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "positive": {
+                  "type": "number"
+                },
+                "negative": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "positive",
+                "negative"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "complete": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "courses",
+          "feedback",
+          "complete"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_authoring_options",
+      "description": "Discover existing Docs section IDs and paths, content categories and supported Markdown/media/quiz formats. Select existing sections; creating or reordering hierarchy requires the manual settings screen.",
+      "capability": "content:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "complete": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "sections",
+          "categories",
+          "complete"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "list_media",
+      "description": "Find ready uploaded images and videos with stable private Fieldbook references. Filter and follow nextCursor until complete. Never insert a pending upload or a temporary signed transfer URL.",
+      "capability": "media:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "query": {
+            "default": "",
+            "type": "string",
+            "maxLength": 200
+          },
+          "type": {
+            "default": "all",
+            "type": "string",
+            "enum": [
+              "all",
+              "image",
+              "video"
+            ]
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "media": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "bytes": {
+                  "type": "number"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "type",
+                "bytes",
+                "url"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "media",
+          "nextCursor",
+          "complete"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "prepare_media_upload",
+      "description": "Prepare an image or video upload. Returns a short-lived PUT or resumable TUS transfer instruction, not a usable content URL. The client must transfer the file bytes outside MCP, then call complete_media_upload. If the client cannot transfer files, use the Fieldbook editor upload manually. No arbitrary remote URL imports.",
+      "capability": "media:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "image/gif",
+              "video/mp4",
+              "video/webm"
+            ]
+          },
+          "size": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "size"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "upload": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "method": {
+                    "type": "string",
+                    "const": "PUT"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "url",
+                  "method",
+                  "headers"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "protocol": {
+                    "type": "string",
+                    "const": "tus"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "metadata": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "chunkSize": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "protocol",
+                  "url",
+                  "headers",
+                  "metadata",
+                  "chunkSize"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "nextAction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "upload",
+          "nextAction"
+        ],
+        "additionalProperties": false
+      },
+      "manual": "Upload the file in the content editor, then use list_media."
+    },
+    {
+      "name": "complete_media_upload",
+      "description": "Verify the current publisher's completed transfer against stored file type, size and owner. Returns a stable private content URL only after verification; repeat this call safely after a lost acknowledgement.",
+      "capability": "media:write",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_reporting_scopes",
+      "description": "List the teams, intersecting learning groups and published courses available for this account's learning reports. Managers are restricted to explicitly managed teams and descendants; group filters never expand that scope.",
+      "capability": "reports:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "organizationWide": {
+            "type": "boolean"
+          },
+          "teams": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "courses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "version"
+              ],
+              "additionalProperties": {}
+            }
+          }
+        },
+        "required": [
+          "organizationWide",
+          "teams",
+          "groups",
+          "courses"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "learning_report",
+      "description": "Read a paginated learning report by teams, learning groups and courses, with names, current-version completion, saved assignment dates/deadlines and overdue status. Group filters intersect team scope. Follow nextCursor for the complete export; optional learning is separate from assigned completion.",
+      "capability": "reports:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "teamIds": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "groupIds": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "courseIds": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "assignment": {
+            "default": "assigned",
+            "type": "string",
+            "enum": [
+              "all",
+              "assigned",
+              "optional"
+            ]
+          },
+          "status": {
+            "default": "all",
+            "type": "string",
+            "enum": [
+              "all",
+              "not_started",
+              "in_progress",
+              "complete",
+              "overdue"
+            ]
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "person": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": {}
+                },
+                "team": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                },
+                "groups": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "name"
+                    ],
+                    "additionalProperties": {}
+                  }
+                },
+                "course": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "version"
+                  ],
+                  "additionalProperties": {}
+                },
+                "assignment": {
+                  "type": "string",
+                  "enum": [
+                    "assigned",
+                    "optional"
+                  ]
+                },
+                "assignedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "savedDueDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "dueDate": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "not_started",
+                    "in_progress",
+                    "complete",
+                    "overdue"
+                  ]
+                },
+                "complete": {
+                  "type": "boolean"
+                },
+                "overdue": {
+                  "type": "boolean"
+                },
+                "completionPercent": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "person",
+                "team",
+                "groups",
+                "course",
+                "assignment",
+                "assignedAt",
+                "savedDueDate",
+                "dueDate",
+                "status",
+                "complete",
+                "overdue",
+                "completionPercent"
+              ],
+              "additionalProperties": {}
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "totals": {
+            "type": "object",
+            "properties": {
+              "assigned": {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "number"
+                  },
+                  "complete": {
+                    "type": "number"
+                  },
+                  "overdue": {
+                    "type": "number"
+                  },
+                  "not_started": {
+                    "type": "number"
+                  },
+                  "in_progress": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "total",
+                  "complete",
+                  "overdue",
+                  "not_started",
+                  "in_progress"
+                ],
+                "additionalProperties": false
+              },
+              "optional": {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "number"
+                  },
+                  "complete": {
+                    "type": "number"
+                  },
+                  "not_started": {
+                    "type": "number"
+                  },
+                  "in_progress": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "total",
+                  "complete",
+                  "not_started",
+                  "in_progress"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "assigned",
+              "optional"
+            ],
+            "additionalProperties": false
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          },
+          "asOf": {
+            "type": "string"
+          },
+          "dueDatesEnabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rows",
+          "total",
+          "totals",
+          "nextCursor",
+          "complete",
+          "asOf",
+          "dueDatesEnabled"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "feedback_report",
+      "description": "Read paginated content or general feedback, including respondent names but no emails or quiz answers. Contributor publishing access includes feedback; this does not grant learner progress reporting.",
+      "capability": "feedback:read",
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "default": "all",
+            "type": "string",
+            "enum": [
+              "all",
+              "doc",
+              "brief",
+              "course",
+              "general"
+            ]
+          },
+          "contentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "rating": {
+            "default": "all",
+            "type": "string",
+            "enum": [
+              "all",
+              "up",
+              "down"
+            ]
+          },
+          "cursor": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "limit": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "contentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "doc",
+                    "brief",
+                    "course",
+                    "general",
+                    "removed"
+                  ]
+                },
+                "version": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "person": {
+                  "type": "string"
+                },
+                "rating": {
+                  "type": "string",
+                  "enum": [
+                    "up",
+                    "down"
+                  ]
+                },
+                "comment": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "contentId",
+                "title",
+                "kind",
+                "version",
+                "person",
+                "rating",
+                "comment",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "total": {
+            "type": "number"
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "complete": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "rows",
+          "total",
+          "nextCursor",
+          "complete"
+        ],
+        "additionalProperties": {}
+      }
+    },
+    {
+      "name": "manage_course_assignment",
+      "description": "Administrator only: explicitly assign or unassign one published course to one existing team or learning group through Fieldbook's canonical assignment service. Saved ongoing deadlines and other assignment sources are preserved. Refresh the course revision after each write.",
+      "capability": "content:assign",
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": true,
+        "openWorldHint": false
+      },
+      "inputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "operation": {
+            "type": "string",
+            "enum": [
+              "assign",
+              "unassign"
+            ]
+          },
+          "audience": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "team",
+                  "group"
+                ]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "id",
+          "expected_revision",
+          "operation",
+          "audience"
+        ],
+        "additionalProperties": false
+      },
+      "outputSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          },
+          "revision": {
+            "type": "number"
+          },
+          "publishedRevision": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "nextAction": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "id",
+          "revision",
+          "publishedRevision",
+          "nextAction"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

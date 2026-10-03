@@ -28,14 +28,14 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
-  /** Server-owned identity of the built-in team; settings forms cannot replace it. */
-  organizationTeamId?: string;
   askAi?: import("./ai").AskAiSettings;
   /** Availability only; internal model/guidance settings stay on the server. */
   askAiEnabled?: boolean;
   externalLinks?: ExternalLink[];
   homePage?: "updates" | "courses" | "docs";
   guestGroupId?: string | null;
+  /** Server-owned identity of the built-in team; settings forms cannot replace it. */
+  organizationTeamId?: string | null;
   docCategoryOrder?: string[];
   docSections?: import("./docs-navigation").DocSection[];
   newUserStage?: "existing" | "newhire";
@@ -54,6 +54,7 @@ export const defaultSettings: SiteSettings = {
   externalLinks: [],
   homePage: "courses",
   guestGroupId: null,
+  organizationTeamId: null,
   newUserStage: "existing",
   dueDatesEnabled: true,
   onboardingDays: 90,
@@ -75,6 +76,7 @@ export function publicSettings(
     askAi: _askAi,
     askAiEnabled: _askAiEnabled,
     guestGroupId: _guestGroupId,
+    organizationTeamId: _organizationTeamId,
     logoUrl: _legacyLogoUrl,
     tagline: _legacyTagline,
     ...visible

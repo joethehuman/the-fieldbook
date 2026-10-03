@@ -1,3 +1,8 @@
+import {
+  assignmentAudiences,
+  audienceKey,
+  assignLearningToAudiences,
+} from "@/lib/assignment-audiences";
 import type { Workspace } from "@/lib/store";
 import { groupItems } from "@/lib/learning-groups";
 import type { LearningAction } from "@/lib/learning";
@@ -22,16 +27,30 @@ export function contentRelationshipCommands(
   const reason = records.some(
     (c) => !published.some((p) => p.id === c.id && p.status === "published"),
   )
-    ? "Publish every selected item before changing group assignments or audiences."
+    ? "Publish every selected item before changing assignments or audiences."
     : undefined;
   const commands: BulkCommand[] = ([true, false] as const).map((add) => ({
     id: add ? "group-add" : "group-remove",
-    label: add ? "Add to learning groups" : "Remove from learning groups",
+    label:
+      kind === "brief"
+        ? add
+          ? "Add relevant groups"
+          : "Remove relevant groups"
+        : add
+          ? "Assign to teams or groups"
+          : "Remove team or group assignments",
     disabledReason: reason,
+    applyLabel: "Review changes",
     description: add
       ? "Add direct learning assignments or Update audiences. Overlapping courses count once. Existing history is preserved."
-      : "Remove direct links only. Learning inherited through a curriculum or another group remains; saved history is preserved.",
-    options: data.groups.map((g) => ({ id: g.id, label: g.name })),
+      : "Remove direct links only. Learning inherited through a curriculum or another team or group remains; saved history is preserved.",
+    options:
+      kind === "brief"
+        ? data.groups.map((g) => ({ id: g.id, label: `Group: ${g.name}` }))
+        : assignmentAudiences(data).map((a) => ({
+            id: audienceKey(a),
+            label: `${a.kind === "group" ? "Group" : "Team"}: ${a.name}`,
+          })),
     apply: async (ids) => {
       if (kind === "brief") {
         await learn(
@@ -46,31 +65,14 @@ export function contentRelationshipCommands(
         );
         return;
       }
-      await save({
-        ...data,
-        groups: data.groups.map((g) =>
-          !ids.includes(g.id)
-            ? g
-            : {
-                ...g,
-                learningItems: add
-                  ? [
-                      ...groupItems(g, published),
-                      ...selected
-                        .filter(
-                          (id) =>
-                            !groupItems(g, published).some(
-                              (i) => i.kind === "course" && i.id === id,
-                            ),
-                        )
-                        .map((id) => ({ kind: "course" as const, id })),
-                    ]
-                  : groupItems(g, published).filter(
-                      (i) => i.kind !== "course" || !selected.includes(i.id),
-                    ),
-              },
+      await save(
+        assignLearningToAudiences(
+          data,
+          selected.map((id) => ({ kind: "course", id })),
+          ids,
+          add ? "add" : "remove",
         ),
-      });
+      );
     },
   }));
   if (kind === "course")
@@ -78,8 +80,9 @@ export function contentRelationshipCommands(
       id: "curriculum-add",
       label: "Add to curricula",
       disabledReason: reason,
+      applyLabel: "Review changes",
       description:
-        "Append these courses without duplicates. Learning groups using these curricula receive the added courses; history is preserved.",
+        "Append these courses without duplicates. Teams and groups using these curricula receive the added courses; history is preserved.",
       options: (data.curricula || []).map((c) => ({ id: c.id, label: c.name })),
       apply: async (ids) => {
         await save({
@@ -101,7 +104,10 @@ export function curriculumGroupCommands(
 ): BulkCommand[] {
   return ([true, false] as const).map((add) => ({
     id: add ? "group-add" : "group-remove",
-    label: add ? "Add to learning groups" : "Remove from learning groups",
+    label: add
+      ? "Assign to teams or groups"
+      : "Remove team or group assignments",
+    applyLabel: "Review assignments",
     description:
       "Change direct curriculum assignments. Course content and saved learning history are preserved.",
     disabledReason:
@@ -111,37 +117,19 @@ export function curriculumGroupCommands(
       )
         ? "Publish every selected curriculum first."
         : undefined,
-    options: data.groups.map((g) => ({ id: g.id, label: g.name })),
+    options: assignmentAudiences(data).map((a) => ({
+      id: audienceKey(a),
+      label: `${a.kind === "group" ? "Group" : "Team"}: ${a.name}`,
+    })),
     apply: async (ids) => {
-      await save({
-        ...data,
-        groups: data.groups.map((g) =>
-          !ids.includes(g.id)
-            ? g
-            : {
-                ...g,
-                learningItems: add
-                  ? [
-                      ...groupItems(g, data.publishedContent || data.content),
-                      ...selected
-                        .filter(
-                          (id) =>
-                            !groupItems(
-                              g,
-                              data.publishedContent || data.content,
-                            ).some(
-                              (i) => i.kind === "curriculum" && i.id === id,
-                            ),
-                        )
-                        .map((id) => ({ kind: "curriculum" as const, id })),
-                    ]
-                  : groupItems(g, data.publishedContent || data.content).filter(
-                      (i) =>
-                        i.kind !== "curriculum" || !selected.includes(i.id),
-                    ),
-              },
+      await save(
+        assignLearningToAudiences(
+          data,
+          selected.map((id) => ({ kind: "curriculum", id })),
+          ids,
+          add ? "add" : "remove",
         ),
-      });
+      );
     },
   }));
 }

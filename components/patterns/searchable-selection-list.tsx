@@ -1,5 +1,5 @@
 "use client";
-import { useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { Checkbox, Radio } from "../ui/choice";
 import { Input } from "../ui/input";
 import { Field, FieldGroup } from "../ui/field";
@@ -14,6 +14,8 @@ export type SelectionOption = {
   id: string;
   label: string;
   description?: string;
+  labelContent?: ReactNode;
+  detail?: ReactNode;
 };
 /** Bounded, searchable single or multiple selection. Search and pages never discard selections. */
 export function SearchableSelectionList({
@@ -25,6 +27,12 @@ export function SearchableSelectionList({
   selectionMode = "multiple",
   placeholder = "Name or email",
   emptyMessage = "No matching people.",
+  searchControls,
+  visibleOptions,
+  onReviewSelected,
+  pageResetKey,
+  emptyAction,
+  bounded = false,
 }: {
   options: SelectionOption[];
   value: string[];
@@ -34,12 +42,24 @@ export function SearchableSelectionList({
   selectionMode?: "single" | "multiple";
   placeholder?: string;
   emptyMessage?: string;
+  /** A specialized collection may own discovery while reusing bounded selection. */
+  searchControls?: ReactNode;
+  visibleOptions?: SelectionOption[];
+  onReviewSelected?: () => void;
+  pageResetKey?: string;
+  emptyAction?: ReactNode;
+  /** Fill a DialogBody, scrolling results without moving controls or actions. */
+  bounded?: boolean;
 }) {
   const groupName = useId();
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selectedOnly, setSelectedOnly] = useState(false);
-  const matches = options.filter(
+  useEffect(() => setPage(1), [pageResetKey]);
+  useEffect(() => {
+    if (!value.length) setSelectedOnly(false);
+  }, [value.length]);
+  const matches = (visibleOptions || options).filter(
     (option) =>
       (!selectedOnly || value.includes(option.id)) &&
       `${option.label} ${option.description || ""}`
@@ -55,21 +75,30 @@ export function SearchableSelectionList({
     value.includes(option.id),
   ).length;
   return (
-    <FieldGroup disabled={disabled}>
-      <FormField
-        label={label}
-        description="Selections are kept while you search or change pages."
-      >
-        <Input
-          type="search"
-          placeholder={placeholder}
-          value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            setPage(1);
-          }}
-        />
-      </FormField>
+    <FieldGroup
+      disabled={disabled}
+      className={
+        bounded
+          ? "flex h-full min-h-0 flex-col [&>:not([data-slot=selection-results])]:shrink-0"
+          : undefined
+      }
+    >
+      {searchControls || (
+        <FormField
+          label={label}
+          description="Selections are kept while you search or change pages."
+        >
+          <Input
+            type="search"
+            placeholder={placeholder}
+            value={query}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              setPage(1);
+            }}
+          />
+        </FormField>
+      )}
       {selectionMode === "multiple" && options.length > 1 && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border pb-3">
           {pageOptions.length > 1 && (
@@ -112,7 +141,7 @@ export function SearchableSelectionList({
           />
           {matches.length > pageOptions.length &&
             pageSelected === pageOptions.length &&
-            value.length < matches.length && (
+            matches.some((option) => !value.includes(option.id)) && (
               <Button
                 type="button"
                 variant="link"
@@ -133,6 +162,7 @@ export function SearchableSelectionList({
                 variant="outline"
                 disabled={disabled}
                 onClick={() => {
+                  onReviewSelected?.();
                   setSelectedOnly(!selectedOnly);
                   setQuery("");
                   setPage(1);
@@ -144,7 +174,10 @@ export function SearchableSelectionList({
                 type="button"
                 variant="ghost"
                 disabled={disabled}
-                onClick={() => onChange([])}
+                onClick={() => {
+                  setSelectedOnly(false);
+                  onChange([]);
+                }}
               >
                 Clear selection
               </Button>
@@ -152,13 +185,20 @@ export function SearchableSelectionList({
           )}
         </div>
       )}
-      <div className="grid gap-2">
+      <div
+        data-slot="selection-results"
+        className={
+          bounded
+            ? "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+            : "grid gap-2"
+        }
+      >
         {pageOptions.map((option) => (
           <Field
             key={option.id}
             orientation="horizontal"
             data-selected={value.includes(option.id)}
-            className="min-h-16 rounded-md border border-border p-3 hover:bg-muted/40 data-[selected=true]:border-primary/40 data-[selected=true]:bg-selected/40"
+            className="min-h-16 shrink-0 rounded-md border border-border p-3 hover:bg-muted/40 data-[selected=true]:border-primary/40 data-[selected=true]:bg-selected/40"
           >
             {selectionMode === "single" ? (
               <Radio
@@ -181,17 +221,32 @@ export function SearchableSelectionList({
                 }
               />
             )}
-            <span className="min-w-0 [overflow-wrap:anywhere]">
-              <span className="block">{option.label}</span>
+            <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
+              <span className="block">
+                {option.labelContent || option.label}
+              </span>
               {option.description && (
                 <span className="block text-copy font-normal text-muted-foreground">
                   {option.description}
                 </span>
               )}
+              {option.detail && (
+                <span
+                  data-slot="selection-excerpt"
+                  className="mt-1 line-clamp-3 text-copy font-normal text-muted-foreground"
+                >
+                  {option.detail}
+                </span>
+              )}
             </span>
           </Field>
         ))}
-        {!matches.length && <EmptyState>{emptyMessage}</EmptyState>}
+        {!matches.length && (
+          <EmptyState>
+            {emptyMessage}
+            {emptyAction}
+          </EmptyState>
+        )}
       </div>
       {(matches.length > 10 ||
         selectionMode === "single" ||

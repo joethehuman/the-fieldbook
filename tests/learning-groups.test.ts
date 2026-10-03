@@ -39,12 +39,12 @@ test("demo learning groups combine live teams, curriculum order and direct assig
     {
       id: "all",
       name: "Everyone",
+      teamIds: ["sales-team"],
       learningItems: [{ kind: "course", id: a.id }],
     },
     {
       id: "sales",
       name: "Sales",
-      parentId: "all",
       teamIds: ["sales-team"],
       learningItems: [
         { kind: "curriculum", id: "start" },
@@ -55,7 +55,7 @@ test("demo learning groups combine live teams, curriculum order and direct assig
   next.users[0].groups = [];
   const saved = reconcileLearning(original, next, "2026-09-20T00:00:00.000Z");
   const user = saved.users[0];
-  assert.deepEqual([...effectiveGroups(user, saved.groups)], ["sales", "all"]);
+  assert.deepEqual([...effectiveGroups(user, saved.groups)], ["all", "sales"]);
   assert.deepEqual(
     requiredSequence(saved.content, user, saved.groups).map((c) => c.id),
     [a.id, b.id, c.id],
@@ -120,10 +120,14 @@ test("Updates split once into relevant and other updates, independent of learnin
     { ...base, id: "other", groups: [], updatedAt: "2026-09-21" },
     { ...base, id: "draft", status: "draft" as const, groups: ["sales"] },
   ];
-  const result = updatesForUser(content, data.users[0], [
-    { id: "parent", name: "Everyone" },
-    { id: "sales", name: "Sales", parentId: "parent" },
-  ]);
+  const result = updatesForUser(
+    content,
+    { ...data.users[0], groups: ["sales", "parent"] },
+    [
+      { id: "parent", name: "Everyone" },
+      { id: "sales", name: "Sales" },
+    ],
+  );
   assert.deepEqual(
     result.forYou.map((c) => c.id),
     ["new", "old"],
@@ -141,7 +145,7 @@ test("Updates split once into relevant and other updates, independent of learnin
   assert.equal(guest.other.length, 3);
 });
 
-test("Update recommendations feature at most two recent inherited matches and retain every other published update", () => {
+test("Update recommendations feature at most two recent audience matches and retain every other published update", () => {
   const data = freshWorkspace();
   const base = data.content.find((c) => c.kind === "brief")!;
   const many = Array.from({ length: 24 }, (_, index) => ({
@@ -152,7 +156,7 @@ test("Update recommendations feature at most two recent inherited matches and re
   }));
   const result = updatesForUser(many, data.users[0], [
     { id: "parent", name: "Everyone" },
-    { id: "sales", name: "Sales", parentId: "parent" },
+    { id: "sales", name: "Sales" },
   ]);
   assert.deepEqual(
     result.forYou.map((item) => item.id),
@@ -225,7 +229,10 @@ test("learning governance rejects bad team links, duplicate items and unpublishe
   const input = {
     expected: 1,
     users: [],
-    teams: [{ id: "t", name: "Team" }],
+    teams: [
+      { id: "organization", name: "Organization", system: "organization" },
+      { id: "t", name: "Team", parentId: "organization" },
+    ],
     groups: [
       {
         id: "g",
@@ -246,6 +253,13 @@ test("learning governance rejects bad team links, duplicate items and unpublishe
   };
   assert.equal(governanceSchema.safeParse(input).success, true);
   for (const bad of [
+    { ...input, groups: [{ ...input.groups[0], parentId: "g" }] },
+    { ...input, groups: [{ ...input.groups[0], teamLinkScope: "direct" }] },
+    { ...input, groups: [{ ...input.groups[0], legacyDirectTeamIds: ["t"] }] },
+    {
+      ...input,
+      groups: [{ ...input.groups[0], legacyDirectTeamIds: ["missing"] }],
+    },
     { ...input, teams: [] },
     { ...input, curricula: [{ ...input.curricula[0], status: "draft" }] },
     { ...input, curricula: [{ ...input.curricula[0], courseIds: [cid, cid] }] },

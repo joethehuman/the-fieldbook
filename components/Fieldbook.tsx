@@ -25,6 +25,7 @@ import { NavigationButton } from "./patterns/navigation-button";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState, PageHeader } from "@/components/patterns/layout";
 import Updates from "./Updates";
+import { reviewDeadlines, recalculateDeadlines } from "@/lib/assignment-episodes";
 import { reconcileLearning } from "@/lib/learning-groups";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
@@ -656,6 +657,12 @@ export default function Fieldbook() {
             data={data}
             user={user}
             onChange={persist}
+            onReviewDeadlines={async (token) => {
+              const current = loadWorkspace();
+              const review = reviewDeadlines(current);
+              if (token) { const next = recalculateDeadlines(current, token); saveWorkspace(next); setData(next); }
+              return review;
+            }}
             onSaveContent={async (content, intent) => {
               try {
                 const before = loadWorkspace();
@@ -697,6 +704,13 @@ export default function Fieldbook() {
               setReportIssue(undefined);
               setError("");
               return latest;
+            }}
+            onLoadPublished={async (id) => {
+              const latest = loadWorkspace();
+              const draft = latest.content.find((item) => item.id === id);
+              const published = latest.publishedContent?.find((item) => item.id === id);
+              if (!draft || !published) throw new Error("The published version is unavailable. Your changes remain open.");
+              return { ...published, revision: draft.revision, publishedRevision: draft.publishedRevision };
             }}
           />
         </ReportAvailability.Provider>
