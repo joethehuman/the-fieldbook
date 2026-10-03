@@ -113,7 +113,7 @@ test("flat groups retain curriculum links and deduplicate learning across audien
     .getByRole("searchbox", { name: "Find a group", exact: true })
     .fill("Account");
   await page
-    .getByRole("button", { name: "Account executives", exact: true })
+    .getByRole("link", { name: "Account executives", exact: true })
     .click();
   await expect(
     page.getByRole("tab", { name: "People", exact: true }),
@@ -198,7 +198,7 @@ test("branch membership stays staged and explains overlapping sources", async ({
   page,
 }, info) => {
   await start(page, fixture());
-  await page.getByRole("button", { name: "Pilot", exact: true }).click();
+  await page.getByRole("link", { name: "Pilot", exact: true }).click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
   await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const membership = page.getByRole("dialog", {
@@ -259,7 +259,7 @@ test("branch membership stays staged and explains overlapping sources", async ({
   });
   await page.reload();
   await section(page);
-  await page.getByRole("button", { name: "Pilot", exact: true }).click();
+  await page.getByRole("link", { name: "Pilot", exact: true }).click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
   await expect(
     page.getByRole("row").filter({ hasText: "Alex Edwards" }),
@@ -271,7 +271,7 @@ test("large group roster is paginated, searchable and contained on narrow screen
 }, info) => {
   await start(page, fixture(true));
   await page
-    .getByRole("button", { name: "Account executives", exact: true })
+    .getByRole("link", { name: "Account executives", exact: true })
     .click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
   const table = page.getByRole("table", { name: "Group members" });
@@ -324,7 +324,7 @@ test("group workspace starts with people and clearly separates assigned content 
   );
   await start(page, data);
   await page
-    .getByRole("button", { name: "Account executives", exact: true })
+    .getByRole("link", { name: "Account executives", exact: true })
     .click();
   const tabs = page.getByRole("tablist", { name: "Learning group sections" });
   await expect(tabs.getByRole("tab")).toHaveText([
@@ -449,7 +449,7 @@ test("People filters and bulk direct removal preserve team membership and cancel
   });
   await start(page, data);
   await page
-    .getByRole("button", { name: "Account executives", exact: true })
+    .getByRole("link", { name: "Account executives", exact: true })
     .click();
   const table = page.getByRole("table", { name: "Group members" });
   await expect(table).toHaveAttribute("data-layout", "groupMembersSelectable");
@@ -651,7 +651,7 @@ test("group index keeps selection across pages and creation reveals the new row 
     .getByRole("button", { name: "Create group", exact: true })
     .click();
   await expect(create).not.toBeVisible();
-  const created = table.getByRole("button", {
+  const created = table.getByRole("link", {
     name: "AAA new audience",
     exact: true,
   });
@@ -832,7 +832,7 @@ test("bulk group deletion reviews once, cancels intact, and preserves content hi
     .click();
   await expect(review).not.toBeVisible();
   await expect(
-    table.getByRole("button", { name: "All GTM", exact: true }),
+    table.getByRole("link", { name: "All GTM", exact: true }),
   ).toBeVisible();
   await expect(table.getByRole("checkbox")).toHaveCount(0);
   const after = await saved(page);

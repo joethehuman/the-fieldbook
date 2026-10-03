@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine administrative tables and People progress with compact shared rows, quieter record metadata and persistent row-action menus. Make names edit links, show reporting teams in People, simplify row completion to a ring and percentage, and keep action menus visible while horizontally scrolling. Add direct Learning-group membership and assignment shortcuts, align Teams selection into a compact list, and use labeled icon counts for membership and hierarchy.
+
 - Coordinate Focus mode transitions with the outline and details panels, keep the moving canvas opaque with synchronized text/media resizing, and make Enter from a lesson title start on an empty line above the first block, including video.
 
 - Unify visual writing and preview with inline player-style media, editable lesson titles inside the canvas, contextual media controls, and Focus mode that expands the existing editor. Offer Markdown downloads from the toolbar’s more menu, retain source recovery for unsupported content, autosave and separate publication.

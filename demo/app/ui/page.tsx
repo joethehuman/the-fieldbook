@@ -34,6 +34,7 @@ import { BrowseToolbar } from "@/components/patterns/layout";
 import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
 
+import { RecordExamples } from "./record-examples";
 import { DataTable } from "@/components/patterns/data-table";
 import { AccountMenu } from "@/components/patterns/account-menu";
 import { ArrowRight, Layers, Settings } from "lucide-react";
@@ -619,29 +620,7 @@ export default function ComponentCatalog() {
               Edit example group
             </Button>
           </SectionHeader>
-          <TableContainer>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Person</TableHead>
-                  <TableHead>Learning complete</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                <TableRow>
-                  <TableCell>Example learner</TableCell>
-                  <TableCell>75%</TableCell>
-                  <TableCell>
-                    <ActionGroup>
-                      <Button variant="link">Edit</Button>
-                      <Button variant="link">Courses &amp; progress</Button>
-                    </ActionGroup>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <RecordExamples />
         </Stack>
       </Card>
       <Card>

@@ -32,6 +32,8 @@ import {
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { CsvExport } from "./patterns/csv-export";
 import { FormField } from "./patterns/form-field";
+import { RecordName, RecordMeta, RecordProgress } from "./patterns/record-row";
+import { RowActions } from "./patterns/row-actions";
 import { DataTable } from "./patterns/data-table";
 import { Pagination } from "./patterns/pagination";
 import { EmptyState, SectionHeader } from "./patterns/layout";
@@ -497,6 +499,7 @@ export function TeamProgress({
             {
               <TableContainer aria-label="People progress">
                 <DataTable
+                  density="compact"
                   layout={
                     deadlines ? "progressPeople" : "progressPeopleNoDates"
                   }
@@ -506,7 +509,7 @@ export function TeamProgress({
                       <TableHead>Person</TableHead>
                       <TableHead>Reporting team</TableHead>
                       <TableHead>User type</TableHead>
-                      <TableHead align="right">Completion</TableHead>
+                      <TableHead>Completion</TableHead>
                       {deadlines && (
                         <TableHead align="right">Overdue</TableHead>
                       )}
@@ -519,29 +522,38 @@ export function TeamProgress({
                     {visible.map((r) => (
                       <TableRow key={r.u.id}>
                         <TableCell>
-                          <strong>{r.u.name}</strong>
-                          <small>{r.u.email}</small>
+                          <RecordName
+                            data-person-id={r.u.id}
+                            onClick={() => void open(r)}
+                          >
+                            {r.u.name}
+                          </RecordName>
+                          <RecordMeta title={r.u.email}>{r.u.email}</RecordMeta>
                         </TableCell>
                         <TableCell>{r.team}</TableCell>
                         <TableCell>{r.stage}</TableCell>
-                        <TableCell align="right">
-                          {r.percent === null ? "—" : `${r.percent}%`}
-                          <small>
-                            {r.completed} of {r.assigned} courses
-                          </small>
-                          <small>{statusLabels[r.status]}</small>
+                        <TableCell>
+                          <RecordProgress
+                            percent={r.percent}
+                            completed={r.completed}
+                            assigned={r.assigned}
+                            status={statusLabels[r.status]}
+                            overdue={deadlines ? r.overdue : 0}
+                          />
                         </TableCell>
                         {deadlines && (
                           <TableCell align="right">{r.overdue}</TableCell>
                         )}
                         <TableCell>
-                          <Button
-                            variant="link"
-                            data-person-id={r.u.id}
-                            onClick={() => void open(r)}
-                          >
-                            View courses
-                          </Button>
+                          <RowActions
+                            label={r.u.name}
+                            actions={[
+                              {
+                                label: "View courses",
+                                onSelect: () => void open(r),
+                              },
+                            ]}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -629,7 +641,7 @@ export function TeamProgress({
             </p>
           ) : detail.courses.length ? (
             <TableContainer aria-label="Person course assignments">
-              <DataTable layout="progressAssignments">
+              <DataTable density="compact" layout="progressAssignments">
                 <TableHeader>
                   <TableRow>
                     <TableHead>Course</TableHead>

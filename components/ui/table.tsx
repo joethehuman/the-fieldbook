@@ -1,10 +1,23 @@
 import type { ComponentProps } from "react";
 import { cn } from "@/lib/utils";
-export function Table({ className, ...props }: ComponentProps<"table">) {
+export function Table({
+  className,
+  density = "comfortable",
+  pinActions = false,
+  ...props
+}: ComponentProps<"table"> & {
+  density?: "comfortable" | "compact";
+  pinActions?: boolean;
+}) {
   return (
     <table
       data-slot="table"
-      className={cn("w-full caption-bottom text-left text-sm", className)}
+      data-density={density}
+      data-pin-actions={pinActions}
+      className={cn(
+        "group/table w-full caption-bottom text-left text-sm",
+        className,
+      )}
       {...props}
     />
   );
@@ -29,7 +42,7 @@ export function TableRow({ className, ...props }: ComponentProps<"tr">) {
   return (
     <tr
       className={cn(
-        "hover:bg-muted/40 focus-within:bg-muted/40",
+        "group/row hover:bg-muted/40 focus-within:bg-muted/40 group-data-[pin-actions=true]/table:hover:bg-surface group-data-[pin-actions=true]/table:focus-within:bg-surface",
         className,
       )}
       {...props}
@@ -45,7 +58,8 @@ export function TableHead({
     <th
       scope="col"
       className={cn(
-        "px-4 py-3 align-middle font-medium",
+        "px-4 py-3 align-middle font-medium group-data-[density=compact]/table:px-3 group-data-[density=compact]/table:py-2",
+        "group-data-[pin-actions=true]/table:last:sticky group-data-[pin-actions=true]/table:last:right-0 group-data-[pin-actions=true]/table:last:z-10 group-data-[pin-actions=true]/table:last:bg-surface group-data-[pin-actions=true]/table:last:before:absolute group-data-[pin-actions=true]/table:last:before:inset-y-0 group-data-[pin-actions=true]/table:last:before:right-full group-data-[pin-actions=true]/table:last:before:w-4 group-data-[pin-actions=true]/table:last:before:pointer-events-none group-data-[pin-actions=true]/table:last:before:bg-linear-to-r group-data-[pin-actions=true]/table:last:before:from-transparent group-data-[pin-actions=true]/table:last:before:to-surface",
         align === "right" && "text-right tabular-nums",
         className,
       )}
@@ -61,7 +75,8 @@ export function TableCell({
   return (
     <td
       className={cn(
-        "px-4 py-4 align-middle [&_strong]:font-medium [&_small]:mt-1 [&_small]:block [&_small]:text-xs [&_small]:text-muted-foreground",
+        "px-4 py-4 align-middle group-data-[density=compact]/table:px-3 group-data-[density=compact]/table:py-2 [&_strong]:font-medium [&_small]:mt-1 [&_small]:block [&_small]:text-xs [&_small]:text-muted-foreground",
+        "group-data-[pin-actions=true]/table:last:sticky group-data-[pin-actions=true]/table:last:right-0 group-data-[pin-actions=true]/table:last:z-10 group-data-[pin-actions=true]/table:last:bg-background group-data-[pin-actions=true]/table:last:group-hover/row:bg-surface group-data-[pin-actions=true]/table:last:group-focus-within/row:bg-surface group-data-[pin-actions=true]/table:last:before:absolute group-data-[pin-actions=true]/table:last:before:inset-y-0 group-data-[pin-actions=true]/table:last:before:right-full group-data-[pin-actions=true]/table:last:before:w-4 group-data-[pin-actions=true]/table:last:before:pointer-events-none group-data-[pin-actions=true]/table:last:before:bg-linear-to-r group-data-[pin-actions=true]/table:last:before:from-transparent group-data-[pin-actions=true]/table:last:before:to-background group-data-[pin-actions=true]/table:last:group-hover/row:before:to-surface group-data-[pin-actions=true]/table:last:group-focus-within/row:before:to-surface",
         align === "right" && "text-right tabular-nums",
         className,
       )}

@@ -38,9 +38,13 @@ export function Progress({
 function RingGraphic({
   value,
   summary = false,
+  compact = false,
+  tone = "neutral",
 }: {
   value: number;
   summary?: boolean;
+  compact?: boolean;
+  tone?: "neutral" | "complete" | "overdue";
 }) {
   return (
     <svg
@@ -49,7 +53,9 @@ function RingGraphic({
       className={
         summary
           ? "absolute inset-0 size-full -rotate-90"
-          : "size-5 shrink-0 -rotate-90"
+          : compact
+            ? "size-4 shrink-0 -rotate-90"
+            : "size-5 shrink-0 -rotate-90"
       }
     >
       <circle
@@ -59,7 +65,7 @@ function RingGraphic({
         fill="none"
         stroke="currentColor"
         strokeWidth="3"
-        className="text-border"
+        className={tone === "overdue" ? "text-destructive/30" : "text-border"}
       />
       <circle
         cx="20"
@@ -71,7 +77,17 @@ function RingGraphic({
         pathLength="100"
         strokeDasharray={`${value} 100`}
         strokeLinecap={value ? "round" : "butt"}
-        className={summary ? "text-link" : "text-primary"}
+        className={
+          tone === "overdue"
+            ? "text-destructive"
+            : tone === "complete"
+              ? "text-success"
+              : summary
+                ? "text-link"
+                : compact
+                  ? "text-muted-foreground"
+                  : "text-primary"
+        }
       />
     </svg>
   );
@@ -81,39 +97,63 @@ export function ProgressRing({
   value,
   label = "Assigned course progress",
   caption = "complete",
-}: {
+  variant = "summary",
+  tone = "neutral",
+  className,
+  ...props
+}: ComponentProps<"div"> & {
   value: number | null;
   label?: string;
   caption?: string;
+  variant?: "summary" | "compact";
+  tone?: "neutral" | "complete" | "overdue";
 }) {
   const percent = percentage(value ?? 0);
   return (
     <div
       data-slot="progress-ring"
-      className="relative grid aspect-square w-34 max-w-full shrink-0 place-items-center rounded-full p-4"
+      className={cn(
+        variant === "compact"
+          ? "inline-flex items-center gap-2 rounded-sm text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          : "relative grid aspect-square w-34 max-w-full shrink-0 place-items-center rounded-full p-4",
+        className,
+      )}
       role={value === null ? "img" : "progressbar"}
       aria-label={value === null ? `${label}: no assigned courses` : label}
       aria-valuenow={value === null ? undefined : percent}
       aria-valuemin={value === null ? undefined : 0}
       aria-valuemax={value === null ? undefined : 100}
       aria-valuetext={value === null ? undefined : `${percent}% ${caption}`}
+      {...props}
     >
-      <RingGraphic value={percent} summary />
-      <div aria-hidden="true" className="grid place-content-center text-center">
-        <strong className="text-3xl leading-tight tabular-nums">
-          {value === null ? (
-            "—"
-          ) : (
-            <>
-              {percent}
-              <small>%</small>
-            </>
-          )}
-        </strong>
-        <span className="text-xs text-muted-foreground">
-          {value === null ? "no assignments" : caption}
-        </span>
-      </div>
+      <RingGraphic
+        value={percent}
+        summary={variant === "summary"}
+        compact={variant === "compact"}
+        tone={tone}
+      />
+      {variant === "compact" ? (
+        <span aria-hidden="true">{value === null ? "—" : `${percent}%`}</span>
+      ) : (
+        <div
+          aria-hidden="true"
+          className="grid place-content-center text-center"
+        >
+          <strong className="text-3xl leading-tight tabular-nums">
+            {value === null ? (
+              "—"
+            ) : (
+              <>
+                {percent}
+                <small>%</small>
+              </>
+            )}
+          </strong>
+          <span className="text-xs text-muted-foreground">
+            {value === null ? "no assignments" : caption}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

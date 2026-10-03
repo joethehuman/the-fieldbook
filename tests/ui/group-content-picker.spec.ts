@@ -105,7 +105,7 @@ async function start(page: Page, kind: "courses" | "updates" = "courses") {
       .getByRole("tab", { name: "Learning groups", exact: true })
       .click();
   await page
-    .getByRole("button", { name: "Picker audience", exact: true })
+    .getByRole("link", { name: "Picker audience", exact: true })
     .click();
   await page
     .getByRole("tab", {

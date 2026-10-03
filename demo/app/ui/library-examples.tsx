@@ -20,6 +20,7 @@ import {
   SelectRows,
   useBulkSelection,
 } from "@/components/patterns/bulk-selection";
+import { RowActions } from "@/components/patterns/row-actions";
 import { DataTable } from "@/components/patterns/data-table";
 import {
   TableContainer,
@@ -988,6 +989,7 @@ function GroupIndexExample() {
       <TableContainer>
         <DataTable
           layout="learningGroupsSelectable"
+          density="compact"
           aria-label="Example learning groups"
         >
           <TableHeader>
@@ -1004,6 +1006,7 @@ function GroupIndexExample() {
               <TableHead>Group</TableHead>
               <TableHead align="right">People</TableHead>
               <TableHead align="right">Courses</TableHead>
+              <TableHead><span className="sr-only">Actions</span></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1023,6 +1026,7 @@ function GroupIndexExample() {
                 <TableCell>{row.name}</TableCell>
                 <TableCell align="right">{row.people}</TableCell>
                 <TableCell align="right">{row.courses}</TableCell>
+                <TableCell><RowActions label={row.name} actions={[{ label: "Select group", onSelect: () => selection.toggle(row.id, true) }]} /></TableCell>
               </TableRow>
             ))}
           </TableBody>
