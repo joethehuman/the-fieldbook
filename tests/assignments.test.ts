@@ -9,7 +9,7 @@ import {
   onboardingTarget,
   requiredSequence,
 } from "../lib/learning";
-import { freshWorkspace } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import { defaultSettings } from "../lib/settings";
 const admin = "00000000-0000-4000-8000-000000000001",
   learner = "00000000-0000-4000-8000-000000000002",

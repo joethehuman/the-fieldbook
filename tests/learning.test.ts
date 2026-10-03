@@ -1,7 +1,8 @@
 import { withTwoQuestionQuiz } from "./fixtures/quiz";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { freshWorkspace, updateProgress } from "../lib/store";
+import { updateProgress } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import { assignedCourses, isComplete } from "../lib/types";
 // Deliberate model fixture: three assigned courses, two also relevant to Solutions.
 function learningFixture() {
