@@ -25,7 +25,7 @@ export function PopoverContent({
         sideOffset={sideOffset}
         collisionPadding={12}
         className={cn(
-          "z-50 w-80 max-w-[calc(100vw-1.5rem)] max-h-[min(calc(100dvh-1.5rem),var(--radix-popover-content-available-height))] overflow-y-auto overscroll-y-contain pe-3 [scrollbar-gutter:stable] rounded-lg border border-border bg-popover text-popover-foreground shadow-sm outline-none",
+          "z-50 w-80 max-w-[calc(100vw-1.5rem)] max-h-[min(calc(100dvh-1.5rem),var(--radix-popover-content-available-height))] overflow-y-auto overscroll-y-contain pe-3 [scrollbar-gutter:stable] rounded-lg border border-border bg-popover text-popover-foreground shadow-floating outline-none",
           layout === "picker" &&
             "flex flex-col [&>:not([data-slot=popover-results])]:shrink-0",
           className,

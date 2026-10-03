@@ -7,6 +7,7 @@ import { Badge } from "./ui/badge";
 import { Alert } from "./ui/alert";
 import { Note } from "./ui/note";
 import { Card } from "./ui/card";
+import { QuizResults } from "./patterns/quiz-results";
 import { Radio, Checkbox } from "./ui/choice";
 import { Field, FieldGroup } from "./ui/field";
 import { ActionGroup } from "./ui/action-group";
@@ -190,38 +191,19 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             {p?.lessons.includes(lesson.id) && <Badge variant="success"><CheckCircle2 size={16} /> Lesson completed</Badge>}
           </section>
         </> : <section ref={activeCard} className={`${course.questions.length ? "course-quiz" : "course-finish-card"} grid gap-6`}>
-          {course.questions.length ? showResults ? <>
-            <span className="eyebrow">Quiz results</span>
-            <h2 ref={heading} tabIndex={-1}>{score === undefined ? "Quiz submitted" : `${score} of ${course.questions.length} correct`}</h2>
-            <Alert role="status" variant={complete ? "success" : "default"}>
-              {complete ? "Course complete." : quizUnlocked(course, p?.attempts) ? "Your quiz is graded. Finish the course to save completion." : "Answer all questions correctly to complete this course. Retry when you’re ready."}
-            </Alert>
-            {latestAttempt?.answers && <details className="grid gap-3">
-              <summary>Review answers</summary>
-              <ol className="list-decimal space-y-4 pl-5">
-                {course.questions.map((item) => {
-                  const saved = latestAttempt.answers?.find((answer) => answer.questionId === item.id);
-                  const selected = item.options.filter((_, index) => saved?.optionIds.includes(optionIds(item)[index]));
-                  return <li key={item.id}>
-                    <div className="grid gap-2">
-                      <strong>{item.prompt}</strong>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                        <Badge variant={saved?.correct ? "success" : "destructive"}>{saved?.correct ? "Correct" : "Incorrect"}</Badge>
-                        <span><strong>Your answer:</strong> {selected.join(", ") || "Unavailable"}</span>
-                      </div>
-                      {item.explanation && <Note>{item.explanation}</Note>}
-                    </div>
-                  </li>;
-                })}
-              </ol>
-            </details>}
-            {complete && feedback}
-            <ActionGroup className="justify-center">
-              {(score === undefined || score < course.questions.length) && <Button variant="outline" onClick={retry}>Retry quiz</Button>}
-              {!complete && quizUnlocked(course, p?.attempts) && <Button onClick={completeEarlierProgress} loading={busy}>Finish course</Button>}
+          {course.questions.length ? showResults ? <QuizResults
+            questions={course.questions}
+            answers={latestAttempt?.answers}
+            complete={complete}
+            headingRef={heading}
+            message={complete ? "Course complete." : quizUnlocked(course, p?.attempts) ? "Your quiz is graded. Finish the course to save completion." : "Answer all questions correctly to complete this course. Retry when you’re ready."}
+            actions={<>
               {complete && <Button onClick={onBack}>Close course</Button>}
-            </ActionGroup>
-          </> : <>
+              {!complete && quizUnlocked(course, p?.attempts) && <Button onClick={completeEarlierProgress} loading={busy}>Finish course</Button>}
+              {(score === undefined || score < course.questions.length) && <Button variant={complete ? "outline" : "default"} onClick={retry}>Retry quiz</Button>}
+            </>}
+            feedback={complete ? feedback : undefined}
+          /> : <>
             <span className="eyebrow">Question {questionIndex + 1} of {course.questions.length}</span>
             <h2 ref={heading} tabIndex={-1}>Check your knowledge</h2>
             {questionIndex === 0 && <p>{requiresPassing(course) ? "Answer every question correctly to complete this course. You can retry after seeing your results." : "Answer each question, then see your results. Passing is not required to complete this course."}</p>}

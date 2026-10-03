@@ -117,7 +117,7 @@ export function ContentCardFooter({
       className="mt-auto flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3 text-xs text-muted-foreground"
     >
       {children}
-      <span data-slot="card-action" className="inline-flex items-center gap-2">
+      <span data-slot="card-action" className="inline-flex items-center gap-2 text-foreground">
         {action}
       </span>
     </div>

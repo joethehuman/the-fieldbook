@@ -18,7 +18,7 @@ export function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex min-h-control w-full min-w-0 items-center justify-between gap-2 rounded-control border border-control-border bg-background px-3 py-1.5 text-left text-label font-normal text-foreground outline-none transition-colors motion-reduce:transition-none hover:enabled:border-control-hover focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border aria-invalid:border-destructive [&>span:first-child]:min-w-0 [&>span:first-child]:whitespace-normal [&>span:first-child]:[overflow-wrap:anywhere] [&>svg]:shrink-0 [&>svg]:text-muted-foreground",
+        "flex min-h-control w-full min-w-0 items-center justify-between gap-2 rounded-control border border-control-border bg-background px-3 py-1.5 text-left text-label font-normal text-foreground outline-none hover:enabled:border-control-hover focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border aria-invalid:border-destructive [&>span:first-child]:min-w-0 [&>span:first-child]:whitespace-normal [&>span:first-child]:[overflow-wrap:anywhere] [&>svg]:shrink-0 [&>svg]:text-muted-foreground",
         className,
       )}
       {...props}
@@ -43,7 +43,7 @@ export function SelectContent({
         position={position}
         sideOffset={5}
         className={cn(
-          "relative z-50 max-h-[min(22rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg",
+          "relative z-50 max-h-[min(22rem,var(--radix-select-content-available-height))] min-w-[var(--radix-select-trigger-width)] max-w-[calc(100vw-2rem)] overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-floating",
           className,
         )}
         {...props}

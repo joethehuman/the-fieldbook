@@ -140,11 +140,18 @@ test("required quiz shows one question at a time, grades, and retries", async ({
     page.getByRole("heading", { name: "1 of 2 correct" }),
   ).toBeVisible();
   await cardInView(page, ".course-quiz");
-  await page.getByText("Review answers").click();
+  const review = page.getByRole("button", { name: /^Review answers/ });
+  const savedBeforeReview = await page.evaluate(() => localStorage.getItem("fieldbook.workspace.v1"));
+  await review.focus();
+  await page.keyboard.press("Enter");
+  await expect(review).toHaveAttribute("aria-expanded", "true");
   await expect(
     page.locator('[data-slot="badge"]', { hasText: "Incorrect" }),
   ).toBeVisible();
   await page.screenshot({ path: info.outputPath("required-quiz-results.png") });
+  await page.keyboard.press("Space");
+  await expect(review).toHaveAttribute("aria-expanded", "false");
+  expect(await page.evaluate(() => localStorage.getItem("fieldbook.workspace.v1"))).toBe(savedBeforeReview);
   await expect(page.getByRole("button", { name: "Close course" })).toHaveCount(
     0,
   );
@@ -171,11 +178,16 @@ test("required quiz shows one question at a time, grades, and retries", async ({
       const button = await page
         .getByRole("button", { name: "Close course" })
         .boundingBox();
-      return Math.abs(
-        button!.x + button!.width / 2 - (card!.x + card!.width / 2),
-      );
+      return Math.abs(button!.x - card!.x);
     })
     .toBeLessThan(2);
+  expect(await page.locator(".course-quiz").evaluate(section => {
+    const close = [...section.querySelectorAll("button")].find(button => button.textContent === "Close course")!;
+    const disclosure = section.querySelector('[data-slot="collapsible-trigger"]')!;
+    return close.getBoundingClientRect().bottom < disclosure.getBoundingClientRect().top;
+  })).toBe(true);
+  await review.click();
+  await page.screenshot({ path: info.outputPath("completed-quiz-results.png") });
 });
 
 test("optional quiz completes after a missed answer and still offers retry", async ({

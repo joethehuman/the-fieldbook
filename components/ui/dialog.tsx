@@ -39,7 +39,7 @@ export function DialogDescription({
 export const dialogOverlayClass =
   "[&:has(~_[data-slot=dialog-overlay][data-state=open])]:hidden fixed inset-0 z-40 bg-overlay";
 export const dialogContentClass =
-  "fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-xl outline-none";
+  "fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl border border-border bg-background p-5 text-foreground shadow-floating outline-none";
 export function DialogContent({
   className,
   size = "default",
@@ -112,7 +112,7 @@ export function DialogFooter({
     <div
       data-slot="dialog-footer"
       className={cn(
-        "-mx-5 -mb-5 mt-2 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-b-lg border-t border-border bg-surface px-5 py-3",
+        "-mx-5 -mb-5 mt-2 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-b-xl border-t border-border bg-surface px-5 py-3",
         className,
       )}
       {...props}
