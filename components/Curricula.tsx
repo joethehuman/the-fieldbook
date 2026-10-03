@@ -35,6 +35,7 @@ import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
 import type { UploadMedia } from "./MarkdownEditor";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Plus } from "lucide-react";
+import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
 import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
 import { assignmentAudiences } from "@/lib/assignment-audiences";
 import { useNestedNavigationGuard } from "./patterns/use-nested-navigation-guard";
@@ -48,8 +49,10 @@ export default function Curricula({
   onChange,
   onUpload,
   registerNavigationGuard,
+  onPrepareAssignments,
 }: {
   registerNavigationGuard?: RegisterNavigationGuard;
+  onPrepareAssignments?: () => Promise<Workspace>;
   data: Workspace;
   onChange: (
     data: Workspace,
@@ -80,6 +83,13 @@ export default function Curricula({
     dirty || busy,
     registerNavigationGuard,
   );
+
+  const assignmentPicker = useLearningAssignmentPicker({
+    data,
+    onChange,
+    onPrepare: onPrepareAssignments,
+    registerNavigationGuard: registerAssignmentGuard,
+  });
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty || busy) {
@@ -226,6 +236,7 @@ export default function Curricula({
       aria-label={editing ? "Curriculum editor" : "Curricula"}
       className="learning-admin"
     >
+      {assignmentPicker.picker}
       {notice && <Alert variant="destructive">{notice}</Alert>}
       {editing ? (
         <form
@@ -520,7 +531,12 @@ export default function Curricula({
                   });
                 },
               })),
-              ...curriculumGroupCommands(data, selection.actionIds, onChange),
+              ...curriculumGroupCommands(
+                data,
+                selection.actionIds,
+                onChange,
+                assignmentPicker.open,
+              ),
             ]}
           />
           {selection.canSelect && (
@@ -569,6 +585,7 @@ export default function Curricula({
                         item={{ kind: "curriculum", id: c.id }}
                         title={c.name}
                         onChange={onChange}
+                        onPrepare={onPrepareAssignments}
                         registerNavigationGuard={registerAssignmentGuard}
                       />
                     )}

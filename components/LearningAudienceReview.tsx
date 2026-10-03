@@ -35,34 +35,58 @@ export function LearningAudienceReview({
   after,
   item,
   stamp,
+  showLearningTitles = false,
 }: {
   before: Workspace;
   after: Workspace;
-  item: LearningItem;
+  item: LearningItem | LearningItem[];
   stamp: string;
+  showLearningTitles?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const impact = useMemo(
     () => learningAudienceReview(before, after, item, stamp),
     [before, after, item, stamp],
   );
-  const was = directlyAssignedAudiences(before, item),
-    now = directlyAssignedAudiences(after, item);
-  const options = audienceOptions(after);
-  const changes = [
-    ...now
-      .filter((key) => !was.includes(key))
-      .map((key) => ({ key, status: "Added" })),
-    ...was
-      .filter((key) => !now.includes(key))
-      .map((key) => ({ key, status: "Removed" })),
+  const items = Array.isArray(item) ? item : [item];
+  const now = [
+    ...new Set(items.flatMap((item) => directlyAssignedAudiences(after, item))),
   ];
-  const dates = new Map<string, string[]>();
+  const options = audienceOptions(after);
+  const changes = items.flatMap((item) => {
+    const previous = directlyAssignedAudiences(before, item),
+      current = directlyAssignedAudiences(after, item);
+    const title =
+      item.kind === "course"
+        ? after.content.find((c) => c.id === item.id)?.title
+        : after.curricula?.find((c) => c.id === item.id)?.name;
+    return [
+      ...current
+        .filter((key) => !previous.includes(key))
+        .map((key) => ({
+          key,
+          itemKey: `${item.kind}:${item.id}`,
+          title,
+          status: "Added",
+        })),
+      ...previous
+        .filter((key) => !current.includes(key))
+        .map((key) => ({
+          key,
+          itemKey: `${item.kind}:${item.id}`,
+          title,
+          status: "Removed",
+        })),
+    ];
+  });
+  const dates = new Map<string, Map<string, string>>();
   impact.rows
     .filter((r) => r.status === "New assignment" && r.due)
-    .forEach((r) =>
-      dates.set(r.due!, [...(dates.get(r.due!) || []), r.person]),
-    );
+    .forEach((r) => {
+      const people = dates.get(r.due!) || new Map<string, string>();
+      people.set(r.personId, r.person);
+      dates.set(r.due!, people);
+    });
   const rows = impact.rows.filter((r) =>
     `${r.person} ${r.course} ${r.status}`
       .toLowerCase()
@@ -83,12 +107,14 @@ export function LearningAudienceReview({
         </p>
       </div>
       <div className="grid gap-2" aria-label="Audience changes">
-        {changes.map(({ key, status }) => (
+        {changes.map(({ key, itemKey, title, status }) => (
           <div
             className="flex justify-between gap-3 border-b border-border py-2 text-sm"
-            key={key}
+            key={`${itemKey}:${key}`}
           >
             <span>
+              {(showLearningTitles || items.length > 1) &&
+                `${title || "Unavailable learning"} · `}
               {options.find((a) => contentAudienceKey(a) === key)?.name ||
                 "Unavailable audience"}
             </span>
@@ -102,7 +128,7 @@ export function LearningAudienceReview({
           {[...dates]
             .map(
               ([date, people]) =>
-                `${dateLabel(date)} for ${people.length === 1 ? people[0] : `${people.length} people`}`,
+                `${dateLabel(date)} for ${people.size === 1 ? [...people.values()][0] : `${people.size} people`}`,
             )
             .join("; ")}
           .
@@ -113,7 +139,7 @@ export function LearningAudienceReview({
         {impact.dueDates
           ? " Existing assignments keep their saved deadlines."
           : " Due dates are off."}{" "}
-        Curriculum assignments stay in place.
+        Other assignment sources stay in place.
       </p>
       {options.some(
         (a) => a.publicGuests && now.includes(contentAudienceKey(a)),
@@ -161,7 +187,8 @@ export function LearningAudienceReview({
                       <TableRow key={`${row.personId}:${row.courseId}`}>
                         <TableCell>
                           {row.person}
-                          {item.kind === "curriculum" && (
+                          {(items.length > 1 ||
+                            items[0]?.kind === "curriculum") && (
                             <p className="text-xs text-muted-foreground">
                               {row.course}
                             </p>

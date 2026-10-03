@@ -1,7 +1,16 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Workspace } from "@/lib/store";
 import type { LearningItem } from "@/lib/types";
+import { ContentSelectionList } from "./patterns/content-selection-list";
+import { SearchableSelectionList } from "./patterns/searchable-selection-list";
+import {
+  applyLearningSelection,
+  learningSelectionOptions,
+  selectedLearningItems,
+  type LearningAssignmentTarget,
+} from "@/lib/learning-assignment-selection";
+import { expandLearning } from "@/lib/learning-groups";
 import { AudienceSelection } from "./patterns/audience-selection";
 import { audienceOptions, contentAudienceKey } from "@/lib/content-audiences";
 import {
@@ -44,12 +53,14 @@ export function LearningAssignmentPicker({
   draftAudiences,
   onDraftChange,
   showPeople = true,
+  target,
+  onFinish,
 }: {
   onPrepare?: () => Promise<Workspace | null>;
   triggerLabel?: string;
   compact?: boolean;
   data: Workspace;
-  item: LearningItem | { kind: "brief"; id: string };
+  onFinish?: (saved: boolean, error?: Error) => void;
   draftAudiences?: string[];
   showPeople?: boolean;
   onDraftChange?: (keys: string[]) => void;
@@ -59,7 +70,10 @@ export function LearningAssignmentPicker({
     options?: OrganizationChangeOptions,
   ) => void | Promise<void>;
   registerNavigationGuard?: RegisterNavigationGuard;
-}) {
+} & (
+  | { item: LearningItem | { kind: "brief"; id: string }; target?: never }
+  | { item?: never; target: LearningAssignmentTarget }
+)) {
   const [open, setOpen] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
@@ -136,16 +150,39 @@ export function LearningAssignmentPicker({
     };
   }, [open, dirty, busy, registerNavigationGuard]);
   const allAudiences = assignmentAudiences(data);
-  const learningItem = item.kind === "brief" ? undefined : item;
+  const learningItem = item && item.kind !== "brief" ? item : undefined;
+  const learningItems = target
+    ? selectedLearningItems(target, selected)
+    : learningItem
+      ? [learningItem]
+      : [];
+  const selectionOptions = useMemo(
+    () => (target ? learningSelectionOptions(data, target) : []),
+    [data, target],
+  );
+  const returnFocus = useRef<HTMLElement | null>(null);
   const inherited = Object.fromEntries(
     allAudiences.flatMap((candidate) => {
       const key = audienceKey(candidate);
-      const sources = learningItem
-        ? curriculumAudienceSources(data, key, learningItem)
-        : [];
+      const sources = learningItems.flatMap((learning) =>
+        curriculumAudienceSources(data, key, learning),
+      );
       return sources.length ? [[key, sources]] : [];
     }),
   );
+  const selectedCourseIds = new Set(
+    expandLearning(learningItems, data.curricula || []),
+  );
+  const existingAudienceKeys =
+    target?.kind === "items"
+      ? allAudiences
+          .filter((audience) =>
+            expandLearning(audience.items, data.curricula || []).some((id) =>
+              selectedCourseIds.has(id),
+            ),
+          )
+          .map(audienceKey)
+      : undefined;
   const draftKeys = showPeople
     ? draftAudiences
     : draftAudiences?.filter((key) => key.startsWith("group:"));
@@ -182,6 +219,7 @@ export function LearningAssignmentPicker({
       reviewDone.current = null;
       setOpen(false);
       setError("");
+      onFinish?.(false);
     }
   }
   async function save() {
@@ -198,14 +236,20 @@ export function LearningAssignmentPicker({
     setError("");
     try {
       validateCurrent();
-      if (item.kind === "brief") {
+      if (item?.kind === "brief") {
         if (!onDraftChange)
           throw new Error("Update audience editing is unavailable.");
         onDraftChange(selected);
       } else {
         if (!onChange) throw new Error("Assignment saving is unavailable.");
         await onChange(
-          assignLearningToAudiences(dataRef.current, [item], selected),
+          target
+            ? applyLearningSelection(dataRef.current, target, selected)
+            : assignLearningToAudiences(
+                dataRef.current,
+                learningItems,
+                selected,
+              ),
           {
             locallyHandled: true,
             validateCurrent,
@@ -237,10 +281,11 @@ export function LearningAssignmentPicker({
       initial.current = selected;
       setOpen(false);
       notify(
-        item.kind === "brief"
+        item?.kind === "brief"
           ? "Audience updated in draft. Publish to update recommendations."
           : "Assignments saved. Existing history and deadlines preserved.",
       );
+      onFinish?.(true);
     } catch (e) {
       if (!isOrganizationChangeCanceled(e)) {
         if (e instanceof SaveRecoveryError) setStale(true);
@@ -259,20 +304,33 @@ export function LearningAssignmentPicker({
     setStale(false);
     try {
       const prepared = onPrepare ? await onPrepare() : dataRef.current;
-      if (!prepared || !mounted.current) return;
-      const ids =
-        item.kind === "brief"
+      if (!prepared || !mounted.current) {
+        onFinish?.(false);
+        return;
+      }
+      returnFocus.current =
+        document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      const ids = target
+        ? []
+        : item?.kind === "brief"
           ? draftKeys || []
-          : directlyAssignedAudiences(prepared, item);
+          : learningItem
+            ? directlyAssignedAudiences(prepared, learningItem)
+            : [];
       initial.current = ids;
       revision.current = prepared.governanceRevision;
       snapshot.current = assignmentSnapshot(prepared);
-      setSelected(ids);
+      setSelected(target?.kind === "audiences" ? target.selected || [] : ids);
       setStep("select");
       setReviewPlan(null);
       setOpen(true);
     } catch (e) {
-      if (mounted.current) setError((e as Error).message);
+      if (mounted.current) {
+        setError((e as Error).message);
+        onFinish?.(false, e as Error);
+      }
     } finally {
       running.current = false;
       if (mounted.current) setBusy(false);
@@ -290,9 +348,13 @@ export function LearningAssignmentPicker({
       revision.current = latest.governanceRevision;
       snapshot.current = assignmentSnapshot(latest);
       initial.current =
-        item.kind === "brief"
+        item?.kind === "brief"
           ? draftKeys || []
-          : directlyAssignedAudiences(latest, item);
+          : target
+            ? []
+            : learningItem
+              ? directlyAssignedAudiences(latest, learningItem)
+              : [];
       setStale(false);
       setError("");
       setReviewPlan(null);
@@ -305,19 +367,24 @@ export function LearningAssignmentPicker({
       setBusy(false);
     }
   }
+  useEffect(() => {
+    if (target) void begin();
+  }, [target]);
   return (
     <>
-      <Button
-        type="button"
-        variant={compact ? "link" : "outline"}
-        size={compact ? "sm" : "default"}
-        loading={busy && !open}
-        onClick={() => void begin()}
-      >
-        {triggerLabel}
-      </Button>
+      {!target && (
+        <Button
+          type="button"
+          variant={compact ? "link" : "outline"}
+          size={compact ? "sm" : "default"}
+          loading={busy && !open}
+          onClick={() => void begin()}
+        >
+          {triggerLabel}
+        </Button>
+      )}
       {!open && error && <Alert variant="destructive">{error}</Alert>}
-      {!compact && (
+      {!compact && !target && (
         <p className="text-sm text-muted-foreground">
           {initialKeys.length || Object.keys(inherited).length
             ? [...new Set([...initialKeys, ...Object.keys(inherited)])]
@@ -343,6 +410,12 @@ export function LearningAssignmentPicker({
       >
         <DialogContent
           size="workflow"
+          onCloseAutoFocus={(event) => {
+            if (target && returnFocus.current?.isConnected) {
+              event.preventDefault();
+              returnFocus.current.focus();
+            }
+          }}
           onEscapeKeyDown={(event) => {
             event.preventDefault();
             void close();
@@ -359,11 +432,15 @@ export function LearningAssignmentPicker({
           <div className="flex shrink-0 items-start justify-between gap-4">
             <div className="grid gap-2">
               <DialogTitle ref={heading} tabIndex={-1}>
-                {item.kind === "brief"
-                  ? "Update audience"
-                  : item.kind === "curriculum"
-                    ? "Curriculum audience"
-                    : "Course audience"}
+                {target
+                  ? target.kind === "audiences"
+                    ? "Assign Courses"
+                    : "Learning audience"
+                  : item?.kind === "brief"
+                    ? "Update audience"
+                    : item?.kind === "curriculum"
+                      ? "Curriculum audience"
+                      : "Course audience"}
               </DialogTitle>
               <DialogDescription>{title}</DialogDescription>
             </div>
@@ -378,9 +455,14 @@ export function LearningAssignmentPicker({
               <X aria-hidden="true" />
             </Button>
           </div>
-          {item.kind !== "brief" && (
+          {item?.kind !== "brief" && (
             <DialogSteps
-              steps={["Select audience", "Review changes"]}
+              steps={[
+                target?.kind === "audiences"
+                  ? "Select learning"
+                  : "Select audience",
+                "Review changes",
+              ]}
               current={step === "review" ? 1 : 0}
             />
           )}
@@ -405,27 +487,57 @@ export function LearningAssignmentPicker({
             )}
             <div hidden={step !== "select"} className="grid gap-4">
               <p className="text-sm text-muted-foreground">
-                {item.kind === "brief"
-                  ? "Choose who gets this Update in For you. No completion requirement."
-                  : "Choose who gets this learning in For you and assigned learning."}
+                {target
+                  ? target.mode === "remove"
+                    ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."
+                    : target.kind === "audiences"
+                      ? "Choose courses or curricula for this audience. Other assignments stay in place."
+                      : "Add audiences for the selected learning. Other assignments stay in place."
+                  : item?.kind === "brief"
+                    ? "Choose who gets this Update in For you. No completion requirement."
+                    : "Choose who gets this learning in For you and assigned learning."}
               </p>
-              <AudienceSelection
-                recommendationsOnly={item.kind === "brief"}
-                data={data}
-                selected={selected}
-                initialSelected={initial.current}
-                onChange={setSelected}
-                disabled={busy || stale}
-                inherited={inherited}
-                showPeople={showPeople}
-              />
+              {target?.kind === "audiences" ? (
+                <ContentSelectionList
+                  bounded
+                  label="Find courses or curricula"
+                  showTypeFilter
+                  disabled={busy || stale}
+                  options={selectionOptions.flatMap((option) =>
+                    option.type ? [{ ...option, type: option.type }] : [],
+                  )}
+                  value={selected}
+                  onChange={setSelected}
+                />
+              ) : target?.mode === "remove" ? (
+                <SearchableSelectionList
+                  label="Find a team or group"
+                  options={selectionOptions}
+                  value={selected}
+                  onChange={setSelected}
+                  disabled={busy || stale}
+                />
+              ) : (
+                <AudienceSelection
+                  recommendationsOnly={item?.kind === "brief"}
+                  data={data}
+                  selected={selected}
+                  initialSelected={initial.current}
+                  existingAudienceKeys={existingAudienceKeys}
+                  onChange={setSelected}
+                  disabled={busy || stale}
+                  inherited={target ? undefined : inherited}
+                  showPeople={showPeople}
+                />
+              )}
             </div>
-            {step === "review" && reviewPlan && learningItem && (
+            {step === "review" && reviewPlan && learningItems.length > 0 && (
               <LearningAudienceReview
                 key={reviewPlan.stamp}
                 before={reviewPlan.before}
                 after={reviewPlan.after}
-                item={learningItem}
+                item={learningItems}
+                showLearningTitles={target?.kind === "audiences"}
                 stamp={reviewPlan.stamp}
               />
             )}
@@ -459,6 +571,7 @@ export function LearningAssignmentPicker({
                   onClick={() => {
                     discardDone.current?.(true);
                     discardDone.current = null;
+                    onFinish?.(false);
                   }}
                 >
                   Discard changes
@@ -491,7 +604,7 @@ export function LearningAssignmentPicker({
                 <Button
                   type="button"
                   loading={busy}
-                  disabled={!dirty || stale}
+                  disabled={!dirty || stale || (target && !selected.length)}
                   onClick={() => {
                     if (step === "review") {
                       running.current = true;
@@ -500,7 +613,7 @@ export function LearningAssignmentPicker({
                     } else void save();
                   }}
                 >
-                  {item.kind === "brief"
+                  {item?.kind === "brief"
                     ? "Apply to draft"
                     : step === "review"
                       ? "Save assignments"
