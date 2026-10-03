@@ -13,6 +13,7 @@ import { ActionGroup } from "./ui/action-group";
 import { ImageViewer } from "./patterns/image-viewer";
 import { NavigationButton } from "./patterns/navigation-button";
 import { CourseVideo } from "./patterns/course-video";
+import { ElasticScrollContent } from "./patterns/elastic-scroll-content";
 import { useCourseReaderLayout } from "./patterns/use-course-reader-layout";
 import Markdown from "./Markdown";
 import { correctOptionIds, optionIds, quizUnlocked, requiresPassing, type QuizAnswers } from "@/lib/course-quiz";
@@ -162,7 +163,8 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
           </div>
         </Card>
       </aside>
-      <div ref={reader} className="course-reader focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-[-2px]" role="region" aria-label={lesson ? "Lesson content" : "Course activity"} data-native-overscroll={!!lesson || undefined}>
+      <div ref={reader} className="course-reader focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring focus-visible:outline-offset-[-2px]" role="region" aria-label={lesson ? "Lesson content" : "Course activity"} data-elastic-scroll={!!lesson || undefined}>
+        <ElasticScrollContent enabled={!!lesson}>
         {saveError && <Alert variant="destructive" role="alert">{saveError}</Alert>}
         {lesson ? <>
           <section ref={activeCard} className="course-lesson grid gap-6">
@@ -251,6 +253,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
             <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish course"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Course complete"}</span></span><ChevronRight aria-hidden="true" size={16} />
           </Button>}
         </nav>}
+        </ElasticScrollContent>
       </div>
     </div>
     <ImageViewer image={image} onClose={() => setImage(null)} />

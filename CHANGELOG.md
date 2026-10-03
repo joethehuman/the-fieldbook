@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Allow native browser edge bounce on learner course browsing, Docs and Updates. On roomy desktop screens, the course player scrolls its lesson content independently; narrow or short layouts retain a reachable page. Administration stays unchanged, and reduced motion disables the added bounce. The effect follows browser and device support.
+- Add an experimental content edge spring to course browsing, Docs, Updates and the bounded desktop lesson reader. Native scrolling stays in charge; the content stretches briefly at either edge without moving the header or course outline, adding scroll range or affecting Admin. Reduced motion disables the effect.
 
 - Fit desktop content editors to the available workspace, keeping titles and controls visible while overflowing writing, Outline, Details or Quiz panes scroll independently. Use natural page scrolling on narrow or short screens so every control stays reachable.
 

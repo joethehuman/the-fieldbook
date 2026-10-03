@@ -172,8 +172,18 @@
   .main-content:has(> .editor) {
     padding-block-start: 0;
   }
-  /* Opt in only the learner's page scroller; keep native boundary containment. */
-  .main-content[data-native-overscroll="true"] { overscroll-behavior-y: contain; }
+  /* Edge motion is visual only; clipping keeps native scroll bounds unchanged. */
+  .elastic-scroll-boundary, .elastic-scroll-motion {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    min-width: 0;
+    gap: inherit;
+  }
+  .elastic-scroll-boundary[data-elastic-active="true"] { overflow: clip; }
+  .elastic-scroll-boundary[data-elastic-active="true"] > .elastic-scroll-motion { will-change: transform; }
+  .course-player[data-scroll-layout="page"] .course-reader > .elastic-scroll-boundary,
+  .course-player[data-scroll-layout="page"] .course-reader > .elastic-scroll-boundary > .elastic-scroll-motion { display: contents; }
   .main-content:has(> .course-player[data-scroll-layout="workspace"]) {
     display: flex;
     flex-direction: column;
@@ -1006,7 +1016,6 @@
     scroll-padding-block: var(--space-6);
     padding-inline: var(--space-1);
   }
-  .course-player[data-scroll-layout="workspace"] .course-reader[data-native-overscroll="true"] { overscroll-behavior-y: contain; }
   .course-lesson, .course-quiz, .course-finish-card { min-width: 0; padding-top: var(--space-6); }
   .course-lesson, .course-quiz, .course-finish-card { scroll-margin-block-start: var(--anchor-offset); }
   .course-continue.reading-pagination { margin-top: var(--space-12); padding-top: var(--space-4); }
@@ -1036,7 +1045,6 @@
 
 @layer components {
   @media (prefers-reduced-motion: reduce) {
-    .main-content[data-native-overscroll="true"],
-    .course-player[data-scroll-layout="workspace"] .course-reader[data-native-overscroll="true"] { overscroll-behavior-y: none; }
+    .elastic-scroll-motion { transform: none; }
   }
 }

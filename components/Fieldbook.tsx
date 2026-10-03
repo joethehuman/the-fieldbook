@@ -405,7 +405,7 @@ export default function Fieldbook() {
       menu={menu}
       pending={false}
       admin={view === "admin" && canPublish(user)}
-      nativeOverscroll={
+      elasticScrolling={
         ["docs", "briefs", "learn"].includes(view) && item?.kind !== "course"
       }
       onDismiss={() => setMenu(false)}

@@ -235,7 +235,7 @@ export function ReaderShell({
         menu={menu}
         pending={navigationPending && showNavigationProgress}
         admin={section === "admin"}
-        nativeOverscroll={
+        elasticScrolling={
           ["docs", "updates", "curricula"].includes(section) ||
           (section === "courses" && !selected)
         }

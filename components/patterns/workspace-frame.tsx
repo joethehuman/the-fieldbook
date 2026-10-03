@@ -2,6 +2,7 @@ import type { ReactNode, MouseEventHandler } from "react";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "./brand-theme-sync";
 import { SkipLink } from "./skip-link";
+import { ElasticScrollContent } from "./elastic-scroll-content";
 import { AppBar } from "./app-bar";
 import { Button } from "../ui/button";
 
@@ -17,7 +18,7 @@ export function WorkspaceFrame({
   alert,
   overlays,
   admin = false,
-  nativeOverscroll = false,
+  elasticScrolling = false,
   onDismiss,
   onClickCapture,
 }: {
@@ -31,7 +32,7 @@ export function WorkspaceFrame({
   alert?: ReactNode;
   overlays?: ReactNode;
   admin?: boolean;
-  nativeOverscroll?: boolean;
+  elasticScrolling?: boolean;
   onDismiss: () => void;
   onClickCapture?: MouseEventHandler<HTMLDivElement>;
 }) {
@@ -72,10 +73,10 @@ export function WorkspaceFrame({
         <main
           id="main-content"
           className={`main-content${admin ? " admin-content" : ""}`}
-          data-native-overscroll={(nativeOverscroll && !admin) || undefined}
+          data-elastic-scroll={(elasticScrolling && !admin) || undefined}
           tabIndex={-1}
         >
-          {children}
+          {elasticScrolling && !admin ? <ElasticScrollContent>{children}</ElasticScrollContent> : children}
         </main>
       </div>
       {overlays}

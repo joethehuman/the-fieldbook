@@ -3,7 +3,7 @@ import { freshWorkspace } from "../../lib/store";
 import type { Content } from "../../lib/types";
 import { courseSidebarGap, expectDesktopOutlineMinimum, expectContentSizedCourseSidebar, exercisePreviousLessons } from "../fixtures/course-layout";
 import { expectShortLessonFits, exerciseImageViewer, readerImageAlt, readerImageUrl, serveReaderImage } from "../fixtures/reader-layout";
-import { exerciseLessonScrollOwner, expectNativePageOverscroll } from "../fixtures/native-overscroll";
+import { exerciseLessonScrollOwner, expectElasticPage, expectEdgeSpring } from "../fixtures/native-overscroll";
 const backend = "http://127.0.0.1:3130";
 const ids = [
   "00000000-0000-4000-8000-000000000021",
@@ -73,13 +73,18 @@ async function fixture(request: any, extra = {}) {
 }
 test.beforeEach(async ({ request }) => fixture(request));
 
-test("installed learner pages allow native edge bounce with a reduced-motion opt-out", async ({ page, request }) => {
+test("installed learner pages show a visible edge spring with a reduced-motion opt-out", async ({ page, request }) => {
   await fixture(request, { settings: { access: "public", homePage: "courses" } });
   for (const path of ["/", "/courses", "/updates", `/updates/${ids[1]}`, `/docs/${ids[0]}`, "/curricula"]) {
     await page.goto(path);
-    await expectNativePageOverscroll(page);
+    await expectElasticPage(page);
+    await expectEdgeSpring(page, page.locator(".main-content"), "top");
+    await expectEdgeSpring(page, page.locator(".main-content"), "bottom");
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await expectNativePageOverscroll(page, false);
+    await expectElasticPage(page, false);
+    await page.locator(".main-content").hover();
+    await page.mouse.wheel(0, 180);
+    await expect(page.locator(".main-content > .elastic-scroll-boundary > .elastic-scroll-motion")).toHaveCSS("transform", "none");
     await page.emulateMedia({ reducedMotion: "no-preference" });
   }
 });
