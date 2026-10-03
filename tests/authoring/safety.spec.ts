@@ -323,7 +323,9 @@ test("failed save preserves downloadable text and does not show success", async 
   page,
 }, info) => {
   const production = info.project.name.startsWith("production");
+  if (info.project.name.endsWith("desktop")) await page.setViewportSize({ width: 1440, height: 620 });
   const { control } = await setup(page, production);
+  if (info.project.name.endsWith("desktop")) await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "workspace");
   await failDraftWrites(page, production, control);
   await page.getByLabel("Title", { exact: true }).fill("Recover my draft");
   await page.keyboard.press("ControlOrMeta+s");
@@ -335,7 +337,8 @@ test("failed save preserves downloadable text and does not show success", async 
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Recover my draft",
   );
-  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Changes not saved");
+  await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Changes not saved");
+  await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "page");
   await expect(page.locator('[data-slot="toast"]')).toHaveCount(0);
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download your changes" }).click();

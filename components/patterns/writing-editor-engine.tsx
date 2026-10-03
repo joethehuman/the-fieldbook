@@ -453,6 +453,17 @@ export default function WritingEditorEngine({
     return () => document.removeEventListener("pointerdown", close);
   }, [slashOpen, slashFromToolbar, slashQuery, keepSlashAsText]);
 
+  useEffect(() => {
+    if (!slashOpen) return;
+    const viewport = root.current?.closest<HTMLElement>(".main-content");
+    const close = () => {
+      if (slashFromToolbar) setSlashOpen(false);
+      else keepSlashAsText(slashQuery, false);
+    };
+    viewport?.addEventListener("scroll", close, { passive: true });
+    return () => viewport?.removeEventListener("scroll", close);
+  }, [slashOpen, slashFromToolbar, slashQuery, keepSlashAsText]);
+
   function rememberSelection() {
     mediaSelection.current = null;
     lexicalEditor.current?.getEditorState().read(() => {

@@ -50,6 +50,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import {
   Dialog,
   DialogContent,
+  DialogBody,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -1309,6 +1310,7 @@ export function TeamsAdmin({
       >
         {moving && team && (
           <DialogContent
+            size="picker"
             onEscapeKeyDown={(event) => {
               if (busy) event.preventDefault();
             }}
@@ -1326,60 +1328,63 @@ export function TeamsAdmin({
               reporting or learning changes before saving.
             </DialogDescription>
             {notice && <Alert variant="destructive">{notice}</Alert>}
-            <SearchableSelectionList
-              label={
-                moving.mode === "into"
-                  ? "Find a team to move here"
-                  : "Choose a new parent"
-              }
-              selectionMode="single"
-              placeholder="Team name or hierarchy path"
-              emptyMessage="No eligible teams. Moves that create a cycle are excluded."
-              value={moving.choice == null ? [] : [moving.choice]}
-              onChange={(ids) =>
-                setMoving({ ...moving, choice: ids[0] ?? null })
-              }
-              disabled={busy}
-              options={
-                moving.mode === "into"
-                  ? [...teams]
-                      .sort(byName)
-                      .filter(
-                        (item) =>
-                          item.parentId !== team.id &&
-                          canParent(item.id, team.id, teams),
-                      )
-                      .map((item) => ({
-                        id: item.id,
-                        label: item.name,
-                        description: teamPath(item.id, teams),
-                      }))
-                  : [
-                      ...(team.parentId && !organization
-                        ? [
-                            {
-                              id: "",
-                              label: "Top-level team",
-                              description:
-                                "Keep this branch; remove its parent.",
-                            },
-                          ]
-                        : []),
-                      ...[...teams]
+            <DialogBody className="flex flex-col overflow-y-auto">
+              <SearchableSelectionList
+                bounded="compact"
+                label={
+                  moving.mode === "into"
+                    ? "Find a team to move here"
+                    : "Choose a new parent"
+                }
+                selectionMode="single"
+                placeholder="Team name or hierarchy path"
+                emptyMessage="No eligible teams. Moves that create a cycle are excluded."
+                value={moving.choice == null ? [] : [moving.choice]}
+                onChange={(ids) =>
+                  setMoving({ ...moving, choice: ids[0] ?? null })
+                }
+                disabled={busy}
+                options={
+                  moving.mode === "into"
+                    ? [...teams]
                         .sort(byName)
                         .filter(
                           (item) =>
-                            item.id !== team.parentId &&
-                            canParent(team.id, item.id, teams),
+                            item.parentId !== team.id &&
+                            canParent(item.id, team.id, teams),
                         )
                         .map((item) => ({
                           id: item.id,
                           label: item.name,
                           description: teamPath(item.id, teams),
-                        })),
-                    ]
-              }
-            />
+                        }))
+                    : [
+                        ...(team.parentId && !organization
+                          ? [
+                              {
+                                id: "",
+                                label: "Top-level team",
+                                description:
+                                  "Keep this branch; remove its parent.",
+                              },
+                            ]
+                          : []),
+                        ...[...teams]
+                          .sort(byName)
+                          .filter(
+                            (item) =>
+                              item.id !== team.parentId &&
+                              canParent(team.id, item.id, teams),
+                          )
+                          .map((item) => ({
+                            id: item.id,
+                            label: item.name,
+                            description: teamPath(item.id, teams),
+                          })),
+                      ]
+                }
+              />
+            </DialogBody>
             {impact && (
               <p className="text-copy text-muted-foreground [overflow-wrap:anywhere]">
                 {impact.from} → {impact.to}

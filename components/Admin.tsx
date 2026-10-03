@@ -21,6 +21,7 @@ import {
   type DetailsReveal,
 } from "./patterns/editor-frame";
 import { revealEditorTarget } from "./patterns/reveal-editor-target";
+import { useEditorLayout } from "./patterns/use-editor-layout";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
 import { contentSignature, hasUnpublishedEdits } from "@/lib/demo-publication";
@@ -1819,7 +1820,6 @@ export function Editor({
 }) {
   const notify = useToast();
   const form = useRef<HTMLFormElement>(null);
-  const heading = useRef<HTMLDivElement>(null);
   const [savedMessage, setSavedMessage] = useState("");
   const [detailsReveal, setDetailsReveal] = useState<DetailsReveal>();
   const [revealStep, setRevealStep] = useState<{
@@ -1960,26 +1960,7 @@ export function Editor({
     }, 900);
     return () => clearTimeout(timer);
   }, [c, dirty, busy, saving]);
-  useEffect(() => {
-    const target = heading.current;
-    if (!target) return;
-    const viewport = target.closest<HTMLElement>(".main-content");
-    const measure = () => {
-      const height = Math.ceil(target.getBoundingClientRect().height);
-      const sticky =
-        height <= (viewport?.clientHeight || window.innerHeight) / 2;
-      form.current?.style.setProperty(
-        "--editor-header-height",
-        `${sticky ? height : 0}px`,
-      );
-      target.dataset.sticky = String(sticky);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(target);
-    if (viewport) observer.observe(viewport);
-    return () => observer.disconnect();
-  }, []);
+  useEditorLayout(form);
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (pendingUploads.current || recoveringNow.current) return false;
@@ -2580,6 +2561,7 @@ export function Editor({
     <form
       ref={form}
       className="editor"
+      data-scroll-layout="page"
       onSubmit={(event) => void submit(event, "draft")}
       onKeyDown={(event) => {
         if (
@@ -2591,7 +2573,7 @@ export function Editor({
         }
       }}
     >
-      <div ref={heading} className="editor-heading">
+      <div className="editor-heading">
         <h1 className="sr-only">
           {c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"}{" "}
           editor
@@ -2668,7 +2650,7 @@ export function Editor({
             : "Saving or refreshing. Keep this page open."}
         </p>
       )}
-      <FieldGroup disabled={busy} className="editor-content">
+      <FieldGroup disabled={busy} className="editor-content flex min-h-0 flex-col">
         <section
           className="editor-introduction"
           aria-label={

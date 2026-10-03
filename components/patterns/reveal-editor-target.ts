@@ -4,12 +4,16 @@ const activeReveals = new WeakMap<HTMLElement, () => void>();
 
 /** Reveal one field within its owning scroll area, then an offscreen stacked panel if needed. */
 export function revealEditorTarget(target: HTMLElement, {
-  container = target.closest<HTMLElement>(".writing-scroll-area, .editor-frame-details, .editor-frame-outline")
+  container = target.closest<HTMLElement>(".writing-scroll-area, .editor-frame-details, .editor-frame-outline, .editor-frame-canvas")
     || target.closest<HTMLElement>(".main-content"),
   context = target.closest<HTMLElement>('[data-slot="field"]') || target,
   focus = true,
 }: { container?: HTMLElement | null; context?: HTMLElement; focus?: boolean } = {}) {
   const owner = target.closest<HTMLElement>(".main-content") || container;
+  const bounded = !!target.closest('.editor[data-scroll-layout="workspace"]');
+  // Stacked panels and the natural writing body belong to the page. A native
+  // Markdown textarea can still own its text scrolling in the page layout.
+  if (!bounded && !container?.matches("textarea")) container = owner;
   if (!container || !owner) { if (focus) target.focus({ preventScroll: true }); return () => {}; }
   activeReveals.get(container)?.();
   if (focus) target.focus({ preventScroll: true });

@@ -83,9 +83,10 @@ test("requirements smoothly reveal artwork within Details and course title withi
     expect((await main.boundingBox())!.x + (await main.boundingBox())!.width).toBe(2560);
     expect((await page.locator(".editor").boundingBox())!.width).toBeLessThanOrEqual(1440);
   }
-  // Stacked phone panels also have a local Details scroller; show the readiness list first.
+  const bounded = await page.locator(".editor").getAttribute("data-scroll-layout") === "workspace";
+  const owner = bounded ? details : main;
   await details.getByRole("button", { name: "Give artwork a short title of up to 40 characters", exact: true }).scrollIntoViewIfNeeded();
-  await details.evaluate((node) => {
+  await owner.evaluate((node) => {
     (window as unknown as { revealSamples: number[] }).revealSamples = [];
     node.addEventListener("scroll", () => (window as unknown as { revealSamples: number[] }).revealSamples.push(node.scrollTop));
   });
@@ -93,16 +94,16 @@ test("requirements smoothly reveal artwork within Details and course title withi
   await details.getByRole("button", { name: "Give artwork a short title of up to 40 characters", exact: true }).click();
   const art = page.getByRole("textbox", { name: "Short title", exact: true });
   await expect(art).toBeFocused();
-  await expect.poll(() => details.evaluate((node) => node.scrollTop)).toBeGreaterThan(100);
+  await expect.poll(() => owner.evaluate((node) => node.scrollTop)).toBeGreaterThan(100);
   await expect.poll(async () => {
-    const a = await art.boundingBox(); const d = await details.boundingBox();
+    const a = await art.boundingBox(); const d = await owner.boundingBox();
     return !!a && !!d && a.y >= d.y + 12 && a.y + a.height <= d.y + d.height - 12;
   }).toBe(true);
-  await withinOwner(art, details);
+  await withinOwner(art, owner);
   const samples = await page.evaluate(() => (window as unknown as { revealSamples: number[] }).revealSamples);
   expect(new Set(samples).size).toBeGreaterThan(3);
-  if (info.project.name !== "production-phone") expect(await main.evaluate((node) => node.scrollTop)).toBe(before);
-  await details.evaluate((node) => { node.scrollTop = 0; });
+  if (bounded) expect(await main.evaluate((node) => node.scrollTop)).toBe(before);
+  await owner.evaluate((node) => { node.scrollTop = 0; });
   await details.getByRole("button", { name: "Add a title", exact: true }).click();
   const title = page.getByRole("textbox", { name: "Title", exact: true });
   await expect(title).toBeFocused();
@@ -124,14 +125,16 @@ test("a distant lesson requirement selects its canvas and scrolls the Outline to
   const toggle = page.getByRole("button", { name: /^Outline/ });
   if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
   const outline = page.getByRole("complementary", { name: "Course outline", exact: true });
+  const bounded = await page.locator(".editor").getAttribute("data-scroll-layout") === "workspace";
+  const owner = bounded ? outline : page.locator(".main-content");
   const selected = outline.locator('[aria-current="step"]');
   await expect(selected).toContainText("Lesson 20");
-  await expect.poll(() => outline.evaluate((node) => node.scrollTop)).toBeGreaterThan(100);
+  await expect.poll(() => owner.evaluate((node) => node.scrollTop)).toBeGreaterThan(100);
   await expect.poll(async () => {
-    const s = await selected.boundingBox(); const o = await outline.boundingBox();
+    const s = await selected.boundingBox(); const o = await owner.boundingBox();
     return !!s && !!o && s.y >= o.y && s.y + s.height <= o.y + o.height;
   }).toBe(true);
-  await expect(outline).toHaveAttribute("data-scroll-fade-before", "true");
+  if (bounded) await expect(outline).toHaveAttribute("data-scroll-fade-before", "true");
   if (info.project.name === "production-phone") await expect(page.getByRole("button", { name: /^Details/ })).toHaveAttribute("aria-expanded", "false");
   await page.screenshot({ path: info.outputPath("distant-lesson-outline.png") });
 });
@@ -141,6 +144,14 @@ test("blank writing keeps its height and first-line placeholder position when fo
   const editor = page.getByRole("textbox", { name: "Lesson content", exact: true });
   const surface = page.locator(".writing-editor.writing-surface");
   const placeholder = surface.locator('.writing-content:not([contenteditable])');
+  await expect(editor).toBeVisible();
+  if (await page.locator(".editor").getAttribute("data-scroll-layout") === "workspace") {
+    const body = page.locator('.writing-viewport[data-state="active"]');
+    const box = (await body.boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * 0.8);
+    await expect(editor).toBeFocused();
+    await expect.poll(() => body.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeLessThanOrEqual(1);
+  }
   await editor.click();
   await expect(editor).toBeFocused();
   const focused = await surface.boundingBox();

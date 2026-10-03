@@ -105,12 +105,12 @@ export function WritingEditor({
         setFailureDetail("");
         setMode(key);
       }} asChild>
-        <section className="grid min-w-0 gap-3" aria-label={`${label} editor`} onFocusCapture={(event) => {
+        <section className="writing-root flex min-w-0 flex-col gap-3" aria-label={`${label} editor`} onFocusCapture={(event) => {
           const target = event.target;
           if (!(target instanceof HTMLElement) || !target.matches('[contenteditable], textarea, [role="tabpanel"]')) return;
           const surface = target.closest<HTMLElement>(".writing-surface");
           const viewport = surface?.closest<HTMLElement>(".main-content");
-          if (surface && viewport && getComputedStyle(surface).maxHeight !== "none")
+          if (surface && viewport && !surface.closest('.editor[data-scroll-layout="workspace"]') && getComputedStyle(surface).maxHeight !== "none")
             revealEditorTarget(surface, { container: viewport, focus: false });
         }}>
           {issue && (

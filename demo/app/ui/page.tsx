@@ -9,6 +9,7 @@ import { BulkExamples } from "./bulk-examples";
 import { WritingExamples } from "./writing-examples";
 import { ImageViewerExamples } from "./image-viewer-examples";
 import { LibraryExamples } from "./library-examples";
+import { ScrollingExamples } from "./scrolling-examples";
 import { ControlExamples } from "./control-examples";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { Article } from "@/components/patterns/reading";
@@ -226,6 +227,7 @@ export default function ComponentCatalog() {
       </section>
       <BulkExamples />
       <LibraryExamples />
+      <ScrollingExamples />
       <section className="grid gap-4" aria-label="Content editor frame">
         <SectionHeader title={<h2>Content editor frame</h2>}
           description="Persistent Outline and Details controls reveal in-page panels. The writing canvas stays mounted when either panel changes." />

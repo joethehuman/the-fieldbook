@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
@@ -59,39 +59,14 @@ export function EditorFrame({
   const detailsPresent = usePanelPresence(panels.details);
   const outlineFade = useScrollFade<HTMLElement>(panels.outline && !!outline);
   const detailsFade = useScrollFade<HTMLElement>(panels.details);
-  const [canvasScrolled, setCanvasScrolled] = useState(false);
-  const measureCanvasFade = useCallback(() => {
-    const surface = canvas.current;
-    const boundary = controls.current;
-    setCanvasScrolled(!!surface && !!boundary && surface.getBoundingClientRect().top < boundary.getBoundingClientRect().bottom - 2);
-    const target = frame.current;
-    const viewport = target?.closest<HTMLElement>(".main-content");
-    if (target && viewport && surface && boundary) {
-      const style = getComputedStyle(target);
-      const stop = viewport.getBoundingClientRect().top + viewport.clientTop
-        + (parseFloat(style.getPropertyValue("--editor-header-height")) || 0)
-        + boundary.getBoundingClientRect().height + (parseFloat(style.rowGap) || 0);
-      target.dataset.writingPinned = String(surface.getBoundingClientRect().top <= stop + 1);
-    }
-  }, []);
-
   useEffect(() => {
     const target = frame.current;
     if (!target) return;
-    const viewport = target.closest<HTMLElement>(".main-content");
     const measure = () => {
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
       const width = target.getBoundingClientRect().width;
-      const controlsHeight = controls.current?.getBoundingClientRect().height || 48;
-      const headerHeight = parseFloat(getComputedStyle(target).getPropertyValue("--editor-header-height")) || 0;
-      const bottomInset = viewport ? parseFloat(getComputedStyle(viewport).paddingBottom) || 0 : 0;
-      const available = (viewport?.clientHeight || window.innerHeight) - headerHeight - controlsHeight - rem * 0.75 - bottomInset;
-      target.style.setProperty("--editor-controls-height", `${controlsHeight}px`);
-      if (viewport) target.style.setProperty("--editor-viewport-height", `${viewport.clientHeight}px`);
-      target.dataset.writingScroll = available >= 12 * rem ? "contained" : "page";
       wide.current = width >= 78 * rem;
       narrow.current = width < 48 * rem;
-      measureCanvasFade();
       if (!wide.current)
         setPanels((current) => current.outline && current.details
           ? { outline: true, details: false } : current);
@@ -101,13 +76,10 @@ export function EditorFrame({
     observer.observe(target);
     if (controls.current) observer.observe(controls.current);
     if (canvas.current) observer.observe(canvas.current);
-    if (viewport) observer.observe(viewport);
-    viewport?.addEventListener("scroll", measureCanvasFade, { passive: true });
     return () => {
       observer.disconnect();
-      viewport?.removeEventListener("scroll", measureCanvasFade);
     };
-  }, [measureCanvasFade]);
+  }, []);
 
   useEffect(() => {
     if (!revealDetails) return;
@@ -167,7 +139,7 @@ export function EditorFrame({
   const open = panels.outline ? panels.details ? "both" : "outline" : panels.details ? "details" : "none";
   return (
     <section ref={frame} className="editor-frame" data-panels={open} aria-label="Writing workspace">
-      <div ref={controls} className="editor-frame-controls" data-heading={heading ? "true" : undefined} data-canvas-scrolled={canvasScrolled}>
+      <div ref={controls} className="editor-frame-controls" data-heading={heading ? "true" : undefined}>
         {outline && (
           <Button ref={outlineToggle} type="button" variant="ghost" size="sm"
             disabled={disabled}

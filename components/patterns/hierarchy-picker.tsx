@@ -4,7 +4,12 @@ import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverResults,
+  PopoverTrigger,
+} from "../ui/popover";
 import { cn } from "@/lib/utils";
 
 export type HierarchyPickerOption = {
@@ -99,9 +104,10 @@ export function HierarchyPicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent
+          layout="picker"
           align="start"
           sideOffset={4}
-          className="grid w-[var(--radix-popover-trigger-width)] gap-2 p-2"
+          className="w-[var(--radix-popover-trigger-width)] gap-2 p-2"
           onOpenAutoFocus={(event) => {
             event.preventDefault();
             input.current?.focus();
@@ -137,12 +143,7 @@ export function HierarchyPicker({
               }
             }}
           />
-          <div
-            id={listId}
-            role="listbox"
-            aria-label={searchLabel}
-            className="max-h-60 overflow-y-auto pe-2 [scrollbar-gutter:stable]"
-          >
+          <PopoverResults id={listId} role="listbox" aria-label={searchLabel}>
             {matching.map((option, index) => (
               <div
                 key={option.id}
@@ -184,7 +185,7 @@ export function HierarchyPicker({
                 No matching teams.
               </p>
             )}
-          </div>
+          </PopoverResults>
           <div className="grid h-16 min-w-0 content-start gap-1 border-t pt-2">
             <p className="text-xs text-muted-foreground">Full hierarchy</p>
             <div

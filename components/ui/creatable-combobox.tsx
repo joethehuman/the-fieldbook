@@ -4,7 +4,12 @@ import { useId, useRef, useState, type ComponentProps } from "react";
 import { Check, ChevronDown, Plus } from "lucide-react";
 import { Input } from "./input";
 import { Button } from "./button";
-import { Popover, PopoverAnchor, PopoverContent } from "./popover";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverResults,
+} from "./popover";
 import { cn } from "@/lib/utils";
 
 type Props = Omit<ComponentProps<"input">, "value" | "onChange" | "list"> & {
@@ -136,6 +141,7 @@ export function CreatableCombobox({
         </div>
       </PopoverAnchor>
       <PopoverContent
+        layout="picker"
         align="start"
         sideOffset={4}
         className="w-[var(--radix-popover-trigger-width)] p-1"
@@ -149,12 +155,7 @@ export function CreatableCombobox({
             event.preventDefault();
         }}
       >
-        <div
-          id={listId}
-          role="listbox"
-          aria-label={listLabel}
-          className="max-h-60 overflow-y-auto pe-3 [scrollbar-gutter:stable]"
-        >
+        <PopoverResults id={listId} role="listbox" aria-label={listLabel}>
           {items.map((item, index) => (
             <div
               key={item.value}
@@ -191,7 +192,7 @@ export function CreatableCombobox({
               Type a name to add it.
             </p>
           )}
-        </div>
+        </PopoverResults>
       </PopoverContent>
     </Popover>
   );

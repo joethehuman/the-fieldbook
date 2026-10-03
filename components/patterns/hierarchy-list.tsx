@@ -311,7 +311,7 @@ export function HierarchyList({
           className={cn(
             "min-w-0 overflow-hidden",
             compact &&
-              "max-h-96 overflow-y-auto rounded-lg border border-border bg-surface p-1",
+              "max-h-96 overflow-y-auto overscroll-y-contain rounded-lg border border-border bg-surface p-1",
             !compact && "rounded-lg border border-border",
           )}
         >
