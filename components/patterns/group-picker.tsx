@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { FieldGroup, FieldDescription, Field } from "@/components/ui/field";
 import { useState } from "react";
 import { ancestorIds } from "@/lib/types";
+import { useScrollFade } from "./use-scroll-fade";
 
 export function GroupPicker({
   groups,
@@ -17,9 +18,21 @@ export function GroupPicker({
   onChange: (value: string[]) => void;
 }) {
   const [query, setQuery] = useState("");
-  const path = (id: string) => [...ancestorIds(id, groups)].reverse().map((key) => groups.find((group) => group.id === key)?.name || "Unknown group").join(" / ");
-  const matching = groups.filter((group) => path(group.id).toLowerCase().includes(query.toLowerCase()));
-  const visible = [...matching].sort((a, b) => path(a.id).localeCompare(path(b.id)));
+  const fade = useScrollFade<HTMLDivElement>();
+  const path = (id: string) =>
+    [...ancestorIds(id, groups)]
+      .reverse()
+      .map(
+        (key) =>
+          groups.find((group) => group.id === key)?.name || "Unknown group",
+      )
+      .join(" / ");
+  const matching = groups.filter((group) =>
+    path(group.id).toLowerCase().includes(query.toLowerCase()),
+  );
+  const visible = [...matching].sort((a, b) =>
+    path(a.id).localeCompare(path(b.id)),
+  );
   return (
     <FieldGroup className="group-picker">
       <legend>
@@ -40,7 +53,13 @@ export function GroupPicker({
           onChange={(event) => setQuery(event.target.value)}
         />
       )}
-      <div className="group-picker-options">
+      <div
+        ref={fade.ref}
+        onScroll={fade.measure}
+        data-scroll-fade-before={fade.edges.before}
+        data-scroll-fade-after={fade.edges.after}
+        className="group-picker-options scroll-fade"
+      >
         {visible.map((group) => (
           <Field
             orientation="horizontal"

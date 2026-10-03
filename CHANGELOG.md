@@ -4,6 +4,13 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Restore and reactivate exact-email Recently deleted users through CSV Import, with a non-blocking review warning and stable identity/history. Keep purge, inactive-user and access guards. Apply `20261003222648_roster_import_reactivation.sql` before deployment; it rewrites no existing data.
+
+- Compact People and CSV review tables, use User labels and show complete proposed records in import details. Disable browser saved-form suggestions by default in shared text controls. Review manager deletion without requiring a replacement, and add reviewed bulk team deletion that returns direct users and surviving immediate subteams to Organization. Surviving branches retain their users and nested subteams. Apply `20261003212205_roster_team_deletion.sql` before deployment; the upgrade preserves existing data.
+
+- Refine people imports with opening feedback for the native file chooser, status count badges, one Issues tab and a 2,000-row file limit. Let nested Groups lists hand scrolling back to person dialogs at their edges. Add Recently added People sorting, separate from hire date; its additive roster timestamp migration leaves historical dates unknown.
+
+- Import people and teams from a reviewed CSV in one transaction, with stable identities, stale-review protection and safe retries. Use an inline blank-template link, readable field changes and shared scroll fades. Align individual pre-registration and demo profiles with the same modal frame. See [CSV import](docs/roster-import.md); apply its additive database migration before deploying.
 - Unify visual-editor block actions and image settings, place table handles on grid edges with row/column movement indicators and menu alternatives, retain formatting tools for whole-paragraph selections, and offer Divider in the Commands and slash menus.
 
 - Coordinate Focus mode transitions with the outline and details panels, keep the moving canvas opaque with synchronized text/media resizing, and make Enter from a lesson title start on an empty line above the first block, including video.

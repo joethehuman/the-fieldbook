@@ -74,7 +74,7 @@ export function teamProgressCsv(
 ): CsvReport {
   return {
     headings: [
-      "Person",
+      "User",
       "Email",
       "Reporting team",
       "Assigned courses",
@@ -143,7 +143,7 @@ export function courseProgressCsv(
   view: "team" | "assignment" = "assignment",
 ): CsvReport {
   const headings = [
-    "Person",
+    "User",
     "Email",
     "Reporting team",
     "Course",
@@ -232,7 +232,7 @@ export function feedbackCsv(rows: ReturnType<typeof feedbackRows>): CsvReport {
       "Content",
       "Content type",
       "Content version",
-      "Person",
+      "User",
       "Rating",
       "Comment",
       "Updated at (UTC)",

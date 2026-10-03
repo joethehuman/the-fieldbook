@@ -15,26 +15,29 @@ export async function syncAuthoringProvider(page: Page, data: Workspace) {
   const published = new Map(
     (data.publishedContent || []).map((item) => [item.id, item]),
   );
-  await page.request.post("http://127.0.0.1:3130/fixture", {
-    data: {
-      settings: data.settings,
-      governanceRevision: data.governanceRevision,
-      groups: data.groups,
-      curricula: data.curricula,
-      documents: data.content.map((item) => ({
-        id: item.id,
-        draft: item,
-        published:
-          published.get(item.id) ||
-          (item.publishedRevision || item.status === "published"
-            ? { ...item, status: "published" }
-            : null),
-        revision: item.revision || 1,
-        published_revision: item.publishedRevision || null,
-        updated_at: item.updatedAt,
-      })),
+  await page.request.post(
+    `http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`,
+    {
+      data: {
+        settings: data.settings,
+        governanceRevision: data.governanceRevision,
+        groups: data.groups,
+        curricula: data.curricula,
+        documents: data.content.map((item) => ({
+          id: item.id,
+          draft: item,
+          published:
+            published.get(item.id) ||
+            (item.publishedRevision || item.status === "published"
+              ? { ...item, status: "published" }
+              : null),
+          revision: item.revision || 1,
+          published_revision: item.publishedRevision || null,
+          updated_at: item.updatedAt,
+        })),
+      },
     },
-  });
+  );
 }
 
 export async function setupAuthoringProvider(page: Page, data: Workspace) {
@@ -42,9 +45,12 @@ export async function setupAuthoringProvider(page: Page, data: Workspace) {
   if (admin) Object.assign(admin, authoringUser);
   await syncAuthoringProvider(page, data);
   const token = await (
-    await page.request.post("http://127.0.0.1:3130/auth/v1/token", {
-      data: {},
-    })
+    await page.request.post(
+      `http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/auth/v1/token`,
+      {
+        data: {},
+      },
+    )
   ).json();
   await page.context().addCookies([
     {

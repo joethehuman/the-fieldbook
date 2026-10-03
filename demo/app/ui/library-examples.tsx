@@ -1,8 +1,12 @@
 "use client";
+import { ScrollRegion } from "@/components/patterns/scroll-region";
 import { GroupedSearch } from "@/components/patterns/grouped-search";
 import { ProgressOverview } from "@/components/patterns/progress-overview";
 import { AudienceSelection } from "@/components/patterns/audience-selection";
 import { freshWorkspace } from "@/lib/store";
+import { RosterReviewPanel } from "@/components/RosterImport";
+import { reviewRosterCsv, rosterExample } from "@/lib/roster-import";
+import { serializeCsv } from "@/lib/csv";
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
 import { HierarchyPicker } from "@/components/patterns/hierarchy-picker";
@@ -36,6 +40,7 @@ import { ContentFeedback } from "@/components/patterns/content-feedback";
 import { Settings, Plus } from "lucide-react";
 import { CollectionControls } from "@/components/patterns/collection-controls";
 import { Input } from "@/components/ui/input";
+import { FilePicker } from "@/components/ui/file-picker";
 import { FormField } from "@/components/patterns/form-field";
 import { SettingsSection } from "@/components/patterns/settings-section";
 import { LoadMore } from "@/components/patterns/load-more";
@@ -385,6 +390,21 @@ export function LibraryExamples() {
       <GroupRosterExample />
       <FilterRowsExample />
       <HierarchyPickerExample />
+      <RosterReviewExample />
+      <FilePickerExample />
+      <SettingsSection
+        id="catalog-scroll-region"
+        title={<h3>Scroll edges</h3>}
+        guidance="Use the shared ScrollRegion for bounded dialog bodies and help. Hidden content fades at either edge; headings and footer actions stay outside the viewport."
+      >
+        <ScrollRegion className="h-48 p-1" aria-label="Scroll edge example">
+          <div className="grid gap-3">
+            {Array.from({ length: 12 }, (_, i) => (
+              <p key={i}>Example row {i + 1}</p>
+            ))}
+          </div>
+        </ScrollRegion>
+      </SettingsSection>
       <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
@@ -1028,6 +1048,67 @@ function GroupIndexExample() {
           </TableBody>
         </DataTable>
       </TableContainer>
+    </SettingsSection>
+  );
+}
+
+function RosterReviewExample() {
+  const [open, setOpen] = useState(false);
+  const [review] = useState(() =>
+    reviewRosterCsv(serializeCsv(rosterExample()), freshWorkspace()),
+  );
+  return (
+    <SettingsSection
+      title={<h3>Roster review</h3>}
+      description="Whole-file counts, stable discovery, paginated rows and inline consequences."
+    >
+      <Button variant="outline" onClick={() => setOpen(true)}>
+        Open roster review example
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent size="workflow-list">
+          <DialogTitle>Roster review example</DialogTitle>
+          <DialogDescription>
+            Synthetic read-only example. Nothing is saved.
+          </DialogDescription>
+          <DialogBody>
+            <RosterReviewPanel review={review} />
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={() => setOpen(false)}>Close example</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </SettingsSection>
+  );
+}
+
+function FilePickerExample() {
+  const [fileName, setFileName] = useState("");
+  return (
+    <SettingsSection
+      title={<h3>File selection</h3>}
+      description="A native file chooser with an explicit button and a wrapping filename."
+    >
+      <FormField
+        label="Example CSV file"
+        description="Choose a CSV. This catalog example does not upload it."
+      >
+        <FilePicker
+          accept=".csv,text/csv"
+          fileName={fileName}
+          buttonLabel="Choose CSV file"
+          emptyLabel="No CSV file selected"
+          onFileChange={(file) => setFileName(file.name)}
+        />
+      </FormField>
+      <FormField label="Unavailable file selection">
+        <FilePicker
+          disabled
+          buttonLabel="Choose unavailable file"
+          onFileChange={() => {}}
+        />
+      </FormField>
     </SettingsSection>
   );
 }

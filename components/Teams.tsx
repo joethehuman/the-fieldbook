@@ -245,7 +245,7 @@ export function TeamProgress({
   const filterLabels: Record<string, string> = {
     query: `People matching: ${filters.query}`,
     team: `Team: ${visibleTeams.find((team) => team.id === safeFilters.team)?.name || defaultLabel}`,
-    personId: `Person: ${all.find((row) => row.u.id === filters.personId)?.u.name || "Selected person"}`,
+    personId: `User: ${all.find((row) => row.u.id === filters.personId)?.u.name || "Selected user"}`,
     group: `Group: ${data.groups.find((g) => g.id === filters.group)?.name || "Learning group"}`,
     status:
       statusLabels[filters.status as keyof typeof statusLabels] ||
@@ -264,7 +264,7 @@ export function TeamProgress({
   const selectedPerson = all.find((row) => row.u.id === filters.personId);
   const scopeLabel =
     filters.personId !== "all"
-      ? selectedPerson?.u.name || "Selected person"
+      ? selectedPerson?.u.name || "Selected user"
       : safeFilters.team === "all"
         ? defaultLabel
         : visibleTeams.find((team) => team.id === safeFilters.team)?.name ||
@@ -280,7 +280,7 @@ export function TeamProgress({
   const scopeDescription =
     filters.personId !== "all"
       ? `${scopeLabel}’s assigned course progress.`
-      : `${scopeLabel} · ${summary.people} ${summary.people === 1 ? "person" : "people"}. ${organization && safeFilters.team === "all" ? "Every team, including people without a team." : "Includes all subteams."}`;
+      : `${scopeLabel} · ${summary.people} ${summary.people === 1 ? "user" : "users"}. ${organization && safeFilters.team === "all" ? "Every team, including people without a team." : "Includes all subteams."}`;
   const searchOptions: GroupedSearchOption[] = [
     {
       id: "team:all",
@@ -406,7 +406,7 @@ export function TeamProgress({
                         id: `query:${query}`,
                         group: "People",
                         label: "Show matching people",
-                        description: `${count} ${count === 1 ? "person" : "people"} in ${safeFilters.team === "all" ? defaultLabel : visibleTeams.find((team) => team.id === safeFilters.team)?.name || defaultLabel}`,
+                        description: `${count} ${count === 1 ? "user" : "users"} in ${safeFilters.team === "all" ? defaultLabel : visibleTeams.find((team) => team.id === safeFilters.team)?.name || defaultLabel}`,
                       };
                     }}
                   />
@@ -503,7 +503,7 @@ export function TeamProgress({
                 >
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Person</TableHead>
+                      <TableHead>User</TableHead>
                       <TableHead>Reporting team</TableHead>
                       <TableHead>User type</TableHead>
                       <TableHead align="right">Completion</TableHead>
@@ -628,7 +628,7 @@ export function TeamProgress({
               Loading assignments…
             </p>
           ) : detail.courses.length ? (
-            <TableContainer aria-label="Person course assignments">
+            <TableContainer aria-label="User course assignments">
               <DataTable layout="progressAssignments">
                 <TableHeader>
                   <TableRow>

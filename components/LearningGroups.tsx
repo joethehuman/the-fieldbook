@@ -119,7 +119,10 @@ export default function LearningGroups({
   ) => Promise<void>;
   initialGroup?: string;
   initialTab?: import("@/lib/admin-destination").AdminDestination["panel"];
-  onDestinationChange?: (id?: string, panel?: import("@/lib/admin-destination").AdminDestination["panel"]) => Promise<boolean>;
+  onDestinationChange?: (
+    id?: string,
+    panel?: import("@/lib/admin-destination").AdminDestination["panel"],
+  ) => Promise<boolean>;
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const [selected, setSelected] = useState(initialGroup || "");
@@ -1080,7 +1083,7 @@ export default function LearningGroups({
           <SectionHeader
             variant="page"
             title={<h2>{group.name}</h2>}
-            description={`${members.length} ${members.length === 1 ? "person" : "people"} · ${courseCount(group)} ${courseCount(group) === 1 ? "course" : "courses"}`}
+            description={`${members.length} ${members.length === 1 ? "user" : "users"} · ${courseCount(group)} ${courseCount(group) === 1 ? "course" : "courses"}`}
           >
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1119,7 +1122,13 @@ export default function LearningGroups({
           <Tabs
             value={tab}
             onValueChange={(value) => {
-              if (onDestinationChange) { void onDestinationChange(selected, value as "people" | "learning" | "updates"); return; }
+              if (onDestinationChange) {
+                void onDestinationChange(
+                  selected,
+                  value as "people" | "learning" | "updates",
+                );
+                return;
+              }
               setTab(value);
               setQuery("");
               setPage(1);
@@ -1261,7 +1270,7 @@ export default function LearningGroups({
                     </Button>
                   }
                   search={
-                    <FormField label="Find a person" visuallyHiddenLabel>
+                    <FormField label="Find a user" visuallyHiddenLabel>
                       <Input
                         type="search"
                         placeholder="Search name, email or team"
@@ -1287,7 +1296,7 @@ export default function LearningGroups({
                       <option value="team">Team</option>
                     </SelectField>
                   </FormField>
-                  <FormField label="Person status">
+                  <FormField label="User status">
                     <SelectField
                       value={statusFilter}
                       onValueChange={(value) => {
@@ -1430,7 +1439,7 @@ export default function LearningGroups({
                               />
                             )}
                           </TableHead>
-                          <TableHead>Person</TableHead>
+                          <TableHead>User</TableHead>
                           <TableHead>Reporting team</TableHead>
                           <TableHead>Included through</TableHead>
                         </TableRow>
@@ -1796,7 +1805,7 @@ export default function LearningGroups({
                   <SearchableSelectionList
                     bounded="compact"
                     key={`${group?.id}:people`}
-                    label="Find a person"
+                    label="Find a user"
                     placeholder="Search name, email or team"
                     emptyMessage="No matching people."
                     disabled={busy}

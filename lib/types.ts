@@ -67,6 +67,8 @@ export type User = {
   active: boolean;
   /** False until the preregistered person activates a verified login. */
   registered?: boolean;
+  /** Roster creation time; unknown for records predating its capture. Not a hire date. */
+  addedAt?: string;
   learningAssignments?: EffectiveAssignment[];
   /** Authorized learning-source projection; it grants no reporting access. */
   assignmentTeams?: Pick<

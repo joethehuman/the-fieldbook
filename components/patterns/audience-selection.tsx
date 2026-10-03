@@ -254,7 +254,7 @@ export function AudienceSelection({
             <FieldDescription id="audience-public-guests-help">
               Uses {guest.name}.
               {showPeople && people.get(guestKey!)?.size
-                ? ` Also includes ${people.get(guestKey!)!.size} registered ${people.get(guestKey!)!.size === 1 ? "person" : "people"}.`
+                ? ` Also includes ${people.get(guestKey!)!.size} registered ${people.get(guestKey!)!.size === 1 ? "user" : "users"}.`
                 : ""}{" "}
               Guests have no due dates or tracked completion.
               {inherited[guestKey!]?.length
@@ -285,8 +285,7 @@ export function AudienceSelection({
             <h3 className="text-sm font-medium">Teams and groups</h3>
             {showPeople && (
               <p className="text-xs text-muted-foreground" aria-live="polite">
-                {totalPeople.size}{" "}
-                {totalPeople.size === 1 ? "person" : "people"}{" "}
+                {totalPeople.size} {totalPeople.size === 1 ? "user" : "users"}{" "}
                 {newPeople === 0 && existingPeople.size > 0
                   ? recommendationsOnly
                     ? "already included"
@@ -296,8 +295,7 @@ export function AudienceSelection({
             )}
           </div>
           <p className="text-xs text-muted-foreground">
-            {existingPeople.size}{" "}
-            {existingPeople.size === 1 ? "person" : "people"}{" "}
+            {existingPeople.size} {existingPeople.size === 1 ? "user" : "users"}{" "}
             {recommendationsOnly ? "already included" : "already assigned"}
             {existingAudienceKeys ? " across selected learning" : ""} ·{" "}
             {newPeople} newly included
@@ -405,7 +403,7 @@ export function AudienceSelection({
                   {showPeople && (
                     <span className="shrink-0 text-xs text-muted-foreground">
                       {people.get(key)?.size || 0}{" "}
-                      {people.get(key)?.size === 1 ? "person" : "people"}
+                      {people.get(key)?.size === 1 ? "user" : "users"}
                     </span>
                   )}
                 </Field>

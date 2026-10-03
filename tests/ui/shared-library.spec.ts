@@ -390,3 +390,24 @@ test("grouped search loads more, searches locally, and preserves keyboard editin
   await expect(search).toBeFocused();
   await expect(search).toHaveValue("");
 });
+
+test("shared scroll edges fade only hidden content at either end", async ({
+  page,
+}, info) => {
+  await page.goto("/ui#catalog-scroll-region");
+  const scroll = page.getByLabel("Scroll edge example", { exact: true });
+  await scroll.scrollIntoViewIfNeeded();
+  await expect(scroll).toHaveAttribute("data-scroll-fade-before", "false");
+  await expect(scroll).toHaveAttribute("data-scroll-fade-after", "true");
+  expect(
+    await scroll.evaluate((el) => getComputedStyle(el).maskImage),
+  ).not.toBe("none");
+  await scroll.evaluate((el) => (el.scrollTop = el.scrollHeight / 2));
+  await expect(scroll).toHaveAttribute("data-scroll-fade-before", "true");
+  await page.screenshot({ path: info.outputPath("scroll-region-middle.png") });
+  await scroll.evaluate((el) => (el.scrollTop = el.scrollHeight));
+  await expect(scroll).toHaveAttribute("data-scroll-fade-before", "true");
+  await expect(scroll).toHaveAttribute("data-scroll-fade-after", "false");
+  await scroll.evaluate((el) => (el.scrollTop = 0));
+  await expect(scroll).toHaveAttribute("data-scroll-fade-before", "false");
+});
