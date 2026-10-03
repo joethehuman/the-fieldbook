@@ -4,6 +4,12 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine the shared neutral design system with consistent rounded controls and surfaces, quieter outline actions, inset search icons, and clearer course-card title hierarchy. Preserve existing page structure and workflows.
+
+- Align course counts in soft shared badges, add subtle card lift and elevation, and make hover highlights immediate across shared controls and navigation. Refine quiz results with grouped completion actions and a clearer keyboard-accessible answer review while preserving grading and retry behavior.
+
+- Give quiz reviews a numbered gutter and inset answers, preserve separate multiple-choice selections, and let longer reviews filter to incorrect answers. Add real-component catalog examples with one, two and ten questions without changing saved course progress.
+
 - Fit desktop content editors to the available workspace, keeping titles and controls visible while overflowing writing, Outline, Details or Quiz panes scroll independently. Use natural page scrolling on narrow or short screens so every control stays reachable.
 
 - Keep independent navigation, outlines and picker lists from scrolling their surroundings at either end. Preserve compact popup sizing, keep picker search/actions visible, and cap searchable popups to their actual available space.

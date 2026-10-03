@@ -39,7 +39,7 @@ export function MessageComposer({
       </Field>
       <div
         data-slot="message-composer-field"
-        className="rounded-control border border-control-border bg-background transition-colors motion-reduce:transition-none hover:border-control-hover focus-within:border-ring focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
+        className="rounded-control border border-control-border bg-background hover:border-control-hover focus-within:border-ring focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 focus-within:ring-offset-background"
       >
         <Textarea
           id={id}

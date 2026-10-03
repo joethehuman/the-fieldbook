@@ -28,12 +28,12 @@
   --popover-foreground: #171717;
   --primary: #171717;
   --primary-foreground: #ffffff;
-  --secondary: #f2f2f2;
+  --secondary: #f5f5f5;
   --secondary-foreground: #171717;
-  --muted: #f2f2f2;
-  --muted-hover: #e2e2e2;
+  --muted: #f5f5f5;
+  --muted-hover: #e8e8e8;
   --muted-foreground: #666666;
-  --accent: #f2f2f2;
+  --accent: #eeeeee;
   --accent-foreground: #171717;
   --destructive: #b42318;
   --destructive-foreground: #ffffff;
@@ -53,7 +53,7 @@
   --destructive-hover: #912018;
   --disabled-background: #f2f2f2;
   --disabled-foreground: #666666;
-  --control-radius: 0.375rem;
+  --control-radius: 0.625rem;
   --control-height: 2.25rem;
   --control-height-sm: 2rem;
   --type-label: 0.875rem;
@@ -73,7 +73,10 @@
   --link: #0069ff;
   --brand: #0069ff;
   --overlay: #17171766;
-  --radius: 0.5rem;
+  --radius: 0.75rem;
+  --elevation-surface: 0 1px 2px rgb(0 0 0 / 3%);
+  --elevation-card-hover: 0 2px 6px rgb(0 0 0 / 5%), 0 6px 16px rgb(0 0 0 / 7%);
+  --elevation-floating: 0 4px 8px rgb(0 0 0 / 4%), 0 16px 40px rgb(0 0 0 / 8%);
   --dialog-workflow-width: 49rem;
   --dialog-workflow-height: 41rem;
   --dialog-workflow-list-height: 52rem;
@@ -133,6 +136,9 @@
   --color-disabled-background: var(--disabled-background);
   --color-disabled-foreground: var(--disabled-foreground);
   --radius-control: var(--control-radius);
+  --shadow-surface: var(--elevation-surface);
+  --shadow-card-hover: var(--elevation-card-hover);
+  --shadow-floating: var(--elevation-floating);
   --spacing-control: var(--control-height);
   --spacing-control-sm: var(--control-height-sm);
   --text-label: var(--type-label);

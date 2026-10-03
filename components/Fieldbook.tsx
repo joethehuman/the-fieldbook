@@ -21,7 +21,7 @@ import {
 import { useDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { brandingFromSettings } from "@/lib/branding";
 import { CurriculumPage } from "./CurriculumPage";
-import { Badge } from "@/components/ui/badge";
+import { Badge, CountBadge } from "@/components/ui/badge";
 import { canPublish } from "@/lib/permissions";
 import { AccountMenu } from "./patterns/account-menu";
 import { NavigationButton } from "./patterns/navigation-button";
@@ -468,9 +468,9 @@ export default function Fieldbook() {
                 <n.icon size={19} />
                 <span className="sidebar-nav-text">{n.title}</span>
                 {n.key === "learn" && (
-                  <span className="nav-count">
+                  <CountBadge className="nav-count">
                     {assigned.length - completed}
-                  </span>
+                  </CountBadge>
                 )}
               </NavigationButton>
             ))}

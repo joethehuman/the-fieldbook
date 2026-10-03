@@ -5,15 +5,15 @@ import { Spinner } from "./spinner";
 import { cn } from "@/lib/utils";
 
 export const buttonVariants = cva(
-  "no-underline hover:no-underline relative inline-flex w-fit shrink-0 items-center justify-center gap-2 rounded-control text-label font-medium border border-transparent transition-colors motion-reduce:transition-none outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border disabled:shadow-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "no-underline hover:no-underline relative inline-flex w-fit shrink-0 items-center justify-center gap-2 rounded-control text-label font-medium border border-transparent outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border disabled:shadow-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default:
           "bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary",
         outline:
-          "border-control-border bg-background text-foreground hover:border-control-hover hover:bg-accent hover:text-accent-foreground",
-        ghost: "text-foreground hover:bg-accent hover:text-accent-foreground",
+          "border-input bg-background text-foreground shadow-surface hover:border-control-border hover:bg-surface hover:text-accent-foreground active:bg-accent",
+        ghost: "text-foreground hover:bg-accent hover:text-accent-foreground active:bg-muted-hover",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive-hover active:bg-destructive",
         link: "text-link underline-offset-4 hover:underline",

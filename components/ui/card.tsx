@@ -11,7 +11,7 @@ export function Card({
     <Comp
       data-slot="card"
       className={cn(
-        "min-w-0 rounded-lg border border-border bg-card p-4 text-card-foreground sm:p-6",
+        "min-w-0 rounded-xl border border-border bg-card p-4 text-card-foreground shadow-surface sm:p-6",
         className,
       )}
       {...props}
@@ -19,7 +19,7 @@ export function Card({
   );
 }
 
-// shadcn Card composition, styled to the observed Geist Fieldset surface.
+// Shared content surface; the footer follows the outer card's corners.
 export function CardHeader({ className, ...props }: ComponentProps<"div">) {
   return (
     <div
@@ -72,7 +72,7 @@ export function CardFooter({ className, ...props }: ComponentProps<"div">) {
     <div
       data-slot="card-footer"
       className={cn(
-        "flex min-w-0 flex-wrap items-center justify-between gap-4 rounded-b-lg border-t border-border bg-surface px-5 py-3",
+        "flex min-w-0 flex-wrap items-center justify-between gap-4 rounded-b-xl border-t border-border bg-surface px-5 py-3",
         className,
       )}
       {...props}

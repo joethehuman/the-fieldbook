@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CountBadge } from "@/components/ui/badge";
 import { ActionGroup } from "@/components/ui/action-group";
 import { FieldGroup } from "@/components/ui/field";
 import { TextField } from "@/components/patterns/text-field";
@@ -39,6 +40,11 @@ export function ControlExamples() {
             Page heading · 32 / 40 · medium
           </p>
           <h3>Section heading · 16 / 24 · medium</h3>
+          <div className="flex flex-wrap items-center gap-6" aria-label="Count badges">
+            <h3 className="flex items-center gap-2">For you <CountBadge>4</CountBadge></h3>
+            <h3 className="flex items-center gap-2">All courses <CountBadge>128</CountBadge></h3>
+            <h3 className="flex items-center gap-2">Empty collection <CountBadge>0</CountBadge></h3>
+          </div>
           <p className="text-label font-medium">Label · 14 / 20 · regular</p>
           <p className="text-copy">Supporting copy · 14 / 22 · regular</p>
           <p className="text-copy">Interface <strong>emphasis</strong> · medium</p>
@@ -64,7 +70,9 @@ export function ControlExamples() {
           </div>
           <p className="text-copy text-muted-foreground">
             Spacing: 4, 8, 12, 16, 24, 32, 48 px. Controls: 36 px, compact 32
-            px. Control radius: 6 px; card radius: 8 px.
+            px. Control radius: 10 px; card/dialog radius: 18 px. White content,
+            neutral grey secondary surfaces, subtle surface edges and shared
+            floating-panel shadows. Field boundaries retain their stronger contrast.
           </p>
         </div>
       </Card>
