@@ -1,4 +1,6 @@
+@source "../node_modules/streamdown/dist/*.js";
 @import "tailwindcss";
+@import "streamdown/styles.css" layer(base);
 @import "./tokens.css";
 @import "./layout.css";
 @import "./content.css";
@@ -10,6 +12,13 @@
 @source "../demo/app";
 
 @layer base {
+  @media (prefers-reduced-motion: reduce) {
+    [data-sd-animate],
+    [data-sd-animate-marker]::marker {
+      animation: none;
+    }
+  }
+
   * {
     border-color: var(--border);
     scrollbar-width: thin;

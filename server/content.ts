@@ -46,7 +46,7 @@ export const readConfig = cache(async () => {
 });
 export function assertCanRead(
   user: User | null,
-  config: Awaited<ReturnType<typeof readConfig>>,
+  config: Pick<Awaited<ReturnType<typeof readConfig>>, "settings">,
 ) {
   if (config.settings.access === "private" && !user)
     throw new HttpError(401, "Sign in to view this Fieldbook.");

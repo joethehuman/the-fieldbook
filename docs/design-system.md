@@ -102,6 +102,10 @@ Browser tests cover desktop, tablet and phone layouts, keyboard Select/Tabs, lon
 
 ## Review requirements
 
+`MessageComposer` combines a full-width labeled multiline `Textarea` with a separate send/stop row inside the same field. The `embedded` textarea variant delegates its border and focus ring to the enclosing field; other textareas retain the default appearance. Keep the action row below the textarea as text wraps or grows, preserve Enter/Shift+Enter and composition behavior, and keep icon buttons named for assistive technology. The live Search/Ask AI catalog example demonstrates this pattern.
+
+`SearchPanel` keeps a consistent viewport-bounded height for empty, short and long results or conversations. The tab header and chat composer stay in place while results or messages scroll within their own area. An empty chat contains only its composer and the small session notice. New conversation uses the shared ghost Button with a leading plus and the standard rounded hover surface.
+
 1. Reuse or extend a shared primitive/pattern before adding feature styling.
 2. Preserve heading hierarchy, label associations, focus and keyboard behavior.
 3. Check narrow screens, long content and enlarged text; keep data tables independently scrollable.

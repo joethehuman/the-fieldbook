@@ -59,6 +59,7 @@ export function AdminWorkspace({
       },
       branding: {
         ...brandingFromSettings(data.settings || {}),
+        askAiEnabled: data.settings?.askAi?.enabled === true,
         externalLinks: accountMenuLinks(data.settings?.externalLinks),
       },
       docs: [],
@@ -98,6 +99,12 @@ export function AdminWorkspace({
           data={data}
           user={user}
           onChange={persist}
+          onSaveSettings={async (before, settings) => {
+            const saved = await runtime.saveSettings(before, settings);
+            setData(saved);
+            setError("");
+            return saved;
+          }}
           onSaveContent={async (content, intent) => {
             try {
               const saved = await runtime.saveContent(content, intent);

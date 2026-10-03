@@ -22,12 +22,14 @@ export function ContentSearch({
   searchProvider,
   clientNavigation = false,
   onOpen,
+  onAskAi,
 }: {
   query: string;
   content: Content[];
   searchProvider?: SearchProvider;
   clientNavigation?: boolean;
   onOpen?: (r: SearchResult) => void;
+  onAskAi?: () => void;
 }) {
   const [filter, setFilter] = useState<SearchFilter>("all");
   const [response, setResponse] = useState<SearchResponse>({
@@ -75,7 +77,7 @@ export function ContentSearch({
       aria-label="Search results"
       aria-busy={pending}
     >
-      <div className="sticky top-0 z-10 grid gap-3 bg-card pb-3 pt-1">
+      <div className="sticky top-[var(--search-tabs-offset,0px)] z-10 grid gap-3 bg-card pb-3 pt-1">
         <FilterOptions
           label="Content type"
           options={[
@@ -162,6 +164,13 @@ export function ContentSearch({
         <p className="text-sm text-muted-foreground">
           Showing 30 results. Refine your search to narrow the list.
         </p>
+      )}
+      {onAskAi && (
+        <div className="flex justify-end border-t border-border pt-3">
+          <Button type="button" variant="outline" size="sm" onClick={onAskAi}>
+            Ask AI
+          </Button>
+        </div>
       )}
     </section>
   );

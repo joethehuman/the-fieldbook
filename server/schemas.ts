@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { askAiSettingsSchema } from "@/lib/ai-schema";
 import { validateDocSections } from "@/lib/docs-navigation";
 import { cardPalettePresets, graphemeCount } from "@/lib/card-art";
 import {
@@ -171,6 +172,7 @@ const publishedPrivacySchema = privacyDocumentSchema.refine(
 );
 export const settingsSchema = z
   .object({
+    askAi: askAiSettingsSchema.optional(),
     externalLinks: z
       .array(
         z.object({
