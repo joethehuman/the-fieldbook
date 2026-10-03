@@ -8,8 +8,12 @@ import {
   useTransition,
   type ReactNode,
 } from "react";
+import { courseLibraryView } from "@/lib/course-destination";
 import Link from "next/link";
-import type { LandingNavigation, NavigationGuard } from "@/lib/navigation-guard";
+import type {
+  LandingNavigation,
+  NavigationGuard,
+} from "@/lib/navigation-guard";
 import { useNavigationHistory } from "./use-navigation-history";
 import { WorkspaceContext } from "./WorkspaceContext";
 import { usePathname, useRouter } from "next/navigation";
@@ -67,10 +71,6 @@ export function ReaderShell({
     },
     [],
   );
-  const shell = useMemo(
-    () => ({ updateContext, registerNavigationGuard, registerLandingNavigation }),
-    [registerNavigationGuard, registerLandingNavigation],
-  );
   async function canLeave() {
     if (checking.current) return false;
     checking.current = true;
@@ -83,6 +83,21 @@ export function ReaderShell({
   const { beforeNavigation, finishNavigation } = useNavigationHistory(
     protectedState,
     canLeave,
+  );
+  const shell = useMemo(
+    () => ({
+      updateContext,
+      registerNavigationGuard,
+      registerLandingNavigation,
+      beforeLocalNavigation: beforeNavigation,
+      finishLocalNavigation: finishNavigation,
+    }),
+    [
+      registerNavigationGuard,
+      registerLandingNavigation,
+      beforeNavigation,
+      finishNavigation,
+    ],
   );
   const [menu, setMenu] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -112,7 +127,7 @@ export function ReaderShell({
       orderedDocs(context.docs, context.docCategoryOrder, context.docSections),
     [context.docs, context.docCategoryOrder, context.docSections],
   );
-  const selected =
+  const selected = section === "admin" || section === "team" || courseLibraryView(pathname) ? null :
     pathname === "/docs"
       ? orderedDocList[0]?.id || null
       : pathname.split("/")[2] || null;
@@ -195,7 +210,7 @@ export function ReaderShell({
       }
       return;
     }
-    if (sameUrl && landing) {
+    if ((sameUrl || (section === "admin" && href === "/admin") || (section === "team" && href === "/team")) && landing) {
       close();
       await landing.open();
       return;

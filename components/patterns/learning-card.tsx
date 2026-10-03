@@ -30,7 +30,10 @@ export function LearningCard({
   const content = (
     <>
       {artwork}
-      <div className="flex flex-1 flex-col gap-3 p-4">
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <h3 className="min-h-12 text-lg font-semibold leading-6 tracking-tight [overflow-wrap:anywhere]">
+          {title}
+        </h3>
         <div className="grid gap-2 text-xs text-muted-foreground">
           <span>{metadata}</span>
           <ProgressStatus
@@ -39,9 +42,6 @@ export function LearningCard({
             started={status.started}
           />
         </div>
-        <h3 className="min-h-12 font-semibold [overflow-wrap:anywhere]">
-          {title}
-        </h3>
         {detail}
         <p className="line-clamp-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
           {description}
@@ -61,6 +61,7 @@ export function LearningCard({
     <ContentAction
       asChild={!!href}
       focusRing="inside"
+      interaction="lift"
       className="course-card flex h-full min-w-0 flex-col"
       onClick={onClick}
     >

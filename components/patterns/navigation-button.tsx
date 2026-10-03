@@ -9,7 +9,7 @@ export function NavigationButton({
     <Button
       variant="ghost"
       className={cn(
-        "w-full justify-start text-left [&.selected]:bg-accent [&.active]:bg-background",
+        "w-full justify-start text-left [&.selected]:bg-accent [&.active]:bg-background [&.active]:shadow-surface",
         className,
       )}
       {...props}

@@ -1,6 +1,6 @@
 "use client";
 import { FormField } from "@/components/patterns/form-field";
-import { Badge } from "@/components/ui/badge";
+import { CountBadge } from "@/components/ui/badge";
 import { SearchField } from "./patterns/search-field";
 import { Card } from "./ui/card";
 import { ProgressRing } from "./ui/progress";
@@ -23,6 +23,7 @@ import {
 } from "@/components/patterns/layout";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
+import { courseViewPaths, type LearningView } from "@/lib/course-destination";
 import { useState } from "react";
 import { CourseRow } from "./patterns/course-row";
 import { Switch } from "./ui/switch";
@@ -49,6 +50,8 @@ import { CourseCard } from "./CourseCard";
 import { IntentLink } from "./patterns/intent-link";
 
 export default function Learning({
+  view: destinationView,
+  onViewChange,
   curricula = [],
   settings,
   courses,
@@ -61,6 +64,8 @@ export default function Learning({
   guest = false,
   linkedNavigation = false,
 }: {
+  view?: LearningView;
+  onViewChange?: (view: LearningView) => void;
   curricula?: import("@/lib/types").Curriculum[];
   settings?: SiteSettings;
   guest?: boolean;
@@ -73,9 +78,8 @@ export default function Learning({
   onOpen: (id: string) => void;
   onCurriculum: (id: string) => void;
 }) {
-  const [view, setView] = useState<"home" | "curricula" | LearningCollection>(
-    "home",
-  );
+  const [localView, setLocalView] = useState<LearningView>("home");
+  const view = destinationView || localView;
   const [hideCompleted, setHideCompleted] = useState(false);
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState("All categories");
@@ -138,7 +142,7 @@ export default function Learning({
         }
         href={
           linkedNavigation
-            ? `/curricula/${encodeURIComponent(item.curriculum.id)}?from=${encodeURIComponent("/courses")}`
+            ? `/curricula/${encodeURIComponent(item.curriculum.id)}?from=${encodeURIComponent(courseViewPaths[view])}`
             : undefined
         }
       />
@@ -250,12 +254,13 @@ export default function Learning({
       }
       onClick={linkedNavigation ? undefined : () => onOpen(c.id)}
       href={
-        linkedNavigation ? `/courses/${encodeURIComponent(c.id)}` : undefined
+        linkedNavigation ? `/courses/${encodeURIComponent(c.id)}?from=${encodeURIComponent(courseViewPaths[view])}` : undefined
       }
     />
   );
   function changeView(next: typeof view) {
-    setView(next);
+    if (onViewChange) onViewChange(next);
+    else setLocalView(next);
     setHideCompleted(false);
     setQuery("");
     setTopic("All categories");
@@ -269,8 +274,8 @@ export default function Learning({
     });
   }
   const forYouHeading = (
-    <h2>
-      For you <Badge variant="default">{outstanding.length}</Badge>
+    <h2 className="flex items-center gap-2">
+      For you <CountBadge>{outstanding.length}</CountBadge>
     </h2>
   );
   const outstandingCards = assignedCards.filter((item) => !completeCard(item));
@@ -409,7 +414,7 @@ export default function Learning({
             <h2 className="flex items-center gap-2">
               {view === "home" ? "All courses" : viewTitle}
               {view === "home" && (
-                <Badge variant="default">{courses.length}</Badge>
+                <CountBadge>{courses.length}</CountBadge>
               )}
             </h2>
           }

@@ -28,3 +28,17 @@ export function Badge({
     />
   );
 }
+
+/** A compact count that stays centered beside navigation and section labels. */
+export function CountBadge({ className, ...props }: ComponentProps<"span">) {
+  return (
+    <span
+      data-slot="count-badge"
+      className={cn(
+        "inline-flex h-6 min-w-6 shrink-0 items-center justify-center rounded-full bg-accent px-1.5 align-middle text-xs font-medium leading-none tabular-nums text-muted-foreground",
+        className,
+      )}
+      {...props}
+    />
+  );
+}

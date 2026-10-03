@@ -7,6 +7,8 @@ import type {
 } from "@/lib/navigation-guard";
 
 export const WorkspaceContext = createContext<{
+  beforeLocalNavigation: () => Promise<boolean>;
+  finishLocalNavigation: () => void;
   updateContext: (context: ReaderShellContext) => void;
   registerNavigationGuard: RegisterNavigationGuard;
   registerLandingNavigation: (

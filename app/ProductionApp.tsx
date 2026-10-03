@@ -2,13 +2,19 @@
 import { useEffect, useMemo } from "react";
 import { AdminWorkspace } from "@/components/admin/AdminWorkspace";
 import { createAdminRuntime } from "@/lib/admin-runtime";
+import type { AdminDestination } from "@/lib/admin-destination";
 import type { Workspace } from "@/lib/store";
 import type { User } from "@/lib/types";
 import type { ReaderShellContext } from "@/lib/reader-types";
 export default function ProductionApp({
   initialAdmin,
 }: {
-  initialAdmin: { data: Workspace; user: User; shell: ReaderShellContext };
+  initialAdmin: {
+    data: Workspace;
+    user: User;
+    shell: ReaderShellContext;
+    destination: AdminDestination;
+  };
 }) {
   const runtime = useMemo(
     () => createAdminRuntime(initialAdmin),

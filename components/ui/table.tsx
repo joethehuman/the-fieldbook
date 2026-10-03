@@ -29,7 +29,7 @@ export function TableRow({ className, ...props }: ComponentProps<"tr">) {
   return (
     <tr
       className={cn(
-        "transition-colors hover:bg-muted/40 focus-within:bg-muted/40 motion-reduce:transition-none",
+        "hover:bg-muted/40 focus-within:bg-muted/40",
         className,
       )}
       {...props}

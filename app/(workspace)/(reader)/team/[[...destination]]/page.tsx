@@ -1,3 +1,5 @@
+import { teamHref, teamPersonId } from "@/lib/team-destination";
+import { notFound } from "next/navigation";
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { PageHeader } from "@/components/patterns/layout";
 import { TeamWorkspace } from "@/components/reader/TeamWorkspace";
@@ -11,8 +13,23 @@ export async function generateMetadata() {
   };
 }
 
-export default async function Page() {
+export default async function Page({
+  params,
+}: {
+  params: Promise<{ destination?: string[] }>;
+}) {
+  const segments = (await params).destination || [];
+  const path =
+    "/team" +
+    (segments.length ? "/" + segments.map(encodeURIComponent).join("/") : "");
+  const personId = teamPersonId(path);
+  if (segments.length && !personId) notFound();
   const { data, user } = await readerTeam();
+  if (
+    personId &&
+    !data.progressReport?.people.some((person) => person.u.id === personId)
+  )
+    notFound();
   return (
     <WorkspacePage section="/team">
       <>
@@ -21,6 +38,7 @@ export default async function Page() {
         </PageHeader>
         <TeamWorkspace
           data={data}
+          initialPerson={personId}
           user={
             user || {
               id: "guest",

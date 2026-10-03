@@ -134,6 +134,7 @@ function UpdateCards({
     <div className="brief-list">
       {items.map((b, i) => (
         <ContentAction
+          interaction="lift"
           className={"brief-card " + (i === 0 ? "featured" : "")}
           key={b.id}
           onClick={() => onOpen(b.id)}

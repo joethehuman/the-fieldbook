@@ -1,6 +1,11 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import {
+  adminScope,
+  adminHref,
+  type AdminDestination,
+} from "@/lib/admin-destination";
 import type { AdminRuntime } from "@/lib/admin-runtime";
 import type { Workspace } from "@/lib/store";
 import type { User } from "@/lib/types";
@@ -21,7 +26,12 @@ export function AdminWorkspace({
   initial,
   runtime,
 }: {
-  initial: { data: Workspace; user: User; shell: ReaderShellContext };
+  initial: {
+    data: Workspace;
+    user: User;
+    shell: ReaderShellContext;
+    destination: AdminDestination;
+  };
   runtime: AdminRuntime;
 }) {
   const [data, setData] = useState(initial.data);
@@ -31,6 +41,8 @@ export function AdminWorkspace({
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const {
     updateContext,
+    beforeLocalNavigation,
+    finishLocalNavigation,
     registerNavigationGuard: registerShellGuard,
     registerLandingNavigation: registerShellLanding,
   } = useWorkspaceShell();
@@ -97,6 +109,30 @@ export function AdminWorkspace({
       <ReportAvailability.Provider value={reportIssue}>
         <Admin
           data={data}
+          initialDestination={initial.destination}
+          onWriteDestination={async (destination, replace) => {
+            if (!(await beforeLocalNavigation())) return false;
+            window.history[replace ? "replaceState" : "pushState"](
+              null,
+              "",
+              adminHref(destination),
+            );
+            finishLocalNavigation();
+            return true;
+          }}
+          onLoadDestination={async (destination) => {
+            const scope = adminScope(destination);
+            let next = await runtime.admin.prepare(
+              scope,
+              scope === "person" ? destination.id : undefined,
+            );
+            if (destination.tab === "content" && destination.id) {
+              const result = await runtime.admin.edit(destination.id);
+              next = result.data;
+            }
+            setData(next);
+            return next;
+          }}
           user={user}
           onChange={persist}
           onSaveSettings={async (before, settings) => {

@@ -60,8 +60,6 @@
   }
   .nav-count {
     margin-left: auto;
-    font-size: 0.75rem;
-    color: var(--muted-foreground);
   }
   .sidebar-bottom {
     display: grid;
@@ -688,10 +686,12 @@
     display: flex;
     align-items: stretch;
     gap: var(--space-4);
-    width: 100%;
+    width: calc(100% + 2 * var(--space-2));
     overflow-x: auto;
     scroll-snap-type: x mandatory;
-    padding: 0;
+    scroll-padding-inline: var(--space-2);
+    padding: var(--space-3) var(--space-2);
+    margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-2));
   }
   .course-row > [data-slot="content-action"] {
     flex: 0 0 min(18rem, 85vw, 100%);
