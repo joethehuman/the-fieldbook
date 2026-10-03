@@ -8,6 +8,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 - Keep independent navigation, outlines and picker lists from scrolling their surroundings at either end. Preserve compact popup sizing, keep picker search/actions visible, and cap searchable popups to their actual available space.
 
+- Give Administration sections, saved editors, organization details and individual progress views their own URLs. Refresh and direct links reopen the current destination, with existing permissions and unsaved-work protection. Courses collections use `/courses/for-you`, `/courses/yours`, `/courses/in-progress`, `/courses/completed`, `/courses/all` and `/courses/curricula`; course and curriculum exits preserve the launching collection. The static demo uses the same destinations after `#`. No database migration is required.
+
 - Keep course assignment search, filters, pagination and actions stationary while only the course list scrolls. Give the chooser more vertical room and show conditional edge fades with the shared scrollbar styling.
 
 - Reuse the Course audience modal for course and curriculum bulk assignments and Learning Groups course addition/removal. Keep Select, Review, Save and discard in one frame, preserve search on Back, and retain other assignment sources and saved deadlines.

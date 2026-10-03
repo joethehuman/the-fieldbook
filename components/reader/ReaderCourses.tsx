@@ -1,13 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { courseLibraryView, courseViewPaths, type LearningView } from "@/lib/course-destination";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Learning from "@/components/Learning";
 import type { CourseReaderData } from "@/lib/reader-types";
 import type { Progress } from "@/lib/types";
 import { assignedCourses } from "@/lib/types";
 
-export function ReaderCourses({ data }: { data: CourseReaderData }) {
+export function ReaderCourses({ data, initialView = "home" }: { data: CourseReaderData; initialView?: LearningView }) {
+  const view = courseLibraryView(usePathname()) || initialView;
   const router = useRouter();
   const [guestProgress, setGuestProgress] = useState<Progress[]>([]);
   useEffect(() => {
@@ -30,6 +32,8 @@ export function ReaderCourses({ data }: { data: CourseReaderData }) {
   }, [data.courses, data.groups, data.user, router]);
   return (
     <Learning
+      view={view}
+      onViewChange={(next) => { window.history.pushState(null, "", courseViewPaths[next]); }}
       courses={data.courses}
       curricula={data.curricula}
       settings={data.settings}
@@ -39,8 +43,8 @@ export function ReaderCourses({ data }: { data: CourseReaderData }) {
       progress={data.user.id === "guest" ? guestProgress : data.progress}
       guest={data.user.id === "guest"}
       linkedNavigation
-      onOpen={(id) => router.push(`/courses/${encodeURIComponent(id)}`)}
-      onCurriculum={(id) => router.push(`/curricula/${encodeURIComponent(id)}`)}
+      onOpen={(id) => router.push(`/courses/${encodeURIComponent(id)}?from=${encodeURIComponent(courseViewPaths[view])}`)}
+      onCurriculum={(id) => router.push(`/curricula/${encodeURIComponent(id)}?from=${encodeURIComponent(courseViewPaths[view])}`)}
     />
   );
 }

@@ -1,4 +1,7 @@
 "use client";
+import { teamHref, teamPersonId } from "@/lib/team-destination";
+import { courseLibraryView, courseViewPaths, type LearningView } from "@/lib/course-destination";
+import { adminHref, parseAdminDestination } from "@/lib/admin-destination";
 import { reconcileDemoPublication } from "@/lib/demo-publication";
 import { WorkspaceFrame } from "./patterns/workspace-frame";
 import { DocumentTree } from "./patterns/document-tree";
@@ -25,7 +28,10 @@ import { NavigationButton } from "./patterns/navigation-button";
 import { Alert } from "@/components/ui/alert";
 import { EmptyState, PageHeader } from "@/components/patterns/layout";
 import Updates from "./Updates";
-import { reviewDeadlines, recalculateDeadlines } from "@/lib/assignment-episodes";
+import {
+  reviewDeadlines,
+  recalculateDeadlines,
+} from "@/lib/assignment-episodes";
 import { reconcileLearning } from "@/lib/learning-groups";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
@@ -67,7 +73,10 @@ import {
   type Workspace,
 } from "@/lib/store";
 import dynamic from "next/dynamic";
-import type { LandingNavigation, NavigationGuard } from "@/lib/navigation-guard";
+import type {
+  LandingNavigation,
+  NavigationGuard,
+} from "@/lib/navigation-guard";
 const Admin = dynamic(() => import("./Admin"));
 // Presentation defaults only; browser storage still owns the active workspace.
 const { settings: demoPickerSettings, users: demoPickerUsers } = freshWorkspace();
@@ -94,6 +103,9 @@ export default function Fieldbook() {
   const [data, setData] = useState<Workspace | null>(null),
     [uid, setUid] = useState<string | null>(null),
     [view, setView] = useState<View>("learn"),
+    [teamPerson, setTeamPerson] = useState<string | undefined>(),
+    [learningView, setLearningView] = useState<LearningView>("home"),
+    [learningReturn, setLearningReturn] = useState<LearningView>("home"),
     [courseOrigin, setCourseOrigin] = useState<string | undefined>(),
     [selected, setSelected] = useState<string | null>(null),
     [targetLesson, setTargetLesson] = useState<string | undefined>(),
@@ -150,16 +162,21 @@ export default function Fieldbook() {
           return;
         }
         acceptedUrl.current = destination;
+        window.dispatchEvent(new Event("fieldbook:admin-history"));
         const [v, id] = window.location.hash.slice(1).split("?")[0].split("/");
         setTargetLesson(
           new URLSearchParams(window.location.search).get("lesson") ||
             undefined,
         );
+        setTeamPerson(teamPersonId("/" + window.location.hash.slice(1).split("?")[0]));
+        const libraryView = courseLibraryView("/" + window.location.hash.slice(1).split("?")[0]);
+        if (libraryView) setLearningView(libraryView);
+        setLearningReturn(courseLibraryView(new URLSearchParams(window.location.search).get("from") || "") || "home");
         const section = resolveSection(v);
         if (section) {
           setView(section);
           setSelected(
-            id
+            !libraryView && v !== "admin" && id
               ? (v === "curricula" ? "curriculum:" : "") +
                   decodeURIComponent(id)
               : null,
@@ -210,6 +227,8 @@ export default function Fieldbook() {
     const destinationId = v === "docs" && !id ? firstDoc?.id : id;
     setView(v);
     setSelected(destinationId || null);
+    const returnView = view === "learn" && !selected ? learningView : learningReturn;
+    setLearningReturn(returnView);
     setCourseOrigin(origin);
     setTargetLesson(lesson);
     const curriculum =
@@ -218,16 +237,28 @@ export default function Fieldbook() {
       ? `curricula/${encodeURIComponent(destinationId!.slice(11))}`
       : sectionPaths[v] +
         (destinationId ? "/" + encodeURIComponent(destinationId) : "");
-    const query = lesson
-      ? `?lesson=${encodeURIComponent(lesson)}`
-      : origin
-        ? `?curriculum=${encodeURIComponent(origin)}`
-        : "";
+    const params = new URLSearchParams();
+    if (lesson) params.set("lesson", lesson);
+    if (origin) params.set("curriculum", origin);
+    if (v === "learn" && destinationId) params.set("from", courseViewPaths[returnView]);
+    const query = params.size ? `?${params}` : "";
     window.history.pushState(
       null,
       "",
       `${window.location.pathname}${query}#${path}`,
     );
+    acceptedUrl.current = window.location.href;
+    document.getElementById("main-content")?.scrollTo({ top: 0 });
+    return true;
+  }
+  async function navigateLibrary(next: LearningView) {
+    if (!(await canLeave())) return false;
+    setView("learn");
+    setSelected(null);
+    setLearningView(next);
+    setCourseOrigin(undefined);
+    setTargetLesson(undefined);
+    window.history.pushState(null, "", `${window.location.pathname}#${courseViewPaths[next].slice(1)}`);
     acceptedUrl.current = window.location.href;
     document.getElementById("main-content")?.scrollTo({ top: 0 });
     return true;
@@ -656,6 +687,20 @@ export default function Fieldbook() {
           <Admin
             data={data}
             user={user}
+            initialDestination={
+              parseAdminDestination("/" + window.location.hash.slice(1)) || {
+                tab: "content",
+              }
+            }
+            onWriteDestination={async (destination, replace) => {
+              window.history[replace ? "replaceState" : "pushState"](
+                null,
+                "",
+                `${window.location.pathname}#${adminHref(destination).slice(1)}`,
+              );
+              acceptedUrl.current = window.location.href;
+              return true;
+            }}
             onChange={persist}
             onReviewDeadlines={async (token) => {
               const current = loadWorkspace();
@@ -666,24 +711,48 @@ export default function Fieldbook() {
             onSaveContent={async (content, intent) => {
               try {
                 const before = loadWorkspace();
-                const previous = before.content.find((item) => item.id === content.id);
+                const previous = before.content.find(
+                  (item) => item.id === content.id,
+                );
                 if ((previous?.revision || 0) !== (content.revision || 0))
-                  throw new Error("This content changed in another tab. Reload and review the saved copy before saving again.");
+                  throw new Error(
+                    "This content changed in another tab. Reload and review the saved copy before saving again.",
+                  );
                 const stamp = new Date().toISOString();
-                const next = reconcileLearning(before, reconcileDemoPublication(before, {
-                  ...before,
-                  content: [...before.content.filter((item) => item.id !== content.id), {
-                    ...content, status: intent, updatedAt: stamp,
-                    createdAt: previous?.createdAt || previous?.updatedAt || content.createdAt || stamp,
-                  }],
-                }));
+                const next = reconcileLearning(
+                  before,
+                  reconcileDemoPublication(before, {
+                    ...before,
+                    content: [
+                      ...before.content.filter(
+                        (item) => item.id !== content.id,
+                      ),
+                      {
+                        ...content,
+                        status: intent,
+                        updatedAt: stamp,
+                        createdAt:
+                          previous?.createdAt ||
+                          previous?.updatedAt ||
+                          content.createdAt ||
+                          stamp,
+                      },
+                    ],
+                  }),
+                );
                 saveWorkspace(next);
                 setData(next);
                 setReportIssue(undefined);
                 return next.content.find((item) => item.id === content.id)!;
               } catch (failure) {
-                setReportIssue("Reload the report before exporting after a failed change.");
-                throw failure instanceof Error ? failure : new Error("Your browser could not save this change. Your edits remain open.");
+                setReportIssue(
+                  "Reload the report before exporting after a failed change.",
+                );
+                throw failure instanceof Error
+                  ? failure
+                  : new Error(
+                      "Your browser could not save this change. Your edits remain open.",
+                    );
               }
             }}
             onBulk={async (action) => {
@@ -708,9 +777,18 @@ export default function Fieldbook() {
             onLoadPublished={async (id) => {
               const latest = loadWorkspace();
               const draft = latest.content.find((item) => item.id === id);
-              const published = latest.publishedContent?.find((item) => item.id === id);
-              if (!draft || !published) throw new Error("The published version is unavailable. Your changes remain open.");
-              return { ...published, revision: draft.revision, publishedRevision: draft.publishedRevision };
+              const published = latest.publishedContent?.find(
+                (item) => item.id === id,
+              );
+              if (!draft || !published)
+                throw new Error(
+                  "The published version is unavailable. Your changes remain open.",
+                );
+              return {
+                ...published,
+                revision: draft.revision,
+                publishedRevision: draft.publishedRevision,
+              };
             }}
           />
         </ReportAvailability.Provider>
@@ -719,6 +797,14 @@ export default function Fieldbook() {
           <PageHeading title="Team progress" />
           <ReportAvailability.Provider value={reportIssue}>
             <TeamProgress
+              initialPerson={teamPerson}
+              onDestinationChange={async (id) => {
+                if (!(await canLeave())) return false;
+                setTeamPerson(id);
+                window.history.pushState(null, "", `${window.location.pathname}#${teamHref(id).slice(1)}`);
+                acceptedUrl.current = window.location.href;
+                return true;
+              }}
               data={data}
               user={user}
               registerLandingNavigation={(navigation) => {
@@ -733,7 +819,7 @@ export default function Fieldbook() {
           settings={data.settings}
           courses={courses}
           progress={progress}
-          onBack={() => navigate("learn")}
+          onBack={() => navigateLibrary(learningReturn)}
           onOpen={(id) => navigate("learn", id, curriculum.id)}
         />
       ) : selected && !item ? (
@@ -750,12 +836,7 @@ export default function Fieldbook() {
             data.curricula?.find((entry) => entry.id === courseOrigin)?.name
           }
           progress={data.progress[user.id] || []}
-          onBack={() =>
-            navigate(
-              "learn",
-              courseOrigin ? `curriculum:${courseOrigin}` : undefined,
-            )
-          }
+          onBack={() => courseOrigin ? navigate("learn", `curriculum:${courseOrigin}`) : navigateLibrary(learningReturn)}
           backLabel={courseOrigin ? "Back to curriculum" : "Back to courses"}
           feedback={
             <Feedback
@@ -801,6 +882,8 @@ export default function Fieldbook() {
         </Article>
       ) : view === "learn" ? (
         <Learning
+          view={learningView}
+          onViewChange={(next) => { void navigateLibrary(next); }}
           key={user.id}
           courses={courses}
           curricula={data.curricula || []}
