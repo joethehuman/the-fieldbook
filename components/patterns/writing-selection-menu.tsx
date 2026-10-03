@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { activeEditor$, applyFormat$, applyListType$, convertSelectionToNode$, currentBlockType$, currentFormat$, currentListType$, openLinkEditDialog$ } from "@mdxeditor/editor";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
-import { $addUpdateTag, $getSelection, $isRangeSelection, $setSelection, SKIP_SCROLL_INTO_VIEW_TAG, type LexicalEditor, type RangeSelection } from "lexical";
+import { $addUpdateTag, $createRangeSelection, $getSelection, $isRangeSelection, $setSelection, SKIP_SCROLL_INTO_VIEW_TAG, type LexicalEditor, type RangeSelection } from "lexical";
 import { Bold, Check, ChevronRight, Code, Italic, Link } from "lucide-react";
 import { Button } from "../ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
@@ -38,16 +38,26 @@ export function WritingSelectionMenu({ disabled, onReady }: {
 
   const snapshot = useCallback(() => {
     if (!editor || disabled) return false;
-    let selection: RangeSelection | null = null;
-    editor.getEditorState().read(() => {
-      const current = $getSelection();
-      if ($isRangeSelection(current) && !current.isCollapsed() && current.getTextContent().trim()) selection = current.clone();
-    });
-    if (!selection) return false;
     const domSelection = window.getSelection();
     const surface = editor.getRootElement();
-    if (!domSelection?.rangeCount || domSelection.isCollapsed || !surface?.contains(domSelection.anchorNode) || !surface.contains(domSelection.focusNode)) return false;
-    range.current = domSelection.getRangeAt(0).cloneRange();
+    if (!domSelection?.rangeCount || domSelection.isCollapsed || !surface) return false;
+    const selected = domSelection.getRangeAt(0).cloneRange();
+    // Native paragraph selection may place its trailing endpoint just outside
+    // contenteditable. Clip that endpoint to the document before taking a snapshot.
+    if (!surface.contains(selected.startContainer) || !selected.intersectsNode(surface)) return false;
+    const contents = document.createRange();
+    contents.selectNodeContents(surface);
+    if (selected.compareBoundaryPoints(Range.END_TO_END, contents) > 0) selected.setEnd(contents.endContainer, contents.endOffset);
+    if (!selected.toString().trim()) return false;
+    let selection: RangeSelection | null = null;
+    editor.read(() => {
+      const existing = $getSelection();
+      const current = $isRangeSelection(existing) ? existing.clone() : $createRangeSelection();
+      current.applyDOMRange(selected);
+      if (!current.isCollapsed() && current.getTextContent().trim()) selection = current;
+    });
+    if (!selection) return false;
+    range.current = selected;
     saved.current = selection;
     savedEditor.current = editor;
     virtualAnchor.current = { getBoundingClientRect: () => range.current?.getBoundingClientRect() || new DOMRect(), contextElement: surface };
@@ -80,7 +90,7 @@ export function WritingSelectionMenu({ disabled, onReady }: {
         if (active instanceof Element && active.closest("[data-writing-selection-menu]")) return;
         const domSelection = window.getSelection();
         const surface = editor?.getRootElement();
-        if (!domSelection || domSelection.isCollapsed || !surface?.contains(domSelection.anchorNode) || !surface.contains(domSelection.focusNode)) {
+        if (!domSelection || domSelection.isCollapsed || !surface?.contains(domSelection.anchorNode)) {
           dismissed.current = "";
           saved.current = null;
           savedEditor.current = null;
@@ -100,10 +110,12 @@ export function WritingSelectionMenu({ disabled, onReady }: {
       });
     };
     document.addEventListener("selectionchange", update);
+    document.addEventListener("pointerup", update);
     const unregister = editor?.registerUpdateListener(update);
     return () => {
       cancelAnimationFrame(pending);
       document.removeEventListener("selectionchange", update);
+      document.removeEventListener("pointerup", update);
       unregister?.();
     };
   }, [editor, snapshot]);

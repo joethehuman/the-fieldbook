@@ -242,7 +242,7 @@ test("branch membership stays staged and explains overlapping sources", async ({
   await page.getByRole("button", { name: "Add Members", exact: true }).click();
   await membership.getByRole("tab", { name: "People", exact: true }).click();
   await membership
-    .getByRole("searchbox", { name: "Find a person", exact: true })
+    .getByRole("searchbox", { name: "Find a user", exact: true })
     .fill("Alex Edwards");
   await membership.getByRole("checkbox").check();
   await membership
@@ -280,7 +280,7 @@ test("large group roster is paginated, searchable and contained on narrow screen
     page.getByRole("region", { name: "Selected items" }),
   ).toContainText("1–25 of 500 people");
   await page
-    .getByRole("searchbox", { name: "Find a person", exact: true })
+    .getByRole("searchbox", { name: "Find a user", exact: true })
     .fill("Person 499");
   await expect(table.getByRole("row")).toHaveCount(2);
   await expect(table).toContainText("Person 499");
@@ -485,7 +485,7 @@ test("People filters and bulk direct removal preserve team membership and cancel
       items.map((item) => item.getBoundingClientRect().width),
     );
   for (const [label, choice, reset] of [
-    ["Person status", "Inactive", "All statuses"],
+    ["User status", "Inactive", "All statuses"],
     ["Reporting team", "Organization", "All teams"],
   ]) {
     await page.getByRole("button", { name: /^Filters/ }).click();

@@ -10,7 +10,7 @@ export function SearchField({
     <div
       data-slot="search-field"
       className={cn(
-        "flex min-w-0 items-center gap-2 [&>svg]:text-muted-foreground",
+        "relative flex min-w-0 items-center gap-2 [&>[data-slot=input]]:pl-9 [&>svg]:pointer-events-none [&>svg]:absolute [&>svg]:left-3 [&>svg]:text-muted-foreground",
         className,
       )}
       {...props}

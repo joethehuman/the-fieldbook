@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { waitForDraftSaved, openContentSettings, closeContentSettings } from "./editor-helpers";
+import { downloadMarkdown, expectMarkdown, replaceWritingText, waitForDraftSaved, openContentSettings, closeContentSettings } from "./editor-helpers";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -73,12 +73,10 @@ test("link popups follow text through scrolling and panel changes, and bare doma
   await edit.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(link).toHaveAttribute("href", "https://example.com/guide?next=yes#next");
   await page.getByRole("textbox", { name: "Title", exact: true }).click();
-  await page.getByRole("tab", { name: "Preview draft", exact: true }).click();
-  const preview = page.getByLabel("Draft preview", { exact: true });
-  await expect(preview.getByRole("link", { name: /^the guide/ })).toHaveAttribute("target", "_blank");
-  await expect(preview.getByRole("link", { name: "Local reference", exact: true })).toHaveAttribute("href", "guide.md");
-  await expect(preview.getByRole("link", { name: "heading", exact: true })).toHaveAttribute("href", "#next");
-  await expect(preview.getByRole("link", { name: /^older web link/ })).toHaveAttribute("href", "https://example.org");
+  await expectMarkdown(page, /\[the guide\]\(https:\/\/example.com\/guide\?next=yes#next\)/);
+  await expectMarkdown(page, /\[Local reference\]\(guide.md\)/);
+  await expectMarkdown(page, /\[heading\]\(#next\)/);
+
 });
 
 test("formatting dropdown focus keeps the owning writing ring and outside focus clears it", async ({ page }, info) => {
@@ -337,7 +335,7 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
   ).toBeVisible();
   await expect(editor).toContainText("A private addition.");
   await page
-    .getByRole("button", { name: "Publish changes", exact: true })
+    .getByRole("button", { name: "Publish", exact: true })
     .click();
   await expect(page.locator('[data-slot="toast"]')).toContainText("published");
   expect((await read()).publishedContent![0].title).toBe("Private title");
@@ -361,7 +359,7 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
   expect(errors).toEqual([]);
 });
 
-test("formatting controls, keyboard save, source fallback and responsive settings", async ({
+test("formatting controls, keyboard save and responsive settings", async ({
   page,
 }, info) => {
   const production = info.project.name.startsWith("production");
@@ -374,32 +372,21 @@ test("formatting controls, keyboard save, source fallback and responsive setting
   await editor.press("ControlOrMeta+A");
   await page.getByRole("button", { name: "Bold", exact: true }).click();
   await expect(editor.locator("strong")).toHaveText("Make this bold");
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(editor.locator("strong")).toHaveCount(0);
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Redo", exact: true }).click();
   await expect(editor.locator("strong")).toHaveText("Make this bold");
+  await page.keyboard.press("Escape");
   await editor.press("ControlOrMeta+s");
   await waitForDraftSaved(page);
   expect((await read()).publishedContent![0].body).toBe("A short update");
   await openContentSettings(page);
   await expect(
-    page.getByRole("heading", { name: "Relevant groups", exact: true }),
+    page.getByRole("heading", { name: "Audience", exact: true }),
   ).toBeVisible();
   await closeContentSettings(page);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  const unsupported = "Keep this footnote[^1].\n\n[^1]: An important detail.\n";
-  await page
-    .getByRole("textbox", { name: "Update content Markdown" })
-    .fill(unsupported);
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
-  await expect(
-    page.getByRole("alert").filter({ hasText: "original text is preserved" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("textbox", { name: "Update content Markdown" }),
-  ).toHaveValue(unsupported);
-  await waitForDraftSaved(page);
-  expect((await read()).content[0].body).toBe(unsupported);
   await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
   expect(
     await page.evaluate(
@@ -472,10 +459,7 @@ test("contextual headings, links and table cells serialize as reader-compatible 
   expect(body).toContain("## Write clearly");
   expect(body).toContain("[Reference](https://example.com/reference)");
   expect(body).toContain("Useful detail");
-  await page
-    .getByRole("tab", { name: "Preview draft", exact: true })
-    .click();
-  const preview = page.getByLabel("Draft preview", { exact: true });
+  const preview = page.getByRole("textbox", { name: "Doc content", exact: true });
   await expect(
     preview.getByRole("heading", { name: "Write clearly" }),
   ).toBeVisible();
@@ -728,10 +712,7 @@ test("slash commands stay visible and normal inline slashes remain text", async 
   await page.keyboard.press("Tab");
   await expect(menu).toHaveCount(0);
   await expect(editor).not.toBeFocused();
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Doc content Markdown" }),
-  ).toHaveValue(/\/hea/);
+  await expectMarkdown(page, /\/hea/);
 });
 
 test("pasting into an inserted list preserves nested lists through a draft save", async ({
@@ -779,10 +760,7 @@ test("pasting into an inserted list preserves nested lists through a draft save"
   const saved = (await read()).content[0].body;
   expect(saved).toContain("Nested point");
   expect(saved).toMatch(/1\. Pasted customer context/);
-  await page
-    .getByRole("tab", { name: "Preview draft", exact: true })
-    .click();
-  const preview = page.getByLabel("Draft preview", { exact: true });
+  const preview = page.getByRole("textbox", { name: "Doc content", exact: true });
   await expect(preview.locator("ul ul li")).toHaveText("Nested point");
   await expect(preview.locator("ol li")).toHaveText("Pasted customer context");
 });
@@ -861,26 +839,21 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
   const menu = page.getByRole("menu", { name: /^Insert content/ });
   const commands = page.getByRole("button", { name: /^Commands:/ });
-  const source = page.getByRole("textbox", { name: "Doc content Markdown", exact: true });
   await editor.click();
   await page.keyboard.type("/hea");
   await expect(menu).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(editor).toBeFocused();
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(source).toHaveValue("/hea");
-  await source.fill("");
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await expectMarkdown(page, "/hea");
+  await replaceWritingText(page, "");
   await editor.click();
   await page.keyboard.type("/h3");
   await menu.getByRole("menuitem", { name: "Close menu esc" }).focus();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(editor).toBeFocused();
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(source).toHaveValue("/h3");
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await expectMarkdown(page, "/h3");
   await commands.focus();
   await page.keyboard.press("Enter");
   await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();
@@ -896,7 +869,6 @@ test("Heading 1–4 commands and selected-text Normal Text preserve authored con
   page.on("pageerror", (error) => errors.push(error.message));
   await setup(page, info.project.name.startsWith("production"), "");
   const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
-  const source = page.getByRole("textbox", { name: "Doc content Markdown", exact: true });
   for (const level of [1, 2, 3, 4]) {
     await editor.click();
     await page.keyboard.type(`/h${level}`);
@@ -908,10 +880,8 @@ test("Heading 1–4 commands and selected-text Normal Text preserve authored con
     await tools.getByRole("button", { name: `Heading ${level}`, exact: true }).click();
     await page.getByRole("menuitem", { name: "Normal Text", exact: true }).click();
     await expect(editor.locator("p").first()).toHaveText(`Heading level ${level}`);
-    await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-    await expect(source).toHaveValue(`Heading level ${level}`);
-    await source.fill("");
-    await page.getByRole("tab", { name: "Write", exact: true }).click();
+    await expectMarkdown(page, `Heading level ${level}`);
+    await replaceWritingText(page, "");
   }
   expect(errors).toEqual([]);
 });
@@ -965,8 +935,7 @@ test("long writing uses a stationary desktop frame and reachable natural page fa
     await page.keyboard.press("ControlOrMeta+End");
     await page.keyboard.type(" Final caret remains visible.");
     await expect(editor).toContainText("Final caret remains visible.");
-    await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-    await expect(page.getByRole("textbox", { name: "Doc content Markdown", exact: true })).toBeVisible();
+    expect((await downloadMarkdown(page)).body).toContain("Final caret remains visible.");
     await page.screenshot({ path: info.outputPath("editor-natural-page.png") });
     return;
   }
@@ -982,7 +951,7 @@ test("long writing uses a stationary desktop frame and reachable natural page fa
   expect(after!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
   expect(after!.y + after!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   await expect(page.getByRole("button", { name: /^Commands:/ })).toBeInViewport();
-  await expect(page.getByRole("tab", { name: "Write", exact: true })).toBeInViewport();
+  await expect(page.getByRole("button", { name: "More editor actions", exact: true })).toBeInViewport();
   expect(await surface.evaluate((node) => getComputedStyle(node).borderBottomLeftRadius)).not.toBe("0px");
   await editor.press("ControlOrMeta+End");
   await page.keyboard.type(" Final caret remains visible.");
@@ -1001,7 +970,6 @@ test("scroll and pointer dismissal preserve pending slash text at its original l
   await setup(page, info.project.name.startsWith("production"), "\n\n" + Array.from({ length: 40 }, (_, i) => `Existing paragraph ${i + 1}.`).join("\n\n"));
   const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
   const menu = page.getByRole("menu", { name: /^Insert content/ });
-  const source = page.getByRole("textbox", { name: "Doc content Markdown", exact: true });
   await editor.locator("p").first().click();
   await editor.locator("p").first().evaluate((node) => {
     (node.closest("[contenteditable]") as HTMLElement).focus();
@@ -1016,10 +984,8 @@ test("scroll and pointer dismissal preserve pending slash text at its original l
   await body.evaluate((node) => { node.scrollTop = 700; });
   await expect(menu).toHaveCount(0);
   await expect.poll(() => body.evaluate((node) => node.scrollTop)).toBeGreaterThan(500);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(source).toHaveValue(/^\/h3Existing paragraph 1/);
-  await source.fill("First line\n\nLast line");
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await expectMarkdown(page, /^\/h3Existing paragraph 1/);
+  await replaceWritingText(page, "First line\n\nLast line");
   await editor.locator("p").first().click();
   await editor.locator("p").first().evaluate((node) => {
     (node.closest("[contenteditable]") as HTMLElement).focus();
@@ -1031,6 +997,5 @@ test("scroll and pointer dismissal preserve pending slash text at its original l
   await expect(menu).toBeVisible();
   await page.getByRole("textbox", { name: "Title", exact: true }).click();
   await expect(menu).toHaveCount(0);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(source).toHaveValue("/heaFirst line\n\nLast line");
+  await expectMarkdown(page, "/heaFirst line\n\nLast line");
 });

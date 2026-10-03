@@ -366,7 +366,14 @@ test("course rows scroll directly and the completion card splits on iPad", async
       .locator('[data-slot="card"]')
       .first()
       .boundingBox();
-    const strip = await row.boundingBox();
+    // Compare content edges, allowing the strip's inset for card elevation.
+    const strip = await row.evaluate(element => {
+      const box = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      const left = parseFloat(style.paddingLeft);
+      const right = parseFloat(style.paddingRight);
+      return { x: box.x + left, y: box.y + parseFloat(style.paddingTop), width: box.width - left - right };
+    });
     const action = await home
       .locator('[data-slot="card"]')
       .first()

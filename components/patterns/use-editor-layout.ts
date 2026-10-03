@@ -3,7 +3,7 @@
 import { useLayoutEffect, type RefObject } from "react";
 
 /** CSS distributes the remaining space; measurement only chooses a usable layout. */
-export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
+export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMode = false) {
   useLayoutEffect(() => {
     const editor = ref.current;
     const viewport = editor?.closest<HTMLElement>(".main-content");
@@ -61,5 +61,5 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
       observer.disconnect();
       mutations.disconnect();
     };
-  }, [ref]);
+  }, [ref, focusMode]);
 }

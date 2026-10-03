@@ -135,6 +135,7 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
         <a href="/ui/workspace">Workspace frame example</a>
+        <a href="/ui/quiz-review">Quiz results: 1, 2 and 10 questions</a>
       </PageHeader>
       <ControlExamples />
       <section className="grid gap-4" aria-label="Admin collection filters">

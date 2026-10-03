@@ -60,8 +60,6 @@
   }
   .nav-count {
     margin-left: auto;
-    font-size: 0.75rem;
-    color: var(--muted-foreground);
   }
   .sidebar-bottom {
     display: grid;
@@ -271,7 +269,7 @@
   .editor-content { gap: var(--space-4); }
   .editor-introduction { display: grid; width: 100%; gap: var(--space-3); padding-block: var(--space-2); }
   .editor-introduction [data-slot="input"], .editor-introduction [data-slot="textarea"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }
-  .editor-frame { --editor-panel-width: calc(18rem + var(--space-6)); display: flex; flex-direction: column; min-width: 0; gap: var(--space-3); container: editor / inline-size; overflow-anchor: none; }
+  .editor-frame { --editor-panel-width: calc(18rem + var(--space-6)); display: flex; flex-direction: column; min-width: 0; gap: var(--space-3); overflow-anchor: none; }
   .editor-frame[data-panels="none"] { --editor-content-padding: max(var(--space-6), calc((100% - var(--editor-writing-width)) / 2)); }
   .app.sidebar-collapsed .editor-frame[data-panels="none"] { --editor-writing-width: var(--editor-writing-focus-width); }
   .editor-frame-controls {
@@ -355,12 +353,12 @@
     .editor-frame-body { transition: none; }
     .editor-frame-panel, .editor-frame-panel[data-open="false"], .editor-frame-outline, .editor-frame-details { transition: none; }
   }
-  @container editor (width < 60rem) {
+  @container editor-shell (width < 60rem) {
     .editor-frame-controls[data-heading="true"] { display: flex; column-gap: var(--space-2); }
     .editor-frame-controls[data-heading="true"] > :last-child { order: 2; }
     .editor-frame-heading { order: 3; flex-basis: 100%; }
   }
-  @container editor (width < 48rem) {
+  @container editor-shell (width < 48rem) {
     .editor-frame-controls[data-canvas-scrolled="true"]::after { inset-inline: 0; }
     .editor-frame[data-panels] > .editor-frame-body { display: flex; flex-direction: column; }
     .editor-frame-panel { display: grid; grid-template-rows: 1fr; width: 100%; position: static; margin-block-end: var(--space-4); transition: grid-template-rows 220ms ease, margin-block-end 220ms ease, visibility 0s; }
@@ -394,6 +392,19 @@
   .editor[data-scroll-layout="workspace"] .course-builder-panel:has(.writing-root) { display: flex; flex-direction: column; }
   .editor[data-scroll-layout="workspace"] .course-builder-panel:has(.writing-root) { flex: 1 1 0; min-height: 0; }
   .editor[data-scroll-layout="workspace"] .editor-frame-canvas:not(:has(.writing-root)) { overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; scroll-padding-block: var(--space-6); }
+  .main-content:has(> .editor[data-focus-mode="true"]) { padding-block-start: var(--space-6); }
+  .editor[data-focus-transition="true"] .editor-frame-canvas { position: relative; z-index: 20; }
+  /* Focus changes only layout. The writer, selections and panel choices stay mounted. */
+  .editor[data-focus-mode="true"] > .editor-heading,
+  .editor[data-focus-mode="true"] .editor-introduction,
+  .editor[data-focus-mode="true"] .editor-frame-controls,
+  .editor[data-focus-mode="true"] .editor-frame-panel { display: none; }
+  .editor[data-focus-mode="true"] .editor-frame {
+    --editor-content-padding: max(var(--space-6), calc((100% - var(--editor-writing-focus-width)) / 2));
+    gap: 0;
+  }
+  .editor[data-focus-mode="true"] .editor-frame-body { grid-template-columns: minmax(0, 1fr); grid-template-areas: "canvas"; transition: none; }
+  .editor[data-focus-mode="true"] .editor-content { gap: 0; }
   .settings-panel,
   .profile-form,
   .learning-admin,
@@ -674,10 +685,12 @@
     display: flex;
     align-items: stretch;
     gap: var(--space-4);
-    width: 100%;
+    width: calc(100% + 2 * var(--space-2));
     overflow-x: auto;
     scroll-snap-type: x mandatory;
-    padding: 0;
+    scroll-padding-inline: var(--space-2);
+    padding: var(--space-3) var(--space-2);
+    margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-2));
   }
   .course-row > [data-slot="content-action"] {
     flex: 0 0 min(18rem, 85vw, 100%);

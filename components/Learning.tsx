@@ -1,6 +1,6 @@
 "use client";
 import { FormField } from "@/components/patterns/form-field";
-import { Badge } from "@/components/ui/badge";
+import { CountBadge } from "@/components/ui/badge";
 import { SearchField } from "./patterns/search-field";
 import { Card } from "./ui/card";
 import { ProgressRing } from "./ui/progress";
@@ -274,8 +274,8 @@ export default function Learning({
     });
   }
   const forYouHeading = (
-    <h2>
-      For you <Badge variant="default">{outstanding.length}</Badge>
+    <h2 className="flex items-center gap-2">
+      For you <CountBadge>{outstanding.length}</CountBadge>
     </h2>
   );
   const outstandingCards = assignedCards.filter((item) => !completeCard(item));
@@ -414,7 +414,7 @@ export default function Learning({
             <h2 className="flex items-center gap-2">
               {view === "home" ? "All courses" : viewTitle}
               {view === "home" && (
-                <Badge variant="default">{courses.length}</Badge>
+                <CountBadge>{courses.length}</CountBadge>
               )}
             </h2>
           }

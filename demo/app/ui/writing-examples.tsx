@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { WritingTitle } from "@/components/patterns/writing-title";
 import { WritingEditor } from "@/components/patterns/writing-editor";
 import { SectionHeader } from "@/components/patterns/layout";
 import { Checkbox } from "@/components/ui/choice";
@@ -12,8 +13,9 @@ import { Card } from "@/components/ui/card";
 
 export function WritingExamples() {
   const [body, setBody] = useState(
-    "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.\n\n| Area | Owner | Next step |\n| :--- | :--- | :--- |\n| **Documentation** | Enablement | Confirm the source |\n| | | |\n| Customer follow-up | Account team | Keep the next decision and its context visible |",
+    "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.\n\n| Area | Owner | Next step |\n| :--- | :--- | :--- |\n| **Documentation** | Enablement | Confirm the source |\n| | | |\n| Customer follow-up | Account team | Keep the next decision and its context visible |\n\n```text\nA code block with its own actions.\n```\n\n![A landscape illustration](/ui/image-viewer-landscape.svg \"Landscape example\")\n\n[Video](https://www.youtube.com/watch?v=69V__a49xtw)\n\n---\n\nTriple-click this paragraph to select it and open the formatting menu.",
   );
+  const [title, setTitle] = useState("A lesson written in place");
   const [category, setCategory] = useState("");
   const [disabled, setDisabled] = useState(false);
   return (
@@ -42,7 +44,7 @@ export function WritingExamples() {
           disabled={disabled}
         />
       </FormField>
-      <WritingEditor value={body} onChange={setBody} disabled={disabled} />
+      <WritingEditor title={<WritingTitle aria-label="Example lesson title" value={title} onChange={(event) => setTitle(event.target.value)} disabled={disabled} />} value={body} onChange={setBody} disabled={disabled} />
       <Card aria-label="Media upload feedback">
         <div className="grid gap-4">
           <h3>Media upload feedback</h3>
@@ -53,8 +55,7 @@ export function WritingExamples() {
       </Card>
       <p className="text-copy text-muted-foreground">
         Saving a draft and publishing are separate actions in the authoring
-        screen. The editor itself owns no persistence. The table demonstrates filled and empty cells with the same grid in Write
-        and Preview draft. This catalog does not upload files.
+        screen. The editor itself owns no persistence. The visual canvas displays media inline, with table and media controls available in place. The more menu downloads Markdown; unsupported content retains source recovery. This catalog does not upload files.
       </p>
     </section>
   );

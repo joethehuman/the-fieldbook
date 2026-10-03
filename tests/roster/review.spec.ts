@@ -7,6 +7,7 @@ import {
   reviewRosterCsv,
 } from "../../lib/roster-import";
 import { serializeCsv } from "../../lib/csv";
+import { applyDemoBulk } from "../../lib/bulk-actions";
 import {
   setupAuthoringProvider,
   authoringUser,
@@ -107,6 +108,9 @@ async function setup(page: Page, installed: boolean, data = freshWorkspace()) {
   await page.goto(installed ? "/admin" : "/#admin");
   const section = installed ? "People" : "Demo profiles",
     picker = page.getByRole("combobox", { name: "Administration section" });
+  await expect(
+    picker.or(page.getByRole("tab", { name: section, exact: true })).first(),
+  ).toBeVisible();
   if (await picker.isVisible()) {
     await picker.click();
     await page.getByRole("option", { name: section, exact: true }).click();
@@ -147,6 +151,105 @@ async function upload(page: Page, text: string, name = "people.csv") {
     page.getByRole("button", { name: "Import", exact: true }),
   ).toBeVisible();
 }
+test("deleted-user reimport warns without blocking and restores the same user with learner access", async ({
+  page,
+}, info) => {
+  const installed = info.project.name.startsWith("production");
+  const original = freshWorkspace();
+  const target = {
+    id: "csv-recovery-user",
+    name: "Recovery User",
+    email: "recovery@example.test",
+    role: "contributor" as const,
+    active: true,
+    groups: [],
+    addedAt: "2026-01-01T00:00:00.000Z",
+  };
+  original.users.push(target);
+  const { data: deleted } = applyDemoBulk(
+    original,
+    original.users.find((u) => u.role === "admin")!,
+    {
+      entity: "user",
+      operation: "delete",
+      items: [{ id: target.id, expected: 0 }],
+    },
+  );
+  const s = await setup(page, installed, deleted);
+  if (installed)
+    await page.route("**/api/admin/roster-import/apply", async (route) => {
+      const { prepareRosterCsv, materializeRoster } =
+        await import("../../lib/roster-import");
+      const prepared = prepareRosterCsv(
+        route.request().postDataJSON().csv,
+        s.data,
+      );
+      Object.assign(
+        s.data,
+        materializeRoster(prepared.proposal!, prepared.review, () => {
+          throw Error("Existing user must keep their ID");
+        }),
+      );
+      await route.fulfill({
+        json: {
+          result: {
+            peopleAdded: 0,
+            peopleUpdated: 1,
+            teamsAdded: 0,
+            completedAt: new Date().toISOString(),
+          },
+        },
+      });
+    });
+  await upload(
+    page,
+    csv([["Recovery User", "recovery@example.test", "", "", "", ""]]),
+  );
+  await expect(
+    s.dialog
+      .getByRole("status")
+      .filter({ hasText: "1 user was recently deleted" }),
+  ).toContainText("1 user was recently deleted");
+  await expect(
+    s.dialog
+      .getByRole("status")
+      .filter({ hasText: "1 user was recently deleted" }),
+  ).toContainText("Import will restore and reactivate their account");
+  const action = s.dialog.getByRole("button", { name: "Import", exact: true });
+  await expect(action).toBeEnabled();
+  await s.dialog
+    .getByRole("button", { name: "Details for Recovery User", exact: true })
+    .click();
+  await expect(s.dialog.locator("dl")).toContainText("Learner");
+  await page.screenshot({ path: info.outputPath("recovery-warning.png") });
+  await action.click();
+  await expect(s.dialog).not.toBeVisible();
+  await page
+    .getByRole("searchbox", { name: "Search profiles", exact: true })
+    .fill(target.email);
+  await expect(
+    page.getByRole("cell", { name: target.name, exact: true }),
+  ).toBeVisible();
+  const saved = installed
+    ? s.data
+    : await page.evaluate(() =>
+        JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
+      );
+  const restored = saved.users.filter(
+    (u: { email: string }) => u.email === target.email,
+  );
+  expect(restored).toHaveLength(1);
+  expect(restored[0]).toMatchObject({
+    id: target.id,
+    active: true,
+    role: "learner",
+    addedAt: target.addedAt,
+  });
+  expect(
+    saved.deletedItems?.some((item: { id: string }) => item.id === target.id),
+  ).toBe(false);
+  expect(saved.progress).toEqual(original.progress);
+});
 test("template download and review cancellation preserve data and restore focus", async ({
   page,
 }, info) => {

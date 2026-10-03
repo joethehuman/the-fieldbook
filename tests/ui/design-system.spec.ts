@@ -884,7 +884,7 @@ test("hire-date guidance labels the date and stage is derived", async ({
   const dialog = page.getByRole("dialog");
   const date = dialog.getByLabel("Hire date", { exact: true });
   await expect(date).toHaveAccessibleDescription(
-    /First sign-in does not start it/,
+    /Signing in does not start this window/,
   );
   await date.fill("2020-01-01");
   await expect(dialog).toContainText("Existing user");

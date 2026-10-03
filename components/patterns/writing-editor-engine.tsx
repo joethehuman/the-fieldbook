@@ -1,13 +1,17 @@
 "use client";
 
+import { WritingImageDialog, WritingImageToolbar } from "./writing-image";
+import { WritingBlockActions, blockActions } from "./writing-block-actions";
+import { writingTableControlsPlugin } from "./writing-table-controls";
 import { writingVideoPlugin } from "./writing-video";
 import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { createWritingBlock, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu } from "./writing-selection-menu";
 import { WritingLinkDialog } from "./writing-link-dialog";
+import { WritingTitleContext, WritingTitleEnterContext } from "./writing-title";
 import { WritingInteractionContext } from "./writing-interaction";
-import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { UploadProgress } from "@/lib/upload-media";
 import { MediaUploadStatus } from "./media-upload-status";
@@ -28,9 +32,11 @@ import {
   realmPlugin,
   addEditorWrapper$,
   activeEditor$,
+  rootEditor$,
   readOnly$,
   $createTableNode,
   insertCodeBlock$,
+  insertThematicBreak$,
   useCodeBlockEditorContext,
   type CodeBlockEditorProps,
 } from "@mdxeditor/editor";
@@ -42,6 +48,8 @@ import {
   $createRangeSelection,
   $getNodeByKey,
   $getRoot,
+  $createParagraphNode,
+  $isParagraphNode,
   $insertNodes,
   $isElementNode,
   $isRangeSelection,
@@ -63,6 +71,7 @@ import {
   Plus,
   Table,
   CodeXml,
+  Minus,
   Image as ImageIcon,
   Video,
 } from "lucide-react";
@@ -71,15 +80,42 @@ import { Tooltip } from "../ui/tooltip";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Alert } from "../ui/alert";
-import { TabsContent } from "../ui/tabs";
 import type { WritingEditorProps } from "./writing-editor";
 import { videoSource } from "@/lib/video";
 import "@mdxeditor/editor/style.css";
 
 function WritingViewPanel({ children }: { children: ReactNode }) {
+  const title = useContext(WritingTitleContext);
+  const lexical = useCellValue(rootEditor$);
+  useEffect(() => {
+    if (!lexical) return;
+    return lexical.registerUpdateListener(({ editorState }) => {
+      const element = lexical.getRootElement();
+      element?.querySelectorAll(".writing-active-line").forEach(line => line.classList.remove("writing-active-line"));
+      editorState.read(() => {
+        const selection = $getSelection();
+        if (!$isRangeSelection(selection) || !selection.isCollapsed()) return;
+        const block = selection.anchor.getNode().getTopLevelElement();
+        if ($isParagraphNode(block)) lexical.getElementByKey(block.getKey())?.classList.add("writing-active-line");
+      });
+    });
+  }, [lexical]);
+  function enterBody() {
+    lexical?.update(() => {
+      const root = $getRoot();
+      const first = root.getFirstChild();
+      // An empty paragraph is an insertion point; a media paragraph is not empty.
+      const paragraph = $isParagraphNode(first) && first.getChildrenSize() === 0
+        ? first : $createParagraphNode();
+      if (paragraph !== first) {
+        if (first) first.insertBefore(paragraph); else root.append(paragraph);
+      }
+      paragraph.selectStart();
+    });
+  }
   const fade = useScrollFade<HTMLDivElement>();
-  return <TabsContent ref={fade.ref} value="write" className="writing-viewport writing-scroll-area scroll-fade mt-0 focus-visible:ring-0"
-    data-scroll-fade-before={fade.edges.before} data-scroll-fade-after={false} onScroll={fade.measure}>{children}</TabsContent>;
+  return <div ref={fade.ref} data-state="active" className="writing-viewport writing-scroll-area scroll-fade mt-0 focus-visible:ring-0"
+    data-scroll-fade-before={fade.edges.before} data-scroll-fade-after={false} onScroll={fade.measure}><WritingTitleEnterContext.Provider value={enterBody}><div className="writing-document">{title && <div className="writing-document-heading">{title}</div>}{children}</div></WritingTitleEnterContext.Provider></div>;
 }
 
 const writingViewPanelPlugin = realmPlugin({
@@ -91,7 +127,7 @@ function PlainCodeEditor({
   language,
   focusEmitter,
 }: CodeBlockEditorProps) {
-  const { setCode } = useCodeBlockEditorContext();
+  const { setCode, parentEditor, lexicalNode } = useCodeBlockEditorContext();
   const readOnly = useCellValue(readOnly$);
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(
@@ -99,21 +135,26 @@ function PlainCodeEditor({
     [focusEmitter],
   );
   return (
+    <div className="writing-code-block" contentEditable={false}>
+    <WritingBlockActions label="Code block" disabled={readOnly} {...blockActions(parentEditor, lexicalNode.getKey())} />
     <Textarea
       ref={input}
       aria-label={`${language || "Plain text"} code block`}
       value={code}
       readOnly={readOnly}
       onChange={(event) => setCode(event.target.value)}
-      className="font-mono"
-      rows={5}
+      variant="embedded"
+      className="writing-code font-mono"
+      rows={Math.max(2, code.split("\n").length)}
     />
+    </div>
   );
 }
 
 type WritingActions = {
   block: (kind: WritingBlock) => void;
   codeBlock: () => void;
+  divider: () => void;
 };
 
 function WritingToolbar({
@@ -131,6 +172,7 @@ function WritingToolbar({
 }) {
   const editor = useCellValue(activeEditor$);
   const code = usePublisher(insertCodeBlock$);
+  const divider = usePublisher(insertThematicBreak$);
   const [canUndo, setCanUndo] = useState(false),
     [canRedo, setCanRedo] = useState(false);
   useEffect(() => {
@@ -143,8 +185,9 @@ function WritingToolbar({
     onEditorReady(editor, {
       block: convert,
       codeBlock: () => code({ code: "", language: "" }),
+      divider: () => divider(),
     });
-  }, [editor, onEditorReady, code]);
+  }, [editor, onEditorReady, code, divider]);
   useEffect(() => {
     if (!editor) return;
     const undo = editor.registerCommand(
@@ -508,6 +551,7 @@ export default function WritingEditorEngine({
     ...writingBlockStyles.map(({ kind, ...command }) => ({ ...command, group: "Basic blocks", run: () => chooseBlock(kind) })),
     { name: "Table", group: "Basic blocks", icon: Table, terms: "table grid rows columns", run: insertTableAtCaret },
     { name: "Code block", group: "Basic blocks", icon: CodeXml, terms: "code block", run: () => { setSlashOpen(false); writingActions.current?.codeBlock(); } },
+    { name: "Divider", group: "Basic blocks", icon: Minus, terms: "divider separator horizontal rule line", run: () => { setSlashOpen(false); writingActions.current?.divider(); } },
     { name: "Image", group: "Media", icon: ImageIcon, terms: "image photo", run: () => openMedia("image") },
     { name: "Upload video", group: "Media", icon: Video, terms: "video upload file", run: () => openMedia("video") },
     { name: "Embed video link", group: "Media", icon: Link, terms: "video embed link", run: () => openMedia("video", "link") },
@@ -632,9 +676,12 @@ export default function WritingEditorEngine({
     linkDialogPlugin({ LinkDialog: WritingLinkDialog }),
     imagePlugin({
       disableImageResize: true,
+      ImageDialog: WritingImageDialog,
+      EditImageToolbar: WritingImageToolbar,
       imageUploadHandler: onUpload ? upload : undefined,
     }),
     tablePlugin(),
+    writingTableControlsPlugin(),
     codeBlockPlugin({
       codeBlockEditorDescriptors: [
         { priority: 0, match: () => true, Editor: PlainCodeEditor },
@@ -812,7 +859,7 @@ export default function WritingEditorEngine({
           try {
             const url = await upload(selected);
             const alt = (imageAlt.trim() || selected.name).replace(/[\[\]\\\n]/g, " ");
-            const markdown = `\n\n${selected.type.startsWith("video/") ? "" : "!"}[${alt}](${url})\n\n`;
+            const markdown = selected.type.startsWith("video/") ? `\n\n[Video](${url})\n\n` : `\n\n![${alt}](${url})\n\n`;
             insertAtMediaSelection(markdown);
             setImageAlt("");
           } catch {

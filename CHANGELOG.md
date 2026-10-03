@@ -11,6 +11,17 @@ No versions have been released. Package and MCP version strings do not constitut
 - Refine people imports with opening feedback for the native file chooser, status count badges, one Issues tab and a 2,000-row file limit. Let nested Groups lists hand scrolling back to person dialogs at their edges. Add Recently added People sorting, separate from hire date; its additive roster timestamp migration leaves historical dates unknown.
 
 - Import people and teams from a reviewed CSV in one transaction, with stable identities, stale-review protection and safe retries. Use an inline blank-template link, readable field changes and shared scroll fades. Align individual pre-registration and demo profiles with the same modal frame. See [CSV import](docs/roster-import.md); apply its additive database migration before deploying.
+- Unify visual-editor block actions and image settings, place table handles on grid edges with row/column movement indicators and menu alternatives, retain formatting tools for whole-paragraph selections, and offer Divider in the Commands and slash menus.
+
+- Coordinate Focus mode transitions with the outline and details panels, keep the moving canvas opaque with synchronized text/media resizing, and make Enter from a lesson title start on an empty line above the first block, including video.
+
+- Unify visual writing and preview with inline player-style media, editable lesson titles inside the canvas, contextual media controls, and Focus mode that expands the existing editor. Offer Markdown downloads from the toolbar’s more menu, retain source recovery for unsupported content, autosave and separate publication.
+
+- Refine the shared neutral design system with consistent rounded controls and surfaces, quieter outline actions, inset search icons, and clearer course-card title hierarchy. Preserve existing page structure and workflows.
+
+- Align course counts in soft shared badges, add subtle card lift and elevation, and make hover highlights immediate across shared controls and navigation. Refine quiz results with grouped completion actions and a clearer keyboard-accessible answer review while preserving grading and retry behavior.
+
+- Give quiz reviews a numbered gutter and inset answers, preserve separate multiple-choice selections, and let longer reviews filter to incorrect answers. Add real-component catalog examples with one, two and ten questions without changing saved course progress.
 
 - Fit desktop content editors to the available workspace, keeping titles and controls visible while overflowing writing, Outline, Details or Quiz panes scroll independently. Use natural page scrolling on narrow or short screens so every control stays reachable.
 

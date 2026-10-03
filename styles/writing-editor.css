@@ -34,6 +34,7 @@
   max-width: 100%;
 }
 .writing-surface {
+  background: var(--background);
   display: flex;
   flex-direction: column;
   overflow: clip;
@@ -71,7 +72,6 @@
 .editor[data-scroll-layout="workspace"] .writing-viewport > .mdxeditor-root-contenteditable { display: flex; flex-direction: column; min-height: 100%; }
 .editor[data-scroll-layout="workspace"] .mdxeditor-contenteditable-wrapper { display: flex; flex: 1; flex-direction: column; }
 .editor[data-scroll-layout="workspace"] .writing-content[contenteditable] { flex: 1; }
-.editor[data-scroll-layout="workspace"] [aria-label="Draft preview"] { min-height: 0; }
 .editor[data-scroll-layout="page"] .writing-viewport:not(.writing-source-panel) { overflow-y: visible; }
 .writing-surface:focus-within,
 .writing-surface[data-editor-interacting="true"] {
@@ -216,7 +216,7 @@
   display: none;
 }
 .writing-editor .writing-content:focus-within
-  > p:last-child:is(:empty, :has(> br:only-child)):not(
+  > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
     .writing-pending-list,
     .writing-media-line
@@ -224,7 +224,7 @@
   position: relative;
 }
 .writing-editor .writing-content:focus-within
-  > p:last-child:is(:empty, :has(> br:only-child)):not(
+  > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
     .writing-pending-list,
     .writing-media-line
@@ -451,3 +451,69 @@
     padding-inline: var(--editor-content-padding, var(--space-4));
   }
 }
+
+/* One document measure and media presentation for visual writing and reading. */
+.writing-document { display: flex; flex-direction: column; min-height: 100%; }
+.editor[data-scroll-layout="workspace"] .writing-document > .mdxeditor-root-contenteditable { display: flex; flex: 1; flex-direction: column; }
+.writing-source-panel { flex-direction: column; }
+.writing-document-heading {
+  flex-shrink: 0;
+  display: grid;
+  gap: var(--space-6);
+  padding-block-start: var(--space-6);
+  padding-inline: var(--editor-content-padding, var(--space-6));
+}
+[data-slot="textarea"].document-title {
+  min-height: 0;
+  font-size: var(--type-page);
+  line-height: var(--type-page-leading);
+  letter-spacing: -0.03em;
+  font-weight: var(--weight-heading);
+  background: transparent;
+}
+.writing-document-heading + .mdxeditor-root-contenteditable .writing-content { padding-block-start: var(--space-6); }
+.writing-media-block { display: block; position: relative; width: 100%; }
+.writing-media-block .course-video-actions:empty { display: none; }
+.writing-editor [data-editor-block-type="image"] { max-width: 100%; }
+.writing-editor [data-editor-block-type="image"] img { display: block; max-width: 100%; height: auto; }
+@media (max-width: 600px) {
+  .writing-document-heading { padding-inline: var(--space-4); }
+}
+.writing-content .writing-code {
+  background: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.course-builder-panel .writing-content h1 { font-size: 1.75rem; line-height: 1.3; letter-spacing: -0.035em; }
+
+/* Block actions share one inset surface, clear of selection outlines and prose. */
+.writing-block-actions { position: absolute; inset-block-start: var(--space-2); inset-inline-end: var(--space-2); z-index: 2; display: inline-flex; opacity: 0; }
+:is(.writing-media-block, .writing-code-block, .writing-table-block, [data-editor-block-type="image"]):is(:hover, :focus-within) > .writing-block-actions,
+.writing-block-actions:has([data-state="open"]) { opacity: 1; }
+.writing-code-block { position: relative; }
+.writing-code-block .writing-code { padding-inline-end: calc(var(--space-4) + var(--control-height)); }
+.writing-editor [data-editor-block-type="image"] { position: relative; padding: var(--space-2); border-radius: var(--radius); }
+.writing-editor [data-editor-block-type="image"] > .writing-block-actions { inset-block-start: var(--space-3); inset-inline-end: var(--space-3); }
+.writing-editor .writing-content .writing-table-block { position: relative; padding: var(--space-12) var(--space-4) var(--space-4); border-radius: 0; }
+.writing-table-block > .writing-block-actions { inset-block-start: 0; }
+.writing-editor .writing-table-block table :is(thead, tfoot),
+.writing-editor .writing-table-block table [data-tool-cell],
+.writing-editor .writing-table-block table col:first-child,
+.writing-editor .writing-table-block table col:last-child { display: none; }
+.writing-table-handle { position: absolute; z-index: 2; transform: translate(-50%, -50%); }
+.writing-table-handle .writing-table-grip { background: transparent; touch-action: none; cursor: grab; }
+.writing-table-handle .writing-table-grip:active { cursor: grabbing; }
+.writing-table-grip-mark { display: block; width: var(--space-4); height: var(--space-1); border-radius: var(--radius); background: var(--muted-foreground); box-shadow: 0 0 0 3px var(--background); }
+.writing-table-row .writing-table-grip-mark { width: var(--space-1); height: var(--space-4); }
+.writing-table-grip:is(:hover, :focus-visible, [data-state="open"]) .writing-table-grip-mark { background: var(--ring); }
+.writing-table-drag-source { position: absolute; pointer-events: none; z-index: 1; background: var(--accent); outline: 2px dashed var(--ring); opacity: 0.65; }
+.writing-table-drop { position: absolute; z-index: 3; pointer-events: none; background: var(--ring); }
+.writing-table-drop-row { height: 3px; transform: translateY(-50%); }
+.writing-table-drop-column { width: 3px; transform: translateX(-50%); }
+@media (hover: none) { .writing-block-actions { opacity: 1; } }
+.writing-editor .mdxeditor-contenteditable-wrapper { position: relative; }
+.writing-divider-tools { position: absolute; transform: translate(-100%, -50%); z-index: 2; }
+.writing-divider-tools .writing-block-actions { position: static; opacity: 1; }
