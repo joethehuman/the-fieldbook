@@ -434,6 +434,12 @@ export function reviewRosterInput(
   before: Workspace,
   options: {
     deletedEmails?: string[];
+    deletedUsers?: {
+      user: User;
+      purgeAfter: string;
+      purging?: boolean;
+      authLocked?: boolean;
+    }[];
     stamp?: string;
     onProposal?: (data: Workspace) => void;
   } = {},
@@ -472,6 +478,19 @@ export function reviewRosterInput(
     );
     return review;
   }
+  const recoveries =
+    options.deletedUsers ||
+    (before.deletedItems || [])
+      .filter((item) => item.entity === "user" && item.user)
+      .map((item) => ({
+        user: item.user!,
+        purgeAfter: item.purgeAfter,
+        purging: item.purging,
+        authLocked: true,
+      }));
+  const deletedUsers = new Map(
+    recoveries.map((item) => [personKey(item.user.email), item]),
+  );
   const currentPeople = new Map<string, User>();
   for (const person of before.users.filter((p) => p.id !== "guest")) {
     const key = personKey(person.email);
@@ -484,6 +503,32 @@ export function reviewRosterInput(
         key,
       );
     currentPeople.set(key, person);
+  }
+  // Deletion clears access and direct memberships. Keep identity/history, never
+  // recover a snapshot's old privileges or memberships through an import.
+  for (const item of recoveries) {
+    const key = personKey(item.user.email);
+    if (currentPeople.has(key)) {
+      addIssue(
+        0,
+        "Email",
+        "existing-email-conflict",
+        "An active and deleted user share this email. Resolve that conflict first.",
+        key,
+      );
+      continue;
+    }
+    currentPeople.set(key, {
+      ...item.user,
+      active: false,
+      role: "learner",
+      groups: [],
+      teamId: undefined,
+      groupJoinedAt: {},
+      effectiveGroupJoinedAt: {},
+      effectiveGroupIds: undefined,
+      assignmentTeams: undefined,
+    });
   }
   const currentTeams = new Map<string, Team>();
   for (const team of before.teams || []) {
@@ -501,7 +546,11 @@ export function reviewRosterInput(
   // Organization is a reserved root reference, including older named roots.
   if (!currentTeams.has(teamKey("Organization")))
     currentTeams.set(teamKey("Organization"), root);
-  const deleted = new Set((options.deletedEmails || []).map(normalized));
+  const deleted = new Set([
+    ...(options.deletedEmails || []).map(normalized),
+    ...recoveries.map((item) => normalized(item.user.email)),
+  ]);
+  const restored = new Set<string>();
   // Derived membership belongs to the proposal's hierarchy, not its saved projection.
   const nextPeople = new Map<string, User>(
     before.users.map((p) => [p.id, { ...p, effectiveGroupIds: undefined }]),
@@ -553,6 +602,12 @@ export function reviewRosterInput(
   for (const person of input.people) {
     const email = normalized(person.email);
     const old = currentPeople.get(personKey(person.email));
+    const recovery = deletedUsers.get(personKey(person.email));
+    const restoring =
+      !!recovery &&
+      recovery.authLocked !== false &&
+      !recovery.purging &&
+      Date.parse(recovery.purgeAfter) > Date.now();
     const id = old?.id || "csv-preview:" + person.key;
     const duplicate = personRows.get(id);
     if (duplicate) {
@@ -578,15 +633,17 @@ export function reviewRosterInput(
         "Add a name for this new user.",
         person.key,
       );
-    if (deleted.has(email))
+    if (deleted.has(email) && !restoring)
       addIssue(
         person.row,
         "Email",
         "deleted-person",
-        "This email belongs to a user in Recently deleted. Resolve that record before importing.",
+        recovery
+          ? "This user's permanent deletion has started, the recovery window has ended, or account deactivation is still finishing. Try again when deactivation finishes; otherwise resolve it in Recently deleted."
+          : "This email has a deleted record that cannot be recovered. Resolve it in Recently deleted before importing.",
         person.key,
       );
-    if (old && !old.active)
+    if (old && !old.active && !recovery)
       addIssue(
         person.row,
         "Email",
@@ -606,6 +663,19 @@ export function reviewRosterInput(
           groups: [],
           onboardingDays: before.settings?.onboardingDays ?? 90,
         };
+    if (restoring) {
+      next.active = true;
+      restored.add(id);
+      difference(row, "Account", "Recently deleted", "Active");
+      addIssue(
+        person.row,
+        "Email",
+        "restore-user",
+        "This user was recently deleted. Import will restore and reactivate their account, removing it from Recently deleted.",
+        person.key,
+        "notice",
+      );
+    }
     if (person.name) {
       difference(row, "Name", old?.name, person.name);
       next.name = person.name;
@@ -702,7 +772,11 @@ export function reviewRosterInput(
     if (team.manager) {
       const managerId = personIds.get(personKey(team.manager)),
         manager = managerId ? nextPeople.get(managerId) : undefined;
-      if (!manager || !manager.active || deleted.has(team.manager))
+      if (
+        !manager ||
+        !manager.active ||
+        (deleted.has(team.manager) && !restored.has(manager.id))
+      )
         addIssue(
           team.rows[0],
           "Team manager email",
@@ -818,6 +892,9 @@ export function reviewRosterInput(
     ...before,
     users: [...nextPeople.values()],
     teams: [...nextTeams.values()],
+    deletedItems: before.deletedItems?.filter(
+      (item) => item.entity !== "user" || !restored.has(item.id),
+    ),
   };
   try {
     validateOrganizationTeams(

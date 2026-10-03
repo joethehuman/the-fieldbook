@@ -221,6 +221,9 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState(new Set<string>());
   const all = [...review.people, ...review.teams];
+  const restoring = review.people.filter((row) =>
+    row.issues.some((issue) => issue.code === "restore-user"),
+  ).length;
   const counts = Object.fromEntries(
     Object.keys(labels).map((status) => [
       status,
@@ -282,6 +285,14 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
             </span>
           ))}
       </ReviewCounts>
+      {review.valid && restoring > 0 && (
+        <Alert variant="warning">
+          {restoring} {restoring === 1 ? "user was" : "users were"} recently
+          deleted. Import will restore and reactivate{" "}
+          {restoring === 1 ? "their account" : "their accounts"}, removing them
+          from Recently deleted.
+        </Alert>
+      )}
       <TabsList aria-label="Import review sections">
         <TabsTrigger value="people">People {review.people.length}</TabsTrigger>
         <TabsTrigger value="teams">Teams {review.teams.length}</TabsTrigger>

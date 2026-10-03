@@ -12,6 +12,7 @@ import {
   materializeRoster,
 } from "@/lib/roster-import";
 import { governanceSchema } from "./governance-schema";
+import { unlockIdentity } from "./identity";
 
 /** Bounded transient input. Review accepts CSV, never client proposals or IDs. */
 async function readRosterBody(
@@ -80,14 +81,13 @@ async function prepare(
   stamp?: string,
 ) {
   requireAdmin(user);
-  const [config, snapshot, published, profiles, deletedEmails] =
-    await Promise.all([
-      store.readConfiguration(),
-      store.readAdminPeopleSnapshot(user.id),
-      store.listPublishedAssignmentContent(),
-      store.listProfiles(),
-      store.listDeletedProfileEmails(),
-    ]);
+  const [config, snapshot, published, profiles, deleted] = await Promise.all([
+    store.readConfiguration(),
+    store.readAdminPeopleSnapshot(user.id),
+    store.listPublishedAssignmentContent(),
+    store.listProfiles(),
+    store.listDeletedRosterProfiles(),
+  ]);
   const current = snapshot.users.find((p) => p.id === user.id);
   if (!current || !current.active || current.role !== "admin")
     throw new HttpError(403, "Administrator access changed. Sign in again.");
@@ -116,13 +116,43 @@ async function prepare(
     progress: {},
     feedback: [],
   };
-  return prepareRosterCsv(csv, workspace, {
+  const recoveryProfiles = profiles.filter((p) => p.deleted_at);
+  const prepared = prepareRosterCsv(csv, workspace, {
     stamp,
     deletedEmails: [
-      ...deletedEmails,
-      ...profiles.filter((p) => p.deleted_at).map((p) => p.email),
+      ...deleted.flatMap((item) => (item.email ? [item.email] : [])),
+      ...recoveryProfiles.map((p) => p.email),
     ],
+    deletedUsers: recoveryProfiles.flatMap((p) => {
+      const item = deleted.find(
+        (d) =>
+          d.id === p.id &&
+          d.email?.trim().toLowerCase() === p.email.trim().toLowerCase(),
+      );
+      return item
+        ? [
+            {
+              user: profile(p),
+              purgeAfter: item.purge_after,
+              purging: item.purging,
+              authLocked: item.auth_locked,
+            },
+          ]
+        : [];
+    }),
   });
+  return {
+    ...prepared,
+    unlockIds: recoveryProfiles
+      .filter(
+        (p) =>
+          p.auth_user_id &&
+          prepared.proposal?.users.some(
+            (user) => user.id === p.id && user.active,
+          ),
+      )
+      .map((p) => p.id),
+  };
 }
 const fileHash = (csv: string) =>
   createHash("sha256").update(csv).digest("hex");
@@ -156,12 +186,13 @@ export async function applyRosterImport(
   csv: string,
   token: string,
   store: DataStore = data(),
+  unlock: (id: string) => Promise<void> = unlockIdentity,
 ) {
   requireAdmin(user);
   const hash = fileHash(csv);
   const operation = await store.rosterImportOperation(user.id, hash, token);
   if (operation.result) return operation.result;
-  const { review, proposal } = await prepare(
+  const { review, proposal, unlockIds } = await prepare(
     user,
     csv,
     store,
@@ -208,6 +239,17 @@ export async function applyRosterImport(
       400,
       "The roster could not be validated. Review the file and existing organization settings.",
     );
+  // As in individual restoration, remove the provider ban while the deleted
+  // profile still denies application access. Only then commit reactivation.
+  // Failed/uncertain writes can retry this idempotent unlock; receipts bypass it.
+  try {
+    for (const id of unlockIds) await unlock(id);
+  } catch {
+    throw new HttpError(
+      503,
+      "The deleted users' login locks could not be cleared. No import was saved. Try Import again.",
+    );
+  }
   await store.rosterImportOperation(user.id, hash, token, {
     users: payload.users,
     teams: payload.teams,

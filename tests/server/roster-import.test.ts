@@ -72,9 +72,19 @@ function provider(
           revision: 1,
         }));
     },
-    async listDeletedProfileEmails() {
+    async listDeletedRosterProfiles() {
       calls.push("deleted emails");
-      return options.tombstone ? ["avery@example.test"] : [];
+      return options.tombstone
+        ? [
+            {
+              id: "gone",
+              email: "avery@example.test",
+              purge_after: "2000-01-01",
+              purging: true,
+              auth_locked: true,
+            },
+          ]
+        : [];
     },
     async listProfiles() {
       calls.push("profiles");

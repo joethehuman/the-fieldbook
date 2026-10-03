@@ -16,7 +16,7 @@ export const learningData: Pick<
   | "readGovernanceSnapshot"
   | "readAdminPeopleSnapshot"
   | "listProfiles"
-  | "listDeletedProfileEmails"
+  | "listDeletedRosterProfiles"
   | "readProfileNames"
   | "findOwnerProfile"
   | "saveGovernance"
@@ -60,13 +60,21 @@ export const learningData: Pick<
     const names: Pick<ProfileRecord, "id" | "name">[] = [];
     // Keep URLs bounded and each result below the provider's row limit.
     for (let start = 0; start < unique.length; start += 500) {
-      const chunks = Array.from({ length: Math.ceil(Math.min(500, unique.length - start) / 100) },
-        (_, offset) => unique.slice(start + offset * 100, start + (offset + 1) * 100));
-      const batch = await Promise.all(chunks.map(async (chunk) => {
-        const { data, error } = await db().from("fb_profiles").select("id,name").in("id", chunk);
-        check(error);
-        return (data || []) as Pick<ProfileRecord, "id" | "name">[];
-      }));
+      const chunks = Array.from(
+        { length: Math.ceil(Math.min(500, unique.length - start) / 100) },
+        (_, offset) =>
+          unique.slice(start + offset * 100, start + (offset + 1) * 100),
+      );
+      const batch = await Promise.all(
+        chunks.map(async (chunk) => {
+          const { data, error } = await db()
+            .from("fb_profiles")
+            .select("id,name")
+            .in("id", chunk);
+          check(error);
+          return (data || []) as Pick<ProfileRecord, "id" | "name">[];
+        }),
+      );
       names.push(...batch.flat());
     }
     return names;
@@ -80,12 +88,21 @@ export const learningData: Pick<
     if (error) throw new Error("Owner lookup failed.");
     return data as { id: string } | null;
   },
-  async listDeletedProfileEmails() {
-    const rows = await readAll<{ email: string | null }>((from, to) =>
-      db().from("fb_deleted_items").select("email", { count: "exact" })
-        .eq("entity", "user").order("id").range(from, to),
+  async listDeletedRosterProfiles() {
+    return await readAll<{
+      id: string;
+      email: string | null;
+      purge_after: string;
+      purging: boolean;
+      auth_locked: boolean;
+    }>((from, to) =>
+      db()
+        .from("fb_deleted_items")
+        .select("id,email,purge_after,purging,auth_locked", { count: "exact" })
+        .eq("entity", "user")
+        .order("id")
+        .range(from, to),
     );
-    return rows.flatMap((row) => row.email ? [row.email] : []);
   },
   async rosterImportOperation(actorId, fileHash, run, payload) {
     const { data, error } = await db().rpc("fb_roster_import", {
@@ -132,8 +149,18 @@ export const learningData: Pick<
     return data as { revision: number };
   },
   async reviewDeadlines(actorId, apply, token) {
-    const { data, error } = await db().rpc("fb_review_deadlines", { p_actor: actorId, p_apply: apply, p_token: token || null });
-    if (error) throw new HttpError(error.message.includes("changed") ? 409 : 400, error.code === "P0001" ? error.message : "Deadline review failed. Try again.");
+    const { data, error } = await db().rpc("fb_review_deadlines", {
+      p_actor: actorId,
+      p_apply: apply,
+      p_token: token || null,
+    });
+    if (error)
+      throw new HttpError(
+        error.message.includes("changed") ? 409 : 400,
+        error.code === "P0001"
+          ? error.message
+          : "Deadline review failed. Try again.",
+      );
     return data;
   },
   async manageLearning(actorId, payload) {

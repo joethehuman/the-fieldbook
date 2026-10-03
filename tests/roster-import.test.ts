@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, existsSync } from "node:fs";
 import { freshWorkspace, type Workspace } from "../lib/store";
+import { applyDemoBulk } from "../lib/bulk-actions";
 import { serializeCsv } from "../lib/csv";
 import { organizationTeam } from "../lib/organization-team";
 import {
@@ -269,6 +270,73 @@ test("parent changes show affected members and reporting/learning consequences o
   );
   assert.equal(d.teams!.find((t) => t.id === "leaf")!.parentId, "us");
   assert.ok(root.system);
+});
+test("CSV recovery restores demo users with a notice, stable ID/history and only explicitly assigned manager access", () => {
+  const before = base();
+  const user = before.users[1];
+  user.role = "admin";
+  user.groups = ["g"];
+  user.addedAt = "2026-01-01T00:00:00.000Z";
+  const { data: deleted } = applyDemoBulk(before, before.users[0], {
+    entity: "user",
+    operation: "delete",
+    items: [{ id: user.id, expected: 0 }],
+  });
+  const input = csv([
+    [
+      "",
+      " ALEX@example.test ",
+      "",
+      "EMEA",
+      "Organization",
+      "alex@example.test",
+    ],
+  ]);
+  const prepared = prepareRosterCsv(input, deleted);
+  assert.equal(prepared.review.valid, true);
+  assert.equal(
+    prepared.review.people.find((p) => p.id === user.id)?.status,
+    "changed",
+  );
+  assert.ok(
+    prepared.review.issues.some(
+      (i) => i.code === "restore-user" && i.severity === "notice",
+    ),
+  );
+  const saved = materializeRoster(prepared.proposal!, prepared.review, () => {
+    throw Error("existing identity must not be allocated");
+  });
+  const restored = saved.users.find((p) => p.id === user.id)!;
+  assert.equal(restored.active, true);
+  assert.equal(restored.role, "manager");
+  assert.equal(restored.hireDate, user.hireDate);
+  assert.equal(restored.addedAt, user.addedAt);
+  assert.deepEqual(restored.groups, []);
+  assert.equal(restored.teamId, "eu");
+  assert.deepEqual(saved.deletedItems, []);
+  assert.deepEqual(saved.progress, before.progress);
+  assert.equal(
+    deleted.deletedItems!.length,
+    1,
+    "review preserves the original workspace",
+  );
+  const plain = prepareRosterCsv(
+    csv([["", user.email, "", "", "", ""]]),
+    deleted,
+  );
+  assert.equal(
+    plain.proposal!.users.find((p) => p.id === user.id)!.role,
+    "learner",
+  );
+  assert.equal(
+    plain.proposal!.users.find((p) => p.id === user.id)!.teamId,
+    undefined,
+  );
+  for (const state of [{ purging: true }, { purgeAfter: "2000-01-01" }]) {
+    const blocked = structuredClone(deleted);
+    Object.assign(blocked.deletedItems![0], state);
+    assert.equal(prepareRosterCsv(input, blocked).review.valid, false);
+  }
 });
 test("blocking row conflicts, references, duplicates, inactive/deleted people and cycles are complete and never calculate partial impacts", () => {
   const d = base();

@@ -75,12 +75,21 @@ async function database() {
       value(pg, "select to_jsonb(c) value from fb_config c where id"),
     readAdminPeopleSnapshot: (actor: string) =>
       value(pg, "select fb_admin_people_snapshot($1) value", [actor]),
-    listDeletedProfileEmails: async () =>
+    listDeletedRosterProfiles: async () =>
       (
-        await pg.query<{ email: string }>(
-          "select email from fb_deleted_items where entity='user' and email is not null",
+        await pg.query<{
+          id: string;
+          email: string | null;
+          purge_after: string;
+          purging: boolean;
+          auth_locked: boolean;
+        }>(
+          "select id,email,purge_after,purging,auth_locked from fb_deleted_items where entity='user'",
         )
-      ).rows.map((row) => row.email),
+      ).rows.map((row) => ({
+        ...row,
+        purge_after: new Date(row.purge_after).toISOString(),
+      })),
     listProfiles: async () =>
       (
         await pg.query<Record<string, unknown>>(
@@ -88,6 +97,14 @@ async function database() {
         )
       ).rows.map((row) => ({
         ...row,
+        hire_date:
+          row.hire_date instanceof Date
+            ? row.hire_date.toISOString().slice(0, 10)
+            : row.hire_date,
+        onboarding_start:
+          row.onboarding_start instanceof Date
+            ? row.onboarding_start.toISOString().slice(0, 10)
+            : row.onboarding_start,
         added_at:
           row.added_at instanceof Date
             ? row.added_at.toISOString()
@@ -139,6 +156,25 @@ async function database() {
     ),
     beforeFunctions,
     "date capture preserves every existing function and permission",
+  );
+  await migrate(pg, "20261003212205_roster_team_deletion.sql");
+  const beforeRecovery = await unchangedData(pg);
+  const preservedFunctions = await value(
+    pg,
+    "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname not in ('fb_roster_import','fb_roster_import_fingerprint')",
+  );
+  await migrate(pg, "20261003222648_roster_import_reactivation.sql");
+  assert.deepEqual(
+    await unchangedData(pg),
+    beforeRecovery,
+    "recovery upgrade rewrites no application data",
+  );
+  assert.deepEqual(
+    await value(
+      pg,
+      "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname not in ('fb_roster_import','fb_roster_import_fingerprint')",
+    ),
+    preservedFunctions,
   );
   return { pg, store };
 }
@@ -629,6 +665,262 @@ test("a lost response after database commit is recoverable without another write
     const result = await applyRosterImport(admin, input, review.token!, store);
     assert.equal(result.peopleAdded, 1);
     assert.deepEqual(await unchangedData(pg), committed);
+  } finally {
+    await pg.close();
+  }
+});
+
+test("CSV recovery atomically restores a signed-in deleted user, retains history and replays without another unlock", async () => {
+  const { pg, store } = await database();
+  try {
+    await pg.exec(
+      `update fb_profiles set role='contributor',hire_date='2026-01-01' where id='${id(2)}'; insert into fb_documents(id,draft,published) values('${id(10)}','{}','{}'); insert into fb_progress(user_id,content_id,version,lessons,passed) values('${id(2)}','${id(10)}',1,'["lesson"]',true); insert into fb_mcp_grants(user_id,client_id,client_name) values('${id(2)}','client','Client');`,
+    );
+    const original = await value(
+      pg,
+      "select to_jsonb(p) value from fb_profiles p where id=$1",
+      [id(2)],
+    );
+    await pg.query("select fb_delete_users($1,$2,$3,'owner@example.test')", [
+      admin.id,
+      (await store.readConfiguration()).governance_revision,
+      JSON.stringify([id(2)]),
+    ]);
+    await pg.query("update fb_deleted_items set auth_locked=true where id=$1", [
+      id(2),
+    ]);
+    const preserved = await value(
+      pg,
+      "select jsonb_build_object('auth',(select jsonb_agg(to_jsonb(a)) from auth.users a),'progress',(select jsonb_agg(to_jsonb(p)) from fb_progress p),'grants',(select jsonb_agg(to_jsonb(g)) from fb_mcp_grants g)) value",
+    );
+    const input = csv([
+      [
+        "Returned",
+        " LEARNER@example.test ",
+        "",
+        "Sales",
+        "Organization",
+        "learner@example.test",
+      ],
+    ]);
+    const review = await reviewRosterImport(admin, input, store);
+    assert.equal(review.valid, true);
+    assert.equal(review.people[0].status, "changed");
+    assert.ok(
+      review.issues.some(
+        (i) => i.code === "restore-user" && i.severity === "notice",
+      ),
+    );
+    const calls: string[] = [];
+    const unlock = async (uid: string) => {
+      calls.push(uid);
+      assert.equal(
+        await value(pg, "select active value from fb_profiles where id=$1", [
+          uid,
+        ]),
+        false,
+        "deleted profile denies access during Auth unlock",
+      );
+      assert.ok(
+        await value(
+          pg,
+          "select deleted_at value from fb_profiles where id=$1",
+          [uid],
+        ),
+      );
+    };
+    const result = await applyRosterImport(
+      admin,
+      input,
+      review.token!,
+      store,
+      unlock,
+    );
+    assert.equal(result.peopleAdded, 0);
+    assert.equal(result.peopleUpdated, 1);
+    const restored = await value(
+      pg,
+      "select to_jsonb(p) value from fb_profiles p where id=$1",
+      [id(2)],
+    );
+    assert.equal(restored.active, true);
+    assert.equal(restored.deleted_at, null);
+    assert.equal(restored.auth_user_id, original.auth_user_id);
+    assert.equal(restored.added_at, original.added_at);
+    assert.equal(restored.hire_date, original.hire_date);
+    assert.equal(
+      restored.role,
+      "manager",
+      "CSV can explicitly assign manager, never recover the old contributor role",
+    );
+    assert.deepEqual(restored.groups, []);
+    assert.equal(
+      await value(
+        pg,
+        "select count(*)::integer value from fb_deleted_items where id=$1",
+        [id(2)],
+      ),
+      0,
+    );
+    assert.deepEqual(
+      await value(
+        pg,
+        "select jsonb_build_object('auth',(select jsonb_agg(to_jsonb(a)) from auth.users a),'progress',(select jsonb_agg(to_jsonb(p)) from fb_progress p),'grants',(select jsonb_agg(to_jsonb(g)) from fb_mcp_grants g)) value",
+      ),
+      preserved,
+    );
+    assert.deepEqual(
+      await applyRosterImport(admin, input, review.token!, store, unlock),
+      result,
+    );
+    assert.deepEqual(calls, [id(2)]);
+  } finally {
+    await pg.close();
+  }
+});
+test("CSV recovery handles pending users and unlock failures with no partial import or duplicate identity", async () => {
+  const { pg, store } = await database();
+  try {
+    const input = csv([
+      ["Pending", "pending@example.test", "2026-01-01", "", "", ""],
+    ]);
+    let review = await reviewRosterImport(admin, input, store);
+    await applyRosterImport(admin, input, review.token!, store);
+    const pending = (await store.listProfiles()).find(
+      (p) => p.email === "pending@example.test",
+    )!;
+    assert.ok(pending.added_at);
+    await pg.query("select fb_delete_users($1,$2,$3,'owner@example.test')", [
+      admin.id,
+      (await store.readConfiguration()).governance_revision,
+      JSON.stringify([pending.id, id(2)]),
+    ]);
+    await pg.exec("update fb_deleted_items set auth_locked=true");
+    const mixed = csv([
+      ["Pending", pending.email, "", "", "", ""],
+      ["Learner", "learner@example.test", "", "", "", ""],
+    ]);
+    review = await reviewRosterImport(admin, mixed, store);
+    const before = await unchangedData(pg);
+    await assert.rejects(
+      applyRosterImport(admin, mixed, review.token!, store, async () => {
+        throw Error("provider unavailable");
+      }),
+      /No import was saved/,
+    );
+    assert.deepEqual(await unchangedData(pg), before);
+    const calls: string[] = [];
+    await applyRosterImport(admin, mixed, review.token!, store, async (id) => {
+      calls.push(id);
+    });
+    assert.deepEqual(
+      calls,
+      [id(2)],
+      "pending users have no provider login to unlock",
+    );
+    const restored = (await store.listProfiles()).find(
+      (p) => p.email === pending.email,
+    )!;
+    assert.equal(restored.id, pending.id);
+    assert.equal(restored.added_at, pending.added_at);
+    assert.equal(restored.active, true);
+    assert.equal(restored.role, "learner");
+    assert.equal(restored.auth_user_id, null);
+  } finally {
+    await pg.close();
+  }
+});
+test("CSV recovery rejects purge/deactivation races, privileged restoration and orphaned email tombstones", async () => {
+  const { pg, store } = await database();
+  try {
+    await pg.query("select fb_delete_users($1,$2,$3,'owner@example.test')", [
+      admin.id,
+      (await store.readConfiguration()).governance_revision,
+      JSON.stringify([id(2)]),
+    ]);
+    await pg.exec("update fb_deleted_items set auth_locked=true");
+    const input = csv([["Learner", "learner@example.test", "", "", "", ""]]);
+    const hash = createHash("sha256").update(input).digest("hex");
+    const review = await reviewRosterImport(admin, input, store);
+    const cfg = await store.readConfiguration();
+    const payload = {
+      users: [
+        { ...admin },
+        {
+          id: id(2),
+          name: "Learner",
+          email: "learner@example.test",
+          active: true,
+          role: "admin",
+          groups: [],
+        },
+      ],
+      teams: cfg.teams,
+    };
+    const before = await unchangedData(pg);
+    await assert.rejects(
+      store.rosterImportOperation(
+        admin.id,
+        hash,
+        review.token!,
+        payload as any,
+      ),
+      /explicitly assigned manager/,
+    );
+    assert.deepEqual(await unchangedData(pg), before);
+    for (const state of [
+      "purging=true",
+      "auth_locked=false",
+      "deleted_at=now()-interval '31 days',purge_after=now()-interval '1 second'",
+    ]) {
+      const goodReview = await reviewRosterImport(admin, input, store);
+      await pg.exec("update fb_deleted_items set " + state);
+      const denied = await reviewRosterImport(admin, input, store);
+      assert.equal(denied.valid, false);
+      assert.ok(
+        denied.issues.some(
+          (i) => i.code === "deleted-person" && i.severity === "error",
+        ),
+      );
+      const unchanged = await unchangedData(pg);
+      await assert.rejects(
+        applyRosterImport(admin, input, goodReview.token!, store, async () => {
+          throw Error("should never unlock stale restoration");
+        }),
+        /changed/,
+      );
+      assert.deepEqual(await unchangedData(pg), unchanged);
+      await pg.exec(
+        "update fb_deleted_items set purging=false,auth_locked=true,purge_after=now()+interval '30 days'",
+      );
+    }
+    for (const role of ["anon", "authenticated"]) {
+      assert.equal(
+        await value(
+          pg,
+          "select has_function_privilege($1,'public.fb_roster_import(uuid,text,uuid,jsonb)','execute') value",
+          [role],
+        ),
+        false,
+      );
+    }
+    await pg.exec(
+      "insert into fb_deleted_items(entity,id,name,email,revision,deleted_by,snapshot,auth_locked) values('user','" +
+        id(55) +
+        "','Orphan','orphan@example.test',1,'" +
+        admin.id +
+        "','{}',true)",
+    );
+    assert.equal(
+      (
+        await reviewRosterImport(
+          admin,
+          csv([["Orphan", "orphan@example.test", "", "", "", ""]]),
+          store,
+        )
+      ).valid,
+      false,
+    );
   } finally {
     await pg.close();
   }

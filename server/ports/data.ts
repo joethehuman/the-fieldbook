@@ -54,6 +54,7 @@ export type ProfileRecord = {
   active: boolean;
   groups: string[];
   added_at?: string | null;
+  auth_user_id?: string | null;
   team_id?: string | null;
   onboarding_start?: string | null;
   group_joined_at?: Record<string, string>;
@@ -219,7 +220,15 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
     last_run: string | null;
   } | null>;
   listProfiles(): Promise<ProfileRecord[]>;
-  listDeletedProfileEmails(): Promise<string[]>;
+  listDeletedRosterProfiles(): Promise<
+    {
+      id: string;
+      email: string | null;
+      purge_after: string;
+      purging: boolean;
+      auth_locked: boolean;
+    }[]
+  >;
   readProfileNames(
     ids: string[],
   ): Promise<Pick<ProfileRecord, "id" | "name">[]>;
