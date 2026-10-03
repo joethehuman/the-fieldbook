@@ -90,6 +90,7 @@ export function LearningAssignmentPicker({
   const discardDone = useRef<((accepted: boolean) => void) | null>(null);
   const previousStep = useRef<"select" | "review">("select");
   const heading = useRef<HTMLHeadingElement>(null);
+  const selectingLearning = target?.kind === "audiences" && step === "select";
   useEffect(() => {
     body.current?.scrollTo(0, 0);
     heading.current?.focus({ preventScroll: true });
@@ -409,7 +410,7 @@ export function LearningAssignmentPicker({
         }}
       >
         <DialogContent
-          size="workflow"
+          size={target?.kind === "audiences" ? "workflow-list" : "workflow"}
           onCloseAutoFocus={(event) => {
             if (target && returnFocus.current?.isConnected) {
               event.preventDefault();
@@ -468,10 +469,14 @@ export function LearningAssignmentPicker({
           )}
           <DialogBody
             ref={body}
-            className="overflow-y-auto [scrollbar-gutter:stable]"
+            className={
+              selectingLearning
+                ? "flex flex-col gap-4 overflow-y-auto"
+                : "overflow-y-auto [scrollbar-gutter:stable]"
+            }
           >
             {error && (
-              <div className="mb-4 grid gap-3">
+              <div className="mb-4 grid shrink-0 gap-3">
                 <Alert variant="destructive">{error}</Alert>
                 {stale && (
                   <Button
@@ -485,8 +490,15 @@ export function LearningAssignmentPicker({
                 )}
               </div>
             )}
-            <div hidden={step !== "select"} className="grid gap-4">
-              <p className="text-sm text-muted-foreground">
+            <div
+              hidden={step !== "select"}
+              className={
+                selectingLearning
+                  ? "flex min-h-0 flex-1 flex-col gap-4"
+                  : "grid gap-4"
+              }
+            >
+              <p className="shrink-0 text-sm text-muted-foreground">
                 {target
                   ? target.mode === "remove"
                     ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."

@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep course assignment search, filters, pagination and actions stationary while only the course list scrolls. Give the chooser more vertical room and show conditional edge fades with the shared scrollbar styling.
+
 - Reuse the Course audience modal for course and curriculum bulk assignments and Learning Groups course addition/removal. Keep Select, Review, Save and discard in one frame, preserve search on Back, and retain other assignment sources and saved deadlines.
 
 - Explain course audiences through explicitly named curricula and linked groups. Teams covered by a selected group appear included; current-person overlap stays selectable. Park new redundant team choices, preserve saved independent assignments, and distinguish existing recipients from newly included people. Demo sample data is unchanged.

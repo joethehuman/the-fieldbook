@@ -3,6 +3,9 @@ import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
+// Headless Chromium hides scrollbars by default; this picker must show overflow.
+test.use({ launchOptions: { ignoreDefaultArgs: ["--hide-scrollbars"] } });
+
 async function section(page: Page, name: string) {
   const picker = page.getByRole("combobox", {
     name: "Administration section",
@@ -13,7 +16,7 @@ async function section(page: Page, name: string) {
     await page.getByRole("option", { name, exact: true }).click();
   } else await page.getByRole("tab", { name, exact: true }).click();
 }
-async function setup(page: Page, installed: boolean) {
+async function setup(page: Page, installed: boolean, manyCourses = false) {
   let data = withPublishedSnapshots(freshWorkspace());
   const sample = data.content.find((c) => c.kind === "course")!;
   data.content = ["Foundation", "Discovery"].map((title, i) => ({
@@ -26,6 +29,16 @@ async function setup(page: Page, installed: boolean) {
     publishedRevision: 1,
     status: "published",
   }));
+  if (manyCourses)
+    data.content.push(
+      ...Array.from({ length: 12 }, (_, i) => ({
+        ...structuredClone(data.content[0]),
+        id: `00000000-0000-4000-8000-0000000002${String(i).padStart(2, "0")}`,
+        title: `Practice course ${String(i + 1).padStart(2, "0")}`,
+        description:
+          "A practical course about clear decisions, consistent follow-through, and working together through change.",
+      })),
+    );
   data.publishedContent = structuredClone(data.content);
   data.groups = [
     {
@@ -202,6 +215,120 @@ test("course bulk Add/Remove uses the stable workflow and preserves other assign
   if (installed) {
     expect(state.writes()).toBe(2);
     expect(state.prepares()).toBeGreaterThanOrEqual(2);
+  }
+});
+
+test("group course list scrolls without moving search, filters, pagination or modal actions", async ({
+  page,
+}, info) => {
+  const installed = info.project.name.startsWith("production");
+  await setup(page, installed, true);
+  await section(page, "Learning groups");
+  await page
+    .getByRole("button", { name: "Account executives", exact: true })
+    .click();
+  await page
+    .getByRole("tab", { name: "Assigned Courses", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Assign Courses", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog", {
+    name: "Assign Courses",
+    exact: true,
+  });
+  const results = dialog.locator('[data-slot="selection-results"]');
+  const search = dialog.getByRole("searchbox", {
+    name: "Find courses or curricula",
+    exact: true,
+  });
+  const geometry = () =>
+    dialog.evaluate((element) => {
+      const top = (selector: string) =>
+        element.querySelector(selector)?.getBoundingClientRect().top;
+      const body = element.querySelector<HTMLElement>(
+        '[data-slot="dialog-body"]',
+      )!;
+      const list = element.querySelector<HTMLElement>(
+        '[data-slot="selection-results"]',
+      )!;
+      return {
+        search: top('input[type="search"]'),
+        filters: top('[data-slot="collection-controls"]'),
+        pagination: top('nav[aria-label="Search results pages"]'),
+        footer: top('[data-slot="dialog-footer"]'),
+        bodyScroll: body.scrollTop,
+        bodyHeight: body.clientHeight,
+        bodyContent: body.scrollHeight,
+        resultsHeight: list.clientHeight,
+        resultsContent: list.scrollHeight,
+      };
+    });
+  await expect(results).toHaveAttribute("data-scroll-fade-after", "true");
+  await expect(results).toHaveAttribute("data-scroll-fade-before", "false");
+  const before = await geometry();
+  expect(before.bodyContent).toBeLessThanOrEqual(before.bodyHeight + 1);
+  expect(before.resultsContent).toBeGreaterThan(before.resultsHeight);
+  expect(
+    await results.evaluate(
+      (element) => element.offsetWidth - element.clientWidth,
+    ),
+  ).toBeGreaterThan(0);
+  if (!info.project.name.endsWith("phone"))
+    expect(
+      await results.evaluate((element) => {
+        const third = element.querySelectorAll('[data-slot="field"]')[2];
+        return (
+          third.getBoundingClientRect().bottom <=
+          element.getBoundingClientRect().bottom - 16
+        );
+      }),
+    ).toBe(true);
+  await page.screenshot({ path: info.outputPath("group-course-list-top.png") });
+  await results.hover();
+  await page.mouse.wheel(0, 150);
+  await expect(results).toHaveAttribute("data-scroll-fade-before", "true");
+  const after = await geometry();
+  expect(after.search).toBe(before.search);
+  expect(after.filters).toBe(before.filters);
+  expect(after.pagination).toBe(before.pagination);
+  expect(after.footer).toBe(before.footer);
+  expect(after.bodyScroll).toBe(0);
+  await page.screenshot({
+    path: info.outputPath("group-course-list-middle.png"),
+  });
+  await results.getByRole("checkbox").last().focus();
+  await expect(results).toHaveAttribute("data-scroll-fade-after", "false");
+  expect((await geometry()).bodyScroll).toBe(0);
+  await search.fill("Foundation course");
+  await expect(
+    results.getByRole("checkbox", { name: /^Foundation course\b/ }),
+  ).toHaveCount(1);
+  await expect(results).toHaveAttribute("data-scroll-fade-after", "false");
+  await expect(results).toHaveAttribute("data-scroll-fade-before", "false");
+  const single = await geometry();
+  await search.fill("no-matching-course");
+  await expect(results).toContainText(
+    "No content matches your search or filters.",
+  );
+  expect((await geometry()).resultsHeight).toBe(single.resultsHeight);
+  expect((await geometry()).footer).toBe(before.footer);
+  await page.screenshot({
+    path: info.outputPath("group-course-list-empty.png"),
+  });
+  if (info.project.name.endsWith("phone")) {
+    await page.setViewportSize({ width: 375, height: 500 });
+    await search.fill("");
+    await expect(results.getByRole("checkbox")).toHaveCount(10);
+    expect((await geometry()).resultsHeight).toBeGreaterThanOrEqual(128);
+    await results.getByRole("checkbox").last().focus();
+    await expect(results.getByRole("checkbox").last()).toBeInViewport();
+    await expect(
+      dialog.getByRole("button", { name: "Review changes", exact: true }),
+    ).toBeInViewport();
+    await page.screenshot({
+      path: info.outputPath("group-course-list-short-screen.png"),
+    });
   }
 });
 

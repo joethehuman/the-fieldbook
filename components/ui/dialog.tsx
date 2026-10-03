@@ -36,7 +36,7 @@ export function DialogContent({
   onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  size?: "default" | "media" | "selection" | "workflow";
+  size?: "default" | "media" | "selection" | "workflow" | "workflow-list";
 }) {
   const returnFocus = React.useRef<HTMLElement | null>(null);
   return (
@@ -53,8 +53,10 @@ export function DialogContent({
             "h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
           size === "selection" &&
             "flex h-[min(48rem,calc(100dvh-3rem))] max-w-3xl flex-col overflow-hidden",
-          size === "workflow" &&
+          (size === "workflow" || size === "workflow-list") &&
             "flex h-[calc(100dvh-2rem)] sm:h-[min(var(--dialog-workflow-height),calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] max-w-[var(--dialog-workflow-width)] flex-col overflow-hidden",
+          size === "workflow-list" &&
+            "[--dialog-workflow-height:var(--dialog-workflow-list-height)]",
           className,
         )}
         {...props}
