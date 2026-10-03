@@ -2,6 +2,7 @@ import type { Workspace } from "./store";
 import {
   ancestorIds,
   effectiveGroups,
+  groupTeamLinks,
   reportingTeamId,
   type AssignmentAudience,
   type Content,
@@ -73,7 +74,7 @@ export function audiencePeople(data: Workspace) {
   }
   return people;
 }
-/** Structural team coverage survives membership changes. Group coverage describes current people only. */
+/** Team coverage follows explicit branches; individual membership overlap never covers a team. */
 export function audienceCoverage(
   data: Workspace,
   candidate: AudienceOption,
@@ -89,11 +90,33 @@ export function audienceCoverage(
   const organization = other.find((a) => a.organization);
   if (organization) return [organization];
   if (candidate.kind === "team")
-    return other.filter(
-      (a) =>
-        a.kind === "team" &&
-        ancestorIds(candidate.id, data.teams || []).has(a.id),
-    );
+    return other.filter((a) => {
+      const ancestors = ancestorIds(candidate.id, data.teams || []);
+      if (a.kind === "team") return ancestors.has(a.id);
+      const group = data.groups.find((g) => g.id === a.id);
+      // Legacy direct-only links do not include a team's current/future subteams.
+      return (
+        !!group &&
+        groupTeamLinks(group).some(
+          (link) => link.scope === "subtree" && ancestors.has(link.teamId),
+        )
+      );
+    });
+  return audienceMemberCoverage(data, candidate, keys, people);
+}
+/** Current people can overlap without sharing a durable audience relationship. */
+export function audienceMemberCoverage(
+  data: Workspace,
+  candidate: AudienceOption,
+  keys: string[],
+  people = audiencePeople(data),
+) {
+  if (candidate.publicGuests) return [];
+  const other = audienceOptions(data).filter(
+    (a) =>
+      contentAudienceKey(a) !== contentAudienceKey(candidate) &&
+      keys.includes(contentAudienceKey(a)),
+  );
   const members =
     people.get(contentAudienceKey(candidate)) || new Set<string>();
   if (

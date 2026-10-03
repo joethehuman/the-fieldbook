@@ -5,6 +5,7 @@ import type { Workspace } from "@/lib/store";
 import {
   audienceOptions,
   audienceCoverage,
+  audienceMemberCoverage,
   audiencePeople,
   audienceSummary,
   contentAudienceKey,
@@ -30,6 +31,7 @@ export function AudienceSelection({
   inherited = {},
   showPeople = true,
   initialSelected = [],
+  recommendationsOnly = false,
 }: {
   data: Workspace;
   selected: string[];
@@ -38,9 +40,12 @@ export function AudienceSelection({
   inherited?: Record<string, string[]>;
   showPeople?: boolean;
   initialSelected?: string[];
+  recommendationsOnly?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const parked = useRef<string[] | null>(null);
+  const coveredTeams = useRef(new Set<string>());
+  const independentTeams = useRef(new Set<string>());
   const all = audienceOptions(data).filter(
     (a) => showPeople || a.kind === "group",
   );
@@ -57,21 +62,53 @@ export function AudienceSelection({
   const members = (audienceKeys: string[]) =>
     new Set(audienceKeys.flatMap((k) => [...(people.get(k) || [])]));
   const directPeople = members(selected),
-    inheritedPeople = members(Object.keys(inherited));
-  const extraPeople = [...inheritedPeople].filter(
-    (id) => !directPeople.has(id),
+    existingPeople = members([...initialSelected, ...Object.keys(inherited)]),
+    totalPeople = members(keys);
+  const newPeople = [...totalPeople].filter(
+    (id) => !existingPeople.has(id),
   ).length;
   const curricula = [...new Set(Object.values(inherited).flat())];
   const specific = all.filter((a) => !a.organization && !a.publicGuests);
   const candidates = specific.filter((a) =>
     `${a.name} ${a.kind}`.toLowerCase().includes(query.trim().toLowerCase()),
   );
-  const toggle = (key: string, checked: boolean) => {
+  const changeSelection = (next: string[]) => {
+    const proposed = [...new Set([...next, ...coveredTeams.current])];
+    const coverageKeys = [...proposed, ...Object.keys(inherited)];
+    const result = new Set(next);
+    for (const a of all) {
+      const key = contentAudienceKey(a);
+      if (
+        a.kind !== "team" ||
+        a.organization ||
+        !proposed.includes(key) ||
+        initialSelected.includes(key) ||
+        independentTeams.current.has(key)
+      )
+        continue;
+      if (
+        inherited[key]?.length ||
+        audienceCoverage(data, a, coverageKeys, people).length
+      ) {
+        coveredTeams.current.add(key);
+        result.delete(key);
+      } else {
+        coveredTeams.current.delete(key);
+        result.add(key);
+      }
+    }
+    onChange([...result]);
+  };
+  const toggle = (key: string, checked: boolean, independent = false) => {
+    if (!checked) {
+      coveredTeams.current.delete(key);
+      independentTeams.current.delete(key);
+    } else if (independent) independentTeams.current.add(key);
     if (parked.current)
       parked.current = checked
         ? [...new Set([...parked.current, key])]
         : parked.current.filter((k) => k !== key);
-    onChange(
+    changeSelection(
       checked
         ? [...new Set([...selected, key])]
         : selected.filter((k) => k !== key),
@@ -104,7 +141,7 @@ export function AudienceSelection({
               disabled={disabled}
               onChange={() => {
                 parked.current = selected.filter((k) => k !== orgKey);
-                onChange([
+                changeSelection([
                   ...selected.filter(
                     (k) => initialSelected.includes(k) || k === guestKey,
                   ),
@@ -131,7 +168,7 @@ export function AudienceSelection({
               checked={!org}
               disabled={disabled}
               onChange={() =>
-                onChange(
+                changeSelection(
                   [
                     ...new Set([
                       ...(parked.current || selected),
@@ -197,18 +234,22 @@ export function AudienceSelection({
             <h3 className="text-sm font-medium">Teams and groups</h3>
             {showPeople && (
               <p className="text-xs text-muted-foreground" aria-live="polite">
-                {directPeople.size}{" "}
-                {directPeople.size === 1 ? "person" : "people"} selected
+                {totalPeople.size}{" "}
+                {totalPeople.size === 1 ? "person" : "people"}{" "}
+                {newPeople === 0 && existingPeople.size > 0
+                  ? recommendationsOnly
+                    ? "already included"
+                    : "already assigned"
+                  : "in audience"}
               </p>
             )}
           </div>
-          {extraPeople > 0 && (
-            <p className="text-xs text-muted-foreground">
-              {extraPeople} other{" "}
-              {extraPeople === 1 ? "person stays" : "people stay"} assigned
-              through a curriculum.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            {existingPeople.size}{" "}
+            {existingPeople.size === 1 ? "person" : "people"}{" "}
+            {recommendationsOnly ? "already included" : "already assigned"} ·{" "}
+            {newPeople} newly included
+          </p>
           <SearchField>
             <Input
               type="search"
@@ -228,6 +269,17 @@ export function AudienceSelection({
                   ? audienceCoverage(data, candidate, keys, people)
                   : [];
               const through = inherited[key] || [];
+              const coverageCurricula = [
+                ...new Set(
+                  coverage.flatMap(
+                    (a) => inherited[contentAudienceKey(a)] || [],
+                  ),
+                ),
+              ];
+              const overlap =
+                showPeople && !coverage.length
+                  ? audienceMemberCoverage(data, candidate, keys, people)
+                  : [];
               const included =
                 !direct &&
                 (through.length > 0 ||
@@ -236,7 +288,7 @@ export function AudienceSelection({
                 <Field
                   key={key}
                   orientation="horizontal"
-                  className="border-b border-border py-3 font-normal"
+                  className={`border-b border-border py-3 font-normal${included ? " text-muted-foreground" : ""}`}
                 >
                   {included ? (
                     <span aria-label={`${label} included`}>
@@ -257,20 +309,42 @@ export function AudienceSelection({
                       {candidate.name}{" "}
                       <span className="text-xs text-muted-foreground">
                         {candidate.kind === "team" ? "Team" : "Group"}
+                        {included && " · Included"}
                       </span>
                     </span>
-                    {included && (
+                    {through.length > 0 && (
                       <FieldDescription>
-                        Included through{" "}
-                        {through.length
-                          ? through.join(", ")
-                          : coverage.map((a) => a.name).join(", ")}
+                        Assigned through{" "}
+                        {through.length === 1 ? "curriculum" : "curricula"}:{" "}
+                        {through.join(", ")}
                       </FieldDescription>
                     )}
+                    {coverage.length > 0 && candidate.kind === "team" && (
+                      <FieldDescription>
+                        {coverage
+                          .map((a) =>
+                            a.kind === "group"
+                              ? `Included in group: ${a.name}`
+                              : `Included through team: ${a.name}`,
+                          )
+                          .join(" · ")}
+                      </FieldDescription>
+                    )}
+                    {coverageCurricula.length > 0 &&
+                      candidate.kind === "team" && (
+                        <FieldDescription>
+                          Course assigned through{" "}
+                          {coverageCurricula.length === 1
+                            ? "curriculum"
+                            : "curricula"}
+                          : {coverageCurricula.join(", ")}
+                        </FieldDescription>
+                      )}
                     {!included &&
                       !direct &&
-                      candidate.kind === "group" &&
-                      coverage.length > 0 && (
+                      (candidate.kind === "group"
+                        ? coverage.length > 0
+                        : overlap.length > 0) && (
                         <FieldDescription>
                           Current members already included · select to include
                           future members.
@@ -278,8 +352,10 @@ export function AudienceSelection({
                       )}
                     {direct && (through.length > 0 || coverage.length > 0) && (
                       <FieldDescription>
-                        Saved separately · removing this choice keeps other
-                        assignments.
+                        {initialSelected.includes(key)
+                          ? "Saved separately"
+                          : "Selected independently"}{" "}
+                        · removing this choice keeps other assignments.
                       </FieldDescription>
                     )}
                   </span>
@@ -315,7 +391,9 @@ export function AudienceSelection({
             >
               {selected.length
                 ? `Selected: ${selected.map((k) => all.find((a) => contentAudienceKey(a) === k)?.name || "Unavailable audience").join(", ")}`
-                : "No teams or groups selected"}
+                : existingPeople.size > 0
+                  ? "No additional audiences selected"
+                  : "No teams or groups selected"}
             </span>
             <Button
               type="button"
@@ -364,7 +442,9 @@ export function AudienceSelection({
       {curricula.length > 0 && (
         <section className="grid gap-2 border-t border-border pt-4">
           <h3 className="text-sm font-medium">
-            Also assigned through {curricula.join(", ")}
+            Assigned through{" "}
+            {curricula.length === 1 ? "curriculum" : "curricula"}:{" "}
+            {curricula.join(", ")}
           </h3>
           <p className="text-xs text-muted-foreground">
             These assignments stay in place. To change them, edit the curriculum
@@ -381,7 +461,7 @@ export function AudienceSelection({
           </CollapsibleTrigger>
           <CollapsibleContent className="grid gap-3 pt-3">
             <p className="text-xs text-muted-foreground">
-              An independent audience continues if its covering team or
+              An independent audience continues if its covering group, team or
               curriculum is removed later.
             </p>
             {independent.map((a) => (
@@ -390,7 +470,7 @@ export function AudienceSelection({
                   disabled={disabled}
                   checked={selected.includes(contentAudienceKey(a))}
                   onCheckedChange={(checked) =>
-                    toggle(contentAudienceKey(a), checked === true)
+                    toggle(contentAudienceKey(a), checked === true, true)
                   }
                   aria-label={`Keep ${a.name} independently`}
                 />

@@ -33,15 +33,13 @@ function fixture() {
     { id: "ae", name: "Account executives", parentId: "sales" },
     { id: "other", name: "Support", parentId: "org" },
   ];
-  data.users = data.users
-    .slice(0, 3)
-    .map((u, i) => ({
-      ...u,
-      id: `person-${i}`,
-      active: true,
-      groups: i === 0 ? ["sales-group"] : [],
-      teamId: i === 0 ? "ae" : i === 1 ? "other" : undefined,
-    }));
+  data.users = data.users.slice(0, 3).map((u, i) => ({
+    ...u,
+    id: `person-${i}`,
+    active: true,
+    groups: i === 0 ? ["sales-group"] : [],
+    teamId: i === 0 ? "ae" : i === 1 ? "other" : undefined,
+  }));
   return data;
 }
 test("Organization covers every registered audience, parent teams cover descendants, and configured guests remain separate", () => {
@@ -105,6 +103,40 @@ test("group overlap describes current membership and does not confuse empty or g
       ["team:sales"],
     ),
     [],
+  );
+});
+test("linked groups structurally cover teams and future subteams even with no current members", () => {
+  const data = fixture();
+  data.groups[0].teamIds = ["sales"];
+  data.users = [];
+  const team = audienceOptions(data).find(
+    (a) => a.kind === "team" && a.id === "ae",
+  )!;
+  assert.equal(
+    audienceCoverage(data, team, ["group:sales-group"])[0].id,
+    "sales-group",
+  );
+  data.teams!.push({ id: "future", name: "New branch", parentId: "ae" });
+  const future = audienceOptions(data).find((a) => a.id === "future")!;
+  assert.equal(
+    audienceCoverage(data, future, ["group:sales-group"])[0].id,
+    "sales-group",
+  );
+  assert.deepEqual(audienceCoverage(data, future, []), []);
+});
+test("manual person overlap and legacy direct-only group links do not cover a team branch", () => {
+  const data = fixture();
+  const team = audienceOptions(data).find(
+    (a) => a.kind === "team" && a.id === "ae",
+  )!;
+  assert.deepEqual(audienceCoverage(data, team, ["group:sales-group"]), []);
+  data.groups[0].teamIds = ["ae"];
+  data.groups[0].teamLinkScope = "direct";
+  assert.deepEqual(audienceCoverage(data, team, ["group:sales-group"]), []);
+  data.groups[0].teamLinkScope = "subtree";
+  assert.equal(
+    audienceCoverage(data, team, ["group:sales-group"])[0].id,
+    "sales-group",
   );
 });
 test("Update audience drafts preserve live targeting until publication, include Organization fallback and never include guests via teams", () => {

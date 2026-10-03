@@ -211,7 +211,7 @@ test("course Details edits the same links without replacing the editor or resett
     .click();
   const picker = assignmentDialog(page);
   const source = picker.getByRole("heading", {
-    name: "Also assigned through GTM foundation",
+    name: "Assigned through curriculum: GTM foundation",
     exact: true,
   });
   await source.scrollIntoViewIfNeeded();
@@ -261,7 +261,7 @@ test("course Details edits the same links without replacing the editor or resett
   ).toBeVisible();
   await expect(
     picker.getByRole("heading", {
-      name: "Also assigned through GTM foundation",
+      name: "Assigned through curriculum: GTM foundation",
       exact: true,
     }),
   ).toBeVisible();

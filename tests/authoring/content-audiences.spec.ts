@@ -9,6 +9,7 @@ async function setup(
   installed: boolean,
   kind: "course" | "brief",
   guestMode: "dedicated" | "shared" | "none" | "private" = "dedicated",
+  coverageMode?: "linked" | "overlap" | "legacy" | "curriculum",
 ) {
   const data = withPublishedSnapshots(freshWorkspace());
   const item = structuredClone(data.content.find((c) => c.kind === kind)!);
@@ -73,6 +74,38 @@ async function setup(
     teamId: i === 0 ? "sales" : undefined,
     active: true,
   }));
+  if (coverageMode) {
+    data.users[0].teamId = undefined;
+    data.users[0].groups = [];
+    data.users[1].teamId = "sales";
+    data.users[1].groups = ["sales-group"];
+    data.teams![1].name = "AE Startups";
+    data.teams![1].learningItems = [];
+    data.teams!.push({
+      id: "csm",
+      name: "CSM Startups",
+      parentId: "org",
+      learningItems: [],
+    });
+    data.groups[0].name = "Startups account teams";
+    data.groups[0].teamIds = coverageMode === "overlap" ? [] : ["sales", "csm"];
+    data.groups[0].teamLinkScope =
+      coverageMode === "legacy" ? "direct" : "subtree";
+    if (coverageMode === "curriculum") {
+      data.curricula = [
+        {
+          id: "startup-onboarding",
+          name: "Startup onboarding",
+          status: "published",
+          courseIds: [item.id],
+          description: "",
+        },
+      ];
+      data.groups[0].learningItems = [
+        { kind: "curriculum", id: "startup-onboarding" },
+      ];
+    }
+  }
   const read = async (live = false): Promise<any> =>
     installed
       ? (
@@ -103,7 +136,7 @@ async function setup(
         groups: data.groups,
         teams: data.teams,
         users: data.users.map((u) => ({ ...u, team_id: u.teamId })),
-        curricula: [],
+        curricula: data.curricula,
         documents: data.content.map((c) => ({
           id: c.id,
           draft: c,
@@ -135,6 +168,141 @@ async function setup(
   await expect(panel).toBeVisible();
   return { data, item, panel, read, details };
 }
+test("linked group includes teams, parks staged choices and allows deliberate independent sources", async ({
+  page,
+}, info) => {
+  const { panel } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "course",
+    "dedicated",
+    "linked",
+  );
+  const group = panel.getByRole("checkbox", {
+    name: "Assign directly to Group: Startups account teams",
+    exact: true,
+  });
+  const team = panel.getByRole("checkbox", {
+    name: "Assign directly to Team: AE Startups",
+    exact: true,
+  });
+  await team.check();
+  await group.check();
+  await expect(team).toHaveCount(0);
+  await expect(
+    panel.getByLabel("Team: AE Startups included", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByLabel("Team: CSM Startups included", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByText("Included in group: Startups account teams", {
+      exact: true,
+    }),
+  ).toHaveCount(2);
+  await group.uncheck();
+  await expect(team).toBeChecked();
+  await group.check();
+  await panel
+    .getByRole("button", { name: "Keep an audience independently" })
+    .click();
+  await panel
+    .getByRole("checkbox", {
+      name: "Keep AE Startups independently",
+      exact: true,
+    })
+    .check();
+  await expect(team).toBeChecked();
+  await expect(
+    panel.getByText(
+      "Selected independently · removing this choice keeps other assignments.",
+      { exact: true },
+    ),
+  ).toHaveCount(2);
+  await panel
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await panel.getByRole("button", { name: "← Back", exact: true }).click();
+  await expect(team).toBeChecked();
+  await page.screenshot({ path: info.outputPath("audience-linked-group.png") });
+});
+for (const mode of ["overlap", "legacy"] as const) {
+  test(`group ${mode} does not disable a team branch`, async ({
+    page,
+  }, info) => {
+    const { panel } = await setup(
+      page,
+      info.project.name.startsWith("production"),
+      "course",
+      "dedicated",
+      mode,
+    );
+    await panel
+      .getByRole("checkbox", {
+        name: "Assign directly to Group: Startups account teams",
+        exact: true,
+      })
+      .check();
+    const team = panel.getByRole("checkbox", {
+      name: "Assign directly to Team: AE Startups",
+      exact: true,
+    });
+    await expect(team).toBeEnabled();
+    await expect(
+      panel.getByLabel("Team: AE Startups included", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      panel.getByText(
+        "Current members already included · select to include future members.",
+        { exact: true },
+      ),
+    ).toBeVisible();
+    await team.check();
+    await expect(team).toBeChecked();
+  });
+}
+test("curriculum group inclusion starts with named paths and existing reach", async ({
+  page,
+}, info) => {
+  const { panel } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "course",
+    "dedicated",
+    "curriculum",
+  );
+  await expect(
+    panel.getByText("Assigned through curriculum: Startup onboarding", {
+      exact: true,
+    }),
+  ).toHaveCount(2);
+  await expect(
+    panel.getByLabel("Team: AE Startups included", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByLabel("Team: CSM Startups included", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByText("Course assigned through curriculum: Startup onboarding", {
+      exact: true,
+    }),
+  ).toHaveCount(2);
+  await expect(
+    panel.getByText("1 person already assigned", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByText("No additional audiences selected", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Team: AE Startups",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page.screenshot({
+    path: info.outputPath("audience-curriculum-group-path.png"),
+  });
+});
 test("shared workflow parks new choices, retains saved sources and contains review/cancel", async ({
   page,
 }, info) => {
@@ -390,7 +558,7 @@ for (const mode of ["none", "private", "shared"] as const)
       "Uses Account executives. Also includes 1 registered person.",
     );
     await guest.check();
-    await expect(panel).toContainText("1 person selected");
+    await expect(panel).toContainText("1 person in audience");
     await panel
       .getByRole("button", { name: "Apply to draft", exact: true })
       .click();

@@ -410,6 +410,7 @@ export function LearningAssignmentPicker({
                   : "Choose who gets this learning in For you and assigned learning."}
               </p>
               <AudienceSelection
+                recommendationsOnly={item.kind === "brief"}
                 data={data}
                 selected={selected}
                 initialSelected={initial.current}
