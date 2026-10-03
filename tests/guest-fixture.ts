@@ -1,4 +1,4 @@
-import { freshWorkspace } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import { defaultSettings } from "../lib/settings";
 import { reconcileLearning } from "../lib/learning-groups";
 export function guestFixture() {

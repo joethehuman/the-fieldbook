@@ -271,7 +271,7 @@ test("group course list scrolls without moving search, filters, pagination or mo
   expect(before.resultsContent).toBeGreaterThan(before.resultsHeight);
   expect(
     await results.evaluate(
-      (element) => element.offsetWidth - element.clientWidth,
+      (element) => (element as HTMLElement).offsetWidth - element.clientWidth,
     ),
   ).toBeGreaterThan(0);
   if (!info.project.name.endsWith("phone"))
