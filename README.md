@@ -53,6 +53,8 @@ Provider accounts, quotas, pricing, and backups are the operator's responsibilit
 
 **The default repository-root deployment is the installed application.** The optional `demo/` deployment uses synthetic browser-local data; never enter private information in it. Demo and production may be deployed as separate Vercel projects; you do not need to deploy the demo to run your own instance.
 
+Fresh and reset demo workspaces load a fixed fictional organization: 200 people, 50 teams including Organization, six learning groups, and four curricula. The four selectable profiles stay the same. Sales, Marketing, Customer Success, and Solutions Engineering have regional and functional sub-teams; dated sample learning records show varied progress. The records live in `demo/data/hooli.ts`, with no database or runtime roster generation. Existing browser workspaces keep their saved edits until Reset demo is used. Sample dates are fixed and need occasional maintenance as the calendar advances.
+
 ## Current capabilities and boundaries
 
 The production application includes:

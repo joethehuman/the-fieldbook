@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
-import { freshWorkspace } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import { assignedCourses, effectiveGroups, isComplete } from "../lib/types";
 import {
   groupItems,

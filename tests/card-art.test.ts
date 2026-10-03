@@ -15,7 +15,7 @@ import {
 } from "../lib/card-art";
 import { seedContent } from "../lib/seed";
 import { reconcileDemoPublication } from "../lib/demo-publication";
-import { freshWorkspace } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 
 test("art seeds and fallback titles stay tied to an item, with many distinct arrangements", () => {
   const title = "Very long launch announcement for everyone";

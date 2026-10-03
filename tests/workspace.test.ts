@@ -7,11 +7,12 @@ import {
   reportTeamIds,
   isComplete,
 } from "../lib/types";
-import { DEMO_PROFILE_IDS, freshWorkspace, updateProgress } from "../lib/store";
+import { DEMO_PROFILE_IDS, updateProgress } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import { learningTarget } from "../lib/learning";
 import { videoSource } from "../lib/video";
 
-test("demo presents four personas and a five-rep manager team with varied completion", () => {
+test("legacy demo snapshot retains four personas and a five-rep manager team with varied completion", () => {
   const d = freshWorkspace();
   assert.deepEqual(DEMO_PROFILE_IDS, [
     "demo-learner",
