@@ -2,7 +2,17 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
-export const Dialog = DialogPrimitive.Root;
+const DialogModalContext = React.createContext(true);
+export function Dialog({
+  modal = true,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Root>) {
+  return (
+    <DialogModalContext.Provider value={modal}>
+      <DialogPrimitive.Root modal={modal} {...props} />
+    </DialogModalContext.Provider>
+  );
+}
 export const DialogClose = DialogPrimitive.Close;
 export function DialogTitle({
   className,
@@ -26,9 +36,10 @@ export function DialogDescription({
     />
   );
 }
-export const dialogOverlayClass = "fixed inset-0 z-40 bg-overlay";
+export const dialogOverlayClass =
+  "[&:has(~_[data-slot=dialog-overlay][data-state=open])]:hidden fixed inset-0 z-40 bg-overlay";
 export const dialogContentClass =
-  "[&:has(~_[data-slot=dialog-content][data-state=open])]:hidden fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-xl outline-none";
+  "fixed top-1/2 left-1/2 z-40 grid max-h-[calc(100dvh-3rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-lg border border-border bg-background p-5 text-foreground shadow-xl outline-none";
 export function DialogContent({
   className,
   size = "default",
@@ -36,45 +47,58 @@ export function DialogContent({
   onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  size?: "default" | "media" | "selection" | "workflow" | "workflow-list";
+  size?:
+    "default" | "media" | "picker" | "selection" | "workflow" | "workflow-list";
 }) {
   const returnFocus = React.useRef<HTMLElement | null>(null);
+  const modal = React.useContext(DialogModalContext);
+  const content = (
+    <DialogPrimitive.Content
+      data-slot="dialog-content"
+      className={cn(
+        dialogContentClass,
+        size === "media" &&
+          "h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
+        size === "selection" &&
+          "flex h-[min(48rem,calc(100dvh-3rem))] max-w-3xl flex-col overflow-hidden",
+        size === "picker" &&
+          "flex flex-col overscroll-y-contain [&>:not([data-slot=dialog-body])]:shrink-0 [&>[data-slot=dialog-body]]:min-h-[var(--dialog-picker-body-min-height)]",
+        (size === "workflow" || size === "workflow-list") &&
+          "flex h-[calc(100dvh-2rem)] sm:h-[min(var(--dialog-workflow-height),calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] max-w-[var(--dialog-workflow-width)] flex-col overflow-hidden",
+        size === "workflow-list" &&
+          "[--dialog-workflow-height:var(--dialog-workflow-list-height)]",
+        className,
+      )}
+      {...props}
+      onOpenAutoFocus={(event) => {
+        returnFocus.current =
+          document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+        onOpenAutoFocus?.(event);
+      }}
+      onCloseAutoFocus={(event) => {
+        onCloseAutoFocus?.(event);
+        if (!event.defaultPrevented && returnFocus.current?.isConnected) {
+          event.preventDefault();
+          returnFocus.current.focus();
+        }
+      }}
+    />
+  );
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Overlay
-        data-slot="dialog-overlay"
-        className={dialogOverlayClass}
-      />
-      <DialogPrimitive.Content
-        data-slot="dialog-content"
-        className={cn(
-          dialogContentClass,
-          size === "media" &&
-            "h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
-          size === "selection" &&
-            "flex h-[min(48rem,calc(100dvh-3rem))] max-w-3xl flex-col overflow-hidden",
-          (size === "workflow" || size === "workflow-list") &&
-            "flex h-[calc(100dvh-2rem)] sm:h-[min(var(--dialog-workflow-height),calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] max-w-[var(--dialog-workflow-width)] flex-col overflow-hidden",
-          size === "workflow-list" &&
-            "[--dialog-workflow-height:var(--dialog-workflow-list-height)]",
-          className,
-        )}
-        {...props}
-        onOpenAutoFocus={(event) => {
-          returnFocus.current =
-            document.activeElement instanceof HTMLElement
-              ? document.activeElement
-              : null;
-          onOpenAutoFocus?.(event);
-        }}
-        onCloseAutoFocus={(event) => {
-          onCloseAutoFocus?.(event);
-          if (!event.defaultPrevented && returnFocus.current?.isConnected) {
-            event.preventDefault();
-            returnFocus.current.focus();
-          }
-        }}
-      />
+      {modal ? (
+        // Keep portaled popup events within Radix's scroll-lock React tree.
+        <DialogPrimitive.Overlay
+          data-slot="dialog-overlay"
+          className={dialogOverlayClass}
+        >
+          {content}
+        </DialogPrimitive.Overlay>
+      ) : (
+        content
+      )}
     </DialogPrimitive.Portal>
   );
 }
@@ -96,7 +120,7 @@ export function DialogFooter({
   );
 }
 
-/** Fixed selection dialogs reserve a flexible body between heading and actions. */
+/** Picker and workflow dialogs reserve a flexible body between heading and actions. */
 export function DialogBody({
   className,
   ...props

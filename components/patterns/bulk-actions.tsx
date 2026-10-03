@@ -17,6 +17,7 @@ import { Alert } from "../ui/alert";
 import {
   Dialog,
   DialogContent,
+  DialogBody,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -203,7 +204,7 @@ export function BulkActions({
         <Alert variant="destructive">
           <p>{resultNotice.message}</p>
           {resultNotice.details && (
-            <ul className="max-h-48 overflow-y-auto">
+            <ul className="max-h-48 overflow-y-auto overscroll-y-contain">
               {resultNotice.details.map((detail, i) => (
                 <li key={i}>{detail}</li>
               ))}
@@ -219,7 +220,13 @@ export function BulkActions({
         }}
       >
         {command && active && (
-          <DialogContent>
+          <DialogContent
+            size={
+              command.options && command.selectionMode !== "single"
+                ? "picker"
+                : "default"
+            }
+          >
             <DialogTitle>{command.label}</DialogTitle>
             <DialogDescription>
               {active.ids.length} {noun} selected. {command.description}
@@ -241,15 +248,18 @@ export function BulkActions({
                   </SelectField>
                 </FormField>
               ) : (
-                <SearchableSelectionList
-                  label={command.fieldLabel || "Choose destinations"}
-                  disabled={busy}
-                  placeholder="Search destinations"
-                  emptyMessage="No matching destinations."
-                  options={command.options}
-                  value={values}
-                  onChange={setValues}
-                />
+                <DialogBody className="flex flex-col overflow-y-auto">
+                  <SearchableSelectionList
+                    bounded="compact"
+                    label={command.fieldLabel || "Choose destinations"}
+                    disabled={busy}
+                    placeholder="Search destinations"
+                    emptyMessage="No matching destinations."
+                    options={command.options}
+                    value={values}
+                    onChange={setValues}
+                  />
+                </DialogBody>
               ))}
             {command.options?.length === 0 && (
               <p>

@@ -90,7 +90,7 @@ export function LearningAssignmentPicker({
   const discardDone = useRef<((accepted: boolean) => void) | null>(null);
   const previousStep = useRef<"select" | "review">("select");
   const heading = useRef<HTMLHeadingElement>(null);
-  const selectingLearning = target?.kind === "audiences" && step === "select";
+  const selecting = step === "select";
   useEffect(() => {
     body.current?.scrollTo(0, 0);
     heading.current?.focus({ preventScroll: true });
@@ -470,7 +470,7 @@ export function LearningAssignmentPicker({
           <DialogBody
             ref={body}
             className={
-              selectingLearning
+              selecting
                 ? "flex flex-col gap-4 overflow-y-auto"
                 : "overflow-y-auto [scrollbar-gutter:stable]"
             }
@@ -493,9 +493,7 @@ export function LearningAssignmentPicker({
             <div
               hidden={step !== "select"}
               className={
-                selectingLearning
-                  ? "flex min-h-0 flex-1 flex-col gap-4"
-                  : "grid gap-4"
+                selecting ? "flex min-h-0 flex-1 flex-col gap-4" : "grid gap-4"
               }
             >
               <p className="shrink-0 text-sm text-muted-foreground">
@@ -523,6 +521,7 @@ export function LearningAssignmentPicker({
                 />
               ) : target?.mode === "remove" ? (
                 <SearchableSelectionList
+                  bounded
                   label="Find a team or group"
                   options={selectionOptions}
                   value={selected}
@@ -531,6 +530,7 @@ export function LearningAssignmentPicker({
                 />
               ) : (
                 <AudienceSelection
+                  bounded
                   recommendationsOnly={item?.kind === "brief"}
                   data={data}
                   selected={selected}

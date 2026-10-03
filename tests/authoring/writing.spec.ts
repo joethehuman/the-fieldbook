@@ -506,8 +506,9 @@ test("Update category filters, creates, normalizes and survives draft saves", as
     .getByRole("option", { name: "Add “Customer stories”", exact: true })
     .click();
   await expect(input).toHaveValue("Customer stories");
-  await waitForDraftSaved(page);
-  expect((await read()).content[0].category).toBe("Customer stories");
+  await expect
+    .poll(async () => (await read()).content[0].category)
+    .toBe("Customer stories");
   expect((await read()).publishedContent![0].category).toBe(existing);
   await page
     .getByRole("button", { name: "Show categories", exact: true })

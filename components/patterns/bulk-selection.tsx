@@ -11,6 +11,7 @@ import { Alert } from "../ui/alert";
 import {
   Dialog,
   DialogContent,
+  DialogBody,
   DialogTitle,
   DialogDescription,
   DialogFooter,
@@ -175,20 +176,23 @@ export function BulkPicker({
           if (!running.current) setOpen(value);
         }}
       >
-        <DialogContent>
+        <DialogContent size="picker">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
           {error && <Alert variant="destructive">{error}</Alert>}
-          <SearchableSelectionList
-            selectionMode={selectionMode}
-            options={options}
-            value={chosen}
-            onChange={setChosen}
-            label="Choose items"
-            placeholder="Search"
-            emptyMessage="No matching items."
-            disabled={busy}
-          />
+          <DialogBody className="flex flex-col overflow-y-auto">
+            <SearchableSelectionList
+              bounded="compact"
+              selectionMode={selectionMode}
+              options={options}
+              value={chosen}
+              onChange={setChosen}
+              label="Choose items"
+              placeholder="Search"
+              emptyMessage="No matching items."
+              disabled={busy}
+            />
+          </DialogBody>
           {!!chosen.length && (
             <p className="text-copy text-muted-foreground">
               Selected ({chosen.length}):{" "}

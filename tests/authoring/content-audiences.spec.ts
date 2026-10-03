@@ -422,7 +422,7 @@ test("search keeps internal geometry for many, one and zero matches", async ({
     dialog: await panel.boundingBox(),
     search: await search.boundingBox(),
     list: await panel
-      .getByLabel("Matching audiences", { exact: true })
+      .getByLabel("Audience choices", { exact: true })
       .boundingBox(),
     summary: await panel
       .getByLabel("Selected audiences", { exact: true })
