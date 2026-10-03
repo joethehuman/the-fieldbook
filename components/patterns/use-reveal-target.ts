@@ -5,7 +5,13 @@ import { useEffect, useRef, useState } from "react";
 /** Request from an explicit navigation action, after accepting any leave guard. */
 export function useRevealTarget<T extends HTMLElement = HTMLDivElement>({
   context = false,
-}: { context?: boolean } = {}) {
+  scrollContainer,
+  block = "start",
+}: {
+  context?: boolean;
+  scrollContainer?: string;
+  block?: "start" | "nearest";
+} = {}) {
   const ref = useRef<T>(null);
   const [request, setRequest] = useState<{ focus: boolean } | null>(null);
   useEffect(() => {
@@ -18,15 +24,31 @@ export function useRevealTarget<T extends HTMLElement = HTMLDivElement>({
       const scrollTarget = context
         ? target.closest<HTMLElement>("[data-reveal-context]") || target
         : target;
-      scrollTarget.scrollIntoView({
-        block: "start",
-        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-          ? "instant"
-          : "smooth",
-      });
+      const behavior = window.matchMedia("(prefers-reduced-motion: reduce)")
+        .matches
+        ? "instant"
+        : "smooth";
+      if (scrollContainer) {
+        // Reveal inside the owning pane without scrolling the page behind it.
+        const area = scrollTarget.closest<HTMLElement>(scrollContainer);
+        if (!area) return;
+        const visible = area.getBoundingClientRect();
+        const bounds = scrollTarget.getBoundingClientRect();
+        const top =
+          block === "start" || bounds.height > area.clientHeight
+            ? bounds.top - visible.top
+            : bounds.bottom > visible.bottom
+              ? bounds.bottom - visible.bottom
+              : bounds.top < visible.top
+                ? bounds.top - visible.top
+                : 0;
+        if (top) area.scrollBy({ top, behavior });
+      } else {
+        scrollTarget.scrollIntoView({ block, behavior });
+      }
     });
     return () => cancelAnimationFrame(frame);
-  }, [request, context]);
+  }, [request, context, scrollContainer, block]);
   return {
     targetProps: { ref, tabIndex: -1, "data-reveal-target": true as const },
     reveal: (focus = true) => setRequest({ focus }),

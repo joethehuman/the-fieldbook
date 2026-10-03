@@ -13,11 +13,12 @@ The goal is a choice of complete stacks for a fresh installation. A future Digit
 | Persistence | Content validation, permissions, publication, quiz grading and reporting calculations | `server/ports/data.ts`, composed in `server/data.ts`; Supabase queries and complete reads under `server/providers/supabase/` |
 | Identity | Registration policy, active people, roles, MCP grants and same-origin checks | `server/identity.ts`, plain types in `server/ports/identity.ts`; Supabase browser sessions and OAuth operations in its adapter |
 | Private files | Upload limits, ownership, readiness, reference protection and access checks | `server/ports/storage.ts`, composed in `server/storage.ts`; Supabase Storage behind signed upload/read instructions |
+| Ask AI | Reader admission, published evidence, concise guidance and source provenance | `server/ports/ai.ts`, composed in `server/ai.ts`; AI SDK/Gateway generation in `server/providers/vercel/ai.ts`, passage retrieval behind the data port |
 | Recovery | Immediate logical deletion, 30-day restoration, retry and permanent-erasure policy | Fieldbook bulk/cleanup services; current SQL transactions and provider identity/object operations |
 
 Routes validate requests and call Fieldbook services. Adapters translate provider operations into plain values and application errors. Browser uploads receive a temporary request instruction; browser code does not construct a provider SDK client. Stored media references stay `/api/media/{id}.{extension}` so published content does not store temporary provider URLs.
 
-These are interfaces for operations the application already needs. There is one service implementation, selected through ordinary imports. There is no dynamic plugin registry or alternate-provider stub.
+These are interfaces for operations the application already needs. Each service currently has one supported implementation; small server composition modules select it. There is no dynamic plugin registry or alternate-provider stub.
 
 ## MCP contract
 
@@ -72,4 +73,4 @@ Vercel Web Analytics and Speed Insights use their official Next.js SDKs, compose
 
 For another host's analytics, add its implementation under `server/providers/{host}/` and select it in `server/telemetry.tsx`. Keep SDK imports out of layouts and product components; extend `pnpm check:providers` to cover the new SDK. Document setup and verify script loading, route tracking and disabled behavior for that recipe. Analytics are optional: ordinary content, identity and persistence services must remain usable without them.
 
-Add other optional platform features at their owning boundary and document activation, credentials and removal. AI Gateway is not installed or activated.
+Add other optional platform features at their owning boundary and document activation, credentials and removal. Ask AI remains off by default and selects its model router through `FIELDBOOK_AI_ROUTER`, independently of hosting. Only `vercel` is implemented today; omission retains it for existing installations, while explicit unsupported values fail closed. Saved primary/fallback IDs belong to their router. The neutral Admin form displays connector metadata and universal controls; connector capabilities determine fallback availability. Credential handling, model discovery/validation and routing stay inside the adapter. A new router needs a working implementation and verified setup, not a UI option. See [Ask AI setup](ask-ai.md).

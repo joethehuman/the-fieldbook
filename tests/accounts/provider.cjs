@@ -15,5 +15,15 @@ globalThis.fetch = (input, init) => {
       init,
     );
   }
+  if (raw.startsWith("https://ai-gateway.vercel.sh/")) {
+    const local = raw.replace(
+      "https://ai-gateway.vercel.sh",
+      "http://127.0.0.1:3130/gateway",
+    );
+    return original(
+      input instanceof Request ? new Request(local, input) : local,
+      init,
+    );
+  }
   return original(input, init);
 };

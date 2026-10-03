@@ -104,6 +104,48 @@ test("contributors share publishing editors with four permitted destinations on 
   await expect(page.getByText("Learning groups", { exact: true })).toHaveCount(0);
 });
 
+test("contributor Update audience offers groups without team or Organization controls", async ({
+  page,
+}, info) => {
+  await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "contributor",
+    false,
+  );
+  await openMenu(page);
+  await page
+    .getByRole("menuitem", { name: "Manage content", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Update", exact: true }).click();
+  await page
+    .getByLabel("Title", { exact: true })
+    .fill("Contributor audience draft");
+  await expect(page.locator(".editor-heading [role=status] .sr-only")).toHaveText("Saved");
+  await openContentSettings(page);
+  await page
+    .getByRole("button", { name: "Edit audience", exact: true })
+    .click();
+  const panel = page.getByRole("dialog", {
+    name: "Update audience",
+    exact: true,
+  });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole("radio")).toHaveCount(0);
+  await expect(panel.getByRole("checkbox", { name: /Team:/ })).toHaveCount(0);
+  await expect(
+    panel.getByRole("checkbox", { name: /Group:/ }).first(),
+  ).toBeVisible();
+  await panel
+    .getByRole("checkbox", { name: /Group:/ })
+    .first()
+    .check();
+  await panel
+    .getByRole("button", { name: "Apply to draft", exact: true })
+    .click();
+  await expect(panel).not.toBeVisible();
+});
+
 test("team managers who contribute get two destinations; administrators get the organization destination", async ({ page }, info) => {
   const production = info.project.name.startsWith("production");
   await setup(page, production, "contributor", true);

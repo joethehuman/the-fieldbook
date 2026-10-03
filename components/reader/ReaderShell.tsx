@@ -450,7 +450,16 @@ export function ReaderShell({
                 </>
               )}
             </nav>
-            <ReaderSearch />
+            <ReaderSearch
+              enabled={context.branding.askAiEnabled === true}
+              userId={context.user?.id || null}
+              onOpen={async (result) => {
+                if (!(await canLeave())) return false;
+                beforeNavigation();
+                startNavigation(() => router.push(result.href));
+                return true;
+              }}
+            />
           </>
         }
       >

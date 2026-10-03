@@ -132,20 +132,20 @@ export type ProgressRow = ReturnType<typeof progressPeople>[number];
 export type ProgressFilters = {
   team: string;
   query: string;
+  personId: string;
   group: string;
   status: string;
   stage: string;
   started: string;
-  signedIn: string;
 };
 export const emptyProgressFilters: ProgressFilters = {
   team: "all",
   query: "",
+  personId: "all",
   group: "all",
   status: "all",
   stage: "all",
   started: "all",
-  signedIn: "all",
 };
 export function filterProgress(
   rows: ProgressRow[],
@@ -153,19 +153,20 @@ export function filterProgress(
   f: ProgressFilters,
   sort = "name",
 ) {
-  const q = f.query.trim().toLowerCase();
+  const words = f.query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   return rows
     .filter(
       (r) =>
         (f.team === "all" ||
           ancestorIds(r.teamId || "", teams || []).has(f.team)) &&
-        (!q ||
-          `${r.u.name} ${r.u.email} ${r.team}`.toLowerCase().includes(q)) &&
+        (f.personId === "all" || r.u.id === f.personId) &&
+        words.every((word) =>
+          `${r.u.name} ${r.u.email} ${r.team}`.toLowerCase().includes(word),
+        ) &&
         (f.group === "all" || r.groupIds.includes(f.group)) &&
         (f.status === "all" || r.status === f.status) &&
         (f.stage === "all" || r.stage === f.stage) &&
-        (f.started === "all" || (r.assigned > 0 && !r.started)) &&
-        (f.signedIn === "all" || r.u.registered === false),
+        (f.started === "all" || (r.assigned > 0 && !r.started)),
     )
     .sort(
       (a, b) =>
@@ -241,8 +242,7 @@ export function progressPeopleCsv(
       "Person",
       "Email",
       "Reporting team",
-      "Stage",
-      "Sign-in status",
+      "User type",
       "Assigned courses",
       "Completed courses",
       "Completion (%)",
@@ -254,7 +254,6 @@ export function progressPeopleCsv(
       r.u.email,
       r.team,
       r.stage,
-      r.u.registered === false ? "Not signed in" : "Signed in",
       r.assigned,
       r.completed,
       r.percent,

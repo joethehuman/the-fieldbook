@@ -68,6 +68,7 @@ export function useOrganizationChangeReview() {
     after: Workspace,
     options?: OrganizationChangeOptions,
   ) {
+    if (options?.review?.confirm) return options.review.confirm(before, after);
     const summary = organizationChangeSummary(before, after);
     if (!summary.changed && !options?.review?.always) return true;
     resolve.current?.(false);

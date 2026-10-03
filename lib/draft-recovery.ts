@@ -5,6 +5,7 @@ import { contentSignature } from "./demo-publication";
 export function revertToPublished(
   current: Content,
   published: Content,
+  canEditUpdateTeams = true,
 ): Content {
   if (
     current.id !== published.id ||
@@ -27,6 +28,9 @@ export function revertToPublished(
     version: current.version,
     assignments: current.assignments,
     groups: current.kind === "course" ? current.groups : published.groups,
+    ...(current.kind === "brief" && !canEditUpdateTeams
+      ? { updateTeams: current.updateTeams }
+      : {}),
   };
 }
 

@@ -279,3 +279,114 @@ test("reporting overview fits enlarged text without clipping controls", async ({
   await page.keyboard.press("Enter");
   await expect(overdue).toHaveAttribute("aria-pressed", "true");
 });
+
+test("animated filter rows wrap, stay left-aligned and clear without an empty spacer", async ({
+  page,
+}, info) => {
+  await page.goto("/ui#catalog-filter-rows");
+  const example = page.locator("#catalog-filter-rows");
+  const row = example.locator('[data-slot="collection-applied-filters"]');
+  const search = example.getByRole("textbox", {
+    name: "Find example items",
+    exact: true,
+  });
+  const results = example.getByRole("heading", {
+    name: "Example results",
+    exact: true,
+  });
+  await expect.poll(async () => (await row.boundingBox())!.height).toBe(0);
+  const baseline =
+    (await results.boundingBox())!.y - (await search.boundingBox())!.y;
+  await example
+    .getByRole("button", { name: "Add example filters", exact: true })
+    .click();
+  const chips = row.getByRole("button", { name: /^Remove Example filter/ });
+  await expect(chips).toHaveCount(15);
+  await expect
+    .poll(async () => (await row.boundingBox())!.height)
+    .toBeGreaterThan(52);
+  await expect
+    .poll(
+      async () =>
+        (await row.boundingBox())!.height -
+        (await row
+          .locator(":scope > div")
+          .evaluate((el) => el.getBoundingClientRect().height)),
+    )
+    .toBe(0);
+  const first = chips.first();
+  expect(
+    Math.abs((await first.boundingBox())!.x - (await search.boundingBox())!.x),
+  ).toBeLessThanOrEqual(1);
+  await first.focus();
+  expect(
+    await first.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const frame = el
+        .closest('[data-slot="collection-applied-filters"]')!
+        .getBoundingClientRect();
+      return (
+        box.left - 4 >= frame.left - 0.5 &&
+        box.top - 4 >= frame.top - 0.5 &&
+        box.bottom + 4 <= frame.bottom + 0.5
+      );
+    }),
+  ).toBe(true);
+  await page.screenshot({ path: info.outputPath("wrapping-filter-rows.png") });
+  await first.click();
+  await expect(chips).toHaveCount(14);
+  await expect(
+    row.getByRole("button", {
+      name: "Remove Example filter 2 filter",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await row.evaluate((el) => getComputedStyle(el).transitionProperty),
+  ).toBe("none");
+  await example.getByRole("button", { name: "Clear all", exact: true }).click();
+  await expect.poll(async () => (await row.boundingBox())!.height).toBe(0);
+  expect(
+    Math.abs(
+      (await results.boundingBox())!.y -
+        (await search.boundingBox())!.y -
+        baseline,
+    ),
+  ).toBeLessThanOrEqual(1);
+});
+
+test("grouped search loads more, searches locally, and preserves keyboard editing and focus", async ({
+  page,
+}, info) => {
+  await page.goto("/ui#catalog-progress");
+  const search = page.getByRole("combobox", {
+    name: "Search teams or people",
+    exact: true,
+  });
+  await search.click();
+  const people = page
+    .getByRole("listbox", { name: "Search results", exact: true })
+    .getByRole("group", { name: "People", exact: true });
+  await expect(people.getByRole("option")).toHaveCount(6);
+  await page.screenshot({
+    path: info.outputPath("grouped-search-results.png"),
+  });
+  await page
+    .getByRole("button", { name: "More people (14)", exact: true })
+    .click();
+  await expect(people.getByRole("option")).toHaveCount(12);
+  await search.fill("Example person 10");
+  await expect(people.getByRole("option")).toHaveCount(1);
+  await page.keyboard.press("Home");
+  await page.keyboard.press("End");
+  expect(
+    await search.evaluate((input: HTMLInputElement) => input.selectionStart),
+  ).toBe("Example person 10".length);
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("listbox", { name: "Search results", exact: true }),
+  ).not.toBeVisible();
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue("");
+});

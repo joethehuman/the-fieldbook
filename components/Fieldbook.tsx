@@ -8,8 +8,7 @@ import { gradeQuiz } from "@/lib/course-quiz";
 import { Course } from "./Course";
 import { guestRecommendations } from "@/lib/guest-recommendations";
 import { ReportAvailability } from "./patterns/csv-export";
-import { SearchPanel } from "./patterns/search-panel";
-import { ContentSearch } from "./ContentSearch";
+import { SearchExperience } from "./SearchExperience";
 import { InitialsAvatar } from "./ui/initials-avatar";
 import { BrandedAccount } from "./patterns/branded-account";
 import {
@@ -22,11 +21,9 @@ import { CurriculumPage } from "./CurriculumPage";
 import { Badge } from "@/components/ui/badge";
 import { canPublish } from "@/lib/permissions";
 import { AccountMenu } from "./patterns/account-menu";
-import { SearchField } from "./patterns/search-field";
 import { NavigationButton } from "./patterns/navigation-button";
 import { Alert } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Toolbar, EmptyState, PageHeader } from "@/components/patterns/layout";
+import { EmptyState, PageHeader } from "@/components/patterns/layout";
 import Updates from "./Updates";
 import { reviewDeadlines, recalculateDeadlines } from "@/lib/assignment-episodes";
 import { reconcileLearning } from "@/lib/learning-groups";
@@ -99,8 +96,6 @@ export default function Fieldbook() {
     [view, setView] = useState<View>("learn"),
     [courseOrigin, setCourseOrigin] = useState<string | undefined>(),
     [selected, setSelected] = useState<string | null>(null),
-    [search, setSearch] = useState(""),
-    [searchOpen, setSearchOpen] = useState(false),
     [targetLesson, setTargetLesson] = useState<string | undefined>(),
     [error, setError] = useState(""),
     [reportIssue, setReportIssue] = useState<string | undefined>(),
@@ -202,13 +197,13 @@ export default function Fieldbook() {
         : null;
     if (landing?.isCurrent) {
       setMenu(false);
-      return;
+      return true;
     }
-    if (!(await canLeave())) return;
+    if (!(await canLeave())) return false;
     if (landing) {
       setMenu(false);
       await landing.open();
-      return;
+      return true;
     }
     if (v === "docs" && !id) setCollapsed(false);
     if (v !== "docs" || id) setMenu(false);
@@ -217,7 +212,6 @@ export default function Fieldbook() {
     setSelected(destinationId || null);
     setCourseOrigin(origin);
     setTargetLesson(lesson);
-    setSearch("");
     const curriculum =
       v === "learn" && destinationId?.startsWith("curriculum:");
     const path = curriculum
@@ -236,6 +230,7 @@ export default function Fieldbook() {
     );
     acceptedUrl.current = window.location.href;
     document.getElementById("main-content")?.scrollTo({ top: 0 });
+    return true;
   }
   async function persist(
     next: Workspace,
@@ -377,7 +372,6 @@ export default function Fieldbook() {
   const progress = data.progress[user.id] || [];
   const assigned = assignedCourses(visible, user, learningGroups);
   const completed = assigned.filter((c) => isComplete(c, progress)).length;
-  const query = search.trim().toLowerCase();
   const curriculum =
     view === "learn" && selected?.startsWith("curriculum:")
       ? data.curricula?.find(
@@ -593,78 +587,20 @@ export default function Fieldbook() {
               </>
             )}
           </nav>
-          <SearchPanel
+          <SearchExperience
+            key={`${user.id}:${data.settings?.askAi?.enabled ?? true}`}
             id="global-search-results"
-            open={!!query && searchOpen}
-            onDismiss={() => setSearchOpen(false)}
-            trigger={
-              <Toolbar>
-                <SearchField>
-                  <Input
-                    aria-label="Search all content"
-                    aria-expanded={!!query && searchOpen}
-                    aria-controls={
-                      query && searchOpen ? "global-search-results" : undefined
-                    }
-                    onFocus={() => setSearchOpen(true)}
-                    maxLength={160}
-                    onKeyDown={(e) => {
-                      if (e.key === "ArrowDown" && query) setSearchOpen(true);
-                      if (e.key === "ArrowDown") {
-                        const first = document.querySelector<HTMLAnchorElement>(
-                          '[aria-label="Search results"] a',
-                        );
-                        if (first) {
-                          e.preventDefault();
-                          first.focus();
-                        }
-                      }
-                    }}
-                    placeholder="Search fieldbook…"
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      setSearchOpen(true);
-                    }}
-                  />
-                  {search && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Clear search"
-                      onClick={() => {
-                        setSearch("");
-                        document
-                          .querySelector<HTMLInputElement>(
-                            '[aria-label="Search all content"]',
-                          )
-                          ?.focus();
-                      }}
-                    >
-                      <X size={14} />
-                    </Button>
-                  )}
-                </SearchField>
-              </Toolbar>
-            }
-          >
-            <ContentSearch
-              query={search}
-              content={data.publishedContent || data.content}
-              onOpen={async (r) => {
-                await navigate(
-                  r.kind === "course"
-                    ? "learn"
-                    : r.kind === "doc"
-                      ? "docs"
-                      : "briefs",
-                  r.contentId,
-                  undefined,
-                  r.lessonId || undefined,
-                );
-              }}
-            />
-          </SearchPanel>
+            content={data.publishedContent || data.content}
+            aiMode={data.settings?.askAi?.enabled === false ? "off" : "demo"}
+            onOpen={async (r) => {
+              return navigate(
+                r.kind === "course" ? "learn" : r.kind === "doc" ? "docs" : "briefs",
+                r.contentId,
+                undefined,
+                r.lessonId || undefined,
+              );
+            }}
+          />
         </>
       }
       alert={
@@ -887,6 +823,7 @@ export default function Fieldbook() {
             settings={data.settings}
             user={user}
             groups={learningGroups}
+            teams={uid === "guest" ? [] : data.teams}
             onOpen={(id) => navigate("briefs", id)}
           />
         </>

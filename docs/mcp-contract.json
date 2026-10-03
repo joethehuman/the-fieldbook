@@ -557,6 +557,15 @@
                   "maxLength": 80
                 }
               },
+              "updateTeams": {
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                }
+              },
               "lessons": {
                 "default": [],
                 "maxItems": 100,
@@ -926,6 +935,15 @@
                 "type": "array",
                 "items": {
                   "type": "string",
+                  "maxLength": 80
+                }
+              },
+              "updateTeams": {
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
                   "maxLength": 80
                 }
               },

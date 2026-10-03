@@ -1,3 +1,5 @@
+"use client";
+
 import { completionPercent } from "@/lib/learning";
 import { Card } from "../ui/card";
 import { ProgressRing } from "../ui/progress";
@@ -8,7 +10,7 @@ import {
 } from "../ui/distribution-bar";
 import { Button } from "../ui/button";
 import { cn } from "@/lib/utils";
-import type { progressSummary, subteamProgress } from "@/lib/progress-report";
+import type { progressSummary } from "@/lib/progress-report";
 type Summary = ReturnType<typeof progressSummary>;
 function segments(summary: Summary, deadlines: boolean): DistributionSegment[] {
   return [
@@ -16,7 +18,7 @@ function segments(summary: Summary, deadlines: boolean): DistributionSegment[] {
       id: "current",
       label: "Up to date",
       count: summary.current,
-      tone: "success",
+      tone: "progress",
     },
     ...(deadlines
       ? [
@@ -24,7 +26,7 @@ function segments(summary: Summary, deadlines: boolean): DistributionSegment[] {
             id: "within",
             label: "Within due dates",
             count: summary.within,
-            tone: "warning" as const,
+            tone: "muted" as const,
           },
           {
             id: "overdue",
@@ -45,18 +47,14 @@ function segments(summary: Summary, deadlines: boolean): DistributionSegment[] {
 }
 export function ProgressOverview({
   summary,
-  branches,
   deadlines,
   status,
   onStatus,
-  onTeam,
 }: {
   summary: Summary;
-  branches: ReturnType<typeof subteamProgress>;
   deadlines: boolean;
   status: string;
   onStatus: (value: string) => void;
-  onTeam: (value: string) => void;
 }) {
   const states = segments(summary, deadlines);
   return (
@@ -109,7 +107,10 @@ export function ProgressOverview({
               type="button"
               variant="ghost"
               size="sm"
-              className="min-w-0 w-full justify-start whitespace-normal text-left"
+              className={cn(
+                "min-w-0 w-full justify-start whitespace-normal text-left",
+                status === s.id && "bg-accent",
+              )}
               aria-pressed={status === s.id}
               onClick={() => onStatus(s.id)}
             >
@@ -128,53 +129,6 @@ export function ProgressOverview({
             : "Due dates are off. Completion still includes all assigned courses."}
         </p>
       </Card>
-      {branches.length > 0 && (
-        <Card className="grid gap-4 lg:col-span-2">
-          <h3 className="font-semibold">Progress by team</h3>
-          <p className="text-sm text-muted-foreground">
-            Includes each team’s subteams. Select a team to view its people.
-          </p>
-          <div className="grid max-h-80 gap-4 overflow-y-auto pr-2">
-            {branches.map((b) => (
-              <div
-                key={b.id}
-                className="grid min-w-0 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] sm:items-center"
-              >
-                <div className="grid min-w-0 gap-1">
-                  {b.id === "direct" ? (
-                    <p>Direct members</p>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="max-w-full whitespace-normal text-left"
-                      onClick={() => onTeam(b.id)}
-                    >
-                      {b.name}
-                    </Button>
-                  )}
-                  <p className="text-xs text-muted-foreground">
-                    {b.current} of {b.assignedPeople} up to date ·{" "}
-                    {b.unassigned} without assignments
-                  </p>
-                </div>
-                <div className="grid gap-1">
-                  <DistributionBar
-                    segments={segments(b, deadlines)}
-                    label={`${b.name} learning status`}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {b.people} people
-                    {deadlines
-                      ? ` · ${b.overdue} overdue`
-                      : ` · ${b.incomplete} incomplete`}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
     </div>
   );
 }

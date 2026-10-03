@@ -4,9 +4,10 @@ export type DistributionSegment = {
   id: string;
   label: string;
   count: number;
-  tone: "success" | "warning" | "destructive" | "muted";
+  tone: "progress" | "success" | "warning" | "destructive" | "muted";
 };
 export const distributionTone = {
+  progress: "bg-link hover:bg-link",
   success: "bg-success hover:bg-success",
   warning: "bg-warning hover:bg-warning",
   destructive: "bg-destructive hover:bg-destructive",

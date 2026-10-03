@@ -539,7 +539,7 @@ test("manager reporting uses shared filters and scoped people", async ({
   );
   await page.goto("/#team");
   await expect(
-    page.getByRole("button", { name: "Reporting team", exact: true }),
+    page.getByRole("combobox", { name: "Search teams or people", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: /Alex Edwards/ })).toBeVisible();
   const personCell = page.getByRole("cell", { name: /Alex Edwards/ });
@@ -707,22 +707,20 @@ test("report columns stay fixed across teams, long values and empty results", as
       }),
     );
   const baseline = await measure();
-  const picker = page.getByRole("button", {
-    name: "Reporting team",
+  const picker = page.getByRole("combobox", {
+    name: "Search teams or people",
     exact: true,
   });
   for (const team of [
     "Sales team",
     "Customer success and strategic account development",
     "Empty team",
-    "Entire organization",
+    "Organization",
   ]) {
-    await picker.click();
+    await picker.fill(team);
     await page
-      .getByRole("option", {
-        name: team === "Entire organization" ? team : `Organization / ${team}`,
-        exact: true,
-      })
+      .getByRole("group", { name: "Teams", exact: true })
+      .getByRole("option", { name: new RegExp(`^${team} —`) })
       .click();
     const columns = await measure();
     columns.forEach((column, i) => {

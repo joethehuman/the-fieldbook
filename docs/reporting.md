@@ -8,7 +8,7 @@ Exports include every matching row in the displayed order, including rows on oth
 
 | Report | Exported columns |
 | --- | --- |
-| Progress / Team progress | Person, email, reporting team, stage, sign-in status, assigned courses, completed courses, completion (%), learning status, overdue courses (when due dates are on) |
+| Progress / Team progress | Person, email, reporting team, user type, assigned courses, completed courses, completion (%), learning status, overdue courses (when due dates are on) |
 | Person's View courses | Person, email, course, category, published version, status, due date (when enabled), assigned at, assignment sources |
 | Assigned courses | Learning group (when group-scoped), person/email (when person-scoped), course, published version, assigned through, completed people, total people |
 | Course progress detail / optional history | Person, email, reporting team, course, category, published version, assigned/optional, target date, status, progress, recorded lessons, total lessons |
@@ -32,11 +32,17 @@ There is no CSV row limit. Report inputs and downloads must fit in browser/serve
 
 ## Progress visuals and filters
 
-**People up to date** is the share of people with assignments who completed every assigned, currently published course version. People without assigned courses are shown separately, with no completion percentage. **Course assignments complete** is a different, course-weighted measure: completed person/course pairs divided by all assigned pairs. Overlapping sources count once.
+**People up to date** is the share of people with assignments who completed every assigned, currently published course version. People without assigned courses are shown separately, with no completion percentage. A person’s course completion is completed assigned courses divided by all their assigned courses. Overlapping sources count once.
 
 The learning-status chart separates **Up to date**, **Within due dates** (unfinished courses, none overdue) and **Overdue** (at least one unfinished overdue course). Choose a status to filter the people table; the chart retains the current team, group and other people filters for context. With due dates off, the chart uses **Incomplete** and omits overdue reporting; saved deadlines remain unchanged. No assignments is a separate table filter.
 
-Subteam comparisons cover each immediate child's full reporting branch. A Direct members row accounts for people in the selected parent itself. Select a subteam to drill down. Search name, email or reporting team, and filter by learning group, stage, course activity and sign-in status. Learning-group filters intersect the authorized reporting scope and never widen it. Active preregistered people remain in totals; their onboarding stage follows their hire date and applied window, independently of sign-in or overdue status. Returning from person details preserves filters, sort, page and scroll position.
+The overview appears first and states the current reporting scope. It defaults to Organization for an administrator or Organization manager, to the highest managed team and its descendants for a manager of one branch, or all managed branches for a manager of several independent branches. Search sits below the charts beside Filters and Sort.
+
+One **Search teams or people** field shows separately grouped, ranked results from authorized reporting data. Typing does not change the report. Choose a team to view its branch, choose a person to see that person's summary and row, or choose **Show matching people** to apply the query across people in the current branch. Person selection starts a fresh view for that person; team selection retains optional group/type/status filters. More controls reveal additional results. Clear all returns to the highest permitted scope.
+
+An optional learning-group filter includes only people in both that group and the reporting scope; it still measures every assigned course for those people. User type uses New users and Existing users, based on hire date and the applied new-user window. Course activity and learning status can narrow the list. Status selection keeps the overview totals for comparison. Other active people filters are named with the chart scope.
+
+The overview keeps two visuals: people up to date and learning status. Change the reporting scope through the grouped search; selecting a team includes all its subteams. Applied filters sit left-aligned below search and above People. The row appears only when needed, wraps naturally and uses a short height transition unless reduced motion is preferred; no blank row is reserved. Active preregistered people remain in totals so missing sign-ins cannot inflate team completion; sign-in status is not a reporting control or CSV column. Returning from person details preserves filters, sort, page and scroll position.
 
 ## MCP reports
 

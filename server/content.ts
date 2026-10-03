@@ -20,7 +20,7 @@ import {
 } from "@/lib/docs-navigation";
 
 export function redact(c: Content): Content {
-  const { publishedSignature, ...safeContent } = c;
+  const { publishedSignature, updateTeams, ...safeContent } = c;
   return {
     ...safeContent,
     groups: [],
@@ -46,7 +46,7 @@ export const readConfig = cache(async () => {
 });
 export function assertCanRead(
   user: User | null,
-  config: Awaited<ReturnType<typeof readConfig>>,
+  config: Pick<Awaited<ReturnType<typeof readConfig>>, "settings">,
 ) {
   if (config.settings.access === "private" && !user)
     throw new HttpError(401, "Sign in to view this Fieldbook.");
@@ -136,6 +136,21 @@ export async function saveContent(
       "Assigned courses use teams or learning groups and organization windows.",
     );
   const old = await dataStore().findDocument(c.id);
+  if (contributor && c.kind === "brief" && JSON.stringify([...(c.updateTeams || [])].sort()) !== JSON.stringify([...(old?.draft.updateTeams || [])].sort()))
+    throw new HttpError(403, "Only administrators can change Update team assignments.");
+  if (c.updateTeams?.length && c.kind !== "brief")
+    throw new HttpError(400, "Team recommendations apply only to Updates.");
+  if (c.kind === "brief" && c.updateTeams?.length) {
+    const config = await dataStore().readConfiguration();
+    if (
+      c.updateTeams.some((id) => !config.teams.some((team) => team.id === id) && !old?.draft.updateTeams?.includes(id))
+    )
+      throw new HttpError(
+        400,
+        "A team changed. Review the current audience list.",
+      );
+    c.updateTeams = [...new Set(c.updateTeams)];
+  }
   if (old?.deleted_at)
     throw new HttpError(400, "Restore this item before editing it.");
   if (contributor && c.kind === "doc") {

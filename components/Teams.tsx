@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RegisterLandingNavigation } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
 import { reportTeamIds, type User } from "@/lib/types";
 import { teamPath } from "@/lib/team-hierarchy";
-import { todayUTC, completionPercent } from "@/lib/learning";
+import { todayUTC } from "@/lib/learning";
 import { request, RequestError } from "@/lib/workspace-save";
 import {
   emptyProgressFilters,
@@ -15,7 +15,6 @@ import {
   progressPeopleCsv,
   progressSummary,
   statusLabels,
-  subteamProgress,
   type ProgressDetail,
   type ProgressFilters,
   type ProgressRow,
@@ -25,7 +24,11 @@ import {
   CollectionControls,
   CollectionEmpty,
 } from "./patterns/collection-controls";
-import { HierarchyPicker } from "./patterns/hierarchy-picker";
+import { compactHierarchyPath } from "./patterns/hierarchy-picker";
+import {
+  GroupedSearch,
+  type GroupedSearchOption,
+} from "./patterns/grouped-search";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { CsvExport } from "./patterns/csv-export";
 import { FormField } from "./patterns/form-field";
@@ -41,7 +44,6 @@ import {
   TableCell,
 } from "./ui/table";
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
 import { SelectField } from "./ui/select";
 import { Alert } from "./ui/alert";
 import { Spinner } from "./ui/spinner";
@@ -73,11 +75,26 @@ export function TeamProgress({
     [error, setError] = useState("");
   const host = useRef<HTMLDivElement>(null),
     savedScroll = useRef(0),
-    detailEpoch = useRef(0);
+    detailEpoch = useRef(0),
+    returnToPerson = useRef<string | null>(null);
   const teams = data.teams || [],
     allowed = reportTeamIds(user, teams),
     deadlines = data.settings?.dueDatesEnabled !== false;
   const visibleTeams = teams.filter((t) => allowed.has(t.id));
+  const organization = visibleTeams.find((t) => t.system === "organization");
+  const topTeams = visibleTeams.filter(
+    (team) =>
+      team.system !== "organization" &&
+      !visibleTeams.some(
+        (parent) =>
+          parent.id === team.parentId && parent.system !== "organization",
+      ),
+  );
+  const defaultTeam =
+    organization || (topTeams.length === 1 ? topTeams[0] : undefined);
+  const defaultLabel =
+    defaultTeam?.name ||
+    (user.role === "admin" ? "Organization" : "All my teams");
   const all = useMemo(() => progressPeople(data, user), [data, user]);
   const safeFilters = {
     ...filters,
@@ -102,18 +119,23 @@ export function TeamProgress({
   const scrollOwner = () =>
     host.current?.closest<HTMLElement>(".admin-panel") ||
     host.current?.closest<HTMLElement>(".main-content");
+  // Restore before paint, without stealing focus from a later search interaction.
+  useLayoutEffect(() => {
+    if (person || !returnToPerson.current) return;
+    const personId = returnToPerson.current;
+    returnToPerson.current = null;
+    const owner = scrollOwner();
+    if (owner) owner.scrollTop = savedScroll.current;
+    host.current
+      ?.querySelector<HTMLButtonElement>(`[data-person-id="${personId}"]`)
+      ?.focus({ preventScroll: true });
+  }, [person]);
   function back() {
     detailEpoch.current++;
+    returnToPerson.current = person?.u.id || null;
     setPerson(null);
     setDetail(null);
     setError("");
-    requestAnimationFrame(() => {
-      const owner = scrollOwner();
-      if (owner) owner.scrollTop = savedScroll.current;
-      host.current
-        ?.querySelector<HTMLButtonElement>(`[data-person-id="${person?.u.id}"]`)
-        ?.focus({ preventScroll: true });
-    });
   }
   useEffect(() => {
     registerLandingNavigation?.({ isCurrent: !person, open: back });
@@ -207,24 +229,96 @@ export function TeamProgress({
       </EmptyState>
     );
   const filterLabels: Record<string, string> = {
-    query: `Search: ${filters.query}`,
-    group:
-      data.groups.find((g) => g.id === filters.group)?.name || "Learning group",
+    query: `People matching: ${filters.query}`,
+    team: `Team: ${visibleTeams.find((team) => team.id === safeFilters.team)?.name || defaultLabel}`,
+    personId: `Person: ${all.find((row) => row.u.id === filters.personId)?.u.name || "Selected person"}`,
+    group: `Group: ${data.groups.find((g) => g.id === filters.group)?.name || "Learning group"}`,
     status:
       statusLabels[filters.status as keyof typeof statusLabels] ||
       "Learning status",
-    stage: filters.stage,
+    stage: `User type: ${filters.stage}`,
     started: "Not started",
-    signedIn: "Not signed in",
   };
   const applied = Object.entries(filters)
-    .filter(([k, v]) => k !== "team" && v !== "all" && v !== "")
+    .filter(([, v]) => v !== "all" && v !== "")
     .map(([k]) => ({
       id: k,
       label: filterLabels[k],
       onRemove: () =>
         change(k as keyof ProgressFilters, k === "query" ? "" : "all"),
     }));
+  const selectedPerson = all.find((row) => row.u.id === filters.personId);
+  const scopeLabel =
+    filters.personId !== "all"
+      ? selectedPerson?.u.name || "Selected person"
+      : safeFilters.team === "all"
+        ? defaultLabel
+        : visibleTeams.find((team) => team.id === safeFilters.team)?.name ||
+          defaultLabel;
+  const chartFilters = [
+    filters.group !== "all" &&
+      (data.groups.find((group) => group.id === filters.group)?.name ||
+        "Selected learning group"),
+    filters.stage !== "all" && filters.stage,
+    filters.started !== "all" && "Not started",
+    filters.query && `Matching “${filters.query}”`,
+  ].filter(Boolean);
+  const scopeDescription =
+    filters.personId !== "all"
+      ? `${scopeLabel}’s assigned course progress.`
+      : `${scopeLabel} · ${summary.people} ${summary.people === 1 ? "person" : "people"}. ${organization && safeFilters.team === "all" ? "Every team, including people without a team." : "Includes all subteams."}`;
+  const searchOptions: GroupedSearchOption[] = [
+    {
+      id: "team:all",
+      group: "Teams",
+      label: defaultLabel,
+      description: organization
+        ? "All teams and people without a team"
+        : defaultTeam
+          ? "This team and all its subteams"
+          : "All teams you manage",
+    },
+    ...visibleTeams
+      .filter(
+        (team) => team.id !== defaultTeam?.id && team.system !== "organization",
+      )
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((team) => ({
+        id: `team:${team.id}`,
+        group: "Teams",
+        label: team.name,
+        description: compactHierarchyPath(
+          teamPath(team.id, visibleTeams).split(" / "),
+        ),
+        keywords: teamPath(team.id, visibleTeams),
+      })),
+    ...[...all]
+      .sort((a, b) => a.u.name.localeCompare(b.u.name))
+      .map((row) => ({
+        id: `person:${row.u.id}`,
+        group: "People",
+        label: row.u.name,
+        description: `${row.u.email} · ${row.team}`,
+      })),
+  ];
+  function changeTeam(team: string) {
+    setFilters((current) => ({ ...current, team, query: "", personId: "all" }));
+    setPage(1);
+  }
+  function selectSearch(id: string) {
+    if (id.startsWith("team:")) changeTeam(id.slice(5));
+    else if (id.startsWith("person:")) {
+      setFilters({ ...emptyProgressFilters, personId: id.slice(7) });
+      setPage(1);
+    } else if (id.startsWith("query:")) {
+      setFilters((current) => ({
+        ...current,
+        personId: "all",
+        query: id.slice(6),
+      }));
+      setPage(1);
+    }
+  }
   const sorts: Record<string, string> = {
     name: "Name A–Z",
     reverse: "Name Z–A",
@@ -237,8 +331,8 @@ export function TeamProgress({
         <div className="grid min-w-0 gap-6">
           <SectionHeader
             variant="page"
-            title={<h2>People & completion</h2>}
-            description="Assigned courses only, using their current published versions. Includes active people who have not signed in."
+            title={<h2>Progress</h2>}
+            description="Track assigned course completion across your teams."
           >
             {data.progressReport && (
               <Button
@@ -267,79 +361,40 @@ export function TeamProgress({
             </Alert>
           )}
           <div hidden={accessLost} className="grid min-w-0 gap-6">
-            <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <FormField label="Reporting team">
-                <HierarchyPicker
-                  searchLabel="Find a reporting team"
-                  value={safeFilters.team}
-                  onValueChange={(v) => change("team", v)}
-                  options={[
-                    {
-                      id: "all",
-                      label:
-                        user.role === "admin"
-                          ? "Entire organization"
-                          : "All my teams",
-                      path: [],
-                    },
-                    ...visibleTeams.map((t) => ({
-                      id: t.id,
-                      label: t.name,
-                      path: teamPath(t.id, visibleTeams).split(" / "),
-                    })),
-                  ]}
-                />
-              </FormField>
-              <FormField label="Learning group">
-                <SelectField
-                  value={filters.group}
-                  onValueChange={(v) => change("group", v)}
-                >
-                  <option value="all">All learning groups</option>
-                  {data.groups
-                    .filter((g) => all.some((r) => r.groupIds.includes(g.id)))
-                    .map((g) => (
-                      <option key={g.id} value={g.id}>
-                        {g.name}
-                      </option>
-                    ))}
-                </SelectField>
-              </FormField>
-            </div>
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {scopeDescription}{" "}
+              {chartFilters.length > 0 &&
+                `Filtered to: ${chartFilters.join(" · ")}.`}
+            </p>
             <ProgressOverview
               summary={summary}
-              branches={subteamProgress(
-                summaryRows,
-                visibleTeams,
-                safeFilters.team,
-              )}
               deadlines={deadlines}
               status={safeFilters.status}
-              onStatus={(v) =>
-                change("status", safeFilters.status === v ? "all" : v)
+              onStatus={(value) =>
+                change("status", safeFilters.status === value ? "all" : value)
               }
-              onTeam={(v) => change("team", v)}
-            />
-            <p className="text-sm text-muted-foreground tabular-nums">
-              {summary.completed} of {summary.assignments} course assignments
-              complete
-              {summary.assignments
-                ? ` (${completionPercent(summary.completed, summary.assignments)}%)`
-                : ""}
-              . Overlapping assignments count once.
-            </p>
-            <SectionHeader
-              title={<h3>People</h3>}
-              description="Charts reflect the current people filters. Select a learning status to narrow the table. CSV includes all matching people across pages."
             />
             <CollectionControls
+              animateFilterChanges
               search={
-                <FormField label="Find a team member" visuallyHiddenLabel>
-                  <Input
-                    type="search"
-                    placeholder="Find a team member by name, email or team"
-                    value={filters.query}
-                    onChange={(e) => change("query", e.target.value)}
+                <FormField label="Search teams or people" visuallyHiddenLabel>
+                  <GroupedSearch
+                    placeholder="Search teams or people"
+                    options={searchOptions}
+                    onSelect={selectSearch}
+                    queryAction={(query) => {
+                      const count = filterProgress(all, teams, {
+                        ...safeFilters,
+                        personId: "all",
+                        query,
+                      }).length;
+                      return {
+                        id: `query:${query}`,
+                        group: "People",
+                        label: "Show matching people",
+                        description: `${count} ${count === 1 ? "person" : "people"} in ${safeFilters.team === "all" ? defaultLabel : visibleTeams.find((team) => team.id === safeFilters.team)?.name || defaultLabel}`,
+                      };
+                    }}
                   />
                 </FormField>
               }
@@ -366,7 +421,28 @@ export function TeamProgress({
                 </FormField>
               }
             >
-              <FormField label="Learning status">
+              <FormField
+                label="Learning group"
+                description="Only people in this group and the selected team. Completion still includes all their assigned courses."
+              >
+                <SelectField
+                  value={filters.group}
+                  onValueChange={(v) => change("group", v)}
+                >
+                  <option value="all">All learning groups</option>
+                  {data.groups
+                    .filter((g) => all.some((r) => r.groupIds.includes(g.id)))
+                    .map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                </SelectField>
+              </FormField>
+              <FormField
+                label="Learning status"
+                description="Narrows the people list; the overview keeps all statuses for comparison."
+              >
                 <SelectField
                   value={safeFilters.status}
                   onValueChange={(v) => change("status", v)}
@@ -383,13 +459,13 @@ export function TeamProgress({
                   ))}
                 </SelectField>
               </FormField>
-              <FormField label="Stage">
+              <FormField label="User type">
                 <SelectField
                   value={filters.stage}
                   onValueChange={(v) => change("stage", v)}
                 >
-                  <option value="all">All stages</option>
-                  <option value="New user">Onboarding</option>
+                  <option value="all">All user types</option>
+                  <option value="New user">New users</option>
                   <option value="Existing user">Existing users</option>
                 </SelectField>
               </FormField>
@@ -402,16 +478,8 @@ export function TeamProgress({
                   <option value="not-started">Not started</option>
                 </SelectField>
               </FormField>
-              <FormField label="Sign-in status">
-                <SelectField
-                  value={filters.signedIn}
-                  onValueChange={(v) => change("signedIn", v)}
-                >
-                  <option value="all">All people</option>
-                  <option value="pending">Not signed in</option>
-                </SelectField>
-              </FormField>
             </CollectionControls>
+            <SectionHeader title={<h3>People</h3>} />
             {
               <TableContainer aria-label="People progress">
                 <DataTable
@@ -423,7 +491,7 @@ export function TeamProgress({
                     <TableRow>
                       <TableHead>Person</TableHead>
                       <TableHead>Reporting team</TableHead>
-                      <TableHead>Account</TableHead>
+                      <TableHead>User type</TableHead>
                       <TableHead align="right">Completion</TableHead>
                       {deadlines && (
                         <TableHead align="right">Overdue</TableHead>
@@ -441,16 +509,7 @@ export function TeamProgress({
                           <small>{r.u.email}</small>
                         </TableCell>
                         <TableCell>{r.team}</TableCell>
-                        <TableCell>
-                          {r.stage === "New user"
-                            ? "Onboarding"
-                            : "Existing user"}
-                          <small>
-                            {r.u.registered === false
-                              ? "Not signed in"
-                              : "Signed in"}
-                          </small>
-                        </TableCell>
+                        <TableCell>{r.stage}</TableCell>
                         <TableCell align="right">
                           {r.percent === null ? "—" : `${r.percent}%`}
                           <small>
@@ -495,7 +554,7 @@ export function TeamProgress({
       {person && (
         <div className="grid min-w-0 gap-6">
           <DetailNavigation
-            items={[{ label: "Back to people & completion", onSelect: back }]}
+            items={[{ label: "Back to progress", onSelect: back }]}
             current={person.u.name}
           />
           <SectionHeader

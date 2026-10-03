@@ -23,6 +23,7 @@ export type ReaderShellContext = {
     accent: string;
     privacyUrl: string | null;
     externalLinks?: SiteSettings["externalLinks"];
+    askAiEnabled?: boolean;
   };
   docs: DocLink[];
   docCategoryOrder: string[];

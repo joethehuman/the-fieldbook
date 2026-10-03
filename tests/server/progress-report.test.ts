@@ -62,6 +62,22 @@ test("compact report preserves data, scopes roster before aggregation, and denie
         assert.equal(JSON.stringify(r).includes("Secret"), false);
         assert.equal(JSON.stringify(r).includes("SECRET ATTEMPT"), false);
         assert.equal(JSON.stringify(r).includes("learningAssignments"), false);
+        const scoped = workspace(r),
+          scopedRows = progressPeople(scoped, viewer(2, "manager"));
+        assert.deepEqual(
+          filterProgress(scopedRows, scoped.teams, {
+            ...emptyProgressFilters,
+            personId: id(6),
+          }).map((row) => row.u.id),
+          [id(6)],
+        );
+        assert.equal(
+          filterProgress(scopedRows, scoped.teams, {
+            ...emptyProgressFilters,
+            personId: id(1),
+          }).length,
+          0,
+        );
         assert.equal(r.people[0].assigned, 2);
         assert.equal(r.people[0].completed, 1);
         assert.equal(r.people[0].overdue, 1);
@@ -98,7 +114,7 @@ test("compact report preserves data, scopes roster before aggregation, and denie
         const filtered = filterProgress(rows, data.teams, {
           ...emptyProgressFilters,
           group: "shared",
-          signedIn: "pending",
+          query: rows.find((p) => p.u.id === id(6))!.u.email,
         });
         assert.deepEqual(
           filtered.map((p) => p.u.id),

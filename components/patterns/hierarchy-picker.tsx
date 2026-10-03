@@ -89,6 +89,7 @@ export function HierarchyPicker({
             type="button"
             disabled={disabled}
             variant="outline"
+            title={selected?.path.join(" / ") || selected?.label}
             className="w-full justify-between text-left [&>span]:w-full [&>span]:justify-between"
           >
             <span className="min-w-0 truncate">
@@ -148,7 +149,8 @@ export function HierarchyPicker({
                 id={`${listId}-${index}`}
                 role="option"
                 aria-selected={option.id === value}
-                aria-label={option.path.join(" / ")}
+                aria-label={option.path.join(" / ") || option.label}
+                title={option.path.join(" / ") || option.label}
                 className={cn(
                   "flex cursor-pointer items-center gap-2 rounded-control px-2 py-2 text-label hover:bg-accent",
                   active?.id === option.id && "bg-accent",
@@ -183,34 +185,19 @@ export function HierarchyPicker({
               </p>
             )}
           </div>
-          {active && (
-            <div className="border-t pt-2">
-              <p className="text-xs text-muted-foreground">Full hierarchy</p>
-              <div
-                tabIndex={0}
-                role="region"
-                aria-label="Full hierarchy"
-                className="max-h-24 overflow-y-auto pe-2 text-xs [overflow-wrap:anywhere] [scrollbar-gutter:stable] outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {active.path.join(" / ")}
-              </div>
+          <div className="grid h-16 min-w-0 content-start gap-1 border-t pt-2">
+            <p className="text-xs text-muted-foreground">Full hierarchy</p>
+            <div
+              tabIndex={0}
+              role="region"
+              aria-label="Full hierarchy"
+              className="min-w-0 overflow-x-auto whitespace-nowrap pb-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {active?.path.join(" / ") || active?.label || "No matching team"}
             </div>
-          )}
+          </div>
         </PopoverContent>
       </Popover>
-      {selected && selected.path.length > 1 && (
-        <details className="min-w-0 text-xs text-muted-foreground">
-          <summary className="cursor-pointer rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <span className="[overflow-wrap:anywhere]">
-              {compactHierarchyPath(selected.path)}
-            </span>
-            <span className="sr-only"> — Show full hierarchy</span>
-          </summary>
-          <p className="pt-2 [overflow-wrap:anywhere]">
-            {selected.path.join(" / ")}
-          </p>
-        </details>
-      )}
     </div>
   );
 }

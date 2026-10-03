@@ -57,7 +57,24 @@ export function SearchResultCard({
       className="grid gap-1 break-words p-4 hover:bg-muted hover:no-underline hover:shadow-none focus-visible:bg-muted"
     >
       {clientNavigation ? (
-        <IntentLink href={href || result.href} onClick={onOpen}>
+        <IntentLink
+          href={href || result.href}
+          onClick={
+            onOpen
+              ? (event) => {
+                  if (
+                    !event.metaKey &&
+                    !event.ctrlKey &&
+                    !event.shiftKey &&
+                    !event.altKey
+                  ) {
+                    event.preventDefault();
+                    onOpen();
+                  }
+                }
+              : undefined
+          }
+        >
           <ResultBody result={result} />
         </IntentLink>
       ) : (

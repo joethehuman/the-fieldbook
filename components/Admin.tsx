@@ -68,6 +68,7 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { SelectField } from "./ui/select";
 import LearningGroups from "./LearningGroups";
 import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
+import { updateAudienceKeys } from "@/lib/content-audiences";
 import { assignLearningToAudiences } from "@/lib/assignment-audiences";
 import {
   OrganizationChangeCanceledError,
@@ -230,6 +231,12 @@ const adminSections = [
         icon: FileText,
       },
       {
+        id: "settings-ai",
+        name: "Ask AI",
+        description: "Choose primary and fallback models, published sources and answer guidance.",
+        icon: Settings,
+      },
+      {
         id: "settings-mcp",
         name: "MCP",
         description: "Connect your AI tools to Fieldbook.",
@@ -264,6 +271,7 @@ type Props = {
   registerNavigationGuard?: RegisterNavigationGuard;
   registerLandingNavigation?: RegisterLandingNavigation;
   onReload?: () => Promise<Workspace>;
+  onSaveSettings?: (before: Workspace, settings: import("@/lib/settings").SiteSettings) => Promise<Workspace>;
   onReviewDeadlines?: (
     token?: string,
   ) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
@@ -287,6 +295,7 @@ export default function Admin({
   registerNavigationGuard,
   registerLandingNavigation,
   onReload,
+  onSaveSettings,
   onReviewDeadlines,
   onLoadPublished,
 }: Props) {
@@ -1026,6 +1035,7 @@ export default function Admin({
                 onReviewDeadlines={onReviewDeadlines}
                 onChange={onChange}
                 production={production}
+                onSaveSettings={onSaveSettings}
               />
             ) : tab === "feedback" ? (
               <FeedbackAdmin data={data} />
@@ -2103,7 +2113,7 @@ export function Editor({
         queue.current!.block();
         throw new Error("The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.");
       }
-      const next = revertToPublished(latest, published);
+      const next = revertToPublished(latest, published, !!onWorkspaceChange);
       original.current = latest;
       baseline.current = latest;
       queue.current!.reset(latest);
@@ -2419,18 +2429,72 @@ export function Editor({
           </FormField>
         )}
       </EditorDetailsGroup>
-      {c.kind === "brief" && (
+      {c.kind !== "doc" && (c.kind === "brief" || onLearning) && (
         <EditorDetailsGroup
-          id="writing-relevance"
-          title="Relevant groups"
-          description="Groups guide recommendations. Everyone allowed into the installation can still read this update."
+          id="content-assignments"
+          title="Audience"
+          description={
+            c.kind === "brief"
+              ? "Appears in For you. No completion requirement or due date. Publish audience changes to make them live."
+              : "Appears in For you and counts toward assigned learning. Due dates follow organization settings."
+          }
         >
-          <GroupPicker
-            groups={data.groups}
-            showDescription={false}
-            value={c.groups}
-            onChange={(groups) => set("groups", groups)}
-          />
+          {c.kind === "brief" ? (
+            <LearningAssignmentPicker
+              data={data}
+              item={{ kind: "brief", id: c.id }}
+              title={c.title || "Untitled update"}
+              draftAudiences={updateAudienceKeys(c)}
+              showPeople={!!onWorkspaceChange}
+              onPrepare={
+                onWorkspaceChange
+                  ? async () => {
+                      if (!(await guard.current())) return null;
+                      return onPrepareAssignments
+                        ? onPrepareAssignments()
+                        : data;
+                    }
+                  : undefined
+              }
+              onDraftChange={(keys) =>
+                setC((current) => ({
+                  ...current,
+                  groups: keys
+                    .filter((key) => key.startsWith("group:"))
+                    .map((key) => key.slice(6)),
+                  updateTeams: onWorkspaceChange
+                    ? keys
+                        .filter((key) => key.startsWith("team:"))
+                        .map((key) => key.slice(5))
+                    : current.updateTeams,
+                }))
+              }
+              registerNavigationGuard={registerAssignmentGuard}
+            />
+          ) : existing &&
+            (data.publishedContent ?? data.content).some(
+              (item) => item.id === c.id && item.status === "published",
+            ) &&
+            onWorkspaceChange ? (
+            <LearningAssignmentPicker
+              data={data}
+              item={{ kind: "course", id: c.id }}
+              title={c.title}
+              onChange={async (next, options) => {
+                await onWorkspaceChange(next, options);
+                setAssignmentSave((count) => count + 1);
+              }}
+              registerNavigationGuard={registerAssignmentGuard}
+              onPrepare={async () => {
+                if (!(await guard.current())) return null;
+                return onPrepareAssignments ? onPrepareAssignments() : data;
+              }}
+            />
+          ) : (
+            <p className="text-copy text-muted-foreground">
+              Publish this course to assign it to teams or groups.
+            </p>
+          )}
         </EditorDetailsGroup>
       )}
       {c.kind !== "doc" && (
@@ -2491,38 +2555,6 @@ export function Editor({
                 Current version: {c.version}. Keep this unchecked for minor
                 corrections.
               </FieldDescription>
-            </EditorDetailsGroup>
-          )}
-          {onLearning && (
-            <EditorDetailsGroup
-              id="course-assignments"
-              title="Assignments"
-              description="Assign courses to teams or custom learning groups. Completion windows are managed in organization settings."
-            >
-              {existing &&
-              (data.publishedContent ?? data.content).some(
-                (item) => item.id === c.id && item.status === "published",
-              ) &&
-              onWorkspaceChange ? (
-                <LearningAssignmentPicker
-                  data={data}
-                  item={{ kind: "course", id: c.id }}
-                  title={c.title}
-                  onChange={async (next, options) => {
-                    await onWorkspaceChange(next, options);
-                    setAssignmentSave((count) => count + 1);
-                  }}
-                  registerNavigationGuard={registerAssignmentGuard}
-                  onPrepare={async () => {
-                    if (!(await guard.current())) return null;
-                    return onPrepareAssignments ? onPrepareAssignments() : data;
-                  }}
-                />
-              ) : (
-                <p className="text-copy text-muted-foreground">
-                  Publish this course to assign it to teams or groups.
-                </p>
-              )}
             </EditorDetailsGroup>
           )}
         </>

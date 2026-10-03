@@ -1,6 +1,6 @@
 # Learning model
 
-Everyone with access to an installation can explore its full published library. Teams assign courses and curricula; learning groups provide custom learning audiences and personalize Updates; they never control content visibility. Drafts retain their editorial protections. Organization access settings still determine whether sign-in is needed to enter an installation.
+Everyone with access to an installation can explore its full published library. Teams assign courses and curricula; learning groups provide custom learning audiences; both teams and groups personalize Updates; they never control content visibility. Drafts retain their editorial protections. Organization access settings still determine whether sign-in is needed to enter an installation.
 
 ## Groups, categories and curricula
 
@@ -37,7 +37,7 @@ Self-directed activity never changes the assigned completion percentage. Someone
 
 Course-row arrows appear only when the row overflows and are disabled at each unavailable endpoint. Resizing and course-list changes recalculate their state. Compact progress indicators are shared UI primitives, with text status as well as color.
 
-The Updates page shows up to two recent published updates for the signed-in viewer's effective groups, or the configured guest group for signed-out visitors. Below that, the full published Updates library continues in the same order, excluding only the updates already featured; older relevant updates remain in the library. The library reveals ten more items at a time, without fetching another page because the catalog is already loaded. An update appears at most once. Updates have no completion requirement and do not affect course completion or deadlines. Users without matching groups see the full library without a For you section.
+The Updates page shows up to two recent published updates for the signed-in viewer's selected teams (including ancestor teams and Organization) or effective groups, or the configured guest group for signed-out visitors. Below that, the full published Updates library continues in the same order, excluding only the updates already featured; older relevant updates remain in the library. The library reveals ten more items at a time, without fetching another page because the catalog is already loaded. An update appears at most once. Updates have no completion requirement and do not affect course completion or deadlines. Users without matching groups see the full library without a For you section.
 
 The current content model does not store a first-publication timestamp. Ordering therefore uses the timestamp on the published snapshot (`updatedAt`), falling back to a valid creation timestamp and then a stable ID order for undated items. Draft-only edits do not change the published snapshot or move an update. Republishing an edited update does change its published timestamp and can move it higher in the feed. A separate first-publication date would require a future data-model change.
 

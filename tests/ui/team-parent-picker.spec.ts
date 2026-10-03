@@ -40,6 +40,7 @@ test("parent picker searches ancestry, reveals the whole path, and cancels witho
     .fill("Proposed district");
   const picker = dialog.locator('[data-slot="hierarchy-picker"]');
   const trigger = picker.getByRole("button");
+  const closedHeight = (await picker.boundingBox())!.height;
   await trigger.click();
   const search = page.getByRole("combobox", {
     name: "Find a parent team",
@@ -54,16 +55,15 @@ test("parent picker searches ancestry, reveals the whole path, and cancels witho
   });
   await expect(path).toContainText("Commercial division / Regional level 2");
   await expect(path).toContainText("Regional level 11 / Regional level 12");
+  expect(
+    await path.evaluate((node) => node.scrollWidth > node.clientWidth),
+  ).toBe(true);
+  const footerHeight = (await path.boundingBox())!.height;
   await page.keyboard.press("Enter");
   await expect(trigger).toHaveText("Regional level 12");
   await expect(trigger).toBeFocused();
-  await expect(picker.locator("summary")).toContainText(
-    "Organization / … / Regional level 11 / Regional level 12",
-  );
-  await picker.locator("summary").click();
-  await expect(picker.locator("details p")).toContainText(
-    "Commercial division / Regional level 2",
-  );
+  expect((await picker.boundingBox())!.height).toBe(closedHeight);
+  await expect(picker.locator("details")).toHaveCount(0);
   await trigger.click();
   const selectedOption = page.getByRole("option", {
     name: /Regional level 12$/,
@@ -81,6 +81,14 @@ test("parent picker searches ancestry, reveals the whole path, and cancels witho
       );
     })
     .toBe(true);
+  expect((await path.boundingBox())!.height).toBe(footerHeight);
+  const popup = page
+    .locator('[data-slot="popover-content"]')
+    .filter({ has: search });
+  const popupHeight = (await popup.boundingBox())!.height;
+  await page.getByRole("option", { name: "Organization", exact: true }).hover();
+  await expect(path).toHaveText("Organization");
+  expect((await popup.boundingBox())!.height).toBe(popupHeight);
   await search.fill("no such team");
   await expect(
     page.getByText("No matching teams.", { exact: true }),

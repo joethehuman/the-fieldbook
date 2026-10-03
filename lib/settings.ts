@@ -28,9 +28,13 @@ export const defaultPrivacy: PrivacySettings = {
   publishedAt: null,
 };
 export type SiteSettings = {
+  askAi?: import("./ai").AskAiSettings;
+  /** Availability only; internal model/guidance settings stay on the server. */
+  askAiEnabled?: boolean;
   externalLinks?: ExternalLink[];
   homePage?: "updates" | "courses" | "docs";
   guestGroupId?: string | null;
+  /** Server-owned identity of the built-in team; settings forms cannot replace it. */
   organizationTeamId?: string | null;
   docCategoryOrder?: string[];
   docSections?: import("./docs-navigation").DocSection[];
@@ -69,6 +73,8 @@ export function publicSettings(
   content: DocLink[] = [],
 ): SiteSettings {
   const {
+    askAi: _askAi,
+    askAiEnabled: _askAiEnabled,
     guestGroupId: _guestGroupId,
     organizationTeamId: _organizationTeamId,
     logoUrl: _legacyLogoUrl,
@@ -93,6 +99,7 @@ export function publicSettings(
   }
   return {
     ...visible,
+    askAiEnabled: settings.askAi?.enabled === true,
     externalLinks: accountMenuLinks(settings.externalLinks),
     docCategoryOrder: settings.docCategoryOrder?.filter((name) =>
       docs.some((doc) => doc.category === name),

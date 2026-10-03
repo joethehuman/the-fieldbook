@@ -10,8 +10,11 @@ import type { SaveIntent } from "./draft-save-queue";
 import { mergeSavedContent } from "./content-save";
 import { SaveRecoveryError } from "./save-recovery";
 import { uploadMediaFile } from "./upload-media";
+import { createSettingsSaver } from "./settings-save";
+import type { SiteSettings } from "./settings";
 export type AdminRuntime = {
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
+  saveSettings: (before: Workspace, settings: SiteSettings) => Promise<Workspace>;
   saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
   publishedContent: (id: string) => Promise<Content>;
   refresh: () => Promise<Workspace>;
@@ -26,6 +29,7 @@ export type AdminRuntime = {
     ) => Promise<{ data: Workspace; results: BulkResult[] }>;
     prefetch: () => void;
     prepare: (scope: AdminScope, userId?: string) => Promise<Workspace>;
+    prepareAssignments: () => Promise<Workspace>;
     edit: (id: string) => Promise<{ data: Workspace; item: Content }>;
     unpublish: (id: string) => Promise<Workspace>;
   };
@@ -81,7 +85,7 @@ export function createAdminRuntime(initial: {
     let data = state.data as Workspace;
     if (
       openItem &&
-      (target === "content" || target === "people") &&
+      (target === "content" || target === "people" || target === "governance") &&
       data.content.some((entry) => entry.id === openItem)
     ) {
       const item = await request(
@@ -110,8 +114,15 @@ export function createAdminRuntime(initial: {
     return load;
   }
   const saver = createWorkspaceSaver(request, fresh);
+  const settingsSaver = createSettingsSaver(request, fresh);
   return {
     upload: uploadMediaFile,
+    saveSettings: (before, settings) => mutate(async () => {
+      const saved = await settingsSaver(before, settings);
+      clearCached();
+      cached.set(scope, saved);
+      return saved;
+    }),
     publishedContent: (id) => request(`/api/content?id=${encodeURIComponent(id)}&snapshot=published`),
     saveContent: (content, intent) =>
       mutate(async () => {
@@ -289,6 +300,12 @@ export function createAdminRuntime(initial: {
           ...(initial.user.role === "admin" ? [prepared("people")] : []),
           prepared("feedback"),
         ]);
+      },
+      prepareAssignments: async () => {
+        const data = await prepared("governance");
+        scope = "governance";
+        // Audience selection belongs to the open editor; retain its full-draft refresh.
+        return data;
       },
       prepare: async (next, userId) => {
         const previousPerson = personId;

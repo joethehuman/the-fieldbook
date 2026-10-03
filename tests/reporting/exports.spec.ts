@@ -72,6 +72,25 @@ async function section(page: Page, name: string) {
     await page.getByRole("option", { name, exact: true }).click();
   } else await page.getByRole("tab", { name, exact: true }).click();
 }
+async function searchPeople(page: Page, query: string) {
+  const search = page.getByRole("combobox", {
+    name: "Search teams or people",
+    exact: true,
+  });
+  await search.fill(query);
+  await page.getByRole("option", { name: /^Show matching people/ }).click();
+}
+async function searchTeam(page: Page, name: string) {
+  const search = page.getByRole("combobox", {
+    name: "Search teams or people",
+    exact: true,
+  });
+  await search.fill(name);
+  await page
+    .getByRole("group", { name: "Teams", exact: true })
+    .getByRole("option", { name: new RegExp(`^${name} —`) })
+    .click();
+}
 async function select(page: Page, name: string, option: string) {
   await page.getByRole("combobox", { name, exact: true }).click();
   await page.getByRole("option", { name: option, exact: true }).click();
@@ -292,13 +311,8 @@ test("progress filters, keyboard download, member details and empty report", asy
 }, info) => {
   await setup(page, info);
   await section(page, "Progress");
-  await page
-    .getByRole("button", { name: "Reporting team", exact: true })
-    .click();
-  await page.getByRole("option", { name: /\/ Sales team$/ }).click();
-  await page
-    .getByRole("searchbox", { name: "Find a team member" })
-    .fill("zoe@example.test");
+  await searchTeam(page, "Sales team");
+  await searchPeople(page, "zoe@example.test");
   const displayed = page.locator(
     'table[data-layout="progressPeople"] tbody tr',
   );
@@ -317,8 +331,10 @@ test("progress filters, keyboard download, member details and empty report", asy
     "zoe@example.test",
     "Subteam",
   ]);
-  expect(rows[1].slice(5, 8)).toEqual(["3", "1", "33"]);
-  await expect(displayed).toContainText(rows[1][8]);
+  expect(rows[1].slice(4, 7)).toEqual(["3", "1", "33"]);
+  await expect(displayed).toContainText(
+    rows[1][rows[0].indexOf("Learning status")],
+  );
   await screenshot(page, info, "team-filtered");
   await page.getByRole("button", { name: "View courses", exact: true }).click();
   const detail = await download(
@@ -333,12 +349,8 @@ test("progress filters, keyboard download, member details and empty report", asy
     "Self-directed exploration",
   );
   await screenshot(page, info, "member-assignments");
-  await page
-    .getByRole("button", { name: "Back to people & completion" })
-    .click();
-  await page
-    .getByRole("searchbox", { name: "Find a team member" })
-    .fill("no-match");
+  await page.getByRole("button", { name: "Back to progress" }).click();
+  await searchPeople(page, "no-match");
   const empty = await download(
     page,
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -414,7 +426,7 @@ test("feedback filters and sorting preserve text, formula protection and timesta
     .getByRole("group", { name: "Feedback type", exact: true })
     .getByRole("button", { name: "Courses", exact: true })
     .click();
-  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await page.getByRole("button", { name: /^Filters/ }).click();
   await select(page, "Feedback rating", "Useful");
   await page.keyboard.press("Escape");
   await page.getByRole("searchbox", { name: "Search feedback" }).fill("東京");
@@ -485,9 +497,7 @@ test("large reports download every row in displayed order", async ({
   );
   await setup(page, info, "admin", data);
   await section(page, "Progress");
-  await page
-    .getByRole("searchbox", { name: "Find a team member" })
-    .fill("Large person");
+  await searchPeople(page, "Large person");
   const result = await download(
     page,
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -686,9 +696,7 @@ test("preparation state prevents duplicate clicks and reports a changed filter w
   await expect(preparing).toBeDisabled();
   await expect(preparing).toHaveAttribute("aria-busy", "true");
   await screenshot(page, info, "preparing");
-  await page
-    .getByRole("searchbox", { name: "Find a team member" })
-    .fill("no match");
+  await searchPeople(page, "no match");
   await page.clock.runFor(10);
   await expect(
     page.getByText(
@@ -757,7 +765,7 @@ test("People connects hire-date guidance and preregistration to the shared roste
   await screenshot(page, info, "people-hire-date-guidance");
 });
 
-test("people ring, statuses, pending people and subteam drill reconcile with CSV", async ({
+test("people ring, statuses, pending people and team search reconcile with CSV", async ({
   page,
 }, info) => {
   let data = fixture();
@@ -809,7 +817,7 @@ test("people ring, statuses, pending people and subteam drill reconcile with CSV
     "overdue",
   );
   expect(overdue.rows).toHaveLength(2);
-  expect(overdue.rows[1][9]).toBe("2");
+  expect(overdue.rows[1][overdue.rows[0].indexOf("Overdue courses")]).toBe("2");
   await screenshot(page, info, "batch3-overdue");
   await overview
     .getByRole("heading", { name: "Learning status", exact: true })
@@ -820,13 +828,9 @@ test("people ring, statuses, pending people and subteam drill reconcile with CSV
   await overview
     .getByRole("button", { name: "Overdue 1", exact: true })
     .click();
-  await overview
-    .getByRole("button", { name: "Sales team", exact: true })
-    .click();
+  await searchTeam(page, "Sales team");
   await expect(rows).toHaveCount(6);
-  await page.getByRole("button", { name: "Filters", exact: true }).click();
-  await select(page, "Sign-in status", "Not signed in");
-  await page.keyboard.press("Escape");
+  await searchPeople(page, "pending@example.test");
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText("Pending learner");
   const pending = await download(
@@ -836,7 +840,9 @@ test("people ring, statuses, pending people and subteam drill reconcile with CSV
     "pending",
   );
   expect(pending.rows).toHaveLength(2);
-  expect(pending.rows[1][4]).toBe("Not signed in");
+  expect(pending.rows[0]).not.toContain("Sign-in status");
+  expect(pending.rows[0]).toContain("User type");
+  expect(pending.rows[1][0]).toBe("Pending learner");
 });
 
 test("due dates off removes overdue language and no assignments stays N/A", async ({
@@ -851,9 +857,7 @@ test("due dates off removes overdue language and no assignments stays N/A", asyn
   await expect(
     overview.getByRole("button", { name: /Overdue|Within due dates/ }),
   ).toHaveCount(0);
-  await page
-    .getByRole("searchbox", { name: "Find a team member" })
-    .fill("contributor@example.com");
+  await searchPeople(page, "contributor@example.com");
   const row = page.locator(
     'table[data-layout="progressPeopleNoDates"] tbody tr',
   );
@@ -867,8 +871,10 @@ test("due dates off removes overdue language and no assignments stays N/A", asyn
     "unassigned",
   );
   expect(result.rows[0]).not.toContain("Overdue courses");
-  expect(result.rows[1][7]).toBe("");
-  expect(result.rows[1][8]).toBe("No assigned courses");
+  expect(result.rows[1][result.rows[0].indexOf("Completion (%)")]).toBe("");
+  expect(result.rows[1][result.rows[0].indexOf("Learning status")]).toBe(
+    "No assigned courses",
+  );
   await screenshot(page, info, "batch3-no-dates");
 });
 
@@ -886,9 +892,7 @@ test("person back preserves page, sort, filter and scroll", async ({
   );
   await setup(page, info, "admin", data);
   await section(page, "Progress");
-  await page
-    .getByRole("searchbox", { name: "Find a team member" })
-    .fill("Preserved person");
+  await searchPeople(page, "Preserved person");
   await page
     .getByRole("button", { name: "Sort: Name A–Z", exact: true })
     .click();
@@ -911,9 +915,7 @@ test("person back preserves page, sort, filter and scroll", async ({
   await expect(
     page.getByRole("heading", { name: /’s assignments$/ }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Back to people & completion" })
-    .click();
+  await page.getByRole("button", { name: "Back to progress" }).click();
   await expect(pages).toContainText("Page 2 of 3");
   expect(
     await table.locator("tbody td:first-child strong").allTextContents(),
@@ -975,3 +977,275 @@ test("changed saved report blocks CSV until refresh and revoked access blocks de
   ).toBeDisabled();
   await screenshot(page, info, "batch3-detail-denied");
 });
+
+test("progress scope is distinct from optional people filters and stays stable", async ({
+  page,
+}, info) => {
+  const data = fixture();
+  data.groups.push({
+    id: "pilot",
+    name: "Pilot audience",
+    requiredCourseIds: [],
+  });
+  data.users[0].groups.push("pilot");
+  data.users.find((user) => user.id === "outsider")!.groups.push("pilot");
+  await setup(page, info, "admin", data);
+  await section(page, "Progress");
+  await expect(
+    page.getByRole("heading", { name: "Progress", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("People & completion", { exact: true }),
+  ).toHaveCount(0);
+  const search = page.getByRole("combobox", {
+    name: "Search teams or people",
+    exact: true,
+  });
+  await search.click();
+  await expect(
+    page
+      .getByRole("group", { name: "Teams", exact: true })
+      .getByRole("option", { name: /^Organization —/ }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("option", { name: /Entire organization/ }),
+  ).toHaveCount(0);
+  await searchTeam(page, "Sales team");
+  const overview = page.locator('[data-slot="progress-overview"]');
+  const controls = page.locator('[data-slot="collection-controls"]');
+  expect((await overview.boundingBox())!.y).toBeLessThan(
+    (await controls.boundingBox())!.y,
+  );
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Sign-in status", exact: true }),
+  ).toHaveCount(0);
+  const group = page.getByRole("combobox", {
+    name: "Learning group",
+    exact: true,
+  });
+  await expect(group).toHaveAccessibleDescription(/all their assigned courses/);
+  await select(page, "Learning group", "Pilot audience");
+  await page.getByRole("combobox", { name: "User type", exact: true }).click();
+  await expect(
+    page.getByRole("option", { name: "New users", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("option", { name: "Existing users", exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Escape");
+  const rows = page.locator('table[data-layout="progressPeople"] tbody tr');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText("zoe@example.test");
+  // This group assigns no courses. Its members still report all their assignments.
+  await expect(rows).toContainText("1 of 3 courses");
+  await expect(rows).not.toContainText("SECRET OUTSIDER");
+  await expect(rows).not.toContainText("Onboarding");
+  await expect(rows).not.toContainText("Signed in");
+  await page.getByRole("button", { name: "Clear all", exact: true }).click();
+  const activePeople = data.users.filter((user) => user.active).length;
+  await expect(
+    page.getByText(`Organization · ${activePeople} people.`, { exact: false }),
+  ).toBeVisible();
+  await expect(rows).toHaveCount(activePeople);
+  await screenshot(page, info, "progress-refined-scope");
+});
+
+test("two-chart overview stays bounded with fifty teams and filter row appears left-aligned above People", async ({
+  page,
+}, info) => {
+  const data = fixture();
+  data.teams!.push(
+    ...Array.from({ length: 50 }, (_, index) => ({
+      id: `region-${index}`,
+      name: `Regional team ${String(index + 1).padStart(2, "0")}`,
+      parentId: data.settings!.organizationTeamId!,
+    })),
+  );
+  await setup(page, info, "admin", data);
+  await section(page, "Progress");
+  const overview = page.locator('[data-slot="progress-overview"]');
+  await expect(overview.locator(':scope > [data-slot="card"]')).toHaveCount(2);
+  await expect(
+    overview.getByRole("heading", { name: "Progress by team", exact: true }),
+  ).toHaveCount(0);
+  const controls = page.locator('[data-slot="collection-controls"]');
+  const primary = controls.locator('[data-slot="collection-primary-row"]');
+  const headingRow = controls.locator(
+    '[data-slot="collection-applied-filters"]',
+  );
+  const table = page.getByRole("region", {
+    name: "People progress",
+    exact: true,
+  });
+  const tableOffset = async () =>
+    (await table.boundingBox())!.y -
+    ((await primary.boundingBox())!.y + (await primary.boundingBox())!.height);
+  const baseline = await tableOffset();
+  expect((await headingRow.boundingBox())!.height).toBe(0);
+  await searchTeam(page, "Sales team");
+  await expect(
+    headingRow.getByRole("button", {
+      name: "Remove Team: Sales team filter",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect
+    .poll(async () => (await headingRow.boundingBox())!.height)
+    .toBe(52);
+  expect(Math.abs((await tableOffset()) - baseline - 52)).toBeLessThanOrEqual(
+    1,
+  );
+  const chip = headingRow.getByRole("button", {
+    name: "Remove Team: Sales team filter",
+    exact: true,
+  });
+  const search = page.getByRole("combobox", {
+    name: "Search teams or people",
+    exact: true,
+  });
+  expect(
+    Math.abs((await chip.boundingBox())!.x - (await search.boundingBox())!.x),
+  ).toBeLessThanOrEqual(1);
+  const people = page.getByRole("heading", { name: "People", exact: true });
+  expect((await people.boundingBox())!.y).toBeGreaterThan(
+    (await headingRow.boundingBox())!.y + 52,
+  );
+  await screenshot(page, info, "left-aligned-progress-filters");
+  await page.getByRole("button", { name: "Clear all", exact: true }).click();
+  await expect
+    .poll(async () => (await headingRow.boundingBox())!.height)
+    .toBe(0);
+  expect(Math.abs((await tableOffset()) - baseline)).toBeLessThanOrEqual(1);
+  // Team discovery still reaches a later result among more than fifty teams.
+  await searchTeam(page, "Regional team 50");
+  await expect(
+    page.getByText("Regional team 50 · 0 people.", { exact: false }),
+  ).toBeVisible();
+  await searchTeam(page, "Organization");
+  await screenshot(page, info, "compact-progress-fifty-teams");
+});
+
+test("unified search groups results, commits a person by identity, and keeps highest-scope charts while typing", async ({
+  page,
+}, info) => {
+  const data = fixture();
+  data.users.find((user) => user.id === "outsider")!.name = data.users[0].name;
+  await setup(page, info, "admin", data);
+  await section(page, "Progress");
+  const overview = page.locator('[data-slot="progress-overview"]');
+  const baseline = await overview
+    .getByRole("progressbar", { name: "People up to date", exact: true })
+    .getAttribute("aria-valuenow");
+  const search = page.getByRole("combobox", {
+    name: "Search teams or people",
+    exact: true,
+  });
+  await search.fill("team");
+  const list = page.getByRole("listbox", {
+    name: "Search results",
+    exact: true,
+  });
+  const groups = list.getByRole("group");
+  await expect(groups).toHaveCount(2);
+  await expect(groups.nth(0)).toHaveAccessibleName("Teams");
+  await expect(groups.nth(1)).toHaveAccessibleName("People");
+  await expect(
+    overview.getByRole("progressbar", {
+      name: "People up to date",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-valuenow", baseline!);
+  await search.fill("Zoë");
+  const people = list.getByRole("group", { name: "People", exact: true });
+  await expect(
+    people.getByRole("option", { name: /zoe@example.test/ }),
+  ).toHaveCount(1);
+  await expect(
+    people.getByRole("option", { name: /outsider@example.test/ }),
+  ).toHaveCount(1);
+  await people.getByRole("option", { name: /zoe@example.test/ }).click();
+  await expect(search).toBeFocused();
+  await expect(list).not.toBeVisible();
+  const rows = page.locator('table[data-layout="progressPeople"] tbody tr');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText("zoe@example.test");
+  await expect(rows).not.toContainText("outsider@example.test");
+  const exported = await download(
+    page,
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+    info,
+    "selected-person",
+  );
+  expect(exported.rows).toHaveLength(2);
+  expect(exported.rows[1][1]).toBe("zoe@example.test");
+  await searchTeam(page, "Sales team");
+  await expect(rows).toHaveCount(5);
+  await expect(
+    page.getByText("Sales team · 5 people. Includes all subteams.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await screenshot(page, info, "unified-report-search");
+});
+
+test("manager unified search never offers sibling people or teams", async ({
+  page,
+}, info) => {
+  await setup(page, info, "manager");
+  const search = page.getByRole("combobox", {
+    name: "Search teams or people",
+    exact: true,
+  });
+  await expect(
+    page.getByText("Sales team · 5 people. Includes all subteams.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await search.fill("outsider");
+  await expect(
+    page.getByRole("option", { name: /outsider@example.test/ }),
+  ).toHaveCount(0);
+  await search.fill("Sibling");
+  await expect(page.getByRole("option", { name: /^Sibling team/ })).toHaveCount(
+    0,
+  );
+  await page.keyboard.press("Escape");
+  await expect(search).toBeFocused();
+  await screenshot(page, info, "manager-search-scope");
+});
+
+for (const scope of ["multiple roots", "Organization"]) {
+  test(`manager overview defaults to the highest permitted scope: ${scope}`, async ({
+    page,
+  }, info) => {
+    const data = fixture();
+    const manager = data.users.find((user) => user.id === "demo-manager")!;
+    const root = data.teams!.find((team) =>
+      scope === "Organization"
+        ? team.system === "organization"
+        : team.id === "other",
+    )!;
+    root.managerId = manager.id;
+    const count =
+      scope === "Organization"
+        ? data.users.filter((user) => user.active).length
+        : 6;
+    const label = scope === "Organization" ? "Organization" : "All my teams";
+    await setup(page, info, "manager", data);
+    const rows = page.locator('table[data-layout="progressPeople"] tbody tr');
+    await expect(rows).toHaveCount(count);
+    await expect(
+      page.getByText(`${label} · ${count} people.`, { exact: false }),
+    ).toBeVisible();
+    await searchTeam(page, "Sales team");
+    await expect(rows).toHaveCount(5);
+    await page.getByRole("button", { name: "Clear all", exact: true }).click();
+    await expect(rows).toHaveCount(count);
+    await expect(
+      page.getByText(`${label} · ${count} people.`, { exact: false }),
+    ).toBeVisible();
+    await screenshot(page, info, `manager-highest-${scope.replace(" ", "-")}`);
+  });
+}

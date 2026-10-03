@@ -20,6 +20,7 @@ export function FormField({
   label,
   description,
   error,
+  errorPlaceholder,
   visuallyHiddenLabel = false,
   children,
   className,
@@ -28,6 +29,8 @@ export function FormField({
   label: ReactNode;
   description?: ReactNode;
   error?: ReactNode;
+  /** Reserve wrapping space for anticipated validation without announcing it. */
+  errorPlaceholder?: ReactNode;
   visuallyHiddenLabel?: boolean;
   children: ReactElement<ControlProps>;
 }) {
@@ -47,7 +50,12 @@ export function FormField({
       className={cn("grid min-w-0 gap-2", className)}
       {...props}
     >
-      <Field htmlFor={id} className={visuallyHiddenLabel ? "sr-only" : undefined}>{label}</Field>
+      <Field
+        htmlFor={id}
+        className={visuallyHiddenLabel ? "sr-only" : undefined}
+      >
+        {label}
+      </Field>
       {cloneElement(children, {
         id,
         "aria-describedby": describedBy,
@@ -58,7 +66,15 @@ export function FormField({
           {description}
         </FieldDescription>
       )}
-      {error && <FieldError id={`${id}-error`}>{error}</FieldError>}
+      {(error || errorPlaceholder) && (
+        <FieldError
+          id={error ? `${id}-error` : undefined}
+          aria-hidden={error ? undefined : true}
+          className={!error ? "invisible" : undefined}
+        >
+          {error || errorPlaceholder}
+        </FieldError>
+      )}
     </div>
   );
 }

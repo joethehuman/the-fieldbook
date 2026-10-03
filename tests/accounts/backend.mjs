@@ -53,6 +53,25 @@ let documents = [],
   reads = 0,
   authReads = 0;
 let fixtureGeneration = Date.now();
+let aiGenerations = 0,
+  aiFailure = "",
+  aiAnswer = "",
+  aiPassages = [];
+let aiStage = 0;
+let stageWaiters = [];
+const waitForAiStage = (stage) =>
+  aiStage >= stage
+    ? Promise.resolve()
+    : new Promise((resolve) => {
+        const timeout = setTimeout(resolve, 20_000);
+        stageWaiters.push({
+          stage,
+          release: () => {
+            clearTimeout(timeout);
+            resolve();
+          },
+        });
+      });
 let readQueries = [];
 let settings = initial(),
   configuredGroups = [],
@@ -140,10 +159,154 @@ createServer(async (req, res) => {
     fail = !!change.fail;
     role = change.role || "admin";
     revision = 1;
+    aiGenerations = 0;
+    aiStage = 0;
+    stageWaiters.forEach(({ release }) => release());
+    stageWaiters = [];
+    aiFailure = change.aiFailure || "";
+    aiAnswer = change.aiAnswer || "";
+    aiPassages = change.aiPassages || [];
+    return send(res, { ok: true });
+  }
+  if (url.pathname === "/ai-stage") {
+    aiStage = JSON.parse(body).stage;
+    stageWaiters = stageWaiters.filter((waiter) => {
+      if (waiter.stage > aiStage) return true;
+      waiter.release();
+      return false;
+    });
     return send(res, { ok: true });
   }
   if (url.pathname === "/reads")
-    return send(res, { reads, readQueries, authReads });
+    return send(res, { reads, readQueries, authReads, aiGenerations });
+  if (url.pathname === "/gateway/v1/models")
+    return send(res, {
+      data: [
+        ...Array.from({ length: 8 }, (_, i) => ({
+          id: `catalog/model-${i}`,
+          name: `Synthetic compatible ${i + 1}`,
+          type: "language",
+          tags: ["tool-use"],
+          pricing: {
+            input: String((i + 1) / 1000000),
+            output: String((i + 1) / 1000000),
+          },
+        })),
+        {
+          id: "test/primary",
+          name: "Synthetic free model",
+          type: "language",
+          tags: ["tool-use"],
+          pricing: { input: "0", output: "0" },
+          zdr: "none",
+          no_training: "none",
+        },
+        {
+          id: "synthetic/paid",
+          name: "Synthetic paid model",
+          type: "language",
+          tags: ["tool-use"],
+          pricing: { input: "0.00000002", output: "0.00000006" },
+          zdr: "some",
+          no_training: "all",
+        },
+      ],
+    });
+  if (
+    url.pathname.startsWith("/gateway/") &&
+    url.pathname.endsWith("/language-model")
+  ) {
+    aiGenerations++;
+    if (
+      aiFailure === "budget-planning" ||
+      (aiFailure === "budget-answer" &&
+        req.headers["ai-language-model-streaming"] !== "false")
+    )
+      return send(
+        res,
+        {
+          error: {
+            type: "quota_for_entity_exceeded",
+            message: "PRIVATE synthetic spend and credentials",
+          },
+        },
+        402,
+      );
+
+    const usage = {
+      inputTokens: { total: 10, noCache: 10, cacheRead: 0, cacheWrite: 0 },
+      outputTokens: { total: 8, text: 8, reasoning: 0 },
+    };
+    if (
+      aiFailure === "staged-answer" &&
+      req.headers["ai-language-model-streaming"] === "false"
+    )
+      await waitForAiStage(1);
+    if (req.headers["ai-language-model-streaming"] === "false")
+      return send(res, {
+        content: [
+          {
+            type: "tool-call",
+            toolCallId: "search",
+            toolName: "searchPublishedContent",
+            input: JSON.stringify({ queries: ["setup check"] }),
+          },
+        ],
+        finishReason: { unified: "tool-calls", raw: "tool_calls" },
+        usage,
+      });
+    res.writeHead(200, { "Content-Type": "text/event-stream" });
+    if (aiFailure === "staged-answer") {
+      const write = (part) =>
+        res.write("data: " + JSON.stringify(part) + "\n\n");
+      write({ type: "stream-start", warnings: [] });
+      write({ type: "text-start", id: "answer" });
+      await waitForAiStage(2);
+      write({
+        type: "text-delta",
+        id: "answer",
+        delta: aiAnswer || "Hi! What would you like to know?",
+      });
+      write({ type: "text-end", id: "answer" });
+      await waitForAiStage(3);
+      write({
+        type: "finish",
+        finishReason: { unified: "stop", raw: "stop" },
+        usage,
+      });
+      return res.end();
+    }
+    return res.end(
+      [
+        { type: "stream-start", warnings: [] },
+        { type: "text-start", id: "answer" },
+        {
+          type: "text-delta",
+          id: "answer",
+          delta: "The setup check code is ready. [S1]",
+        },
+        { type: "text-end", id: "answer" },
+        {
+          type: "finish",
+          finishReason: { unified: "stop", raw: "stop" },
+          usage,
+        },
+      ]
+        .map((part) => "data: " + JSON.stringify(part) + "\n\n")
+        .join(""),
+    );
+  }
+  if (url.pathname === "/rest/v1/rpc/fb_ai_passages") {
+    const query = JSON.parse(body);
+    return send(
+      res,
+      query.p_queries.length
+        ? aiPassages.filter((p) => query.p_kinds.includes(p.kind))
+        : [],
+    );
+  }
+  if (url.pathname === "/rest/v1/rpc/fb_ai_sources_current")
+    return send(res, true);
   if (url.pathname === "/health") return send(res, { ok: true });
   if (url.pathname === "/auth/v1/.well-known/jwks.json")
     return send(res, { keys: [jwk] });
@@ -162,6 +325,9 @@ createServer(async (req, res) => {
   if (url.pathname === "/rest/v1/fb_config") {
     if (req.method === "PATCH") {
       const parsed = JSON.parse(body);
+      // Preview's Organization trigger rejects losing this server-owned identity.
+      if (settings.organizationTeamId && parsed.settings.organizationTeamId !== settings.organizationTeamId)
+        return send(res, { code: "P0001", message: "Keep the built-in Organization team as the only top-level team" }, 400);
       if (url.searchParams.get("revision") !== `eq.${revision}`)
         return send(res, null);
       settings = parsed.settings;
@@ -229,6 +395,7 @@ createServer(async (req, res) => {
             "version",
             "createdAt",
             "groups",
+            "updateTeams",
             "assignments",
             "duration",
             "coverImageUrl",
@@ -251,6 +418,7 @@ createServer(async (req, res) => {
             "createdAt",
             "updatedAt",
             "groups",
+            "updateTeams",
             "assignments",
             "coverImageUrl",
             "duration",
