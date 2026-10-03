@@ -11,6 +11,12 @@ function fixture() {
   course.title = "Scrolling course";
   course.groups = [];
   course.assignments = [];
+  course.lessons = Array.from({ length: 40 }, (_, i) => ({
+    ...course.lessons[0], id: `lesson-${i}`, title: `Lesson ${String(i + 1).padStart(2, "0")}`,
+    body: i === 0 ? "A short lesson that fits the writing pane."
+      : Array.from({ length: 60 }, (_, j) => `Paragraph ${j + 1}. Longer authoring content.`).join("\n\n"),
+  }));
+  course.questions = Array.from({ length: 8 }, (_, i) => ({ ...course.questions[0], id: `question-${i}` }));
   const doc = data.content.find((item) => item.kind === "doc")!;
   data.content = [
     course,
@@ -198,12 +204,14 @@ test("editor Details and reader outlines contain native wheel input", async ({
   await row.getByRole("button", { name: "Edit", exact: true }).click();
   await openContentSettings(page);
   const main = page.locator(".main-content");
-  await main.evaluate((el) => {
-    el.scrollTop = (el.scrollHeight - el.clientHeight) / 2;
-  });
+  await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "workspace");
+  await expect.poll(() => main.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
   await contained(page, page.locator(".editor-frame-details"), [
-    page.locator(".topbar"),
+    page.locator(".topbar"), page.getByRole("textbox", { name: "Title", exact: true }),
   ]);
+  await page.locator(".editor-frame-details").evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  const last = page.getByRole("button", { name: "Revert to published version", exact: true });
+  expect(await last.evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThanOrEqual(page.viewportSize()!.height);
   await page.screenshot({
     path: info.outputPath("editor-details-contained.png"),
   });
@@ -215,6 +223,71 @@ test("editor Details and reader outlines contain native wheel input", async ({
   const outline = page.locator(".reading-outline nav:visible");
   await expect(outline).toBeVisible();
   await contained(page, outline, [page.locator(".topbar")]);
+});
+
+test("complete editor fits at its starting position and each overflowing pane remains usable", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await setup(page, info.project.name.startsWith("production"));
+  await page.getByRole("searchbox", { name: "Search content", exact: true }).fill("Scrolling course");
+  await page.getByRole("row").filter({ hasText: "Scrolling course" }).getByRole("button", { name: "Edit", exact: true }).click();
+  const main = page.locator(".main-content");
+  const title = page.getByRole("textbox", { name: "Title", exact: true });
+  const controls = page.locator(".editor-frame-controls");
+  const writing = page.getByRole("textbox", { name: "Lesson content", exact: true });
+  await expect(writing).toBeVisible();
+  await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "workspace");
+  await expect.poll(() => main.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
+  await expect.poll(() => page.locator(".writing-scroll-area").evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
+  await wheel(page, page.locator(".writing-scroll-area"), 700);
+  expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+
+  // An actual enabled last action must be reachable without first scrolling the page.
+  await writing.click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.type(" An unpublished edit.");
+  const details = await openContentSettings(page);
+  await contained(page, details, [title, controls]);
+  await details.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  const revert = details.getByRole("button", { name: "Revert to published version", exact: true });
+  await expect(revert).toBeEnabled();
+  expect(await revert.evaluate((el) => el.getBoundingClientRect().bottom)).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await revert.click();
+  await page.getByRole("alertdialog").getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+  await page.screenshot({ path: info.outputPath("editor-start-complete-details.png") });
+
+  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
+  const source = page.getByRole("textbox", { name: "Lesson content Markdown", exact: true });
+  await source.fill(Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1}. Long writing content.`).join("\n\n"));
+  await contained(page, source, [title, controls, page.locator(".writing-view-header")]);
+  await page.getByRole("tab", { name: "Preview draft", exact: true }).click();
+  await contained(page, page.locator(".writing-scroll-area"), [title, controls]);
+  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await contained(page, page.locator(".writing-scroll-area"), [title, controls, page.locator(".mdxeditor-toolbar")]);
+  const instance = await writing.elementHandle();
+  await page.getByRole("button", { name: /^Outline/ }).click();
+  expect(await instance!.evaluate((el) => el.isConnected)).toBe(true);
+  const outline = page.locator(".editor-frame-outline");
+  await contained(page, outline, [title, controls]);
+  await outline.getByRole("button", { name: "Quiz", exact: true }).click();
+  const quiz = page.locator(".editor-frame-canvas");
+  await contained(page, quiz, [title, controls]);
+  await quiz.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await page.getByRole("button", { name: "Add question", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Question 9", exact: true })).toBeVisible();
+  expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
+  await page.screenshot({ path: info.outputPath("editor-quiz-contained.png") });
+  await outline.getByRole("button", { name: "2 Lesson 02", exact: true }).click();
+  await expect(writing).toBeVisible();
+  await expect.poll(() => page.locator(".writing-scroll-area").evaluate((el) => el.scrollTop)).toBe(0);
+  await page.setViewportSize({ width: 1440, height: 600 });
+  await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "workspace");
+  await expect.poll(() => main.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeLessThanOrEqual(1);
+  await page.setViewportSize({ width: 1440, height: 420 });
+  await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "page");
+  await writing.locator("p").first().click();
+  await page.keyboard.type("Reachable on a short screen. ");
+  await expect(writing).toContainText("Reachable on a short screen.");
 });
 
 test("audience search and actions stay visible through long, one and zero choices", async ({

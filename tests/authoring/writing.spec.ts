@@ -49,7 +49,11 @@ test("link popups follow text through scrolling and panel changes, and bare doma
   await expect.poll(nearLink).toBe(true);
   await expect(page.getByTestId("link-dialog-preview")).toHaveAttribute("href", "https://google.com");
   const before = await link.boundingBox();
-  await editor.evaluate((node) => { node.closest(".writing-scroll-area")!.scrollTop += 12; });
+  await editor.evaluate((node) => {
+    const owner = node.closest('.editor[data-scroll-layout="workspace"]')
+      ? node.closest(".writing-scroll-area")! : node.closest(".main-content")!;
+    owner.scrollTop += 12;
+  });
   await expect.poll(async () => (await link.boundingBox())!.y).toBeLessThan(before!.y);
   await expect.poll(nearLink).toBe(true);
   if (!info.project.name.endsWith("phone")) {
@@ -945,13 +949,27 @@ test("selected-text formatting preserves surrounding text and adjacent list item
   expect((await read()).content[0].body).toMatch(/[*-] Third item/);
 });
 
-test("long writing keeps the toolbar and rounded frame visible while its body scrolls", async ({ page }, info) => {
+test("long writing uses a stationary desktop frame and reachable natural page fallback", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), Array.from({ length: 55 }, (_, index) => `Paragraph ${index + 1}. Practical context that keeps growing as the author writes.`).join("\n\n"));
   const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
-  await editor.click();
+  await editor.locator("p").first().click();
   const body = page.locator('.writing-viewport[data-state="active"]');
   const surface = page.locator(".writing-editor.writing-surface");
-  await expect.poll(() => page.locator(".editor-frame").getAttribute("data-writing-pinned")).toBe("true");
+  const bounded = await page.locator(".editor").getAttribute("data-scroll-layout") === "workspace";
+  if (!bounded) {
+    const main = page.locator(".main-content");
+    await expect.poll(() => main.evaluate((node) => node.scrollHeight - node.clientHeight)).toBeGreaterThan(100);
+    await page.mouse.wheel(0, 900);
+    await expect.poll(() => main.evaluate((node) => node.scrollTop)).toBeGreaterThan(50);
+    await editor.locator("p").last().click();
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.type(" Final caret remains visible.");
+    await expect(editor).toContainText("Final caret remains visible.");
+    await page.getByRole("tab", { name: "Markdown", exact: true }).click();
+    await expect(page.getByRole("textbox", { name: "Doc content Markdown", exact: true })).toBeVisible();
+    await page.screenshot({ path: info.outputPath("editor-natural-page.png") });
+    return;
+  }
   const before = await surface.boundingBox();
   await body.hover();
   await page.mouse.wheel(0, 900);
@@ -984,8 +1002,7 @@ test("scroll and pointer dismissal preserve pending slash text at its original l
   const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
   const menu = page.getByRole("menu", { name: /^Insert content/ });
   const source = page.getByRole("textbox", { name: "Doc content Markdown", exact: true });
-  await editor.click();
-  await expect.poll(() => page.locator(".editor-frame").getAttribute("data-writing-pinned")).toBe("true");
+  await editor.locator("p").first().click();
   await editor.locator("p").first().evaluate((node) => {
     (node.closest("[contenteditable]") as HTMLElement).focus();
     const text = document.createTreeWalker(node, NodeFilter.SHOW_TEXT).nextNode()!;
@@ -994,8 +1011,8 @@ test("scroll and pointer dismissal preserve pending slash text at its original l
   });
   await page.keyboard.type("/h3");
   await expect(menu).toBeVisible();
-  const body = page.locator('.writing-viewport[data-state="active"]');
-  await expect.poll(() => page.locator(".editor-frame").getAttribute("data-writing-pinned")).toBe("true");
+  const body = await page.locator(".editor").getAttribute("data-scroll-layout") === "workspace"
+    ? page.locator('.writing-viewport[data-state="active"]') : page.locator(".main-content");
   await body.evaluate((node) => { node.scrollTop = 700; });
   await expect(menu).toHaveCount(0);
   await expect.poll(() => body.evaluate((node) => node.scrollTop)).toBeGreaterThan(500);

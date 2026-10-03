@@ -36,7 +36,6 @@
 .writing-surface {
   display: flex;
   flex-direction: column;
-  max-height: var(--editor-writing-height, none);
   overflow: clip;
 }
 .writing-editor .mdxeditor {
@@ -66,14 +65,14 @@
   scrollbar-gutter: stable;
   overscroll-behavior-y: auto;
 }
-.editor-frame[data-writing-scroll="contained"][data-writing-pinned="false"] .writing-scroll-area {
-  overflow-y: hidden;
-}
-.editor-frame[data-writing-scroll="page"] .writing-surface { max-height: none; }
-.editor-frame[data-writing-scroll="page"] :is(.mdxeditor-toolbar, .writing-view-header) {
-  position: sticky;
-  top: var(--editor-writing-top);
-}
+.editor[data-scroll-layout="workspace"] :is(.writing-root, .writing-surface) { flex: 1 1 0; min-height: 0; }
+.editor[data-scroll-layout="workspace"] .writing-scroll-area { overscroll-behavior-y: contain; }
+.editor[data-scroll-layout="workspace"] .writing-content[contenteditable] { min-height: 0; }
+.editor[data-scroll-layout="workspace"] .writing-viewport > .mdxeditor-root-contenteditable { display: flex; flex-direction: column; min-height: 100%; }
+.editor[data-scroll-layout="workspace"] .mdxeditor-contenteditable-wrapper { display: flex; flex: 1; flex-direction: column; }
+.editor[data-scroll-layout="workspace"] .writing-content[contenteditable] { flex: 1; }
+.editor[data-scroll-layout="workspace"] [aria-label="Draft preview"] { min-height: 0; }
+.editor[data-scroll-layout="page"] .writing-viewport:not(.writing-source-panel) { overflow-y: visible; }
 .writing-surface:focus-within,
 .writing-surface[data-editor-interacting="true"] {
   border-color: var(--ring);
