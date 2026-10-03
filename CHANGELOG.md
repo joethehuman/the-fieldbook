@@ -4,6 +4,12 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Explain course audiences through explicitly named curricula and linked groups. Teams covered by a selected group appear included; current-person overlap stays selectable. Park new redundant team choices, preserve saved independent assignments, and distinguish existing recipients from newly included people. Demo sample data is unchanged.
+
+- Use a compact, stable audience workflow across Course and Update Details. Choose Organization or specific audiences, preserve saved sources, keep search geometry stable, and review course consequences without replacing the dialog. Updates apply to the draft before explicit Publish. Name the configured public guest group and include any registered members in its reach; public access never creates a group automatically.
+
+- Share one team/group audience picker across Course and Update Details. Organization and parent teams explain which audiences are already included; retain existing separate/curriculum links and keep configured public guests separately selectable. Update team targeting stays in drafts until Publish and creates no completion requirement or deadline.
+
 - Smooth Ask AI router bursts into progressive text with AI Elements' built-in word fade and calmer thinking dots. Hide internal citation IDs until verified numbers are ready, use shared source tooltips, and gently reveal expanded sources within the chat pane. Respect reduced motion and retain Stop without moving the page or composer.
 
 - Let Ask AI respond naturally to greetings and clarification when published-content retrieval is empty, regardless of punctuation. Replace the shifting Answering label with clearly moving, staggered thinking dots in the pending assistant position, static with reduced motion.

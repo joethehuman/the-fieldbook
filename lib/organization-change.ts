@@ -9,6 +9,8 @@ export type OrganizationChangeOptions = {
   /** Revalidate a captured UI target after its consequence review, before persistence. */
   validateCurrent?: () => void;
   review?: {
+    /** A caller may present consequences in its own stable workflow. Persistence still revalidates. */
+    confirm?: (before: Workspace, after: Workspace) => Promise<boolean>;
     title?: string;
     description?: string;
     confirmLabel?: string;

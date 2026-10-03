@@ -38,6 +38,8 @@ export type Content = {
   cardArt?: import("./card-art").CardArt;
   duration: number;
   groups: string[];
+  /** Update recommendations for teams and their descendants; no learning obligation. */
+  updateTeams?: string[];
   lessons: Lesson[];
   questions: Question[];
   /** Missing on older published courses, which retain the original passing rule. */

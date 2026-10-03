@@ -15,6 +15,7 @@ import {
   type Content,
   type User,
   type Group,
+  type Team,
 } from "@/lib/types";
 import { LoadMore } from "@/components/patterns/load-more";
 
@@ -24,24 +25,29 @@ export default function Updates({
   content,
   user,
   groups,
+  teams = [],
   onOpen,
   settings,
 }: {
   content: Content[];
   user: User;
   groups: Group[];
+  teams?: Team[];
   onOpen: (id: string) => void;
   settings?: SiteSettings;
 }) {
-  const { forYou, other } = updatesForUser(content, user, groups);
+  const { forYou, other } = updatesForUser(content, user, groups, teams);
   const paginationKey = JSON.stringify({
     viewer: user.id,
+    team: user.teamId,
+    teams,
     groups: [...effectiveGroups(user, groups)].sort(),
     updates: [...forYou, ...other].map((item) => [
       item.id,
       item.updatedAt,
       item.createdAt,
       [...item.groups].sort(),
+      [...(item.updateTeams || [])].sort(),
     ]),
   });
   const [pagination, setPagination] = useState({ key: "", count: PAGE_SIZE });

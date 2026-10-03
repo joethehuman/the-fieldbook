@@ -102,6 +102,7 @@ export type ReaderIndexRecord = Pick<
   | "cardArt"
   | "feedAt"
   | "groups"
+  | "updateTeams"
 >;
 export type CourseIndexRecord = ReaderIndexRecord &
   Partial<

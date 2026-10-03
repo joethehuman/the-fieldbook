@@ -61,6 +61,7 @@ export const contentBaseSchema = z.object({
   duration: z.number().int().min(0).max(10000),
   requirePassing: z.boolean().optional(),
   groups: z.array(text(80)).max(1000),
+  updateTeams: z.array(text(80).min(1)).max(1000).optional(),
   lessons: z
     .array(
       z.object({

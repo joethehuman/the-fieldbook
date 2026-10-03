@@ -141,6 +141,7 @@ export function isArtworkOnlyUpdate(
       item.category,
       item.folder,
       item.groups,
+      item.updateTeams || [],
       item.lessons,
       item.questions,
       item.version,

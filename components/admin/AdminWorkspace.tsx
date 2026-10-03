@@ -126,7 +126,7 @@ export function AdminWorkspace({
             return result.results;
           }}
           onPrepareAssignments={async () => {
-            const next = await runtime.admin.prepare("governance");
+            const next = await runtime.admin.prepareAssignments();
             setData(next);
             return next;
           }}

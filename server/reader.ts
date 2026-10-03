@@ -32,6 +32,7 @@ import { headers } from "next/headers";
 import { unstable_cache } from "next/cache";
 import { publishedReaderTag } from "./reader-cache";
 import type { Workspace } from "@/lib/store";
+import { updateMatchesAudience } from "@/lib/content-audiences";
 import { reportTeamIds } from "@/lib/types";
 
 export type ReaderItem = Pick<
@@ -52,6 +53,7 @@ export type ReaderItem = Pick<
 >;
 type IndexRow = ReaderItem & {
   groups: string[];
+  updateTeams?: string[];
 };
 type CourseRow = IndexRow & {
   assignments?: Content["assignments"];
@@ -154,10 +156,6 @@ export const readerContext = cache(async (destination: string) => {
           (group: { id: string }) => group.id === config.settings.guestGroupId,
         )
       : undefined;
-  const memberships = effectiveGroups(
-    user || { ...guest, groups: guestGroup ? [guestGroup.id] : [] },
-    groups,
-  );
   const updates = published
     .filter((item) => item.kind === "brief")
     .sort((a, b) => {
@@ -170,7 +168,14 @@ export const readerContext = cache(async (destination: string) => {
       return a.id.localeCompare(b.id);
     });
   const forYou = updates
-    .filter((item) => item.groups?.some((id) => memberships.has(id)))
+    .filter((item) =>
+      updateMatchesAudience(
+        { groups: item.groups || [], updateTeams: item.updateTeams },
+        user || { ...guest, groups: guestGroup ? [guestGroup.id] : [] },
+        groups,
+        config.teams || [],
+      ),
+    )
     .slice(0, 2);
   const featuredIds = new Set(forYou.map((item) => item.id));
   const expose = (item: IndexRow): ReaderItem => ({

@@ -113,7 +113,7 @@ export const contentData: Pick<
       db()
         .from("fb_documents")
         .select(
-          "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,sectionOrder:draft->sectionOrder,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,feedAt:draft->>feedAt,cardArt:draft->cardArt,groups:draft->groups,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
+          "id,revision,published_revision,updated_at,title:draft->>title,summary:draft->>summary,category:draft->>category,folder:draft->>folder,sectionId:draft->>sectionId,sectionOrder:draft->sectionOrder,kind:draft->>kind,status:draft->>status,version:draft->>version,createdAt:draft->>createdAt,feedAt:draft->>feedAt,cardArt:draft->cardArt,groups:draft->groups,updateTeams:draft->updateTeams,assignments:draft->assignments,duration:draft->>duration,coverImageUrl:draft->>coverImageUrl",
           { count: "exact" },
         )
         .is("deleted_at", null)
@@ -153,7 +153,7 @@ export const contentData: Pick<
       db()
         .from("fb_documents")
         .select(
-          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,sectionOrder:published->sectionOrder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,feedAt:published->>feedAt,cardArt:published->cardArt,groups:published->groups",
+          "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,sectionOrder:published->sectionOrder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,feedAt:published->>feedAt,cardArt:published->cardArt,groups:published->groups,updateTeams:published->updateTeams",
           { count: "exact" },
         )
         .not("published", "is", null)

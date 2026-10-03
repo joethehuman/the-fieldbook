@@ -74,6 +74,25 @@ test("revert restores private quiz answers and editorial content without resetti
   assert.notEqual(restored.lessons[0].body, live.lessons[0].body);
 });
 
+test("Update revert restores published audiences while retaining administrator-only team edits for contributors", () => {
+  const live = {
+    ...seedContent.find((item) => item.kind === "brief")!,
+    revision: 2,
+    publishedRevision: 1,
+    groups: ["old-group"],
+    updateTeams: ["old-team"],
+  };
+  const draft = { ...live, revision: 3, groups: ["new-group"], updateTeams: ["org"] };
+  const admin = revertToPublished(draft, live);
+  assert.deepEqual(admin.groups, ["old-group"]);
+  assert.deepEqual(admin.updateTeams, ["old-team"]);
+  const contributor = revertToPublished(draft, live, false);
+  assert.deepEqual(contributor.groups, ["old-group"]);
+  assert.deepEqual(contributor.updateTeams, ["org"]);
+  assert.equal(contributor.revision, 3);
+  assert.deepEqual(draft.updateTeams, ["org"]);
+});
+
 test("revert rejects the wrong item and a missing publication", () => {
   assert.throws(
     () => revertToPublished(published, { ...published, id: "other" }),

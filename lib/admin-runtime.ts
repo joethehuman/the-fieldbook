@@ -29,6 +29,7 @@ export type AdminRuntime = {
     ) => Promise<{ data: Workspace; results: BulkResult[] }>;
     prefetch: () => void;
     prepare: (scope: AdminScope, userId?: string) => Promise<Workspace>;
+    prepareAssignments: () => Promise<Workspace>;
     edit: (id: string) => Promise<{ data: Workspace; item: Content }>;
     unpublish: (id: string) => Promise<Workspace>;
   };
@@ -84,7 +85,7 @@ export function createAdminRuntime(initial: {
     let data = state.data as Workspace;
     if (
       openItem &&
-      (target === "content" || target === "people") &&
+      (target === "content" || target === "people" || target === "governance") &&
       data.content.some((entry) => entry.id === openItem)
     ) {
       const item = await request(
@@ -299,6 +300,12 @@ export function createAdminRuntime(initial: {
           ...(initial.user.role === "admin" ? [prepared("people")] : []),
           prepared("feedback"),
         ]);
+      },
+      prepareAssignments: async () => {
+        const data = await prepared("governance");
+        scope = "governance";
+        // Audience selection belongs to the open editor; retain its full-draft refresh.
+        return data;
       },
       prepare: async (next, userId) => {
         const previousPerson = personId;

@@ -34,6 +34,7 @@ const layouts = {
   teamMembers: ["w-[45%]", "w-[30%]", "w-[25%]"],
   teams: ["w-[24%]", "w-[20%]", "w-[24%]", "w-[16%]", "w-[16%]"],
   assignments: ["w-[27%]", "w-[23%]", "w-[20%]", "w-[30%]"],
+  audienceReview: ["w-[44%]", "w-[30%]", "w-[26%]"],
   organizationReview: ["w-[23%]", "w-[32%]", "w-[25%]", "w-[20%]"],
   deadlineReview: ["w-[23%]", "w-[37%]", "w-[20%]", "w-[20%]"],
   courses: ["w-[30%]", "w-[24%]", "w-[18%]", "w-[28%]"],
@@ -67,7 +68,7 @@ export function DataTable({
           "groupUpdates",
         ].includes(layout)
           ? "min-w-128"
-          : layout === "assignmentGroups"
+          : ["assignmentGroups", "audienceReview"].includes(layout)
             ? "min-w-72 [&_td]:px-2 [&_th]:px-2"
             : "min-w-208",
         className,
