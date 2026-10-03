@@ -93,6 +93,12 @@ import { PendingPeople } from "./PendingPeople";
 import { PersonFields } from "./PersonFields";
 import { ScrollRegion } from "./patterns/scroll-region";
 import { RosterImport } from "./RosterImport";
+import {
+  adminHref,
+  parseAdminDestination,
+  type AdminDestination,
+  type AdminTab,
+} from "@/lib/admin-destination";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   NavigationGuard,
@@ -256,6 +262,12 @@ const adminSections = [
   },
 ];
 type Props = {
+  initialDestination?: AdminDestination;
+  onWriteDestination?: (
+    destination: AdminDestination,
+    replace?: boolean,
+  ) => Promise<boolean>;
+  onLoadDestination?: (destination: AdminDestination) => Promise<Workspace>;
   onBulk: BulkHandler;
   data: Workspace;
   user: User;
@@ -276,14 +288,69 @@ type Props = {
   registerNavigationGuard?: RegisterNavigationGuard;
   registerLandingNavigation?: RegisterLandingNavigation;
   onReload?: () => Promise<Workspace>;
-  onSaveSettings?: (before: Workspace, settings: import("@/lib/settings").SiteSettings) => Promise<Workspace>;
+  onSaveSettings?: (
+    before: Workspace,
+    settings: import("@/lib/settings").SiteSettings,
+  ) => Promise<Workspace>;
   onReviewDeadlines?: (
     token?: string,
   ) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
   onLoadPublished?: (id: string) => Promise<Content>;
 };
 const id = () => crypto.randomUUID();
+function initialContent(
+  destination: AdminDestination,
+  data: Workspace,
+): Content | null {
+  if (destination.tab !== "content") return null;
+  if (destination.id)
+    return data.content.find((item) => item.id === destination.id) || null;
+  const kind = destination.create;
+  if (!kind || !["doc", "brief", "course"].includes(kind)) return null;
+  return {
+    id: id(),
+    kind: kind as Content["kind"],
+    title: "",
+    summary: "",
+    body: "",
+    category: "",
+    folder: "",
+    status: "draft",
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    createdAt: new Date().toISOString(),
+    assignments: [],
+    duration: 5,
+    groups: [],
+    lessons: kind === "course" ? [{ id: id(), title: "", body: "" }] : [],
+    questions: [],
+    ...(kind === "course" ? { requirePassing: false } : {}),
+  };
+}
+function initialPerson(
+  destination: AdminDestination,
+  data: Workspace,
+): User | null {
+  if (destination.tab !== "people") return null;
+  if (destination.create === "person")
+    return {
+      id: id(),
+      name: "",
+      email: "",
+      role: "learner",
+      active: true,
+      groups: [],
+    };
+  return destination.view === "edit"
+    ? structuredClone(
+        data.users.find((person) => person.id === destination.id) || null,
+      )
+    : null;
+}
 export default function Admin({
+  initialDestination = { tab: "content" },
+  onWriteDestination,
+  onLoadDestination,
   onBulk,
   data,
   user,
@@ -359,11 +426,19 @@ export default function Admin({
         ),
     }))
     .filter((section) => section.items.length);
-  const [tab, setTab] = useState("content"),
+  const [destination, setDestination] = useState(initialDestination);
+  const destinationRef = useRef(initialDestination);
+  const navigationBusy = useRef(false);
+  const writingHistory = useRef(false);
+  const [tab, setTab] = useState<string>(initialDestination.tab),
     [openingTab, setOpeningTab] = useState<string | null>(null),
     [openingItem, setOpeningItem] = useState<string | null>(null),
-    [editing, setEditing] = useState<Content | null>(null),
-    [person, setPerson] = useState<User | null>(null),
+    [editing, setEditing] = useState<Content | null>(() =>
+      initialContent(initialDestination, data),
+    ),
+    [person, setPerson] = useState<User | null>(() =>
+      initialPerson(initialDestination, data),
+    ),
     [notice, setNotice] = useState(""),
     [filter, setFilter] = useState("all"),
     [query, setQuery] = useState(""),
@@ -377,13 +452,21 @@ export default function Admin({
     [detailScope, setDetailScope] = useState<{
       groupId?: string;
       userId?: string;
-    } | null>(null);
+    } | null>(() =>
+      initialDestination.tab === "people" &&
+      initialDestination.id &&
+      !initialDestination.view
+        ? { userId: initialDestination.id }
+        : null,
+    );
   const [contentStatus, setContentStatus] = useState("all"),
     [contentSection, setContentSection] = useState("all"),
     [page, setPage] = useState(1);
   const [personBusy, setPersonBusy] = useState(false);
   const [personError, setPersonError] = useState("");
-  const personBaseline = useRef<User | null>(null);
+  const personBaseline = useRef<User | null>(
+    person ? structuredClone(person) : null,
+  );
   const personSaving = useRef(false);
   const personDirty = !!person && !equalJson(person, personBaseline.current);
   const personGuard = useRef(async () => true);
@@ -391,12 +474,15 @@ export default function Admin({
     !personSaving.current &&
     (!personDirty || (await confirm("Discard unsaved profile changes?")));
   function openPerson(value: User) {
-    personBaseline.current = structuredClone(value);
-    setPerson(value);
-    setPersonError("");
+    void navigateDestination(
+      data.users.some((person) => person.id === value.id)
+        ? { tab: "people", id: value.id, view: "edit" }
+        : { tab: "people", create: "person" },
+    );
   }
   async function closePerson() {
-    if (await personGuard.current()) setPerson(null);
+    if (await personGuard.current())
+      await navigateDestination({ tab: "people" }, { approved: true });
   }
   useEffect(() => {
     if (!person) return;
@@ -421,6 +507,102 @@ export default function Admin({
       window.removeEventListener("beforeunload", beforeUnload);
     };
   }, [!!person, personDirty, personBusy, registerAdminGuard]);
+  async function navigateDestination(
+    next: AdminDestination,
+    options: { approved?: boolean; history?: boolean; replace?: boolean } = {},
+  ) {
+    if (!canOpenAdminTab(user, next.tab) || navigationBusy.current)
+      return false;
+    if (!options.approved && !options.history) {
+      if (
+        profileNavigationGuard.current &&
+        !(await profileNavigationGuard.current())
+      )
+        return false;
+      if (adminGuard.current && !(await adminGuard.current())) return false;
+    }
+    navigationBusy.current = true;
+    const previous = destinationRef.current;
+    setOpeningTab(next.id ? null : next.tab);
+    setOpeningItem(next.id || null);
+    try {
+      const loaded = onLoadDestination ? await onLoadDestination(next) : data;
+      if (next.id) {
+        const collection =
+          next.tab === "content"
+            ? loaded.content
+            : next.tab === "people"
+              ? loaded.users
+              : next.tab === "teams"
+                ? loaded.teams
+                : next.tab === "groups"
+                  ? loaded.groups
+                  : next.tab === "progress" ? loaded.progressReport?.people.map((person) => person.u) || loaded.users : loaded.curricula;
+        if (!collection?.some((item) => item.id === next.id))
+          throw new Error(
+            "This item is no longer available. Open its list to choose another item.",
+          );
+      }
+      destinationRef.current = next;
+      if (
+        !options.history &&
+        onWriteDestination &&
+        !(await onWriteDestination(next, options.replace))
+      ) {
+        destinationRef.current = previous;
+        return false;
+      }
+      if (next.tab !== tab) { setQuery(""); setPage(1); }
+      setDestination(next);
+      setTab(next.tab);
+      setEditing(initialContent(next, loaded));
+      const profile = initialPerson(next, loaded);
+      personBaseline.current = profile ? structuredClone(profile) : null;
+      setPerson(profile);
+      setPersonError("");
+      setDetailScope(
+        next.tab === "people" && next.id && !next.view
+          ? { userId: next.id }
+          : null,
+      );
+      setNotice("");
+      adminPanel.reveal(false);
+      return true;
+    } catch (error) {
+      destinationRef.current = previous;
+      if (options.history && onWriteDestination)
+        await onWriteDestination(previous, true);
+      setNotice(
+        error instanceof Error
+          ? error.message
+          : "Could not open this destination. Try again.",
+      );
+      return false;
+    } finally {
+      navigationBusy.current = false;
+      setOpeningTab(null);
+      setOpeningItem(null);
+    }
+  }
+  const restoreDestination = useRef(() => {});
+  restoreDestination.current = () => {
+    if (writingHistory.current) return;
+    const path = production
+      ? window.location.pathname
+      : "/" + window.location.hash.slice(1).split("?")[0];
+    const next = parseAdminDestination(path);
+    if (next && adminHref(next) !== adminHref(destinationRef.current))
+      void navigateDestination(next, { history: true });
+  };
+  useEffect(() => {
+    window.addEventListener(production ? "popstate" : "fieldbook:admin-history", restore);
+    function restore() {
+      restoreDestination.current();
+    }
+    return () => {
+      window.removeEventListener(production ? "popstate" : "fieldbook:admin-history", restore);
+    };
+  }, [production]);
   const contentRows = data.content
     .filter(
       (c) =>
@@ -470,9 +652,12 @@ export default function Admin({
     )
     .sort(
       (a, b) =>
-        (peopleSort === "reverse"
-          ? b.name.localeCompare(a.name)
-          : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id),
+        (peopleSort === "recent"
+          ? (Date.parse(b.addedAt || "") || 0) -
+              (Date.parse(a.addedAt || "") || 0) || a.name.localeCompare(b.name)
+          : peopleSort === "reverse"
+            ? b.name.localeCompare(a.name)
+            : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id),
     );
   const selection = useBulkSelection(
     [
@@ -694,28 +879,30 @@ export default function Admin({
   }
 
   function create(kind: Content["kind"]) {
-    setEditing({
-      id: id(),
-      kind,
-      title: "",
-      summary: "",
-      body: "",
-      category: "",
-      folder: "",
-      status: "draft",
-      version: 1,
-      updatedAt: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      assignments: [],
-      duration: 5,
-      groups: [],
-      lessons: kind === "course" ? [{ id: id(), title: "", body: "" }] : [],
-      questions: [],
-      ...(kind === "course" ? { requirePassing: false } : {}),
-    });
+    void navigateDestination({ tab: "content", create: kind });
+  }
+  async function savedDestination(content: Content) {
+    if (!destinationRef.current.create) return;
+    const next: AdminDestination = {
+      tab: "content",
+      id: content.id,
+      view: "edit",
+    };
+    writingHistory.current = true;
+    try {
+      await onWriteDestination?.(next, true);
+      destinationRef.current = next;
+      setDestination(next);
+    } finally {
+      writingHistory.current = false;
+    }
   }
   async function save(c: Content, intent: SaveIntent = "draft") {
-    if (onSaveContent) return onSaveContent(c, intent);
+    if (onSaveContent) {
+      const saved = await onSaveContent(c, intent);
+      await savedDestination(saved);
+      return saved;
+    }
     const old = data.content.find((x) => x.id === c.id);
     const updated = {
       ...c,
@@ -733,6 +920,7 @@ export default function Admin({
         : [...data.content, updated],
     });
 
+    await savedDestination(updated);
     setNotice("");
     // The server may normalize the draft while saving. Keep the editor's
     // baseline on the persisted revision so a second publish is not treated
@@ -756,6 +944,7 @@ export default function Admin({
     const previous = data.users.find((u) => u.id === person.id);
     const savedPerson = {
       ...person,
+      addedAt: previous ? previous.addedAt : new Date().toISOString(),
       onboardingDays:
         person.hireDate || person.onboardingStart
           ? (person.onboardingDays ?? data.settings?.onboardingDays ?? 90)
@@ -778,7 +967,7 @@ export default function Admin({
           ? data.users.map((u) => (u.id === person.id ? savedPerson : u))
           : [...data.users, savedPerson],
       });
-      setPerson(null);
+      await navigateDestination({ tab: "people" }, { approved: true });
       setNotice("");
       notify(production ? "Account saved." : "Demo profile saved.");
     } catch (e) {
@@ -804,12 +993,15 @@ export default function Admin({
   if (editing)
     return (
       <>
+        {notice && <Alert variant="destructive">{notice}</Alert>}
         <Editor
           key={editing.id}
           content={editing}
           data={data}
           onSave={save}
-          onCancel={() => setEditing(null)}
+          onCancel={() => {
+            void navigateDestination({ tab: "content" }, { approved: true });
+          }}
           onUpload={onUpload}
           production={production}
           onLearning={admin ? manageLearning : undefined}
@@ -845,7 +1037,7 @@ export default function Admin({
                   setOpeningTab(null);
                 }
               }
-              setDetailScope(null);
+              await navigateDestination({ tab: "people" }, { approved: true });
               adminPanel.reveal();
             },
           },
@@ -876,7 +1068,7 @@ export default function Admin({
             onAction={manageLearning}
             onChange={onChange}
             onOpenGroup={async (groupId) => {
-              if (await changeAdminTab("groups")) setDetailScope({ groupId });
+              await navigateDestination({ tab: "groups", id: groupId });
             }}
           />
         </>
@@ -885,30 +1077,8 @@ export default function Admin({
   );
 
   async function changeAdminTab(next: string, approved = false) {
-    if (!canOpenAdminTab(user, next)) return false;
-    if (
-      (next === tab && !detailScope && !editing && !person) ||
-      (!approved && adminGuard.current && !(await adminGuard.current()))
-    )
-      return false;
-    if (openingTab || openingItem) return false;
-    if (onOpenTab) {
-      setOpeningTab(next);
-      try {
-        await onOpenTab(next);
-      } catch (error) {
-        setNotice((error as Error).message);
-        setOpeningTab(null);
-        return false;
-      }
-      setOpeningTab(null);
-    }
-    setTab(next);
-    setDetailScope(null);
-    adminPanel.reveal(false);
-    setNotice("");
-    setQuery("");
-    return true;
+    if (next === tab && !destination.id && !destination.create) return false;
+    return navigateDestination({ tab: next as AdminTab }, { approved });
   }
   return (
     <div className="admin-workspace" aria-busy={!!openingTab || !!openingItem}>
@@ -1072,6 +1242,15 @@ export default function Admin({
               <FeedbackAdmin data={data} />
             ) : tab === "teams" ? (
               <TeamsAdmin
+                key={adminHref(destination)}
+                initialTeam={destination.id}
+                initialTab={destination.panel}
+                onDestinationChange={(id, panel) =>
+                  navigateDestination(
+                    { tab: "teams", ...(id ? { id, panel } : {}) },
+                    { approved: true },
+                  )
+                }
                 data={data}
                 onChange={onChange}
                 registerNavigationGuard={registerAdminGuard}
@@ -1301,20 +1480,12 @@ export default function Admin({
                                 <Button
                                   variant="link"
                                   disabled={openingItem === c.id}
-                                  onClick={async () => {
-                                    if (!onEdit) {
-                                      setEditing(structuredClone(c));
-                                      return;
-                                    }
-                                    setOpeningItem(c.id);
-                                    try {
-                                      setEditing(await onEdit(c.id));
-                                      setNotice("");
-                                    } catch (error) {
-                                      setNotice((error as Error).message);
-                                    } finally {
-                                      setOpeningItem(null);
-                                    }
+                                  onClick={() => {
+                                    void navigateDestination({
+                                      tab: "content",
+                                      id: c.id,
+                                      view: "edit",
+                                    });
                                   }}
                                 >
                                   {openingItem === c.id ? "Opening…" : "Edit"}
@@ -1417,7 +1588,13 @@ export default function Admin({
                 <CollectionControls
                   filters={peopleFilters}
                   onClear={clearPeopleFilters}
-                  sortLabel={peopleSort === "reverse" ? "Name Z–A" : "Name A–Z"}
+                  sortLabel={
+                    peopleSort === "recent"
+                      ? "Recently added"
+                      : peopleSort === "reverse"
+                        ? "Name Z–A"
+                        : "Name A–Z"
+                  }
                   sort={
                     <FormField label="Sort profiles">
                       <SelectField
@@ -1426,6 +1603,7 @@ export default function Admin({
                       >
                         <option value="title">Name A–Z</option>
                         <option value="reverse">Name Z–A</option>
+                        <option value="recent">Recently added</option>
                       </SelectField>
                     </FormField>
                   }
@@ -1584,8 +1762,10 @@ export default function Admin({
                                   onClick={async () => {
                                     setOpeningItem(u.id);
                                     try {
-                                      await onOpenPersonProgress?.(u.id);
-                                      setDetailScope({ userId: u.id });
+                                      await navigateDestination({
+                                        tab: "people",
+                                        id: u.id,
+                                      });
                                       setNotice("");
                                       adminPanel.reveal();
                                     } catch (error) {
@@ -1634,6 +1814,22 @@ export default function Admin({
               </>
             ) : tab === "curricula" ? (
               <Curricula
+                key={adminHref(destination)}
+                initialCurriculum={destination.id}
+                createNew={destination.create === "curriculum"}
+                onDestinationChange={(id, create) =>
+                  navigateDestination(
+                    {
+                      tab: "curricula",
+                      ...(create
+                        ? { create: "curriculum" as const }
+                        : id
+                          ? { id, view: "edit" as const }
+                          : {}),
+                    },
+                    { approved: true },
+                  )
+                }
                 data={data}
                 onChange={onChange}
                 onUpload={onUpload}
@@ -1642,6 +1838,15 @@ export default function Admin({
               />
             ) : tab === "groups" ? (
               <LearningGroups
+                key={adminHref(destination)}
+                initialGroup={destination.id}
+                initialTab={destination.panel}
+                onDestinationChange={(id, panel) =>
+                  navigateDestination(
+                    { tab: "groups", ...(id ? { id, panel } : {}) },
+                    { approved: true },
+                  )
+                }
                 data={data}
                 onChange={onChange}
                 onLearning={manageLearning}
@@ -1650,7 +1855,7 @@ export default function Admin({
                 registerNavigationGuard={registerAdminGuard}
               />
             ) : (
-              <TeamProgress data={data} user={user} />
+              <TeamProgress data={data} user={user} initialPerson={destination.id} onDestinationChange={(id) => navigateDestination({ tab: "progress", ...(id ? { id } : {}) }, { approved: true })} />
             )}
           </>
         </TabsContent>
@@ -2002,7 +2207,9 @@ export function Editor({
         (item) => item.id === c.id,
       );
       if (!latest) {
-        throw new Error("No saved draft is available. Your changes remain open. Try saving again or download your changes.");
+        throw new Error(
+          "No saved draft is available. Your changes remain open. Try saving again or download your changes.",
+        );
       }
       if (
         !(await confirm(
@@ -2031,8 +2238,15 @@ export function Editor({
     setRecovering(true);
     let ready = false;
     try {
-      const latest = (await onReload()).content.find((item) => item.id === current.current.id);
-      const next = resumeDraft(current.current, baseline.current, attemptedSave.current, latest);
+      const latest = (await onReload()).content.find(
+        (item) => item.id === current.current.id,
+      );
+      const next = resumeDraft(
+        current.current,
+        baseline.current,
+        attemptedSave.current,
+        latest,
+      );
       if (latest) {
         original.current = latest;
         baseline.current = latest;
@@ -2051,25 +2265,36 @@ export function Editor({
       recoveringNow.current = false;
       setRecovering(false);
     }
-    if (ready && await flushDraft()) setSavedMessage("Saved");
+    if (ready && (await flushDraft())) setSavedMessage("Saved");
   }
   async function restorePublished() {
     if (!onReload || !onLoadPublished || busy || recoveringNow.current || savingNow.current || queue.current!.blocked) return;
     recoveringNow.current = true;
     setRecovering(true);
     try {
-      if (!await confirm("Discard your unpublished changes and restore the published version? The restored draft will save automatically. Readers will continue seeing the same published content.")) return;
-      const latest = (await onReload()).content.find((item) => item.id === current.current.id);
+      if (
+        !(await confirm(
+          "Discard your unpublished changes and restore the published version? The restored draft will save automatically. Readers will continue seeing the same published content.",
+        ))
+      )
+        return;
+      const latest = (await onReload()).content.find(
+        (item) => item.id === current.current.id,
+      );
       if (!latest || latest.revision !== baseline.current.revision) {
         queue.current!.block();
-        throw new Error("The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.");
+        throw new Error(
+          "The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.",
+        );
       }
       const published = await onLoadPublished(latest.id);
       // Check the publication and write revision together; never overwrite a concurrent edit.
       if (published.revision !== latest.revision ||
           published.publishedRevision !== latest.publishedRevision) {
         queue.current!.block();
-        throw new Error("The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.");
+        throw new Error(
+          "The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.",
+        );
       }
       const next = revertToPublished(latest, published, !!onWorkspaceChange);
       original.current = latest;
@@ -2517,11 +2742,26 @@ export function Editor({
           )}
         </>
       )}
-      {!!c.publishedRevision && <ActionGroup>
-        <Button type="button" variant="outline" size="sm"
-          disabled={busy || saving || needsRecovery || !publicationChanged || !onLoadPublished || !onReload}
-          onClick={() => void restorePublished()}>Revert to published version</Button>
-      </ActionGroup>}
+      {!!c.publishedRevision && (
+        <ActionGroup>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={
+              busy ||
+              saving ||
+              needsRecovery ||
+              !publicationChanged ||
+              !onLoadPublished ||
+              !onReload
+            }
+            onClick={() => void restorePublished()}
+          >
+            Revert to published version
+          </Button>
+        </ActionGroup>
+      )}
     </FieldGroup>
   );
   return (
@@ -2583,31 +2823,63 @@ export function Editor({
         </div>
       </div>
       {error && (
-        <Alert variant="destructive" role="alert" className={needsRecovery ? "text-foreground" : undefined}>
-          {needsRecovery && <>
-            <p className="font-medium text-copy">We couldn’t confirm your latest changes were saved.</p>
-            <p className="text-xs text-muted-foreground">Your work is still here. Keep this page open.</p>
-          </>}
-          <p className={needsRecovery ? "text-xs text-muted-foreground" : undefined}>{error}</p>
-          {needsRecovery && <ActionGroup className="mt-1 gap-x-4 gap-y-2">
-            {onReload && <Button type="button" size="sm" disabled={busy || saving}
-              onClick={() => void retrySaving()}>Retry saving</Button>}
-            <Button type="button" variant="link" size="sm" className="text-xs text-muted-foreground underline" onClick={downloadDraft}>
-              Download your changes
-            </Button>
-            {onReload && (
+        <Alert
+          variant="destructive"
+          role="alert"
+          className={needsRecovery ? "text-foreground" : undefined}
+        >
+          {needsRecovery && (
+            <>
+              <p className="font-medium text-copy">
+                We couldn’t confirm your latest changes were saved.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Your work is still here. Keep this page open.
+              </p>
+            </>
+          )}
+          <p
+            className={
+              needsRecovery ? "text-xs text-muted-foreground" : undefined
+            }
+          >
+            {error}
+          </p>
+          {needsRecovery && (
+            <ActionGroup className="mt-1 gap-x-4 gap-y-2">
+              {onReload && (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={busy || saving}
+                  onClick={() => void retrySaving()}
+                >
+                  Retry saving
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="link"
                 size="sm"
                 className="text-xs text-muted-foreground underline"
-                disabled={busy}
-                onClick={reloadSaved}
+                onClick={downloadDraft}
               >
-                Load saved draft
+                Download your changes
               </Button>
-            )}
-          </ActionGroup>}
+              {onReload && (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="text-xs text-muted-foreground underline"
+                  disabled={busy}
+                  onClick={reloadSaved}
+                >
+                  Load saved draft
+                </Button>
+              )}
+            </ActionGroup>
+          )}
         </Alert>
       )}
       {busy && (

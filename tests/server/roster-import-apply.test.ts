@@ -8,6 +8,7 @@ import {
   episodeMigration,
   contributorMigration,
   flatGroupMigration,
+  saveRoster,
 } from "../helpers/roster-database";
 import {
   reviewRosterImport,
@@ -17,7 +18,11 @@ import {
 import type { DataStore } from "../../server/ports/data";
 import type { User } from "../../lib/types";
 import { serializeCsv } from "../../lib/csv";
-import { rosterTemplate } from "../../lib/roster-import";
+import {
+  rosterTemplate,
+  ROSTER_IMPORT_MAX_ROWS,
+} from "../../lib/roster-import";
+import { profile } from "../../server/auth";
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const admin: User = {
@@ -77,7 +82,17 @@ async function database() {
         )
       ).rows.map((row) => row.email),
     listProfiles: async () =>
-      (await pg.query("select * from fb_profiles order by id")).rows,
+      (
+        await pg.query<Record<string, unknown>>(
+          "select * from fb_profiles order by id",
+        )
+      ).rows.map((row) => ({
+        ...row,
+        added_at:
+          row.added_at instanceof Date
+            ? row.added_at.toISOString()
+            : row.added_at,
+      })),
     listPublishedAssignmentContent: async () =>
       (
         await pg.query(
@@ -97,6 +112,34 @@ async function database() {
         payload ? JSON.stringify(payload) : null,
       ]),
   } as unknown as DataStore;
+  const beforeDates = await unchangedData(pg);
+  const beforeFunctions = await value(
+    pg,
+    "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'",
+  );
+  await migrate(pg, "20261003162418_roster_added_at.sql");
+  const afterDates = await unchangedData(pg);
+  for (const person of afterDates.fb_profiles) {
+    assert.equal(
+      person.added_at,
+      null,
+      "unknown historical dates stay unknown",
+    );
+    delete person.added_at;
+  }
+  assert.deepEqual(
+    afterDates,
+    beforeDates,
+    "date capture does not change any prior application data",
+  );
+  assert.deepEqual(
+    await value(
+      pg,
+      "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname<>'fb_profile_added_at'",
+    ),
+    beforeFunctions,
+    "date capture preserves every existing function and permission",
+  );
   return { pg, store };
 }
 async function unchangedData(pg: Awaited<ReturnType<typeof rosterDatabase>>) {
@@ -117,6 +160,94 @@ async function unchangedData(pg: Awaited<ReturnType<typeof rosterDatabase>>) {
     ),
   );
 }
+test("roster creation dates are database-owned across preregistration, edits, CSV and first sign-in", async () => {
+  const { pg, store } = await database();
+  try {
+    const snapshot = await store.readAdminPeopleSnapshot(admin.id);
+    await pg.query("select fb_save_governance($1,$2,'pending',$3)", [
+      admin.id,
+      snapshot.revision,
+      JSON.stringify({
+        name: "Pending",
+        email: "pending@example.test",
+        role: "learner",
+        groups: [],
+        hireDate: "2020-01-01",
+        addedAt: "1900-01-01T00:00:00.000Z",
+      }),
+    ]);
+    const pending = (await store.listProfiles()).find(
+      (p) => p.email === "pending@example.test",
+    )!;
+    assert.ok(pending.added_at);
+    assert.ok(Date.parse(pending.added_at!) > Date.parse("2020-01-01"));
+    assert.equal(profile(pending).addedAt, pending.added_at);
+    assert.equal(
+      Date.parse(
+        (await store.readAdminPeopleSnapshot(admin.id)).users.find(
+          (p) => p.id === pending.id,
+        )!.added_at!,
+      ),
+      new Date(pending.added_at!).getTime(),
+    );
+    await pg.query(
+      "update fb_profiles set added_at='2099-01-01', name='Edited' where id=$1",
+      [pending.id],
+    );
+    await saveRoster(pg, admin.id, (data) => {
+      data.users.find((p: any) => p.id === pending.id).hireDate = "2021-02-03";
+    });
+    const input = csv([
+      ["CSV rename", "pending@example.test", "2022-03-04", "", "", ""],
+    ]);
+    const review = await reviewRosterImport(admin, input, store);
+    await applyRosterImport(admin, input, review.token!, store);
+    assert.equal(
+      (await store.listProfiles()).find((p) => p.id === pending.id)!.added_at,
+      pending.added_at,
+    );
+    await pg.exec(
+      `insert into auth.users values('${id(99)}'),('${id(98)}'); update fb_config set settings=settings||'{"registration":"open"}' where id;`,
+    );
+    const activated = await value(
+      pg,
+      "select to_jsonb(fb_register_profile($1,$2,'Login',false)) value",
+      [id(99), pending.email],
+    );
+    assert.equal(
+      Date.parse(activated.added_at),
+      new Date(pending.added_at!).getTime(),
+    );
+    const signedUp = await value(
+      pg,
+      "select to_jsonb(fb_register_profile($1,$2,'New login',true)) value",
+      [id(98), "signup@example.test"],
+    );
+    assert.ok(
+      signedUp.added_at,
+      "new verified registrations receive a roster creation time",
+    );
+    await pg.query("update fb_profiles set added_at='2099-01-01' where id=$1", [
+      id(2),
+    ]);
+    assert.equal(
+      (await store.listProfiles()).find((p) => p.id === id(2))!.added_at,
+      null,
+      "editing does not invent a legacy date",
+    );
+    for (const role of ["anon", "authenticated"])
+      assert.equal(
+        await value(
+          pg,
+          "select has_function_privilege($1,'public.fb_profile_added_at()','execute') value",
+          [role],
+        ),
+        false,
+      );
+  } finally {
+    await pg.close();
+  }
+});
 test("atomic real import resolves same-file pending managers, preserves IDs and verified activation, and replays its exact receipt", async () => {
   const { pg, store } = await database();
   try {
@@ -191,6 +322,12 @@ test("atomic real import resolves same-file pending managers, preserves IDs and 
     );
     assert.equal(activated.id, manager.id);
     assert.equal(activated.role, "manager");
+    assert.ok(manager.added_at);
+    assert.equal(
+      Date.parse(activated.added_at),
+      new Date(manager.added_at!).getTime(),
+      "verified activation retains roster creation time",
+    );
     const rerun = await reviewRosterImport(admin, input, store);
     assert.equal(rerun.valid, true);
     const noChange = await applyRosterImport(admin, input, rerun.token!, store);
@@ -347,7 +484,7 @@ test("failed validation is atomic and saved learning deadlines, completed progre
     await pg.close();
   }
 });
-test("500 people and ten-level teams import together; service-only permissions and denied replay are enforced", async () => {
+test("the full row limit and ten-level teams import together with 100 courses, safe retries and service-only permissions", async () => {
   const { pg, store } = await database();
   try {
     // Each imported person inherits 100 courses through the Organization branch.
@@ -372,7 +509,7 @@ test("500 people and ten-level teams import together; service-only permissions a
     ]);
     await pg.exec("select fb_sync_learning()");
     const input = csv([
-      ...Array.from({ length: 500 }, (_, i) => [
+      ...Array.from({ length: ROSTER_IMPORT_MAX_ROWS }, (_, i) => [
         `Person ${i}`,
         `person-${i}@example.test`,
         "",
@@ -381,18 +518,29 @@ test("500 people and ten-level teams import together; service-only permissions a
         "",
       ]),
     ]);
+    const started = performance.now();
     const review = await reviewRosterImport(admin, input, store);
     assert.equal(review.valid, true);
     const result = await applyRosterImport(admin, input, review.token!, store);
-    assert.equal(result.peopleAdded, 500);
+    assert.equal(result.peopleAdded, ROSTER_IMPORT_MAX_ROWS);
     assert.equal(result.teamsAdded, 10);
-    assert.equal((await store.listProfiles()).length, 502);
+    assert.equal(
+      (await store.listProfiles()).length,
+      ROSTER_IMPORT_MAX_ROWS + 2,
+    );
     assert.equal(
       await value(
         pg,
         "select count(*)::integer value from fb_assignment_episodes where ended_at is null",
       ),
-      50200,
+      (ROSTER_IMPORT_MAX_ROWS + 2) * 100,
+    );
+    console.log(
+      JSON.stringify({
+        scalePeople: ROSTER_IMPORT_MAX_ROWS,
+        scaleCourses: 100,
+        reviewAndApplyMs: Math.round(performance.now() - started),
+      }),
     );
     const receipts = await Promise.all([
       applyRosterImport(admin, input, review.token!, store),

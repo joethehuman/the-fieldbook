@@ -4,11 +4,15 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine people imports with opening feedback for the native file chooser, status count badges, one Issues tab and a 2,000-row file limit. Let nested Groups lists hand scrolling back to person dialogs at their edges. Add Recently added People sorting, separate from hire date; its additive roster timestamp migration leaves historical dates unknown.
+
 - Import people and teams from a reviewed CSV in one transaction, with stable identities, stale-review protection and safe retries. Use an inline blank-template link, readable field changes and shared scroll fades. Align individual pre-registration and demo profiles with the same modal frame. See [CSV import](docs/roster-import.md); apply its additive database migration before deploying.
 
 - Fit desktop content editors to the available workspace, keeping titles and controls visible while overflowing writing, Outline, Details or Quiz panes scroll independently. Use natural page scrolling on narrow or short screens so every control stays reachable.
 
 - Keep independent navigation, outlines and picker lists from scrolling their surroundings at either end. Preserve compact popup sizing, keep picker search/actions visible, and cap searchable popups to their actual available space.
+
+- Give Administration sections, saved editors, organization details and individual progress views their own URLs. Refresh and direct links reopen the current destination, with existing permissions and unsaved-work protection. Courses collections use `/courses/for-you`, `/courses/yours`, `/courses/in-progress`, `/courses/completed`, `/courses/all` and `/courses/curricula`; course and curriculum exits preserve the launching collection. The static demo uses the same destinations after `#`. No database migration is required.
 
 - Keep course assignment search, filters, pagination and actions stationary while only the course list scrolls. Give the chooser more vertical room and show conditional edge fades with the shared scrollbar styling.
 

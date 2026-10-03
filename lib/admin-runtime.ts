@@ -1,4 +1,5 @@
 import { canPublish, canOpenPublishingScope } from "./permissions";
+import { adminScope, type AdminDestination } from "./admin-destination";
 import type { AdminScope } from "./admin-scope";
 import { request, createWorkspaceSaver, RequestError } from "./workspace-save";
 import type { UploadMedia } from "@/components/MarkdownEditor";
@@ -14,7 +15,10 @@ import { createSettingsSaver } from "./settings-save";
 import type { SiteSettings } from "./settings";
 export type AdminRuntime = {
   save: (before: Workspace, after: Workspace) => Promise<Workspace>;
-  saveSettings: (before: Workspace, settings: SiteSettings) => Promise<Workspace>;
+  saveSettings: (
+    before: Workspace,
+    settings: SiteSettings,
+  ) => Promise<Workspace>;
   saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
   publishedContent: (id: string) => Promise<Content>;
   refresh: () => Promise<Workspace>;
@@ -37,11 +41,18 @@ export type AdminRuntime = {
 export function createAdminRuntime(initial: {
   data: Workspace;
   user: User;
+  destination?: AdminDestination;
 }): AdminRuntime {
-  let scope: AdminScope = "content";
-  let personId: string | undefined;
-  let openItem: string | null = null;
-  const cached = new Map<AdminScope, Workspace>([["content", initial.data]]);
+  let scope: AdminScope = initial.destination
+    ? adminScope(initial.destination)
+    : "content";
+  let personId: string | undefined =
+    scope === "person" ? initial.destination?.id : undefined;
+  let openItem: string | null =
+    initial.destination?.tab === "content"
+      ? initial.destination.id || null
+      : null;
+  const cached = new Map<AdminScope, Workspace>([[scope, initial.data]]);
   const pending = new Map<AdminScope, Promise<Workspace>>();
   let cacheVersion = 0;
   let contentRecoveryRequired = false;

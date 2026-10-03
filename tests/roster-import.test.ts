@@ -13,6 +13,7 @@ import {
   rosterExample,
   rosterIssueReport,
   ROSTER_IMPORT_MAX_BYTES,
+  ROSTER_IMPORT_MAX_ROWS,
 } from "../lib/roster-import";
 const csv = (rows: string[][]) => serializeCsv({ ...rosterTemplate(), rows });
 function base(): Workspace {
@@ -329,7 +330,7 @@ test("malformed files and real date boundaries return clear issues rather than c
     "file-size",
   );
 });
-test("500 people and 100 courses are reviewed as bounded metadata and shared course names, without mutating data", () => {
+test("the full row limit and 100 courses are reviewed as bounded metadata without mutating data", () => {
   const d = base();
   d.users = [d.users[0]];
   d.content = Array.from({ length: 100 }, (_, i) => ({
@@ -343,7 +344,8 @@ test("500 people and 100 courses are reviewed as bounded metadata and shared cou
     id: c.id,
   }));
   d.groups = [];
-  const rows = Array.from({ length: 500 }, (_, i) => [
+  const people = ROSTER_IMPORT_MAX_ROWS - 1;
+  const rows = Array.from({ length: people }, (_, i) => [
     "Person " + i,
     `person${i}@example.test`,
     "2026-09-01",
@@ -356,27 +358,71 @@ test("500 people and 100 courses are reviewed as bounded metadata and shared cou
     start = performance.now(),
     result = reviewRosterCsv(csv(rows.reverse()), d);
   assert.equal(result.valid, true);
-  assert.equal(result.people.length, 500);
+  assert.equal(result.people.length, people);
   assert.equal(result.courses.length, 100);
   assert.equal(
     result.impact.reduce((n, p) => n + p.coursesAdded.length, 0),
-    50000,
+    people * 100,
   );
   assert.ok(
-    new TextEncoder().encode(JSON.stringify(result)).byteLength < 1_000_000,
+    new TextEncoder().encode(JSON.stringify(result)).byteLength < 4_000_000,
   );
   assert.equal(JSON.stringify(d), before);
   console.log(
     JSON.stringify({
-      scalePeople: 500,
+      scalePeople: people,
       scaleCourses: 100,
       reviewMs: Math.round(performance.now() - start),
       payloadBytes: JSON.stringify(result).length,
     }),
   );
   assert.equal(
-    parseRosterCsv(csv([...rows, ...rows])).issues[0].code,
+    parseRosterCsv(
+      csv([...rows, ["Overflow", "overflow@example.test", "", "", "", ""]]),
+    ).issues[0].code,
     "row-limit",
+  );
+});
+
+test("new roster dates are captured at apply, while existing known and unknown dates survive", () => {
+  const data = base();
+  data.users[0].addedAt = "2025-01-02T03:04:05.000Z";
+  const prepared = prepareRosterCsv(
+    csv([
+      ["New", "new@example.test", "2020-01-01", "", "", ""],
+      ["Alex renamed", "alex@example.test", "", "US", "", ""],
+    ]),
+    data,
+  );
+  assert.equal(prepared.review.valid, true);
+  assert.equal(
+    prepared.proposal!.users.find((p) => p.email === "new@example.test")!
+      .addedAt,
+    undefined,
+  );
+  const saved = materializeRoster(
+    prepared.proposal!,
+    prepared.review,
+    () => "new-id",
+    "2026-10-03T16:00:00.000Z",
+  );
+  assert.equal(
+    saved.users.find((p) => p.email === "new@example.test")!.addedAt,
+    "2026-10-03T16:00:00.000Z",
+  );
+  assert.equal(saved.users[0].addedAt, data.users[0].addedAt);
+  assert.equal(
+    saved.users.find((p) => p.email === "alex@example.test")!.addedAt,
+    undefined,
+  );
+  assert.equal(
+    materializeRoster(
+      saved,
+      { ...prepared.review, people: [] },
+      () => "unused",
+      "2027-01-01T00:00:00.000Z",
+    ).users.find((p) => p.email === "new@example.test")!.addedAt,
+    "2026-10-03T16:00:00.000Z",
   );
 });
 

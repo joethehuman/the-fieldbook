@@ -79,7 +79,7 @@ export function ReviewCollection({
   );
 }
 
-/** Whole-proposal count filters, independent of current search/page. */
+/** Whole-proposal status summary, independent of current filters/search/page. */
 export function ReviewCounts({ children }: { children: ReactNode }) {
   return (
     <div

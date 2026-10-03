@@ -1,3 +1,5 @@
+import { courseLibraryView } from "@/lib/course-destination";
+import { teamPersonId } from "@/lib/team-destination";
 import { ReaderShell } from "@/components/reader/ReaderShell";
 import {
   readerShellContext,
@@ -5,6 +7,7 @@ import {
   readerCurriculum,
   readerItem,
   readerUpdateItem,
+  readerTeam,
 } from "@server/reader";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
@@ -22,7 +25,7 @@ export default async function Layout({
   const section = parts[0];
   if (
     parts.length < 1 ||
-    parts.length > 2 ||
+    (!["admin", "team"].includes(section) && parts.length > 2) ||
     !["docs", "updates", "courses", "curricula", "team", "admin"].includes(
       section,
     )
@@ -31,7 +34,16 @@ export default async function Layout({
 
   // Direct HTML must resolve before streaming. RSC navigation resolves in the
   // page, avoiding a second article read in the shared layout.
-  if (parts[1] && requestHeaders.get("rsc") !== "1") {
+  if (section === "team" && requestHeaders.get("rsc") !== "1") {
+    const personId = teamPersonId(path);
+    if (parts.length > 1 && !personId) notFound();
+    if (personId) {
+      const { data } = await readerTeam();
+      if (!data.progressReport?.people.some((person) => person.u.id === personId))
+        notFound();
+    }
+  }
+  if (section !== "admin" && section !== "team" && !courseLibraryView(path) && parts[1] && requestHeaders.get("rsc") !== "1") {
     const id = decodeURIComponent(parts[1]);
     if (section === "docs") await readerItem("doc", id);
     else if (section === "updates") await readerUpdateItem(id);

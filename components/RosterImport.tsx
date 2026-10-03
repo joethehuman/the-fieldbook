@@ -6,6 +6,7 @@ import { downloadCsv } from "@/lib/csv";
 import {
   ROSTER_IMPORT_COLUMNS,
   ROSTER_IMPORT_MAX_BYTES,
+  ROSTER_IMPORT_MAX_ROWS,
   reviewRosterCsv,
   prepareRosterCsv,
   materializeRoster,
@@ -15,6 +16,7 @@ import {
   type RosterReview,
 } from "@/lib/roster-import";
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 import { Input } from "./ui/input";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import { useInteractionDialog } from "./ui/interaction-dialog";
@@ -192,11 +194,11 @@ function RowDetails({
         </div>
       )}
       {teams && <AffectedPeople row={row} review={review} />}
-      <p className="text-caption text-muted-foreground">
-        {row.csvRows.length
-          ? `CSV rows: ${row.csvRows.join(", ")}`
-          : "Affected by changes elsewhere in the file."}
-      </p>
+      {!row.csvRows.length && (
+        <p className="text-caption text-muted-foreground">
+          Affected by changes elsewhere in the file.
+        </p>
+      )}
     </div>
   );
 }
@@ -263,39 +265,20 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
         {Object.entries(labels)
           .filter(([key]) => key !== "issue")
           .map(([key, label]) => (
-            <Button
+            <span
               key={key}
-              variant={
-                state === key && tab !== "issues" ? "default" : "outline"
-              }
-              size="sm"
-              aria-pressed={state === key && tab !== "issues"}
-              onClick={() => {
-                if (tab === "issues") setTab("people");
-                setState(key as StateFilter);
-                setPage(1);
-              }}
+              className="inline-flex items-center gap-2 px-2 py-1 text-label"
             >
-              {label} {counts[key]}
-            </Button>
+              {label} <Badge>{counts[key]}</Badge>
+            </span>
           ))}
-        <Button
-          variant={tab === "issues" ? "default" : "outline"}
-          size="sm"
-          aria-pressed={tab === "issues"}
-          onClick={() => {
-            setTab("issues");
-            setQuery("");
-            setPage(1);
-          }}
-        >
-          Issues {review.issues.length}
-        </Button>
       </ReviewCounts>
       <TabsList aria-label="Import review sections">
         <TabsTrigger value="people">People {review.people.length}</TabsTrigger>
         <TabsTrigger value="teams">Teams {review.teams.length}</TabsTrigger>
-        <TabsTrigger value="issues">Issues</TabsTrigger>
+        <TabsTrigger value="issues">
+          Issues <Badge>{review.issues.length}</Badge>
+        </TabsTrigger>
       </TabsList>
       <CollectionControls
         secondaryRow
@@ -814,7 +797,7 @@ export function RosterImport({
                 </p>
                 <FormField
                   label="CSV file"
-                  description="UTF-8 CSV · up to 1,000 data rows · 2 MB"
+                  description={`Up to ${ROSTER_IMPORT_MAX_ROWS.toLocaleString("en-US")} rows per file, excluding the header · 2 MB maximum`}
                 >
                   <FilePicker
                     accept=".csv,text/csv"

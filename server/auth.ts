@@ -21,6 +21,7 @@ export function profile(row: ProfileRecord): User {
     role: row.role,
     active: row.active,
     registered: row.auth_user_id !== null,
+    addedAt: row.added_at || undefined,
     learningAssignments: (
       row.learning_assignments || row.assignment_context?.learning_assignments
     )

@@ -217,7 +217,8 @@ export async function adminSnapshot(
     });
   if (!reports) return data;
   if (scope === "person" && !data.users.some((person) => person.id === userId))
-    throw new Error(
+    throw new HttpError(
+      404,
       "This person is no longer available. Refresh the People list.",
     );
   const courses = new Map(courseRows.map((row) => [row.id, row]));

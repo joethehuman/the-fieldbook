@@ -2,7 +2,7 @@
 
 Administrators can open **Manage organization → People → Import CSV**. Download the blank template from the instructions, fill it in using an ordinary spreadsheet, and export UTF-8 CSV. The interactive demo offers the same review under Demo profiles and uses browser-local sample data. Do not upload private information to the demo.
 
-Choose **Choose CSV file** to open the system file chooser. The selected filename appears next to the button; choose it again to replace the file.
+Choose **Choose CSV file** to open the system file chooser. The button acknowledges opening immediately; the browser and operating system control when the chooser appears. Selecting a file or cancelling restores the button. The selected filename appears next to it; choose it again to replace the file.
 
 Choose **Import** after reviewing the complete proposal. The changes are saved together, then People refreshes. Imported people have stable roster entries before their first verified Google sign-in; no Auth-provider account or invitation email is created. Learning groups are not created or enrolled by CSV.
 
@@ -23,7 +23,9 @@ A team-only row leaves Name, Email and Hire date blank. Use it to define an empt
 
 For example, a person in Enterprise US lists `Enterprise US` in Team and `Sales US` in Parent team. A separate team-only row can place `Sales US` under `Organization`.
 
-The initial bounds are **1,000 data rows and 2 MB**. Quoted commas, quoted line breaks, UTF-8 BOM, and common line endings are accepted. Excel workbooks are not accepted; export them as CSV.
+Each file can contain **2,000 rows, excluding the header, and be at most 2 MB**. Team-only rows count toward the row limit. This bounds a single review and atomic save; it is not an organization-size limit. A 1,050-person organization can use one file if its people and team-only rows together fit. For larger imports, save parent teams and managers first, then import the remaining people, so references exist in Fieldbook or the current file. CSV review never treats omitted people as deletions.
+
+Export the spreadsheet as CSV UTF-8, a text format that preserves accented names and other languages. Quoted commas, quoted line breaks, UTF-8 BOM, and common line endings are accepted. Excel workbooks are not accepted; export them as CSV.
 
 ## Existing records and blanks
 
@@ -40,11 +42,11 @@ To clear an existing manager or hire date, or rename a team, use the ordinary ma
 
 ## Reviewing hundreds of rows
 
-The whole-file counts summarize new, changed and unchanged people and teams. People, Teams and Issues have search, filters, sorting and 25-row pages; counts always cover the entire proposal. People also includes existing members affected by a team change elsewhere in the file.
+The noninteractive badges summarize new, changed and unchanged people and teams across the whole proposal. People, Teams and Issues select the record type; use Filters to narrow the change type. Each section has search, sorting and 25-row pages. People also includes existing members affected by a team change elsewhere in the file.
 
 Expand a row for before/after values and learning or reporting consequences. A team change summarizes affected people together, with its own pages, rather than asking for hundreds of separate approvals. Courses retained through overlapping assignment sources are counted once. Continuous requirements keep their existing deadlines and progress.
 
-Issues retain every row and column reference. Filter by issue type or download the complete issue report, correct the source spreadsheet, and upload again. Conflicting definitions, duplicate identities, missing references, invalid dates, hierarchy cycles, and inactive or deleted identities block consequence calculation for the whole proposal. Notices alone do not block it. Back preserves the current review; choosing a replacement file clears it. Cancel closes an unsubmitted review without saving. The Import action commits the whole valid file, not only the current filtered page.
+Issues retain every source row and column reference. Row 5 means spreadsheet row 5, counting the header as row 1; it is not a count of imported people. Filter by issue type or download the complete issue report, correct the source spreadsheet, and upload again. Conflicting definitions, duplicate identities, missing references, invalid dates, hierarchy cycles, and inactive or deleted identities block consequence calculation for the whole proposal. Notices alone do not block it. Back preserves the current review; choosing a replacement file clears it. Cancel closes an unsubmitted review without saving. The Import action commits the whole valid file, not only the current filtered page.
 
 The installed app computes the review from current server-owned records and requires administrator access. It accepts CSV text, not client-selected IDs or proposed totals. Review files are transient and are not stored as uploaded artifacts. The additive `20261003140729_roster_csv_import.sql` migration creates a service-only receipt table and review/apply functions. Apply it before deploying dependent code; existing roster, assignments and progress are preserved by the migration.
 
@@ -63,3 +65,9 @@ The CSV parser translates rows into a shared roster input: people, teams, immedi
 This is a foundation for future adapters, not an HRIS or directory integration. No provider mapping table, SCIM endpoint, credentials, synchronization job, field ownership rule, or email-change reconciliation is implemented. SSO authentication remains separate from roster provisioning.
 
 This implementation was written with AI assistance. Its validation evidence includes synthetic 500-person/100-course reviews, permission and input-boundary tests, and browser checks; it does not substitute for an installation’s hosted sign-in and import acceptance.
+
+## Recently added people
+
+People and Demo profiles offer **Recently added** sorting. It uses the time a roster entry was saved, independently of hire date and first sign-in. Imports, individual pre-registration and new verified sign-ups capture it; editing, CSV updates and later sign-in preserve it. People created before this capture was introduced have unknown dates and follow dated entries, ordered by name. No historical dates are invented.
+
+Apply `20261003162418_roster_added_at.sql` before deploying this refinement. It adds a nullable roster timestamp and a private trigger that assigns it on insertion and preserves it on updates. Existing application data, functions, access policies and learning clocks remain unchanged.

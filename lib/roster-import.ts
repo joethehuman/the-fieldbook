@@ -43,7 +43,7 @@ export const ROSTER_IMPORT_COLUMNS = [
     guidance: "This team's manager, already in Fieldbook or in this file.",
   },
 ] as const;
-export const ROSTER_IMPORT_MAX_ROWS = 1_000;
+export const ROSTER_IMPORT_MAX_ROWS = 2_000;
 // Below the host's request-body ceiling even after JSON quoting. More than enough
 // for 1,000 records with the same field bounds as ordinary roster editing.
 export const ROSTER_IMPORT_MAX_BYTES = 2 * 1024 * 1024;
@@ -260,7 +260,7 @@ export function parseRosterCsv(csv: string): RosterInput {
       0,
       "File",
       "row-limit",
-      "Use at most 1,000 data rows, including team-only rows.",
+      `Use at most ${ROSTER_IMPORT_MAX_ROWS.toLocaleString("en-US")} rows per file, excluding the header. Team-only rows count toward this limit.`,
     );
     return input;
   }
@@ -985,6 +985,7 @@ export function materializeRoster(
   proposal: Workspace,
   review: RosterReview,
   allocate: () => string,
+  addedAt = new Date().toISOString(),
 ): Workspace {
   const ids = new Map<string, string>();
   for (const record of [...review.people, ...review.teams])
@@ -994,6 +995,7 @@ export function materializeRoster(
     ...proposal,
     users: proposal.users.map((p) => ({
       ...p,
+      addedAt: ids.has(p.id) ? addedAt : p.addedAt,
       id: resolve(p.id)!,
       teamId: resolve(p.teamId),
     })),

@@ -102,6 +102,8 @@ export default function LearningGroups({
   onLearning,
   onLearningMany,
   initialGroup,
+  initialTab,
+  onDestinationChange,
   registerNavigationGuard,
   onPrepareAssignments,
 }: {
@@ -116,10 +118,12 @@ export default function LearningGroups({
     actions: import("@/lib/learning").LearningAction[],
   ) => Promise<void>;
   initialGroup?: string;
+  initialTab?: import("@/lib/admin-destination").AdminDestination["panel"];
+  onDestinationChange?: (id?: string, panel?: import("@/lib/admin-destination").AdminDestination["panel"]) => Promise<boolean>;
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const [selected, setSelected] = useState(initialGroup || "");
-  const [tab, setTab] = useState("people");
+  const [tab, setTab] = useState<string>(initialTab || "people");
   const [indexQuery, setIndexQuery] = useState("");
   const [indexPage, setIndexPage] = useState(1);
   const [indexSort, setIndexSort] = useState("name");
@@ -535,6 +539,10 @@ export default function LearningGroups({
     }
   }
   function openGroup(id: string) {
+    if (onDestinationChange) {
+      void onDestinationChange(id);
+      return;
+    }
     resetPeopleFilters();
     setSelected(id);
     setTab("people");
@@ -587,6 +595,7 @@ export default function LearningGroups({
         },
       )
     ) {
+      if (onDestinationChange) await onDestinationChange();
       setSelected("");
       destination.reveal();
     }
@@ -1057,6 +1066,10 @@ export default function LearningGroups({
               {
                 label: "All learning groups",
                 onSelect: () => {
+                  if (onDestinationChange) {
+                    void onDestinationChange();
+                    return;
+                  }
                   setSelected("");
                   setNotice("");
                   destination.reveal();
@@ -1106,6 +1119,7 @@ export default function LearningGroups({
           <Tabs
             value={tab}
             onValueChange={(value) => {
+              if (onDestinationChange) { void onDestinationChange(selected, value as "people" | "learning" | "updates"); return; }
               setTab(value);
               setQuery("");
               setPage(1);

@@ -53,6 +53,7 @@ export type ProfileRecord = {
   role: User["role"];
   active: boolean;
   groups: string[];
+  added_at?: string | null;
   team_id?: string | null;
   onboarding_start?: string | null;
   group_joined_at?: Record<string, string>;

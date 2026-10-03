@@ -59,17 +59,19 @@ test("the installed HTTP route enforces origin, identity and admin access and re
   expect(
     (await request({ csv: "x" }, "https://other.example.test")).status(),
   ).toBe(403);
-  await page.request.post("http://127.0.0.1:3130/fixture", {
-    data: { role: "learner" },
-  });
+  await page.request.post(
+    `http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`,
+    {
+      data: { role: "learner" },
+    },
+  );
   expect((await request({ csv: "x" })).status()).toBe(403);
   expect((await apply(input)).status()).toBe(403);
   await page.context().clearCookies();
   expect((await request({ csv: "x" })).status()).toBe(401);
   expect((await apply(input)).status()).toBe(401);
 });
-async function setup(page: Page, installed: boolean) {
-  const data = freshWorkspace();
+async function setup(page: Page, installed: boolean, data = freshWorkspace()) {
   let writes = 0;
   if (installed) {
     await setupAuthoringProvider(page, data);
@@ -265,6 +267,17 @@ test("500-row review has bounded pages, stable controls for one/zero/many matche
       "Pre-registered person. No email or login account is created.",
     ),
   ).toBeVisible();
+  await expect(s.dialog.locator('[data-slot="review-counts"]')).toContainText(
+    "New",
+  );
+  await expect(
+    s.dialog.locator('[data-slot="review-counts"] [data-slot="badge"]'),
+  ).toHaveCount(3);
+  await expect(
+    s.dialog.locator('[data-slot="review-counts"] button'),
+  ).toHaveCount(0);
+  await expect(s.dialog.getByRole("tab", { name: /^Issues/ })).toHaveCount(1);
+  await expect(s.dialog.getByText(/^CSV rows:/)).toHaveCount(0);
   // Focusing a row action may scroll the table, never the discovery header sideways.
   expect((await query.boundingBox())!.x).toBeCloseTo(before!.x, 0);
   await page.screenshot({ path: info.outputPath("large-review.png") });
@@ -286,7 +299,7 @@ test("all grouped issues span pages, download completely, and a replacement file
   ]);
   await upload(page, csv(rows));
   await expect(
-    s.dialog.getByRole("tab", { name: "Issues", exact: true }),
+    s.dialog.getByRole("tab", { name: /^Issues \d+$/ }),
   ).toHaveAttribute("data-state", "active");
   await expect(
     s.dialog.getByRole("navigation", { name: "Review pages" }),
@@ -669,6 +682,7 @@ test("individual person creation saves once, returns to People, and rejects a du
         id: "00000000-0000-4000-8000-000000000099",
         active: true,
         registered: false,
+        addedAt: new Date().toISOString(),
       });
       s.data.governanceRevision = (s.data.governanceRevision || 0) + 1;
       await route.fulfill({ json: { revision: s.data.governanceRevision } });
@@ -722,4 +736,77 @@ test("individual person creation saves once, returns to People, and rejects a du
     }),
   ).toBeVisible();
   if (installed) expect(saves).toBe(1);
+  await page
+    .getByRole("searchbox", { name: "Search profiles", exact: true })
+    .fill("");
+  await page
+    .getByRole("button", { name: "Sort: Name A–Z", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Sort profiles", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Recently added", exact: true })
+    .click();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.locator('[data-layout="peopleSelection"] tbody tr').first(),
+  ).toContainText("Single Person");
 });
+
+for (const count of [3, 20])
+  test(`Groups with ${count} options hands scrolling back to the person modal at its edges`, async ({
+    page,
+  }, info) => {
+    const installed = info.project.name.startsWith("production");
+    const data = freshWorkspace();
+    data.groups = Array.from({ length: count }, (_, i) => ({
+      id: `scroll-group-${i}`,
+      name: `Scroll group ${String(i).padStart(2, "0")}`,
+    }));
+    const s = await setup(page, installed, data);
+    await s.dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page
+      .getByRole("button", {
+        name: installed ? "Pre-register person" : "Add demo profile",
+        exact: true,
+      })
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: installed ? "Pre-register person" : "Demo profile",
+      exact: true,
+    });
+    const outer = dialog.locator('[data-slot="scroll-region"]');
+    const inner = dialog.locator(".group-picker-options");
+    await outer.evaluate((e) => {
+      e.scrollTop = e.scrollHeight;
+    });
+    await expect
+      .poll(() => outer.evaluate((e) => e.scrollTop))
+      .toBeGreaterThan(100);
+    await inner.evaluate((e) => {
+      e.scrollTop = 0;
+    });
+    await expect(inner).toHaveAttribute(
+      "data-scroll-fade-after",
+      count > 6 ? "true" : "false",
+    );
+    const before = await outer.evaluate((e) => e.scrollTop);
+    await inner.hover();
+    await page.mouse.wheel(0, -400);
+    await expect
+      .poll(() => outer.evaluate((e) => e.scrollTop))
+      .toBeLessThan(before);
+    if (count > 6) {
+      await outer.evaluate((e) => {
+        e.scrollTop = e.scrollHeight;
+      });
+      await inner.hover();
+      await page.mouse.wheel(0, 150);
+      await expect
+        .poll(() => inner.evaluate((e) => e.scrollTop))
+        .toBeGreaterThan(0);
+      await expect(inner).toHaveAttribute("data-scroll-fade-before", "true");
+    }
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  });
