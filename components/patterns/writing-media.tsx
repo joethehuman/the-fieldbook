@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Pencil, Trash2 } from "lucide-react";
+import { WritingBlockActions } from "./writing-block-actions";
 import { CourseVideo } from "./course-video";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -37,60 +37,8 @@ export function WritingMediaVideo({
   return (
     <span className="writing-media-block" contentEditable={false}>
       <CourseVideo key={url} url={url} title={label} allowTheater={false} />
-      <span
-        className="writing-media-actions"
-        role="group"
-        aria-label="Video editing controls"
-      >
-        {onParagraph && (
-          <>
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              aria-label="Write before video"
-              disabled={disabled}
-              onClick={() => onParagraph("before")}
-            >
-              <ArrowUp />
-            </Button>
-            <Button
-              type="button"
-              size="icon"
-              variant="outline"
-              aria-label="Write after video"
-              disabled={disabled}
-              onClick={() => onParagraph("after")}
-            >
-              <ArrowDown />
-            </Button>
-          </>
-        )}
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          aria-label="Edit video"
-          disabled={disabled}
-          onClick={() => {
-            setDraft(url);
-            setError("");
-            setEditing(true);
-          }}
-        >
-          <Pencil />
-        </Button>
-        <Button
-          type="button"
-          size="icon"
-          variant="outline"
-          aria-label="Remove video"
-          disabled={disabled}
-          onClick={onRemove}
-        >
-          <Trash2 />
-        </Button>
-      </span>
+      <WritingBlockActions label="Video" disabled={disabled} onRemove={onRemove} onParagraph={onParagraph}
+        onEdit={() => { setDraft(url); setError(""); setEditing(true); }} />
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent>
           <DialogTitle>Edit video</DialogTitle>
