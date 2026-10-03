@@ -830,16 +830,16 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
     .last()
     .evaluate((cell) => cell.getBoundingClientRect().width);
   expect(trailingControlWidth).toBeLessThan(50);
-  await table.getByRole("button", { name: "Column menu" }).first().click();
+  await page.getByRole("button", { name: "Column 1 actions and drag handle" }).first().click();
   await expect(
-    page.getByTitle("Insert a column to the right of this one"),
+    page.getByRole("menuitem", { name: "Insert column after" }),
   ).toBeVisible();
   await table.evaluate((node) => {
     const scroller = node.closest('[data-lexical-decorator="true"]');
     if (scroller) scroller.scrollLeft = 180;
   });
   await expect(
-    page.getByTitle("Insert a column to the right of this one"),
+    page.getByRole("menuitem", { name: "Insert column after" }),
   ).toHaveCount(0);
   await page.screenshot({
     path: info.outputPath("course-editor-wide-table.png"),
@@ -918,18 +918,19 @@ test("slash Table can be chosen with the pointer", async ({ page }, info) => {
   await expect(page.getByRole("menu", { name: /^Insert content/ })).toHaveCount(
     0,
   );
-  await table.getByRole("button", { name: "Column menu" }).first().click();
-  await page.getByTitle("Insert a column to the right of this one").click();
+  await page.getByRole("button", { name: "Column 1 actions and drag handle" }).first().click();
+  await page.getByRole("menuitem", { name: "Insert column after" }).click();
   await expect(
     table
       .locator("tbody tr")
       .first()
       .locator(":is(td, th):not([data-tool-cell])"),
   ).toHaveCount(4);
-  await table.getByRole("button", { name: "Row menu" }).first().click();
-  await page.getByTitle("Insert a row below this one").click();
+  await page.getByRole("button", { name: "Row 1 actions and drag handle" }).first().click();
+  await page.getByRole("menuitem", { name: "Insert row after" }).click();
   await expect(table.locator("tbody tr")).toHaveCount(4);
-  await table.getByRole("button", { name: "Delete table" }).click();
+  await page.getByRole("button", { name: "Table actions" }).click();
+  await page.getByRole("menuitem", { name: "Remove table" }).click();
   await expect(table).toHaveCount(0);
 });
 

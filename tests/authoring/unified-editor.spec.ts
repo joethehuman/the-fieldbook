@@ -155,12 +155,14 @@ test("inline video can be edited, written around, removed and undone without los
     "src",
     "https://www.youtube-nocookie.com/embed/69V__a49xtw",
   );
+  await page.getByRole("button", { name: "Video actions", exact: true }).click();
   await page
-    .getByRole("button", { name: "Write after video", exact: true })
+    .getByRole("menuitem", { name: "Write after video", exact: true })
     .click();
   await page.keyboard.type("Between video and prose.");
   await expect(writer).toContainText("Between video and prose.");
-  await page.getByRole("button", { name: "Edit video", exact: true }).click();
+  await page.getByRole("button", { name: "Video actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Edit video", exact: true }).click();
   const dialog = page.getByRole("dialog", { name: "Edit video", exact: true });
   await dialog
     .getByRole("textbox", { name: "Video URL", exact: true })
@@ -170,7 +172,8 @@ test("inline video can be edited, written around, removed and undone without los
     "src",
     "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
   );
-  await page.getByRole("button", { name: "Remove video", exact: true }).click();
+  await page.getByRole("button", { name: "Video actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Remove video", exact: true }).click();
   await expect(frame).toHaveCount(0);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(frame).toHaveCount(1);

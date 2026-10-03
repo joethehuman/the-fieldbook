@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Unify visual-editor block actions and image settings, place table handles on grid edges with row/column movement indicators and menu alternatives, retain formatting tools for whole-paragraph selections, and offer Divider in the Commands and slash menus.
+
 - Coordinate Focus mode transitions with the outline and details panels, keep the moving canvas opaque with synchronized text/media resizing, and make Enter from a lesson title start on an empty line above the first block, including video.
 
 - Unify visual writing and preview with inline player-style media, editable lesson titles inside the canvas, contextual media controls, and Focus mode that expands the existing editor. Offer Markdown downloads from the toolbar’s more menu, retain source recovery for unsupported content, autosave and separate publication.

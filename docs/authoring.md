@@ -45,3 +45,11 @@ Import normalization must not mark an untouched document dirty or rewrite it whe
 The demo upgrades existing browser work to separate draft and published snapshots without resetting profiles or content. It cannot reconstruct a historical publication already overwritten by an older demo save. The server already stores separate snapshots; this interface change requires no database migration. The shared draft-save queue serializes revision-checked writes and keeps newer typed edits when a slower response arrives. Publication remains an explicit request using the latest work.
 
 Run the authoring suite after both builds. It covers existing-content round trips, formatting/undo, source fallback, repeated draft saves, publishing, unpublishing, failure recovery and pending uploads. Tests use synthetic server responses; they are not proof of hosted authentication or Storage behavior.
+
+### Block controls
+
+Choose **Divider** from Commands or type `/divider` to insert a horizontal separator.
+
+Images, videos, code blocks, tables and dividers have a contextual **…** menu for removal and writing before or after the block. Image settings use the same dialog and fields as the rest of Fieldbook. Removal is an editor change that can be undone; it does not delete the uploaded media file.
+
+Table handles sit on the top and left grid edges. Click a handle for row/column actions or drag it to reorder: the original position remains highlighted and a line marks the destination. Escape cancels the move. The menu also provides move, insert, remove and column alignment actions for keyboard and touch use. The first row remains the Markdown table header; moving a row to the first position makes it the header. Formatted cells and column alignment move together. Select a word or an entire paragraph for the same formatting menu.

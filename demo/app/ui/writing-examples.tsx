@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 
 export function WritingExamples() {
   const [body, setBody] = useState(
-    "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.\n\n| Area | Owner | Next step |\n| :--- | :--- | :--- |\n| **Documentation** | Enablement | Confirm the source |\n| | | |\n| Customer follow-up | Account team | Keep the next decision and its context visible |",
+    "## A clear place to write\n\nWrite **formatted text**, add a [helpful link](https://example.com), and keep your work as a draft.\n\n- Explain the change\n- Make the next step clear\n\n> Keep guidance concise.\n\n| Area | Owner | Next step |\n| :--- | :--- | :--- |\n| **Documentation** | Enablement | Confirm the source |\n| | | |\n| Customer follow-up | Account team | Keep the next decision and its context visible |\n\n```text\nA code block with its own actions.\n```\n\n![A landscape illustration](/ui/image-viewer-landscape.svg \"Landscape example\")\n\n[Video](https://www.youtube.com/watch?v=69V__a49xtw)\n\n---\n\nTriple-click this paragraph to select it and open the formatting menu.",
   );
   const [title, setTitle] = useState("A lesson written in place");
   const [category, setCategory] = useState("");
