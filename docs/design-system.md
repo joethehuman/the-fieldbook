@@ -203,7 +203,9 @@ The first section of `/ui` compares button/input variants and live validation; `
 
 ## Form composition and information
 
-Use `TextField` for a text input with a supplied stable ID (including server-rendered presentation). Use `FormField` inside interactive forms to wrap **one** Input, Textarea or SelectField. FormField uses React `useId` unless the control already has an ID, preserves existing descriptions and invalid state, and links its label/help/error without including helper copy in the control's name. It does not validate, transform values or save. Pass the actual control directly, not an arbitrary wrapper or fragment. Keep refs and event handlers on that control.
+Use `TextField` for a text input with a supplied stable ID (including server-rendered presentation). Use `FormField` inside interactive forms to wrap **one** Input, Textarea, SelectField or FilePicker. FormField uses React `useId` unless the control already has an ID, preserves existing descriptions and invalid state, and links its label/help/error without including helper copy in the control's name. It does not validate, transform values or save. Pass the actual control directly, not an arbitrary wrapper or fragment. Keep refs and event handlers on that control.
+
+Use `FilePicker` when selecting a file is an explicit action. It pairs the shared outline Button with a hidden native file input and a wrapping, announced filename. It preserves native system selection, keyboard activation, hover/focus/disabled states and selecting the same file again. Features own the accepted formats, displayed filename, validation and upload; choosing or cancelling a file does not imply a save. The `/ui` catalog shows enabled and disabled selection.
 
 ```tsx
 <FormField

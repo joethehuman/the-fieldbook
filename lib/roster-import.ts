@@ -11,31 +11,36 @@ import { learningStage, onboardingClockTarget } from "./learning";
 import type { CsvReport } from "./csv";
 
 export const ROSTER_IMPORT_COLUMNS = [
-  { key: "name", label: "Name", guidance: "Required for a new person." },
+  {
+    key: "name",
+    label: "Name",
+    guidance: "Required for new people; blank keeps an existing name.",
+  },
   {
     key: "email",
     label: "Email",
-    guidance: "Required for a person; matches their existing record.",
+    guidance: "Required for people. Used to match existing records.",
   },
   {
     key: "hireDate",
     label: "Hire date",
-    guidance: "Optional YYYY-MM-DD. Starts the new-user clock.",
+    guidance: "Optional YYYY-MM-DD. Starts the new-user learning window.",
   },
   {
     key: "team",
     label: "Team",
-    guidance: "The person's direct team. Use a unique team name.",
+    guidance: "The person's direct reporting team. Use its unique name.",
   },
   {
     key: "parent",
     label: "Parent team",
-    guidance: "That team's immediate parent, not the full path.",
+    guidance:
+      "The team directly above this team. Use its name, not a full path.",
   },
   {
     key: "manager",
     label: "Team manager email",
-    guidance: "Manager of this team, even if they belong elsewhere.",
+    guidance: "This team's manager, already in Fieldbook or in this file.",
   },
 ] as const;
 export const ROSTER_IMPORT_MAX_ROWS = 1_000;

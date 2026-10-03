@@ -82,7 +82,7 @@ async function setup(page: Page, installed: boolean) {
     ? JSON.stringify(data)
     : await page.evaluate(() => localStorage.getItem("fieldbook.workspace.v1"));
   await page.getByRole("button", { name: "Import CSV", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Import people and teams" });
+  const dialog = page.getByRole("dialog", { name: "Review CSV import" });
   await expect(dialog).toBeVisible();
   return {
     dialog,
@@ -98,14 +98,19 @@ async function setup(page: Page, installed: boolean) {
   };
 }
 async function upload(page: Page, text: string, name = "people.csv") {
+  const chooser = page.waitForEvent("filechooser");
   await page
-    .getByLabel("CSV file", { exact: true })
-    .setInputFiles({ name, mimeType: "text/csv", buffer: Buffer.from(text) });
+    .getByRole("button", { name: "Choose CSV file", exact: true })
+    .click();
+  await (
+    await chooser
+  ).setFiles({ name, mimeType: "text/csv", buffer: Buffer.from(text) });
+  await expect(page.getByRole("dialog").getByRole("status")).toHaveText(name);
   const review = page.getByRole("button", { name: "Review file", exact: true });
   await expect(review).toBeEnabled();
   await review.click();
   await expect(
-    page.getByRole("button", { name: "Close review", exact: true }),
+    page.getByRole("button", { name: "Done", exact: true }),
   ).toBeVisible();
 }
 test("stored downloads and example review are real, read-only, and restore focus on close", async ({
@@ -120,22 +125,53 @@ test("stored downloads and example review are real, read-only, and restore focus
   expect(readFileSync((await file.path())!, "utf8")).toBe(
     serializeCsv(rosterTemplate()),
   );
+  const choose = s.dialog.getByRole("button", {
+    name: "Choose CSV file",
+    exact: true,
+  });
+  await choose.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  const background = await choose.evaluate(
+    (el) => getComputedStyle(el).backgroundColor,
+  );
+  await choose.hover();
+  await expect
+    .poll(() => choose.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .not.toBe(background);
+  const guide = s.dialog.getByRole("button", {
+    name: "Column guide",
+    exact: true,
+  });
+  await guide.click();
+  await expect(s.dialog.locator("dt")).toHaveCount(6);
+  await expect(
+    s.dialog.getByText("Parents and managers can appear later in the file.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await guide.click();
+  await page.screenshot({ path: info.outputPath("upload-refined.png") });
   await upload(page, serializeCsv(rosterExample()));
   await expect(
-    s.dialog.getByText("Review only — no changes applied."),
+    s.dialog.getByText("Preview only. No changes are saved."),
   ).toBeVisible();
   await s.dialog.getByRole("tab", { name: /Teams/ }).click();
   await expect(
     s.dialog.getByRole("cell", { name: "Revenue Organization", exact: true }),
   ).toBeVisible();
   await page.screenshot({ path: info.outputPath("example-review.png") });
-  await s.dialog
-    .getByRole("button", { name: "Close review", exact: true })
-    .click();
+  await s.dialog.getByRole("button", { name: "Done", exact: true }).click();
   await expect(s.dialog).not.toBeVisible();
   await expect(
     page.getByRole("button", { name: "Import CSV", exact: true }),
   ).toBeFocused();
+  await page.getByRole("button", { name: "Import CSV", exact: true }).click();
+  await expect(s.dialog.getByRole("status")).toHaveText("No CSV file selected");
+  await expect(
+    s.dialog.getByRole("button", { name: "Review file", exact: true }),
+  ).toBeDisabled();
+  await s.dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(s.dialog).not.toBeVisible();
   await s.unchanged();
   expect(s.writes()).toBe(0);
 });
@@ -173,7 +209,7 @@ test("500-row review has bounded pages, stable controls for one/zero/many matche
     .getAttribute("data-compact");
   const anchor =
     compact === "true"
-      ? s.dialog.getByRole("button", { name: "Close review", exact: true })
+      ? s.dialog.getByRole("button", { name: "Done", exact: true })
       : query;
   const before = await anchor.boundingBox();
   await query.fill("person499@example.test");
@@ -200,9 +236,7 @@ test("500-row review has bounded pages, stable controls for one/zero/many matche
   // Focusing a row action may scroll the table, never the discovery header sideways.
   expect((await query.boundingBox())!.x).toBeCloseTo(before!.x, 0);
   await page.screenshot({ path: info.outputPath("large-review.png") });
-  await s.dialog
-    .getByRole("button", { name: "Close review", exact: true })
-    .click();
+  await s.dialog.getByRole("button", { name: "Done", exact: true }).click();
   await s.unchanged();
   expect(s.writes()).toBe(0);
 });
@@ -250,9 +284,7 @@ test("all grouped issues span pages, download completely, and a replacement file
   await expect(
     s.dialog.getByRole("button", { name: "Download issues", exact: true }),
   ).toHaveCount(0);
-  await s.dialog
-    .getByRole("button", { name: "Close review", exact: true })
-    .click();
+  await s.dialog.getByRole("button", { name: "Done", exact: true }).click();
   await s.unchanged();
   expect(s.writes()).toBe(0);
 });
@@ -292,7 +324,7 @@ test("ten-level ancestry and enlarged text keep short-height dialog controls rea
   await page.getByRole("option", { name: "All records", exact: true }).click();
   await page.keyboard.press("Escape");
   const close = s.dialog.getByRole("button", {
-    name: "Close review",
+    name: "Done",
     exact: true,
   });
   await expect(close).toBeInViewport();
@@ -346,11 +378,9 @@ test("failed installed review is retryable and cancellation cannot reveal an aba
     .getByRole("button", { name: "Review file", exact: true })
     .click();
   await expect(
-    s.dialog.getByRole("button", { name: "Close review", exact: true }),
+    s.dialog.getByRole("button", { name: "Done", exact: true }),
   ).toBeVisible();
-  await s.dialog
-    .getByRole("button", { name: "Close review", exact: true })
-    .click();
+  await s.dialog.getByRole("button", { name: "Done", exact: true }).click();
   await page.getByRole("button", { name: "Import CSV", exact: true }).click();
   let release: () => void;
   const gate = new Promise<void>((resolve) => {
@@ -380,7 +410,9 @@ test("failed installed review is retryable and cancellation cannot reveal an aba
   await s.dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   release!();
   await page.getByRole("button", { name: "Import CSV", exact: true }).click();
-  await expect(s.dialog.getByLabel("CSV file", { exact: true })).toBeVisible();
+  await expect(
+    s.dialog.getByRole("button", { name: "Choose CSV file", exact: true }),
+  ).toBeVisible();
   await expect(
     s.dialog.getByRole("button", { name: "Review file", exact: true }),
   ).toBeDisabled();

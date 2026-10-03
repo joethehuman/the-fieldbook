@@ -13,11 +13,13 @@ import {
 } from "@/lib/roster-import";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { FilePicker } from "./ui/file-picker";
 import { Alert } from "./ui/alert";
 import { Note } from "./ui/note";
 import { ActionGroup } from "./ui/action-group";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogTitle,
   DialogDescription,
@@ -638,6 +640,7 @@ export function RosterImport({
   return (
     <>
       <Button
+        type="button"
         variant="outline"
         disabled={disabled}
         onClick={() => setOpen(true)}
@@ -652,9 +655,9 @@ export function RosterImport({
         }}
       >
         <DialogContent size="workflow-list">
-          <DialogTitle>Import people and teams</DialogTitle>
+          <DialogTitle>Review CSV import</DialogTitle>
           <DialogDescription>
-            Review only — no changes applied.
+            Preview only. No changes are saved.
           </DialogDescription>
           <DialogSteps steps={["Upload", "Review"]} current={step} />
           {error && (
@@ -666,8 +669,9 @@ export function RosterImport({
             <div hidden={step !== 0} className="h-full overflow-y-auto p-1">
               <div className="grid gap-5">
                 <p className="text-copy">
-                  One row per person. Use a team’s immediate parent, rather than
-                  its full hierarchy. A team-only row can define an empty team.
+                  Fill in the template, export it as CSV, then choose your file
+                  to review. Use one row per person. For a team with no direct
+                  members, fill in only the team columns.
                 </p>
                 <ActionGroup>
                   <Button asChild variant="outline">
@@ -686,52 +690,47 @@ export function RosterImport({
                   label="CSV file"
                   description="UTF-8 CSV · up to 1,000 data rows · 2 MB"
                 >
-                  <Input
-                    type="file"
+                  <FilePicker
                     accept=".csv,text/csv"
                     disabled={busy}
-                    onChange={(e) => {
-                      void choose(e.target.files?.[0]);
-                      e.target.value = "";
-                    }}
+                    fileName={file?.name}
+                    buttonLabel="Choose CSV file"
+                    emptyLabel="No CSV file selected"
+                    onFileChange={(selected) => void choose(selected)}
                   />
                 </FormField>
-                <p role="status" className="text-copy text-muted-foreground">
-                  {busy
-                    ? "Preparing review…"
-                    : file
-                      ? file.name
-                      : "Choose your completed template."}
-                </p>
                 <Note>
-                  Blank optional cells preserve existing values. New people
-                  without a team live in Organization; new teams without a
-                  parent sit under Organization. People and teams omitted from
-                  the file stay unchanged.
+                  <p>
+                    Leave optional cells blank to keep existing values. People
+                    and teams not listed in the file stay unchanged.
+                  </p>
+                  <p>
+                    For new records, a blank Team or Parent team places them in
+                    Organization. Enter Organization explicitly to move an
+                    existing person or team there.
+                  </p>
                 </Note>
                 <Collapsible>
                   <CollapsibleTrigger asChild>
-                    <Button variant="ghost">
+                    <Button type="button" variant="link" size="sm">
                       <ChevronDown aria-hidden="true" />
                       Column guide
                     </Button>
                   </CollapsibleTrigger>
                   <CollapsibleContent>
-                    <dl className="grid gap-3 py-3">
+                    <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-4 gap-y-2 py-3 text-copy">
                       {ROSTER_IMPORT_COLUMNS.map((c) => (
-                        <div key={c.key}>
+                        <Fragment key={c.key}>
                           <dt className="font-medium">{c.label}</dt>
-                          <dd className="text-copy text-muted-foreground">
+                          <dd className="text-muted-foreground">
                             {c.guidance}
                           </dd>
-                        </div>
+                        </Fragment>
                       ))}
                     </dl>
                     <p className="text-copy text-muted-foreground">
-                      Use Organization explicitly to move an existing person or
-                      team there. Managers and parents can appear anywhere in
-                      the file. Learning groups are managed separately. No
-                      invitation email is sent.
+                      Parents and managers can appear later in the file. Leave
+                      Name, Email and Hire date blank on a team-only row.
                     </p>
                   </CollapsibleContent>
                 </Collapsible>
@@ -746,10 +745,13 @@ export function RosterImport({
           <DialogFooter>
             {step === 0 ? (
               <>
-                <Button variant="outline" onClick={close}>
-                  Cancel
-                </Button>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Cancel
+                  </Button>
+                </DialogClose>
                 <Button
+                  type="button"
                   disabled={!file}
                   loading={busy}
                   onClick={() => void prepare()}
@@ -760,11 +762,16 @@ export function RosterImport({
             ) : (
               <>
                 <ActionGroup>
-                  <Button variant="outline" onClick={() => setStep(0)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep(0)}
+                  >
                     Back
                   </Button>
                   {review && !!review.issues.length && (
                     <Button
+                      type="button"
                       variant="ghost"
                       onClick={() =>
                         downloadCsv(
@@ -778,7 +785,9 @@ export function RosterImport({
                     </Button>
                   )}
                 </ActionGroup>
-                <Button onClick={close}>Close review</Button>
+                <DialogClose asChild>
+                  <Button type="button">Done</Button>
+                </DialogClose>
               </>
             )}
           </DialogFooter>

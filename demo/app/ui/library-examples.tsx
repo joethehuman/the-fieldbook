@@ -39,6 +39,7 @@ import { ContentFeedback } from "@/components/patterns/content-feedback";
 import { Settings, Plus } from "lucide-react";
 import { CollectionControls } from "@/components/patterns/collection-controls";
 import { Input } from "@/components/ui/input";
+import { FilePicker } from "@/components/ui/file-picker";
 import { FormField } from "@/components/patterns/form-field";
 import { SettingsSection } from "@/components/patterns/settings-section";
 import { LoadMore } from "@/components/patterns/load-more";
@@ -389,6 +390,7 @@ export function LibraryExamples() {
       <FilterRowsExample />
       <HierarchyPickerExample />
       <RosterReviewExample />
+      <FilePickerExample />
       <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
@@ -1063,6 +1065,36 @@ function RosterReviewExample() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </SettingsSection>
+  );
+}
+
+function FilePickerExample() {
+  const [fileName, setFileName] = useState("");
+  return (
+    <SettingsSection
+      title={<h3>File selection</h3>}
+      description="A native file chooser with an explicit button and a wrapping filename."
+    >
+      <FormField
+        label="Example CSV file"
+        description="Choose a CSV. This catalog example does not upload it."
+      >
+        <FilePicker
+          accept=".csv,text/csv"
+          fileName={fileName}
+          buttonLabel="Choose CSV file"
+          emptyLabel="No CSV file selected"
+          onFileChange={(file) => setFileName(file.name)}
+        />
+      </FormField>
+      <FormField label="Unavailable file selection">
+        <FilePicker
+          disabled
+          buttonLabel="Choose unavailable file"
+          onFileChange={() => {}}
+        />
+      </FormField>
     </SettingsSection>
   );
 }

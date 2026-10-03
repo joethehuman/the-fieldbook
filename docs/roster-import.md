@@ -2,7 +2,9 @@
 
 Administrators can open **Manage organization → People → Import CSV**. Download the stored blank template or fictional example, fill it in using an ordinary spreadsheet, and export UTF-8 CSV. The interactive demo offers the same review under Demo profiles and uses browser-local sample data. Do not upload private information to the demo.
 
-**This workflow currently reviews files only. Close review saves nothing.** It does not create accounts, send invitations, change assignments, or import learning groups. A validated review is a proposed change, not a completed import.
+Choose **Choose CSV file** to open the system file chooser. The selected filename appears next to the button; choose it again to replace the file.
+
+**This workflow currently reviews files only. Done closes the review and saves nothing.** It does not create accounts, send invitations, change assignments, or import learning groups. A validated review is a proposed change, not a completed import.
 
 ## The template
 
@@ -42,7 +44,7 @@ The whole-file counts summarize new, changed and unchanged people and teams. Peo
 
 Expand a row for before/after values and learning or reporting consequences. A team change summarizes affected people together, with its own pages, rather than asking for hundreds of separate approvals. Courses retained through overlapping assignment sources are counted once. Continuous requirements keep their existing deadlines and progress.
 
-Issues retain every row and column reference. Filter by issue type or download the complete issue report, correct the source spreadsheet, and upload again. Conflicting definitions, duplicate identities, missing references, invalid dates, hierarchy cycles, and inactive or deleted identities block consequence calculation for the whole proposal. Notices alone do not block it. Back preserves the current review; choosing a replacement file clears it. Cancel or Close review makes no changes.
+Issues retain every row and column reference. Filter by issue type or download the complete issue report, correct the source spreadsheet, and upload again. Conflicting definitions, duplicate identities, missing references, invalid dates, hierarchy cycles, and inactive or deleted identities block consequence calculation for the whole proposal. Notices alone do not block it. Back preserves the current review; choosing a replacement file clears it. Cancel or Done closes the dialog without saving changes.
 
 The installed app computes the review from current server-owned records and requires administrator access. It accepts CSV text, not client-selected IDs or proposed totals. Review files are transient and are not stored as uploaded artifacts. The review uses existing database reads and needs no new migration.
 
