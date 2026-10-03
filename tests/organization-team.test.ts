@@ -9,7 +9,8 @@ import {
 import { defaultSettings, publicSettings } from "../lib/settings";
 import { settingsSchema } from "../server/schemas";
 import { governanceSchema } from "../server/governance-schema";
-import { freshWorkspace, loadWorkspace, saveWorkspace } from "../lib/store";
+import { loadWorkspace, saveWorkspace } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import { moveTeam, teamDeletionBlockers } from "../lib/team-hierarchy";
 import { reportTeamIds, type Team } from "../lib/types";
 

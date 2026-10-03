@@ -2,8 +2,7 @@ import { freshWorkspace } from "../../lib/store";
 import { withTwoQuestionQuiz } from "./quiz";
 
 // These interaction tests own a small curriculum, independent of demo editorial data.
-export function learningUiFixture() {
-  const data = freshWorkspace();
+export function learningUiFixture(data = freshWorkspace()) {
   const titles = [
     "Start with the customer",
     "Know the platform",
@@ -20,12 +19,10 @@ export function learningUiFixture() {
       category: "Sales foundations",
       groups: ["sales"],
       assignments: undefined,
-      lessons: course.lessons
-        .slice(0, 2)
-        .map((lesson, index) => ({
-          ...lesson,
-          title: index === 0 ? "The big idea" : "Put it into practice",
-        })),
+      lessons: course.lessons.slice(0, 2).map((lesson, index) => ({
+        ...lesson,
+        title: index === 0 ? "The big idea" : "Put it into practice",
+      })),
       questions: course.questions.map((question, questionIndex) => ({
         ...question,
         prompt:

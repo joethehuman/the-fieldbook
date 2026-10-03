@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { withPublishedSnapshots } from "../lib/demo-publication";
 import { reconcileLearning, expandLearning } from "../lib/learning-groups";
-import { freshWorkspace, loadWorkspace, saveWorkspace } from "../lib/store";
+import { loadWorkspace, saveWorkspace } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import { assignedCourses, isComplete } from "../lib/types";
 
 test("Hooli security course stays assigned when progress is saved", () => {

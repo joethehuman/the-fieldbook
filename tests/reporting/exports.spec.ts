@@ -7,6 +7,8 @@ import {
 } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { learningUiFixture } from "../fixtures/learning-ui";
+import { legacyWorkspace } from "../fixtures/legacy-workspace";
+import { freshWorkspace } from "../../lib/store";
 import { reconcileLearning } from "../../lib/learning-groups";
 import type { Workspace } from "../../lib/store";
 
@@ -96,7 +98,7 @@ async function select(page: Page, name: string, option: string) {
   await page.getByRole("option", { name: option, exact: true }).click();
 }
 export function fixture(): Workspace {
-  const data = learningUiFixture();
+  const data = learningUiFixture(legacyWorkspace());
   data.users[0].name = 'Zoë "Example", 東京';
   data.users[0].email = "zoe@example.test";
   data.teams!.push(
@@ -1050,6 +1052,38 @@ test("progress scope is distinct from optional people filters and stays stable",
   ).toBeVisible();
   await expect(rows).toHaveCount(activePeople);
   await screenshot(page, info, "progress-refined-scope");
+});
+
+test("refreshed Hooli organization reports all 200 people through bounded pages and matching CSV", async ({
+  page,
+}, info) => {
+  await setup(page, info, "admin", freshWorkspace());
+  await section(page, "Progress");
+  await expect(
+    page.getByText("Organization · 200 people.", { exact: false }),
+  ).toBeVisible();
+  const table = page.getByRole("region", {
+    name: "People progress",
+    exact: true,
+  });
+  await expect(
+    table.getByRole("row").filter({ has: page.getByRole("cell") }),
+  ).toHaveCount(25);
+  const overview = page.locator('[data-slot="progress-overview"]');
+  await expect(overview.locator(':scope > [data-slot="card"]')).toHaveCount(2);
+  const exported = await download(
+    page,
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+    info,
+    "hooli-organization",
+  );
+  expect(exported.rows).toHaveLength(201);
+  const assigned = exported.rows[0].indexOf("Assigned courses");
+  expect(assigned).toBeGreaterThanOrEqual(0);
+  expect(
+    exported.rows.slice(1).reduce((sum, row) => sum + Number(row[assigned]), 0),
+  ).toBe(1481);
+  await screenshot(page, info, "hooli-progress");
 });
 
 test("two-chart overview stays bounded with fifty teams and filter row appears left-aligned above People", async ({

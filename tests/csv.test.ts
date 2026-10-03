@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { serializeCsv, csvFilename, csvTimestamp } from "../lib/csv";
-import { freshWorkspace } from "../lib/store";
+import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import {
   teamProgressRows,
   teamProgressCsv,
