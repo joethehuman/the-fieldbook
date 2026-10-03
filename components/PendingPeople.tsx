@@ -21,10 +21,12 @@ export function PendingPeople({
   data,
   onChange,
   registerNavigationGuard,
+  importAction,
 }: {
   data: Workspace;
   onChange: (data: Workspace) => void | Promise<void>;
   registerNavigationGuard?: RegisterNavigationGuard;
+  importAction?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
@@ -87,22 +89,25 @@ export function PendingPeople({
       guidance="Pre-register a Google email. The person appears in the roster immediately and activates their login on verified sign-in, even when registration is closed. No email is sent."
     >
       {!editing && (
-        <Button
-          onClick={() => {
-            const person: Pending = {
-              email: "",
-              name: "",
-              role: "learner",
-              groups: [],
-            };
-            baseline.current = structuredClone(person);
-            setEditing(person);
-            setError("");
-          }}
-        >
-          <Plus aria-hidden="true" />
-          Pre-register person
-        </Button>
+        <ActionGroup>
+          <Button
+            onClick={() => {
+              const person: Pending = {
+                email: "",
+                name: "",
+                role: "learner",
+                groups: [],
+              };
+              baseline.current = structuredClone(person);
+              setEditing(person);
+              setError("");
+            }}
+          >
+            <Plus aria-hidden="true" />
+            Pre-register person
+          </Button>
+          {importAction}
+        </ActionGroup>
       )}
       {editing && (
         <form className="profile-form" onSubmit={save}>

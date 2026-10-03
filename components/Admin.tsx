@@ -90,6 +90,7 @@ import { defaultSettings } from "@/lib/settings";
 import { OnboardingFields } from "./OnboardingFields";
 import { learningStage, onboardingClockTarget } from "@/lib/learning";
 import { PendingPeople } from "./PendingPeople";
+import { RosterImport } from "./RosterImport";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   NavigationGuard,
@@ -1000,23 +1001,26 @@ export default function Admin({
                   }
                 >
                   {tab === "people" && !production && (
-                    <Button
-                      variant="default"
-                      onClick={() =>
-                        openPerson({
-                          id: id(),
-                          name: "",
-                          email: "",
-                          role: "learner",
-                          hireDate: undefined,
-                          groups: [],
-                          active: true,
-                        })
-                      }
-                    >
-                      <Plus size={16} />
-                      Add demo profile
-                    </Button>
+                    <ActionGroup>
+                      <Button
+                        variant="default"
+                        onClick={() =>
+                          openPerson({
+                            id: id(),
+                            name: "",
+                            email: "",
+                            role: "learner",
+                            hireDate: undefined,
+                            groups: [],
+                            active: true,
+                          })
+                        }
+                      >
+                        <Plus size={16} />
+                        Add demo profile
+                      </Button>
+                      <RosterImport data={data} />
+                    </ActionGroup>
                   )}
                 </SectionHeader>
               )}
@@ -1385,6 +1389,7 @@ export default function Admin({
                 {production && (
                   <PendingPeople
                     data={data}
+                    importAction={<RosterImport data={data} production />}
                     onChange={onChange}
                     registerNavigationGuard={registerAdminGuard}
                   />

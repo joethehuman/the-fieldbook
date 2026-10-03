@@ -3,6 +3,9 @@ import { GroupedSearch } from "@/components/patterns/grouped-search";
 import { ProgressOverview } from "@/components/patterns/progress-overview";
 import { AudienceSelection } from "@/components/patterns/audience-selection";
 import { freshWorkspace } from "@/lib/store";
+import { RosterReviewPanel } from "@/components/RosterImport";
+import { reviewRosterCsv, rosterExample } from "@/lib/roster-import";
+import { serializeCsv } from "@/lib/csv";
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
 import { HierarchyPicker } from "@/components/patterns/hierarchy-picker";
@@ -385,6 +388,7 @@ export function LibraryExamples() {
       <GroupRosterExample />
       <FilterRowsExample />
       <HierarchyPickerExample />
+      <RosterReviewExample />
       <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
@@ -1028,6 +1032,37 @@ function GroupIndexExample() {
           </TableBody>
         </DataTable>
       </TableContainer>
+    </SettingsSection>
+  );
+}
+
+function RosterReviewExample() {
+  const [open, setOpen] = useState(false);
+  const [review] = useState(() =>
+    reviewRosterCsv(serializeCsv(rosterExample()), freshWorkspace()),
+  );
+  return (
+    <SettingsSection
+      title={<h3>Roster review</h3>}
+      description="Whole-file counts, stable discovery, paginated rows and inline consequences."
+    >
+      <Button variant="outline" onClick={() => setOpen(true)}>
+        Open roster review example
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent size="workflow-list">
+          <DialogTitle>Roster review example</DialogTitle>
+          <DialogDescription>
+            Synthetic read-only example. Nothing is saved.
+          </DialogDescription>
+          <DialogBody>
+            <RosterReviewPanel review={review} />
+          </DialogBody>
+          <DialogFooter>
+            <Button onClick={() => setOpen(false)}>Close example</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </SettingsSection>
   );
 }

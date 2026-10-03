@@ -83,6 +83,7 @@ The production application includes:
 - [Learning model](docs/learning-model.md), [groups and curricula](docs/learning-groups.md), and [course browsing](docs/learning-browser.md)
 - [Optional guest recommendations](docs/guest-recommendations.md)
 - [Reports and CSV exports](docs/reporting.md)
+- [Review people and team CSV files](docs/roster-import.md)
 - [Roles and permissions](docs/permissions.md)
 - [Server-rendered reading pages, metadata and caching](docs/reading-pages.md)
 - [Writing Docs and Updates](docs/authoring.md)

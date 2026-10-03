@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Add administrator CSV upload and read-only roster review with downloadable six-column template/example, whole-file validation, paginated People/Teams/Issues views and learning/reporting consequences. Preserve existing identities, optional blanks, saved deadlines and progress. Close review saves nothing; see [CSV review](docs/roster-import.md). No new migration is required.
+
 - Keep course assignment search, filters, pagination and actions stationary while only the course list scrolls. Give the chooser more vertical room and show conditional edge fades with the shared scrollbar styling.
 
 - Reuse the Course audience modal for course and curriculum bulk assignments and Learning Groups course addition/removal. Keep Select, Review, Save and discard in one frame, preserve search on Back, and retain other assignment sources and saved deadlines.
