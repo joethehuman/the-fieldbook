@@ -4,6 +4,22 @@ import { cn } from "@/lib/utils";
 
 // Column widths are a property of the view, never of the currently filtered rows.
 const layouts = {
+  progressPeopleNoDates: [
+    "w-[27%]",
+    "w-[22%]",
+    "w-[19%]",
+    "w-[18%]",
+    "w-[14%]",
+  ],
+  progressPeople: [
+    "w-[25%]",
+    "w-[18%]",
+    "w-[15%]",
+    "w-[18%]",
+    "w-[11%]",
+    "w-[13%]",
+  ],
+  progressAssignments: ["w-[32%]", "w-[20%]", "w-[16%]", "w-[32%]"],
   contentSelection: [
     "w-12",
     "w-[30%]",

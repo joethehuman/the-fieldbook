@@ -148,6 +148,10 @@ export type DocumentWrite = {
 
 /** Task-level operations; implementations preserve atomic writes and complete reads. */
 export interface DataStore extends McpDataStore, McpReportingDataStore {
+  readProgressReport(
+    actorId: string,
+    personId?: string,
+  ): Promise<import("../progress-report").ProgressReportRecord>;
   /** Nonsecret identifier used to partition cached published reads. */
   cacheNamespace(): string;
   readConfiguration(): Promise<ConfigurationRecord>;

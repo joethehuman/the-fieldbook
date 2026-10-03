@@ -38,11 +38,20 @@ function reportError(error: { message: string; code?: string } | null) {
 export const reportingData: Pick<
   DataStore,
   | "readReportInputs"
+  | "readProgressReport"
   | "searchPublished"
   | "readMcpReportingScopes"
   | "readMcpLearningReport"
   | "readMcpFeedbackReport"
 > = {
+  async readProgressReport(actorId, personId) {
+    const { data, error } = await db().rpc("fb_progress_report", {
+      p_actor: actorId,
+      p_person: personId || null,
+    });
+    reportError(error);
+    return data as import("../../../progress-report").ProgressReportRecord;
+  },
   async readMcpReportingScopes(actorId) {
     const { data, error } = await db().rpc("fb_mcp_reporting_scopes", {
       p_actor: actorId,

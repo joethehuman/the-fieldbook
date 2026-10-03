@@ -1,4 +1,5 @@
 import { defineConfig } from "@playwright/test";
+const backendPort = Number(process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130);
 const demoPort = Number(process.env.FIELDBOOK_TEST_PORT || 3147);
 const serverPort = Number(process.env.FIELDBOOK_SERVER_TEST_PORT || 3148);
 export default defineConfig({
@@ -48,7 +49,7 @@ export default defineConfig({
   webServer: [
     {
       command: "node tests/accounts/backend.mjs",
-      url: "http://127.0.0.1:3130/health",
+      url: `http://127.0.0.1:${backendPort}/health`,
       reuseExistingServer: false,
     },
     {

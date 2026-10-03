@@ -1,4 +1,5 @@
 "use client";
+import { ProgressOverview } from "@/components/patterns/progress-overview";
 import { useState } from "react";
 import { HierarchyList } from "@/components/patterns/hierarchy-list";
 import { HierarchyPicker } from "@/components/patterns/hierarchy-picker";
@@ -64,6 +65,7 @@ import {
 import { ActionGroup } from "@/components/ui/action-group";
 
 export function LibraryExamples() {
+  const [progressStatus, setProgressStatus] = useState("all");
   const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
   const [browserBranch, setBrowserBranch] = useState("");
   const [browserQuery, setBrowserQuery] = useState("");
@@ -532,7 +534,33 @@ export function LibraryExamples() {
           <ProgressRing value={0} label="Not started example" />
           <ProgressRing value={67} label="Assigned example" />
           <ProgressRing value={100} label="Completed example" />
+          <ProgressRing
+            value={64}
+            label="People up to date example"
+            caption="up to date"
+          />
+          <ProgressRing value={null} label="No assigned people example" />
         </div>
+        <ProgressOverview
+          summary={{
+            people: 54,
+            assignedPeople: 50,
+            current: 32,
+            within: 12,
+            overdue: 6,
+            incomplete: 0,
+            unassigned: 4,
+            assignments: 150,
+            completed: 120,
+          }}
+          branches={[]}
+          deadlines
+          status={progressStatus}
+          onStatus={(value) =>
+            setProgressStatus(value === progressStatus ? "all" : value)
+          }
+          onTeam={() => {}}
+        />
         <Progress value={50} aria-label="Lesson example" />
         <ActionGroup>
           <ProgressStatus value={0} started={false} complete={false} />

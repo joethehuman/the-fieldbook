@@ -7,6 +7,7 @@ import {
 } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { learningUiFixture } from "../fixtures/learning-ui";
+import { reconcileLearning } from "../../lib/learning-groups";
 import type { Workspace } from "../../lib/store";
 
 // Read actual browser downloads, independently of the application's serializer.
@@ -75,7 +76,7 @@ async function select(page: Page, name: string, option: string) {
   await page.getByRole("combobox", { name, exact: true }).click();
   await page.getByRole("option", { name: option, exact: true }).click();
 }
-function fixture(): Workspace {
+export function fixture(): Workspace {
   const data = learningUiFixture();
   data.users[0].name = 'Zoë "Example", 東京';
   data.users[0].email = "zoe@example.test";
@@ -140,7 +141,7 @@ function fixture(): Workspace {
   ];
   return data;
 }
-async function setup(
+export async function setup(
   page: Page,
   info: TestInfo,
   role = "admin",
@@ -174,52 +175,62 @@ async function setup(
           assignment.userId = ids.get(assignment.userId) || assignment.userId;
     for (const rating of data.feedback || [])
       rating.userId = ids.get(rating.userId) || rating.userId;
-    await page.request.post("http://127.0.0.1:3130/fixture", {
-      data: {
-        settings: data.settings,
-        groups: data.groups,
-        curricula: data.curricula,
-        role,
-        userGroups: user.groups,
-        teams: data.teams,
-        users: data.users.map((entry) => ({
-          id: entry.id,
-          name: entry.name,
-          email: entry.email,
-          role: entry.role,
-          active: entry.active,
-          groups: entry.groups,
-          team_id: entry.teamId || null,
-          onboarding_start: entry.onboardingStart || null,
-          group_joined_at: entry.groupJoinedAt || {},
-          effective_group_joined_at: entry.effectiveGroupJoinedAt || {},
-        })),
-        progress: Object.entries(data.progress).flatMap(([id, rows]) =>
-          rows.map((entry) => ({ ...entry, user_id: id })),
-        ),
-        feedback: (data.feedback || []).map((entry) => ({
-          id: entry.id,
-          user_id: entry.userId,
-          content_id: entry.contentId,
-          version: entry.version,
-          rating: entry.rating,
-          comment: entry.comment,
-          updated_at: entry.updatedAt,
-        })),
-        documents: data.content.map((item) => ({
-          id: item.id,
-          published: item.status === "published" ? item : null,
-          draft: item,
-          revision: item.revision || 1,
-          published_revision: item.status === "published" ? 1 : null,
-          updated_at: item.updatedAt,
-        })),
+    await page.request.post(
+      `http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`,
+      {
+        data: {
+          settings: data.settings,
+          groups: data.groups,
+          curricula: data.curricula,
+          role,
+          userGroups: user.groups,
+          teams: data.teams,
+          users: data.users.map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            email: entry.email,
+            role: entry.role,
+            active: entry.active,
+            groups: entry.groups,
+            auth_user_id: entry.registered === false ? null : entry.id,
+            hire_date: entry.hireDate || null,
+            onboarding_days: entry.onboardingDays || null,
+            learning_assignments: entry.learningAssignments,
+            team_id: entry.teamId || null,
+            onboarding_start: entry.onboardingStart || null,
+            group_joined_at: entry.groupJoinedAt || {},
+            effective_group_joined_at: entry.effectiveGroupJoinedAt || {},
+          })),
+          progress: Object.entries(data.progress).flatMap(([id, rows]) =>
+            rows.map((entry) => ({ ...entry, user_id: id })),
+          ),
+          feedback: (data.feedback || []).map((entry) => ({
+            id: entry.id,
+            user_id: entry.userId,
+            content_id: entry.contentId,
+            version: entry.version,
+            rating: entry.rating,
+            comment: entry.comment,
+            updated_at: entry.updatedAt,
+          })),
+          documents: data.content.map((item) => ({
+            id: item.id,
+            published: item.status === "published" ? item : null,
+            draft: item,
+            revision: item.revision || 1,
+            published_revision: item.status === "published" ? 1 : null,
+            updated_at: item.updatedAt,
+          })),
+        },
       },
-    });
+    );
     const token = await (
-      await page.request.post("http://127.0.0.1:3130/auth/v1/token", {
-        data: {},
-      })
+      await page.request.post(
+        `http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/auth/v1/token`,
+        {
+          data: {},
+        },
+      )
     ).json();
     await page.context().addCookies([
       {
@@ -281,13 +292,16 @@ test("progress filters, keyboard download, member details and empty report", asy
 }, info) => {
   await setup(page, info);
   await section(page, "Progress");
-  await page.getByRole("button", { name: "Filters", exact: true }).click();
-  await select(page, "Reporting team", "Organization / Sales team");
-  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "Reporting team", exact: true })
+    .click();
+  await page.getByRole("option", { name: /\/ Sales team$/ }).click();
   await page
     .getByRole("searchbox", { name: "Find a team member" })
     .fill("zoe@example.test");
-  const displayed = page.locator('table[data-layout="progress"] tbody tr');
+  const displayed = page.locator(
+    'table[data-layout="progressPeople"] tbody tr',
+  );
   await expect(displayed).toHaveCount(1);
   const { rows, filename } = await download(
     page,
@@ -298,29 +312,30 @@ test("progress filters, keyboard download, member details and empty report", asy
   );
   expect(filename).toMatch(/^team-progress-/);
   expect(rows).toHaveLength(2);
-  expect(rows[1].slice(0, 6)).toEqual([
+  expect(rows[1].slice(0, 3)).toEqual([
     'Zoë "Example", 東京',
     "zoe@example.test",
     "Subteam",
-    "3",
-    "1",
-    "33",
   ]);
-  await expect(displayed).toContainText(rows[1][6]);
+  expect(rows[1].slice(5, 8)).toEqual(["3", "1", "33"]);
+  await expect(displayed).toContainText(rows[1][8]);
   await screenshot(page, info, "team-filtered");
   await page.getByRole("button", { name: "View courses", exact: true }).click();
   const detail = await download(
     page,
-    page.getByRole("button", { name: "Export CSV", exact: true }).nth(1),
+    page.getByRole("button", { name: "Export CSV", exact: true }),
     info,
     "member",
   );
   expect(detail.rows).toHaveLength(4);
-  expect(detail.rows[1][8]).toBe("Completed");
+  expect(detail.rows[1][5]).toBe("Complete");
   expect(detail.rows.flat().join(" ")).not.toContain(
     "Self-directed exploration",
   );
   await screenshot(page, info, "member-assignments");
+  await page
+    .getByRole("button", { name: "Back to people & completion" })
+    .click();
   await page
     .getByRole("searchbox", { name: "Find a team member" })
     .fill("no-match");
@@ -480,10 +495,12 @@ test("large reports download every row in displayed order", async ({
     "large",
   );
   expect(result.rows).toHaveLength(1206);
-  const displayed = page.locator('table[data-layout="progress"] tbody tr');
-  await expect(displayed).toHaveCount(1205);
+  const displayed = page.locator(
+    'table[data-layout="progressPeople"] tbody tr',
+  );
+  await expect(displayed).toHaveCount(25);
   const exportedNames = result.rows.slice(1).map((row) => row[0]);
-  expect(exportedNames).toEqual(
+  expect(exportedNames.slice(0, 25)).toEqual(
     await displayed.locator("td:first-child strong").allTextContents(),
   );
   expect(new Set(exportedNames)).toEqual(
@@ -533,7 +550,7 @@ test("unavailable or pending admin report never offers export", async ({
   );
   let release!: () => void;
   await page.route("**/api/admin/snapshot?**", async (route) => {
-    if (!route.request().url().includes("scope=governance"))
+    if (!route.request().url().includes("scope=progress"))
       return route.continue();
     await new Promise<void>((resolve) => {
       release = resolve;
@@ -574,22 +591,22 @@ test("admin warms lightweight lists and loads full reporting inputs on demand wi
     !info.project.name.startsWith("production"),
     "Server-only data path",
   );
-  const reads = { people: 0, governance: 0, feedback: 0 };
+  const reads = { people: 0, progress: 0, feedback: 0 };
   await page.route("**/api/admin/snapshot?**", async (route) => {
     const scope = new URL(route.request().url()).searchParams.get("scope");
-    if (scope === "people" || scope === "governance" || scope === "feedback")
+    if (scope === "people" || scope === "progress" || scope === "feedback")
       reads[scope]++;
     await route.continue();
   });
   await setup(page, info);
   await expect.poll(() => reads.people).toBe(1);
-  expect(reads.governance).toBe(0);
+  expect(reads.progress).toBe(0);
   await expect.poll(() => reads.feedback).toBe(1);
   await section(page, "Progress");
   await expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
   await section(page, "Feedback");
   await expect(page.getByRole("heading", { name: "Feedback" })).toBeVisible();
-  expect(reads).toEqual({ people: 1, governance: 1, feedback: 1 });
+  expect(reads).toEqual({ people: 1, progress: 1, feedback: 1 });
   await expect(page.getByText("Opening section…")).toHaveCount(0);
 });
 
@@ -738,4 +755,223 @@ test("People connects hire-date guidance and preregistration to the shared roste
     dialog.getByLabel("Hire date", { exact: true }),
   ).toHaveAccessibleDescription(/First sign-in does not start it/);
   await screenshot(page, info, "people-hire-date-guidance");
+});
+
+test("people ring, statuses, pending people and subteam drill reconcile with CSV", async ({
+  page,
+}, info) => {
+  let data = fixture();
+  const current = data.users.find((u) => u.id === "demo-rep-2")!;
+  data.progress[current.id] = data.content
+    .filter((c) => ["course-1", "course-2", "course-3"].includes(c.id))
+    .map((c) => ({
+      content_id: c.id,
+      version: c.version,
+      lessons: c.lessons.map((l) => l.id),
+      passed: true,
+    }));
+  data.users.push({
+    ...data.users[0],
+    id: "pending",
+    name: "Pending learner",
+    email: "pending@example.test",
+    registered: false,
+    hireDate: "2000-01-01",
+  });
+  data = reconcileLearning(data, data, "2026-01-01T00:00:00Z");
+  for (const u of data.users)
+    for (const a of u.learningAssignments || [])
+      a.dueDate = u.id === "demo-learner" ? "2000-01-01" : "2040-01-01";
+  data.users[0].hireDate = "2000-01-01";
+  await setup(page, info, "admin", data);
+  await section(page, "Progress");
+  const overview = page.locator('[data-slot="progress-overview"]');
+  await expect(
+    overview.getByRole("progressbar", {
+      name: "People up to date",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-valuenow", "11");
+  await expect(
+    overview.getByRole("button", { name: "Overdue 1", exact: true }),
+  ).toBeVisible();
+  await overview
+    .getByRole("button", { name: "Overdue 1", exact: true })
+    .click();
+  const rows = page.locator('table[data-layout="progressPeople"] tbody tr');
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText("zoe@example.test");
+  await expect(rows).toContainText("Existing user");
+  const overdue = await download(
+    page,
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+    info,
+    "overdue",
+  );
+  expect(overdue.rows).toHaveLength(2);
+  expect(overdue.rows[1][9]).toBe("2");
+  await screenshot(page, info, "batch3-overdue");
+  await overview
+    .getByRole("heading", { name: "Learning status", exact: true })
+    .scrollIntoViewIfNeeded();
+  await screenshot(page, info, "batch3-status");
+  await rows.first().scrollIntoViewIfNeeded();
+  await screenshot(page, info, "batch3-people");
+  await overview
+    .getByRole("button", { name: "Overdue 1", exact: true })
+    .click();
+  await overview
+    .getByRole("button", { name: "Sales team", exact: true })
+    .click();
+  await expect(rows).toHaveCount(6);
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await select(page, "Sign-in status", "Not signed in");
+  await page.keyboard.press("Escape");
+  await expect(rows).toHaveCount(1);
+  await expect(rows).toContainText("Pending learner");
+  const pending = await download(
+    page,
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+    info,
+    "pending",
+  );
+  expect(pending.rows).toHaveLength(2);
+  expect(pending.rows[1][4]).toBe("Not signed in");
+});
+
+test("due dates off removes overdue language and no assignments stays N/A", async ({
+  page,
+}, info) => {
+  const data = fixture();
+  data.settings!.dueDatesEnabled = false;
+  await setup(page, info, "admin", data);
+  await section(page, "Progress");
+  const overview = page.locator('[data-slot="progress-overview"]');
+  await expect(overview).toContainText("Due dates are off");
+  await expect(
+    overview.getByRole("button", { name: /Overdue|Within due dates/ }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("searchbox", { name: "Find a team member" })
+    .fill("contributor@example.com");
+  const row = page.locator(
+    'table[data-layout="progressPeopleNoDates"] tbody tr',
+  );
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText("No assigned courses");
+  await expect(row).toContainText("—");
+  const result = await download(
+    page,
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+    info,
+    "unassigned",
+  );
+  expect(result.rows[0]).not.toContain("Overdue courses");
+  expect(result.rows[1][7]).toBe("");
+  expect(result.rows[1][8]).toBe("No assigned courses");
+  await screenshot(page, info, "batch3-no-dates");
+});
+
+test("person back preserves page, sort, filter and scroll", async ({
+  page,
+}, info) => {
+  const data = fixture();
+  data.users.push(
+    ...Array.from({ length: 60 }, (_, i) => ({
+      ...data.users[0],
+      id: `preserved-${i}`,
+      name: `Preserved person ${String(i).padStart(2, "0")}`,
+      email: `preserved-${i}@example.test`,
+    })),
+  );
+  await setup(page, info, "admin", data);
+  await section(page, "Progress");
+  await page
+    .getByRole("searchbox", { name: "Find a team member" })
+    .fill("Preserved person");
+  await page
+    .getByRole("button", { name: "Sort: Name A–Z", exact: true })
+    .click();
+  await select(page, "Sort team members", "Name Z–A");
+  await page.keyboard.press("Escape");
+  const pages = page.getByRole("navigation", { name: "People progress pages" });
+  await pages.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(pages).toContainText("Page 2 of 3");
+  const table = page.locator('table[data-layout="progressPeople"]');
+  const names = await table
+    .locator("tbody td:first-child strong")
+    .allTextContents();
+  const open = table
+    .getByRole("button", { name: "View courses", exact: true })
+    .first();
+  await open.scrollIntoViewIfNeeded();
+  const panel = page.locator(".admin-panel");
+  const position = await panel.evaluate((el) => el.scrollTop);
+  await open.click();
+  await expect(
+    page.getByRole("heading", { name: /’s assignments$/ }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Back to people & completion" })
+    .click();
+  await expect(pages).toContainText("Page 2 of 3");
+  expect(
+    await table.locator("tbody td:first-child strong").allTextContents(),
+  ).toEqual(names);
+  expect(await panel.evaluate((el) => el.scrollTop)).toBeCloseTo(position, 0);
+  await expect(open).toBeFocused();
+});
+
+test("changed saved report blocks CSV until refresh and revoked access blocks details", async ({
+  page,
+}, info) => {
+  test.skip(
+    !info.project.name.startsWith("production"),
+    "Server revalidation boundary",
+  );
+  await setup(page, info);
+  await section(page, "Progress");
+  let fresh: any;
+  await page.route("**/api/reports/progress", async (route) => {
+    const response = await route.fetch();
+    fresh = await response.json();
+    fresh.progressReport.people[0].completed = 0;
+    fresh.progressReport.people[0].assigned = 7;
+    await route.fulfill({ json: fresh });
+  });
+  const files: string[] = [];
+  page.on("download", (d) => files.push(d.suggestedFilename()));
+  await page.getByRole("button", { name: "Export CSV", exact: true }).click();
+  await expect(
+    page.getByText(
+      "CSV could not be prepared. Reload the report and try again.",
+    ),
+  ).toBeVisible();
+  expect(files).toEqual([]);
+  await page
+    .getByRole("button", { name: "Refresh report", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+  ).toBeEnabled();
+  await download(
+    page,
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+    info,
+    "refreshed",
+  );
+  await page.route("**/api/reports/progress?personId=**", (route) =>
+    route.fulfill({ status: 403, json: { error: "Reporting access changed" } }),
+  );
+  await page
+    .getByRole("button", { name: "View courses", exact: true })
+    .first()
+    .click();
+  await expect(
+    page.getByRole("alert").filter({ hasText: "Reporting access changed" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Export CSV", exact: true }),
+  ).toBeDisabled();
+  await screenshot(page, info, "batch3-detail-denied");
 });

@@ -80,29 +80,39 @@ function RingGraphic({
 export function ProgressRing({
   value,
   label = "Assigned course progress",
+  caption = "complete",
 }: {
-  value: number;
+  value: number | null;
   label?: string;
+  caption?: string;
 }) {
-  const percent = percentage(value);
+  const percent = percentage(value ?? 0);
   return (
     <div
       data-slot="progress-ring"
       className="relative grid aspect-square w-34 max-w-full shrink-0 place-items-center rounded-full p-4"
-      role="progressbar"
-      aria-label={label}
-      aria-valuenow={percent}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      aria-valuetext={`${percent}% complete`}
+      role={value === null ? "img" : "progressbar"}
+      aria-label={value === null ? `${label}: no assigned courses` : label}
+      aria-valuenow={value === null ? undefined : percent}
+      aria-valuemin={value === null ? undefined : 0}
+      aria-valuemax={value === null ? undefined : 100}
+      aria-valuetext={value === null ? undefined : `${percent}% ${caption}`}
     >
       <RingGraphic value={percent} summary />
       <div aria-hidden="true" className="grid place-content-center text-center">
         <strong className="text-3xl leading-tight tabular-nums">
-          {percent}
-          <small>%</small>
+          {value === null ? (
+            "—"
+          ) : (
+            <>
+              {percent}
+              <small>%</small>
+            </>
+          )}
         </strong>
-        <span className="text-xs text-muted-foreground">complete</span>
+        <span className="text-xs text-muted-foreground">
+          {value === null ? "no assignments" : caption}
+        </span>
       </div>
     </div>
   );

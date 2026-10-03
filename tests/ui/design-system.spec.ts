@@ -539,7 +539,7 @@ test("manager reporting uses shared filters and scoped people", async ({
   );
   await page.goto("/#team");
   await expect(
-    page.getByRole("combobox", { name: "Reporting team", exact: true }),
+    page.getByRole("button", { name: "Reporting team", exact: true }),
   ).toBeVisible();
   await expect(page.getByRole("cell", { name: /Alex Edwards/ })).toBeVisible();
   const personCell = page.getByRole("cell", { name: /Alex Edwards/ });
@@ -677,8 +677,13 @@ test("report columns stay fixed across teams, long values and empty results", as
       {
         id: "long-team",
         name: "Customer success and strategic account development",
+        parentId: data.settings!.organizationTeamId ?? undefined,
       },
-      { id: "empty-team", name: "Empty team" },
+      {
+        id: "empty-team",
+        name: "Empty team",
+        parentId: data.settings!.organizationTeamId ?? undefined,
+      },
     );
     data.users.push({
       id: "long-person",
@@ -693,7 +698,7 @@ test("report columns stay fixed across teams, long values and empty results", as
   }, freshWorkspace());
   await page.reload();
   await adminSection(page, "Progress");
-  const table = page.locator("table[data-layout=progress]");
+  const table = page.locator("table[data-layout=progressPeople]");
   const measure = () =>
     table.getByRole("columnheader").evaluateAll((nodes) =>
       nodes.map((n) => {
@@ -702,7 +707,7 @@ test("report columns stay fixed across teams, long values and empty results", as
       }),
     );
   const baseline = await measure();
-  const picker = page.getByRole("combobox", {
+  const picker = page.getByRole("button", {
     name: "Reporting team",
     exact: true,
   });
@@ -713,7 +718,12 @@ test("report columns stay fixed across teams, long values and empty results", as
     "Entire organization",
   ]) {
     await picker.click();
-    await page.getByRole("option", { name: team, exact: true }).click();
+    await page
+      .getByRole("option", {
+        name: team === "Entire organization" ? team : `Organization / ${team}`,
+        exact: true,
+      })
+      .click();
     const columns = await measure();
     columns.forEach((column, i) => {
       expect(Math.abs(column.x - baseline[i].x)).toBeLessThan(1);

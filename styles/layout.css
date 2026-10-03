@@ -546,10 +546,6 @@
   .report-summary strong {
     font-size: 1.25rem;
   }
-  .report-course {
-    display: grid;
-    gap: var(--space-2);
-  }
   .brand-control {
     display: grid;
     gap: var(--space-3);

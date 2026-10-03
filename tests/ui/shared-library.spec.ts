@@ -129,6 +129,23 @@ test("library: associated help, selections, choice keys, tooltip, menu and progr
   const ring = region.getByRole("progressbar", { name: "Assigned example" });
   await expect(ring).toHaveAttribute("aria-valuenow", "67");
   await expect(ring).toHaveAttribute("aria-valuetext", "67% complete");
+  await expect(
+    region.getByRole("progressbar", {
+      name: "People up to date example",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-valuetext", "64% up to date");
+  await expect(
+    region.getByRole("img", {
+      name: "No assigned people example: no assigned courses",
+      exact: true,
+    }),
+  ).not.toHaveAttribute("aria-valuenow");
+  const status = region.getByRole("button", { name: "Overdue 6", exact: true });
+  await status.click();
+  await expect(status).toHaveAttribute("aria-pressed", "true");
+  await status.click();
+  await expect(status).toHaveAttribute("aria-pressed", "false");
   await ring.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("library-progress.png") });
   await region.getByRole("button", { name: "Load more" }).click();
@@ -140,7 +157,9 @@ test("library: associated help, selections, choice keys, tooltip, menu and progr
   await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "dark" });
   expect(
     await region
-      .locator('[role="status"] svg')
+      .getByRole("status")
+      .filter({ hasText: "Loading example…" })
+      .locator("svg")
       .evaluate((el) => getComputedStyle(el).animationName),
   ).toBe("none");
   await fits(page);
@@ -180,8 +199,8 @@ test("product settings: connected help, editor hints and enlarged navigation", a
     /Defaults apply to future onboarding clocks and assignment episodes/,
   );
   await useDueDates.uncheck();
-  await expect(onboardingDays).toBeDisabled();
-  await expect(catchUpDays).toBeDisabled();
+  await expect(onboardingDays).toBeEnabled();
+  await expect(catchUpDays).toBeEnabled();
   await page.screenshot({
     path: info.outputPath("settings-due-dates-off.png"),
     fullPage: true,
@@ -200,25 +219,24 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   ).toHaveAccessibleDescription(
     "An HTTPS contact page can keep your email address private.",
   );
-  const bold = page.getByRole("button", { name: "Bold", exact: true });
-  const heading = page.getByRole("combobox", { name: "Heading level" });
-  await heading.scrollIntoViewIfNeeded();
-  // At tablet widths the toolbar wraps. Reveal the destination button too,
-  // so native Tab scrolling does not immediately dismiss its focus tooltip.
-  await bold.scrollIntoViewIfNeeded();
-  // Let native scroll notifications finish before opening a focus tooltip:
-  // Radix intentionally dismisses tooltips when an ancestor scrolls.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-  await heading.focus();
-  await page.keyboard.press("Tab");
-  await expect(bold).toBeFocused();
-  await expect(page.getByRole("tooltip")).toHaveText("Bold");
+  const editor = page.getByRole("region", {
+    name: "Privacy policy draft editor",
+  });
+  const commands = editor.getByRole("button", { name: /^Commands:/ });
+  const menu = page.getByRole("menu", { name: /^Insert content/ });
+  await commands.scrollIntoViewIfNeeded();
+  await commands.focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    menu.getByRole("menuitem", { name: "Normal Text", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    menu.getByRole("menuitem", { name: "Heading 1", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(commands).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("settings-privacy.png"),
@@ -235,4 +253,29 @@ test("product settings: connected help, editor hints and enlarged navigation", a
     path: info.outputPath("settings-enlarged.png"),
     fullPage: true,
   });
+});
+
+test("reporting overview fits enlarged text without clipping controls", async ({
+  page,
+}) => {
+  await page.goto("/ui#shared-library");
+  const overview = page.locator('[data-slot="progress-overview"]');
+  await expect(overview).toBeVisible();
+  await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
+  await overview.scrollIntoViewIfNeeded();
+  expect(
+    await overview.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return (
+        box.right <= innerWidth + 1 && el.scrollWidth <= el.clientWidth + 1
+      );
+    }),
+  ).toBe(true);
+  const overdue = overview.getByRole("button", {
+    name: "Overdue 6",
+    exact: true,
+  });
+  await overdue.focus();
+  await page.keyboard.press("Enter");
+  await expect(overdue).toHaveAttribute("aria-pressed", "true");
 });

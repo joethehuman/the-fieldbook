@@ -18,7 +18,7 @@ export function CsvExport({
   filename,
   disabledReason,
 }: {
-  report: () => CsvReport;
+  report: () => CsvReport | Promise<CsvReport>;
   filename: string;
   disabledReason?: string;
 }) {
@@ -48,7 +48,14 @@ export function CsvExport({
       if (!mounted.current) return;
       if (latest.current.unavailable || latest.current.report !== selected)
         throw new Error("The report changed. Try exporting again.");
-      downloadCsv(selected(), filename);
+      const prepared = await selected();
+      if (
+        !mounted.current ||
+        latest.current.unavailable ||
+        latest.current.report !== selected
+      )
+        throw new Error("The report changed. Try exporting again.");
+      downloadCsv(prepared, filename);
     } catch {
       setError("CSV could not be prepared. Reload the report and try again.");
     } finally {

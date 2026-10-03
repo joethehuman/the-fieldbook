@@ -1,5 +1,11 @@
+import { register } from "tsx/esm/api";
+import { register as registerCjs } from "tsx/cjs/api";
+register();
+registerCjs();
 import { createServer } from "node:http";
 import { createSign, generateKeyPairSync } from "node:crypto";
+const fixturePort = Number(process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130);
+const fixtureOrigin = `http://127.0.0.1:${fixturePort}`;
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,
 });
@@ -10,7 +16,11 @@ const jwk = {
   kid: "synthetic-reader",
 };
 const file = "00000000-0000-4000-8000-000000000001.png";
-const organization = { id: "account-fixture-organization", name: "Organization", system: "organization" };
+const organization = {
+  id: "account-fixture-organization",
+  name: "Organization",
+  system: "organization",
+};
 const initial = () => ({
   organizationTeamId: organization.id,
   name: "Acme Learning",
@@ -76,12 +86,18 @@ const profile = () =>
 const send = (res, data, status = 200, headers = {}) => {
   // Match PostgREST pagination so large synthetic lists exercise complete reads.
   if (Array.isArray(data) && res.req.url.startsWith("/rest/v1/")) {
-    const params = new URL(res.req.url, "http://127.0.0.1:3130").searchParams;
+    const params = new URL(res.req.url, fixtureOrigin).searchParams;
     const offset = Number(params.get("offset") || 0);
-    const limit = params.has("limit") ? Number(params.get("limit")) : data.length;
+    const limit = params.has("limit")
+      ? Number(params.get("limit"))
+      : data.length;
     const total = data.length;
     data = data.slice(offset, offset + limit);
-    headers = { ...headers, "Content-Range": total === 0 ? "*/0" : `${offset}-${offset + data.length - 1}/${total}` };
+    headers = {
+      ...headers,
+      "Content-Range":
+        total === 0 ? "*/0" : `${offset}-${offset + data.length - 1}/${total}`,
+    };
   }
 
   res.writeHead(status, {
@@ -92,7 +108,7 @@ const send = (res, data, status = 200, headers = {}) => {
   res.end(JSON.stringify(data));
 };
 createServer(async (req, res) => {
-  const url = new URL(req.url, "http://127.0.0.1:3130");
+  const url = new URL(req.url, fixtureOrigin);
   let body = "";
   for await (const chunk of req) body += chunk;
   if (url.pathname === "/fixture") {
@@ -111,10 +127,15 @@ createServer(async (req, res) => {
     // Model a migrated installation: Organization is the sole root. Supplied
     // ordinary team fixtures remain descendants without changing their IDs.
     const supplied = change.teams || [];
-    const root = supplied.find((team) => team.system === "organization") || organization;
+    const root =
+      supplied.find((team) => team.system === "organization") || organization;
     settings.organizationTeamId = root.id;
-    configuredTeams = [root, ...supplied.filter((team) => team.id !== root.id)
-      .map((team) => team.parentId ? team : { ...team, parentId: root.id })];
+    configuredTeams = [
+      root,
+      ...supplied
+        .filter((team) => team.id !== root.id)
+        .map((team) => (team.parentId ? team : { ...team, parentId: root.id })),
+    ];
     userGroups = change.userGroups || [];
     fail = !!change.fail;
     role = change.role || "admin";
@@ -321,14 +342,137 @@ createServer(async (req, res) => {
       );
     return send(res, people);
   }
+  if (url.pathname === "/rest/v1/rpc/fb_progress_report") {
+    const { progressPeople, localProgressDetail } =
+      await import("../../lib/progress-report.ts");
+    const { reconcileAssignments } =
+      await import("../../lib/assignment-episodes.ts");
+    const { reconcileLearning } = await import("../../lib/learning-groups.ts");
+    const { reportTeamIds } = await import("../../lib/types.ts");
+    const { p_actor, p_person } = JSON.parse(body || "{}");
+    const users = (configuredUsers.length ? configuredUsers : [profile()])
+      .filter((p) => !p.deleted_at)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        role: p.role,
+        active: p.active,
+        registered: p.auth_user_id !== null,
+        groups: p.groups || [],
+        teamId: p.team_id || undefined,
+        hireDate: p.hire_date || undefined,
+        onboardingStart: p.onboarding_start || undefined,
+        onboardingDays: p.onboarding_days,
+        learningAssignments: p.learning_assignments,
+        groupJoinedAt: p.group_joined_at,
+        effectiveGroupJoinedAt: p.effective_group_joined_at,
+      }));
+    let model = {
+      schema: 1,
+      settings,
+      groups: configuredGroups,
+      teams: configuredTeams,
+      curricula: configuredCurricula,
+      users,
+      content: documents.filter((d) => d.published).map((d) => d.published),
+      progress: Object.fromEntries(
+        users.map((p) => [
+          p.id,
+          configuredProgress.filter((r) => r.user_id === p.id),
+        ]),
+      ),
+    };
+    model = reconcileLearning(model, model);
+    model.users = reconcileAssignments(
+      model,
+      model,
+      new Date().toISOString(),
+      true,
+    );
+    for (const u of model.users) {
+      const p = configuredUsers.find((p) => p.id === u.id);
+      if (p) p.learning_assignments = u.learningAssignments;
+    }
+    const actor = model.users.find((u) => u.id === p_actor);
+    if (
+      !actor ||
+      !actor.active ||
+      actor.registered === false ||
+      !["admin", "manager", "contributor"].includes(actor.role)
+    )
+      return send(
+        res,
+        { code: "42501", message: "Reporting access is required" },
+        403,
+      );
+    const rows = progressPeople(model, actor);
+    const target = rows.find((r) => r.u.id === p_person);
+    if (p_person && !target)
+      return send(
+        res,
+        {
+          code: "42501",
+          message: "This person is outside your current reporting access",
+        },
+        403,
+      );
+    const allowed = reportTeamIds(actor, configuredTeams);
+    return send(res, {
+      asOf: new Date().toISOString().slice(0, 10),
+      revision: fixtureGeneration,
+      settings: {
+        name: settings.name,
+        accent: settings.accent,
+        dueDatesEnabled: settings.dueDatesEnabled,
+        onboardingDays: settings.onboardingDays,
+      },
+      teams: configuredTeams.filter((t) => allowed.has(t.id)),
+      groups: configuredGroups
+        .filter((g) => rows.some((r) => r.groupIds.includes(g.id)))
+        .map((g) => ({ id: g.id, name: g.name })),
+      people: rows
+        .filter((r) => !p_person || r.u.id === p_person)
+        .map((r) => ({
+          u: {
+            id: r.u.id,
+            name: r.u.name,
+            email: r.u.email,
+            role: r.u.role,
+            active: r.u.active,
+            registered: r.u.registered,
+            groups: [],
+            teamId: r.u.teamId,
+            hireDate: r.u.hireDate,
+            onboardingStart: r.u.onboardingStart,
+            onboardingDays: r.u.onboardingDays,
+          },
+          groupIds: r.groupIds,
+          assigned: r.assigned,
+          completed: r.completed,
+          overdue: r.overdue,
+          started: r.started,
+        })),
+      detail: target ? localProgressDetail(model, target.u) : null,
+    });
+  }
   if (url.pathname === "/rest/v1/rpc/fb_admin_people_snapshot") {
     const { p_actor, p_user } = JSON.parse(body || "{}");
-    const users = (configuredUsers.length ? configuredUsers : [profile()]).filter((p) => !p.deleted_at);
+    const users = (
+      configuredUsers.length ? configuredUsers : [profile()]
+    ).filter((p) => !p.deleted_at);
     if (!users.some((p) => p.id === p_actor && p.role === "admin" && p.active))
       return send(res, { message: "Administrator access is required" }, 403);
     return send(res, {
-      users, progress: p_user ? configuredProgress.filter((p) => p.user_id === p_user) : [],
-      groups: configuredGroups, teams: configuredTeams, curricula: configuredCurricula, pending: [], revision: fixtureGeneration,
+      users,
+      progress: p_user
+        ? configuredProgress.filter((p) => p.user_id === p_user)
+        : [],
+      groups: configuredGroups,
+      teams: configuredTeams,
+      curricula: configuredCurricula,
+      pending: [],
+      revision: fixtureGeneration,
     });
   }
   if (url.pathname === "/rest/v1/rpc/fb_governance_snapshot")
@@ -419,4 +563,4 @@ createServer(async (req, res) => {
     { message: `Unhandled synthetic request ${url.pathname}` },
     404,
   );
-}).listen(3130, "127.0.0.1");
+}).listen(fixturePort, "127.0.0.1");
