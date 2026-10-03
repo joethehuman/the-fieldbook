@@ -1,4 +1,6 @@
 "use client";
+import { GroupedSearch } from "@/components/patterns/grouped-search";
+import { ProgressOverview } from "@/components/patterns/progress-overview";
 import { AudienceSelection } from "@/components/patterns/audience-selection";
 import { freshWorkspace } from "@/lib/store";
 import { useState } from "react";
@@ -67,16 +69,46 @@ import { ActionGroup } from "@/components/ui/action-group";
 
 function AudienceSelectionExample() {
   const [selected, setSelected] = useState<string[]>(["team:organization"]);
-  const [data] = useState(() => ({ ...freshWorkspace(),
-    settings: { ...freshWorkspace().settings!, access: "public" as const, guestGroupId: "visitors" },
-    groups: [{ id: "visitors", name: "Visitors" }, { id: "sales", name: "Account executives" }],
-    teams: [{ id: "organization", name: "Organization", system: "organization" as const }, { id: "sales", name: "Sales", parentId: "organization" }],
-    users: freshWorkspace().users.map(user => ({ ...user, teamId: "sales", groups: ["sales"] })),
+  const [data] = useState(() => ({
+    ...freshWorkspace(),
+    settings: {
+      ...freshWorkspace().settings!,
+      access: "public" as const,
+      guestGroupId: "visitors",
+    },
+    groups: [
+      { id: "visitors", name: "Visitors" },
+      { id: "sales", name: "Account executives" },
+    ],
+    teams: [
+      {
+        id: "organization",
+        name: "Organization",
+        system: "organization" as const,
+      },
+      { id: "sales", name: "Sales", parentId: "organization" },
+    ],
+    users: freshWorkspace().users.map((user) => ({
+      ...user,
+      teamId: "sales",
+      groups: ["sales"],
+    })),
   }));
-  return <section><h3>Content audiences</h3><AudienceSelection data={data} selected={selected} initialSelected={["team:sales"]} onChange={setSelected} /></section>;
+  return (
+    <section>
+      <h3>Content audiences</h3>
+      <AudienceSelection
+        data={data}
+        selected={selected}
+        initialSelected={["team:sales"]}
+        onChange={setSelected}
+      />
+    </section>
+  );
 }
 
 export function LibraryExamples() {
+  const [progressStatus, setProgressStatus] = useState("all");
   const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
   const [browserBranch, setBrowserBranch] = useState("");
   const [browserQuery, setBrowserQuery] = useState("");
@@ -351,6 +383,7 @@ export function LibraryExamples() {
       </SettingsSection>
       <GroupIndexExample />
       <GroupRosterExample />
+      <FilterRowsExample />
       <HierarchyPickerExample />
       <SettingsSection
         id="catalog-hierarchy"
@@ -546,7 +579,52 @@ export function LibraryExamples() {
           <ProgressRing value={0} label="Not started example" />
           <ProgressRing value={67} label="Assigned example" />
           <ProgressRing value={100} label="Completed example" />
+          <ProgressRing
+            value={64}
+            label="People up to date example"
+            caption="up to date"
+          />
+          <ProgressRing value={null} label="No assigned people example" />
         </div>
+        <FormField label="Search teams or people">
+          <GroupedSearch
+            placeholder="Search teams or people"
+            options={[
+              { id: "example-org", group: "Teams", label: "Organization" },
+              {
+                id: "example-sales",
+                group: "Teams",
+                label: "Sales",
+                description: "Organization / Commercial / Sales",
+              },
+              ...Array.from({ length: 20 }, (_, index) => ({
+                id: `example-person-${index}`,
+                group: "People",
+                label: `Example person ${index + 1}`,
+                description: `person-${index + 1}@example.test · Sales`,
+              })),
+            ]}
+            onSelect={() => {}}
+          />
+        </FormField>
+        <ProgressOverview
+          summary={{
+            people: 54,
+            assignedPeople: 50,
+            current: 32,
+            within: 12,
+            overdue: 6,
+            incomplete: 0,
+            unassigned: 4,
+            assignments: 150,
+            completed: 120,
+          }}
+          deadlines
+          status={progressStatus}
+          onStatus={(value) =>
+            setProgressStatus(value === progressStatus ? "all" : value)
+          }
+        />
         <Progress value={50} aria-label="Lesson example" />
         <ActionGroup>
           <ProgressStatus value={0} started={false} complete={false} />
@@ -566,6 +644,44 @@ export function LibraryExamples() {
         />
       </SettingsSection>
     </section>
+  );
+}
+
+function FilterRowsExample() {
+  const [filters, setFilters] = useState<number[]>([]);
+  return (
+    <SettingsSection
+      id="catalog-filter-rows"
+      title={<h3>Wrapping applied filters</h3>}
+      guidance="Applied filters sit below search. The row grows with its contents, respects reduced motion and disappears when cleared. These synthetic filters demonstrate wrapping."
+    >
+      <CollectionControls
+        animateFilterChanges
+        search={
+          <Input
+            aria-label="Find example items"
+            placeholder="Find example items"
+          />
+        }
+        primaryAction={
+          <Button
+            onClick={() =>
+              setFilters(Array.from({ length: 15 }, (_, index) => index + 1))
+            }
+          >
+            Add example filters
+          </Button>
+        }
+        filters={filters.map((id) => ({
+          id: String(id),
+          label: `Example filter ${id}`,
+          onRemove: () =>
+            setFilters((current) => current.filter((value) => value !== id)),
+        }))}
+        onClear={() => setFilters([])}
+      />
+      <h4>Example results</h4>
+    </SettingsSection>
   );
 }
 
@@ -599,6 +715,7 @@ function GroupRosterExample() {
       guidance="Filter before paging. Only direct membership can be removed; linked-team inclusion remains. The feature owns its final consequence review."
     >
       <CollectionControls
+        animateFilterChanges
         search={
           <FormField label="Find example group members">
             <Input

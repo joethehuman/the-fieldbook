@@ -16,6 +16,7 @@ export async function GET(req: Request) {
         "people",
         "person",
         "governance",
+        "progress",
         "feedback",
         "maintenance",
       ].includes(scope || "")

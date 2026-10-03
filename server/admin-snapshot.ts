@@ -8,6 +8,7 @@ import type { Content, User } from "@/lib/types";
 import { canAdminister, canOpenPublishingScope } from "@/lib/permissions";
 import { publicSettings } from "@/lib/settings";
 import type { AdminScope } from "@/lib/admin-scope";
+import { progressReport } from "./progress-report";
 export type { AdminScope } from "@/lib/admin-scope";
 
 const contentIndex = async (): Promise<Content[]> => {
@@ -53,6 +54,7 @@ export async function adminSnapshot(
       "Administrator access is required for this section.",
     );
   const admin = canAdminister(user);
+  if (scope === "progress") return progressReport(user);
   const store = dataStore();
   const reports = scope === "governance" || scope === "person";
   // Start independent reads together after the request-time permission check.

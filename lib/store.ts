@@ -13,6 +13,11 @@ import { hooliDemoData } from "../demo/data/hooli";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 import { gradeQuiz, quizUnlocked } from "./course-quiz";
 export type Workspace = {
+  /** Read-only report projection; not part of governance writes. */
+  progressReport?: {
+    asOf: string;
+    people: import("./progress-report").ProgressPerson[];
+  };
   cleanupStatus?: { configured: boolean; lastRun?: string };
   deletedItems?: import("./bulk-actions").DeletedItem[];
   settings?: import("./settings").SiteSettings;

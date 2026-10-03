@@ -8,7 +8,7 @@ globalThis.fetch = (input, init) => {
   if (raw.startsWith("https://test.supabase.co/")) {
     const local = raw.replace(
       "https://test.supabase.co",
-      "http://127.0.0.1:3130",
+      `http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}`,
     );
     return original(
       input instanceof Request ? new Request(local, input) : local,

@@ -171,3 +171,9 @@ Before deploying this MCP version, apply these additive migrations in order to t
 They add service-only catalog/report functions and explicit connection permissions. They preserve content, saved assignments/deadlines, progress and existing shared functions. Existing administrator grants receive exactly their old permissions; any unexpected legacy non-administrator grant is disabled. Their defaults support the old administrator-only consent writer during a rolling deployment. Code rollback leaves additive functions/columns in place; do not replay or remove applied migrations.
 
 The endpoint and client registration remain unchanged. Approve added permissions in Connections on the same connection. For ChatGPT developer-mode apps, refresh its tool definitions and start a new chat; old chats may retain the previous tools. Named reports and media transfers do not become authorized merely because the server now advertises them. Verify revocation, role downgrade, administrator-promotion reapproval and managed-team removal as well as content/report/upload behavior. See [MCP setup](mcp-setup.md).
+
+## Shared Progress report upgrade
+
+Apply `20261002232135_progress_report.sql` after all preceding migrations, including `20261002222355_mcp_scoped_reports.sql`, before deploying the matching server application. It adds the service-only `fb_progress_report` function and does not alter existing functions, roster data, saved assignments, deadlines or progress. It reuses the current explicit reporting-scope helpers. Browser and authenticated database clients cannot execute it directly.
+
+Rehearse against an isolated backend and verify current role/branch boundaries, pending roster people, current-version completion and due-date settings. A code rollback leaves this additive function unused and preserves the previous reporting reads. Do not replay the migration: keep its application in your migration ledger.

@@ -1,5 +1,5 @@
 "use client";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { ArrowDownWideNarrow, SlidersHorizontal, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
@@ -17,6 +17,7 @@ export function CollectionControls({
   actions,
   primaryAction,
   secondaryRow = false,
+  animateFilterChanges = false,
 }: {
   search: ReactNode;
   children?: ReactNode;
@@ -29,6 +30,8 @@ export function CollectionControls({
   primaryAction?: ReactNode;
   /** Keep discovery controls beneath search, including inside bounded pickers. */
   secondaryRow?: boolean;
+  /** Soften chip wrapping and removal without reserving blank space. */
+  animateFilterChanges?: boolean;
 }) {
   const secondary = (
     <>
@@ -70,7 +73,7 @@ export function CollectionControls({
     </>
   );
   return (
-    <div data-slot="collection-controls" className="grid min-w-0 gap-3">
+    <div data-slot="collection-controls" className="grid min-w-0">
       <div
         data-slot="collection-primary-row"
         className="flex min-w-0 flex-wrap items-center gap-3"
@@ -89,16 +92,13 @@ export function CollectionControls({
       {(primaryAction || secondaryRow) && (children || sort || actions) && (
         <div
           data-slot="collection-secondary-row"
-          className="flex min-w-0 flex-wrap items-center gap-3"
+          className="mt-3 flex min-w-0 flex-wrap items-center gap-3"
         >
           {secondary}
         </div>
       )}
-      {filters.length > 0 && (
-        <div
-          className="flex flex-wrap items-center gap-2"
-          aria-label="Applied filters"
-        >
+      {(animateFilterChanges || filters.length > 0) && (
+        <FilterRows animated={animateFilterChanges} active={filters.length > 0}>
           {filters.map((filter) => (
             <Button
               key={filter.id}
@@ -112,13 +112,58 @@ export function CollectionControls({
               <X className="size-3" aria-hidden="true" />
             </Button>
           ))}
-          {onClear && (
+          {filters.length > 0 && onClear && (
             <Button type="button" variant="ghost" size="sm" onClick={onClear}>
               Clear all
             </Button>
           )}
-        </div>
+        </FilterRows>
       )}
+    </div>
+  );
+}
+
+function FilterRows({
+  children,
+  animated,
+  active,
+}: {
+  children: ReactNode;
+  animated: boolean;
+  active: boolean;
+}) {
+  const viewport = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!animated || !viewport.current || !content.current) return;
+    const frame = viewport.current;
+    const inner = content.current;
+    // Measure the actual wrapped content, including space for outer focus rings.
+    const resize = () => {
+      frame.style.height = `${inner.getBoundingClientRect().height}px`;
+    };
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [animated]);
+  return (
+    <div
+      ref={viewport}
+      data-slot="collection-applied-filters"
+      className={
+        animated
+          ? "-mx-1 h-0 min-w-0 overflow-hidden transition-[height] duration-150 ease-out motion-reduce:transition-none"
+          : "mt-3 min-w-0"
+      }
+    >
+      <div
+        ref={content}
+        className={`flex min-w-0 flex-wrap items-center gap-2${animated ? (active ? " px-1 pb-1 pt-4" : " px-1") : ""}`}
+        aria-label={active ? "Applied filters" : undefined}
+      >
+        {children}
+      </div>
     </div>
   );
 }

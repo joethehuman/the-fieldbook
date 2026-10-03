@@ -132,15 +132,17 @@ export function AdminWorkspace({
           }}
           onOpenTab={async (next) => {
             const scope =
-              next === "people" || next === "teams" || next === "curricula"
-                ? "people"
-                : next === "deleted"
-                  ? "maintenance"
-                  : next === "feedback"
-                    ? "feedback"
-                    : next === "content" || next.startsWith("settings-")
-                      ? "content"
-                      : "governance";
+              next === "progress"
+                ? "progress"
+                : next === "people" || next === "teams" || next === "curricula"
+                  ? "people"
+                  : next === "deleted"
+                    ? "maintenance"
+                    : next === "feedback"
+                      ? "feedback"
+                      : next === "content" || next.startsWith("settings-")
+                        ? "content"
+                        : "governance";
             setData(await runtime.admin.prepare(scope));
           }}
           onOpenPersonProgress={async (id) => {

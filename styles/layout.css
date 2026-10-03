@@ -222,6 +222,9 @@
   .admin-panel {
     display: flow-root;
     min-height: 0;
+    /* Keep outer focus rings inside the scrollport without moving content. */
+    margin-inline-start: calc(-1 * var(--space-2));
+    padding-inline-start: var(--space-2);
     padding-bottom: var(--space-6);
     padding-inline-end: var(--space-4);
     overflow-y: auto;
@@ -545,10 +548,6 @@
   }
   .report-summary strong {
     font-size: 1.25rem;
-  }
-  .report-course {
-    display: grid;
-    gap: var(--space-2);
   }
   .brand-control {
     display: grid;

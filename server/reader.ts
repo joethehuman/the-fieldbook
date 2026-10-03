@@ -1,4 +1,5 @@
 import "server-only";
+import { progressReport } from "./progress-report";
 import { cache } from "react";
 import { notFound, redirect } from "next/navigation";
 import { profile, readerActor as verifiedReaderActor } from "./auth";
@@ -14,7 +15,6 @@ import { HttpError } from "./errors";
 import { brandingFromSettings } from "@/lib/branding";
 import {
   effectiveGroups,
-  reportingTeamId,
   type Content,
   type Curriculum,
   type Progress,
@@ -251,83 +251,7 @@ export const readerTeam = cache(async () => {
   )
     return { data: empty, user };
 
-  const [governance, rows] = await Promise.all([
-    dataStore().readGovernanceSnapshot(user.id),
-    publishedCourseIndex(
-      dataStore().cacheNamespace(),
-      config.governance_revision,
-    ),
-  ]);
-  const current = (governance?.users || []).find(
-    (entry: { id: string }) => entry.id === user.id,
-  );
-  if (!current || !current.active || current.role !== user.role)
-    throw new Error("Account access changed. Reload and sign in again.");
-  const teams = governance.teams || [];
-  const allowed = reportTeamIds(user, teams);
-  const visibleTeams =
-    user.role === "admin"
-      ? teams
-      : teams.filter((team: { id: string }) => allowed.has(team.id));
-  const people: User[] = (governance.users || [])
-    .map(profile)
-    .filter(
-      (person: User) =>
-        user.role === "admin" ||
-        person.id === user.id ||
-        (person.active &&
-          allowed.has(reportingTeamId(person.teamId, teams) || "")),
-    );
-  const peopleIds = new Set(people.map((person) => person.id));
-  const allGroups = governance.groups || [];
-  const visibleGroupIds = new Set(
-    people.flatMap((person) => [...effectiveGroups(person, allGroups)]),
-  );
-  const groups =
-    user.role === "admin"
-      ? allGroups
-      : allGroups.filter((group: { id: string }) =>
-          visibleGroupIds.has(group.id),
-        );
-  const groupIds = new Set(groups.map((group: { id: string }) => group.id));
-  const courses = rows
-    .filter((row) => row.kind === "course" && row.status === "published")
-    .map((row) => courseSummary(row as unknown as CourseRow))
-    .map((course) => ({
-      ...course,
-      groups: course.groups.filter((id) => groupIds.has(id)),
-      assignments: course.assignments?.filter(
-        (assignment) =>
-          (assignment.groupId && groupIds.has(assignment.groupId)) ||
-          (assignment.teamId && people.some(person => person.assignmentTeams?.some(t => t.id === assignment.teamId))) ||
-          (assignment.userId && peopleIds.has(assignment.userId)),
-      ),
-    }));
-  const progress: Workspace["progress"] = {};
-  for (const row of governance.progress || []) {
-    if (!peopleIds.has(row.user_id)) continue;
-    (progress[row.user_id] ??= []).push({
-      content_id: row.content_id,
-      version: row.version,
-      lessons: row.lessons,
-      passed: row.passed,
-      attempts: row.attempts,
-      revision: row.revision,
-    });
-  }
-  return {
-    user,
-    data: {
-      ...empty,
-      settings: publicSettings(config.settings, courses),
-      content: courses,
-      publishedContent: courses,
-      users: people,
-      groups,
-      teams: visibleTeams,
-      progress,
-    },
-  };
+  return { user, data: await progressReport(user) };
 });
 
 function courseSummary(row: CourseRow): Content {

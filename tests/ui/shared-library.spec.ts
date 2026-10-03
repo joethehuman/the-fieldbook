@@ -129,6 +129,23 @@ test("library: associated help, selections, choice keys, tooltip, menu and progr
   const ring = region.getByRole("progressbar", { name: "Assigned example" });
   await expect(ring).toHaveAttribute("aria-valuenow", "67");
   await expect(ring).toHaveAttribute("aria-valuetext", "67% complete");
+  await expect(
+    region.getByRole("progressbar", {
+      name: "People up to date example",
+      exact: true,
+    }),
+  ).toHaveAttribute("aria-valuetext", "64% up to date");
+  await expect(
+    region.getByRole("img", {
+      name: "No assigned people example: no assigned courses",
+      exact: true,
+    }),
+  ).not.toHaveAttribute("aria-valuenow");
+  const status = region.getByRole("button", { name: "Overdue 6", exact: true });
+  await status.click();
+  await expect(status).toHaveAttribute("aria-pressed", "true");
+  await status.click();
+  await expect(status).toHaveAttribute("aria-pressed", "false");
   await ring.scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("library-progress.png") });
   await region.getByRole("button", { name: "Load more" }).click();
@@ -140,7 +157,9 @@ test("library: associated help, selections, choice keys, tooltip, menu and progr
   await page.emulateMedia({ reducedMotion: "reduce", colorScheme: "dark" });
   expect(
     await region
-      .locator('[role="status"] svg')
+      .getByRole("status")
+      .filter({ hasText: "Loading example…" })
+      .locator("svg")
       .evaluate((el) => getComputedStyle(el).animationName),
   ).toBe("none");
   await fits(page);
@@ -180,8 +199,8 @@ test("product settings: connected help, editor hints and enlarged navigation", a
     /Defaults apply to future onboarding clocks and assignment episodes/,
   );
   await useDueDates.uncheck();
-  await expect(onboardingDays).toBeDisabled();
-  await expect(catchUpDays).toBeDisabled();
+  await expect(onboardingDays).toBeEnabled();
+  await expect(catchUpDays).toBeEnabled();
   await page.screenshot({
     path: info.outputPath("settings-due-dates-off.png"),
     fullPage: true,
@@ -200,25 +219,24 @@ test("product settings: connected help, editor hints and enlarged navigation", a
   ).toHaveAccessibleDescription(
     "An HTTPS contact page can keep your email address private.",
   );
-  const bold = page.getByRole("button", { name: "Bold", exact: true });
-  const heading = page.getByRole("combobox", { name: "Heading level" });
-  await heading.scrollIntoViewIfNeeded();
-  // At tablet widths the toolbar wraps. Reveal the destination button too,
-  // so native Tab scrolling does not immediately dismiss its focus tooltip.
-  await bold.scrollIntoViewIfNeeded();
-  // Let native scroll notifications finish before opening a focus tooltip:
-  // Radix intentionally dismisses tooltips when an ancestor scrolls.
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-  await heading.focus();
-  await page.keyboard.press("Tab");
-  await expect(bold).toBeFocused();
-  await expect(page.getByRole("tooltip")).toHaveText("Bold");
+  const editor = page.getByRole("region", {
+    name: "Privacy policy draft editor",
+  });
+  const commands = editor.getByRole("button", { name: /^Commands:/ });
+  const menu = page.getByRole("menu", { name: /^Insert content/ });
+  await commands.scrollIntoViewIfNeeded();
+  await commands.focus();
+  await page.keyboard.press("Enter");
+  await expect(
+    menu.getByRole("menuitem", { name: "Normal Text", exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(
+    menu.getByRole("menuitem", { name: "Heading 1", exact: true }),
+  ).toBeFocused();
   await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(commands).toBeFocused();
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({
     path: info.outputPath("settings-privacy.png"),
@@ -235,4 +253,140 @@ test("product settings: connected help, editor hints and enlarged navigation", a
     path: info.outputPath("settings-enlarged.png"),
     fullPage: true,
   });
+});
+
+test("reporting overview fits enlarged text without clipping controls", async ({
+  page,
+}) => {
+  await page.goto("/ui#shared-library");
+  const overview = page.locator('[data-slot="progress-overview"]');
+  await expect(overview).toBeVisible();
+  await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));
+  await overview.scrollIntoViewIfNeeded();
+  expect(
+    await overview.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      return (
+        box.right <= innerWidth + 1 && el.scrollWidth <= el.clientWidth + 1
+      );
+    }),
+  ).toBe(true);
+  const overdue = overview.getByRole("button", {
+    name: "Overdue 6",
+    exact: true,
+  });
+  await overdue.focus();
+  await page.keyboard.press("Enter");
+  await expect(overdue).toHaveAttribute("aria-pressed", "true");
+});
+
+test("animated filter rows wrap, stay left-aligned and clear without an empty spacer", async ({
+  page,
+}, info) => {
+  await page.goto("/ui#catalog-filter-rows");
+  const example = page.locator("#catalog-filter-rows");
+  const row = example.locator('[data-slot="collection-applied-filters"]');
+  const search = example.getByRole("textbox", {
+    name: "Find example items",
+    exact: true,
+  });
+  const results = example.getByRole("heading", {
+    name: "Example results",
+    exact: true,
+  });
+  await expect.poll(async () => (await row.boundingBox())!.height).toBe(0);
+  const baseline =
+    (await results.boundingBox())!.y - (await search.boundingBox())!.y;
+  await example
+    .getByRole("button", { name: "Add example filters", exact: true })
+    .click();
+  const chips = row.getByRole("button", { name: /^Remove Example filter/ });
+  await expect(chips).toHaveCount(15);
+  await expect
+    .poll(async () => (await row.boundingBox())!.height)
+    .toBeGreaterThan(52);
+  await expect
+    .poll(
+      async () =>
+        (await row.boundingBox())!.height -
+        (await row
+          .locator(":scope > div")
+          .evaluate((el) => el.getBoundingClientRect().height)),
+    )
+    .toBe(0);
+  const first = chips.first();
+  expect(
+    Math.abs((await first.boundingBox())!.x - (await search.boundingBox())!.x),
+  ).toBeLessThanOrEqual(1);
+  await first.focus();
+  expect(
+    await first.evaluate((el) => {
+      const box = el.getBoundingClientRect();
+      const frame = el
+        .closest('[data-slot="collection-applied-filters"]')!
+        .getBoundingClientRect();
+      return (
+        box.left - 4 >= frame.left - 0.5 &&
+        box.top - 4 >= frame.top - 0.5 &&
+        box.bottom + 4 <= frame.bottom + 0.5
+      );
+    }),
+  ).toBe(true);
+  await page.screenshot({ path: info.outputPath("wrapping-filter-rows.png") });
+  await first.click();
+  await expect(chips).toHaveCount(14);
+  await expect(
+    row.getByRole("button", {
+      name: "Remove Example filter 2 filter",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  expect(
+    await row.evaluate((el) => getComputedStyle(el).transitionProperty),
+  ).toBe("none");
+  await example.getByRole("button", { name: "Clear all", exact: true }).click();
+  await expect.poll(async () => (await row.boundingBox())!.height).toBe(0);
+  expect(
+    Math.abs(
+      (await results.boundingBox())!.y -
+        (await search.boundingBox())!.y -
+        baseline,
+    ),
+  ).toBeLessThanOrEqual(1);
+});
+
+test("grouped search loads more, searches locally, and preserves keyboard editing and focus", async ({
+  page,
+}, info) => {
+  await page.goto("/ui#catalog-progress");
+  const search = page.getByRole("combobox", {
+    name: "Search teams or people",
+    exact: true,
+  });
+  await search.click();
+  const people = page
+    .getByRole("listbox", { name: "Search results", exact: true })
+    .getByRole("group", { name: "People", exact: true });
+  await expect(people.getByRole("option")).toHaveCount(6);
+  await page.screenshot({
+    path: info.outputPath("grouped-search-results.png"),
+  });
+  await page
+    .getByRole("button", { name: "More people (14)", exact: true })
+    .click();
+  await expect(people.getByRole("option")).toHaveCount(12);
+  await search.fill("Example person 10");
+  await expect(people.getByRole("option")).toHaveCount(1);
+  await page.keyboard.press("Home");
+  await page.keyboard.press("End");
+  expect(
+    await search.evaluate((input: HTMLInputElement) => input.selectionStart),
+  ).toBe("Example person 10".length);
+  await page.keyboard.press("Enter");
+  await expect(
+    page.getByRole("listbox", { name: "Search results", exact: true }),
+  ).not.toBeVisible();
+  await expect(search).toBeFocused();
+  await expect(search).toHaveValue("");
 });
