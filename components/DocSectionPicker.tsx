@@ -41,7 +41,7 @@ export function DocSectionPicker({
       <div
         role="group"
         aria-label="Doc section choices"
-        className="max-h-64 space-y-1 overflow-y-auto pe-3 [scrollbar-gutter:stable]"
+        className="max-h-64 space-y-1 overflow-y-auto overscroll-y-contain pe-3 [scrollbar-gutter:stable]"
       >
         {matches.map((section) => (
           <Button

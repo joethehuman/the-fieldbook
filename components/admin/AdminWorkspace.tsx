@@ -99,6 +99,11 @@ export function AdminWorkspace({
           data={data}
           user={user}
           onChange={persist}
+          onImported={async () => {
+            setData(await runtime.refresh());
+            setError("");
+            setReportIssue(undefined);
+          }}
           onSaveSettings={async (before, settings) => {
             const saved = await runtime.saveSettings(before, settings);
             setData(saved);

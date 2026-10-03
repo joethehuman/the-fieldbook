@@ -17,7 +17,8 @@ export function ReviewCollection({
     header = useRef<HTMLDivElement>(null),
     end = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
-  const fade = useScrollFade<HTMLDivElement>();
+  const fade = useScrollFade<HTMLDivElement>(!compact);
+  const outerFade = useScrollFade<HTMLDivElement>(compact);
   useLayoutEffect(() => {
     const measure = () => {
       if (body.current && header.current && end.current)
@@ -37,13 +38,19 @@ export function ReviewCollection({
   }, []);
   return (
     <div
-      ref={body}
+      ref={(element) => {
+        body.current = element;
+        outerFade.ref.current = element;
+      }}
+      onScroll={outerFade.measure}
+      data-scroll-fade-before={compact && outerFade.edges.before}
+      data-scroll-fade-after={compact && outerFade.edges.after}
       data-slot="review-collection"
       data-compact={compact}
       className={cn(
         "flex h-full min-h-0 flex-col gap-4",
         compact
-          ? "overflow-y-auto overscroll-contain p-1"
+          ? "scroll-fade overflow-y-auto overscroll-contain p-1"
           : "overflow-hidden p-1",
       )}
     >

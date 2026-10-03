@@ -1,10 +1,10 @@
-# Review a people and team CSV
+# Import people and teams from CSV
 
-Administrators can open **Manage organization → People → Import CSV**. Download the stored blank template or fictional example, fill it in using an ordinary spreadsheet, and export UTF-8 CSV. The interactive demo offers the same review under Demo profiles and uses browser-local sample data. Do not upload private information to the demo.
+Administrators can open **Manage organization → People → Import CSV**. Download the blank template from the instructions, fill it in using an ordinary spreadsheet, and export UTF-8 CSV. The interactive demo offers the same review under Demo profiles and uses browser-local sample data. Do not upload private information to the demo.
 
 Choose **Choose CSV file** to open the system file chooser. The selected filename appears next to the button; choose it again to replace the file.
 
-**This workflow currently reviews files only. Done closes the review and saves nothing.** It does not create accounts, send invitations, change assignments, or import learning groups. A validated review is a proposed change, not a completed import.
+Choose **Import** after reviewing the complete proposal. The changes are saved together, then People refreshes. Imported people have stable roster entries before their first verified Google sign-in; no Auth-provider account or invitation email is created. Learning groups are not created or enrolled by CSV.
 
 ## The template
 
@@ -21,7 +21,7 @@ Use one row per person. The six headers can appear in any order. Keep every head
 
 A team-only row leaves Name, Email and Hire date blank. Use it to define an empty team or a parent that has no direct members. Parents and managers can appear later in the file. Repeated team names describe the same team: nonblank parent and manager values must agree; blank repeated cells do not undo another row's values.
 
-For example, a person in Enterprise US lists `Enterprise US` in Team and `Sales US` in Parent team. A separate team-only row can place `Sales US` under `Organization`. The downloaded example illustrates this without requiring a full path on every row.
+For example, a person in Enterprise US lists `Enterprise US` in Team and `Sales US` in Parent team. A separate team-only row can place `Sales US` under `Organization`.
 
 The initial bounds are **1,000 data rows and 2 MB**. Quoted commas, quoted line breaks, UTF-8 BOM, and common line endings are accepted. Excel workbooks are not accepted; export them as CSV.
 
@@ -44,9 +44,17 @@ The whole-file counts summarize new, changed and unchanged people and teams. Peo
 
 Expand a row for before/after values and learning or reporting consequences. A team change summarizes affected people together, with its own pages, rather than asking for hundreds of separate approvals. Courses retained through overlapping assignment sources are counted once. Continuous requirements keep their existing deadlines and progress.
 
-Issues retain every row and column reference. Filter by issue type or download the complete issue report, correct the source spreadsheet, and upload again. Conflicting definitions, duplicate identities, missing references, invalid dates, hierarchy cycles, and inactive or deleted identities block consequence calculation for the whole proposal. Notices alone do not block it. Back preserves the current review; choosing a replacement file clears it. Cancel or Done closes the dialog without saving changes.
+Issues retain every row and column reference. Filter by issue type or download the complete issue report, correct the source spreadsheet, and upload again. Conflicting definitions, duplicate identities, missing references, invalid dates, hierarchy cycles, and inactive or deleted identities block consequence calculation for the whole proposal. Notices alone do not block it. Back preserves the current review; choosing a replacement file clears it. Cancel closes an unsubmitted review without saving. The Import action commits the whole valid file, not only the current filtered page.
 
-The installed app computes the review from current server-owned records and requires administrator access. It accepts CSV text, not client-selected IDs or proposed totals. Review files are transient and are not stored as uploaded artifacts. The review uses existing database reads and needs no new migration.
+The installed app computes the review from current server-owned records and requires administrator access. It accepts CSV text, not client-selected IDs or proposed totals. Review files are transient and are not stored as uploaded artifacts. The additive `20261003140729_roster_csv_import.sql` migration creates a service-only receipt table and review/apply functions. Apply it before deploying dependent code; existing roster, assignments and progress are preserved by the migration.
+
+## Saving and recovery
+
+Import revalidates the file against server-owned records. Every changed row, new team, manager role and assignment-source update is committed in one database transaction. Blocking issues prevent the entire import. Existing identities, roles, continuous course deadlines and progress are preserved; new requirements follow the existing assignment rules.
+
+If roster, configuration, published learning or the review date changes, review the file again. A lost response does not mean failure: Retry Import checks the same operation and returns its saved receipt without creating duplicate people. Back cannot replace an operation while its save is unconfirmed. If the save succeeds but refreshing People fails, Reload People retries only that refresh.
+
+Receipts retain a file hash, actor reference, baseline hash and compact result counts; uploaded CSV files and proposed rosters are not retained. Abandoned reviews expire after a day. Committed receipts remain available for retry and accountability. Person deletion clears the receipt’s actor reference; receipts do not retain names or emails. Browser-local demo imports use the same validator and commit to local storage with a stale-data check.
 
 ## Future roster connections
 
@@ -54,4 +62,4 @@ The CSV parser translates rows into a shared roster input: people, teams, immedi
 
 This is a foundation for future adapters, not an HRIS or directory integration. No provider mapping table, SCIM endpoint, credentials, synchronization job, field ownership rule, or email-change reconciliation is implemented. SSO authentication remains separate from roster provisioning.
 
-This implementation was written with AI assistance. Its validation evidence includes synthetic 500-person/100-course reviews, permission and input-boundary tests, and browser checks; it does not establish hosted import or transaction behavior, because saving is not yet part of this workflow.
+This implementation was written with AI assistance. Its validation evidence includes synthetic 500-person/100-course reviews, permission and input-boundary tests, and browser checks; it does not substitute for an installation’s hosted sign-in and import acceptance.

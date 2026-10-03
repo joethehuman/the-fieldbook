@@ -16,9 +16,11 @@ export const learningData: Pick<
   | "readGovernanceSnapshot"
   | "readAdminPeopleSnapshot"
   | "listProfiles"
+  | "listDeletedProfileEmails"
   | "readProfileNames"
   | "findOwnerProfile"
   | "saveGovernance"
+  | "rosterImportOperation"
   | "manageLearning"
   | "reviewDeadlines"
   | "consumeRateLimit"
@@ -77,6 +79,42 @@ export const learningData: Pick<
       .maybeSingle();
     if (error) throw new Error("Owner lookup failed.");
     return data as { id: string } | null;
+  },
+  async listDeletedProfileEmails() {
+    const rows = await readAll<{ email: string | null }>((from, to) =>
+      db().from("fb_deleted_items").select("email", { count: "exact" })
+        .eq("entity", "user").order("id").range(from, to),
+    );
+    return rows.flatMap((row) => row.email ? [row.email] : []);
+  },
+  async rosterImportOperation(actorId, fileHash, run, payload) {
+    const { data, error } = await db().rpc("fb_roster_import", {
+      p_actor: actorId,
+      p_file_hash: fileHash,
+      p_run: run || null,
+      p_data: payload || null,
+    });
+    if (error) {
+      if (error.message.includes("Administrator"))
+        throw new HttpError(
+          403,
+          "Administrator access changed. Sign in again.",
+        );
+      if (
+        error.message.includes("changed") ||
+        error.message.includes("review does not match")
+      )
+        throw new HttpError(
+          409,
+          "The organization changed. Review the file again before importing.",
+        );
+      if (error.code === "P0001") throw new HttpError(400, error.message);
+      throw new HttpError(
+        503,
+        "Import could not be confirmed. Try Import again to check the same operation.",
+      );
+    }
+    return data;
   },
   async saveGovernance(actorId, expected, operation, payload) {
     const { data, error } = await db().rpc("fb_save_governance", {

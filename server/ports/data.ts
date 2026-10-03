@@ -218,12 +218,27 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
     last_run: string | null;
   } | null>;
   listProfiles(): Promise<ProfileRecord[]>;
+  listDeletedProfileEmails(): Promise<string[]>;
   readProfileNames(
     ids: string[],
   ): Promise<Pick<ProfileRecord, "id" | "name">[]>;
   findOwnerProfile(email: string): Promise<{ id: string } | null>;
   ensureLearningSetup(): Promise<void>;
   ensureOnboardingSetup(): Promise<void>;
+  rosterImportOperation(
+    actorId: string,
+    fileHash: string,
+    run?: string,
+    payload?: {
+      users: (typeof governanceSchema)["_output"]["users"];
+      teams: Team[];
+    },
+  ): Promise<{
+    id: string;
+    day?: string;
+    baseline?: string;
+    result?: import("@/lib/roster-import").RosterImportResult;
+  }>;
   saveGovernance(
     actorId: string,
     expected: number,

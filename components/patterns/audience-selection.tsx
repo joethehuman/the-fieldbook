@@ -33,6 +33,7 @@ export function AudienceSelection({
   initialSelected = [],
   recommendationsOnly = false,
   existingAudienceKeys,
+  bounded = false,
 }: {
   data: Workspace;
   selected: string[];
@@ -44,6 +45,8 @@ export function AudienceSelection({
   recommendationsOnly?: boolean;
   /** Additive batches keep existing sources; they contribute reach without disabling new choices. */
   existingAudienceKeys?: string[];
+  /** Keep discovery outside one scrolling surface for all audience choices. */
+  bounded?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const parked = useRef<string[] | null>(null);
@@ -125,7 +128,50 @@ export function AudienceSelection({
       audienceCoverage(data, a, keys, people).length ||
       inherited[contentAudienceKey(a)]?.length,
   );
-  return (
+  const Results = bounded ? "div" : SelectionViewport;
+  const search = (
+    <SearchField>
+      <Input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Find a team or group"
+        aria-label="Find a team or group"
+        disabled={disabled}
+      />
+    </SearchField>
+  );
+  const summary = (
+    <div
+      className="flex h-8 items-center justify-between gap-3 text-xs text-muted-foreground"
+      aria-label="Selected audiences"
+    >
+      <span
+        className="truncate"
+        title={selected
+          .map((k) => all.find((a) => contentAudienceKey(a) === k)?.name || k)
+          .join(", ")}
+      >
+        {selected.length
+          ? `Selected: ${selected.map((k) => all.find((a) => contentAudienceKey(a) === k)?.name || "Unavailable audience").join(", ")}`
+          : existingPeople.size > 0
+            ? "No additional audiences selected"
+            : "No teams or groups selected"}
+      </span>
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className={query ? "shrink-0" : "invisible shrink-0"}
+        tabIndex={query ? 0 : -1}
+        disabled={disabled}
+        onClick={() => setQuery("")}
+      >
+        Clear search
+      </Button>
+    </div>
+  );
+  const choices = (
     <div className="grid gap-4">
       {organization && (
         <div
@@ -256,17 +302,8 @@ export function AudienceSelection({
             {existingAudienceKeys ? " across selected learning" : ""} ·{" "}
             {newPeople} newly included
           </p>
-          <SearchField>
-            <Input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Find a team or group"
-              aria-label="Find a team or group"
-              disabled={disabled}
-            />
-          </SearchField>
-          <SelectionViewport aria-label="Matching audiences">
+          {!bounded && search}
+          <Results aria-label="Matching audiences">
             {candidates.map((candidate) => {
               const key = contentAudienceKey(candidate),
                 label = `${candidate.kind === "team" ? "Team" : "Group"}: ${candidate.name}`;
@@ -381,38 +418,8 @@ export function AudienceSelection({
                   : "No teams or groups available."}
               </p>
             )}
-          </SelectionViewport>
-          <div
-            className="flex h-8 items-center justify-between gap-3 text-xs text-muted-foreground"
-            aria-label="Selected audiences"
-          >
-            <span
-              className="truncate"
-              title={selected
-                .map(
-                  (k) =>
-                    all.find((a) => contentAudienceKey(a) === k)?.name || k,
-                )
-                .join(", ")}
-            >
-              {selected.length
-                ? `Selected: ${selected.map((k) => all.find((a) => contentAudienceKey(a) === k)?.name || "Unavailable audience").join(", ")}`
-                : existingPeople.size > 0
-                  ? "No additional audiences selected"
-                  : "No teams or groups selected"}
-            </span>
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className={query ? "shrink-0" : "invisible shrink-0"}
-              tabIndex={query ? 0 : -1}
-              disabled={disabled}
-              onClick={() => setQuery("")}
-            >
-              Clear search
-            </Button>
-          </div>
+          </Results>
+          {!bounded && summary}
         </section>
       )}
       {org && saved.length > 0 && (
@@ -514,5 +521,20 @@ export function AudienceSelection({
         </p>
       )}
     </div>
+  );
+  return bounded ? (
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      {!org && <div className="shrink-0">{search}</div>}
+      <SelectionViewport
+        fill
+        className="border-t-0"
+        aria-label="Audience choices"
+      >
+        {choices}
+      </SelectionViewport>
+      {!org && <div className="shrink-0">{summary}</div>}
+    </div>
+  ) : (
+    choices
   );
 }

@@ -49,11 +49,11 @@ export function SearchableSelectionList({
   onReviewSelected?: () => void;
   pageResetKey?: string;
   emptyAction?: ReactNode;
-  /** Fill a DialogBody, scrolling results without moving controls or actions. */
-  bounded?: boolean;
+  /** Fill a workflow body, or retain a compact preferred list height in a picker. */
+  bounded?: boolean | "compact";
 }) {
   const groupName = useId();
-  const fade = useScrollFade<HTMLDivElement>(bounded);
+  const fade = useScrollFade<HTMLDivElement>(!!bounded);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selectedOnly, setSelectedOnly] = useState(false);
@@ -81,7 +81,7 @@ export function SearchableSelectionList({
       disabled={disabled}
       className={
         bounded
-          ? "flex h-full min-h-0 flex-col [&>:not([data-slot=selection-results])]:shrink-0"
+          ? `flex flex-col [&>:not([data-slot=selection-results])]:shrink-0 ${bounded === "compact" ? "flex-1" : "h-full min-h-0"}`
           : undefined
       }
     >
@@ -195,7 +195,7 @@ export function SearchableSelectionList({
         data-scroll-fade-after={bounded && fade.edges.after}
         className={
           bounded
-            ? "scroll-fade flex min-h-[var(--selection-results-min-height)] flex-1 flex-col gap-2 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:auto] [scrollbar-color:auto]"
+            ? `scroll-fade flex min-h-[var(--selection-results-min-height)] flex-1 flex-col gap-2 overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable] [scrollbar-width:auto] [scrollbar-color:auto] ${bounded === "compact" ? "max-h-[var(--selection-results-height)]" : ""}`
             : "grid gap-2"
         }
       >

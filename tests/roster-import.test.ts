@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { freshWorkspace, type Workspace } from "../lib/store";
 import { serializeCsv } from "../lib/csv";
 import { organizationTeam } from "../lib/organization-team";
 import {
   parseRosterCsv,
+  prepareRosterCsv,
+  materializeRoster,
   reviewRosterCsv,
   rosterTemplate,
   rosterExample,
@@ -75,15 +77,15 @@ function base(): Workspace {
   d.governanceRevision = 10;
   return d;
 }
-test("stored templates match the parser contract in both apps and their example is human-buildable", () => {
+test("stored blank templates match both apps and filled-in examples are not public downloads", () => {
   for (const dir of ["public", "demo/public"]) {
     assert.equal(
       readFileSync(dir + "/templates/people-import-template.csv", "utf8"),
       serializeCsv(rosterTemplate()),
     );
     assert.equal(
-      readFileSync(dir + "/templates/people-import-example.csv", "utf8"),
-      serializeCsv(rosterExample()),
+      existsSync(dir + "/templates/people-import-example.csv"),
+      false,
     );
   }
   const review = reviewRosterCsv(serializeCsv(rosterExample()), base());
@@ -376,4 +378,23 @@ test("500 people and 100 courses are reviewed as bounded metadata and shared cou
     parseRosterCsv(csv([...rows, ...rows])).issues[0].code,
     "row-limit",
   );
+});
+
+test("materializing new records preserves every existing ID, even one resembling a provisional reference", () => {
+  const data = base();
+  data.teams![1].id = "csv-preview:old-team";
+  data.users[1].teamId = data.teams![1].id;
+  const prepared = prepareRosterCsv(
+    csv([["Alex", "alex@example.test", "", "US", "", ""]]),
+    data,
+  );
+  assert.equal(prepared.review.valid, true);
+  const saved = materializeRoster(
+    prepared.proposal!,
+    prepared.review,
+    () => "allocated",
+  );
+  assert.equal(saved.teams![1].id, data.teams![1].id);
+  assert.equal(saved.users[1].id, data.users[1].id);
+  assert.equal(saved.users[1].teamId, data.teams![1].id);
 });

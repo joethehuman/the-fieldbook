@@ -119,6 +119,8 @@ export type RosterReview = {
   reviewedAt: string;
   governanceRevision?: number;
   valid: boolean;
+  /** Opaque reviewed-operation receipt; installed authority lives in the database. */
+  token?: string;
 };
 const normalized = (value: string) => value.trim().toLowerCase();
 const personKey = (email: string) => "person:" + normalized(email);
@@ -433,7 +435,11 @@ export function parseRosterCsv(csv: string): RosterInput {
 export function reviewRosterInput(
   input: RosterInput,
   before: Workspace,
-  options: { deletedEmails?: string[]; stamp?: string } = {},
+  options: {
+    deletedEmails?: string[];
+    stamp?: string;
+    onProposal?: (data: Workspace) => void;
+  } = {},
 ): RosterReview {
   const stamp = options.stamp || new Date().toISOString();
   const review: RosterReview = {
@@ -537,7 +543,11 @@ export function reviewRosterInput(
     value: string | undefined,
   ) => {
     if ((old || "") === (value || "")) return;
-    row.changes.push({ field, before: old || "—", after: value || "—" });
+    row.changes.push({
+      field,
+      before: old || "Not set",
+      after: value || "Not set",
+    });
     if (row.status !== "new") row.status = "changed";
   };
   const teamLabel = (id: string | undefined, teams: Map<string, Team>) =>
@@ -634,7 +644,7 @@ export function reviewRosterInput(
     }
     if (!old)
       row.notes.push(
-        "Pre-registered learner. No email or login account is created.",
+        "Pre-registered person. No email or login account is created.",
       );
     nextPeople.set(id, next);
     personIds.set(personKey(person.email), id);
@@ -936,6 +946,7 @@ export function reviewRosterInput(
   review.affectedPeople = after.users
     .filter((p) => affected.has(p.id))
     .map(({ id, name, email }) => ({ id, name, email }));
+  options.onProposal?.(after);
   return review;
 }
 
@@ -945,6 +956,67 @@ export function reviewRosterCsv(
   options?: Parameters<typeof reviewRosterInput>[2],
 ) {
   return reviewRosterInput(parseRosterCsv(csv), before, options);
+}
+/** One validator/proposal boundary for CSV and future roster adapters. */
+export function prepareRosterCsv(
+  csv: string,
+  before: Workspace,
+  options?: Parameters<typeof reviewRosterInput>[2],
+) {
+  let proposal: Workspace | undefined;
+  const review = reviewRosterInput(parseRosterCsv(csv), before, {
+    ...options,
+    onProposal: (value) => {
+      proposal = value;
+    },
+  });
+  return { review, proposal };
+}
+export type RosterImportResult = {
+  peopleAdded: number;
+  peopleUpdated: number;
+  teamsAdded: number;
+  teamsUpdated: number;
+  revision: number;
+  completedAt: string;
+};
+/** Replace provisional references only after validation; retained IDs are unchanged. */
+export function materializeRoster(
+  proposal: Workspace,
+  review: RosterReview,
+  allocate: () => string,
+): Workspace {
+  const ids = new Map<string, string>();
+  for (const record of [...review.people, ...review.teams])
+    if (record.status === "new" && record.id) ids.set(record.id, allocate());
+  const resolve = (id?: string) => (id ? ids.get(id) || id : undefined);
+  return {
+    ...proposal,
+    users: proposal.users.map((p) => ({
+      ...p,
+      id: resolve(p.id)!,
+      teamId: resolve(p.teamId),
+    })),
+    teams: proposal.teams?.map((t) => ({
+      ...t,
+      id: resolve(t.id)!,
+      parentId: resolve(t.parentId),
+      managerId: resolve(t.managerId),
+    })),
+  };
+}
+/** Demo stale guard excludes progress, which may change while someone reviews. */
+export function rosterBaseline(data: Workspace) {
+  return JSON.stringify({
+    settings: data.settings,
+    users: data.users,
+    teams: data.teams,
+    groups: data.groups,
+    curricula: data.curricula,
+    content: data.publishedContent || data.content,
+    deleted: data.deletedItems,
+    day: new Date().toISOString().slice(0, 10),
+  });
 }
 export function rosterTemplate(): CsvReport {
   return { headings: ROSTER_IMPORT_COLUMNS.map((c) => c.label), rows: [] };

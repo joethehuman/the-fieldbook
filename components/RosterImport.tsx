@@ -7,12 +7,18 @@ import {
   ROSTER_IMPORT_COLUMNS,
   ROSTER_IMPORT_MAX_BYTES,
   reviewRosterCsv,
+  prepareRosterCsv,
+  materializeRoster,
+  rosterBaseline,
   rosterIssueReport,
   type ImportReviewRow,
   type RosterReview,
 } from "@/lib/roster-import";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
+import { useInteractionDialog } from "./ui/interaction-dialog";
+import { ScrollRegion } from "./patterns/scroll-region";
 import { FilePicker } from "./ui/file-picker";
 import { Alert } from "./ui/alert";
 import { Note } from "./ui/note";
@@ -59,6 +65,11 @@ const labels = {
   issue: "Issues",
 };
 const pageSize = 25;
+function summaryChanges(row: ImportReviewRow) {
+  return row.status === "new"
+    ? row.changes.filter((change) => change.field !== "Name")
+    : row.changes;
+}
 function impactText(review: RosterReview, id?: string) {
   const impact = review.impact.find((p) => p.id === id);
   if (!impact) return "";
@@ -135,7 +146,15 @@ function RowDetails({
           <div key={c.field}>
             <dt className="font-medium">{c.field}</dt>
             <dd className="text-copy text-muted-foreground">
-              {c.before} → {c.after}
+              {row.status === "new" ? (
+                c.after
+              ) : (
+                <>
+                  <span>Current: {c.before}</span>
+                  <br />
+                  <span>After import: {c.after}</span>
+                </>
+              )}
             </dd>
           </div>
         ))}
@@ -458,18 +477,20 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
                             {row.issues.some((i) => i.severity === "error") ? (
                               row.issues.find((i) => i.severity === "error")!
                                 .message
-                            ) : row.changes[0] ? (
+                            ) : summaryChanges(row)[0] ? (
                               <>
                                 <span className="text-copy">
-                                  {row.changes[0].field}
+                                  {summaryChanges(row)[0].field}
                                 </span>
                                 <small>
-                                  {row.changes[0].before} →{" "}
-                                  {row.changes[0].after}
+                                  {row.status === "new"
+                                    ? summaryChanges(row)[0].after
+                                    : `Change to ${summaryChanges(row)[0].after}`}
                                 </small>
-                                {row.changes.length > 1 && (
+                                {summaryChanges(row).length > 1 && (
                                   <small>
-                                    +{row.changes.length - 1} more changes
+                                    +{summaryChanges(row).length - 1} more
+                                    changes
                                   </small>
                                 )}
                               </>
@@ -539,10 +560,16 @@ export function RosterImport({
   data,
   production = false,
   disabled = false,
+  onChange,
+  onImported,
+  registerNavigationGuard,
 }: {
   data: Workspace;
   production?: boolean;
   disabled?: boolean;
+  onChange: (data: Workspace) => void | Promise<void>;
+  onImported?: () => Promise<void>;
+  registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const [open, setOpen] = useState(false),
     [step, setStep] = useState(0);
@@ -550,6 +577,36 @@ export function RosterImport({
   const [review, setReview] = useState<RosterReview | null>(null);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [applying, setApplying] = useState(false);
+  const saving = useRef(false);
+  const uncertain = useRef(false);
+  const committed = useRef(false);
+  const baseline = useRef("");
+  const { confirm } = useInteractionDialog();
+  const guard = useRef(async () => true);
+  guard.current = async () =>
+    !saving.current &&
+    (!uncertain.current ||
+      (await confirm(
+        "Close this import? The save may already have completed. Retry Import to confirm it before closing.",
+      )));
+  useEffect(() => {
+    if (!open) return;
+    registerNavigationGuard?.(() => guard.current(), {
+      protected: applying || uncertain.current,
+    });
+    const unload = (event: BeforeUnloadEvent) => {
+      if (saving.current || uncertain.current) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", unload);
+    return () => {
+      registerNavigationGuard?.(null);
+      window.removeEventListener("beforeunload", unload);
+    };
+  }, [open, applying, error, registerNavigationGuard]);
   const generation = useRef(0),
     abort = useRef<AbortController | null>(null);
   const cancel = () => {
@@ -565,12 +622,15 @@ export function RosterImport({
     [],
   );
   const close = () => {
+    if (saving.current) return;
     cancel();
     setOpen(false);
     setFile(null);
     setReview(null);
     setError("");
     setStep(0);
+    committed.current = false;
+    uncertain.current = false;
   };
   async function choose(selected?: File) {
     cancel();
@@ -626,7 +686,10 @@ export function RosterImport({
             body.error || "Unable to review this file. Try again.",
           );
         result = body.review;
-      } else result = reviewRosterCsv(file.csv, data);
+      } else {
+        result = reviewRosterCsv(file.csv, data);
+        baseline.current = rosterBaseline(data);
+      }
       if (ticket === generation.current) {
         setReview(result);
         setStep(1);
@@ -635,6 +698,72 @@ export function RosterImport({
       if (ticket === generation.current) setError((e as Error).message);
     } finally {
       if (ticket === generation.current) setBusy(false);
+    }
+  }
+  async function apply() {
+    if (!file || !review?.valid || saving.current || busy) return;
+    saving.current = true;
+    setApplying(true);
+    setError("");
+    try {
+      if (!committed.current) {
+        if (production) {
+          uncertain.current = true;
+          const response = await fetch("/api/admin/roster-import/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ csv: file.csv, token: review.token }),
+          });
+          const body = await response.json();
+          if (!response.ok) {
+            if (response.status === 409 || response.status === 400) {
+              uncertain.current = false;
+              setReview(null);
+              setStep(0);
+            }
+            throw new Error(
+              body.error ||
+                "Import could not be confirmed. Retry Import to check the same operation.",
+            );
+          }
+          if (!body.result?.completedAt)
+            throw new Error("Import could not be confirmed. Retry Import.");
+        } else {
+          if (baseline.current !== rosterBaseline(data)) {
+            setReview(null);
+            setStep(0);
+            throw new Error(
+              "The organization changed. Review the file again before importing.",
+            );
+          }
+          const prepared = prepareRosterCsv(file.csv, data, {
+            stamp: review.reviewedAt,
+          });
+          if (!prepared.review.valid || !prepared.proposal)
+            throw new Error("Fix blocking issues before importing.");
+          await onChange(
+            materializeRoster(prepared.proposal, prepared.review, () =>
+              crypto.randomUUID(),
+            ),
+          );
+        }
+        committed.current = true;
+        uncertain.current = false;
+      }
+      try {
+        await onImported?.();
+      } catch {
+        throw new Error(
+          "Import saved, but People could not be refreshed. Retry to load the updated roster.",
+        );
+      }
+      saving.current = false;
+      close();
+    } catch (error) {
+      setError((error as Error).message);
+    } finally {
+      saving.current = false;
+      setApplying(false);
     }
   }
   return (
@@ -651,13 +780,16 @@ export function RosterImport({
       <Dialog
         open={open}
         onOpenChange={(value) => {
-          if (!value) close();
+          if (!value)
+            void guard.current().then((allowed) => {
+              if (allowed) close();
+            });
         }}
       >
         <DialogContent size="workflow-list">
-          <DialogTitle>Review CSV import</DialogTitle>
+          <DialogTitle>Import people and teams</DialogTitle>
           <DialogDescription>
-            Preview only. No changes are saved.
+            Review the changes, then import when you’re ready.
           </DialogDescription>
           <DialogSteps steps={["Upload", "Review"]} current={step} />
           {error && (
@@ -666,26 +798,20 @@ export function RosterImport({
             </Alert>
           )}
           <DialogBody>
-            <div hidden={step !== 0} className="h-full overflow-y-auto p-1">
+            <ScrollRegion hidden={step !== 0} className="h-full p-1">
               <div className="grid gap-5">
                 <p className="text-copy">
-                  Fill in the template, export it as CSV, then choose your file
-                  to review. Use one row per person. For a team with no direct
+                  <a
+                    className="text-link underline underline-offset-4"
+                    href="/templates/people-import-template.csv"
+                    download
+                  >
+                    Download the template
+                  </a>
+                  , fill it in, then export it as CSV and choose your file to
+                  review. Use one row per person. For a team with no direct
                   members, fill in only the team columns.
                 </p>
-                <ActionGroup>
-                  <Button asChild variant="outline">
-                    <a href="/templates/people-import-template.csv" download>
-                      <Download aria-hidden="true" />
-                      Download template
-                    </a>
-                  </Button>
-                  <Button asChild variant="link">
-                    <a href="/templates/people-import-example.csv" download>
-                      Download example
-                    </a>
-                  </Button>
-                </ActionGroup>
                 <FormField
                   label="CSV file"
                   description="UTF-8 CSV · up to 1,000 data rows · 2 MB"
@@ -735,7 +861,7 @@ export function RosterImport({
                   </CollapsibleContent>
                 </Collapsible>
               </div>
-            </div>
+            </ScrollRegion>
             {review && (
               <div hidden={step !== 1} className="h-full">
                 <RosterReviewPanel review={review} />
@@ -765,9 +891,24 @@ export function RosterImport({
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={
+                      applying || uncertain.current || committed.current
+                    }
                     onClick={() => setStep(0)}
                   >
                     Back
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={applying}
+                    onClick={() =>
+                      void guard.current().then((allowed) => {
+                        if (allowed) close();
+                      })
+                    }
+                  >
+                    Cancel
                   </Button>
                   {review && !!review.issues.length && (
                     <Button
@@ -785,9 +926,20 @@ export function RosterImport({
                     </Button>
                   )}
                 </ActionGroup>
-                <DialogClose asChild>
-                  <Button type="button">Done</Button>
-                </DialogClose>
+                <Button
+                  type="button"
+                  disabled={!review?.valid}
+                  loading={applying}
+                  onClick={() => void apply()}
+                >
+                  {applying
+                    ? "Importing…"
+                    : committed.current
+                      ? "Reload People"
+                      : uncertain.current
+                        ? "Retry Import"
+                        : "Import"}
+                </Button>
               </>
             )}
           </DialogFooter>

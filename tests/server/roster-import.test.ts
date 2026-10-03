@@ -19,7 +19,12 @@ const admin: User = {
   groups: [],
 };
 function provider(
-  options: { changed?: boolean; revoked?: boolean; deleted?: boolean } = {},
+  options: {
+    changed?: boolean;
+    revoked?: boolean;
+    deleted?: boolean;
+    tombstone?: boolean;
+  } = {},
 ) {
   const d = freshWorkspace();
   d.users = [admin];
@@ -67,6 +72,10 @@ function provider(
           revision: 1,
         }));
     },
+    async listDeletedProfileEmails() {
+      calls.push("deleted emails");
+      return options.tombstone ? ["avery@example.test"] : [];
+    },
     async listProfiles() {
       calls.push("profiles");
       return options.deleted
@@ -97,7 +106,14 @@ test("admin review derives consequences from current server inputs using read op
   assert.equal(result.governanceRevision, 10);
   assert.deepEqual(
     calls.sort(),
-    ["config", "config", "people", "profiles", "published"].sort(),
+    [
+      "config",
+      "config",
+      "people",
+      "profiles",
+      "published",
+      "deleted emails",
+    ].sort(),
   );
 });
 test("signed-out, inactive, learner, contributor and manager requests fail before roster reads", async () => {
@@ -164,4 +180,11 @@ test("the HTTP input is bounded UTF-8 CSV and rejects client-selected IDs, propo
     ),
     /Choose a CSV/,
   );
+});
+
+test("a pending-deletion identity stays blocked after its profile has been removed", async () => {
+  const { store } = provider({ tombstone: true });
+  const result = await rosterImportReview(admin, input, store);
+  assert.equal(result.valid, false);
+  assert.ok(result.issues.some((issue) => issue.code === "deleted-person"));
 });

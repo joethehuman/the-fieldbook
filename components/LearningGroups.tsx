@@ -1667,7 +1667,13 @@ export default function LearningGroups({
             // delayed restoration of focus to the Create group trigger.
             setReturnToGroup(id);
           }}
-          size={editor?.kind === "updates" ? "selection" : "default"}
+          size={
+            editor?.kind === "updates"
+              ? "selection"
+              : editor?.kind === "membership"
+                ? "picker"
+                : "default"
+          }
           onEscapeKeyDown={(event) => {
             if (busy) event.preventDefault();
           }}
@@ -1703,85 +1709,99 @@ export default function LearningGroups({
             </form>
           )}
           {editor?.kind === "membership" && (
-            <Tabs value={sourceTab} onValueChange={setSourceTab}>
-              <TabsList aria-label="Membership sources">
-                <TabsTrigger value="people">People</TabsTrigger>
-                <TabsTrigger value="teams">Teams</TabsTrigger>
-              </TabsList>
-              <TabsContent value="teams">
-                <Stack>
-                  <p className="text-copy text-muted-foreground">
-                    Linked teams include their current and future subteams.
-                  </p>
-                  {editor.legacy.some((id) => editor.teams.includes(id)) && (
-                    <FieldGroup disabled={busy}>
-                      <p className="text-copy text-muted-foreground">
-                        These older links include direct members only. Choose
-                        which links should also include subteams.
-                      </p>
-                      {editor.legacy
-                        .filter((id) => editor.teams.includes(id))
-                        .map((id) => (
-                          <Field key={id} orientation="horizontal">
-                            <Checkbox
-                              checked={editor.expanded.includes(id)}
-                              onCheckedChange={(value) =>
-                                setEditor({
-                                  ...editor,
-                                  expanded:
-                                    value === true
-                                      ? [...editor.expanded, id]
-                                      : editor.expanded.filter(
-                                          (item) => item !== id,
-                                        ),
-                                })
-                              }
-                            />
-                            Include subteams for{" "}
-                            {teams.find((team) => team.id === id)?.name ||
-                              "Unknown team"}
-                          </Field>
-                        ))}
-                    </FieldGroup>
-                  )}
+            <DialogBody className="flex flex-col overflow-y-auto">
+              <Tabs
+                value={sourceTab}
+                onValueChange={setSourceTab}
+                className="flex flex-1 flex-col gap-3"
+              >
+                <TabsList className="shrink-0" aria-label="Membership sources">
+                  <TabsTrigger value="people">People</TabsTrigger>
+                  <TabsTrigger value="teams">Teams</TabsTrigger>
+                </TabsList>
+                <TabsContent
+                  value="teams"
+                  className="flex-1 data-[state=active]:flex data-[state=active]:flex-col"
+                >
+                  <Stack className="flex flex-1 flex-col [&>:not(fieldset)]:shrink-0">
+                    <p className="text-copy text-muted-foreground">
+                      Linked teams include their current and future subteams.
+                    </p>
+                    {editor.legacy.some((id) => editor.teams.includes(id)) && (
+                      <FieldGroup disabled={busy}>
+                        <p className="text-copy text-muted-foreground">
+                          These older links include direct members only. Choose
+                          which links should also include subteams.
+                        </p>
+                        {editor.legacy
+                          .filter((id) => editor.teams.includes(id))
+                          .map((id) => (
+                            <Field key={id} orientation="horizontal">
+                              <Checkbox
+                                checked={editor.expanded.includes(id)}
+                                onCheckedChange={(value) =>
+                                  setEditor({
+                                    ...editor,
+                                    expanded:
+                                      value === true
+                                        ? [...editor.expanded, id]
+                                        : editor.expanded.filter(
+                                            (item) => item !== id,
+                                          ),
+                                  })
+                                }
+                              />
+                              Include subteams for{" "}
+                              {teams.find((team) => team.id === id)?.name ||
+                                "Unknown team"}
+                            </Field>
+                          ))}
+                      </FieldGroup>
+                    )}
+                    <SearchableSelectionList
+                      bounded="compact"
+                      key={`${group?.id}:teams`}
+                      label="Find a team"
+                      placeholder="Search teams"
+                      emptyMessage="No matching teams."
+                      disabled={busy}
+                      options={[...teams].sort(byName).map((team) => ({
+                        id: team.id,
+                        label: team.name,
+                        description: `${teamPath(team.id, teams)}${editor.legacy.includes(team.id) && !editor.expanded.includes(team.id) ? " · Direct members only" : " · Includes subteams"}`,
+                      }))}
+                      value={editor.teams}
+                      onChange={(ids) => setEditor({ ...editor, teams: ids })}
+                    />
+                  </Stack>
+                </TabsContent>
+                <TabsContent
+                  value="people"
+                  className="flex-1 data-[state=active]:flex data-[state=active]:flex-col"
+                >
                   <SearchableSelectionList
-                    key={`${group?.id}:teams`}
-                    label="Find a team"
-                    placeholder="Search teams"
-                    emptyMessage="No matching teams."
+                    bounded="compact"
+                    key={`${group?.id}:people`}
+                    label="Find a person"
+                    placeholder="Search name, email or team"
+                    emptyMessage="No matching people."
                     disabled={busy}
-                    options={[...teams].sort(byName).map((team) => ({
-                      id: team.id,
-                      label: team.name,
-                      description: `${teamPath(team.id, teams)}${editor.legacy.includes(team.id) && !editor.expanded.includes(team.id) ? " · Direct members only" : " · Includes subteams"}`,
+                    options={[...data.users].sort(byName).map((person) => ({
+                      id: person.id,
+                      label: person.name,
+                      description: `${person.email} · ${teams.find((team) => team.id === reportingTeamId(person.teamId, teams))?.name || "No direct team"}${!person.active ? " · Inactive" : ""}`,
                     }))}
-                    value={editor.teams}
-                    onChange={(ids) => setEditor({ ...editor, teams: ids })}
+                    value={editor.people}
+                    onChange={(ids) => setEditor({ ...editor, people: ids })}
                   />
-                </Stack>
-              </TabsContent>
-              <TabsContent value="people">
-                <SearchableSelectionList
-                  key={`${group?.id}:people`}
-                  label="Find a person"
-                  placeholder="Search name, email or team"
-                  emptyMessage="No matching people."
-                  disabled={busy}
-                  options={[...data.users].sort(byName).map((person) => ({
-                    id: person.id,
-                    label: person.name,
-                    description: `${person.email} · ${teams.find((team) => team.id === reportingTeamId(person.teamId, teams))?.name || "No direct team"}${!person.active ? " · Inactive" : ""}`,
-                  }))}
-                  value={editor.people}
-                  onChange={(ids) => setEditor({ ...editor, people: ids })}
-                />
-              </TabsContent>
-              <p className="text-copy text-muted-foreground">
-                {editor.teams.length} teams · {editor.people.length}{" "}
-                individually added. Removing one source keeps anyone included
-                through another.
-              </p>
-            </Tabs>
+                </TabsContent>
+                <p className="shrink-0 text-copy text-muted-foreground">
+                  {editor.teams.length} teams · {editor.people.length}{" "}
+                  individually added. Removing one source keeps anyone included
+                  through another.
+                </p>
+              </Tabs>
+            </DialogBody>
           )}
           {editor?.kind === "updates" && (
             <DialogBody>

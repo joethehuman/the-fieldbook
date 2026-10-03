@@ -7,8 +7,9 @@ import { useScrollFade } from "../patterns/use-scroll-fade";
 export function SelectionViewport({
   className,
   children,
+  fill = false,
   ...props
-}: ComponentProps<"div">) {
+}: ComponentProps<"div"> & { fill?: boolean }) {
   const fade = useScrollFade<HTMLDivElement>();
   return (
     <div
@@ -18,7 +19,10 @@ export function SelectionViewport({
       data-scroll-fade-before={fade.edges.before}
       data-scroll-fade-after={fade.edges.after}
       className={cn(
-        "scroll-fade h-[var(--selection-results-height)] shrink-0 overflow-y-auto overscroll-contain border-t border-border [scrollbar-gutter:stable]",
+        "scroll-fade overflow-y-auto overscroll-y-contain border-t border-border [scrollbar-gutter:stable]",
+        fill
+          ? "min-h-[var(--selection-results-min-height)] flex-1"
+          : "h-[var(--selection-results-height)] shrink-0",
         className,
       )}
     >

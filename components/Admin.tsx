@@ -21,6 +21,7 @@ import {
   type DetailsReveal,
 } from "./patterns/editor-frame";
 import { revealEditorTarget } from "./patterns/reveal-editor-target";
+import { useEditorLayout } from "./patterns/use-editor-layout";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
 import { contentSignature, hasUnpublishedEdits } from "@/lib/demo-publication";
@@ -87,9 +88,10 @@ import {
   type DocSection,
 } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
-import { OnboardingFields } from "./OnboardingFields";
 import { learningStage, onboardingClockTarget } from "@/lib/learning";
 import { PendingPeople } from "./PendingPeople";
+import { PersonFields } from "./PersonFields";
+import { ScrollRegion } from "./patterns/scroll-region";
 import { RosterImport } from "./RosterImport";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type {
@@ -98,12 +100,12 @@ import type {
   RegisterLandingNavigation,
 } from "@/lib/navigation-guard";
 import { ActionGroup } from "./ui/action-group";
-import { GroupPicker } from "./patterns/group-picker";
 import { Button } from "./ui/button";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
+  DialogBody,
   DialogTitle,
   DialogDescription,
 } from "./ui/dialog";
@@ -257,6 +259,7 @@ type Props = {
   onBulk: BulkHandler;
   data: Workspace;
   user: User;
+  onImported?: () => Promise<void>;
   onOpenTab?: (tab: string) => Promise<void>;
   onPrepareAssignments?: () => Promise<Workspace>;
   onOpenPersonProgress?: (id: string) => Promise<void>;
@@ -284,6 +287,7 @@ export default function Admin({
   onBulk,
   data,
   user,
+  onImported,
   onOpenTab,
   onPrepareAssignments,
   onOpenPersonProgress,
@@ -1000,26 +1004,43 @@ export default function Admin({
                     </>
                   }
                 >
-                  {tab === "people" && !production && (
+                  {tab === "people" && (
                     <ActionGroup>
-                      <Button
-                        variant="default"
-                        onClick={() =>
-                          openPerson({
-                            id: id(),
-                            name: "",
-                            email: "",
-                            role: "learner",
-                            hireDate: undefined,
-                            groups: [],
-                            active: true,
-                          })
-                        }
-                      >
-                        <Plus size={16} />
-                        Add demo profile
-                      </Button>
-                      <RosterImport data={data} />
+                      {production ? (
+                        <PendingPeople
+                          data={data}
+                          onChange={onChange}
+                          registerNavigationGuard={registerAdminGuard}
+                        />
+                      ) : (
+                        <Button
+                          variant="default"
+                          onClick={() =>
+                            openPerson({
+                              id: id(),
+                              name: "",
+                              email: "",
+                              role: "learner",
+                              hireDate: undefined,
+                              groups: [],
+                              active: true,
+                            })
+                          }
+                        >
+                          <Plus size={16} />
+                          Add demo profile
+                        </Button>
+                      )}
+                      <RosterImport
+                        data={data}
+                        production={production}
+                        onChange={persist}
+                        registerNavigationGuard={registerAdminGuard}
+                        onImported={async () => {
+                          await onImported?.();
+                          notify("People and teams imported.");
+                        }}
+                      />
                     </ActionGroup>
                   )}
                 </SectionHeader>
@@ -1386,14 +1407,6 @@ export default function Admin({
               </>
             ) : tab === "people" ? (
               <>
-                {production && (
-                  <PendingPeople
-                    data={data}
-                    importAction={<RosterImport data={data} production />}
-                    onChange={onChange}
-                    registerNavigationGuard={registerAdminGuard}
-                  />
-                )}
                 <Toolbar>
                   <p className="muted">
                     {production
@@ -1650,135 +1663,85 @@ export default function Admin({
         }}
       >
         {person && (
-          <DialogContent className="profile-dialog">
-            <form className="profile-form" onSubmit={savePerson}>
-              <FieldGroup disabled={personBusy}>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  size="icon"
-                  className="absolute top-3 right-3"
-                  aria-label="Close profile editor"
-                  onClick={closePerson}
-                >
-                  <X />
+          <DialogContent size="workflow">
+            <form
+              className="flex min-h-0 flex-1 flex-col gap-4"
+              onSubmit={savePerson}
+            >
+              <Button
+                variant="ghost"
+                type="button"
+                size="icon"
+                className="absolute top-3 right-3"
+                aria-label="Close profile editor"
+                onClick={closePerson}
+              >
+                <X />
+              </Button>
+              <DialogTitle>{production ? "Account" : "Demo profile"}</DialogTitle>
+              <DialogDescription>
+                {production
+                  ? person.registered === false
+                    ? "This preregistered person can activate their account with verified Google sign-in. Email is read-only."
+                    : "Changes apply to this verified account. Login email is read-only."
+                  : "Use fictional details. This does not create a secure account."}
+              </DialogDescription>
+              <DialogBody>
+                <ScrollRegion className="h-full p-1">
+                  <FieldGroup disabled={personBusy}>
+                    {personError && (
+                      <Alert variant="destructive">{personError}</Alert>
+                    )}
+                    {personDirty && (
+                      <p role="status" className="text-caption text-muted-foreground">
+                        Unsaved changes
+                      </p>
+                    )}
+                    <PersonFields
+                      person={person}
+                      data={data}
+                      onChange={setPerson}
+                      emailLabel={production ? "Login email" : "Email label"}
+                      emailReadOnly={production}
+                      roleReadOnly={person.id === user.id}
+                    />
+                    {person.hireDate !== personBaseline.current?.hireDate && (
+                      <FieldDescription>
+                        Onboarding end:{" "}
+                        {personBaseline.current
+                          ? onboardingClockTarget(
+                              personBaseline.current,
+                              data.settings,
+                            ) || "No clock"
+                          : "No clock"}
+                        {" → "}
+                        {onboardingClockTarget(person, data.settings) || "No clock"}.
+                        Save applies this clock change; course completion history is
+                        preserved.
+                      </FieldDescription>
+                    )}
+                    <Field orientation="horizontal">
+                      <Checkbox
+                        disabled={person.id === user.id}
+                        checked={person.active}
+                        onCheckedChange={(checked) =>
+                          setPerson({ ...person, active: checked === true })
+                        }
+                      />
+                      Active profile
+                    </Field>
+                  </FieldGroup>
+                </ScrollRegion>
+              </DialogBody>
+              <DialogFooter className="justify-end">
+                <Button type="button" variant="outline" onClick={closePerson}>
+                  Cancel
                 </Button>
-                <DialogTitle>
-                  {production ? "Account" : "Demo profile"}
-                </DialogTitle>
-                <DialogDescription>
-                  {production
-                    ? person.registered === false
-                      ? "This preregistered person can activate their account with verified Google sign-in. Email is read-only."
-                      : "Changes apply to this verified account. Login email is read-only."
-                    : "Use fictional details. This does not create a secure account."}
-                </DialogDescription>
-                {personError && (
-                  <Alert variant="destructive">{personError}</Alert>
-                )}
-                {personDirty && (
-                  <p
-                    role="status"
-                    className="text-caption text-muted-foreground"
-                  >
-                    Unsaved changes
-                  </p>
-                )}
-                <FormField label="Name">
-                  <Input
-                    required
-                    maxLength={80}
-                    value={person.name}
-                    onChange={(e) =>
-                      setPerson({ ...person, name: e.target.value })
-                    }
-                  />
-                </FormField>
-                <FormField label={production ? "Login email" : "Email label"}>
-                  <Input
-                    type="email"
-                    required
-                    disabled={production}
-                    value={person.email}
-                    onChange={(e) =>
-                      setPerson({ ...person, email: e.target.value })
-                    }
-                  />
-                </FormField>
-                <OnboardingFields
-                  user={person}
-                  settings={data.settings}
-                  onChange={(hireDate) => setPerson({ ...person, hireDate })}
-                />
-                {person.hireDate !== personBaseline.current?.hireDate && (
-                  <FieldDescription>
-                    Onboarding end:{" "}
-                    {personBaseline.current
-                      ? onboardingClockTarget(
-                          personBaseline.current,
-                          data.settings,
-                        ) || "No clock"
-                      : "No clock"}
-                    {" → "}
-                    {onboardingClockTarget(person, data.settings) || "No clock"}
-                    . Save applies this clock change; course completion history
-                    is preserved.
-                  </FieldDescription>
-                )}
-                <FormField label="Access">
-                  <SelectField
-                    disabled={person.id === user.id}
-                    value={person.role}
-                    onValueChange={(value) =>
-                      setPerson({ ...person, role: value as User["role"] })
-                    }
-                  >
-                    <option value="learner">Learner</option>
-                    <option value="admin">Administrator</option>
-                    <option value="manager">Manager</option>
-                    <option value="contributor">Contributor</option>
-                  </SelectField>
-                </FormField>
-                <FormField label="Reporting team">
-                  <SelectField
-                    value={person.teamId || ""}
-                    onValueChange={(value) =>
-                      setPerson({ ...person, teamId: value || undefined })
-                    }
-                  >
-                    <option value="">Organization (no direct team)</option>
-                    {(data.teams || []).map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {teamPath(t.id, data.teams || [])}
-                      </option>
-                    ))}
-                  </SelectField>
-                </FormField>
-                <GroupPicker
-                  groups={data.groups}
-                  value={person.groups}
-                  onChange={(groups) => setPerson({ ...person, groups })}
-                />
-                <Field orientation="horizontal">
-                  <Checkbox
-                    disabled={person.id === user.id}
-                    checked={person.active}
-                    onCheckedChange={(checked) =>
-                      setPerson({ ...person, active: checked === true })
-                    }
-                  />
-                  Active profile
-                </Field>
-                <DialogFooter className="justify-end">
-                  <Button type="button" variant="outline" onClick={closePerson}>
-                    Cancel
-                  </Button>
-                  <Button variant="default" loading={personBusy}>
-                    <Save size={16} />
-                    Save profile
-                  </Button>
-                </DialogFooter>
-              </FieldGroup>
+                <Button variant="default" loading={personBusy}>
+                  <Save size={16} />
+                  Save profile
+                </Button>
+              </DialogFooter>
             </form>
           </DialogContent>
         )}
@@ -1824,7 +1787,6 @@ export function Editor({
 }) {
   const notify = useToast();
   const form = useRef<HTMLFormElement>(null);
-  const heading = useRef<HTMLDivElement>(null);
   const [savedMessage, setSavedMessage] = useState("");
   const [detailsReveal, setDetailsReveal] = useState<DetailsReveal>();
   const [revealStep, setRevealStep] = useState<{
@@ -1965,26 +1927,7 @@ export function Editor({
     }, 900);
     return () => clearTimeout(timer);
   }, [c, dirty, busy, saving]);
-  useEffect(() => {
-    const target = heading.current;
-    if (!target) return;
-    const viewport = target.closest<HTMLElement>(".main-content");
-    const measure = () => {
-      const height = Math.ceil(target.getBoundingClientRect().height);
-      const sticky =
-        height <= (viewport?.clientHeight || window.innerHeight) / 2;
-      form.current?.style.setProperty(
-        "--editor-header-height",
-        `${sticky ? height : 0}px`,
-      );
-      target.dataset.sticky = String(sticky);
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(target);
-    if (viewport) observer.observe(viewport);
-    return () => observer.disconnect();
-  }, []);
+  useEditorLayout(form);
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (pendingUploads.current || recoveringNow.current) return false;
@@ -2585,6 +2528,7 @@ export function Editor({
     <form
       ref={form}
       className="editor"
+      data-scroll-layout="page"
       onSubmit={(event) => void submit(event, "draft")}
       onKeyDown={(event) => {
         if (
@@ -2596,7 +2540,7 @@ export function Editor({
         }
       }}
     >
-      <div ref={heading} className="editor-heading">
+      <div className="editor-heading">
         <h1 className="sr-only">
           {c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"}{" "}
           editor
@@ -2673,7 +2617,7 @@ export function Editor({
             : "Saving or refreshing. Keep this page open."}
         </p>
       )}
-      <FieldGroup disabled={busy} className="editor-content">
+      <FieldGroup disabled={busy} className="editor-content flex min-h-0 flex-col">
         <section
           className="editor-introduction"
           aria-label={

@@ -77,6 +77,7 @@
   --dialog-workflow-width: 49rem;
   --dialog-workflow-height: 41rem;
   --dialog-workflow-list-height: 52rem;
+  --dialog-picker-body-min-height: 6rem;
   --selection-results-height: 15rem;
   --selection-results-min-height: 8rem;
   --sidebar-width: 16rem;

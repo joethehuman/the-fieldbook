@@ -4,7 +4,11 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Add administrator CSV upload and read-only roster review with a clear file-picker action, downloadable six-column template/example, compact column help, whole-file validation, paginated People/Teams/Issues views and learning/reporting consequences. Preserve existing identities, optional blanks, saved deadlines and progress. Done closes the review and saves nothing; see [CSV review](docs/roster-import.md). No new migration is required.
+- Import people and teams from a reviewed CSV in one transaction, with stable identities, stale-review protection and safe retries. Use an inline blank-template link, readable field changes and shared scroll fades. Align individual pre-registration and demo profiles with the same modal frame. See [CSV import](docs/roster-import.md); apply its additive database migration before deploying.
+
+- Fit desktop content editors to the available workspace, keeping titles and controls visible while overflowing writing, Outline, Details or Quiz panes scroll independently. Use natural page scrolling on narrow or short screens so every control stays reachable.
+
+- Keep independent navigation, outlines and picker lists from scrolling their surroundings at either end. Preserve compact popup sizing, keep picker search/actions visible, and cap searchable popups to their actual available space.
 
 - Keep course assignment search, filters, pagination and actions stationary while only the course list scrolls. Give the chooser more vertical room and show conditional edge fades with the shared scrollbar styling.
 

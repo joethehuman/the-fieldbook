@@ -3,7 +3,7 @@ import { register as registerCjs } from "tsx/cjs/api";
 register();
 registerCjs();
 import { createServer } from "node:http";
-import { createSign, generateKeyPairSync } from "node:crypto";
+import { createSign, generateKeyPairSync, randomUUID } from "node:crypto";
 const fixturePort = Number(process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130);
 const fixtureOrigin = `http://127.0.0.1:${fixturePort}`;
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
@@ -53,6 +53,7 @@ let documents = [],
   reads = 0,
   authReads = 0;
 let fixtureGeneration = Date.now();
+const rosterRuns = new Map();
 let aiGenerations = 0,
   aiFailure = "",
   aiAnswer = "",
@@ -623,6 +624,28 @@ createServer(async (req, res) => {
         })),
       detail: target ? localProgressDetail(model, target.u) : null,
     });
+  }
+  if (url.pathname === "/rest/v1/rpc/fb_roster_import") {
+    const { p_actor, p_file_hash, p_run, p_data } = JSON.parse(body || "{}");
+    const users = configuredUsers.length ? configuredUsers : [profile()];
+    if (!users.some(p => p.id === p_actor && p.role === "admin" && p.active)) return send(res, { message: "Administrator access is required", code: "P0001" }, 400);
+    if (!p_run) {
+      const id = randomUUID(), run = { id, actor: p_actor, hash: p_file_hash, generation: fixtureGeneration, day: new Date().toISOString().slice(0,10) };
+      rosterRuns.set(id,run); return send(res, { id, day: run.day, baseline: String(fixtureGeneration) });
+    }
+    const run = rosterRuns.get(p_run);
+    if (!run || run.actor !== p_actor || run.hash !== p_file_hash) return send(res,{ message: "Import review does not match", code: "P0001" },400);
+    if (run.result) return send(res,{ id: run.id, result: run.result });
+    if (run.generation !== fixtureGeneration) return send(res,{ message: "The organization changed", code: "P0001" },400);
+    if (p_data) {
+      const peopleAdded = p_data.users.filter(p => !users.some(u=>u.id===p.id)).length;
+      const teamsAdded = p_data.teams.filter(t=>!configuredTeams.some(old=>old.id===t.id)).length;
+      configuredUsers = p_data.users.map(p=>({ ...p, auth_user_id: users.find(u=>u.id===p.id)?.auth_user_id || null, team_id:p.teamId || null, hire_date:p.hireDate || null, onboarding_start:p.onboardingStart || null }));
+      configuredTeams = p_data.teams; fixtureGeneration++;
+      run.result = { peopleAdded, peopleUpdated:0, teamsAdded, teamsUpdated:0, revision: fixtureGeneration, completedAt: new Date().toISOString() };
+      return send(res,{ id:run.id,result:run.result });
+    }
+    return send(res,{ id:run.id, day:run.day, baseline:String(fixtureGeneration) });
   }
   if (url.pathname === "/rest/v1/rpc/fb_admin_people_snapshot") {
     const { p_actor, p_user } = JSON.parse(body || "{}");

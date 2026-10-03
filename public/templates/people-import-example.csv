@@ -1,7 +1,0 @@
-﻿"Name","Email","Hire date","Team","Parent team","Team manager email"
-"Avery Rivera","avery@example.test","2025-01-06","Revenue","","avery@example.test"
-"Jordan Lee","jordan@example.test","2025-04-07","US","Revenue","jordan@example.test"
-"Morgan Shaw","morgan@example.test","2025-03-03","EMEA","Revenue","morgan@example.test"
-"Alex Chen","alex@example.test","2026-09-15","Enterprise US","US","jordan@example.test"
-"Sam Patel","sam@example.test","2026-08-17","Enterprise EMEA","EMEA","morgan@example.test"
-"","","","Sales Engineering US","US","jordan@example.test"

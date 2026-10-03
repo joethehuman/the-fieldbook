@@ -3,7 +3,12 @@
 import { useEffect, useId, useRef, useState, type ComponentProps } from "react";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
+import {
+  Popover,
+  PopoverAnchor,
+  PopoverContent,
+  PopoverResults,
+} from "../ui/popover";
 import { cn } from "@/lib/utils";
 
 export type GroupedSearchOption = {
@@ -151,20 +156,21 @@ export function GroupedSearch({
         />
       </PopoverAnchor>
       <PopoverContent
+        layout="picker"
         align="start"
         sideOffset={4}
-        className="grid w-[var(--radix-popover-trigger-width)] min-w-0 gap-2 p-2"
+        className="w-[var(--radix-popover-trigger-width)] min-w-0 gap-2 p-2"
         onOpenAutoFocus={(event) => event.preventDefault()}
         onCloseAutoFocus={(event) => event.preventDefault()}
         onInteractOutside={(event) => {
           if (event.target === input.current) event.preventDefault();
         }}
       >
-        <div
+        <PopoverResults
           id={listId}
           role="listbox"
           aria-label="Search results"
-          className="max-h-96 overflow-y-auto pe-2 [scrollbar-gutter:stable]"
+          className="max-h-96"
         >
           {sections
             .filter((section) => section.rows.length)
@@ -214,7 +220,7 @@ export function GroupedSearch({
               No matching results.
             </p>
           )}
-        </div>
+        </PopoverResults>
         {sections.some((section) => section.remaining) && (
           <div className="flex flex-wrap gap-2 border-t pt-2">
             {sections

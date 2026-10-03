@@ -1,32 +1,33 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Plus } from "lucide-react";
-import { FormField } from "./patterns/form-field";
-import { Input } from "./ui/input";
-import { SettingsSection } from "./patterns/settings-section";
-import { ActionGroup } from "./ui/action-group";
-import { GroupPicker } from "./patterns/group-picker";
 import { Button } from "./ui/button";
-import { SelectField } from "./ui/select";
-import { OnboardingFields } from "./OnboardingFields";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { FieldGroup } from "./ui/field";
 import { equalJson } from "@/lib/equal-json";
-import { teamPath } from "@/lib/team-hierarchy";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+  DialogFooter,
+} from "./ui/dialog";
+import { ScrollRegion } from "./patterns/scroll-region";
+import { Alert } from "./ui/alert";
+import { PersonFields } from "./PersonFields";
 type Pending = NonNullable<Workspace["pendingUsers"]>[number];
 export function PendingPeople({
   data,
   onChange,
   registerNavigationGuard,
-  importAction,
 }: {
   data: Workspace;
   onChange: (data: Workspace) => void | Promise<void>;
   registerNavigationGuard?: RegisterNavigationGuard;
-  importAction?: React.ReactNode;
 }) {
   const [editing, setEditing] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
@@ -81,120 +82,74 @@ export function PendingPeople({
       setBusy(false);
     }
   }
+  async function close() {
+    if (await guard.current()) setEditing(null);
+  }
   return (
-    <SettingsSection
-      measure="full"
-      id="preregister-person"
-      title={<h2>Add people</h2>}
-      guidance="Pre-register a Google email. The person appears in the roster immediately and activates their login on verified sign-in, even when registration is closed. No email is sent."
-    >
-      {!editing && (
-        <ActionGroup>
-          <Button
-            onClick={() => {
-              const person: Pending = {
-                email: "",
-                name: "",
-                role: "learner",
-                groups: [],
-              };
-              baseline.current = structuredClone(person);
-              setEditing(person);
-              setError("");
-            }}
-          >
-            <Plus aria-hidden="true" />
-            Pre-register person
-          </Button>
-          {importAction}
-        </ActionGroup>
-      )}
-      {editing && (
-        <form className="profile-form" onSubmit={save}>
-          <FieldGroup disabled={busy}>
-            {error && <p role="alert">{error}</p>}
-            {dirty && (
-              <p role="status" className="text-caption text-muted-foreground">
-                Unsaved changes
-              </p>
-            )}
-            <FormField label="Name">
-              <Input
-                required
-                maxLength={80}
-                value={editing.name}
-                onChange={(event) =>
-                  setEditing({ ...editing, name: event.target.value })
-                }
-              />
-            </FormField>
-            <FormField label="Google email">
-              <Input
-                required
-                type="email"
-                maxLength={254}
-                value={editing.email}
-                onChange={(event) =>
-                  setEditing({ ...editing, email: event.target.value })
-                }
-              />
-            </FormField>
-            <OnboardingFields
-              user={{ id: "preregistered", ...editing }}
-              settings={data.settings}
-              onChange={(hireDate) => setEditing({ ...editing, hireDate })}
-            />
-            <FormField label="Access">
-              <SelectField
-                value={editing.role}
-                onValueChange={(role) =>
-                  setEditing({ ...editing, role: role as Pending["role"] })
-                }
-              >
-                <option value="learner">Learner</option>
-                <option value="manager">Manager</option>
-                  <option value="contributor">Contributor</option>
-                <option value="admin">Administrator</option>
-              </SelectField>
-            </FormField>
-            <FormField label="Reporting team">
-              <SelectField
-                value={editing.teamId || ""}
-                onValueChange={(teamId) =>
-                  setEditing({ ...editing, teamId: teamId || undefined })
-                }
-              >
-                <option value="">No team</option>
-                {data.teams?.map((team) => (
-                  <option key={team.id} value={team.id}>
-                    {teamPath(team.id, data.teams || [])}
-                  </option>
-                ))}
-              </SelectField>
-            </FormField>
-            <GroupPicker
-              groups={data.groups}
-              value={editing.groups}
-              onChange={(groups) => setEditing({ ...editing, groups })}
-            />
-            <ActionGroup>
-              <Button type="submit" loading={busy}>
-                {busy ? "Saving…" : "Save person"}
-              </Button>
-              <Button
-                variant="link"
-                type="button"
-                disabled={busy}
-                onClick={async () => {
-                  if (await guard.current()) setEditing(null);
-                }}
-              >
-                Cancel
-              </Button>
-            </ActionGroup>
-          </FieldGroup>
-        </form>
-      )}
-    </SettingsSection>
+    <>
+      <Button
+        onClick={() => {
+          const person: Pending = {
+            email: "",
+            name: "",
+            role: "learner",
+            groups: [],
+          };
+          baseline.current = structuredClone(person);
+          setEditing(person);
+          setError("");
+        }}
+      >
+        <Plus aria-hidden="true" />
+        Pre-register person
+      </Button>
+      <Dialog
+        open={!!editing}
+        onOpenChange={(open) => {
+          if (!open) void close();
+        }}
+      >
+        {editing && (
+          <DialogContent size="workflow">
+            <DialogTitle>Pre-register person</DialogTitle>
+            <DialogDescription>
+              Add someone before they sign in. Their verified Google email
+              activates this roster entry. No email is sent.
+            </DialogDescription>
+            <form
+              className="flex min-h-0 flex-1 flex-col gap-4"
+              onSubmit={save}
+            >
+              <DialogBody>
+                <ScrollRegion className="h-full p-1">
+                  <FieldGroup disabled={busy}>
+                    {error && <Alert variant="destructive">{error}</Alert>}
+                    <PersonFields
+                      person={editing}
+                      data={data}
+                      onChange={setEditing}
+                      emailLabel="Google email"
+                    />
+                  </FieldGroup>
+                </ScrollRegion>
+              </DialogBody>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void close()}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" loading={busy}>
+                  Pre-register person
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        )}
+      </Dialog>
+    </>
   );
 }

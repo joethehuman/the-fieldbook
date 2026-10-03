@@ -211,6 +211,7 @@
   .document-tree {
     min-height: 8rem;
     overflow-y: auto;
+    overscroll-behavior-y: contain;
     overflow-x: hidden;
     scrollbar-gutter: stable;
     padding-inline-end: var(--space-3);
@@ -336,6 +337,7 @@
     margin-top: var(--space-2);
     max-height: 40dvh;
     overflow-y: auto;
+    overscroll-behavior-y: contain;
     padding-inline-end: var(--space-3);
     scrollbar-gutter: stable;
   }

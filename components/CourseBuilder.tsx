@@ -104,6 +104,12 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
         setSelected(navigation.step);
         surface?.focus({ preventScroll: true });
       };
+      if (surface?.closest('.editor[data-scroll-layout="workspace"]')) {
+        const canvas = surface.closest<HTMLElement>(".editor-frame-canvas");
+        if (canvas) canvas.scrollTop = 0;
+        finish();
+        return;
+      }
       const delta = position();
       const leadingHeight = surface?.querySelector<HTMLElement>('[aria-label="Editor view"], h2')?.getBoundingClientRect().height || 0;
       const inset = surface ? parseFloat(getComputedStyle(surface).scrollMarginBlockStart) || 0 : 0;

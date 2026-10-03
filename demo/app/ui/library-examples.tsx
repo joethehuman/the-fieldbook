@@ -1,4 +1,5 @@
 "use client";
+import { ScrollRegion } from "@/components/patterns/scroll-region";
 import { GroupedSearch } from "@/components/patterns/grouped-search";
 import { ProgressOverview } from "@/components/patterns/progress-overview";
 import { AudienceSelection } from "@/components/patterns/audience-selection";
@@ -391,6 +392,19 @@ export function LibraryExamples() {
       <HierarchyPickerExample />
       <RosterReviewExample />
       <FilePickerExample />
+      <SettingsSection
+        id="catalog-scroll-region"
+        title={<h3>Scroll edges</h3>}
+        guidance="Use the shared ScrollRegion for bounded dialog bodies and help. Hidden content fades at either edge; headings and footer actions stay outside the viewport."
+      >
+        <ScrollRegion className="h-48 p-1" aria-label="Scroll edge example">
+          <div className="grid gap-3">
+            {Array.from({ length: 12 }, (_, i) => (
+              <p key={i}>Example row {i + 1}</p>
+            ))}
+          </div>
+        </ScrollRegion>
+      </SettingsSection>
       <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}

@@ -2,7 +2,7 @@ import { expect, type Page } from "@playwright/test";
 
 /** Wait for the latest edit acknowledgement, without requesting publication. */
 export async function waitForDraftSaved(page: Page) {
-  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Saved");
+  await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText(/^Saved(?:\. Unpublished edits)?$/);
 }
 
 export async function openContentSettings(page: Page) {

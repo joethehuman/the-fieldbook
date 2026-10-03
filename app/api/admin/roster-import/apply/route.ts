@@ -6,12 +6,12 @@ import {
   sameOrigin,
 } from "@server/auth";
 import { findProfileBySubject, verifyIdentity } from "@server/identity";
-import { readRosterUpload, reviewRosterImport } from "@server/roster-import";
+import { readRosterApply, applyRosterImport } from "@server/roster-import";
 
 export async function POST(req: Request) {
   try {
     sameOrigin(req);
-    // This read boundary deliberately cannot register a first-time visitor.
+    // This boundary deliberately cannot register a first-time visitor.
     const identity = await verifyIdentity(undefined, true);
     if (!identity) throw new HttpError(401, "Sign in to continue.");
     if (!identity.emailVerified || !identity.email)
@@ -19,15 +19,15 @@ export async function POST(req: Request) {
     const record = await findProfileBySubject(identity.subject);
     const user = record ? profile(record) : null;
     requireAdmin(user);
-    const csv = await readRosterUpload(req);
-    const review = await reviewRosterImport(user, csv);
+    const { csv, token } = await readRosterApply(req);
+    const result = await applyRosterImport(user, csv, token);
     const current = await findProfileBySubject(identity.subject);
     requireAdmin(current ? profile(current) : null);
     return Response.json(
-      { review },
+      { result },
       { headers: { "Cache-Control": "no-store" } },
     );
   } catch (error) {
-    return errorResponse(error, "api/admin/roster-import/review");
+    return errorResponse(error, "api/admin/roster-import/apply");
   }
 }
