@@ -7,6 +7,7 @@ import type { Workspace } from "@/lib/store";
 import { groupItems } from "@/lib/learning-groups";
 import type { LearningAction } from "@/lib/learning";
 import type { BulkCommand } from "./patterns/bulk-actions";
+import type { OpenLearningAssignment } from "./use-learning-assignment-picker";
 type Save = (data: Workspace) => void | Promise<void>;
 export type LearningMany = (actions: LearningAction[]) => Promise<void>;
 export function contentRelationshipCommands(
@@ -14,6 +15,7 @@ export function contentRelationshipCommands(
   selected: string[],
   save: Save,
   learn: LearningMany,
+  openAssignments?: OpenLearningAssignment,
 ): BulkCommand[] {
   const records = data.content.filter((c) => selected.includes(c.id));
   const kind = records[0]?.kind;
@@ -40,17 +42,20 @@ export function contentRelationshipCommands(
           ? "Assign to teams or groups"
           : "Remove team or group assignments",
     disabledReason: reason,
+    externalReview: kind === "course" && !!openAssignments,
     applyLabel: "Review changes",
     description: add
       ? "Add direct learning assignments or Update audiences. Overlapping courses count once. Existing history is preserved."
       : "Remove direct links only. Learning inherited through a curriculum or another team or group remains; saved history is preserved.",
     options:
-      kind === "brief"
-        ? data.groups.map((g) => ({ id: g.id, label: `Group: ${g.name}` }))
-        : assignmentAudiences(data).map((a) => ({
-            id: audienceKey(a),
-            label: `${a.kind === "group" ? "Group" : "Team"}: ${a.name}`,
-          })),
+      kind === "course" && openAssignments
+        ? undefined
+        : kind === "brief"
+          ? data.groups.map((g) => ({ id: g.id, label: `Group: ${g.name}` }))
+          : assignmentAudiences(data).map((a) => ({
+              id: audienceKey(a),
+              label: `${a.kind === "group" ? "Group" : "Team"}: ${a.name}`,
+            })),
     apply: async (ids) => {
       if (kind === "brief") {
         await learn(
@@ -62,6 +67,17 @@ export function contentRelationshipCommands(
               expected: c.revision || 0,
             })),
           ),
+        );
+        return;
+      }
+      if (openAssignments) {
+        await openAssignments(
+          {
+            kind: "items",
+            items: selected.map((id) => ({ kind: "course", id })),
+            mode: add ? "add" : "remove",
+          },
+          `${records.length} selected ${records.length === 1 ? "course" : "courses"}`,
         );
         return;
       }
@@ -101,12 +117,14 @@ export function curriculumGroupCommands(
   data: Workspace,
   selected: string[],
   save: Save,
+  openAssignments?: OpenLearningAssignment,
 ): BulkCommand[] {
   return ([true, false] as const).map((add) => ({
     id: add ? "group-add" : "group-remove",
     label: add
       ? "Assign to teams or groups"
       : "Remove team or group assignments",
+    externalReview: !!openAssignments,
     applyLabel: "Review assignments",
     description:
       "Change direct curriculum assignments. Course content and saved learning history are preserved.",
@@ -117,11 +135,24 @@ export function curriculumGroupCommands(
       )
         ? "Publish every selected curriculum first."
         : undefined,
-    options: assignmentAudiences(data).map((a) => ({
-      id: audienceKey(a),
-      label: `${a.kind === "group" ? "Group" : "Team"}: ${a.name}`,
-    })),
+    options: openAssignments
+      ? undefined
+      : assignmentAudiences(data).map((a) => ({
+          id: audienceKey(a),
+          label: `${a.kind === "group" ? "Group" : "Team"}: ${a.name}`,
+        })),
     apply: async (ids) => {
+      if (openAssignments) {
+        await openAssignments(
+          {
+            kind: "items",
+            items: selected.map((id) => ({ kind: "curriculum", id })),
+            mode: add ? "add" : "remove",
+          },
+          `${selected.length} selected ${selected.length === 1 ? "curriculum" : "curricula"}`,
+        );
+        return;
+      }
       await save(
         assignLearningToAudiences(
           data,

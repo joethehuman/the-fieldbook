@@ -9,6 +9,7 @@ import { Button } from "../ui/button";
 import { Pagination } from "./pagination";
 import { SelectionSummary } from "./selection-summary";
 import { ActionGroup } from "../ui/action-group";
+import { useScrollFade } from "./use-scroll-fade";
 
 export type SelectionOption = {
   id: string;
@@ -52,6 +53,7 @@ export function SearchableSelectionList({
   bounded?: boolean;
 }) {
   const groupName = useId();
+  const fade = useScrollFade<HTMLDivElement>(bounded);
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selectedOnly, setSelectedOnly] = useState(false);
@@ -187,9 +189,13 @@ export function SearchableSelectionList({
       )}
       <div
         data-slot="selection-results"
+        ref={fade.ref}
+        onScroll={bounded ? fade.measure : undefined}
+        data-scroll-fade-before={bounded && fade.edges.before}
+        data-scroll-fade-after={bounded && fade.edges.after}
         className={
           bounded
-            ? "flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+            ? "scroll-fade flex min-h-[var(--selection-results-min-height)] flex-1 flex-col gap-2 overflow-y-auto overscroll-contain [scrollbar-gutter:stable] [scrollbar-width:auto] [scrollbar-color:auto]"
             : "grid gap-2"
         }
       >

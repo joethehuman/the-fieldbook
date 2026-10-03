@@ -76,7 +76,9 @@
   --radius: 0.5rem;
   --dialog-workflow-width: 49rem;
   --dialog-workflow-height: 41rem;
+  --dialog-workflow-list-height: 52rem;
   --selection-results-height: 15rem;
+  --selection-results-min-height: 8rem;
   --sidebar-width: 16rem;
   --outline-width: 13rem;
   --course-outline-min-height: 16rem;

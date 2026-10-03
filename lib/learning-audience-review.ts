@@ -12,10 +12,11 @@ import { assignmentDeadline } from "./assignment-episodes";
 export function learningAudienceReview(
   before: Workspace,
   after: Workspace,
-  item: LearningItem,
+  item: LearningItem | LearningItem[],
   stamp: string,
 ) {
-  const ids = new Set(expandLearning([item], after.curricula || []));
+  const items = Array.isArray(item) ? item : [item];
+  const ids = new Set(expandLearning(items, after.curricula || []));
   const courses = (after.publishedContent || after.content).filter(
     (c) => c.kind === "course" && c.status === "published" && ids.has(c.id),
   );

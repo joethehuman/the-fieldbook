@@ -32,6 +32,7 @@ export function AudienceSelection({
   showPeople = true,
   initialSelected = [],
   recommendationsOnly = false,
+  existingAudienceKeys,
 }: {
   data: Workspace;
   selected: string[];
@@ -41,6 +42,8 @@ export function AudienceSelection({
   showPeople?: boolean;
   initialSelected?: string[];
   recommendationsOnly?: boolean;
+  /** Additive batches keep existing sources; they contribute reach without disabling new choices. */
+  existingAudienceKeys?: string[];
 }) {
   const [query, setQuery] = useState("");
   const parked = useRef<string[] | null>(null);
@@ -62,8 +65,10 @@ export function AudienceSelection({
   const members = (audienceKeys: string[]) =>
     new Set(audienceKeys.flatMap((k) => [...(people.get(k) || [])]));
   const directPeople = members(selected),
-    existingPeople = members([...initialSelected, ...Object.keys(inherited)]),
-    totalPeople = members(keys);
+    existingPeople = members(
+      existingAudienceKeys || [...initialSelected, ...Object.keys(inherited)],
+    ),
+    totalPeople = members([...keys, ...(existingAudienceKeys || [])]);
   const newPeople = [...totalPeople].filter(
     (id) => !existingPeople.has(id),
   ).length;
@@ -247,7 +252,8 @@ export function AudienceSelection({
           <p className="text-xs text-muted-foreground">
             {existingPeople.size}{" "}
             {existingPeople.size === 1 ? "person" : "people"}{" "}
-            {recommendationsOnly ? "already included" : "already assigned"} ·{" "}
+            {recommendationsOnly ? "already included" : "already assigned"}
+            {existingAudienceKeys ? " across selected learning" : ""} ·{" "}
             {newPeople} newly included
           </p>
           <SearchField>
