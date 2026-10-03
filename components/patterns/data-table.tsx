@@ -30,11 +30,15 @@ const layouts = {
   ],
   peopleSelection: [
     "w-12",
-    "w-[24%]",
     "w-[12%]",
-    "w-[22%]",
+    "w-[18%]",
+    "w-[12%]",
+    "w-[8%]",
+    "w-[13%]",
     "w-[10%]",
-    "w-[26%]",
+    "w-[7%]",
+    "w-[8%]",
+    "w-[12%]",
   ],
   deleted: ["w-12", "w-[30%]", "w-[20%]", "w-[20%]", "w-[24%]"],
   progress: ["w-[28%]", "w-[17%]", "w-[17%]", "w-[12%]", "w-[11%]", "w-[15%]"],
@@ -51,7 +55,8 @@ const layouts = {
   teams: ["w-[24%]", "w-[20%]", "w-[24%]", "w-[16%]", "w-[16%]"],
   assignments: ["w-[27%]", "w-[23%]", "w-[20%]", "w-[30%]"],
   audienceReview: ["w-[44%]", "w-[30%]", "w-[26%]"],
-  rosterReview: ["w-[32%]", "w-[38%]", "w-20", "w-14"],
+  rosterReviewPeople: ["w-[24%]", "w-[30%]", "w-[24%]", "w-20", "w-14"],
+  rosterReviewTeams: ["w-[28%]", "w-[28%]", "w-[22%]", "w-20", "w-14"],
   rosterIssues: ["w-[12%]", "w-[24%]", "w-[64%]"],
   organizationReview: ["w-[23%]", "w-[32%]", "w-[25%]", "w-[20%]"],
   deadlineReview: ["w-[23%]", "w-[37%]", "w-[20%]", "w-[20%]"],
@@ -59,13 +64,18 @@ const layouts = {
 } as const;
 export function DataTable({
   layout,
+  density = "default",
   className,
   children,
   ...props
-}: ComponentProps<typeof Table> & { layout: keyof typeof layouts }) {
+}: ComponentProps<typeof Table> & {
+  layout: keyof typeof layouts;
+  density?: "default" | "compact";
+}) {
   return (
     <Table
       data-layout={layout}
+      data-density={density}
       className={cn(
         "table-fixed [&_td]:[overflow-wrap:anywhere] [&_th]:[overflow-wrap:anywhere]",
         [
@@ -89,11 +99,16 @@ export function DataTable({
           : [
                 "assignmentGroups",
                 "audienceReview",
-                "rosterReview",
+                "rosterReviewPeople",
+                "rosterReviewTeams",
                 "rosterIssues",
               ].includes(layout)
             ? "min-w-72 [&_td]:px-2 [&_th]:px-2"
             : "min-w-208",
+        (layout === "rosterReviewPeople" || layout === "rosterReviewTeams") &&
+          "min-w-144",
+        density === "compact" &&
+          "text-caption [&_td]:px-2 [&_td]:py-2 [&_th]:whitespace-nowrap [&_th]:px-2 [&_th]:py-2",
         className,
       )}
       {...props}

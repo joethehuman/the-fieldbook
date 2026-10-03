@@ -12,6 +12,7 @@ export function Textarea({
   return (
     <textarea
       data-slot="textarea"
+      autoComplete="off"
       className={cn(
         "w-full min-w-0 bg-background text-base sm:text-copy font-normal text-foreground outline-none transition-colors motion-reduce:transition-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-disabled-background disabled:text-disabled-foreground",
         variant === "embedded"

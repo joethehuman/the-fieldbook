@@ -8,16 +8,16 @@ Choose **Import** after reviewing the complete proposal. The changes are saved t
 
 ## The template
 
-Use one row per person. The six headers can appear in any order. Keep every header, even when an optional column is empty.
+Use one row per user. The six headers can appear in any order. Keep every header, even when an optional column is empty.
 
 | Column | What to enter |
 |---|---|
-| Name | The person's display name. Required for a new person; blank preserves an existing name. |
-| Email | The person's email. It identifies an existing roster record, including a person who has not signed in. |
+| Name | The user's display name. Required for a new user; blank preserves an existing name. |
+| Email | The user's email. It identifies an existing roster record, including a person who has not signed in. |
 | Hire date | Optional calendar date in `YYYY-MM-DD` form. It starts the new-user window. |
-| Team | The person's direct reporting team, using its unique name. |
+| Team | The user's direct reporting team, using its unique name. |
 | Parent team | That team's immediate parent, using its unique name. Do not enter a hierarchy path. |
-| Team manager email | The manager of that team. It must identify an eligible person already in Fieldbook or in this file. |
+| Team manager email | The manager of that team. It must identify an eligible user already in Fieldbook or in this file. |
 
 A team-only row leaves Name, Email and Hire date blank. Use it to define an empty team or a parent that has no direct members. Parents and managers can appear later in the file. Repeated team names describe the same team: nonblank parent and manager values must agree; blank repeated cells do not undo another row's values.
 
@@ -32,9 +32,9 @@ Export the spreadsheet as CSV UTF-8, a text format that preserves accented names
 People match by exact email after trimming and case normalization. Teams match by their unique names after the same normalization. Matches keep their stable Fieldbook IDs. This is not an email-change, team-rename, or identity-merge workflow.
 
 - Blank optional cells preserve existing values. People and teams absent from the file remain untouched.
-- A new person with no Team belongs to Organization. A new team with no Parent team sits directly under Organization.
+- A new user with no Team belongs to Organization. A new team with no Parent team sits directly under Organization.
 - Explicit `Organization` moves an existing person or team to that root. The CSV cannot change Organization's parent or manager; use its management page.
-- A new person without Hire date is an Existing user, with a review notice. Import day and first sign-in never substitute for hire date.
+- A new user without Hire date is an Existing user, with a review notice. Import day and first sign-in never substitute for hire date.
 - Hire-date corrections show the proposed user type and new-user window. Existing saved course deadlines and completion stay fixed; changing those requires the separate deadline recalculation workflow.
 - Manager assignments show any required manager-role change. Administrator and contributor permissions are preserved. The CSV cannot grant administrator access, reactivate inactive or deleted people, or delete omitted records.
 
@@ -44,7 +44,7 @@ To clear an existing manager or hire date, or rename a team, use the ordinary ma
 
 The noninteractive badges summarize new, changed and unchanged people and teams across the whole proposal. People, Teams and Issues select the record type; use Filters to narrow the change type. Each section has search, sorting and 25-row pages. People also includes existing members affected by a team change elsewhere in the file.
 
-Expand a row for before/after values and learning or reporting consequences. A team change summarizes affected people together, with its own pages, rather than asking for hundreds of separate approvals. Courses retained through overlapping assignment sources are counted once. Continuous requirements keep their existing deadlines and progress.
+The compact Users table separates user name, email, team and state. The Teams table shows team name, parent and manager. Expand Details for the complete proposed record, including hire date, hierarchy, manager, access and new-user window. Values identify whether they came from CSV, stayed unchanged or were calculated; changed values also show the current value. Learning and reporting consequences remain in the same detail panel. A team change summarizes affected people together, with its own pages, rather than asking for hundreds of separate approvals. Courses retained through overlapping assignment sources are counted once. Continuous requirements keep their existing deadlines and progress.
 
 Issues retain every source row and column reference. Row 5 means spreadsheet row 5, counting the header as row 1; it is not a count of imported people. Filter by issue type or download the complete issue report, correct the source spreadsheet, and upload again. Conflicting definitions, duplicate identities, missing references, invalid dates, hierarchy cycles, and inactive or deleted identities block consequence calculation for the whole proposal. Notices alone do not block it. Back preserves the current review; choosing a replacement file clears it. Cancel closes an unsubmitted review without saving. The Import action commits the whole valid file, not only the current filtered page.
 

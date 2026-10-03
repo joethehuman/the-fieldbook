@@ -67,11 +67,8 @@ const labels = {
   issue: "Issues",
 };
 const pageSize = 25;
-function summaryChanges(row: ImportReviewRow) {
-  return row.status === "new"
-    ? row.changes.filter((change) => change.field !== "Name")
-    : row.changes;
-}
+const reviewValue = (row: ImportReviewRow, field: string) =>
+  row.values.find((value) => value.field === field)?.value || "Not resolved";
 function impactText(review: RosterReview, id?: string) {
   const impact = review.impact.find((p) => p.id === id);
   if (!impact) return "";
@@ -143,20 +140,32 @@ function RowDetails({
       className="grid gap-4 p-2"
       id={`details-${encodeURIComponent(row.key)}`}
     >
-      <dl className="grid gap-2">
-        {row.changes.map((c) => (
-          <div key={c.field}>
-            <dt className="font-medium">{c.field}</dt>
+      <p className="font-semibold">
+        {row.values.length ? "After import" : "Record needs review"}
+      </p>
+      {!row.values.length && (
+        <p className="text-copy text-muted-foreground">
+          Resolve the file’s issues to see the complete proposed record.
+        </p>
+      )}
+      <dl className="grid gap-4 sm:grid-cols-2">
+        {row.values.map((value) => (
+          <div key={value.field}>
+            <dt className="font-medium">{value.field}</dt>
             <dd className="text-copy text-muted-foreground">
-              {row.status === "new" ? (
-                c.after
-              ) : (
-                <>
-                  <span>Current: {c.before}</span>
-                  <br />
-                  <span>After import: {c.after}</span>
-                </>
-              )}
+              <span>{value.value}</span>
+              <small>{value.source}</small>
+              {row.status !== "new" &&
+                row.changes.find((change) => change.field === value.field) && (
+                  <small>
+                    Current:{" "}
+                    {
+                      row.changes.find(
+                        (change) => change.field === value.field,
+                      )!.before
+                    }
+                  </small>
+                )}
             </dd>
           </div>
         ))}
@@ -228,7 +237,7 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
             ? r.status !== "unchanged"
             : r.status === state)) &&
         words.every((word) =>
-          `${r.name} ${r.secondary} ${r.changes.map((c) => `${c.field} ${c.before} ${c.after}`).join(" ")}`
+          `${r.name} ${r.secondary} ${r.values.map((value) => value.value).join(" ")} ${r.changes.map((c) => `${c.field} ${c.before} ${c.after}`).join(" ")}`
             .toLowerCase()
             .includes(word),
         ),
@@ -285,11 +294,13 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
         search={
           <FormField label="Search review" visuallyHiddenLabel>
             <Input
+              id="roster-import-review-search"
+              name="roster-import-review-search"
               type="search"
               placeholder={
                 tab === "issues"
                   ? "Search issues"
-                  : "Search names, emails or changes"
+                  : "Search users, teams or details"
               }
               value={query}
               onChange={(e) => {
@@ -435,11 +446,21 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
             </TableContainer>
           ) : (
             <TableContainer>
-              <DataTable layout="rosterReview">
+              <DataTable
+                layout={
+                  tab === "teams" ? "rosterReviewTeams" : "rosterReviewPeople"
+                }
+                density="compact"
+              >
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{tab === "teams" ? "Team" : "Person"}</TableHead>
-                    <TableHead>Changes</TableHead>
+                    <TableHead>{tab === "teams" ? "Team" : "User"}</TableHead>
+                    <TableHead>
+                      {tab === "teams" ? "Parent team" : "Email"}
+                    </TableHead>
+                    <TableHead>
+                      {tab === "teams" ? "Manager" : "Team"}
+                    </TableHead>
                     <TableHead>State</TableHead>
                     <TableHead>
                       <span className="sr-only">Details</span>
@@ -454,41 +475,16 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
                         <TableRow>
                           <TableCell>
                             <strong>{row.name}</strong>
-                            <small>{row.secondary}</small>
                           </TableCell>
                           <TableCell>
-                            {row.issues.some((i) => i.severity === "error") ? (
-                              row.issues.find((i) => i.severity === "error")!
-                                .message
-                            ) : summaryChanges(row)[0] ? (
-                              <>
-                                <span className="text-copy">
-                                  {summaryChanges(row)[0].field}
-                                </span>
-                                <small>
-                                  {row.status === "new"
-                                    ? summaryChanges(row)[0].after
-                                    : `Change to ${summaryChanges(row)[0].after}`}
-                                </small>
-                                {summaryChanges(row).length > 1 && (
-                                  <small>
-                                    +{summaryChanges(row).length - 1} more
-                                    changes
-                                  </small>
-                                )}
-                              </>
-                            ) : row.status === "changed" ? (
-                              "Affected by team changes"
-                            ) : (
-                              "No field changes"
-                            )}
-                            {tab === "teams" && !!row.affected.length && (
-                              <small>
-                                {row.affected.length} affected people
-                              </small>
-                            )}
-                            {tab === "people" && impactText(review, row.id) && (
-                              <small>{impactText(review, row.id)}</small>
+                            {tab === "teams"
+                              ? reviewValue(row, "Parent team")
+                              : row.secondary}
+                          </TableCell>
+                          <TableCell>
+                            {reviewValue(
+                              row,
+                              tab === "teams" ? "Team manager" : "Team",
                             )}
                           </TableCell>
                           <TableCell>{labels[row.status]}</TableCell>
@@ -518,7 +514,7 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
                         </TableRow>
                         {expanded.has(row.key) && (
                           <TableRow>
-                            <TableCell colSpan={4}>
+                            <TableCell colSpan={5}>
                               <RowDetails
                                 row={row}
                                 review={review}
@@ -792,7 +788,7 @@ export function RosterImport({
                     Download the template
                   </a>
                   , fill it in, then export it as CSV and choose your file to
-                  review. Use one row per person. For a team with no direct
+                  review. Use one row per user. For a team with no direct
                   members, fill in only the team columns.
                 </p>
                 <FormField
@@ -816,7 +812,7 @@ export function RosterImport({
                   <p>
                     For new records, a blank Team or Parent team places them in
                     Organization. Enter Organization explicitly to move an
-                    existing person or team there.
+                    existing user or team there.
                   </p>
                 </Note>
                 <Collapsible>

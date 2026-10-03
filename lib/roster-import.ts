@@ -8,18 +8,19 @@ import {
 import { assignmentImpact, reportingImpact } from "./assignment-episodes";
 import { updateMatchesAudience } from "./content-audiences";
 import { learningStage, onboardingClockTarget } from "./learning";
+import { roleLabel } from "./permissions";
 import type { CsvReport } from "./csv";
 
 export const ROSTER_IMPORT_COLUMNS = [
   {
     key: "name",
     label: "Name",
-    guidance: "Required for new people; blank keeps an existing name.",
+    guidance: "Required for new users; blank keeps an existing name.",
   },
   {
     key: "email",
     label: "Email",
-    guidance: "Required for people. Used to match existing records.",
+    guidance: "Required for users. Used to match existing records.",
   },
   {
     key: "hireDate",
@@ -29,7 +30,7 @@ export const ROSTER_IMPORT_COLUMNS = [
   {
     key: "team",
     label: "Team",
-    guidance: "The person's direct reporting team. Use its unique name.",
+    guidance: "The user's direct reporting team. Use its unique name.",
   },
   {
     key: "parent",
@@ -85,6 +86,11 @@ export type RosterInput = {
   issues: ImportIssue[];
 };
 export type ImportChange = { field: string; before: string; after: string };
+export type ImportReviewValue = {
+  field: string;
+  value: string;
+  source: "From CSV" | "Kept" | "From team" | "Calculated" | "Default";
+};
 export type ImportReviewRow = {
   key: string;
   id?: string;
@@ -93,6 +99,8 @@ export type ImportReviewRow = {
   csvRows: number[];
   status: "new" | "changed" | "unchanged" | "issue";
   changes: ImportChange[];
+  /** Display-only projection of the authoritative proposed record. */
+  values: ImportReviewValue[];
   notes: string[];
   issues: ImportIssue[];
   affected: string[];
@@ -265,12 +273,7 @@ export function parseRosterCsv(csv: string): RosterInput {
     return input;
   }
   if (!input.rows) {
-    issue(
-      0,
-      "File",
-      "empty",
-      "Add at least one person or team to the template.",
-    );
+    issue(0, "File", "empty", "Add at least one user or team to the template.");
     return input;
   }
   const people = new Map<string, number>();
@@ -291,7 +294,7 @@ export function parseRosterCsv(csv: string): RosterInput {
     const key = values.email ? personKey(values.email) : "row:" + row;
     if (values.name || values.email || values.hireDate) {
       if (!values.email)
-        issue(row, "Email", "email", "Add an email for this person.", key);
+        issue(row, "Email", "email", "Add an email for this user.", key);
       else if (!emailValid(values.email))
         issue(
           row,
@@ -322,14 +325,14 @@ export function parseRosterCsv(csv: string): RosterInput {
           row,
           "Email",
           "duplicate-person",
-          "This email is also in row " + first + ". Keep one row per person.",
+          "This email is also in row " + first + ". Keep one row per user.",
           key,
         );
         issue(
           first,
           "Email",
           "duplicate-person",
-          "This email is also in row " + row + ". Keep one row per person.",
+          "This email is also in row " + row + ". Keep one row per user.",
           key,
         );
       } else if (values.email) people.set(normalized(values.email), row);
@@ -342,13 +345,7 @@ export function parseRosterCsv(csv: string): RosterInput {
         team: values.team || undefined,
       });
     } else if (!values.team)
-      issue(
-        row,
-        "Team",
-        "empty-row",
-        "Add a person email or a team name.",
-        key,
-      );
+      issue(row, "Team", "empty-row", "Add a user email or a team name.", key);
     if (!values.team) {
       if (values.parent || values.manager)
         issue(
@@ -532,6 +529,7 @@ export function reviewRosterInput(
     csvRows,
     status: isNew ? "new" : "unchanged",
     changes: [],
+    values: [],
     notes: [],
     issues: [],
     affected: [],
@@ -564,7 +562,7 @@ export function reviewRosterInput(
     const row = newRow(
       person.key,
       id,
-      person.name || old?.name || "Person in row " + person.row,
+      person.name || old?.name || "User in row " + person.row,
       email,
       [person.row],
       !old,
@@ -577,7 +575,7 @@ export function reviewRosterInput(
         person.row,
         "Name",
         "name-required",
-        "Add a name for this new person.",
+        "Add a name for this new user.",
         person.key,
       );
     if (deleted.has(email))
@@ -585,7 +583,7 @@ export function reviewRosterInput(
         person.row,
         "Email",
         "deleted-person",
-        "This email belongs to a person in Recently deleted. Resolve that record before importing.",
+        "This email belongs to a user in Recently deleted. Resolve that record before importing.",
         person.key,
       );
     if (old && !old.active)
@@ -593,7 +591,7 @@ export function reviewRosterInput(
         person.row,
         "Email",
         "inactive-person",
-        "This person is inactive. Resolve their access in People before importing.",
+        "This user is inactive. Resolve their access in People before importing.",
         person.key,
       );
     const next: User = old
@@ -637,14 +635,14 @@ export function reviewRosterInput(
         person.row,
         "Hire date",
         "missing-hire-date",
-        "No hire date: this new person will be an Existing user.",
+        "No hire date: this new user will be an Existing user.",
         person.key,
         "notice",
       );
     }
     if (!old)
       row.notes.push(
-        "Pre-registered person. No email or login account is created.",
+        "Pre-registered user. No email or login account is created.",
       );
     nextPeople.set(id, next);
     personIds.set(personKey(person.email), id);
@@ -688,7 +686,7 @@ export function reviewRosterInput(
           "missing-parent",
           "Parent " +
             team.parent +
-            " does not exist. Add its person or team-only row, or use an existing team name.",
+            " does not exist. Add its user or team-only row, or use an existing team name.",
           team.key,
         );
       else {
@@ -711,7 +709,7 @@ export function reviewRosterInput(
           "missing-manager",
           "Manager " +
             team.manager +
-            " must be an active existing person or a person row in this file.",
+            " must be an active existing user or a user row in this file.",
           team.key,
         );
       else {
@@ -745,7 +743,7 @@ export function reviewRosterInput(
               false,
             );
             pr.notes.push(
-              "Included because this person will manage " + row.name + ".",
+              "Included because this user will manage " + row.name + ".",
             );
             personRows.set(manager.id, pr);
             review.people.push(pr);
@@ -946,6 +944,93 @@ export function reviewRosterInput(
   review.affectedPeople = after.users
     .filter((p) => affected.has(p.id))
     .map(({ id, name, email }) => ({ id, name, email }));
+  // Project final values after all parents, managers and indirect effects resolve.
+  // These fields describe the review; apply still accepts only the original CSV.
+  const declaredPeople = new Map(input.people.map((p) => [p.key, p]));
+  const declaredTeams = new Map(input.teams.map((t) => [t.key, t]));
+  const source = (
+    supplied: unknown,
+    existing: unknown,
+  ): ImportReviewValue["source"] =>
+    supplied ? "From CSV" : existing ? "Kept" : "Default";
+  const value = (
+    field: string,
+    text: string | undefined,
+    origin: ImportReviewValue["source"],
+  ): ImportReviewValue => ({ field, value: text || "Not set", source: origin });
+  const hierarchy = (team: Team) => {
+    const names: string[] = [];
+    const seen = new Set<string>();
+    let cursor: Team | undefined = team;
+    while (cursor && !seen.has(cursor.id)) {
+      seen.add(cursor.id);
+      names.unshift(cursor.name);
+      cursor = cursor.parentId ? nextTeams.get(cursor.parentId) : undefined;
+    }
+    return names.join(" / ");
+  };
+  for (const row of review.people) {
+    const person = nextPeople.get(row.id!)!;
+    const declared = declaredPeople.get(row.key);
+    const old = currentPeople.get(personKey(person.email));
+    const team =
+      nextTeams.get(reportingTeamId(person.teamId, after.teams)!) || root;
+    const manager = team.managerId ? nextPeople.get(team.managerId) : undefined;
+    row.values = [
+      value("Name", person.name, source(declared?.name, old)),
+      value("Email", person.email, source(declared?.email, old)),
+      value("Hire date", person.hireDate, source(declared?.hireDate, old)),
+      value("Team", team.name, source(declared?.team, old)),
+      value(
+        "Parent team",
+        nextTeams.get(team.parentId || "")?.name,
+        "From team",
+      ),
+      value("Team manager", manager?.name, "From team"),
+      value("Team manager email", manager?.email, "From team"),
+      value("Hierarchy", hierarchy(team), "Calculated"),
+      value(
+        "Access",
+        roleLabel(person.role),
+        old?.role === person.role
+          ? "Kept"
+          : old || person.role === "manager"
+            ? "Calculated"
+            : "Default",
+      ),
+      value(
+        "User type",
+        learningStage(person, before.settings, stamp.slice(0, 10)),
+        "Calculated",
+      ),
+      value(
+        "New-user clock ends",
+        onboardingClockTarget(person, before.settings),
+        "Calculated",
+      ),
+    ];
+  }
+  for (const row of review.teams) {
+    const team = nextTeams.get(row.id!)!;
+    const declared = declaredTeams.get(row.key);
+    const old = currentTeams.get(teamKey(team.name));
+    const manager = team.managerId ? nextPeople.get(team.managerId) : undefined;
+    row.values = [
+      value("Name", team.name, source(declared?.name, old)),
+      value(
+        "Parent team",
+        nextTeams.get(team.parentId || "")?.name,
+        source(declared?.parent, old),
+      ),
+      value("Team manager", manager?.name, source(declared?.manager, old)),
+      value(
+        "Team manager email",
+        manager?.email,
+        source(declared?.manager, old),
+      ),
+      value("Hierarchy", hierarchy(team), "Calculated"),
+    ];
+  }
   options.onProposal?.(after);
   return review;
 }

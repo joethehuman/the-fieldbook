@@ -191,7 +191,12 @@ test("template download and review cancellation preserve data and restore focus"
   ).toBeVisible();
   await s.dialog.getByRole("tab", { name: /Teams/ }).click();
   await expect(
-    s.dialog.getByRole("cell", { name: "Revenue Organization", exact: true }),
+    s.dialog
+      .getByRole("row")
+      .filter({
+        has: page.getByRole("cell", { name: "Organization", exact: true }),
+      })
+      .getByRole("cell", { name: "Revenue", exact: true }),
   ).toBeVisible();
   await page.screenshot({ path: info.outputPath("example-review.png") });
   await s.dialog.getByRole("button", { name: "Cancel", exact: true }).click();
@@ -237,6 +242,8 @@ test("500-row review has bounded pages, stable controls for one/zero/many matche
     s.dialog.getByRole("navigation", { name: "Review pages" }),
   ).toContainText("26–50 of 500");
   const query = s.dialog.getByRole("searchbox", { name: "Search review" });
+  await expect(query).toHaveAttribute("autocomplete", "off");
+  await expect(query).toHaveAttribute("name", "roster-import-review-search");
   await query.scrollIntoViewIfNeeded();
   const compact = await s.dialog
     .locator('[data-slot="review-collection"]')
@@ -264,7 +271,7 @@ test("500-row review has bounded pages, stable controls for one/zero/many matche
     .click();
   await expect(
     s.dialog.getByText(
-      "Pre-registered person. No email or login account is created.",
+      "Pre-registered user. No email or login account is created.",
     ),
   ).toBeVisible();
   await expect(s.dialog.locator('[data-slot="review-counts"]')).toContainText(
@@ -522,6 +529,15 @@ test("Import commits the complete file and returns to the updated People roster 
     .click();
   await expect(s.dialog.getByText("Name", { exact: true })).toBeVisible();
   await expect(s.dialog.getByText(/→/)).toHaveCount(0);
+  const finalValues = s.dialog.locator("dl");
+  await expect(finalValues).toContainText("csv-person@example.test");
+  await expect(finalValues).toContainText("Team manager");
+  await expect(finalValues).toContainText("CSV Manager");
+  await expect(finalValues).toContainText("Hierarchy");
+  await expect(finalValues).toContainText("Organization / CSV Team");
+  await expect(finalValues).toContainText("From CSV");
+  await expect(finalValues).toContainText("Calculated");
+  await page.screenshot({ path: info.outputPath("import-final-values.png") });
   await s.dialog.getByRole("button", { name: "Import", exact: true }).click();
   await expect(s.dialog).not.toBeVisible();
   await expect(
@@ -532,10 +548,20 @@ test("Import commits the complete file and returns to the updated People roster 
     .fill("csv-person@example.test");
   await expect(
     page.getByRole("cell", {
-      name: "CSV Person csv-person@example.test",
+      name: /^CSV Person$/,
       exact: true,
     }),
   ).toBeVisible();
+  if (info.project.name.endsWith("desktop")) {
+    const roster = page.locator('[data-layout="peopleSelection"]');
+    expect(
+      await roster.evaluate(
+        (table) =>
+          table.getBoundingClientRect().width <=
+          table.parentElement!.clientWidth + 1,
+      ),
+    ).toBe(true);
+  }
   if (!installed) {
     const saved = await page.evaluate(() =>
       JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
@@ -629,12 +655,12 @@ test("individual person forms share the workflow modal and scroll fades with gua
   await s.dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await page
     .getByRole("button", {
-      name: installed ? "Pre-register person" : "Add demo profile",
+      name: installed ? "Pre-register user" : "Add demo profile",
       exact: true,
     })
     .click();
   const dialog = page.getByRole("dialog", {
-    name: installed ? "Pre-register person" : "Demo profile",
+    name: installed ? "Pre-register user" : "Demo profile",
     exact: true,
   });
   await expect(dialog).toBeVisible();
@@ -658,7 +684,7 @@ test("individual person forms share the workflow modal and scroll fades with gua
   await expect(dialog).not.toBeVisible();
   await expect(
     page.getByRole("button", {
-      name: installed ? "Pre-register person" : "Add demo profile",
+      name: installed ? "Pre-register user" : "Add demo profile",
       exact: true,
     }),
   ).toBeFocused();
@@ -688,12 +714,12 @@ test("individual person creation saves once, returns to People, and rejects a du
       await route.fulfill({ json: { revision: s.data.governanceRevision } });
     });
   const trigger = page.getByRole("button", {
-    name: installed ? "Pre-register person" : "Add demo profile",
+    name: installed ? "Pre-register user" : "Add demo profile",
     exact: true,
   });
   await trigger.click();
   const dialog = page.getByRole("dialog", {
-    name: installed ? "Pre-register person" : "Demo profile",
+    name: installed ? "Pre-register user" : "Demo profile",
     exact: true,
   });
   await dialog
@@ -705,7 +731,7 @@ test("individual person creation saves once, returns to People, and rejects a du
   });
   await email.fill(s.data.users[0].email);
   const submit = dialog.getByRole("button", {
-    name: installed ? "Pre-register person" : "Save profile",
+    name: installed ? "Pre-register user" : "Save profile",
     exact: true,
   });
   await submit.click();
@@ -731,7 +757,7 @@ test("individual person creation saves once, returns to People, and rejects a du
     .fill("single-person@example.test");
   await expect(
     page.getByRole("cell", {
-      name: "Single Person single-person@example.test",
+      name: /^Single Person$/,
       exact: true,
     }),
   ).toBeVisible();
@@ -768,12 +794,12 @@ for (const count of [3, 20])
     await s.dialog.getByRole("button", { name: "Cancel", exact: true }).click();
     await page
       .getByRole("button", {
-        name: installed ? "Pre-register person" : "Add demo profile",
+        name: installed ? "Pre-register user" : "Add demo profile",
         exact: true,
       })
       .click();
     const dialog = page.getByRole("dialog", {
-      name: installed ? "Pre-register person" : "Demo profile",
+      name: installed ? "Pre-register user" : "Demo profile",
       exact: true,
     });
     const outer = dialog.locator('[data-slot="scroll-region"]');

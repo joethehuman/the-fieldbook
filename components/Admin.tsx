@@ -595,12 +595,18 @@ export default function Admin({
       void navigateDestination(next, { history: true });
   };
   useEffect(() => {
-    window.addEventListener(production ? "popstate" : "fieldbook:admin-history", restore);
+    window.addEventListener(
+      production ? "popstate" : "fieldbook:admin-history",
+      restore,
+    );
     function restore() {
       restoreDestination.current();
     }
     return () => {
-      window.removeEventListener(production ? "popstate" : "fieldbook:admin-history", restore);
+      window.removeEventListener(
+        production ? "popstate" : "fieldbook:admin-history",
+        restore,
+      );
     };
   }, [production]);
   const contentRows = data.content
@@ -1581,7 +1587,7 @@ export default function Admin({
                 <Toolbar>
                   <p className="muted">
                     {production
-                      ? "Manage everyone, including people who have not signed in. Deactivation preserves course history. Clear managed teams before removing a manager’s access."
+                      ? "Manage everyone, including people who have not signed in. Deactivation preserves course history. Reassign managed teams before deactivating a manager. Deleting a manager leaves their teams unassigned."
                       : "Sample profiles for trying role-based assignments. No accounts or emails are created."}
                   </p>
                 </Toolbar>
@@ -1610,10 +1616,12 @@ export default function Admin({
                   search={
                     <FormField label="Search profiles" visuallyHiddenLabel>
                       <Input
+                        id="admin-people-search"
+                        name="admin-people-search"
                         type="search"
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
-                        placeholder="Search profiles by name or email"
+                        placeholder="Search users by name or email"
                       />
                     </FormField>
                   }
@@ -1685,7 +1693,7 @@ export default function Admin({
                 />
                 {!!peopleRows.length && (
                   <TableContainer>
-                    <DataTable layout="peopleSelection">
+                    <DataTable layout="peopleSelection" density="compact">
                       <TableHeader>
                         <TableRow>
                           <TableHead>
@@ -1702,10 +1710,14 @@ export default function Admin({
                               />
                             )}
                           </TableHead>
-                          <TableHead>Name</TableHead>
+                          <TableHead>User</TableHead>
+                          <TableHead>Email</TableHead>
+                          <TableHead>Team</TableHead>
                           <TableHead>Access</TableHead>
                           <TableHead>Groups</TableHead>
+                          <TableHead>User type</TableHead>
                           <TableHead>Status</TableHead>
+                          <TableHead>Sign-in</TableHead>
                           <TableHead>
                             <span className="sr-only">Actions</span>
                           </TableHead>
@@ -1727,7 +1739,11 @@ export default function Admin({
                             </TableCell>
                             <TableCell>
                               <strong>{u.name}</strong>
-                              <small>{u.email}</small>
+                            </TableCell>
+                            <TableCell>{u.email}</TableCell>
+                            <TableCell>
+                              {data.teams?.find((team) => team.id === u.teamId)
+                                ?.name || "Organization"}
                             </TableCell>
                             <TableCell>{roleLabel(u.role)}</TableCell>
                             <TableCell>
@@ -1739,13 +1755,17 @@ export default function Admin({
                                 .join(", ") || "No groups"}
                             </TableCell>
                             <TableCell>
+                              {learningStage(u, data.settings)}
+                            </TableCell>
+                            <TableCell>
                               {u.active ? "Active" : "Inactive"}
-                              <div className="text-caption text-muted-foreground">
-                                {learningStage(u, data.settings)}
-                              </div>
-                              {u.registered === false && (
-                                <small>Not signed in</small>
-                              )}
+                            </TableCell>
+                            <TableCell>
+                              {production
+                                ? u.registered === false
+                                  ? "Pending"
+                                  : "Signed in"
+                                : "Simulated"}
                             </TableCell>
                             <TableCell>
                               <ActionGroup variant="text">
@@ -1775,7 +1795,7 @@ export default function Admin({
                                     }
                                   }}
                                 >
-                                  Courses & progress
+                                  Progress
                                 </Button>
                               </ActionGroup>
                             </TableCell>
@@ -1855,7 +1875,17 @@ export default function Admin({
                 registerNavigationGuard={registerAdminGuard}
               />
             ) : (
-              <TeamProgress data={data} user={user} initialPerson={destination.id} onDestinationChange={(id) => navigateDestination({ tab: "progress", ...(id ? { id } : {}) }, { approved: true })} />
+              <TeamProgress
+                data={data}
+                user={user}
+                initialPerson={destination.id}
+                onDestinationChange={(id) =>
+                  navigateDestination(
+                    { tab: "progress", ...(id ? { id } : {}) },
+                    { approved: true },
+                  )
+                }
+              />
             )}
           </>
         </TabsContent>
@@ -1883,11 +1913,13 @@ export default function Admin({
               >
                 <X />
               </Button>
-              <DialogTitle>{production ? "Account" : "Demo profile"}</DialogTitle>
+              <DialogTitle>
+                {production ? "Account" : "Demo profile"}
+              </DialogTitle>
               <DialogDescription>
                 {production
                   ? person.registered === false
-                    ? "This preregistered person can activate their account with verified Google sign-in. Email is read-only."
+                    ? "This preregistered user can activate their account with verified Google sign-in. Email is read-only."
                     : "Changes apply to this verified account. Login email is read-only."
                   : "Use fictional details. This does not create a secure account."}
               </DialogDescription>

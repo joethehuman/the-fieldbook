@@ -39,7 +39,7 @@ export function PendingPeople({
   const guard = useRef(async () => true);
   guard.current = async () =>
     !saving.current &&
-    (!dirty || (await confirm("Discard unsaved person details?")));
+    (!dirty || (await confirm("Discard unsaved user details?")));
   useEffect(() => {
     if (!editing) return;
     registerNavigationGuard?.(() => guard.current(), {
@@ -64,7 +64,7 @@ export function PendingPeople({
     if (
       data.users.some((row) => row.email.trim().toLowerCase() === person.email)
     ) {
-      setError("A person already uses that email.");
+      setError("A user already uses that email.");
       return;
     }
     saving.current = true;
@@ -101,7 +101,7 @@ export function PendingPeople({
         }}
       >
         <Plus aria-hidden="true" />
-        Pre-register person
+        Pre-register user
       </Button>
       <Dialog
         open={!!editing}
@@ -111,7 +111,7 @@ export function PendingPeople({
       >
         {editing && (
           <DialogContent size="workflow">
-            <DialogTitle>Pre-register person</DialogTitle>
+            <DialogTitle>Pre-register user</DialogTitle>
             <DialogDescription>
               Add someone before they sign in. Their verified Google email
               activates this roster entry. No email is sent.
@@ -143,7 +143,7 @@ export function PendingPeople({
                   Cancel
                 </Button>
                 <Button type="submit" loading={busy}>
-                  Pre-register person
+                  Pre-register user
                 </Button>
               </DialogFooter>
             </form>

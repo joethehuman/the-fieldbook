@@ -365,7 +365,8 @@ test("the full row limit and 100 courses are reviewed as bounded metadata withou
     people * 100,
   );
   assert.ok(
-    new TextEncoder().encode(JSON.stringify(result)).byteLength < 4_000_000,
+    new TextEncoder().encode(JSON.stringify(result)).byteLength < 4_200_000,
+    `Review payload is ${new TextEncoder().encode(JSON.stringify(result)).byteLength} bytes`,
   );
   assert.equal(JSON.stringify(d), before);
   console.log(
@@ -443,4 +444,40 @@ test("materializing new records preserves every existing ID, even one resembling
   assert.equal(saved.teams![1].id, data.teams![1].id);
   assert.equal(saved.users[1].id, data.users[1].id);
   assert.equal(saved.users[1].teamId, data.teams![1].id);
+});
+
+test("review details resolve the complete final record, preserved blanks and calculated hierarchy", () => {
+  const d = base();
+  const review = reviewRosterCsv(
+    csv([
+      ["", "alex@example.test", "", "Leaf", "US", "boss@example.test"],
+      ["Boss", "boss@example.test", "", "US", "", ""],
+    ]),
+    d,
+  );
+  assert.equal(review.valid, true);
+  const alex = review.people.find((p) => p.id === "one")!;
+  const field = (name: string) => alex.values.find((v) => v.field === name)!;
+  assert.equal(field("Hire date").value, "2026-09-01");
+  assert.equal(field("Hire date").source, "Kept");
+  assert.equal(field("Email").value, "alex@example.test");
+  assert.equal(field("Team").value, "Leaf");
+  assert.equal(field("Team").source, "From CSV");
+  assert.equal(field("Parent team").value, "US");
+  assert.equal(field("Team manager").value, "Boss");
+  assert.equal(field("Team manager email").value, "boss@example.test");
+  assert.equal(field("Hierarchy").value, "Organization / US / Leaf");
+  assert.equal(field("Hierarchy").source, "Calculated");
+  assert.equal(
+    review.people
+      .find((p) => p.name === "Boss")!
+      .values.find((v) => v.field === "Access")!.value,
+    "Manager",
+  );
+  assert.equal(
+    review.teams
+      .find((t) => t.name === "Leaf")!
+      .values.find((v) => v.field === "Parent team")!.value,
+    "US",
+  );
 });

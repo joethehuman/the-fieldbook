@@ -91,3 +91,50 @@ export function teamDeletionBlockers(data: Workspace, id: string) {
     ),
   };
 }
+
+/** Direct users and surviving immediate subteams return to Organization. */
+export function deleteTeams(data: Workspace, selected: string[]) {
+  const ids = new Set(selected);
+  const teams = data.teams || [];
+  if (!ids.size || [...ids].some((id) => !teams.some((team) => team.id === id)))
+    throw new Error(
+      "The selected teams changed. Reload and select them again.",
+    );
+  const root = organizationTeam(teams, data.settings?.organizationTeamId);
+  if (!root)
+    throw new Error("Organization changed. Reload before deleting teams.");
+  const blocked: string[] = [];
+  for (const id of ids) {
+    const team = teams.find((team) => team.id === id)!;
+    const blockers = teamDeletionBlockers(data, id);
+    const reasons = [
+      blockers.organization && "Organization cannot be deleted",
+      blockers.learning.length && "remove its assigned learning first",
+      blockers.groups.length && "remove its learning-group links first",
+    ].filter(Boolean);
+    if (reasons.length) blocked.push(`${team.name}: ${reasons.join("; ")}.`);
+  }
+  if (blocked.length) throw new Error(blocked.join("\n"));
+  return {
+    ...data,
+    teams: teams
+      .filter((team) => !ids.has(team.id))
+      .map((team) =>
+        team.parentId && ids.has(team.parentId)
+          ? { ...team, parentId: root.id }
+          : team,
+      ),
+    users: data.users.map((user) =>
+      user.teamId && ids.has(user.teamId)
+        ? { ...user, teamId: undefined }
+        : user,
+    ),
+    ...(data.pendingUsers && {
+      pendingUsers: data.pendingUsers.map((user) =>
+        user.teamId && ids.has(user.teamId)
+          ? { ...user, teamId: undefined }
+          : user,
+      ),
+    }),
+  };
+}

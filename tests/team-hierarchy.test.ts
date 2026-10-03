@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { freshWorkspace } from "../lib/store";
 import {
+  deleteTeams,
   moveTeam,
   teamMoveImpact,
   teamDeletionBlockers,
@@ -272,5 +273,66 @@ test("guarded deletion migration: stored references, revision, authorization and
     ]);
   } finally {
     await pg.close();
+  }
+});
+
+test("reviewed team deletion moves direct users to Organization and keeps unselected branches and history", () => {
+  const data = freshWorkspace();
+  const root = data.teams!.find((t) => t.system === "organization")!;
+  data.teams = [
+    root,
+    { id: "parent", name: "Parent", parentId: root.id },
+    { id: "branch", name: "Branch", parentId: "parent" },
+    { id: "child", name: "Child", parentId: "branch" },
+  ];
+  const user = data.users[0];
+  data.users = [
+    { ...user, id: "one", teamId: "branch" },
+    { ...user, id: "two", teamId: "child", active: false },
+    { ...user, id: "three", teamId: "parent" },
+  ];
+  data.groups = [];
+  data.pendingUsers = [
+    {
+      email: "pending@example.test",
+      name: "Pending",
+      role: "learner",
+      groups: [],
+      teamId: "child",
+    },
+  ];
+  const before = structuredClone(data);
+  const parentOnly = deleteTeams(data, ["branch"]);
+  assert.equal(
+    parentOnly.teams.find((t) => t.id === "child")!.parentId,
+    root.id,
+  );
+  assert.equal(parentOnly.users[1].teamId, "child");
+  assert.equal(parentOnly.users[0].teamId, undefined);
+  assert.throws(() => deleteTeams(data, [root.id]), /Organization cannot/);
+  const next = deleteTeams(data, ["branch", "child"]);
+  assert.deepEqual(data, before);
+  assert.deepEqual(
+    next.teams.map((t) => t.id),
+    [root.id, "parent"],
+  );
+  assert.equal(next.users[0].teamId, undefined);
+  assert.equal(next.users[1].teamId, undefined);
+  assert.equal(next.users[2].teamId, "parent");
+  assert.equal(next.pendingUsers![0].teamId, undefined);
+  assert.deepEqual(next.progress, before.progress);
+  assert.deepEqual(
+    next.users.map(({ teamId, ...u }) => u),
+    before.users.map(({ teamId, ...u }) => u),
+  );
+  for (const blocker of [
+    { learningItems: [{ kind: "course" as const, id: "course" }] },
+    {},
+  ]) {
+    const linked = structuredClone(data);
+    Object.assign(linked.teams![2], blocker);
+    if (!("learningItems" in blocker))
+      linked.groups = [{ id: "group", name: "Group", teamIds: ["branch"] }];
+    assert.throws(() => deleteTeams(linked, ["branch", "child"]), /learning/);
   }
 });

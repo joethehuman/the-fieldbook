@@ -28,6 +28,31 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   const organizationId = data.teams!.find(
     (team) => team.system === "organization",
   )!.id;
+  // Keep this movement fixture independent of the larger demo seed.
+  data.teams = data
+    .teams!.filter((team) => [organizationId, "sales-team"].includes(team.id))
+    .map((team) =>
+      team.id === "sales-team"
+        ? {
+            ...team,
+            name: "Sales team",
+            learningItems: [],
+            requiredCourseIds: [],
+          }
+        : team,
+    );
+  data.groups = [];
+  data.curricula = [];
+  data.users = data.users
+    .filter((user) =>
+      ["demo-admin", "demo-manager", "demo-learner"].includes(user.id),
+    )
+    .map((user) => ({
+      ...user,
+      groups: [],
+      teamId:
+        user.teamId && user.teamId !== "sales-team" ? undefined : user.teamId,
+    }));
   data.teams!.push(
     { id: "other", name: "Customer success", parentId: organizationId },
     {
@@ -218,10 +243,16 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   expect(after.teams!.find((team) => team.id === "other")!.parentId).toBe(
     organizationId,
   );
-  await action(page, "Delete empty team");
-  await expect(page.locator("[data-slot=alert]")).toContainText(
-    "1 immediate subteams",
-  );
+  await action(page, "Delete team");
+  const parentDeletion = page.getByRole("dialog", {
+    name: "Delete Customer success?",
+    exact: true,
+  });
+  await expect(parentDeletion).toContainText("Subteams moving to Organization");
+  await expect(parentDeletion).toContainText("Regional customer success");
+  await parentDeletion
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
   expect((await saved(page)).teams!.some((team) => team.id === "other")).toBe(
     true,
   );
@@ -238,12 +269,12 @@ test("search hierarchy, move existing branch, detach and guard deletion", async 
   await page
     .getByRole("button", { name: "Open Empty team", exact: true })
     .click();
-  await action(page, "Delete empty team");
+  await action(page, "Delete team");
   const deletion = page.getByRole("dialog", {
     name: "Delete Empty team?",
     exact: true,
   });
-  await expect(deletion).toContainText("permanently removes the empty team");
+  await expect(deletion).toContainText("Deleted teams cannot be restored");
   await deletion
     .getByRole("button", { name: "Delete team", exact: true })
     .click();
@@ -288,9 +319,9 @@ test("direct learning prevents empty-team deletion and survives a team rename", 
   await page
     .getByRole("button", { name: "Open Assignment audience", exact: true })
     .click();
-  await action(page, "Delete empty team");
+  await action(page, "Delete team");
   await expect(page.locator("[data-slot=alert]")).toContainText(
-    "1 assigned courses or curricula",
+    "remove its assigned learning first",
   );
   await expect(
     page.getByRole("dialog", {
@@ -319,9 +350,9 @@ test("direct learning prevents empty-team deletion and survives a team rename", 
   expect(after.groups).toEqual(baseline.groups);
   expect(after.curricula).toEqual(baseline.curricula);
   expect(after.progress).toEqual(baseline.progress);
-  await action(page, "Delete empty team");
+  await action(page, "Delete team");
   await expect(page.locator("[data-slot=alert]")).toContainText(
-    "1 assigned courses or curricula",
+    "remove its assigned learning first",
   );
   await page.screenshot({
     path: info.outputPath("team-direct-learning-deletion-guard.png"),

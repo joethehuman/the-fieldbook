@@ -97,11 +97,11 @@ export function LearningAudienceReview({
       <div className="grid gap-2">
         <p className="text-xl font-medium">
           {impact.gained
-            ? `${impact.gained} ${impact.gained === 1 ? "person will" : "people will"} ${impact.dueDates ? "be newly assigned" : "receive a new learning recommendation"}.`
+            ? `${impact.gained} ${impact.gained === 1 ? "user will" : "users will"} ${impact.dueDates ? "be newly assigned" : "receive a new learning recommendation"}.`
             : "No new course assignments."}
         </p>
         <p className="text-sm text-muted-foreground">
-          {impact.total} {impact.total === 1 ? "person" : "people"} assigned in
+          {impact.total} {impact.total === 1 ? "user" : "users"} assigned in
           total · {impact.retained} already assigned
           {impact.lost ? ` · ${impact.lost} people lose this assignment` : ""}
         </p>
@@ -162,8 +162,8 @@ export function LearningAudienceReview({
               <SearchField>
                 <Input
                   type="search"
-                  aria-label="Find an affected person"
-                  placeholder="Find a person"
+                  aria-label="Find an affected user"
+                  placeholder="Find a user"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                 />
@@ -177,7 +177,7 @@ export function LearningAudienceReview({
                 >
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Person</TableHead>
+                      <TableHead>User</TableHead>
                       <TableHead>Assignment</TableHead>
                       <TableHead>{impact.dueDates ? "Due date" : ""}</TableHead>
                     </TableRow>

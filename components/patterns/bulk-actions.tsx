@@ -266,7 +266,8 @@ export function BulkActions({
                 No eligible destinations. Create one in its owning screen first.
               </p>
             )}
-            {values.some(Boolean) && command.review?.(values, active.ids)}
+            {(values.some(Boolean) || (!command.options && !command.field)) &&
+              command.review?.(values, active.ids)}
             {command.field === "date" && (
               <FormField label={command.fieldLabel || "Onboarding start date"}>
                 <Input
