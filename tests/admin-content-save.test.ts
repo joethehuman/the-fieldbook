@@ -172,6 +172,32 @@ test("workspace mutations wait behind content writes, and their uncertain failur
     globalThis.fetch = fetchBefore;
   }
 });
+test("direct settings save does not clear an uncertain content-save guard", async () => {
+  const initial = fixture();
+  const course = initial.data.content.find((item) => item.kind === "course")!;
+  const savedFetch = globalThis.fetch;
+  const writes: string[] = [];
+  let current = initial;
+  globalThis.fetch = async (input, init) => {
+    const path = String(input);
+    if (init?.method === "POST") {
+      writes.push(path);
+      if (path === "/api/content") throw new TypeError("response lost");
+      const { settings } = JSON.parse(String(init.body));
+      current = { ...initial, data: { ...initial.data, settings, revision: 2 } };
+      return response({ revision: 2, settings });
+    }
+    return response(path.startsWith("/api/content?") ? course : current);
+  };
+  try {
+    const runtime = createAdminRuntime(initial);
+    await assert.rejects(runtime.saveContent(course, "draft"), SaveRecoveryError);
+    const saved = await runtime.saveSettings(initial.data, { ...initial.data.settings!, name: "Saved settings" });
+    assert.equal(saved.settings!.name, "Saved settings");
+    await assert.rejects(runtime.saveContent(course, "published"), SaveRecoveryError);
+    assert.deepEqual(writes, ["/api/content", "/api/settings"]);
+  } finally { globalThis.fetch = savedFetch; }
+});
 test("demo autosaves preserve assigned-course windows, published lessons and progress until explicit version publication", () => {
   const { data } = fixture();
   const before = reconcileLearning(data, data, "2026-09-01T00:00:00.000Z");

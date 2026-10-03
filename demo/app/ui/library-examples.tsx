@@ -73,7 +73,7 @@ function AudienceSelectionExample() {
     teams: [{ id: "organization", name: "Organization", system: "organization" as const }, { id: "sales", name: "Sales", parentId: "organization" }],
     users: freshWorkspace().users.map(user => ({ ...user, teamId: "sales", groups: ["sales"] })),
   }));
-  return <section><h3>Content audiences</h3><AudienceSelection data={data} selected={selected} onChange={setSelected} /></section>;
+  return <section><h3>Content audiences</h3><AudienceSelection data={data} selected={selected} initialSelected={["team:sales"]} onChange={setSelected} /></section>;
 }
 
 export function LibraryExamples() {

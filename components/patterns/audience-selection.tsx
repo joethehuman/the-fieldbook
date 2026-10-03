@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Check } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import {
@@ -9,23 +9,19 @@ import {
   audienceSummary,
   contentAudienceKey,
 } from "@/lib/content-audiences";
-import { Checkbox } from "../ui/choice";
+import { Checkbox, Radio } from "../ui/choice";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Field, FieldDescription } from "../ui/field";
+import { SelectionViewport } from "../ui/selection-viewport";
 import {
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  TableContainer,
-} from "../ui/table";
-import { DataTable } from "./data-table";
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "../ui/collapsible";
 import { SearchField } from "./search-field";
-import { Pagination } from "./pagination";
 
-/** Shared audience selection; callers own draft/publication or governance writes. */
+/** Shared presentation; callers retain permissions, sources, publication and governance writes. */
 export function AudienceSelection({
   data,
   selected,
@@ -33,6 +29,7 @@ export function AudienceSelection({
   disabled,
   inherited = {},
   showPeople = true,
+  initialSelected = [],
 }: {
   data: Workspace;
   selected: string[];
@@ -40,215 +37,396 @@ export function AudienceSelection({
   disabled?: boolean;
   inherited?: Record<string, string[]>;
   showPeople?: boolean;
+  initialSelected?: string[];
 }) {
   const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
-  const all = audienceOptions(data);
-  const peopleByAudience = useMemo(
+  const parked = useRef<string[] | null>(null);
+  const all = audienceOptions(data).filter(
+    (a) => showPeople || a.kind === "group",
+  );
+  const people = useMemo(
     () => audiencePeople(data),
     [data.users, data.groups, data.teams],
   );
-  const guest = all.find((a) => a.publicGuests);
+  const organization = all.find((a) => a.organization),
+    guest = all.find((a) => a.publicGuests);
+  const orgKey = organization && contentAudienceKey(organization),
+    guestKey = guest && contentAudienceKey(guest);
+  const org = !!orgKey && selected.includes(orgKey);
   const keys = [...new Set([...selected, ...Object.keys(inherited)])];
-  const candidates = all.filter(
-    (a) =>
-      !a.publicGuests &&
-      `${a.kind}: ${a.name}${a.organization ? " everyone in the organization" : ""}`
-        .toLowerCase()
-        .includes(query.trim().toLowerCase()),
+  const members = (audienceKeys: string[]) =>
+    new Set(audienceKeys.flatMap((k) => [...(people.get(k) || [])]));
+  const directPeople = members(selected),
+    inheritedPeople = members(Object.keys(inherited));
+  const extraPeople = [...inheritedPeople].filter(
+    (id) => !directPeople.has(id),
+  ).length;
+  const curricula = [...new Set(Object.values(inherited).flat())];
+  const specific = all.filter((a) => !a.organization && !a.publicGuests);
+  const candidates = specific.filter((a) =>
+    `${a.name} ${a.kind}`.toLowerCase().includes(query.trim().toLowerCase()),
   );
-  const currentPage = Math.min(
-    page,
-    Math.max(1, Math.ceil(candidates.length / 10)),
-  );
-  const toggle = (key: string, checked: boolean) =>
+  const toggle = (key: string, checked: boolean) => {
+    if (parked.current)
+      parked.current = checked
+        ? [...new Set([...parked.current, key])]
+        : parked.current.filter((k) => k !== key);
     onChange(
       checked
         ? [...new Set([...selected, key])]
-        : selected.filter((id) => id !== key),
+        : selected.filter((k) => k !== key),
     );
+  };
+  const saved = initialSelected.filter((k) => k !== orgKey && k !== guestKey);
+  const independent = specific.filter(
+    (a) =>
+      audienceCoverage(data, a, keys, people).length ||
+      inherited[contentAudienceKey(a)]?.length,
+  );
   return (
-    <>
-      <SearchField>
-        <Input
-          type="search"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setPage(1);
-          }}
-          placeholder="Search teams or groups"
-          aria-label="Find a team or group"
-          disabled={disabled}
-        />
-      </SearchField>
-      <TableContainer>
-        <DataTable
-          layout="assignmentGroups"
-          aria-label="Team and group assignments"
+    <div className="grid gap-4">
+      {organization && (
+        <div
+          className="grid gap-3 sm:grid-cols-2"
+          role="group"
+          aria-label="Audience scope"
         >
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <span className="sr-only">Assign</span>
-              </TableHead>
-              <TableHead>Team or group</TableHead>
-              <TableHead>{showPeople ? "People" : ""}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {candidates
-              .slice((currentPage - 1) * 10, currentPage * 10)
-              .map((candidate) => {
-                const key = contentAudienceKey(candidate);
-                const label = `${candidate.kind === "team" ? "Team" : "Group"}: ${candidate.name}`;
-                const direct = selected.includes(key);
-                const through = inherited[key] || [];
-                const coverage = showPeople
-                  ? audienceCoverage(data, candidate, keys, peopleByAudience)
-                  : [];
-                const included = through.length > 0 || coverage.length > 0;
-                const organization = coverage.find((a) => a.organization);
-                const reason = through.length
-                  ? `Included through ${through.join(", ")}.`
-                  : organization
-                    ? "Included through Organization."
-                    : candidate.kind === "team"
-                      ? `Included through ${coverage.map((a) => a.name).join(", ")}.`
-                      : "Everyone currently in this group is already included.";
-                const people = peopleByAudience.get(key)?.size || 0;
-                return (
-                  <TableRow key={key}>
-                    <TableCell>
-                      {included && !direct ? (
-                        <span aria-label={`${label} included`}>
-                          <Check className="size-4" aria-hidden="true" />
-                        </span>
-                      ) : (
-                        <Checkbox
-                          aria-label={`Assign directly to ${label}`}
-                          aria-describedby={`audience-${candidate.kind}-${candidate.id}`}
-                          checked={direct}
-                          disabled={disabled}
-                          onCheckedChange={(checked) =>
-                            toggle(key, checked === true)
-                          }
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span>{label}</span>
-                      <div
-                        id={`audience-${candidate.kind}-${candidate.id}`}
-                        className="text-xs text-muted-foreground"
-                      >
-                        {candidate.organization && (
-                          <p>
-                            Everyone in the organization, including future
-                            members.
-                          </p>
-                        )}
-                        {included && (
-                          <p>
-                            {reason}
-                            {direct
-                              ? " Separate assignment retained; uncheck to remove it."
-                              : ""}
-                          </p>
-                        )}
-                        {included && !direct && (
-                          <Button
-                            type="button"
-                            variant="link"
-                            size="sm"
-                            disabled={disabled}
-                            onClick={() => toggle(key, true)}
-                          >
-                            Assign separately
-                            <span className="sr-only"> to {label}</span>
-                          </Button>
-                        )}
-                        {included &&
-                          !direct &&
-                          candidate.kind === "group" &&
-                          !organization &&
-                          !through.length && (
-                            <p>
-                              A separate assignment also covers future group
-                              members.
-                            </p>
-                          )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{showPeople ? people : ""}</TableCell>
-                  </TableRow>
-                );
-              })}
-          </TableBody>
-        </DataTable>
-      </TableContainer>
-      {showPeople &&
-        selected
-          .filter((key) => !all.some((a) => contentAudienceKey(a) === key))
-          .map((key) => (
-            <Field key={key} orientation="horizontal">
-              <Checkbox
-                checked
-                disabled={disabled}
-                onCheckedChange={() => toggle(key, false)}
-                aria-label={`Keep unavailable audience ${key}`}
-              />
-              <div>
-                Audience no longer exists
-                <FieldDescription>
-                  Uncheck to remove this saved audience.
-                </FieldDescription>
-              </div>
-            </Field>
-          ))}
-      {!candidates.length && (
-        <p className="text-copy text-muted-foreground">
-          {all.length
-            ? "No matching teams or groups."
-            : "Create a team or group before assigning content."}
-        </p>
+          <Field
+            orientation="horizontal"
+            variant="choice"
+            className="items-start"
+          >
+            <Radio
+              name="audience-scope"
+              value="organization"
+              aria-label="Organization"
+              checked={org}
+              disabled={disabled}
+              onChange={() => {
+                parked.current = selected.filter((k) => k !== orgKey);
+                onChange([
+                  ...selected.filter(
+                    (k) => initialSelected.includes(k) || k === guestKey,
+                  ),
+                  orgKey!,
+                ]);
+              }}
+            />
+            <span>
+              Organization
+              <FieldDescription>
+                Everyone registered, now and in future.
+              </FieldDescription>
+            </span>
+          </Field>
+          <Field
+            orientation="horizontal"
+            variant="choice"
+            className="items-start"
+          >
+            <Radio
+              name="audience-scope"
+              value="specific"
+              aria-label="Specific teams or groups"
+              checked={!org}
+              disabled={disabled}
+              onChange={() =>
+                onChange(
+                  [
+                    ...new Set([
+                      ...(parked.current || selected),
+                      ...selected.filter((k) => k !== orgKey),
+                    ]),
+                  ].filter((k) => k !== orgKey),
+                )
+              }
+            />
+            <span>
+              Specific teams or groups
+              <FieldDescription>Choose one or more audiences.</FieldDescription>
+            </span>
+          </Field>
+        </div>
       )}
-      <Pagination
-        page={currentPage}
-        pageSize={10}
-        total={candidates.length}
-        onPageChange={setPage}
-        label="Teams and groups"
-      />
-      {guest && (
-        <Field orientation="horizontal">
+      {guest ? (
+        <Field
+          orientation="horizontal"
+          className="items-start border-b border-border pb-4"
+        >
           <Checkbox
             id="audience-public-guests"
-            aria-label="Public guests"
-            checked={selected.includes(contentAudienceKey(guest))}
+            aria-label="Also include public guests"
+            checked={selected.includes(guestKey!)}
             disabled={disabled}
-            onCheckedChange={(checked) =>
-              toggle(contentAudienceKey(guest), checked === true)
-            }
+            onCheckedChange={(checked) => toggle(guestKey!, checked === true)}
             aria-describedby="audience-public-guests-help"
           />
-          <div>
-            <span>Public guests</span>
+          <span>
+            Also include public guests
             <FieldDescription id="audience-public-guests-help">
-              Use Group: {guest.name} for anonymous recommendations. Guests have
-              no completion requirement or due date.
-              {inherited[contentAudienceKey(guest)]?.length
-                ? ` Already included through ${inherited[contentAudienceKey(guest)].join(", ")}; removing this selection keeps those recommendations.`
+              Uses {guest.name}.
+              {showPeople && people.get(guestKey!)?.size
+                ? ` Also includes ${people.get(guestKey!)!.size} registered ${people.get(guestKey!)!.size === 1 ? "person" : "people"}.`
+                : ""}{" "}
+              Guests have no due dates or tracked completion.
+              {inherited[guestKey!]?.length
+                ? ` Already included through ${inherited[guestKey!].join(", ")}; removing this direct choice keeps those recommendations.`
                 : ""}
             </FieldDescription>
-          </div>
+          </span>
         </Field>
+      ) : (
+        data.settings?.access === "public" && (
+          <p className="text-sm text-muted-foreground">
+            Guest recommendations aren’t configured. Choose a group in Access
+            settings.
+          </p>
+        )
       )}
+      {org ? (
+        <div className="grid gap-1 rounded-md bg-surface p-4">
+          <p>All {directPeople.size} registered people</p>
+          <p className="text-sm text-muted-foreground">
+            Includes every team, people without a team, and future members. You
+            don’t need to select smaller audiences.
+          </p>
+        </div>
+      ) : (
+        <section className="grid gap-3" aria-label="Teams and groups">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="text-sm font-medium">Teams and groups</h3>
+            {showPeople && (
+              <p className="text-xs text-muted-foreground" aria-live="polite">
+                {directPeople.size}{" "}
+                {directPeople.size === 1 ? "person" : "people"} selected
+              </p>
+            )}
+          </div>
+          {extraPeople > 0 && (
+            <p className="text-xs text-muted-foreground">
+              {extraPeople} other{" "}
+              {extraPeople === 1 ? "person stays" : "people stay"} assigned
+              through a curriculum.
+            </p>
+          )}
+          <SearchField>
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Find a team or group"
+              aria-label="Find a team or group"
+              disabled={disabled}
+            />
+          </SearchField>
+          <SelectionViewport aria-label="Matching audiences">
+            {candidates.map((candidate) => {
+              const key = contentAudienceKey(candidate),
+                label = `${candidate.kind === "team" ? "Team" : "Group"}: ${candidate.name}`;
+              const direct = selected.includes(key),
+                coverage = showPeople
+                  ? audienceCoverage(data, candidate, keys, people)
+                  : [];
+              const through = inherited[key] || [];
+              const included =
+                !direct &&
+                (through.length > 0 ||
+                  (candidate.kind === "team" && coverage.length > 0));
+              return (
+                <Field
+                  key={key}
+                  orientation="horizontal"
+                  className="border-b border-border py-3 font-normal"
+                >
+                  {included ? (
+                    <span aria-label={`${label} included`}>
+                      <Check className="size-4" aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <Checkbox
+                      aria-label={`Assign directly to ${label}`}
+                      checked={direct}
+                      disabled={disabled}
+                      onCheckedChange={(checked) =>
+                        toggle(key, checked === true)
+                      }
+                    />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span>
+                      {candidate.name}{" "}
+                      <span className="text-xs text-muted-foreground">
+                        {candidate.kind === "team" ? "Team" : "Group"}
+                      </span>
+                    </span>
+                    {included && (
+                      <FieldDescription>
+                        Included through{" "}
+                        {through.length
+                          ? through.join(", ")
+                          : coverage.map((a) => a.name).join(", ")}
+                      </FieldDescription>
+                    )}
+                    {!included &&
+                      !direct &&
+                      candidate.kind === "group" &&
+                      coverage.length > 0 && (
+                        <FieldDescription>
+                          Current members already included · select to include
+                          future members.
+                        </FieldDescription>
+                      )}
+                    {direct && (through.length > 0 || coverage.length > 0) && (
+                      <FieldDescription>
+                        Saved separately · removing this choice keeps other
+                        assignments.
+                      </FieldDescription>
+                    )}
+                  </span>
+                  {showPeople && (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {people.get(key)?.size || 0}{" "}
+                      {people.get(key)?.size === 1 ? "person" : "people"}
+                    </span>
+                  )}
+                </Field>
+              );
+            })}
+            {!candidates.length && (
+              <p className="py-4 text-sm text-muted-foreground">
+                {query
+                  ? "No matching teams or groups."
+                  : "No teams or groups available."}
+              </p>
+            )}
+          </SelectionViewport>
+          <div
+            className="flex h-8 items-center justify-between gap-3 text-xs text-muted-foreground"
+            aria-label="Selected audiences"
+          >
+            <span
+              className="truncate"
+              title={selected
+                .map(
+                  (k) =>
+                    all.find((a) => contentAudienceKey(a) === k)?.name || k,
+                )
+                .join(", ")}
+            >
+              {selected.length
+                ? `Selected: ${selected.map((k) => all.find((a) => contentAudienceKey(a) === k)?.name || "Unavailable audience").join(", ")}`
+                : "No teams or groups selected"}
+            </span>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className={query ? "shrink-0" : "invisible shrink-0"}
+              tabIndex={query ? 0 : -1}
+              disabled={disabled}
+              onClick={() => setQuery("")}
+            >
+              Clear search
+            </Button>
+          </div>
+        </section>
+      )}
+      {org && saved.length > 0 && (
+        <section className="grid gap-3 border-t border-border pt-4">
+          <h3 className="text-sm font-medium">Separately saved audiences</h3>
+          <p className="text-xs text-muted-foreground">
+            These were saved before this edit. They stay selected alongside
+            Organization until you remove them.
+          </p>
+          {saved.map((key) => (
+            <div className="flex items-center justify-between gap-3" key={key}>
+              <span className="text-sm">
+                {all.find((a) => contentAudienceKey(a) === key)?.name ||
+                  "Unavailable audience"}
+              </span>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                disabled={disabled}
+                onClick={() => toggle(key, !selected.includes(key))}
+              >
+                {selected.includes(key) ? "Remove" : "Undo removal"}
+                <span className="sr-only">
+                  {" "}
+                  {all.find((a) => contentAudienceKey(a) === key)?.name}
+                </span>
+              </Button>
+            </div>
+          ))}
+        </section>
+      )}
+      {curricula.length > 0 && (
+        <section className="grid gap-2 border-t border-border pt-4">
+          <h3 className="text-sm font-medium">
+            Also assigned through {curricula.join(", ")}
+          </h3>
+          <p className="text-xs text-muted-foreground">
+            These assignments stay in place. To change them, edit the curriculum
+            in Curricula.
+          </p>
+        </section>
+      )}
+      {showPeople && independent.length > 0 && (
+        <Collapsible>
+          <CollapsibleTrigger asChild>
+            <Button type="button" variant="link" size="sm" disabled={disabled}>
+              Keep an audience independently
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="grid gap-3 pt-3">
+            <p className="text-xs text-muted-foreground">
+              An independent audience continues if its covering team or
+              curriculum is removed later.
+            </p>
+            {independent.map((a) => (
+              <Field orientation="horizontal" key={contentAudienceKey(a)}>
+                <Checkbox
+                  disabled={disabled}
+                  checked={selected.includes(contentAudienceKey(a))}
+                  onCheckedChange={(checked) =>
+                    toggle(contentAudienceKey(a), checked === true)
+                  }
+                  aria-label={`Keep ${a.name} independently`}
+                />
+                <span>{a.name}</span>
+              </Field>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+      {selected
+        .filter((k) => !all.some((a) => contentAudienceKey(a) === k))
+        .map((key) => (
+          <Field key={key} orientation="horizontal">
+            <Checkbox
+              checked
+              disabled={disabled}
+              onCheckedChange={() => toggle(key, false)}
+              aria-label={`Keep unavailable audience ${key}`}
+            />
+            <span>
+              Audience no longer exists
+              <FieldDescription>
+                Uncheck to remove this saved audience.
+              </FieldDescription>
+            </span>
+          </Field>
+        ))}
+      <p className="text-xs text-muted-foreground">
+        Everyone allowed into this installation can still read published
+        content.
+      </p>
       {showPeople && (
-        <p className="text-sm text-muted-foreground" aria-live="polite">
-          {audienceSummary(data, keys, peopleByAudience)}
+        <p className="sr-only" aria-live="polite">
+          {audienceSummary(data, keys, people)}
         </p>
       )}
-    </>
+    </div>
   );
 }

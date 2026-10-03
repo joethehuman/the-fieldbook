@@ -103,6 +103,7 @@ function readerBranding(config: Awaited<ReturnType<typeof canRead>>) {
   return {
     ...brandingFromSettings(config.settings),
     externalLinks: accountMenuLinks(config.settings.externalLinks),
+    askAiEnabled: config.settings.askAi?.enabled === true,
   };
 }
 function readerAccount(

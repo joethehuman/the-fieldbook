@@ -4,7 +4,12 @@ import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { setupAuthoringProvider, authoringUser } from "./provider-fixture";
 import { openContentSettings } from "./editor-helpers";
 
-async function setup(page: Page, installed: boolean, kind: "course" | "brief") {
+async function setup(
+  page: Page,
+  installed: boolean,
+  kind: "course" | "brief",
+  guestMode: "dedicated" | "shared" | "none" | "private" = "dedicated",
+) {
   const data = withPublishedSnapshots(freshWorkspace());
   const item = structuredClone(data.content.find((c) => c.kind === kind)!);
   item.id = "00000000-0000-4000-8000-000000000102";
@@ -23,8 +28,13 @@ async function setup(page: Page, installed: boolean, kind: "course" | "brief") {
   data.publishedContent = [structuredClone(item)];
   data.settings = {
     ...data.settings!,
-    access: "public",
-    guestGroupId: "visitors",
+    access: guestMode === "private" ? "private" : "public",
+    guestGroupId:
+      guestMode === "none"
+        ? null
+        : guestMode === "shared"
+          ? "sales-group"
+          : "visitors",
     organizationTeamId: "org",
   };
   data.groups = [
@@ -59,7 +69,7 @@ async function setup(page: Page, installed: boolean, kind: "course" | "brief") {
     },
   ].map((u, i) => ({
     ...u,
-    groups: i === 0 ? ["sales-group"] : [],
+    groups: (guestMode === "shared" ? i === 1 : i === 0) ? ["sales-group"] : [],
     teamId: i === 0 ? "sales" : undefined,
     active: true,
   }));
@@ -116,16 +126,16 @@ async function setup(page: Page, installed: boolean, kind: "course" | "brief") {
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const details = await openContentSettings(page);
   await details
-    .getByRole("button", { name: "Assign to teams or groups", exact: true })
+    .getByRole("button", { name: "Edit audience", exact: true })
     .click();
   const panel = page.getByRole("dialog", {
-    name: "Assign to teams or groups",
+    name: kind === "course" ? "Course audience" : "Update audience",
     exact: true,
   });
   await expect(panel).toBeVisible();
   return { data, item, panel, read, details };
 }
-test("shared picker recognizes Organization coverage, retains separate links and preserves cancellation", async ({
+test("shared workflow parks new choices, retains saved sources and contains review/cancel", async ({
   page,
 }, info) => {
   const { panel } = await setup(
@@ -133,9 +143,6 @@ test("shared picker recognizes Organization coverage, retains separate links and
     info.project.name.startsWith("production"),
     "course",
   );
-  await expect(panel.getByRole("row").nth(1)).toContainText(
-    "Team: Organization",
-  );
   await expect(
     panel.getByRole("checkbox", {
       name: "Assign directly to Team: Sales",
@@ -144,55 +151,80 @@ test("shared picker recognizes Organization coverage, retains separate links and
   ).toBeChecked();
   await panel
     .getByRole("checkbox", {
-      name: "Assign directly to Team: Organization",
+      name: "Assign directly to Group: Account executives",
       exact: true,
     })
     .check();
-  const sales = panel.getByRole("row").filter({ hasText: "Team: Sales" });
-  await expect(sales).toContainText("Separate assignment retained");
+  const selectBounds = await panel.boundingBox();
+  await panel.getByRole("radio", { name: "Organization", exact: true }).check();
+  await expect(
+    panel.getByText("Separately saved audiences", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByRole("button", { name: "Remove Sales", exact: true }),
+  ).toBeVisible();
+  await expect(
+    panel.getByRole("button", {
+      name: "Remove Account executives",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await panel
+    .getByRole("checkbox", { name: "Also include public guests", exact: true })
+    .check();
+  await expect(panel).toContainText("All 4 registered people");
+  await page.screenshot({ path: info.outputPath("audience-organization.png") });
+  await panel
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await expect(
+    panel.getByRole("button", { name: "Save assignments", exact: true }),
+  ).toBeVisible();
+  expect(await panel.boundingBox()).toEqual(selectBounds);
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await panel
+    .getByRole("button", { name: "View people and due dates", exact: true })
+    .click();
+  expect(await panel.boundingBox()).toEqual(selectBounds);
+  await expect(
+    panel.getByRole("table", { name: "Assignment recipients" }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("audience-review-expanded.png"),
+  });
+  await panel.getByRole("button", { name: "← Back", exact: true }).click();
+  await panel
+    .getByRole("radio", { name: "Specific teams or groups", exact: true })
+    .check();
   await expect(
     panel.getByRole("checkbox", {
       name: "Assign directly to Group: Account executives",
       exact: true,
     }),
-  ).toHaveCount(0);
+  ).toBeChecked();
+  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(
-    panel.getByLabel("Group: Account executives included", { exact: true }),
+    panel.getByText("Discard audience changes?", { exact: true }),
   ).toBeVisible();
-  await expect(
-    panel.getByRole("checkbox", { name: "Public guests", exact: true }),
-  ).not.toBeChecked();
+  expect(await panel.boundingBox()).toEqual(selectBounds);
   await panel
-    .getByRole("checkbox", { name: "Public guests", exact: true })
-    .check();
-  await expect(panel).toContainText(
-    "Everyone in the organization · 4 people · Public guests also included",
-  );
-  await page.screenshot({ path: info.outputPath("audience-organization.png") });
-  await panel
-    .getByRole("checkbox", {
-      name: "Assign directly to Team: Sales",
-      exact: true,
-    })
+    .getByRole("button", { name: "Keep editing", exact: true })
     .click();
   await expect(
-    panel.getByLabel("Team: Sales included", { exact: true }),
-  ).toBeVisible();
-  await panel.getByRole("searchbox").fill("no match");
-  await expect(panel.getByText("No matching teams or groups.")).toBeVisible();
-  await panel.getByRole("searchbox").fill("");
-  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
-  const confirm = page.getByRole("alertdialog", {
-    name: "Confirm action",
-    exact: true,
-  });
-  await confirm.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(panel).toBeVisible();
-  await panel.getByRole("button", { name: "Cancel", exact: true }).click();
-  await confirm.getByRole("button", { name: "Confirm", exact: true }).click();
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Team: Sales",
+      exact: true,
+    }),
+  ).toBeChecked();
+  await panel
+    .getByRole("button", { name: "Close audience editor", exact: true })
+    .click();
+  await panel
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
   await expect(panel).not.toBeVisible();
   await page
-    .getByRole("button", { name: "Assign to teams or groups", exact: true })
+    .getByRole("button", { name: "Edit audience", exact: true })
     .click();
   await expect(
     panel.getByRole("checkbox", {
@@ -202,10 +234,61 @@ test("shared picker recognizes Organization coverage, retains separate links and
   ).toBeChecked();
   await expect(
     panel.getByRole("checkbox", {
-      name: "Assign directly to Team: Organization",
+      name: "Assign directly to Group: Account executives",
       exact: true,
     }),
   ).not.toBeChecked();
+});
+
+test("search keeps internal geometry for many, one and zero matches", async ({
+  page,
+}, info) => {
+  const { panel } = await setup(
+    page,
+    info.project.name.startsWith("production"),
+    "course",
+  );
+  const search = panel.getByRole("searchbox");
+  await search.scrollIntoViewIfNeeded();
+  const bounds = async () => ({
+    dialog: await panel.boundingBox(),
+    search: await search.boundingBox(),
+    list: await panel
+      .getByLabel("Matching audiences", { exact: true })
+      .boundingBox(),
+    summary: await panel
+      .getByLabel("Selected audiences", { exact: true })
+      .boundingBox(),
+    footer: await panel.locator('[data-slot="dialog-footer"]').boundingBox(),
+  });
+  const before = await bounds();
+  await search.pressSequentially("Account executives");
+  expect(await bounds()).toEqual(before);
+  await expect(
+    panel.getByRole("checkbox", {
+      name: "Assign directly to Group: Account executives",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await search.fill("No matches here");
+  expect(await bounds()).toEqual(before);
+  await search.fill("");
+  expect(await bounds()).toEqual(before);
+  await page.screenshot({
+    path: info.outputPath("audience-search-stable.png"),
+  });
+  await panel
+    .getByRole("checkbox", {
+      name: "Assign directly to Group: Account executives",
+      exact: true,
+    })
+    .check();
+  await search.fill("Account executives");
+  await panel
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await panel.getByRole("button", { name: "← Back", exact: true }).click();
+  await expect(search).toHaveValue("Account executives");
 });
 test("Update picker applies to the draft, saves team/guest audiences, then publishes them explicitly", async ({
   page,
@@ -216,19 +299,14 @@ test("Update picker applies to the draft, saves team/guest audiences, then publi
     "brief",
   );
   await panel
-    .getByRole("checkbox", {
-      name: "Assign directly to Team: Organization",
+    .getByRole("radio", {
+      name: "Organization",
       exact: true,
     })
     .check();
   await panel
-    .getByRole("checkbox", { name: "Public guests", exact: true })
+    .getByRole("checkbox", { name: "Also include public guests", exact: true })
     .check();
-  await panel.getByRole("searchbox").fill("Sales");
-  await expect(
-    panel.getByLabel("Team: Sales included", { exact: true }),
-  ).toBeVisible();
-  await panel.getByRole("searchbox").fill("");
   await page.screenshot({ path: info.outputPath("update-audience-draft.png") });
   await panel
     .getByRole("button", { name: "Apply to draft", exact: true })
@@ -241,22 +319,31 @@ test("Update picker applies to the draft, saves team/guest audiences, then publi
   await page
     .getByRole("button", { name: "Revert to published version", exact: true })
     .click();
-  const restore = page.getByRole("alertdialog", { name: "Confirm action", exact: true });
+  const restore = page.getByRole("alertdialog", {
+    name: "Confirm action",
+    exact: true,
+  });
   await restore.getByRole("button", { name: "Cancel", exact: true }).click();
   expect((await read()).updateTeams).toEqual(["org"]);
-  await page.getByRole("button", { name: "Revert to published version", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Revert to published version", exact: true })
+    .click();
   await restore.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect.poll(async () => (await read()).updateTeams).toBeUndefined();
   expect((await read()).groups).toEqual([]);
   expect((await read(true)).groups).toEqual([]);
-  await page.getByRole("button", { name: "Assign to teams or groups", exact: true }).click();
-  await panel.getByRole("checkbox", { name: "Assign directly to Team: Organization", exact: true }).check();
-  await panel.getByRole("checkbox", { name: "Public guests", exact: true }).check();
-  await panel.getByRole("button", { name: "Apply to draft", exact: true }).click();
-  await expect.poll(async () => (await read()).updateTeams).toEqual(["org"]);
   await page
-    .getByRole("button", { name: "Publish", exact: true })
+    .getByRole("button", { name: "Edit audience", exact: true })
     .click();
+  await panel.getByRole("radio", { name: "Organization", exact: true }).check();
+  await panel
+    .getByRole("checkbox", { name: "Also include public guests", exact: true })
+    .check();
+  await panel
+    .getByRole("button", { name: "Apply to draft", exact: true })
+    .click();
+  await expect.poll(async () => (await read()).updateTeams).toEqual(["org"]);
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect
     .poll(async () => (await read(true)).updateTeams)
     .toEqual(["org"]);
@@ -280,3 +367,34 @@ test("Update picker applies to the draft, saves team/guest audiences, then publi
     ).toBeVisible();
   }
 });
+
+for (const mode of ["none", "private", "shared"] as const)
+  test(`guest shortcut respects ${mode} configuration`, async ({
+    page,
+  }, info) => {
+    const { panel, read } = await setup(
+      page,
+      info.project.name.startsWith("production"),
+      "brief",
+      mode,
+    );
+    const guest = panel.getByRole("checkbox", {
+      name: "Also include public guests",
+      exact: true,
+    });
+    if (mode !== "shared") {
+      await expect(guest).toHaveCount(0);
+      return;
+    }
+    await expect(panel).toContainText(
+      "Uses Account executives. Also includes 1 registered person.",
+    );
+    await guest.check();
+    await expect(panel).toContainText("1 person selected");
+    await panel
+      .getByRole("button", { name: "Apply to draft", exact: true })
+      .click();
+    await expect
+      .poll(async () => (await read()).groups)
+      .toEqual(["sales-group"]);
+  });

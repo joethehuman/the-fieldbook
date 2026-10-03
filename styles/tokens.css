@@ -1,4 +1,21 @@
 /* The sole owner of interface color and sizing values. Branding is a separate token. */
+/* Inline keeps the staggered delay local to each dot. */
+@theme inline {
+  --animate-loading-dot: loading-dot 1.4s ease-in-out
+    var(--loading-dot-delay, 0s) infinite;
+
+  @keyframes loading-dot {
+    0%,
+    60%,
+    100% {
+      transform: translateY(0);
+    }
+    30% {
+      transform: translateY(-0.1875rem);
+    }
+  }
+}
+
 :root {
   --background: #ffffff;
   --surface: #fafafa;
@@ -57,6 +74,9 @@
   --brand: #0069ff;
   --overlay: #17171766;
   --radius: 0.5rem;
+  --dialog-workflow-width: 49rem;
+  --dialog-workflow-height: 41rem;
+  --selection-results-height: 15rem;
   --sidebar-width: 16rem;
   --outline-width: 13rem;
   --course-outline-min-height: 16rem;

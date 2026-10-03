@@ -52,25 +52,28 @@ test("installed Content prepares the full audience and saves only after final as
     .getByRole("button", { name: "Assign", exact: true })
     .click();
   const picker = page.getByRole("dialog", {
-    name: "Assign to teams or groups",
+    name: "Course audience",
     exact: true,
   });
   await expect(picker).toBeVisible();
   expect(prepares).toBeGreaterThan(0);
   await picker
-    .getByRole("checkbox", { name: "Assign directly to Group: Pilot", exact: true })
+    .getByRole("checkbox", {
+      name: "Assign directly to Group: Pilot",
+      exact: true,
+    })
     .check();
   await picker
-    .getByRole("button", { name: "Review assignments", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
   const review = page.getByRole("dialog", {
-    name: "Assign Assignment preparation",
+    name: "Course audience",
     exact: true,
   });
   await expect(review).toBeVisible();
-  await expect(picker).not.toBeVisible();
+  await expect(picker).toBeVisible();
   expect(writes).toBe(0);
-  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await review.getByRole("button", { name: "← Back", exact: true }).click();
   await expect(picker).toBeVisible();
   await expect(
     picker.getByRole("checkbox", {
@@ -79,7 +82,7 @@ test("installed Content prepares the full audience and saves only after final as
     }),
   ).toBeChecked();
   await picker
-    .getByRole("button", { name: "Review assignments", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
   state = reconcileLearning(state, {
     ...state,
@@ -92,7 +95,7 @@ test("installed Content prepares the full audience and saves only after final as
   });
   state.governanceRevision = 13;
   await review
-    .getByRole("button", { name: "Apply assignments", exact: true })
+    .getByRole("button", { name: "Save assignments", exact: true })
     .click();
   await expect(picker).not.toBeVisible();
   expect(writes).toBe(1);

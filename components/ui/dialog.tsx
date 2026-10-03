@@ -36,7 +36,7 @@ export function DialogContent({
   onCloseAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
-  size?: "default" | "media" | "selection";
+  size?: "default" | "media" | "selection" | "workflow";
 }) {
   const returnFocus = React.useRef<HTMLElement | null>(null);
   return (
@@ -53,6 +53,8 @@ export function DialogContent({
             "h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
           size === "selection" &&
             "flex h-[min(48rem,calc(100dvh-3rem))] max-w-3xl flex-col overflow-hidden",
+          size === "workflow" &&
+            "flex h-[calc(100dvh-2rem)] sm:h-[min(var(--dialog-workflow-height),calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] max-w-[var(--dialog-workflow-width)] flex-col overflow-hidden",
           className,
         )}
         {...props}
@@ -103,5 +105,43 @@ export function DialogBody({
       className={cn("min-h-0 flex-1 overflow-hidden", className)}
       {...props}
     />
+  );
+}
+
+/** Informational steps within one workflow; navigation belongs to its actions. */
+export function DialogSteps({
+  steps,
+  current,
+}: {
+  steps: string[];
+  current: number;
+}) {
+  return (
+    <ol
+      aria-label="Steps"
+      className="flex shrink-0 gap-6 border-b border-border text-sm"
+    >
+      {steps.map((step, index) => (
+        <li
+          key={step}
+          aria-current={current === index ? "step" : undefined}
+          className={cn(
+            "flex items-center gap-2 border-b-2 border-transparent pb-3 text-muted-foreground",
+            current === index && "border-foreground text-foreground",
+          )}
+        >
+          <span
+            className={cn(
+              "flex size-4 items-center justify-center rounded-full border border-border text-xs",
+              current === index &&
+                "border-foreground bg-foreground text-background",
+            )}
+          >
+            {index + 1}
+          </span>
+          {step}
+        </li>
+      ))}
+    </ol>
   );
 }

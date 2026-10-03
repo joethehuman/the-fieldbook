@@ -231,6 +231,12 @@ const adminSections = [
         icon: FileText,
       },
       {
+        id: "settings-ai",
+        name: "Ask AI",
+        description: "Choose primary and fallback models, published sources and answer guidance.",
+        icon: Settings,
+      },
+      {
         id: "settings-mcp",
         name: "MCP",
         description: "Connect your AI tools to Fieldbook.",
@@ -265,6 +271,7 @@ type Props = {
   registerNavigationGuard?: RegisterNavigationGuard;
   registerLandingNavigation?: RegisterLandingNavigation;
   onReload?: () => Promise<Workspace>;
+  onSaveSettings?: (before: Workspace, settings: import("@/lib/settings").SiteSettings) => Promise<Workspace>;
   onReviewDeadlines?: (
     token?: string,
   ) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
@@ -288,6 +295,7 @@ export default function Admin({
   registerNavigationGuard,
   registerLandingNavigation,
   onReload,
+  onSaveSettings,
   onReviewDeadlines,
   onLoadPublished,
 }: Props) {
@@ -1027,6 +1035,7 @@ export default function Admin({
                 onReviewDeadlines={onReviewDeadlines}
                 onChange={onChange}
                 production={production}
+                onSaveSettings={onSaveSettings}
               />
             ) : tab === "feedback" ? (
               <FeedbackAdmin data={data} />
@@ -2423,7 +2432,7 @@ export function Editor({
       {c.kind !== "doc" && (c.kind === "brief" || onLearning) && (
         <EditorDetailsGroup
           id="content-assignments"
-          title="Assignments"
+          title="Audience"
           description={
             c.kind === "brief"
               ? "Appears in For you. No completion requirement or due date. Publish audience changes to make them live."

@@ -18,6 +18,8 @@ import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { CardPaletteSettings } from "./CardPaletteSettings";
 import { ExternalLinksSettings } from "./ExternalLinksSettings";
+import { AskAiSettingsPanel } from "./AskAiSettingsPanel";
+import { defaultAskAiSettings } from "@/lib/ai";
 import {
   externalLinkLabelError,
   externalLinkUrlError,
@@ -26,10 +28,11 @@ import { availableDocSections } from "@/lib/docs-navigation";
 import { groupPath } from "@/lib/group-hierarchy";
 import { defaultSettings, privacyHref } from "@/lib/settings";
 import { equalJson } from "@/lib/equal-json";
+import { useRevealTarget } from "./patterns/use-reveal-target";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
 export type SettingsSection =
-  "identity" | "links" | "docs" | "courses" | "access" | "privacy" | "mcp";
+  "identity" | "links" | "docs" | "courses" | "access" | "privacy" | "mcp" | "ai";
 export default function SiteSettingsPanel({
   data,
   onChange,
@@ -37,6 +40,7 @@ export default function SiteSettingsPanel({
   contributor = false,
   section,
   registerNavigationGuard,
+  onSaveSettings,
   onReviewDeadlines,
 }: {
   onReviewDeadlines?: (token?: string) => Promise<import("@/lib/assignment-episodes").DeadlineReview>;
@@ -46,18 +50,28 @@ export default function SiteSettingsPanel({
   contributor?: boolean;
   section: SettingsSection;
   registerNavigationGuard?: RegisterNavigationGuard;
+  onSaveSettings?: (before: Workspace, settings: import("@/lib/settings").SiteSettings) => Promise<Workspace>;
 }) {
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
-  const [settings, setSettings] = useState(() => {
-      const saved = (data.settings || {}) as Partial<typeof defaultSettings> & {
-        logoUrl?: string;
-      };
-      const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
-      return { ...defaultSettings, ...withoutLogo };
-    }),
+  const saveError = useRevealTarget();
+  const loadedSettings = (workspace: Workspace) => {
+    const saved = (workspace.settings || {}) as Partial<typeof defaultSettings> & {
+      logoUrl?: string;
+    };
+    const { logoUrl: _legacyLogoUrl, ...withoutLogo } = saved;
+    return {
+      ...defaultSettings, ...withoutLogo,
+      ...(withoutLogo.askAi ? { askAi: { ...defaultAskAiSettings, ...withoutLogo.askAi } } : {}),
+      ...(section === "ai" && !withoutLogo.askAi ? {
+        askAi: { ...defaultAskAiSettings, enabled: !production },
+      } : {}),
+    };
+  };
+  const [settings, setSettings] = useState(() => loadedSettings(data)),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
+  const saveBase = useRef(data);
   const savedSettings = useRef(settings);
   const dirty = !equalJson(settings, savedSettings.current);
   const guard = useRef(async () => true);
@@ -86,11 +100,23 @@ export default function SiteSettingsPanel({
   );
   const [nameError, setNameError] = useState("");
   const [linkErrors, setLinkErrors] = useState(false);
+  async function persistSettings(next: typeof settings) {
+    let saved: Workspace;
+    if (onSaveSettings) saved = await onSaveSettings(saveBase.current, next);
+    else {
+      await onChange({ ...data, settings: next });
+      saved = { ...data, settings: next };
+    }
+    saveBase.current = saved;
+    const latest = loadedSettings(saved);
+    savedSettings.current = latest;
+    setSettings(latest);
+  }
   const saveAction = (
     <ActionGroup>
       {dirty && <span role="status" className="text-caption text-muted-foreground">Unsaved changes</span>}
       {dirty && <Button type="button" variant="outline" disabled={busy} onClick={() => { setSettings(savedSettings.current); setNotice(""); }}>Discard changes</Button>}
-      <Button type="submit" loading={busy}>{busy ? "Saving…" : "Save settings"}</Button>
+      <Button type="submit" loading={busy} disabled={section === "ai" && !!settings.askAi?.enabled && !settings.askAi.model}>{busy ? "Saving…" : "Save settings"}</Button>
     </ActionGroup>
   );
   return (
@@ -99,6 +125,10 @@ export default function SiteSettingsPanel({
       onSubmit={async (e) => {
         e.preventDefault();
         if (busy) return;
+        if (section === "ai" && settings.askAi?.enabled && !settings.askAi.model) {
+          setNotice("Choose a primary model before enabling Ask AI.");
+          return;
+        }
         if (section === "links") {
           const invalid = settings.externalLinks?.find(
             (link) =>
@@ -134,12 +164,11 @@ export default function SiteSettingsPanel({
                     ),
                   }
                 : settings;
-          await onChange({ ...data, settings: next });
-          savedSettings.current = next;
-          setSettings(next);
+          await persistSettings(next);
           notify("Settings saved.");
         } catch (e) {
           setNotice((e as Error).message);
+          saveError.reveal();
         } finally {
           setBusy(false);
         }
@@ -529,12 +558,11 @@ export default function SiteSettingsPanel({
               setBusy(true);
               setNotice("");
               try {
-                await onChange({ ...data, settings: next });
-                savedSettings.current = next;
-                setSettings(next);
+                await persistSettings(next);
                 notify("Privacy policy published.");
               } catch (e) {
                 setNotice((e as Error).message);
+                saveError.reveal();
               } finally {
                 setBusy(false);
               }
@@ -543,9 +571,16 @@ export default function SiteSettingsPanel({
         </section>
       )}
       {section === "mcp" && <McpSettings production={production} contributor={contributor} />}
+      {section === "ai" && !contributor && <AskAiSettingsPanel
+        production={production} busy={busy} actions={saveAction}
+        value={settings.askAi ?? defaultAskAiSettings}
+        onChange={(askAi) => setSettings({ ...settings, askAi })}
+      />}
       {section !== "mcp" && notice && (
-        <div className="settings-save-bar">
-          <Alert role="status">{notice}</Alert>
+        <div className="settings-save-bar" {...saveError.targetProps}>
+          <Alert variant="destructive" role="alert">
+            {notice}
+          </Alert>
         </div>
       )}
     </form>

@@ -3,6 +3,9 @@ import type { User, Content } from "@/lib/types";
 import { requireAdmin, HttpError } from "./auth";
 import { data as dataStore } from "./data";
 import { settingsSchema } from "./schemas";
+import { ai } from "./ai";
+import { requireAiRouter, selectionRouter } from "./ai-router";
+import { defaultAskAiSettings } from "@/lib/ai";
 import {
   availableDocSections,
   legacySectionConflict,
@@ -25,6 +28,30 @@ export async function saveSettings(
     throw new HttpError(400, "A settings revision is required.");
   const config = await dataStore().readSettingsContext();
   if (!config) throw new HttpError(503, "Settings are unavailable. Try again.");
+  const previousAi = config.settings.askAi ?? defaultAskAiSettings;
+  let nextAi = parsed.data.askAi;
+  const provider = nextAi?.enabled ? ai() : null;
+  if (nextAi?.enabled && provider) {
+    requireAiRouter(nextAi, provider);
+    nextAi = { ...nextAi, router: provider.id };
+  }
+  // Disabling and unrelated saves must work when the AI service is unavailable.
+  if (
+    nextAi?.enabled &&
+    (!previousAi.enabled ||
+      selectionRouter(nextAi) !== selectionRouter(previousAi) ||
+      nextAi.model !== previousAi.model ||
+      nextAi.fallbackModel !== (previousAi.fallbackModel ?? ""))
+  ) {
+    const signal = AbortSignal.timeout(10_000);
+    await provider!.validateModel(nextAi.model, signal);
+    if (nextAi.fallbackModel)
+      await provider!.validateModel(nextAi.fallbackModel, signal);
+    await Promise.all([
+      dataStore().searchAiPassages([], nextAi.sources, signal),
+      dataStore().areAiSourcesCurrent([], signal),
+    ]);
+  }
   const selected = parsed.data.guestGroupId;
   if (selected && selected !== config.settings.guestGroupId) {
     if (!config.groups.some((g: { id: string }) => g.id === selected))
@@ -105,12 +132,25 @@ export async function saveSettings(
         );
     }
   }
+  const settings = {
+    ...parsed.data,
+    ...(nextAi ? { askAi: nextAi } : {}),
+    // Some installations already enforce this identity in database triggers.
+    // It is not an editable setting and must come from the saved configuration.
+    ...(config.settings.organizationTeamId
+      ? { organizationTeamId: config.settings.organizationTeamId }
+      : {}),
+    // Older loaded Admin clients must not erase a new optional configuration.
+    ...(parsed.data.askAi === undefined && config.settings.askAi
+      ? { askAi: config.settings.askAi }
+      : {}),
+  };
   const data = await dataStore().updateSettings(
-    parsed.data,
+    settings,
     a.expected,
     config.governance_revision,
   );
   if (!data)
     throw new HttpError(409, "Settings changed. Reload before saving.");
-  return data;
+  return { ...data, settings };
 }

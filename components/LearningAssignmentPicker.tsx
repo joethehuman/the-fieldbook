@@ -26,8 +26,10 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
+  DialogSteps,
 } from "./ui/dialog";
-import { useInteractionDialog } from "./ui/interaction-dialog";
+import { LearningAudienceReview } from "./LearningAudienceReview";
+import { X } from "lucide-react";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 
 export function LearningAssignmentPicker({
@@ -37,7 +39,7 @@ export function LearningAssignmentPicker({
   onChange,
   registerNavigationGuard,
   onPrepare,
-  triggerLabel = "Assign to teams or groups",
+  triggerLabel = "Edit audience",
   compact = false,
   draftAudiences,
   onDraftChange,
@@ -62,7 +64,22 @@ export function LearningAssignmentPicker({
     [selected, setSelected] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [stale, setStale] = useState(false);
+    [stale, setStale] = useState(false),
+    [step, setStep] = useState<"select" | "review" | "discard">("select"),
+    [reviewPlan, setReviewPlan] = useState<{
+      before: Workspace;
+      after: Workspace;
+      stamp: string;
+    } | null>(null);
+  const body = useRef<HTMLDivElement>(null);
+  const reviewDone = useRef<((accepted: boolean) => void) | null>(null);
+  const discardDone = useRef<((accepted: boolean) => void) | null>(null);
+  const previousStep = useRef<"select" | "review">("select");
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    body.current?.scrollTo(0, 0);
+    heading.current?.focus({ preventScroll: true });
+  }, [step]);
   const dataRef = useRef(data);
   dataRef.current = data;
   const mounted = useRef(true);
@@ -70,22 +87,37 @@ export function LearningAssignmentPicker({
     mounted.current = true;
     return () => {
       mounted.current = false;
+      reviewDone.current?.(false);
+      discardDone.current?.(false);
     };
   }, []);
   const initial = useRef<string[]>([]),
     revision = useRef<number | undefined>(undefined),
     snapshot = useRef(""),
-    running = useRef(false);
-  const { confirm } = useInteractionDialog();
+    running = useRef(false),
+    refreshing = useRef(false);
   const notify = useToast();
   const dirty =
     open &&
     JSON.stringify([...selected].sort()) !==
       JSON.stringify([...initial.current].sort());
   const guard = useRef(async () => true);
-  guard.current = async () =>
-    !running.current &&
-    (!dirty || (await confirm("Discard unsaved assignment changes?")));
+  guard.current = async () => {
+    if (running.current || refreshing.current) return false;
+    if (!dirty) return true;
+    if (discardDone.current) return false;
+    previousStep.current = step === "review" ? "review" : "select";
+    setStep("discard");
+    const accepted = await new Promise<boolean>((done) => {
+      discardDone.current = done;
+    });
+    if (accepted) {
+      reviewDone.current?.(false);
+      reviewDone.current = null;
+      setOpen(false);
+    }
+    return accepted;
+  };
   useEffect(() => {
     if (!open) return;
     registerNavigationGuard?.(() => guard.current(), {
@@ -114,8 +146,11 @@ export function LearningAssignmentPicker({
       return sources.length ? [[key, sources]] : [];
     }),
   );
+  const draftKeys = showPeople
+    ? draftAudiences
+    : draftAudiences?.filter((key) => key.startsWith("group:"));
   const initialKeys =
-    draftAudiences ||
+    draftKeys ||
     (learningItem ? directlyAssignedAudiences(data, learningItem) : []);
   const assignmentSnapshot = (workspace: Workspace) =>
     JSON.stringify([
@@ -137,22 +172,24 @@ export function LearningAssignmentPicker({
     ) {
       setStale(true);
       throw new Error(
-        "Teams, groups, membership or learning changed. Close this dialog and review the current list.",
+        "Teams, groups, membership or learning changed. Refresh to review the current consequences.",
       );
     }
   };
   async function close() {
     if (await guard.current()) {
+      reviewDone.current?.(false);
+      reviewDone.current = null;
       setOpen(false);
       setError("");
     }
   }
   async function save() {
-    if (running.current) return;
+    if (running.current || refreshing.current) return;
     if (data.governanceRevision !== revision.current) {
       setStale(true);
       setError(
-        "Teams, groups or membership changed. Close this dialog and review the current list.",
+        "Teams, groups or membership changed. Refresh to review the current consequences.",
       );
       return;
     }
@@ -173,9 +210,26 @@ export function LearningAssignmentPicker({
             locallyHandled: true,
             validateCurrent,
             review: {
-              title: `Assign ${title}`,
-              confirmLabel: "Apply assignments",
-              always: true,
+              confirm: async (before, after) => {
+                validateCurrent();
+                running.current = false;
+                setBusy(false);
+                setReviewPlan({
+                  before,
+                  after,
+                  stamp: new Date().toISOString(),
+                });
+                setStep("review");
+                const accepted = await new Promise<boolean>((done) => {
+                  reviewDone.current = done;
+                });
+                reviewDone.current = null;
+                if (accepted) {
+                  running.current = true;
+                  setBusy(true);
+                }
+                return accepted;
+              },
             },
           },
         );
@@ -194,7 +248,7 @@ export function LearningAssignmentPicker({
       }
     } finally {
       running.current = false;
-      setBusy(false);
+      if (!refreshing.current) setBusy(false);
     }
   }
   async function begin() {
@@ -208,18 +262,47 @@ export function LearningAssignmentPicker({
       if (!prepared || !mounted.current) return;
       const ids =
         item.kind === "brief"
-          ? draftAudiences || []
+          ? draftKeys || []
           : directlyAssignedAudiences(prepared, item);
       initial.current = ids;
       revision.current = prepared.governanceRevision;
       snapshot.current = assignmentSnapshot(prepared);
       setSelected(ids);
+      setStep("select");
+      setReviewPlan(null);
       setOpen(true);
     } catch (e) {
       if (mounted.current) setError((e as Error).message);
     } finally {
       running.current = false;
       if (mounted.current) setBusy(false);
+    }
+  }
+  async function refresh() {
+    refreshing.current = true;
+    running.current = true;
+    reviewDone.current?.(false);
+    reviewDone.current = null;
+    setBusy(true);
+    try {
+      const latest = onPrepare ? await onPrepare() : dataRef.current;
+      if (!latest || !mounted.current) return;
+      revision.current = latest.governanceRevision;
+      snapshot.current = assignmentSnapshot(latest);
+      initial.current =
+        item.kind === "brief"
+          ? draftKeys || []
+          : directlyAssignedAudiences(latest, item);
+      setStale(false);
+      setError("");
+      setReviewPlan(null);
+      setStep("select");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      refreshing.current = false;
+      running.current = false;
+      setBusy(false);
     }
   }
   return (
@@ -258,44 +341,172 @@ export function LearningAssignmentPicker({
           if (!next) void close();
         }}
       >
-        <DialogContent size="selection" className="max-w-4xl">
-          <DialogTitle>Assign to teams or groups</DialogTitle>
-          <DialogDescription>
-            {title}. Choose who receives this content in For you. Teams include
-            their subteams.
-            {item.kind === "brief"
-              ? " Updates have no completion requirement or due date. Apply to draft, then Publish to update recommendations."
-              : " Courses count toward assigned learning; due dates follow organization settings. Existing curriculum assignments are retained."}
-          </DialogDescription>
-          {error && <Alert variant="destructive">{error}</Alert>}
-          <DialogBody className="overflow-y-auto">
-            <AudienceSelection
-              key={open ? "open" : "closed"}
-              data={data}
-              selected={selected}
-              onChange={setSelected}
-              disabled={busy || stale}
-              inherited={inherited}
-              showPeople={showPeople}
-            />
-          </DialogBody>
-          <DialogFooter>
+        <DialogContent
+          size="workflow"
+          onEscapeKeyDown={(event) => {
+            event.preventDefault();
+            void close();
+          }}
+          onPointerDownOutside={(event) => {
+            event.preventDefault();
+            void close();
+          }}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            heading.current?.focus({ preventScroll: true });
+          }}
+        >
+          <div className="flex shrink-0 items-start justify-between gap-4">
+            <div className="grid gap-2">
+              <DialogTitle ref={heading} tabIndex={-1}>
+                {item.kind === "brief"
+                  ? "Update audience"
+                  : item.kind === "curriculum"
+                    ? "Curriculum audience"
+                    : "Course audience"}
+              </DialogTitle>
+              <DialogDescription>{title}</DialogDescription>
+            </div>
             <Button
               type="button"
               variant="ghost"
+              size="icon"
+              aria-label="Close audience editor"
               disabled={busy}
               onClick={() => void close()}
             >
-              Cancel
+              <X aria-hidden="true" />
             </Button>
-            <Button
-              type="button"
-              loading={busy}
-              disabled={!dirty || stale}
-              onClick={() => void save()}
-            >
-              {item.kind === "brief" ? "Apply to draft" : "Review assignments"}
-            </Button>
+          </div>
+          {item.kind !== "brief" && (
+            <DialogSteps
+              steps={["Select audience", "Review changes"]}
+              current={step === "review" ? 1 : 0}
+            />
+          )}
+          <DialogBody
+            ref={body}
+            className="overflow-y-auto [scrollbar-gutter:stable]"
+          >
+            {error && (
+              <div className="mb-4 grid gap-3">
+                <Alert variant="destructive">{error}</Alert>
+                {stale && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => void refresh()}
+                  >
+                    Refresh audience
+                  </Button>
+                )}
+              </div>
+            )}
+            <div hidden={step !== "select"} className="grid gap-4">
+              <p className="text-sm text-muted-foreground">
+                {item.kind === "brief"
+                  ? "Choose who gets this Update in For you. No completion requirement."
+                  : "Choose who gets this learning in For you and assigned learning."}
+              </p>
+              <AudienceSelection
+                data={data}
+                selected={selected}
+                initialSelected={initial.current}
+                onChange={setSelected}
+                disabled={busy || stale}
+                inherited={inherited}
+                showPeople={showPeople}
+              />
+            </div>
+            {step === "review" && reviewPlan && learningItem && (
+              <LearningAudienceReview
+                key={reviewPlan.stamp}
+                before={reviewPlan.before}
+                after={reviewPlan.after}
+                item={learningItem}
+                stamp={reviewPlan.stamp}
+              />
+            )}
+            {step === "discard" && (
+              <div className="grid gap-3">
+                <h3 className="text-lg font-medium">
+                  Discard audience changes?
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Your saved audience will stay as it is.
+                </p>
+              </div>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            {step === "discard" ? (
+              <>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    discardDone.current?.(false);
+                    discardDone.current = null;
+                    setStep(previousStep.current);
+                  }}
+                >
+                  Keep editing
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    discardDone.current?.(true);
+                    discardDone.current = null;
+                  }}
+                >
+                  Discard changes
+                </Button>
+              </>
+            ) : (
+              <>
+                {step === "review" ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      reviewDone.current?.(false);
+                      setStep("select");
+                    }}
+                  >
+                    ← Back
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => void close()}
+                  >
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  loading={busy}
+                  disabled={!dirty || stale}
+                  onClick={() => {
+                    if (step === "review") {
+                      running.current = true;
+                      setBusy(true);
+                      reviewDone.current?.(true);
+                    } else void save();
+                  }}
+                >
+                  {item.kind === "brief"
+                    ? "Apply to draft"
+                    : step === "review"
+                      ? "Save assignments"
+                      : "Review changes"}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
