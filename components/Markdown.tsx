@@ -4,7 +4,7 @@ import { ScrollableMarkdownTable } from "./patterns/scrollable-markdown-table";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { contentLinkTarget, normalizeContentLink, type ContentLinkContext } from "@/lib/content-links";
-import { videoSource } from "@/lib/video";
+import { isInlineVideo } from "@/lib/inline-video";
 import { CourseVideo } from "./patterns/course-video";
 import { Button } from "./ui/button";
 
@@ -59,17 +59,8 @@ export default function Markdown({
           : {}),
         a: ({ href, children }) => {
           href = href ? normalizeContentLink(href) : href;
-          if (href && videoSource(href) && linkContext === "course" && (href.startsWith("/api/media/") || String(children) === "Video"))
+          if (href && isInlineVideo(href, String(children)))
             return <CourseVideo url={href} title={String(children)} />;
-          if (href?.startsWith("/api/media/") && /\.(mp4|webm)(?:\?|$)/i.test(href))
-            return (
-              <video
-                controls
-                preload="metadata"
-                src={href}
-                aria-label={String(children)}
-              />
-            );
           const target = contentLinkTarget(href, linkContext, sameSiteOrigins);
           return (
             <a href={href} target={target} rel={target ? "noopener noreferrer" : undefined}>

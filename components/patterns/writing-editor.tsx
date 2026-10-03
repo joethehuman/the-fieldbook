@@ -1,18 +1,45 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Component, createContext, useContext, useLayoutEffect, type ReactNode, useMemo, useRef, useState } from "react";
+import { Component, createContext, useContext, useLayoutEffect, type ReactNode, useMemo, useState } from "react";
 import { Textarea } from "../ui/textarea";
 import { Alert } from "../ui/alert";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
+import { Button } from "../ui/button";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../ui/dropdown-menu";
+import { Download, MoreHorizontal } from "lucide-react";
 import type { UploadMedia } from "../MarkdownEditor";
-import Markdown from "../Markdown";
+import { EditorFocusControls } from "./editor-focus";
+import { WritingTitleContext } from "./writing-title";
 import { useScrollFade } from "./use-scroll-fade";
 import { revealEditorTarget } from "./reveal-editor-target";
 import "../../styles/writing-editor.css";
 
 // Next's loading component does not receive the lazy editor's props.
 const EditorViewContext = createContext<ReactNode>(null);
+const MarkdownDownloadContext = createContext({ value: "", name: "Content" });
+
+function MarkdownDownloadMenu() {
+  const { value, name } = useContext(MarkdownDownloadContext);
+  function download() {
+    const url = URL.createObjectURL(new Blob([value], { type: "text/markdown;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").slice(0, 120) || "Content"}.md`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    // Allow the browser to consume the URL before releasing the download.
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+  return <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button type="button" size="icon" variant="ghost" aria-label="More editor actions"><MoreHorizontal /></Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      <DropdownMenuItem onSelect={download}><Download aria-hidden="true" />Download Markdown</DropdownMenuItem>
+    </DropdownMenuContent>
+  </DropdownMenu>;
+}
 
 function EditorViewHeader({ children }: { children: ReactNode }) {
   return <div className="writing-view-header flex min-w-0 flex-wrap items-center">{children}</div>;
@@ -22,9 +49,9 @@ function WritingToolsLoading() {
   const viewControls = useContext(EditorViewContext);
   return <div className="writing-surface min-w-0 rounded-lg border border-border bg-background">
     <EditorViewHeader>{viewControls}</EditorViewHeader>
-    <TabsContent value="write" className="writing-viewport mt-0 focus-visible:ring-0">
+    <div className="writing-viewport mt-0 focus-visible:ring-0">
       <div className="min-h-96 p-4"><p role="status">Loading writing tools…</p></div>
-    </TabsContent>
+    </div>
   </div>;
 }
 
@@ -50,6 +77,8 @@ class EditorBoundary extends Component<
 }
 
 export type WritingEditorProps = {
+  title?: ReactNode;
+  downloadName?: string;
   value: string;
   onChange: (value: string) => void;
   onUpload?: UploadMedia;
@@ -57,54 +86,28 @@ export type WritingEditorProps = {
   label?: string;
 };
 
-/** Visual authoring and an explicit, lossless source escape hatch share one value. */
+/** Visual authoring with a Markdown download and lossless recovery for unsupported content. */
 export function WritingEditor({
   label = "Content",
+  title,
+  downloadName = label,
   ...props
 }: WritingEditorProps) {
   const [mode, setMode] = useState("write");
   const [issue, setIssue] = useState("");
   const [failureDetail, setFailureDetail] = useState("");
-  const pendingViewFocus = useRef<string | null>(null);
   const sourceFade = useScrollFade<HTMLTextAreaElement>(mode === "source");
-  const previewFade = useScrollFade<HTMLDivElement>(mode === "preview");
   useLayoutEffect(() => { sourceFade.measure(); }, [mode, props.value, sourceFade.measure]);
   // Keep the toolbar slot stable while typing so the engine's plugins stay stable.
   const viewControls = useMemo(() => (
-    <TabsList className="ml-auto shrink-0" aria-label="Editor view">
-      {[
-        ["write", "Write"],
-        ["source", "Markdown"],
-        ["preview", "Preview draft"],
-      ].map(([key, text]) => (
-        <TabsTrigger
-          key={key}
-          value={key}
-          disabled={props.disabled}
-          ref={(button) => {
-            if (!button) return;
-            if (pendingViewFocus.current === key) {
-              pendingViewFocus.current = null;
-              button.focus({ preventScroll: true });
-            }
-            return () => {
-              if (document.activeElement === button && pendingViewFocus.current === null) pendingViewFocus.current = key;
-            };
-          }}
-        >
-          {text}
-        </TabsTrigger>
-      ))}
-    </TabsList>
-  ), [props.disabled]);
+    <div className="writing-view-controls ml-auto flex min-w-0 flex-wrap items-center gap-2">
+      <EditorFocusControls /><MarkdownDownloadMenu />
+    </div>
+  ), []);
   return (
+    <MarkdownDownloadContext.Provider value={{ value: props.value, name: downloadName }}>
+    <WritingTitleContext.Provider value={title}>
     <EditorViewContext.Provider value={viewControls}>
-      <Tabs value={mode} onValueChange={(key) => {
-        if (mode !== key) pendingViewFocus.current = key;
-        setIssue("");
-        setFailureDetail("");
-        setMode(key);
-      }} asChild>
         <section className="writing-root flex min-w-0 flex-col gap-3" aria-label={`${label} editor`} onFocusCapture={(event) => {
           const target = event.target;
           if (!(target instanceof HTMLElement) || !target.matches('[contenteditable], textarea, [role="tabpanel"]')) return;
@@ -116,6 +119,8 @@ export function WritingEditor({
           {issue && (
             <Alert role="alert">
               {issue} Your original text is preserved below.
+              <Button type="button" variant="outline" size="sm" className="ml-2" disabled={props.disabled}
+                onClick={() => { setIssue(""); setFailureDetail(""); setMode("write"); }}>Retry visual editor</Button>
               {process.env.NODE_ENV === "development" && failureDetail && <details className="mt-2">
                 <summary>Editor error details</summary>
                 <p className="mt-2 font-mono text-sm">{failureDetail}</p>
@@ -125,8 +130,8 @@ export function WritingEditor({
           {mode !== "write" ? (
             <div className="writing-surface min-w-0 rounded-lg border border-border bg-background">
               <EditorViewHeader>{viewControls}</EditorViewHeader>
-              {mode === "source" ? (
-                <TabsContent value="source" className="writing-viewport writing-source-panel mt-0 focus-visible:ring-0">
+                <div className="writing-viewport writing-source-panel mt-0 focus-visible:ring-0">
+                  {title && <div className="writing-document-heading">{title}</div>}
                   <Textarea
                     ref={sourceFade.ref}
                     aria-label={`${label} Markdown`}
@@ -139,23 +144,11 @@ export function WritingEditor({
                     data-scroll-fade-after={false}
                     className="writing-source writing-scroll-area scroll-fade rounded-none border-0 px-[var(--editor-content-padding,var(--space-3))] font-mono leading-relaxed focus-visible:ring-0 focus-visible:ring-offset-0"
                   />
-                </TabsContent>
-              ) : (
-                <TabsContent ref={previewFade.ref} value="preview" className="writing-viewport writing-scroll-area scroll-fade mt-0 focus-visible:ring-0"
-                  data-scroll-fade-before={previewFade.edges.before} data-scroll-fade-after={false} onScroll={previewFade.measure}>
-                  <div
-                    className="markdown min-h-96 py-4 px-[var(--editor-content-padding,var(--space-4))] sm:py-6 sm:px-[var(--editor-content-padding,var(--space-6))] [&>:first-child]:mt-0"
-                    aria-label="Draft preview"
-                  >
-                    {props.value ? <Markdown>{props.value}</Markdown> : <p>Nothing to preview yet.</p>}
-                  </div>
-                </TabsContent>
-              )}
+                </div>
             </div>
           ) : (
             <EditorBoundary
               onFailure={(error) => {
-                pendingViewFocus.current = "source";
                 setIssue("The visual editor could not open this content.");
                 setFailureDetail(`${error.name}: ${error.message}`);
                 setMode("source");
@@ -166,9 +159,8 @@ export function WritingEditor({
                 label={label}
                 viewControls={viewControls}
                 onUnsupported={() => {
-                  pendingViewFocus.current = "source";
                   setIssue(
-                    "This content needs Markdown mode to keep all its formatting.",
+                    "This content uses formatting the visual editor cannot safely edit.",
                   );
                   setMode("source");
                 }}
@@ -176,7 +168,8 @@ export function WritingEditor({
             </EditorBoundary>
           )}
         </section>
-      </Tabs>
     </EditorViewContext.Provider>
+    </WritingTitleContext.Provider>
+    </MarkdownDownloadContext.Provider>
   );
 }

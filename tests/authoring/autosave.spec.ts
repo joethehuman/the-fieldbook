@@ -1,3 +1,4 @@
+import { replaceWritingText } from "./editor-helpers";
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -111,7 +112,7 @@ test("Docs, Updates and Courses quietly save incomplete drafts, revert to Publis
       await current.getByLabel("Title", { exact: true }).fill("");
       await expect.poll(async () => (await read()).title).toBe("");
       expect((await read(true)).title).toBe(before.title);
-      await expect(current.getByRole("button", { name: "Publish changes", exact: true })).toBeDisabled();
+      await expect(current.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
       const details = await openContentSettings(current);
       await expect(current.getByRole("button", { name: "Draft recovery", exact: true })).toHaveCount(0);
       await details.getByRole("button", { name: "Revert to published version", exact: true }).click();
@@ -137,7 +138,7 @@ test("Docs, Updates and Courses quietly save incomplete drafts, revert to Publis
         .getByLabel("Title", { exact: true })
         .fill("Explicitly published latest title");
       await current
-        .getByRole("button", { name: "Publish changes", exact: true })
+        .getByRole("button", { name: "Publish", exact: true })
         .click();
       await expect
         .poll(async () => (await read(true)).title)
@@ -239,9 +240,8 @@ test("typing survives a slow draft response and Publish serializes the newest co
   await page.getByLabel("Title", { exact: true }).fill("First request title");
   await expect.poll(() => requests.length).toBe(1);
   await page.getByLabel("Title", { exact: true }).fill("Newest local title");
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
   const writing = page.getByRole("textbox", {
-    name: "Doc content Markdown",
+    name: "Doc content",
     exact: true,
   });
   await writing.fill(
@@ -249,17 +249,17 @@ test("typing survives a slow draft response and Publish serializes the newest co
   );
   await expect(writing).toBeEnabled();
   await page
-    .getByRole("button", { name: "Publish changes", exact: true })
+    .getByRole("button", { name: "Publish", exact: true })
     .click();
   await expect(
-    page.getByRole("button", { name: "Publish changes", exact: true }),
+    page.getByRole("button", { name: "Publish", exact: true }),
   ).toBeDisabled();
   expect(requests).toHaveLength(1);
   release();
   await expect
     .poll(async () => (await read(true)).body)
     .toContain("newest local Markdown");
-  await expect(writing).toHaveValue(
+  await expect(writing).toHaveText(
     "The newest local Markdown survives the earlier response.",
   );
   expect((await read(true)).title).toBe("Newest local title");
@@ -277,10 +277,7 @@ test("an assigned course stages a new version through autosaves and consumes it 
   });
   await version.check();
   await page.getByRole("button", { name: /^Details/ }).click();
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Lesson content Markdown", exact: true })
-    .fill("A small inline lesson correction.");
+  await replaceWritingText(page, "A small inline lesson correction.");
   await expect
     .poll(async () => (await read()).lessons[0].body)
     .toBe("A small inline lesson correction.");
@@ -291,7 +288,7 @@ test("an assigned course stages a new version through autosaves and consumes it 
   await expect(version).toBeChecked();
   await page.getByRole("button", { name: /^Details/ }).click();
   await page
-    .getByRole("button", { name: "Publish changes", exact: true })
+    .getByRole("button", { name: "Publish", exact: true })
     .click();
   await expect
     .poll(async () => (await read(true)).version)

@@ -4,6 +4,10 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Coordinate Focus mode transitions with the outline and details panels, keep the moving canvas opaque with synchronized text/media resizing, and make Enter from a lesson title start on an empty line above the first block, including video.
+
+- Unify visual writing and preview with inline player-style media, editable lesson titles inside the canvas, contextual media controls, and Focus mode that expands the existing editor. Offer Markdown downloads from the toolbar’s more menu, retain source recovery for unsupported content, autosave and separate publication.
+
 - Fit desktop content editors to the available workspace, keeping titles and controls visible while overflowing writing, Outline, Details or Quiz panes scroll independently. Use natural page scrolling on narrow or short screens so every control stays reachable.
 
 - Keep independent navigation, outlines and picker lists from scrolling their surroundings at either end. Preserve compact popup sizing, keep picker search/actions visible, and cap searchable popups to their actual available space.
