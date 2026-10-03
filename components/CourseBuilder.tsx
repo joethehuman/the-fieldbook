@@ -4,6 +4,7 @@ import { Check, ChevronDown, ChevronUp, Copy, MoreHorizontal, Plus, Trash2 } fro
 import type { Content, Question } from "@/lib/types";
 import { correctOptionIds, optionIds, requiresPassing } from "@/lib/course-quiz";
 import type { UploadMedia } from "./MarkdownEditor";
+import { WritingTitle } from "./patterns/writing-title";
 import { WritingEditor } from "./patterns/writing-editor";
 import { EditorFrame, type DetailsReveal } from "./patterns/editor-frame";
 import { revealEditorTarget } from "./patterns/reveal-editor-target";
@@ -43,7 +44,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   const [canvasRequest, setCanvasRequest] = useState(0);
   const [outlineRequest, setOutlineRequest] = useState(0);
   const panel = useRef<HTMLDivElement>(null);
-  const lessonTitle = useRef<HTMLInputElement>(null);
+  const lessonTitle = useRef<HTMLTextAreaElement>(null);
   const pendingNavigation = useRef<{ step: string; instant: boolean } | null>(null);
   const navigationFrame = useRef(0);
   const selectedLesson = course.lessons.find((lesson) => lesson.id === selected);
@@ -196,7 +197,6 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
   return <EditorFrame
     outline={outline}
     outlineContext={selectedLesson ? `Lesson ${course.lessons.indexOf(selectedLesson) + 1} of ${course.lessons.length}` : selected === "quiz" ? "Quiz" : undefined}
-    heading={selectedLesson && <Input key={selectedLesson.id} ref={lessonTitle} variant="lesson-title" aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value }))} />}
     details={details}
     requirementsCount={requirementsCount}
     revealDetails={revealDetails}
@@ -205,7 +205,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     disabled={disabled}
   >
     <div className="course-builder-panel" ref={panel} tabIndex={-1} role="region" aria-label="Course lessons and quiz">
-      {selectedLesson ? <WritingEditor key={selectedLesson.id} label="Lesson content" value={selectedLesson.body} onChange={(body) => editLesson((lesson) => ({ ...lesson, body }))} onUpload={onUpload} disabled={disabled} /> : selected === "quiz" && course.questions.length ? <div className="grid gap-5">
+      {selectedLesson ? <WritingEditor key={selectedLesson.id} label="Lesson content" downloadName={selectedLesson.title} title={<><WritingTitle ref={lessonTitle} aria-label="Lesson title" placeholder="Untitled lesson" required disabled={disabled} value={selectedLesson.title} onChange={(event) => editLesson((lesson) => ({ ...lesson, title: event.target.value.replace(/\n/g, " ") }))} /></>} value={selectedLesson.videoUrl ? `[Video](${selectedLesson.videoUrl})\n\n${selectedLesson.body}` : selectedLesson.body} onChange={(body) => editLesson((lesson) => ({ ...lesson, body, videoUrl: undefined }))} onUpload={onUpload} disabled={disabled} /> : selected === "quiz" && course.questions.length ? <div className="grid gap-5">
         <SectionHeader title={<h2>Quiz</h2>}><Button type="button" variant="ghost" size="sm" disabled={disabled} onClick={() => {
           onChange((current) => ({ ...current, questions: [] })); chooseStep(course.lessons.at(-1)?.id || "", true);
         }}><Trash2 size={15} /> Remove quiz</Button></SectionHeader>

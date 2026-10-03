@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { EditorFocusContext } from "./editor-focus";
 import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { useScrollFade } from "./use-scroll-fade";
@@ -45,6 +46,9 @@ export function EditorFrame({
   disabled?: boolean;
   children: ReactNode;
 }) {
+  const focus = useContext(EditorFocusContext);
+  const exitFocus = useRef(() => {});
+  exitFocus.current = () => { if (focus?.active) focus.toggle(); };
   const frame = useRef<HTMLElement>(null);
   const controls = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLDivElement>(null);
@@ -83,6 +87,7 @@ export function EditorFrame({
 
   useEffect(() => {
     if (!revealDetails) return;
+    exitFocus.current();
     setPanels((current) => ({ outline: wide.current && current.outline, details: true }));
     let cancelReveal: (() => void) | undefined;
     const request = requestAnimationFrame(() => {
@@ -111,6 +116,7 @@ export function EditorFrame({
 
   useEffect(() => {
     if (!revealOutline) return;
+    exitFocus.current();
     setPanels((current) => ({ outline: true, details: wide.current && current.details }));
     let cancelReveal: (() => void) | undefined;
     const request = requestAnimationFrame(() => {

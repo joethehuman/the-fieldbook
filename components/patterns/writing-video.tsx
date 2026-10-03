@@ -1,7 +1,14 @@
 "use client";
 import type { ReactNode } from "react";
+import { useCellValue } from "@mdxeditor/gurx";
+import { readOnly$ } from "@mdxeditor/editor";
+import { WritingMediaVideo } from "./writing-media";
+import { isInlineVideo } from "@/lib/inline-video";
 import {
   $isElementNode,
+  $getNodeByKey,
+  $createParagraphNode,
+  type LexicalEditor,
   DecoratorNode,
   type NodeKey,
   type SerializedLexicalNode,
@@ -12,7 +19,6 @@ import {
   addImportVisitor$,
   addExportVisitor$,
 } from "@mdxeditor/editor";
-import { videoSource } from "@/lib/video";
 
 type VideoData = SerializedLexicalNode & {
   url: string;
@@ -66,17 +72,34 @@ class WritingVideoNode extends DecoratorNode<ReactNode> {
   getTextContent() {
     return this.__label;
   }
-  decorate() {
-    const source = videoSource(this.__url);
-    return (
-      source?.type === "embed" ? <iframe src={source.url} title={this.__label} allowFullScreen loading="lazy" /> : <video
-        controls
-        preload="metadata"
-        src={this.__url}
-        aria-label={this.__label}
-      />
-    );
+  setUrl(url: string) {
+    const writable = this.getWritable();
+    writable.__url = url;
+    writable.__label = "Video";
   }
+  decorate(editor: LexicalEditor) {
+    return <VideoEditor editor={editor} nodeKey={this.__key} url={this.__url} label={this.__label} />;
+  }
+}
+
+function VideoEditor({ editor, nodeKey, url, label }: { editor: LexicalEditor; nodeKey: NodeKey; url: string; label: string }) {
+  const disabled = useCellValue(readOnly$);
+  return <WritingMediaVideo url={url} label={label} disabled={disabled}
+    onChange={(url) => editor.update(() => {
+      const node = $getNodeByKey(nodeKey);
+      if (node instanceof WritingVideoNode) node.setUrl(url);
+    })}
+    onRemove={() => editor.update(() => {
+      const node = $getNodeByKey(nodeKey);
+      if (node) { node.selectPrevious(); node.remove(); }
+    })}
+    onParagraph={(direction) => editor.update(() => {
+      const node = $getNodeByKey(nodeKey)?.getTopLevelElementOrThrow();
+      if (!node) return;
+      const paragraph = $createParagraphNode();
+      if (direction === "before") node.insertBefore(paragraph); else node.insertAfter(paragraph);
+      paragraph.select();
+    })} />;
 }
 
 export const writingVideoPlugin = realmPlugin({
@@ -86,8 +109,7 @@ export const writingVideoPlugin = realmPlugin({
       priority: 100,
       testNode: (node) =>
         node.type === "link" &&
-        (/^\/api\/media\/.+\.(mp4|webm)(?:\?|$)/i.test(node.url) ||
-          !!videoSource(node.url) && node.children.some((child) => child.type === "text" && child.value === "Video")) &&
+        isInlineVideo(node.url, node.children.map((child) => child.type === "text" ? child.value : "").join("")) &&
         node.children.every((child) => child.type === "text"),
       visitNode({ mdastNode, lexicalParent }) {
         if (mdastNode.type !== "link" || !$isElementNode(lexicalParent)) return;

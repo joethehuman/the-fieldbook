@@ -1,3 +1,4 @@
+import { replaceWritingText } from "./editor-helpers";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -256,13 +257,7 @@ test("complete editor fits at its starting position and each overflowing pane re
   expect(await main.evaluate((el) => el.scrollTop)).toBe(0);
   await page.screenshot({ path: info.outputPath("editor-start-complete-details.png") });
 
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  const source = page.getByRole("textbox", { name: "Lesson content Markdown", exact: true });
-  await source.fill(Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1}. Long writing content.`).join("\n\n"));
-  await contained(page, source, [title, controls, page.locator(".writing-view-header")]);
-  await page.getByRole("tab", { name: "Preview draft", exact: true }).click();
-  await contained(page, page.locator(".writing-scroll-area"), [title, controls]);
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await replaceWritingText(page, Array.from({ length: 60 }, (_, i) => `Paragraph ${i + 1}. Long writing content.`).join("\n\n"));
   await contained(page, page.locator(".writing-scroll-area"), [title, controls, page.locator(".mdxeditor-toolbar")]);
   const instance = await writing.elementHandle();
   await page.getByRole("button", { name: /^Outline/ }).click();

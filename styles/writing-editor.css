@@ -34,6 +34,7 @@
   max-width: 100%;
 }
 .writing-surface {
+  background: var(--background);
   display: flex;
   flex-direction: column;
   overflow: clip;
@@ -71,7 +72,6 @@
 .editor[data-scroll-layout="workspace"] .writing-viewport > .mdxeditor-root-contenteditable { display: flex; flex-direction: column; min-height: 100%; }
 .editor[data-scroll-layout="workspace"] .mdxeditor-contenteditable-wrapper { display: flex; flex: 1; flex-direction: column; }
 .editor[data-scroll-layout="workspace"] .writing-content[contenteditable] { flex: 1; }
-.editor[data-scroll-layout="workspace"] [aria-label="Draft preview"] { min-height: 0; }
 .editor[data-scroll-layout="page"] .writing-viewport:not(.writing-source-panel) { overflow-y: visible; }
 .writing-surface:focus-within,
 .writing-surface[data-editor-interacting="true"] {
@@ -216,7 +216,7 @@
   display: none;
 }
 .writing-editor .writing-content:focus-within
-  > p:last-child:is(:empty, :has(> br:only-child)):not(
+  > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
     .writing-pending-list,
     .writing-media-line
@@ -224,7 +224,7 @@
   position: relative;
 }
 .writing-editor .writing-content:focus-within
-  > p:last-child:is(:empty, :has(> br:only-child)):not(
+  > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
     .writing-pending-list,
     .writing-media-line
@@ -451,3 +451,58 @@
     padding-inline: var(--editor-content-padding, var(--space-4));
   }
 }
+
+/* One document measure and media presentation for visual writing and reading. */
+.writing-document { display: flex; flex-direction: column; min-height: 100%; }
+.editor[data-scroll-layout="workspace"] .writing-document > .mdxeditor-root-contenteditable { display: flex; flex: 1; flex-direction: column; }
+.writing-source-panel { flex-direction: column; }
+.writing-document-heading {
+  flex-shrink: 0;
+  display: grid;
+  gap: var(--space-6);
+  padding-block-start: var(--space-6);
+  padding-inline: var(--editor-content-padding, var(--space-6));
+}
+[data-slot="textarea"].document-title {
+  min-height: 0;
+  font-size: var(--type-page);
+  line-height: var(--type-page-leading);
+  letter-spacing: -0.03em;
+  font-weight: var(--weight-heading);
+  background: transparent;
+}
+.writing-document-heading + .mdxeditor-root-contenteditable .writing-content { padding-block-start: var(--space-6); }
+.writing-media-block { display: block; position: relative; width: 100%; }
+.writing-media-actions {
+  display: flex;
+  position: absolute;
+  inset-block-start: var(--space-2);
+  inset-inline-end: var(--space-2);
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.writing-media-block:hover > .writing-media-actions,
+.writing-media-block:focus-within > .writing-media-actions { opacity: 1; }
+.writing-media-actions [data-slot="button"] { background: var(--background); }
+.writing-media-block .course-video-actions:empty { display: none; }
+.writing-editor [data-editor-block-type="image"] { max-width: 100%; }
+.writing-editor [data-editor-block-type="image"] img { display: block; max-width: 100%; height: auto; }
+.writing-editor [data-editor-block-type="image"] > div:last-child:has(button) { opacity: 0; transition: opacity 120ms ease; }
+.writing-editor [data-editor-block-type="image"]:is(:hover, :focus-within) > div:last-child:has(button) { opacity: 1; }
+@media (hover: none) {
+  .writing-media-actions,
+  .writing-editor [data-editor-block-type="image"] > div:last-child:has(button) { opacity: 1; }
+}
+@media (max-width: 600px) {
+  .writing-document-heading { padding-inline: var(--space-4); }
+}
+.writing-content .writing-code {
+  background: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.75;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.course-builder-panel .writing-content h1 { font-size: 1.75rem; line-height: 1.3; letter-spacing: -0.035em; }

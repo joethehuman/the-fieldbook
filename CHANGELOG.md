@@ -4,6 +4,10 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Coordinate Focus mode transitions with the outline and details panels, keep the moving canvas opaque with synchronized text/media resizing, and make Enter from a lesson title start on an empty line above the first block, including video.
+
+- Unify visual writing and preview with inline player-style media, editable lesson titles inside the canvas, contextual media controls, and Focus mode that expands the existing editor. Offer Markdown downloads from the toolbar’s more menu, retain source recovery for unsupported content, autosave and separate publication.
+
 - Refine the shared neutral design system with consistent rounded controls and surfaces, quieter outline actions, inset search icons, and clearer course-card title hierarchy. Preserve existing page structure and workflows.
 
 - Align course counts in soft shared badges, add subtle card lift and elevation, and make hover highlights immediate across shared controls and navigation. Refine quiz results with grouped completion actions and a clearer keyboard-accessible answer review while preserving grading and retry behavior.

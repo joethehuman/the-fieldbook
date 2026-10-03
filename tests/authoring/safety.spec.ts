@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { waitForDraftSaved, openContentSettings } from "./editor-helpers";
+import { expectMarkdown, waitForDraftSaved, openContentSettings } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
@@ -11,6 +11,7 @@ async function setup(
   kind: "doc" | "course" = "doc",
   blankCourse = false,
   assignedCourse = false,
+  lessonBody?: string,
 ) {
   const state = freshWorkspace();
   state.content = state.content.filter((c) => c.kind === kind).slice(0, 1);
@@ -22,6 +23,7 @@ async function setup(
     state.content[0].questions = [];
     state.content[0].requirePassing = false;
   }
+  if (lessonBody !== undefined) state.content[0].lessons[0].body = lessonBody;
   state.publishedContent = [];
   if (assignedCourse) {
     const course = state.content[0];
@@ -747,10 +749,7 @@ test("course builder edits one lesson at a time and keeps one final quiz", async
     )
     .toBe("H2");
   await page.keyboard.type("A heading here");
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Lesson content Markdown" }),
-  ).toHaveValue(/## A heading here/);
+  await expectMarkdown(page, /## A heading here/);
   await openCourseOutline(page);
   await page.getByRole("button", { name: "Add quiz" }).click();
   await expect(
@@ -799,10 +798,7 @@ test("inline media chooser inserts a video where the slash command was opened", 
     .fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
   await chooser.getByRole("button", { name: "Insert video" }).click();
   await expect(chooser).toHaveCount(0);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Lesson content Markdown" }),
-  ).toHaveValue(
+  await expectMarkdown(page,
     /Before the video[\s\S]*\[Video\]\(https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ\)[\s\S]*After the video/,
   );
 });
@@ -810,14 +806,8 @@ test("inline media chooser inserts a video where the slash command was opened", 
 test("wide course tables scroll inside the editor and show a reading edge", async ({
   page,
 }, info) => {
-  await setup(page, info.project.name.startsWith("production"), "course", true);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Lesson content Markdown" })
-    .fill(
-      "Text above the table.\n\n| One | Two | Three | Four | Five | Six |\n| --- | --- | --- | --- | --- | --- |\n| A | B | C | D | E | F |\n\nText below the table.",
-    );
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await setup(page, info.project.name.startsWith("production"), "course", true, false,
+    "Text above the table.\n\n| One | Two | Three | Four | Five | Six |\n| --- | --- | --- | --- | --- | --- |\n| A | B | C | D | E | F |\n\nText below the table.");
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   const table = writing.locator("table").first();
   await expect(table).toBeVisible();
@@ -854,28 +844,19 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   await page.screenshot({
     path: info.outputPath("course-editor-wide-table.png"),
   });
-  await page.getByRole("tab", { name: "Preview draft" }).click();
-  const reader = page.locator(".markdown-table-wrap");
-  await expect(reader).toHaveAttribute("data-more-right", "true");
-  await page.screenshot({
-    path: info.outputPath("course-table-more-columns.png"),
-  });
-  await reader.locator(".markdown-table").evaluate((node) => {
-    node.scrollLeft = node.scrollWidth;
-  });
-  await expect(reader).toHaveAttribute("data-more-right", "false");
-  await page.screenshot({ path: info.outputPath("course-table-scroll.png") });
+  const restoredTable = page.getByRole("textbox", { name: "Lesson content", exact: true }).getByRole("table");
+  await expect(restoredTable).toBeVisible();
+  expect(await restoredTable.evaluate((node) => {
+    const owner = node.closest('[data-lexical-decorator="true"]')!;
+    return owner.scrollWidth > owner.clientWidth;
+  })).toBe(true);
+
 });
 
 test("slash Table inserts at the selected line and unmatched searches can return to writing", async ({
   page,
 }, info) => {
-  await setup(page, info.project.name.startsWith("production"), "course", true);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Lesson content Markdown" })
-    .fill("Before\n\nAfter");
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await setup(page, info.project.name.startsWith("production"), "course", true, false, "Before\n\nAfter");
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.locator("p").first().click();
   await page.keyboard.press("End");
@@ -900,11 +881,7 @@ test("slash Table inserts at the selected line and unmatched searches can return
           ?.textContent,
     );
   expect(beforeTable).toBe("Before");
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Lesson content Markdown" }),
-  ).toHaveValue(/Before[\s\S]*\|[\s\S]*After/);
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await expectMarkdown(page, /Before[\s\S]*\|[\s\S]*After/);
   await writing.locator("p").last().click();
   await page.keyboard.press("End");
   await page.keyboard.press("Enter");
@@ -925,10 +902,7 @@ test("slash Table inserts at the selected line and unmatched searches can return
   await expect(page.getByRole("menu", { name: /^Insert content/ })).toHaveCount(
     0,
   );
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Lesson content Markdown" }),
-  ).toHaveValue(/\/unlikely-block-name continues/);
+  await expectMarkdown(page, /\/unlikely-block-name continues/);
 });
 
 test("slash Table can be chosen with the pointer", async ({ page }, info) => {
@@ -962,12 +936,7 @@ test("slash Table can be chosen with the pointer", async ({ page }, info) => {
 test("slash list begins on the chosen line without an extra blank block", async ({
   page,
 }, info) => {
-  await setup(page, info.project.name.startsWith("production"), "course", true);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Lesson content Markdown" })
-    .fill("Before\n\nAfter");
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await setup(page, info.project.name.startsWith("production"), "course", true, false, "Before\n\nAfter");
   const writing = page.getByRole("textbox", { name: "Lesson content" });
   await writing.locator("p").first().click();
   await page.keyboard.press("End");
@@ -1029,10 +998,7 @@ test("pasted image uploads at the editor caret", async ({ page }, info) => {
   await expect.poll(() => control.uploaded).toBe(true);
   control.releaseUpload();
   await expect(writing.locator("img")).toHaveAttribute("src", /\/api\/media\//);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Lesson content Markdown" }),
-  ).toHaveValue(
+  await expectMarkdown(page,
     /Before the image[\s\S]*!\[pasted\]\(\/api\/media\/[\s\S]*After the image/,
   );
 });
@@ -1046,7 +1012,7 @@ test("image chooser uploads into the selected lesson line", async ({
   );
   const { control } = await setup(page, true, "course", true);
   const writing = page.getByRole("textbox", { name: "Lesson content" });
-  await writing.click();
+  await writing.locator("p").first().click();
   await page.keyboard.press("/");
   await page.getByRole("menuitem", { name: "Image", exact: true }).click();
   const chooser = page.getByRole("dialog", { name: "Insert image" });
@@ -1104,10 +1070,7 @@ for (const { command, query, marker } of [
         }),
       )
       .toBe("LI");
-    await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-    await expect(
-      page.getByRole("textbox", { name: "Lesson content Markdown" }),
-    ).toHaveValue(marker);
+    await expectMarkdown(page, marker);
   });
 }
 
@@ -1148,11 +1111,7 @@ test("Insert menus use full rows and can be dismissed", async ({
   await expect(menu).toHaveCount(0);
   await expect(writing.locator(".writing-command-line")).toHaveCount(0);
   await page.keyboard.type("ding");
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Lesson content Markdown" }),
-  ).toHaveValue(/\/heading/);
-  await page.getByRole("tab", { name: "Write", exact: true }).click();
+  await expectMarkdown(page, /\/heading/);
   await page.getByRole("button", { name: /^Commands:/ }).click();
   await expect(menu).toBeVisible();
   await expect(
@@ -1211,10 +1170,7 @@ test("slash insertion stays beside a blank line after lesson prose", async ({
     )
     .toBe("BLOCKQUOTE");
   await page.keyboard.type("A callout here");
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await expect(
-    page.getByRole("textbox", { name: "Lesson content Markdown" }),
-  ).toHaveValue(/First line[\s\S]*> A callout here/);
+  await expectMarkdown(page, /First line[\s\S]*> A callout here/);
 });
 
 test("an assigned course retains learning state and legacy media when its inline lesson is edited", async ({
@@ -1229,12 +1185,10 @@ test("an assigned course retains learning state and legacy media when its inline
   await expect(
     page.getByLabel("Upload opening video", { exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("tab", { name: "Markdown", exact: true }).click();
-  await page
-    .getByRole("textbox", { name: "Lesson content Markdown", exact: true })
-    .fill(
-      before.content[0].lessons[0].body + "\n\nA small wording correction.",
-    );
+  const writing = page.getByRole("textbox", { name: "Lesson content", exact: true });
+  await writing.press("ControlOrMeta+End");
+  await writing.press("Enter");
+  await page.keyboard.insertText("A small wording correction.");
   await expect.poll(async () => production
     ? state.content[0].lessons[0].body
     : page.evaluate(() => JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!).content[0].lessons[0].body))
@@ -1251,9 +1205,8 @@ test("an assigned course retains learning state and legacy media when its inline
   expect(after.content[0].publishedRevision).toBe(
     before.content[0].publishedRevision,
   );
-  expect(after.content[0].lessons[0].videoUrl).toBe(
-    before.content[0].lessons[0].videoUrl,
-  );
+  expect(after.content[0].lessons[0].videoUrl).toBeUndefined();
+  expect(after.content[0].lessons[0].body).toContain(`[Video](${before.content[0].lessons[0].videoUrl})`);
   expect(after.content[0].lessons[0].body).toContain(
     "A small wording correction.",
   );

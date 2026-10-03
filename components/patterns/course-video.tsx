@@ -8,7 +8,7 @@ import { ActionGroup } from "../ui/action-group";
 import { Note } from "../ui/note";
 import { Field } from "../ui/field";
 
-export function CourseVideo({ url, title, posterUrl }: { url: string; title: string; posterUrl?: string }) {
+export function CourseVideo({ url, title, posterUrl, allowTheater = true }: { url: string; title: string; posterUrl?: string; allowTheater?: boolean }) {
   const source = videoSource(url);
   const ref = useRef<HTMLVideoElement>(null);
   const [theater, setTheater] = useState(false);
@@ -18,7 +18,7 @@ export function CourseVideo({ url, title, posterUrl }: { url: string; title: str
   const [ready, setReady] = useState(false);
   const position = useRef(0);
   if (!source) return <Note>This video URL is not supported. Ask an editor to update it.</Note>;
-  return <div className={theater ? "course-video theater" : "course-video"}>
+  return <span className={theater ? "course-video theater" : "course-video"}>
     {source.type === "file" && !ready && !failed && <span className="course-video-loading" role="status">Loading video…</span>}
     {source.type === "embed" ? <iframe
       src={source.url} title={title} loading="lazy" allowFullScreen
@@ -36,7 +36,7 @@ export function CourseVideo({ url, title, posterUrl }: { url: string; title: str
         setFailed(false);
       }}
     >Your browser does not support video playback.</video>}
-    <ActionGroup className="course-video-actions">
+    <ActionGroup asChild className="course-video-actions"><span>
       {failed && source.type === "file" && <Button type="button" variant="outline" size="sm" onClick={() => { setRetry((value) => value + 1); setFailed(false); setReady(false); }}>Retry video</Button>}
       {source.type === "file" && <Field orientation="horizontal" className="course-video-speed">
         <span>Speed</span>
@@ -47,10 +47,10 @@ export function CourseVideo({ url, title, posterUrl }: { url: string; title: str
           {["0.75", "1", "1.2", "1.5", "2"].map((value) => <option key={value} value={value}>{value}×</option>)}
         </SelectField>
       </Field>}
-      <Button type="button" variant="outline" size="sm" onClick={() => setTheater(!theater)}>
+      {allowTheater && <Button type="button" variant="outline" size="sm" onClick={() => setTheater(!theater)}>
         {theater ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         {theater ? "Exit theater" : "Theater view"}
-      </Button>
-    </ActionGroup>
-  </div>;
+      </Button>}
+    </span></ActionGroup>
+  </span>;
 }

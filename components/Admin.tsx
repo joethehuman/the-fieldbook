@@ -21,6 +21,8 @@ import {
   type DetailsReveal,
 } from "./patterns/editor-frame";
 import { revealEditorTarget } from "./patterns/reveal-editor-target";
+import { EditorFocusContext, useEditorFocus } from "./patterns/editor-focus";
+import { WritingTitle } from "./patterns/writing-title";
 import { useEditorLayout } from "./patterns/use-editor-layout";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
@@ -2014,6 +2016,7 @@ export function Editor({
 }) {
   const notify = useToast();
   const form = useRef<HTMLFormElement>(null);
+  const focus = useEditorFocus(form);
   const [savedMessage, setSavedMessage] = useState("");
   const [detailsReveal, setDetailsReveal] = useState<DetailsReveal>();
   const [revealStep, setRevealStep] = useState<{
@@ -2154,7 +2157,7 @@ export function Editor({
     }, 900);
     return () => clearTimeout(timer);
   }, [c, dirty, busy, saving]);
-  useEditorLayout(form);
+  useEditorLayout(form, focus.active);
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (pendingUploads.current || recoveringNow.current) return false;
@@ -2787,9 +2790,11 @@ export function Editor({
     </FieldGroup>
   );
   return (
+    <EditorFocusContext.Provider value={{ active: focus.active, toggle: focus.toggle, status: needsRecovery ? "Not saved" : saveStatus }}>
     <form
       ref={form}
       className="editor"
+      data-focus-mode={focus.active || undefined}
       data-scroll-layout="page"
       onSubmit={(event) => void submit(event, "draft")}
       onKeyDown={(event) => {
@@ -2953,7 +2958,9 @@ export function Editor({
             disabled={busy}
           >
             <WritingEditor
+              downloadName={c.title}
               label={c.kind === "doc" ? "Doc content" : "Update content"}
+              title={focus.active ? <WritingTitle aria-label="Title" maxLength={160} value={c.title} onChange={(event) => set("title", event.target.value.replace(/\n/g, " "))} placeholder={`Untitled ${c.kind === "doc" ? "doc" : "update"}`} /> : undefined}
               value={c.body}
               onChange={(value) => set("body", value)}
               onUpload={upload}
@@ -2963,5 +2970,6 @@ export function Editor({
         )}
       </FieldGroup>
     </form>
+    </EditorFocusContext.Provider>
   );
 }
