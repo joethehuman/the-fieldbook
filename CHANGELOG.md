@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Add an experimental content edge spring to course browsing, Docs, Updates and the bounded desktop lesson reader. Native scrolling stays in charge; the content stretches briefly at either edge without moving the header or course outline, adding scroll range or affecting Admin. Reduced motion disables the effect.
+
 - Fit desktop content editors to the available workspace, keeping titles and controls visible while overflowing writing, Outline, Details or Quiz panes scroll independently. Use natural page scrolling on narrow or short screens so every control stays reachable.
 
 - Keep independent navigation, outlines and picker lists from scrolling their surroundings at either end. Preserve compact popup sizing, keep picker search/actions visible, and cap searchable popups to their actual available space.
