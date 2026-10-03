@@ -61,8 +61,10 @@ export function answerCitations(
 /** Only this plugin creates active citation links; model-written links stay inert. */
 export function citationLinks({
   numbers,
+  pending = false,
 }: {
   numbers: Readonly<Record<string, number>>;
+  pending?: boolean;
 }) {
   return (tree: MarkdownNode) => {
     function visit(node: MarkdownNode) {
@@ -77,7 +79,11 @@ export function citationLinks({
           visit(child);
           return child;
         }
-        const value = child.value || "";
+        // Keep internal IDs (including an unfinished trailing ID) out of prose
+        // until final metadata can replace them with verified numbered links.
+        const value = pending
+          ? (child.value || "").replace(/\[(?:S\d*)?$/, "")
+          : child.value || "";
         const result: MarkdownNode[] = [];
         let cursor = 0;
         for (const cluster of value.matchAll(/(?:\[S\d+\][ \t]*)+/g)) {
@@ -87,7 +93,7 @@ export function citationLinks({
           for (const match of cluster[0].matchAll(/\[(S\d+)\]/g)) {
             const number = numbers[match[1]];
             if (!number) {
-              result.push({ type: "text", value: match[0] });
+              if (!pending) result.push({ type: "text", value: match[0] });
             } else if (!seen.has(number)) {
               if (seen.size) result.push({ type: "text", value: " " });
               result.push({

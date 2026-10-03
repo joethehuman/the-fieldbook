@@ -43,6 +43,7 @@ let documents = [],
 let fixtureGeneration = Date.now();
 let aiGenerations = 0,
   aiFailure = "",
+  aiAnswer = "",
   aiPassages = [];
 let aiStage = 0;
 let stageWaiters = [];
@@ -140,6 +141,7 @@ createServer(async (req, res) => {
     stageWaiters.forEach(({ release }) => release());
     stageWaiters = [];
     aiFailure = change.aiFailure || "";
+    aiAnswer = change.aiAnswer || "";
     aiPassages = change.aiPassages || [];
     return send(res, { ok: true });
   }
@@ -240,10 +242,10 @@ createServer(async (req, res) => {
       write({
         type: "text-delta",
         id: "answer",
-        delta: "Hi! What would you like to know?",
+        delta: aiAnswer || "Hi! What would you like to know?",
       });
-      await waitForAiStage(3);
       write({ type: "text-end", id: "answer" });
+      await waitForAiStage(3);
       write({
         type: "finish",
         finishReason: { unified: "stop", raw: "stop" },

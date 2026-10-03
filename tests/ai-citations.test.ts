@@ -106,6 +106,32 @@ test("different lessons retain distinct links even when their course is shared",
   );
 });
 
+test("pending prose hides internal and partial source IDs until verified metadata arrives", () => {
+  const pending = unified().use(remarkParse).use(citationLinks, {
+    numbers: {},
+    pending: true,
+  });
+  for (const tail of ["[", "[S", "[S1", "[S12", "[S12]", "[S12][S3]"]) {
+    const tree: any = pending.runSync(pending.parse("Read the steps " + tail));
+    assert.doesNotMatch(JSON.stringify(tree.children), /\[S|value.*\[$/);
+    assert.equal(tree.children[0].children[0].value, "Read the steps ");
+  }
+  const code: any = pending.runSync(pending.parse("`[S12]` and prose [S12]."));
+  assert.equal(code.children[0].children[0].value, "[S12]");
+  assert.doesNotMatch(
+    JSON.stringify(code.children[0].children.slice(1)),
+    /\[S12\]/,
+  );
+  const complete = unified()
+    .use(remarkParse)
+    .use(citationLinks, {
+      numbers: { S12: 1 },
+      pending: false,
+    });
+  const tree = complete.runSync(complete.parse("Read the steps [S12]."));
+  assert.match(JSON.stringify(tree), /__fieldbook-citation\/1/);
+});
+
 test("installed Streamdown updates cached citation processors when final metadata arrives", async () => {
   const { createElement } = await import("react");
   const { renderToStaticMarkup } = await import("react-dom/server");

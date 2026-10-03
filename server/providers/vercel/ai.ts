@@ -1,5 +1,5 @@
 import "server-only";
-import { gateway, generateText, streamText, tool } from "ai";
+import { gateway, generateText, smoothStream, streamText, tool } from "ai";
 import { z } from "zod";
 import { aiBounds, aiUnavailableMessage, type AiModel } from "@/lib/ai";
 import type { AiProvider } from "../../ports/ai";
@@ -179,6 +179,8 @@ export const vercelAi: AiProvider = {
   async *streamAnswer(input) {
     try {
       const result = streamText({
+        // Pace bursts from the router without changing the answer text.
+        experimental_transform: smoothStream({ delayInMs: 50 }),
         system: input.instructions,
         messages: [
           ...input.messages.map((message) => ({

@@ -59,6 +59,7 @@ async function fixture(
   enabled = true,
   signedIn = true,
   aiFailure = "",
+  aiAnswer = "",
 ) {
   const course = freshWorkspace().content.find(
     (item) => item.kind === "course",
@@ -79,6 +80,7 @@ async function fixture(
         askAi: { ...defaultAskAiSettings, enabled, model: "test/primary" },
       },
       aiFailure,
+      aiAnswer,
       aiPassages: [
         {
           content_id: docId,
@@ -271,6 +273,11 @@ test("citations use consecutive clickable numbers, compact titles and safe desti
   const refs = chat.getByRole("link", { name: /^Source \d+:/ });
   await expect(refs).toHaveText(["[1]", "[2]", "[3]", "[1]", "[4]"]);
   await expect(refs.first()).toHaveAttribute("href", `/docs/${docId}`);
+  await expect(refs.first()).not.toHaveAttribute("title");
+  await refs.first().hover();
+  await expect(page.getByRole("tooltip")).toHaveText("Published reference");
+  await page.screenshot({ path: info.outputPath("ask-ai-citation-hint.png") });
+  await input.hover();
   await expect(
     chat.getByRole("link", { name: "fake", exact: true }),
   ).toHaveCount(0);
@@ -360,6 +367,74 @@ test("uncited replies finish quietly and clearing Search closes the panel until 
   await expect(panel).toHaveCount(0);
   await input.click();
   await expect(panel).toHaveCount(0);
+});
+
+test("expanded sources reveal inside the chat while the page, composer and focus stay put", async ({
+  page,
+  request,
+}, info) => {
+  await page.setViewportSize({
+    width: page.viewportSize()!.width,
+    height: 650,
+  });
+  await fixture(page, request);
+  const paragraph =
+    "Use the published reference to understand the process and follow the steps in order. Keep each part of the explanation focused on what the reader needs to do. Check the instructions before changing an installation, and review any details that depend on your own configuration. A concise answer can point you to the right place while the full source gives you the context needed to proceed with confidence.";
+  await page.route("**/api/ask-ai", (route) =>
+    route.fulfill({
+      headers,
+      body: stream(`${paragraph} [S1]\n\n${paragraph} [S2]`, false, [
+        sources[0],
+        {
+          ...sources[0],
+          id: "S2",
+          contentId: "00000000-0000-4000-8000-000000000022",
+          href: "/docs/00000000-0000-4000-8000-000000000022",
+          title: "Follow the published installation instructions",
+        },
+      ]),
+    }),
+  );
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  await input.fill("How should I proceed?");
+  await input.press("Enter");
+  const chat = page.getByRole("region", { name: "Ask AI conversation" });
+  await expect(chat.getByRole("status")).toHaveText("Answer ready.");
+  const area = chat.locator('[data-slot="conversation-scroll"]');
+  const toggle = chat.getByRole("button", { name: "2 sources" });
+  const composer = chat.getByRole("textbox", { name: "Ask a follow-up" });
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    await page.emulateMedia({ reducedMotion });
+    await toggle.scrollIntoViewIfNeeded();
+    const before = {
+      scroll: await area.evaluate((el) => el.scrollTop),
+      composer: await composer.boundingBox(),
+      page: await page.evaluate(() => scrollY),
+    };
+    await toggle.click();
+    const list = chat.getByRole("list", { name: "Answer sources" });
+    await expect
+      .poll(async () => {
+        const visible = (await area.boundingBox())!;
+        const bounds = (await list.boundingBox())!;
+        return (
+          bounds.y >= visible.y - 1 &&
+          bounds.y + bounds.height <= visible.y + visible.height + 1
+        );
+      })
+      .toBe(true);
+    expect(await area.evaluate((el) => el.scrollTop)).toBeGreaterThan(
+      before.scroll + 10,
+    );
+    expect(await page.evaluate(() => scrollY)).toBe(before.page);
+    expect(await composer.boundingBox()).toEqual(before.composer);
+    await expect(toggle).toBeFocused();
+    await page.screenshot({
+      path: info.outputPath(`sources-${reducedMotion}.png`),
+    });
+    await toggle.click();
+    await expect(list).toHaveCount(0);
+  }
 });
 
 test("Ask AI failure, explicit retry, stop and new conversation cancel pending work", async ({
@@ -641,4 +716,117 @@ test("thinking stays in one assistant position from submission through first str
     region.getByText("Response incomplete.", { exact: true }),
   ).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("greeting.png") });
+});
+
+test("a router burst reveals progressively, fades only new words and completes with verified sources", async ({
+  page,
+  request,
+}, info) => {
+  const prose =
+    "Start with a clear published reference that explains what a reader needs to do. Keep the instructions in a sensible order and give each paragraph one purpose. Include the context needed to understand the task, then show the relevant steps with familiar words. A useful answer should help someone act without making them read the same point several times. Review the source whenever the process changes so its guidance stays current. If an important detail is missing, update the reference before relying on it for future answers. The goal is a helpful explanation that uses enough detail to make the next step clear while leaving out background that does not help the reader. Check the published reference for the full instructions and any details that apply to your installation. [S1]";
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await fixture(page, request, true, true, "staged-answer", prose);
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  await input.fill("How should I use the reference?");
+  await input.press("Enter");
+  const region = page.getByRole("region", { name: "Ask AI conversation" });
+  await expect(region.locator('[data-slot="loading-dots"]')).toBeVisible();
+  await request.post("http://127.0.0.1:3130/ai-stage", { data: { stage: 1 } });
+  await expect
+    .poll(
+      async () =>
+        (await (await request.get("http://127.0.0.1:3130/reads")).json())
+          .aiGenerations,
+    )
+    .toBe(2);
+  await request.post("http://127.0.0.1:3130/ai-stage", { data: { stage: 2 } });
+  const assistant = region.locator(".is-assistant");
+  await expect(assistant.locator("[data-sd-animate]").first()).toBeVisible();
+  const frames = await assistant.evaluate(async (message) => {
+    const samples: { text: string; fading: boolean; firstOpacity: number }[] =
+      [];
+    const start = performance.now();
+    while (performance.now() - start < 1600) {
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve()),
+      );
+      const words = [...message.querySelectorAll("[data-sd-animate]")];
+      const opacity = words.map((word) =>
+        Number(getComputedStyle(word).opacity),
+      );
+      samples.push({
+        text: message.querySelector("p")?.textContent || "",
+        fading: opacity.some((value) => value > 0 && value < 0.98),
+        firstOpacity: opacity[0],
+      });
+    }
+    return samples;
+  });
+  await info.attach("stream-reveal-frames", {
+    body: JSON.stringify({ frames }),
+    contentType: "application/json",
+  });
+  const styles = await assistant
+    .locator("[data-sd-animate]")
+    .evaluateAll((words) =>
+      words.slice(-5).map((word) => ({
+        style: word.getAttribute("style"),
+        name: getComputedStyle(word).animationName,
+        duration: getComputedStyle(word).animationDuration,
+        opacity: getComputedStyle(word).opacity,
+        animations: word
+          .getAnimations()
+          .map((a) => ({ current: a.currentTime, state: a.playState })),
+      })),
+    );
+  await info.attach("word-animation-styles", {
+    body: JSON.stringify(styles),
+    contentType: "application/json",
+  });
+  expect(new Set(frames.map((frame) => frame.text)).size).toBeGreaterThan(3);
+  expect(
+    frames.some(
+      (frame) => frame.text.length > 0 && frame.text.length < prose.length,
+    ),
+  ).toBe(true);
+  expect(frames.every((frame) => !/\[S\d*/.test(frame.text))).toBe(true);
+  expect(
+    frames.some((frame) => frame.fading),
+    JSON.stringify(styles),
+  ).toBe(true);
+  // Earlier words settle once rather than blinking again with each new chunk.
+  let settled = false;
+  for (const frame of frames) {
+    if (frame.firstOpacity >= 0.99) settled = true;
+    if (settled) expect(frame.firstOpacity).toBeGreaterThanOrEqual(0.99);
+  }
+  await expect(assistant).toContainText(prose.replace(" [S1]", ""), {
+    timeout: 10_000,
+  });
+  await expect(assistant).not.toContainText(/\[S\d*/);
+  await page.screenshot({ path: info.outputPath("streamed-answer.png") });
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const reduced = await assistant
+    .locator("[data-sd-animate]")
+    .evaluateAll((words) =>
+      words.every(
+        (word) =>
+          getComputedStyle(word).animationName === "none" &&
+          getComputedStyle(word).opacity === "1",
+      ),
+    );
+  expect(reduced).toBe(true);
+  await request.post("http://127.0.0.1:3130/ai-stage", { data: { stage: 3 } });
+  await expect(region.getByRole("status")).toHaveText("Answer ready.");
+  await expect(
+    region.getByRole("link", {
+      name: "Source 1: Published reference",
+      exact: true,
+    }),
+  ).toHaveAttribute("href", `/docs/${docId}`);
+  await expect(assistant.locator("[data-sd-animate]")).toHaveCount(0);
+  await expect(
+    region.getByText("Response incomplete.", { exact: true }),
+  ).toHaveCount(0);
+  await expect(region.getByRole("alert")).toHaveCount(0);
 });

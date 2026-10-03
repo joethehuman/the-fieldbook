@@ -66,7 +66,7 @@ export function AskAiConversation({
       <div
         ref={transcript}
         data-slot="conversation-scroll"
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pt-4 [scrollbar-gutter:stable_both-edges]"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4 [scrollbar-gutter:stable_both-edges]"
       >
         <div className="grid min-w-0 gap-4">
           <div

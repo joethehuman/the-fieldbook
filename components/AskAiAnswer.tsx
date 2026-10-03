@@ -11,6 +11,8 @@ import {
   type MessageResponseProps,
 } from "./ai-elements/message";
 import { Button } from "./ui/button";
+import { Tooltip } from "./ui/tooltip";
+import { useRevealTarget } from "./patterns/use-reveal-target";
 import {
   Collapsible,
   CollapsibleContent,
@@ -19,6 +21,8 @@ import {
 
 const sourceTitle = (source: AiCitation) =>
   source.title + (source.lessonTitle ? ` — ${source.lessonTitle}` : "");
+// A delay between words would outrun incoming chunks and cancel their fade.
+const streamAnimation = { stagger: 0, duration: 80 };
 
 function openSource(
   event: MouseEvent<HTMLAnchorElement>,
@@ -43,6 +47,10 @@ export function AskAiAnswer({
   onSource: (source: AiCitation) => void;
 }) {
   const text = messageText(message);
+  const sourceReveal = useRevealTarget<HTMLUListElement>({
+    scrollContainer: '[data-slot="conversation-scroll"]',
+    block: "nearest",
+  });
   const citations = useMemo(
     () => answerCitations(text, complete ? messageSources(message) : []),
     [message, complete, text],
@@ -55,6 +63,7 @@ export function AskAiAnswer({
         [
           citationLinks,
           {
+            pending: !complete,
             numbers: Object.fromEntries(
               [...citations.byId].map(([id, citation]) => [
                 id,
@@ -72,21 +81,22 @@ export function AskAiAnswer({
           if (!citation) return <span>{children}</span>;
           const { source, number } = citation;
           return (
-            <a
-              href={source.href}
-              className="whitespace-nowrap"
-              aria-label={`Source ${number}: ${sourceTitle(source)}`}
-              title={sourceTitle(source)}
-              onClick={(event) => openSource(event, source, onSource)}
-            >
-              {children}
-            </a>
+            <Tooltip content={sourceTitle(source)}>
+              <a
+                href={source.href}
+                className="whitespace-nowrap"
+                aria-label={`Source ${number}: ${sourceTitle(source)}`}
+                onClick={(event) => openSource(event, source, onSource)}
+              >
+                {children}
+              </a>
+            </Tooltip>
           );
         },
         img: () => null,
       },
     }),
-    [citations, onSource],
+    [citations, onSource, complete],
   );
   return (
     <>
@@ -95,6 +105,7 @@ export function AskAiAnswer({
         key={complete ? "complete" : "streaming"}
         mode={complete ? "static" : "streaming"}
         isAnimating={animating}
+        animated={complete ? false : streamAnimation}
         skipHtml
         controls={false}
         {...rendering}
@@ -102,7 +113,11 @@ export function AskAiAnswer({
         {text}
       </MessageResponse>
       {!!citations.sources.length && (
-        <Collapsible>
+        <Collapsible
+          onOpenChange={(open) => {
+            if (open) sourceReveal.reveal(false);
+          }}
+        >
           <CollapsibleTrigger asChild>
             <Button type="button" variant="ghost" size="sm" className="group">
               {citations.sources.length}{" "}
@@ -114,7 +129,11 @@ export function AskAiAnswer({
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent>
-            <ul aria-label="Answer sources" className="mt-2 grid gap-2 text-sm">
+            <ul
+              {...sourceReveal.targetProps}
+              aria-label="Answer sources"
+              className="mt-2 grid gap-2 text-sm"
+            >
               {citations.sources.map(({ number, source }) => (
                 <li key={source.href}>
                   <a

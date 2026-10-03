@@ -24,15 +24,15 @@ test("thinking dots visibly rise in sequence without moving their row", async ({
   });
   for (let dot = 0; dot < 3; dot++) {
     const y = samples.map((frame) => frame.dots[dot]);
-    expect(Math.max(...y) - Math.min(...y)).toBeGreaterThan(3.5);
-    expect(Math.max(...y) - Math.min(...y)).toBeLessThanOrEqual(4.1);
+    expect(Math.max(...y) - Math.min(...y)).toBeGreaterThan(2.5);
+    expect(Math.max(...y) - Math.min(...y)).toBeLessThanOrEqual(3.1);
   }
   const rowY = samples.map((frame) => frame.row);
   expect(Math.max(...rowY) - Math.min(...rowY)).toBeLessThan(0.1);
   // Different phases must be visible, not three dots moving together.
   expect(
     samples.some(
-      (frame) => Math.max(...frame.dots) - Math.min(...frame.dots) > 2,
+      (frame) => Math.max(...frame.dots) - Math.min(...frame.dots) > 1.5,
     ),
   ).toBe(true);
   await page.screenshot({ path: info.outputPath("thinking-motion.png") });

@@ -193,7 +193,20 @@ test("Gateway adapter uses the installed SDK protocol, forced bounded planning, 
       status: 503,
     });
     assert.deepEqual(await vercelAi.planSearch(input), ["quorum election"]);
-    assert.equal(await answer(), "A quorum elects a leader. [S1]");
+    const paced: string[] = [];
+    for await (const chunk of vercelAi.streamAnswer({ ...input, sources }))
+      paced.push(chunk);
+    assert.equal(paced.join(""), "A quorum elects a leader. [S1]");
+    assert.ok(paced.length > 1); // A router burst reaches the client progressively.
+    const stopped = new AbortController();
+    const pending = vercelAi.streamAnswer({
+      ...input,
+      sources,
+      signal: stopped.signal,
+    })[Symbol.asyncIterator]();
+    assert.equal((await pending.next()).value, paced[0]);
+    stopped.abort();
+    await assert.rejects(pending.next(), { name: "AbortError" });
     mode = "invalid-plan";
     await assert.rejects(vercelAi.planSearch(input), { status: 503 });
     mode = "http-error";
