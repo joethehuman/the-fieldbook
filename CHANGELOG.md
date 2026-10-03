@@ -4,6 +4,10 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep course assignment search, filters, pagination and actions stationary while only the course list scrolls. Give the chooser more vertical room and show conditional edge fades with the shared scrollbar styling.
+
+- Reuse the Course audience modal for course and curriculum bulk assignments and Learning Groups course addition/removal. Keep Select, Review, Save and discard in one frame, preserve search on Back, and retain other assignment sources and saved deadlines.
+
 - Expand fresh and reset Hoolibook demos to a fixed fictional organization with 200 people, 50 teams, six cross-team learning groups, four curricula, and dated assignment and completion records. Use teams for department learning, keep the same four selectable profiles, and give the Sales manager regional and segment sub-teams to explore. Preserve existing browser workspaces until reset; no database is required.
 
 - Explain course audiences through explicitly named curricula and linked groups. Teams covered by a selected group appear included; current-person overlap stays selectable. Park new redundant team choices, preserve saved independent assignments, and distinguish existing recipients from newly included people. Demo sample data is unchanged.

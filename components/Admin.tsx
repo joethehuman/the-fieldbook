@@ -67,6 +67,7 @@ import {
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { SelectField } from "./ui/select";
 import LearningGroups from "./LearningGroups";
+import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
 import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
 import { updateAudienceKeys } from "@/lib/content-audiences";
 import { assignLearningToAudiences } from "@/lib/assignment-audiences";
@@ -336,6 +337,10 @@ export default function Admin({
     },
     [registerNavigationGuard],
   );
+  const assignmentPicker = useLearningAssignmentPicker({
+    data, onChange, onPrepare: onPrepareAssignments,
+    registerNavigationGuard: registerAdminGuard,
+  });
   const admin = canAdminister(user);
   const visibleSections = adminSections
     .map((section) => ({
@@ -848,6 +853,7 @@ export default function Admin({
           onChange={onChange}
           onLearning={manageLearning}
           onLearningMany={manageLearningMany}
+          onPrepareAssignments={onPrepareAssignments}
           initialGroup={detailScope.groupId}
           registerNavigationGuard={registerAdminGuard}
         />
@@ -1192,6 +1198,7 @@ export default function Admin({
                     selection.actionIds,
                     onChange,
                     manageLearningMany,
+                    assignmentPicker.open,
                   )}
                 />
                 {!!contentRows.length && (
@@ -1612,6 +1619,7 @@ export default function Admin({
                 data={data}
                 onChange={onChange}
                 onUpload={onUpload}
+                onPrepareAssignments={onPrepareAssignments}
                 registerNavigationGuard={registerAdminGuard}
               />
             ) : tab === "groups" ? (
@@ -1620,6 +1628,7 @@ export default function Admin({
                 onChange={onChange}
                 onLearning={manageLearning}
                 onLearningMany={manageLearningMany}
+                onPrepareAssignments={onPrepareAssignments}
                 registerNavigationGuard={registerAdminGuard}
               />
             ) : (
@@ -1628,6 +1637,7 @@ export default function Admin({
           </>
         </TabsContent>
       </Tabs>
+      {assignmentPicker.picker}
       <Dialog
         open={!!person}
         onOpenChange={(open) => {

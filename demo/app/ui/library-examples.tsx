@@ -347,7 +347,7 @@ export function LibraryExamples() {
           Open assignment picker
         </Button>
         <Dialog open={contentPickerOpen} onOpenChange={setContentPickerOpen}>
-          <DialogContent size="selection">
+          <DialogContent size="workflow-list">
             <DialogTitle>Assign example content</DialogTitle>
             <DialogDescription>
               Search published content. The result area scrolls while controls

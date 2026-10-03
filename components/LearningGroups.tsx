@@ -15,6 +15,9 @@ import {
   type Group,
   type LearningItem,
 } from "@/lib/types";
+import { learningSelectionOptions } from "@/lib/learning-assignment-selection";
+import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
+import { useNestedNavigationGuard } from "./patterns/use-nested-navigation-guard";
 import { expandLearning, groupItems } from "@/lib/learning-groups";
 import { sourcePassages } from "@/lib/search";
 import { teamPath } from "@/lib/team-hierarchy";
@@ -62,10 +65,7 @@ import { DetailNavigation } from "./patterns/detail-navigation";
 import { DataTable } from "./patterns/data-table";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
-import {
-  ContentSelectionList,
-  type ContentSelectionOption,
-} from "./patterns/content-selection-list";
+import { ContentSelectionList } from "./patterns/content-selection-list";
 import { FormField } from "./patterns/form-field";
 import { SectionHeader, EmptyState, Stack } from "./patterns/layout";
 import {
@@ -85,7 +85,7 @@ const byName = (
 const sorted = (ids: string[]) => [...ids].sort();
 type Editor =
   | { kind: "create" | "rename"; name: string; original: string }
-  | { kind: "learning" | "updates"; ids: string[]; snapshot: string }
+  | { kind: "updates"; ids: string[]; snapshot: string }
   | {
       kind: "membership";
       teams: string[];
@@ -103,7 +103,9 @@ export default function LearningGroups({
   onLearningMany,
   initialGroup,
   registerNavigationGuard,
+  onPrepareAssignments,
 }: {
+  onPrepareAssignments?: () => Promise<Workspace>;
   data: Workspace;
   onChange: (
     data: Workspace,
@@ -388,18 +390,36 @@ export default function LearningGroups({
       ? editor.name !== editor.original
       : editor.kind === "membership"
         ? membershipValue(editor) !== editor.original
-        : editor.kind === "learning" || editor.kind === "updates"
+        : editor.kind === "updates"
           ? editor.ids.length > 0
           : false);
   guard.current = async () =>
     !saving.current &&
     (!dirty || (await confirm("Discard unsaved learning group changes?")));
-  useEffect(() => {
-    registerNavigationGuard?.(() => guard.current(), {
-      protected: dirty || busy,
-    });
-    return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard, dirty, busy]);
+  const registerAssignmentGuard = useNestedNavigationGuard(
+    () => guard.current(),
+    dirty || busy,
+    registerNavigationGuard,
+  );
+  const assignmentPicker = useLearningAssignmentPicker({
+    data,
+    onChange,
+    onPrepare: onPrepareAssignments,
+    registerNavigationGuard: registerAssignmentGuard,
+  });
+  async function editAssignments(mode: "add" | "remove", selected?: string[]) {
+    if (!group) return;
+    setNotice("");
+    try {
+      await assignmentPicker.open(
+        { kind: "audiences", keys: [`group:${group.id}`], mode, selected },
+        group.name,
+      );
+    } catch (error) {
+      if (!isOrganizationChangeCanceled(error))
+        setNotice((error as Error).message);
+    }
+  }
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty || saving.current) {
@@ -663,30 +683,14 @@ export default function LearningGroups({
         setEditor(null);
       return;
     }
-    if (editor.kind !== "learning" && editor.kind !== "updates") return;
+    if (editor.kind !== "updates") return;
     if (editor.snapshot !== learningSnapshot()) {
       setNotice(
         "This group's learning or content changed. Close this picker and review your selection again.",
       );
       return;
     }
-    if (editor.kind === "learning") {
-      const additions = editor.ids
-        .filter((id) => learningOptions.some((option) => option.id === id))
-        .map((id) => ({
-          kind: id.startsWith("course:")
-            ? ("course" as const)
-            : ("curriculum" as const),
-          id: id.slice(id.indexOf(":") + 1),
-        }));
-      if (
-        await changeGroup(
-          { learningItems: [...items, ...additions] },
-          "Learning added.",
-        )
-      )
-        setEditor(null);
-    } else if (
+    if (
       await run(
         () =>
           learnMany(
@@ -704,36 +708,14 @@ export default function LearningGroups({
     )
       setEditor(null);
   }
-  const learningOptions: ContentSelectionOption[] = [
-    ...published
-      .filter((item) => item.kind === "course")
-      .map((item) => ({
-        id: `course:${item.id}`,
-        label: item.title,
-        type: "course" as const,
-        description: item.summary,
-        category: item.category,
-        updatedAt: item.updatedAt,
-        searchText: searchableContent.get(item.id),
-      })),
-    ...curricula
-      .filter((item) => item.status === "published")
-      .map((item) => ({
-        id: `curriculum:${item.id}`,
-        label: item.name,
-        type: "curriculum" as const,
-        description: item.description,
-        searchText: item.courseIds
-          .filter((id) =>
-            published.some(
-              (course) => course.id === id && course.kind === "course",
-            ),
-          )
-          .map((id) => searchableContent.get(id) || "")
-          .join(" "),
-      })),
-  ].filter((option) => !items.some((item) => key(item) === option.id));
-  const updateOptions: ContentSelectionOption[] = published
+  const learningOptions = group
+    ? learningSelectionOptions(data, {
+        kind: "audiences",
+        keys: [`group:${group.id}`],
+        mode: "add",
+      })
+    : [];
+  const updateOptions = published
     .filter(
       (item) =>
         item.kind === "brief" && group && !item.groups.includes(group.id),
@@ -755,18 +737,14 @@ export default function LearningGroups({
         ? "Rename learning group"
         : editor.kind === "membership"
           ? "Add Members"
-          : editor.kind === "learning"
-            ? "Assign Courses"
-            : "Assign Updates";
+          : "Assign Updates";
   const modalDescription = !editor
     ? ""
     : editor.kind === "create" || editor.kind === "rename"
       ? "Use a unique name for this audience."
       : editor.kind === "membership"
         ? `Choose people or teams to include in ${group?.name}. Clear an existing selection to remove that membership source.`
-        : editor.kind === "learning"
-          ? `Assign courses or curricula to ${group?.name}. Overlapping courses count once.`
-          : `Choose relevant Updates for ${group?.name}.`;
+        : `Choose relevant Updates for ${group?.name}.`;
   const modalAction =
     editor?.kind === "create"
       ? "Create group"
@@ -774,9 +752,7 @@ export default function LearningGroups({
         ? "Save name"
         : editor?.kind === "membership"
           ? "Review changes"
-          : editor?.kind === "learning"
-            ? "Review assignment"
-            : "Review changes";
+          : "Review changes";
 
   return (
     <section
@@ -784,6 +760,7 @@ export default function LearningGroups({
       className="learning-admin"
       aria-label={group?.name || "Learning groups"}
     >
+      {assignmentPicker.picker}
       {notice && !editor && <Alert variant="destructive">{notice}</Alert>}
       {needsConversion && (
         <Alert>
@@ -1166,13 +1143,7 @@ export default function LearningGroups({
                       disabled={
                         busy || needsConversion || !learningOptions.length
                       }
-                      onClick={() =>
-                        open({
-                          kind: "learning",
-                          ids: [],
-                          snapshot: learningSnapshot(),
-                        })
-                      }
+                      onClick={() => void editAssignments("add")}
                     >
                       <Plus aria-hidden="true" />
                       Assign Courses
@@ -1227,14 +1198,7 @@ export default function LearningGroups({
                       "Learning order saved.",
                     )
                   }
-                  onRemove={(id) =>
-                    void changeGroup(
-                      {
-                        learningItems: items.filter((item) => key(item) !== id),
-                      },
-                      "Learning removed from group.",
-                    )
-                  }
+                  onRemove={(id) => void editAssignments("remove", [id])}
                 />
                 {!filteredItems.length &&
                   (items.length ? (
@@ -1703,11 +1667,7 @@ export default function LearningGroups({
             // delayed restoration of focus to the Create group trigger.
             setReturnToGroup(id);
           }}
-          size={
-            editor?.kind === "learning" || editor?.kind === "updates"
-              ? "selection"
-              : "default"
-          }
+          size={editor?.kind === "updates" ? "selection" : "default"}
           onEscapeKeyDown={(event) => {
             if (busy) event.preventDefault();
           }}
@@ -1823,20 +1783,13 @@ export default function LearningGroups({
               </p>
             </Tabs>
           )}
-          {(editor?.kind === "learning" || editor?.kind === "updates") && (
+          {editor?.kind === "updates" && (
             <DialogBody>
               <ContentSelectionList
                 bounded
-                label={
-                  editor.kind === "learning"
-                    ? "Find courses or curricula"
-                    : "Find Updates"
-                }
-                showTypeFilter={editor.kind === "learning"}
+                label="Find Updates"
                 disabled={busy}
-                options={
-                  editor.kind === "learning" ? learningOptions : updateOptions
-                }
+                options={updateOptions}
                 value={editor.ids}
                 onChange={(ids) => setEditor({ ...editor, ids })}
               />
