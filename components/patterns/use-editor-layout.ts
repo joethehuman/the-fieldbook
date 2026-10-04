@@ -9,7 +9,6 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMod
     const viewport = editor?.closest<HTMLElement>(".main-content");
     if (!editor || !viewport) return;
     let request = 0;
-    let phonePage = false;
     const observed = new Set<Element>();
     const observer = new ResizeObserver(schedule);
     function schedule() {
@@ -43,29 +42,14 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMod
         + gap(editor) * (editor.children.length - 1) + gap(content) + gap(frame)
         + Array.from(editor.querySelectorAll(".writing-root")).reduce((height, root) => height + gap(root) * (root.children.length - 1), 0)
         + (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+      // A phone document always flows through the page, including its blank
+      // first paragraph. Keyboard changes must not swap or reset scroll owners.
       const phone = window.matchMedia("(max-width: 767px)").matches;
-      if (!phone) phonePage = false;
-      const visible = window.visualViewport;
-      const available = phone && visible?.scale === 1
-        ? Math.min(viewport.clientHeight, visible.offsetTop + visible.height - viewport.getBoundingClientRect().top)
-        : viewport.clientHeight;
-      const fits = (frame.getBoundingClientRect().width >= 48 * rem || phone)
-        && available - reserved >= 12 * rem ? "workspace" : "page";
-      // Once a keyboard needs the page fallback, retain its scroll owner for this
-      // phone editor. Repeated keyboard dismissal must not reset the document.
-      if (phone && fits === "page" && editor.closest<HTMLElement>(".app")?.dataset.phoneKeyboard === "true") phonePage = true;
-      const layout = phonePage ? "page" : fits;
+      const layout = !phone && frame.getBoundingClientRect().width >= 48 * rem
+        && viewport.clientHeight - reserved >= 12 * rem ? "workspace" : "page";
       if (editor.dataset.scrollLayout !== layout) {
-        const selection = window.getSelection();
-        const range = phone && selection?.isCollapsed && selection.rangeCount && editor.contains(selection.focusNode)
-          ? selection.getRangeAt(0) : null;
-        const before = range?.getClientRects()[0]?.top;
         editor.dataset.scrollLayout = layout;
         if (layout === "workspace") viewport.scrollTop = 0;
-        else if (before !== undefined) {
-          const after = range?.getClientRects()[0]?.top;
-          if (after !== undefined) viewport.scrollTop += after - before;
-        }
       }
     }
     // Dynamic save notices and lazy/mode-specific toolbars also consume natural space.
@@ -74,13 +58,11 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMod
         || !target.closest(".writing-viewport, .editor-frame-details, .editor-frame-outline"))) schedule();
     });
     mutations.observe(editor, { childList: true, subtree: true });
-    window.visualViewport?.addEventListener("resize", schedule);
     measure();
     return () => {
       cancelAnimationFrame(request);
       observer.disconnect();
       mutations.disconnect();
-      window.visualViewport?.removeEventListener("resize", schedule);
     };
   }, [ref, focusMode]);
 }

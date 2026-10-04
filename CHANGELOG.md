@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Refine phone authoring with right-aligned Outline/Details buttons and smoothly animated bottom panels with safe-area breathing room, explicit selected-text formatting alongside native selection menus, and writing space that smoothly follows the visible keyboard viewport and retains its scroll owner through repeated keyboard dismissal. Omit Focus mode on phones. Simplify the phone Administration picker and use a searchable Teams directory while retaining tablet and desktop layouts.
+- Refine phone authoring with right-aligned Outline/Details buttons and smoothly animated bottom panels with safe-area breathing room, explicit selected-text formatting alongside native selection menus, and a canvas that stays in natural page flow from its empty first paragraph, with keyboard clearance and smooth caret scrolling without resizing the canvas. Omit Focus mode on phones. Simplify the phone Administration picker and use a searchable Teams directory while retaining tablet and desktop layouts.
 
 - Size application table columns to content up to shared maximum measures, wrap long names and metadata, and reserve surplus width between the last data column and the pinned action menu. Apply the same sizing across administrative, reporting and review tables.
 

@@ -2,107 +2,108 @@
 
 import { useLayoutEffect, type RefObject } from "react";
 
-/** Size the active phone writer to the visible viewport and reveal only its caret. */
+/** Keep phone writing in page flow; reserve keyboard space without resizing it. */
 export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     const root = ref.current;
-    const app = root?.closest<HTMLElement>(".app");
+    const editor = root?.closest<HTMLElement>(".editor");
+    const owner = root?.closest<HTMLElement>(".main-content");
     const viewport = window.visualViewport;
-    if (!root || !app || !root.closest(".editor") || !viewport) return;
+    if (!root || !editor || !owner || !viewport) return;
     const phone = window.matchMedia("(max-width: 767px)");
     let request = 0;
-    let reveal = false;
+    let settle = 0;
+    let closing = 0;
     let keyboardOpen = false;
+    let space = 0;
     function clear() {
-      if (!app) return;
-      delete app.dataset.phoneKeyboard;
-      delete app.dataset.phoneWriter;
-      app.style.removeProperty("--phone-writing-height");
-      app.style.removeProperty("--phone-writing-top");
-      app.style.removeProperty("--phone-writing-clearance");
+      owner!.style.removeProperty("--phone-keyboard-space");
+      delete owner!.dataset.phoneKeyboardClosing;
     }
-    function measure() {
-      if (!root || !app || !viewport) return;
-      const active = document.activeElement;
-      const focused = root.contains(active) || (active instanceof Element && !!active.closest("[data-writing-selection-menu]"));
-      // Do not mistake pinch zoom or ordinary browser chrome for a keyboard.
-      if (!phone.matches || viewport.scale !== 1) {
+    function reserveSpace() {
+      if (!phone.matches || viewport!.scale !== 1) {
         keyboardOpen = false;
-        reveal = false;
+        space = 0;
         clear();
         return;
       }
-      const occluded = window.innerHeight - viewport.height;
-      // Keep fitting the viewport throughout dismissal, even after focus leaves
-      // the writer. Hysteresis avoids flipping at the keyboard's first/last frame.
-      keyboardOpen = keyboardOpen ? occluded > 48 : focused && occluded > 100;
-      app.dataset.phoneWriter = "true";
-      if (keyboardOpen) {
-        app.dataset.phoneKeyboard = "true";
-        app.style.setProperty("--phone-writing-height", `${viewport.height}px`);
-        app.style.setProperty("--phone-writing-top", `${viewport.offsetTop}px`);
-      } else {
-        delete app.dataset.phoneKeyboard;
-        app.style.removeProperty("--phone-writing-height");
-        app.style.removeProperty("--phone-writing-top");
-      }
-      // The animated shell can briefly exceed the already-visible viewport.
-      // Reserve that difference so the caret can scroll clear immediately.
-      app.style.setProperty("--phone-writing-clearance", `${keyboardOpen ? Math.max(0, app.getBoundingClientRect().height - viewport.height) : 0}px`);
-      if (!reveal || !phone.matches || !focused || viewport.scale !== 1) { reveal = false; return; }
-      reveal = false;
-      const selection = window.getSelection();
-      if (!selection?.rangeCount || !selection.isCollapsed || !root.contains(selection.focusNode)) return;
-      const element = selection.focusNode instanceof Element ? selection.focusNode : selection.focusNode?.parentElement;
-      const editable = element?.closest<HTMLElement>('[contenteditable="true"]');
-      if (!editable) return;
-      const range = selection.getRangeAt(0);
-      const caret = range.getClientRects()[0];
-      if (!caret?.height) return;
-      const body = editable.closest<HTMLElement>(".writing-viewport");
-      const owner = body && getComputedStyle(body).overflowY === "auto"
-        ? body : root.closest<HTMLElement>(".main-content");
-      if (!owner) return;
-      const bounds = owner.getBoundingClientRect();
+      const occluded = window.innerHeight - viewport!.height;
+      keyboardOpen = keyboardOpen ? occluded > 48 : editor!.contains(document.activeElement) && occluded > 100;
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const top = Math.max(bounds.top, viewport.offsetTop) + rem;
-      // Leave breathing room for the native keyboard accessory controls.
-      const bottom = Math.min(bounds.bottom, viewport.offsetTop + viewport.height) - (keyboardOpen ? 3 : 1) * rem;
+      const next = keyboardOpen ? Math.max(0, window.innerHeight - viewport!.offsetTop - viewport!.height) + 3 * rem : 0;
+      if (next === space) return;
+      clearTimeout(closing);
+      if (next === 0 && space > 0) {
+        // Only dismissal eases away the spare scroll space. Opening reserves it
+        // immediately so a blank line or the final paragraph can be revealed.
+        owner!.dataset.phoneKeyboardClosing = "true";
+        closing = window.setTimeout(() => { delete owner!.dataset.phoneKeyboardClosing; }, 220);
+      } else delete owner!.dataset.phoneKeyboardClosing;
+      space = next;
+      owner!.style.setProperty("--phone-keyboard-space", `${space}px`);
+    }
+    function revealCaret() {
+      if (!phone.matches || viewport!.scale !== 1 || !root!.contains(document.activeElement)) return;
+      const selection = window.getSelection();
+      if (!selection?.rangeCount || !selection.isCollapsed || !root!.contains(selection.focusNode)) return;
+      const element = selection.focusNode instanceof Element ? selection.focusNode : selection.focusNode?.parentElement;
+      if (!element?.closest('[contenteditable="true"]')) return;
+      let caret = selection.getRangeAt(0).getClientRects()[0];
+      if (!caret?.height) {
+        // A new Lexical paragraph is <p><br></p>: its collapsed range has no
+        // text rectangle. Use only that empty line, never the whole canvas.
+        const line = element.closest("p, li, h1, h2, h3, h4, blockquote, pre");
+        if (!line || line.textContent?.trim()) return;
+        caret = line.getBoundingClientRect();
+      }
+      if (!caret.height) return;
+      const bounds = owner!.getBoundingClientRect();
+      const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
+      const top = Math.max(bounds.top, viewport!.offsetTop) + rem;
+      const bottom = Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height) - (keyboardOpen ? 3 : 1) * rem;
       if (bottom <= top) return;
-      if (caret.bottom > bottom) owner.scrollTop += caret.bottom - bottom;
-      else if (caret.top < top) owner.scrollTop -= top - caret.top;
+      const delta = caret.bottom > bottom ? caret.bottom - bottom : caret.top < top ? caret.top - top : 0;
+      if (Math.abs(delta) < 1) return;
+      const next = Math.max(0, Math.min(owner!.scrollHeight - owner!.clientHeight, owner!.scrollTop + delta));
+      owner!.scrollTo({ top: next, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
     }
-    function schedule(revealCaret = false) {
-      reveal ||= revealCaret;
+    function cancelReveal() {
+      clearTimeout(settle);
       cancelAnimationFrame(request);
-      request = requestAnimationFrame(measure);
     }
-    const resize = () => schedule(true);
-    const pan = () => schedule();
-    const editing = () => schedule(true);
-    const blur = () => schedule();
-    // Reveal against the changing canvas as its height settles, without moving
-    // the whole editable surface or overriding deliberate manual scrolling.
-    const sizing = new ResizeObserver(() => schedule(true));
-    sizing.observe(app);
+    function schedule() {
+      clearTimeout(settle);
+      cancelAnimationFrame(request);
+      // Let native focus/keyboard panning settle before one minimal correction.
+      settle = window.setTimeout(() => { request = requestAnimationFrame(revealCaret); }, 100);
+    }
+    function resize() { reserveSpace(); schedule(); }
+    function pan() { reserveSpace(); }
+    function editing() { reserveSpace(); schedule(); }
+    function blur() { reserveSpace(); }
+    reserveSpace();
     viewport.addEventListener("resize", resize);
     viewport.addEventListener("scroll", pan);
     phone.addEventListener("change", resize);
-    root.addEventListener("focusin", editing);
-    root.addEventListener("focusout", blur);
+    editor.addEventListener("focusin", editing);
+    editor.addEventListener("focusout", blur);
     root.addEventListener("input", editing);
-    document.addEventListener("selectionchange", editing);
+    document.addEventListener("selectionchange", schedule);
+    owner.addEventListener("wheel", cancelReveal, { passive: true });
+    owner.addEventListener("touchstart", cancelReveal, { passive: true });
     return () => {
-      cancelAnimationFrame(request);
-      sizing.disconnect();
+      cancelReveal();
+      clearTimeout(closing);
       clear();
       viewport.removeEventListener("resize", resize);
       viewport.removeEventListener("scroll", pan);
       phone.removeEventListener("change", resize);
-      root.removeEventListener("focusin", editing);
-      root.removeEventListener("focusout", blur);
+      editor.removeEventListener("focusin", editing);
+      editor.removeEventListener("focusout", blur);
       root.removeEventListener("input", editing);
-      document.removeEventListener("selectionchange", editing);
+      document.removeEventListener("selectionchange", schedule);
+      owner.removeEventListener("wheel", cancelReveal);
+      owner.removeEventListener("touchstart", cancelReveal);
     };
   }, [ref]);
 }
