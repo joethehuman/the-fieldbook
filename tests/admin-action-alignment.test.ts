@@ -73,7 +73,7 @@ test("shared admin command snapshots source IDs and revisions and returns exact 
   assert.ok(command.acknowledgment);
 });
 
-test("group Update lists retain individual action targets for one item and stable four-column rows", async () => {
+test("group Update lists retain individual action targets for one item and four data columns with shared action spacing", async () => {
   const { default: LearningGroups } =
     await import("../components/LearningGroups");
   const { InteractionDialogProvider } =
@@ -111,8 +111,9 @@ test("group Update lists retain individual action targets for one item and stabl
   const table =
     html.match(/<table[^>]*data-layout="groupUpdates"[\s\S]*?<\/table>/)?.[0] ||
     "";
-  assert.equal((table.match(/<col class=/g) || []).length, 4);
-  assert.equal((table.match(/<td /g) || []).length, 4);
+  assert.equal((table.match(/<col class=/g) || []).length, 5);
+  assert.equal((table.match(/<td /g) || []).length, 5);
+  assert.equal((table.match(/data-slot="table-space"/g) || []).length, 2);
 });
 
 test("single direct group member has a row action without a bulk-selection fallback", async () => {

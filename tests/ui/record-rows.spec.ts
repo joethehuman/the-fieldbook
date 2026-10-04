@@ -102,18 +102,18 @@ test("content row menus preserve assignment selection and canceled publication c
   const table = page.locator('table[data-layout="contentSelection"]');
   const row = table.locator("tbody tr").first();
   const widths = await table
-    .locator("th")
+    .locator("thead [data-slot=table-cell-content]")
     .evaluateAll((cells) =>
-      cells.map((cell) => cell.getBoundingClientRect().width),
+      cells.map((cell) => getComputedStyle(cell).maxWidth),
     );
   await page
     .getByRole("searchbox", { name: "Search content", exact: true })
     .fill("");
   expect(
     await table
-      .locator("th")
+      .locator("thead [data-slot=table-cell-content]")
       .evaluateAll((cells) =>
-        cells.map((cell) => cell.getBoundingClientRect().width),
+        cells.map((cell) => getComputedStyle(cell).maxWidth),
       ),
   ).toEqual(widths);
   await screenshot(page, info, "content");

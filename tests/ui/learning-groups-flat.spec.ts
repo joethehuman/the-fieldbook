@@ -480,9 +480,9 @@ test("People filters and bulk direct removal preserve team membership and cancel
     page.getByRole("button", { name: "Bulk actions", exact: true }),
   ).toBeDisabled();
   const columns = await table
-    .locator("col")
+    .locator("thead [data-slot=table-cell-content]")
     .evaluateAll((items) =>
-      items.map((item) => item.getBoundingClientRect().width),
+      items.map((item) => getComputedStyle(item).maxWidth),
     );
   for (const [label, choice, reset] of [
     ["User status", "Inactive", "All statuses"],
@@ -498,9 +498,9 @@ test("People filters and bulk direct removal preserve team membership and cancel
     await expect(table.getByRole("checkbox")).toHaveCount(0);
     expect(
       await table
-        .locator("col")
+        .locator("thead [data-slot=table-cell-content]")
         .evaluateAll((items) =>
-          items.map((item) => item.getBoundingClientRect().width),
+          items.map((item) => getComputedStyle(item).maxWidth),
         ),
     ).toEqual(columns);
     await page.getByRole("button", { name: /^Filters/ }).click();
@@ -681,7 +681,7 @@ test("group index keeps selection across pages and creation reveals the new row 
   });
 });
 
-test("group index sorts real counts and filters membership and assigned courses with stable columns", async ({
+test("group index sorts real counts and filters membership and assigned courses with bounded column measures", async ({
   page,
 }) => {
   const data = fixture();
@@ -698,9 +698,9 @@ test("group index sorts real counts and filters membership and assigned courses 
   });
   const widths = () =>
     table
-      .locator("col")
+      .locator("thead [data-slot=table-cell-content]")
       .evaluateAll((columns) =>
-        columns.map((column) => column.getBoundingClientRect().width),
+        columns.map((column) => getComputedStyle(column).maxWidth),
       );
   const original = await widths();
   await indexChoice(page, "Sort groups", "Courses: fewest first");

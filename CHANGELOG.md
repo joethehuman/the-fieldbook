@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Size application table columns to content up to shared maximum measures, wrap long names and metadata, and reserve surplus width between the last data column and the pinned action menu. Apply the same sizing across administrative, reporting and review tables.
+
 - Clarify Teams bulk selection with an outlined Select multiple control beside search and Add team, a visible Done selecting exit, and the standard paginated table with header checkboxes and the existing bulk-action toolbar.
 
 - Simulate Ask AI in the browser-local demo with the shared thinking indicator, streamed canned replies and working Stop control. The first two questions receive Hoolibook/Gavin replies, with a link to thefieldbook.org in the first; later questions receive the demo-unavailable message. No model requests are made.

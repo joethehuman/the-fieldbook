@@ -754,8 +754,8 @@ export default function ComponentCatalog() {
       <Card>
         <Stack>
           <SectionHeader
-            title={<h2>Stable table columns</h2>}
-            description="Changing the result set preserves column positions. Narrow layouts scroll within the table."
+            title={<h2>Content-sized table columns</h2>}
+            description="Columns fit content up to shared limits, then wrap. Spare room sits before actions; narrow layouts scroll within the table."
           >
             <Button
               variant="outline"
@@ -767,7 +767,7 @@ export default function ComponentCatalog() {
           <TableContainer>
             <DataTable
               layout="progress"
-              aria-label="Example stable progress table"
+              aria-label="Example content-sized progress table"
             >
               <TableHeader>
                 <TableRow>
@@ -781,7 +781,7 @@ export default function ComponentCatalog() {
               </TableHeader>
               <TableBody>
                 {!emptyReport &&
-                  ["Example learner", "Example learner with a longer name"].map(
+                  ["Example learner", "Example learner with an unusually long name that wraps without stretching the other columns"].map(
                     (name) => (
                       <TableRow key={name}>
                         <TableCell>
