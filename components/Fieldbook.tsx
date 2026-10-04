@@ -820,6 +820,8 @@ export default function Fieldbook() {
       ) : curriculum ? (
         <CurriculumPage
           curriculum={curriculum}
+          user={user}
+          groups={data.groups}
           settings={data.settings}
           courses={courses}
           progress={progress}

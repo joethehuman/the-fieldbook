@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { FormField } from "./patterns/form-field";
 import { SelectField } from "./ui/select";
-import type { Content, Curriculum, Progress } from "@/lib/types";
+import type { Content, Curriculum, Progress, User, Group } from "@/lib/types";
 import type { SiteSettings } from "@/lib/settings";
+import { learningState } from "@/lib/learning";
 import { curriculumCourses } from "@/lib/learning-cards";
 import { courseProgress } from "@/lib/course-progress";
 import { PageHeader, EmptyState } from "./patterns/layout";
@@ -20,6 +21,8 @@ export function CurriculumPage({
   backLabel = "Back to courses",
   backHref,
   courseHref,
+  user,
+  groups = [],
 }: {
   curriculum: Curriculum;
   courses: Content[];
@@ -30,9 +33,16 @@ export function CurriculumPage({
   backLabel?: string;
   backHref?: string;
   courseHref?: (id: string) => string;
+  user?: User;
+  groups?: Group[];
 }) {
   const [sort, setSort] = useState("recommended");
   const items = curriculumCourses(curriculum, courses);
+  const learning = user
+    ? learningState(items, user, groups, progress, settings)
+    : undefined;
+  const assignedIds = new Set(learning?.required.map((c) => c.id));
+  const overdueIds = new Set(learning?.overdue.map((c) => c.id));
   if (sort !== "recommended")
     items.sort((a, b) => {
       if (sort === "title") return a.title.localeCompare(b.title);
@@ -79,6 +89,14 @@ export function CurriculumPage({
             course={course}
             settings={settings}
             status={courseProgress(course, progress)}
+            assignmentLabel={
+              assignedIds.has(course.id)
+                ? user?.id === "guest" || settings?.dueDatesEnabled === false
+                  ? "Recommended"
+                  : "Assigned"
+                : undefined
+            }
+            pastDue={overdueIds.has(course.id)}
             href={courseHref?.(course.id)}
             onClick={courseHref ? undefined : () => onOpen(course.id)}
           />

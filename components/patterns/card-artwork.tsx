@@ -6,6 +6,7 @@ import {
   resolvedCardPalette,
 } from "@/lib/card-art";
 import type { SiteSettings } from "@/lib/settings";
+import { Badge } from "../ui/badge";
 import { CardImage } from "./card-image";
 
 function mix(a: string, b: string, weight: number) {
@@ -647,6 +648,7 @@ export function CardArtwork({
   legacyCover,
   settings,
   palette,
+  relevance,
 }: {
   id: string;
   title: string;
@@ -656,6 +658,7 @@ export function CardArtwork({
   legacyCover?: string;
   settings?: Pick<SiteSettings, "accent" | "cardPalette">;
   palette?: CardPalette;
+  relevance?: "For you" | "Past due";
 }) {
   const resolved = resolvedCardArt(id, title, art, legacyCover);
   const colors = palette || resolvedCardPalette(settings);
@@ -672,6 +675,26 @@ export function CardArtwork({
   const detail = dark
     ? mix(colors.accent2, "#ffffff", 0.08)
     : mix(colors.accent2, "#ffffff", 0.1);
+  const learning = kind !== "brief";
+  const learningHeader = (
+    <div className="card-artwork-learning-header">
+      <div className="flex items-start justify-between gap-2">
+        <span className="card-artwork-type">
+          {kind === "course" ? "Course" : "Curriculum"}
+        </span>
+        {relevance && (
+          <Badge
+            variant={relevance === "Past due" ? "destructive-soft" : "default"}
+          >
+            {relevance}
+          </Badge>
+        )}
+      </div>
+      {kind === "course" && category && (
+        <span className="card-artwork-category">{category}</span>
+      )}
+    </div>
+  );
   const generated = (
     <>
       <svg
@@ -686,14 +709,13 @@ export function CardArtwork({
       </svg>
       <div className="card-artwork-wash" aria-hidden="true" />
       <div className="card-artwork-copy">
-        <span className="card-artwork-type">
-          {kind === "brief"
-            ? "Update"
-            : kind === "course"
-              ? "Course"
-              : "Curriculum"}
-          {category ? ` · ${category}` : ""}
-        </span>
+        {learning ? (
+          learningHeader
+        ) : (
+          <span className="card-artwork-type">
+            Update{category ? ` · ${category}` : ""}
+          </span>
+        )}
         <strong>{resolved.shortTitle || title}</strong>
       </div>
     </>
@@ -705,6 +727,7 @@ export function CardArtwork({
         resolved.version === 2 ? artComposition(resolved.seed) : undefined
       }
       data-tone={dark ? "dark" : "light"}
+      data-kind={kind}
       style={
         {
           "--card-base": surface,
@@ -713,7 +736,15 @@ export function CardArtwork({
       }
     >
       {resolved.source === "upload" && resolved.imageUrl ? (
-        <CardImage src={resolved.imageUrl} fallback={generated} />
+        <CardImage
+          src={resolved.imageUrl}
+          fallback={generated}
+          overlay={
+            learning ? (
+              <div className="card-artwork-upload-header">{learningHeader}</div>
+            ) : undefined
+          }
+        />
       ) : (
         generated
       )}

@@ -34,6 +34,8 @@ export function ReaderCurriculum({
   return (
     <CurriculumPage
       curriculum={curriculum}
+      user={data.user}
+      groups={data.groups}
       settings={data.settings}
       courses={data.courses}
       progress={data.user.id === "guest" ? guestProgress : data.progress}

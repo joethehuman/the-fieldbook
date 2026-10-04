@@ -2,13 +2,14 @@ import type { ComponentProps } from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 const variants = cva(
-  "inline-flex w-fit shrink-0 items-center gap-1 rounded-full border border-transparent px-2 py-0 text-xs leading-6 font-medium whitespace-nowrap",
+  "inline-flex w-fit shrink-0 items-center justify-center gap-1 rounded-full border border-transparent px-2 py-0 text-xs leading-6 font-medium text-center whitespace-nowrap",
   {
     variants: {
       variant: {
         default: "bg-muted text-foreground",
         success: "bg-success/10 text-success",
         warning: "bg-warning/10 text-warning",
+        "destructive-soft": "bg-destructive-soft text-destructive",
         destructive: "bg-destructive/10 text-destructive",
       },
     },

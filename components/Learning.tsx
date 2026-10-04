@@ -111,6 +111,7 @@ export default function Learning({
     "yours",
   ).length;
   const assignedIds = new Set(assigned.map((c) => c.id));
+  const overdueIds = new Set(state.overdue.map((c) => c.id));
   const outstanding = assigned.filter((c) => !isComplete(c, progress));
   const pct = completionPercent(completed.length, assigned.length);
   const source = learningCollection(
@@ -130,6 +131,11 @@ export default function Learning({
     user,
     groups,
   );
+  const assignedCurriculumIds = new Set(
+    assignedCards.flatMap((item) =>
+      item.kind === "curriculum" ? [item.curriculum.id] : [],
+    ),
+  );
   const completeCard = (item: LearningCardItem) =>
     item.kind === "course"
       ? isComplete(item.course, progress)
@@ -148,6 +154,14 @@ export default function Learning({
         courses={item.courses}
         progress={progress}
         settings={settings}
+        assignmentLabel={
+          assignedCurriculumIds.has(item.curriculum.id)
+            ? useDueDates
+              ? "Assigned"
+              : "Recommended"
+            : undefined
+        }
+        pastDue={item.courses.some((course) => overdueIds.has(course.id))}
         onClick={
           linkedNavigation ? undefined : () => onCurriculum(item.curriculum.id)
         }
@@ -259,12 +273,13 @@ export default function Learning({
       settings={settings}
       status={courseProgress(c, progress)}
       assignmentLabel={
-        !guest && view !== "home" && assignedIds.has(c.id)
+        assignedIds.has(c.id)
           ? useDueDates
             ? "Assigned"
             : "Recommended"
           : undefined
       }
+      pastDue={overdueIds.has(c.id)}
       onClick={linkedNavigation ? undefined : () => onOpen(c.id)}
       href={
         linkedNavigation
