@@ -36,7 +36,7 @@ export function WritingMediaVideo({
   const [error, setError] = useState("");
   return (
     <span className="writing-media-block" contentEditable={false}>
-      <CourseVideo key={url} url={url} title={label} allowTheater={false} />
+      <CourseVideo key={url} url={url} title={label} allowFullscreen={false} />
       <WritingBlockActions label="Video" disabled={disabled} onRemove={onRemove} onParagraph={onParagraph}
         onEdit={() => { setDraft(url); setError(""); setEditing(true); }} />
       <Dialog open={editing} onOpenChange={setEditing}>
