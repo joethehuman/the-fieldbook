@@ -339,7 +339,7 @@ test("an assigned course stages a new version through autosaves and consumes it 
   });
   await version.check();
   await page.getByRole("button", { name: /^Details/ }).click();
-  await replaceWritingText(page, "A small inline lesson correction.");
+  await page.getByRole("textbox", { name: "Lesson content", exact: true }).fill("A small inline lesson correction.");
   await expect
     .poll(async () => (await read()).lessons[0].body)
     .toBe("A small inline lesson correction.");
