@@ -26,6 +26,7 @@ const layouts = {
   groupMembers: ["w-[40%]", "w-[25%]", "w-[35%]"],
   groupUpdates: ["w-12", "", "w-[25%]", "w-16"],
   assignmentGroups: ["w-10", "w-[70%]", "w-[20%]"],
+  teamDirectory: ["w-12", "", "w-[28%]", "w-24", "w-24", "w-16"],
   teamBranches: ["", "w-[32%]", "w-[20%]", "w-16"],
   teamMembers: ["", "w-[35%]", "w-16"],
   teams: ["w-[24%]", "w-[20%]", "w-[24%]", "w-[16%]", "w-[16%]"],
@@ -59,6 +60,7 @@ export function DataTable({
         "contentSelection",
         "peopleSelection",
         "learningGroupsSelectable",
+        "teamDirectory",
         "teamBranches",
         "teamMembers",
         "progressPeople",
@@ -67,6 +69,7 @@ export function DataTable({
       className={cn(
         "table-fixed [&_td]:[overflow-wrap:anywhere] [&_th]:[overflow-wrap:anywhere]",
         [
+          "teamDirectory",
           "contentSelection",
           "peopleSelection",
           "deleted",

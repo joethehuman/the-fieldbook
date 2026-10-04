@@ -460,6 +460,7 @@ export function TeamsAdmin({
       parentId: item.parentId === organization?.id ? undefined : item.parentId,
       label: item.name,
       description: `Manager: ${data.users.find((user) => user.id === item.managerId)?.name || "Unassigned"}`,
+      managerName: data.users.find((user) => user.id === item.managerId)?.name || "Unassigned",
       directMemberCount: data.users.filter((user) => user.teamId === item.id)
         .length,
     }));
@@ -860,25 +861,15 @@ export function TeamsAdmin({
             </ActionGroup>
           }
           selectionActions={
-            selectTeams ? (
-              <div className="grid gap-2 rounded-xl border border-border bg-muted/30 px-4 pt-3 pb-1">
-                <div className="grid gap-1">
-                  <p className="text-label font-semibold">
-                    Select multiple teams
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Choose two or more teams to move them, change their group
-                    links, or delete them.
-                  </p>
-                </div>
-                <BulkActions
-                  collectionSize={teamSelection.collectionSize}
-                  selected={teamSelection.actionIds}
-                  onSelectionChange={teamSelection.setSelected}
-                  noun="teams"
-                  commands={teamCommands(teamSelection.actionIds)}
-                />
-              </div>
+            selectTeams ? (range) => (
+              <BulkActions
+                collectionSize={teamSelection.collectionSize}
+                range={range}
+                selected={teamSelection.actionIds}
+                onSelectionChange={teamSelection.setSelected}
+                noun="teams"
+                commands={teamCommands(teamSelection.actionIds)}
+              />
             ) : undefined
           }
           selected={selectTeams ? teamSelection.selected : undefined}

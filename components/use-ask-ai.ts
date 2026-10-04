@@ -1,36 +1,14 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type ChatTransport } from "ai";
+import { DefaultChatTransport } from "ai";
 import { aiBounds, aiUnavailableMessage } from "@/lib/ai";
+import { createDemoAiTransport } from "@/lib/ai-demo";
 import {
-  demoAiReply,
   messageText,
   recentAiMessages,
   type AskAiMessage,
 } from "@/lib/ai-chat";
-
-const demoTransport: ChatTransport<AskAiMessage> = {
-  async sendMessages() {
-    return new ReadableStream({
-      start(controller) {
-        controller.enqueue({ type: "start", messageId: crypto.randomUUID() });
-        controller.enqueue({ type: "text-start", id: "answer" });
-        controller.enqueue({
-          type: "text-delta",
-          id: "answer",
-          delta: demoAiReply,
-        });
-        controller.enqueue({ type: "text-end", id: "answer" });
-        controller.enqueue({ type: "finish", finishReason: "stop" });
-        controller.close();
-      },
-    });
-  },
-  async reconnectToStream() {
-    return null;
-  },
-};
 
 export function useAskAi(mode: "demo" | "installed" | "off") {
   const completed = useRef(new Set<string>());
@@ -38,6 +16,7 @@ export function useAskAi(mode: "demo" | "installed" | "off") {
   const request = useRef<Promise<void> | null>(null);
   const [notice, setNotice] = useState("");
   const [completion, setCompletion] = useState(0);
+  const demoTransport = useMemo(createDemoAiTransport, []);
   const transport = useMemo(
     () =>
       mode === "demo"
@@ -66,7 +45,7 @@ export function useAskAi(mode: "demo" | "installed" | "off") {
               return response;
             },
           }),
-    [mode],
+    [mode, demoTransport],
   );
   const chat = useChat<AskAiMessage>({
     transport,
@@ -133,6 +112,7 @@ export function useAskAi(mode: "demo" | "installed" | "off") {
   );
   return {
     ...chat,
+    demo: mode === "demo",
     busy,
     notice,
     completion,

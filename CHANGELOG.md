@@ -4,7 +4,9 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Clarify Teams bulk selection with an outlined Select multiple control beside search and Add team, a visible Done selecting exit, and guidance explaining the available bulk actions.
+- Clarify Teams bulk selection with an outlined Select multiple control beside search and Add team, a visible Done selecting exit, and the standard paginated table with header checkboxes and the existing bulk-action toolbar.
+
+- Simulate Ask AI in the browser-local demo with the shared thinking indicator, streamed canned replies and working Stop control. The first two questions receive Hoolibook/Gavin replies, with a link to thefieldbook.org in the first; later questions receive the demo-unavailable message. No model requests are made.
 
 - Prevent the demo account picker from flashing during session refresh. Check the saved profile before first paint and retain an inactive workspace shell until restoration finishes; first visits, explicit profile switching and storage recovery keep the picker.
 

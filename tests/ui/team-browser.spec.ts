@@ -89,9 +89,16 @@ async function pageAction(page: Page, name: string) {
   await page.getByRole("button", { name: "Organization", exact: true }).click();
 }
 async function browse(page: Page, name: string) {
-  await page
-    .getByRole("button", { name: `Browse ${name} subteams`, exact: true })
-    .click();
+  const chartNode = page.getByRole("button", { name: `Browse ${name} subteams`, exact: true });
+  if (await chartNode.count()) {
+    await chartNode.click();
+  } else {
+    const row = page.locator('table[data-layout="teamDirectory"] tbody tr').filter({
+      has: page.getByRole("button", { name, exact: true }),
+    });
+    await row.getByRole("button", { name: `Actions for ${name}`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "Browse subteams", exact: true }).click();
+  }
 }
 
 test("twelve-level chart retains every depth, replaces the expanded sibling path and preserves scroll", async ({
@@ -516,12 +523,12 @@ test("path search and flat bulk selection share the same matches; browsing a res
       ...Array.from({ length: 11 }, (_, index) => levelName(index + 1)),
     ].join(" / "),
   );
-  await page.getByRole("button", { name: "Select teams", exact: true }).click();
+  await page.getByRole("button", { name: "Select multiple", exact: true }).click();
   await expect(
     browser.getByRole("checkbox", { name: /^Select Revenue/ }),
   ).toHaveCount(14);
   await browser
-    .getByRole("checkbox", { name: "Select all matching teams", exact: true })
+    .getByRole("checkbox", { name: "Select all 14", exact: true })
     .check();
   await expect(browser).toContainText("14 selected");
   await browser
@@ -839,4 +846,52 @@ test("Organization automatically includes people without teams and supports a re
   await teamsSection(page);
   await page.getByRole("button", { name: "Organization", exact: true }).click();
   await expect(page.getByText("Guests", { exact: true })).toHaveCount(0);
+});
+
+
+test("standard Teams table keeps page selection and restores the chart", async ({ page }, info) => {
+  const data = stable(freshWorkspace());
+  const total = data.teams!.filter((team) => team.system !== "organization").length;
+  await seed(page, data);
+  await browse(page, "Sales");
+  const browser = page.locator('[data-slot="hierarchy-browser"]');
+  const columns = browser.locator('[data-slot="hierarchy-column"]');
+  await expect(columns).toHaveCount(2);
+  await page.getByRole("button", { name: "Select multiple", exact: true }).click();
+  const table = browser.locator('table[data-layout="teamDirectory"]');
+  await expect(table.getByRole("columnheader")).toHaveText(["", "Team", "Manager", "Members", "Subteams", "Actions"]);
+  await expect(table.locator("tbody tr")).toHaveCount(25);
+  await expect(browser.getByRole("region", { name: "Selected items" })).toContainText(`1–25 of ${total} shown`);
+  await expect(browser.getByText("Choose two or more teams", { exact: false })).toHaveCount(0);
+  const menu = browser.getByRole("button", { name: "Bulk actions", exact: true });
+  await table.locator("tbody tr").first().getByRole("checkbox").check();
+  await expect(menu).toBeDisabled();
+  await table.getByRole("checkbox", { name: "Select page (25)", exact: true }).check();
+  await expect(browser.getByRole("region", { name: "Selected items" })).toContainText("25 selected");
+  await expect(menu).toBeEnabled();
+  await browser.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(table.locator("tbody tr")).toHaveCount(total - 25);
+  await expect(browser.getByRole("region", { name: "Selected items" })).toContainText(`26–${total} of ${total} shown`);
+  await expect(browser.getByRole("region", { name: "Selected items" })).toContainText("25 selected");
+  await table.locator("tbody tr").first().getByRole("checkbox").check();
+  await expect(browser.getByRole("region", { name: "Selected items" })).toContainText("26 selected");
+  await browser.getByRole("button", { name: "Previous", exact: true }).click();
+  await expect(table.getByRole("checkbox", { name: "Select page (25)", exact: true })).toBeChecked();
+  await page.screenshot({ path: info.outputPath("teams-standard-table.png"), fullPage: true });
+  const search = page.getByRole("searchbox", { name: "Find teams", exact: true });
+  await search.fill("APAC Sales Enterprise");
+  await expect(table.locator("tbody tr")).toHaveCount(1);
+  await expect(table.getByRole("checkbox")).toHaveCount(0);
+  await expect(menu).toHaveCount(0);
+  await expect(browser).toContainText("1–1 of 1 shown");
+  await search.fill("No matching team xyz");
+  await expect(table).toHaveCount(0);
+  await expect(browser).toContainText("0 results");
+  await search.fill("");
+  await expect(table.locator("tbody tr")).toHaveCount(25);
+  await expect(menu).toBeDisabled();
+  await page.getByRole("button", { name: "Done selecting", exact: true }).click();
+  await expect(table).toHaveCount(0);
+  await expect(columns).toHaveCount(2);
+  await expect(page.getByRole("button", { name: "Browse Sales subteams", exact: true })).toHaveAttribute("aria-expanded", "true");
 });
