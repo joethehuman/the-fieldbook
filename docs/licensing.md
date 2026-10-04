@@ -22,8 +22,8 @@ Third-party dependencies, fonts and adapted upstream code retain their own licen
 
 Content, uploads and personal data in an independent installation are operator-owned data, separate from the repository's software license. Installing Fieldbook does not automatically license that material under ELv2 or authorize its redistribution.
 
-## Publication and contributions
+## Contributions
 
-The repository remains private while its first public release is prepared. Adding ELv2 establishes the terms for recipients of the software; it does not change repository visibility, publish a release or guarantee access to the source.
+The repository makes Fieldbook's source available under ELv2. A GitHub Release, when present, identifies a particular version; the license applies to the source independently of a release tag.
 
 Contributions are submitted under ELv2 unless the maintainer agrees otherwise. Contributors must have the rights to license their work and preserve third-party notices. See [contributing](../CONTRIBUTING.md) and the separate [release process](releases.md).

@@ -6,10 +6,10 @@ This map explains the installed application's administration areas and the decis
 
 | Area | Use it for | Read next |
 | --- | --- | --- |
-| Content | Draft, edit, publish, unpublish, assign and recover Docs, Updates and Courses | [Authoring](authoring.md), [content presentation](content-presentation.md) |
+| Content | Draft, edit, publish and unpublish Docs, Updates and Courses; choose Course assignments and Update audiences | [Authoring](authoring.md), [content presentation](content-presentation.md) |
 | People | Preregister Google emails, manage roles and status, inspect individual assignments, import a roster | [Permissions](permissions.md), [roster import](roster-import.md) |
 | Teams | One hierarchy for direct membership, course/Update audience reach and explicitly managed reporting branches | [Learning model](learning-model.md), [permissions](permissions.md) |
-| Learning groups | Flat, overlapping audiences from individuals and linked team branches | [Learning groups](learning-groups.md) |
+| Groups | Flat, overlapping audiences from individuals and linked team branches | [Learning groups](learning-groups.md) |
 | Curricula | Ordered collections of published courses for recommendations or assignments | [Learning groups and curricula](learning-groups.md) |
 | Progress | Current-version assignment/completion reports, authorized drill-ins and CSV exports | [Reporting](reporting.md) |
 | Feedback | Content and general responses; administrators and contributors can review/export them | [Permissions](permissions.md), [reporting](reporting.md) |
@@ -44,7 +44,7 @@ Feedback is a signal, not a verdict. Administrators and contributors can review 
 ## Organization Settings
 
 - **Identity:** installation name, optional welcome description, accent and default home (Updates, Courses or Docs). See [branding](branding.md) and [content presentation](content-presentation.md).
-- **Docs:** two-level section/subsection navigation. Documents can sit at either level; settings can move/reorder them and save a reviewed draft of the hierarchy. See [authoring](authoring.md).
+- **Docs navigation:** two-level section/subsection navigation. Documents can sit at either level; settings can move/reorder them and save a reviewed draft of the hierarchy. See [authoring](authoring.md).
 - **Due dates:** on/off, onboarding and catch-up windows. Changed defaults affect future assignments; use Review existing deadlines for an explicit recalculation. See [learning model](learning-model.md).
 - **Access:** public or members-only browsing, registration and an optional guest recommendation group. Published content follows installation access, while group selection guides relevance. See [guest recommendations](guest-recommendations.md).
 - **Privacy:** write and publish a notice for this installation's real services and practices. The maintainer's notice is not an operator default. See [privacy setup](privacy-setup.md).

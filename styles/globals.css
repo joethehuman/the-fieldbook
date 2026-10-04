@@ -3,6 +3,7 @@
 @import "streamdown/styles.css" layer(base);
 @import "./tokens.css";
 @import "./layout.css";
+@import "./dialog.css";
 @import "./content.css";
 @import "./artwork.css";
 

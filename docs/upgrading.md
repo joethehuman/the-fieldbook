@@ -16,7 +16,7 @@ Do not connect your live installation directly to the maintainer's development b
 
 ## First installation from a release
 
-There are no published releases yet. The commands below illustrate the procedure for a future `v0.1.0` release; do not run them until that tag exists. Choose an actual release from GitHub and read its requirements first.
+Choose an available tag in [GitHub Releases](https://github.com/joethehuman/the-fieldbook/releases) and read its requirements. If you intentionally use an untagged commit, record its full SHA and follow the matching source documentation. Set `FIELDBOOK_REF` in your shell to that existing tag or SHA before running the commands below.
 
 1. Fork The Fieldbook into your own GitHub account. A fork preserves the shared history so you can bring in later updates.
 2. Clone your fork to your computer. Replace `YOUR-ACCOUNT` with your account:
@@ -26,7 +26,7 @@ git clone https://github.com/YOUR-ACCOUNT/the-fieldbook.git
 cd the-fieldbook
 git remote add upstream https://github.com/joethehuman/the-fieldbook.git
 git fetch upstream --tags
-git switch -c production v0.1.0
+git switch -c production "$FIELDBOOK_REF"
 git push -u origin production
 ```
 
@@ -39,7 +39,7 @@ Downloading a release ZIP is also a code snapshot, but it loses the convenient G
 
 ## Upgrade an existing installation
 
-Example only: replace `v0.2.0` with a real target release. Read all intervening release notes; during `0.x`, changes may require manual steps.
+Choose an available target release, read all intervening notes and set `FIELDBOOK_TARGET` in your shell to its tag or exact commit. During `0.x`, changes may require manual steps.
 
 1. Back up the database **and storage files separately**. Record your current deployment, configuration, and migration list. Test restores before depending on them.
 2. Bring the target release into an update branch, not directly into production:
@@ -47,8 +47,8 @@ Example only: replace `v0.2.0` with a real target release. Read all intervening 
 ```sh
 git fetch origin
 git fetch upstream --tags
-git switch -c upgrade-v0.2.0 origin/production
-git merge --no-ff v0.2.0
+git switch -c upgrade-fieldbook origin/production
+git merge --no-ff "$FIELDBOOK_TARGET"
 ```
 
 If you have customized the code, Git may report conflicts. Resolve and review them before continuing; do not force-reset your customizations. Run `pnpm install --frozen-lockfile`, tests, and both builds, then push the update branch and open a pull request into **your** `production` branch.
@@ -94,9 +94,9 @@ Versions containing `20260921205449_published_search.sql` require that additive 
 
 The optional guest selection uses the existing settings JSON and needs no additional environment variables or service. Older public installations start with no guest selection. After deploying the matching application, an administrator may choose a group in Organization Settings → Access and save; group creation is explicit and separate. An upgrade to flat learning groups still requires the migration below, which preserves the selected guest group’s former ancestor recommendations. Review [guest recommendations](guest-recommendations.md) for fallback, sign-in and verification behavior.
 
-## Guarded team deletion
+## Earlier team-deletion guard
 
-Apply `supabase/migrations/20260923180607_guarded_team_deletion.sql` after the earlier migrations before enabling this version’s server-side team deletion. It replaces `fb_save_governance` while retaining its grants, authorization, revision lock and audit behavior. It changes no existing team or profile data. A delete is accepted only when the stored team has no direct or pending members, child teams or learning-group links; cleanup must be saved separately. Without this migration, existing branch moves still work but team deletion is rejected by the older database guard. Rehearse on an isolated backend before an operator-approved production upgrade.
+Apply `supabase/migrations/20260923180607_guarded_team_deletion.sql` in filename order when installing or upgrading through this version. It introduced an earlier server-side guard: a team had to have no direct or pending members, child teams or learning-group links before deletion. The later `20261003212205_roster_team_deletion.sql` supersedes that rule with a reviewed deletion that moves direct people and surviving immediate subteams to Organization. Apply all missing migrations in order before using the current Teams workflow; do not replay an applied file. Rehearse on an isolated backend before a production upgrade.
 
 ## Learning-group save repair
 
@@ -106,7 +106,7 @@ Apply `supabase/migrations/20260923230000_scope_pending_group_cleanup.sql` after
 
 `20261001232329_stable_assignment_episodes.sql` requires the roster migration and every earlier migration. Back up and rehearse on isolated non-production, comparing current derived targets with the backfilled baseline and preserving progress, content and identity links. Pause old writers/cleanup, apply the migration, deploy matching code and reload clients before resuming writes. This version adds private episode storage and changes registration’s internal RPC result to include saved assignments; old code cannot provide its deadline/legacy-link review controls. Prefer a forward fix; a code rollback does not undo episodes or explicit subtree/recalculation changes. A restore must account for later writes.
 
-Schema application preserves the reach of every existing direct team link. In the flat-group UI, open **Learning groups → People → Add Members**, check **Include subteams** for the specific older link, and review the added course coverage before applying. Group links do not grant manager access. New team links include descendants. In Organization Settings → Due dates, save defaults first; **Review existing deadlines** is a separate, explicit operation. It previews active onboarding clocks and unfinished obligations, keeps assignment start dates fixed, excludes completed courses, and rejects stale reviews. A migration alone never expands a direct-only link or recalculates deadlines.
+Schema application preserves the reach of every existing direct team link. In the flat-group UI, open **Groups → [group] → People → Add members**, check **Include subteams** for the specific older link, and review the added course coverage before applying. Group links do not grant manager access. New team links include descendants. In Organization Settings → Due dates, save defaults first; **Review existing deadlines** is a separate, explicit operation. It previews active onboarding clocks and unfinished obligations, keeps assignment start dates fixed, excludes completed courses, and rejects stale reviews. A migration alone never expands a direct-only link or recalculates deadlines.
 
 Verify overlap/source removal/rejoin, day 83/84/90 boundaries, old overdue work after onboarding, new course versions, pending activation, descendant moves and scoped manager reads. Verify date changes remain future-only until reviewed recalculation; turning deadlines off/on preserves targets and completion. New episode tables/functions are service-only; browser sessions cannot query them directly.
 

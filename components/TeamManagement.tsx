@@ -817,6 +817,7 @@ export function TeamsAdmin({
           )}
         </SectionHeader>
         <HierarchyBrowser
+          phoneList
           branchId={browseId}
           onBrowse={browseTeam}
           query={hierarchyQuery}

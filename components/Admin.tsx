@@ -306,6 +306,16 @@ type Props = {
   onLoadPublished?: (id: string) => Promise<Content>;
 };
 const id = () => crypto.randomUUID();
+const contentDateMonths = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+function formatContentDate(value?: string) {
+  const date = value ? new Date(value) : null;
+  if (!date || !Number.isFinite(date.getTime())) return "—";
+  // A fixed UTC date keeps server and browser output identical.
+  return `${String(date.getUTCDate()).padStart(2, "0")}-${contentDateMonths[date.getUTCMonth()]}-${date.getUTCFullYear()}`;
+}
 function initialContent(
   destination: AdminDestination,
   data: Workspace,
@@ -1492,10 +1502,11 @@ export default function Admin({
                               />
                             )}
                           </TableHead>
-                          <TableHead>Content</TableHead>
+                          <TableHead>Name</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead>Version</TableHead>
+                          <TableHead>Updated</TableHead>
+                          <TableHead>Created</TableHead>
                           <TableHead>
                             <span className="sr-only">Actions</span>
                           </TableHead>
@@ -1549,7 +1560,12 @@ export default function Admin({
                                 )}
                               />
                             </TableCell>
-                            <TableCell>v{c.version}</TableCell>
+                            <TableCell>
+                              {formatContentDate(c.updatedAt)} (v{c.version})
+                            </TableCell>
+                            <TableCell>
+                              {formatContentDate(c.createdAt)}
+                            </TableCell>
                             <TableCell>
                               {admin &&
                               c.kind === "course" &&
@@ -2523,7 +2539,7 @@ export function Editor({
         target: item.target,
         questionId: item.questionId,
       });
-    } else if (item.field?.startsWith("editor-")) {
+    } else if (item.field?.startsWith("editor-") && !window.matchMedia("(max-width: 767px)").matches) {
       const field = document.getElementById(item.field);
       if (field) revealEditorTarget(field);
     } else {

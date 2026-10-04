@@ -1,10 +1,14 @@
 # Changelog
 
-No versions have been released. Package and MCP version strings do not constitute a GitHub Release. See the [release process](docs/releases.md).
+Entries under **Unreleased** are not yet part of a GitHub Release. Package and MCP version strings alone do not publish one. See the [release process](docs/releases.md).
 
 ## Unreleased
 
-- Expand installation, administration, authoring, search, Ask AI and MCP documentation for human and agent operators. Add a fresh-account installation proof guide, and clarify current product behavior and verification boundaries across the README and contributor guidance.
+- Reconcile installation, administration, authoring, search, Ask AI and MCP guidance for human and agent operators. Add an independent installation proof guide and clarify verification boundaries across the README and contributor guidance.
+
+- The administrative Content table shows Name, Type, Status, Updated and Created. Dates use `04-Oct-2026` formatting, with the content version beside Updated; existing date sorts retain full timestamp precision.
+
+- Refine phone authoring with right-aligned Outline/Details buttons and smoothly animated bottom panels with safe-area breathing room, explicit selected-text formatting alongside native selection menus, and a canvas that stays in natural page flow from its empty first paragraph, with keyboard clearance and smooth caret scrolling without resizing the canvas. Omit Focus mode on phones. Simplify the phone Administration picker and use a searchable Teams directory while retaining tablet and desktop layouts.
 
 - Updates use an unchecked Bring this update to the top choice in Details → Publishing. Republishing corrections preserves feed position and For you freshness; selecting the choice deliberately renews the feed date. First publication remains current. Demo, installed publishing and MCP share the rule; course versions and completions are unchanged.
 
@@ -123,7 +127,7 @@ No versions have been released. Package and MCP version strings do not constitut
 - Administration acknowledges section changes immediately, keeps People and Teams reads independent of course history, and loads a selected person's progress on demand. Recently deleted housekeeping no longer delays other sections. Apply the additive `admin_people_reads` migration before deploying this version.
 
 
-- License Fieldbook under the Elastic License 2.0 (ELv2), add license metadata to both application packages, and describe the project as source available under ELv2. Preserve third-party licenses; the repository remains private and no release is published.
+- License Fieldbook under the Elastic License 2.0 (ELv2), add license metadata to both application packages, and describe the project as source available under ELv2. Preserve third-party licenses and keep software licensing separate from GitHub Release publication.
 
 - Add official Vercel Web Analytics and Speed Insights to the installed app and optional demo. Enable their normal SDK behavior on Vercel, with independent opt-outs, and keep them inactive on other hosts. Document project activation and the telemetry boundary for contributors.
 
@@ -404,20 +408,10 @@ No versions have been released. Package and MCP version strings do not constitut
 - Compact learning status, an accurate no-required-courses state, and expandable group-specific learning.
 - Preserved existing feature handlers; no database or permission changes.
 
-### Current implementation
+### Early server and repository foundation
 
-- Separate browser-local demo and server application sharing a Next.js interface.
-- Production content editing/publication, Google sign-in, learner progress, feedback, media uploads, and instance settings on Vercel and Supabase.
-- Administrator-authorized MCP content tools, aggregate reports, and media lookup; ChatGPT exercised end to end.
-
-### Repository foundation
-
-- Documented the supported Vercel + hosted Supabase setup and its limits.
-- Added explicit release selection, operator-controlled upgrades, migration handling, and a manual maintainer release process.
+- Separated the browser-local demo from the installed server application while sharing the Next.js interface.
+- Added content editing and publication, Google sign-in, learner progress, feedback, media uploads and installation settings on Vercel and Supabase.
+- Added the initial administrator-authorized MCP content tools, aggregate reporting and media lookup; ChatGPT was exercised end to end.
+- Documented the supported Vercel and hosted Supabase setup, operator-controlled upgrades, migration handling and manual release process.
 - Removed the obsolete DigitalOcean deployment manifest and setup instructions.
-
-### Known boundaries
-
-- Groups, teams, people administration, and manager reporting remain demo-only.
-- Search/reporting are bounded, navigation labels are fixed, and uploaded video is not transcoded.
-- Fresh-install rehearsal, remaining live integration checks, license selection, and private security reporting are release gates, not completed claims.

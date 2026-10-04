@@ -1,6 +1,6 @@
 # Contributing
 
-Fieldbook is source available under the [Elastic License 2.0 (ELv2)](LICENSE). The repository remains private while the first public release is prepared. See [licensing](docs/licensing.md) for the permitted uses, restrictions and third-party notices.
+Fieldbook is source available under the [Elastic License 2.0 (ELv2)](LICENSE). See [licensing](docs/licensing.md) for the permitted uses, restrictions and third-party notices.
 
 Submit contributions under ELv2 unless the maintainer agrees otherwise. Only contribute material you have the right to license, and preserve applicable third-party notices.
 
@@ -35,7 +35,7 @@ For reporting changes, run `pnpm test:reporting` after both builds with the same
 
 ## Reporting problems
 
-Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. A private security-reporting channel must be established before public release; see the [release process](docs/releases.md).
+Include expected/actual behavior, version or commit, deployment mode, and minimal reproduction steps. Remove tokens, credentials and learner data from logs/screenshots. Do not post exploitable vulnerabilities or private data in public issues. Use the [security reporting instructions](SECURITY.md), including their private-reporting path when available; see the [release process](docs/releases.md).
 
 ## Scope and releases
 

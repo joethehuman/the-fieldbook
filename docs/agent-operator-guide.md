@@ -8,7 +8,7 @@ Before changing anything, record the exact Fieldbook commit or release, reposito
 
 Use these guides in order:
 
-1. [README](../README.md) for the product, release status and supported stack.
+1. [README](../README.md) for the product and supported stack.
 2. [Installation](installation.md) and the [Vercel recipe](../deployment/vercel/README.md) for a fresh deployment.
 3. [Versions and upgrades](upgrading.md) before applying SQL or changing deployed code.
 4. [Installation proof](installation-proof.md) for account, publication, progress, media, recovery and role checks.

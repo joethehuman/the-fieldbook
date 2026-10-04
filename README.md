@@ -10,8 +10,6 @@ Fieldbook brings three kinds of content together:
 
 Run your own installation, maintain content in the built-in admin panel, and optionally connect an AI client to edit content through MCP. Each installation has its own accounts, data, domain, and configuration. No separate CMS is required.
 
-> **Before the first release:** this project is still being prepared for publication. The code is licensed under ELv2; the repository remains private while the first public release is prepared. There are no published releases. The `0.1.0` values in the code are development placeholders, not a released version. Do not treat the current branch as a stable release.
-
 ## Supported setup
 
 The documented production setup is **Vercel + hosted Supabase + Google sign-in**.
@@ -31,7 +29,7 @@ Provider accounts, quotas, pricing, and backups are the operator's responsibilit
 
 ## Deploy your own instance
 
-1. Obtain your own copy of the code. Once releases exist, start from a named release and keep a separate `production` branch in your repository; see [versions and upgrades](docs/upgrading.md).
+1. Obtain your own copy of the code. Choose an available release tag or pin an exact reviewed commit, then keep a separate `production` branch in your repository; see [versions and upgrades](docs/upgrading.md).
 2. Create your Supabase project and apply every included migration in filename order. The recovery migrations also install the deletion worker's hourly schedule.
 3. Import **your repository** into Vercel with **Root Directory = repository root** (leave the field empty).
 4. Configure the required application and build-identity environment variables, Google sign-in, and matching domain/callback URLs.
@@ -60,7 +58,7 @@ Fresh and reset demo workspaces load a fixed fictional organization: 200 people,
 The production application includes:
 
 - Public or members-only browsing and optional learner registration with Google.
-- Docs, Updates and Courses with visual Markdown editing, automatic draft saving, explicit publication and draft preview.
+- Docs, Updates and Courses with visual Markdown editing, automatic draft saving, explicit publication and visual draft review.
 - Drafts, explicit publication, revision checks, and content-write audit records.
 - Images and video-file uploads limited by the installation's storage settings and optional application limit, with chunked large-file transfers and no transcoding.
 - Persistent learner progress, server-graded quizzes, and optional browser-progress import.
@@ -129,5 +127,4 @@ For interface changes, also run `pnpm check:ui` and `pnpm test:ui` after install
 
 Fieldbook is source available under the [Elastic License 2.0 (ELv2)](LICENSE). You may use, modify and redistribute the software subject to its terms, including for your own internal installation. ELv2 restricts providing substantial Fieldbook functionality to others as a hosted or managed service, circumventing license-key functionality, and removing or obscuring license, copyright or other notices. See [licensing](docs/licensing.md) for scope and third-party notices.
 
-This is a small independent project. Bug reports should include the version and reproduction steps, without credentials or learner data. A private vulnerability-reporting channel must be established before release. There is no promised release schedule, long-term-support branch, or feature roadmap.
-
+This is a small independent project. Bug reports should include the version and reproduction steps, without credentials or learner data. For suspected vulnerabilities, follow [security reporting](SECURITY.md) and keep exploit details out of public issues. There is no promised release schedule, long-term-support branch, or feature roadmap.

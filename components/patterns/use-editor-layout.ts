@@ -42,7 +42,10 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMod
         + gap(editor) * (editor.children.length - 1) + gap(content) + gap(frame)
         + Array.from(editor.querySelectorAll(".writing-root")).reduce((height, root) => height + gap(root) * (root.children.length - 1), 0)
         + (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
-      const layout = frame.getBoundingClientRect().width >= 48 * rem
+      // A phone document always flows through the page, including its blank
+      // first paragraph. Keyboard changes must not swap or reset scroll owners.
+      const phone = window.matchMedia("(max-width: 767px)").matches;
+      const layout = !phone && frame.getBoundingClientRect().width >= 48 * rem
         && viewport.clientHeight - reserved >= 12 * rem ? "workspace" : "page";
       if (editor.dataset.scrollLayout !== layout) {
         editor.dataset.scrollLayout = layout;

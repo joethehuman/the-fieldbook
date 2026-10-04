@@ -6,7 +6,7 @@ Use this guide to test whether a person or agent can install, operate, upgrade a
 
 Use accounts and projects controlled by the tester: a GitHub repository, Vercel project, Supabase project and Google Cloud OAuth client. Use an isolated test domain or canonical Vercel address. Do not reuse the maintainer's production Supabase project, credentials, OAuth client or media bucket. A writable preview needs its own backend and `FIELDBOOK_PREVIEW_SUPABASE_REF`; never point it at production. Do not put credentials, OAuth codes, account exports or learner information in an issue, agent transcript, screenshot or proof report.
 
-Choose and record one exact commit or release tag. There is no published Fieldbook release yet; until one exists, say **development snapshot** and record the full commit. Record the package-manager and Node versions from that commit. Note any account-plan feature that was unavailable or paid. Do not change code to make the instructions appear to work before recording the failure.
+Choose an available release tag or exact reviewed commit and record its full commit SHA. If using an untagged commit, call it a source snapshot rather than a release. Record the package-manager and Node versions from that commit. Note any account-plan feature that was unavailable or paid. Do not change code to make the instructions appear to work before recording the failure.
 
 ## Evidence sheet
 
@@ -14,7 +14,7 @@ Keep a private proof record with these fields:
 
 | Field | Record |
 | --- | --- |
-| Source | Commit/tag, repository URL and whether it was a release or development snapshot |
+| Source | Commit/tag, repository URL and whether it was a release or source snapshot |
 | Runtime | Node, pnpm, Vercel framework/root/production branch, canonical origin |
 | Services | Supabase project reference, region and plan; Google OAuth client identifier (never the secret) |
 | Database | Ordered filenames applied, method (SQL editor or CLI), ledger and results |
@@ -49,7 +49,7 @@ Use separate synthetic accounts or preregistered roster entries. Check direct UR
 
 Upload a small image and a playable short video. Check publication, private draft denial, video start/seek/replay, signed-link renewal and alternative text. Then test a file above 6 MiB to exercise signed TUS chunks, a storage-limit rejection and an interrupted transfer. Confirm the editor preserves text and never inserts an unverified media URL. Back up and restore actual objects, not only database references. The app has no fixed file cap; [configured limits](installation.md#configure-upload-limits) and the provider decide what succeeds.
 
-Search published Doc and lesson text, including a typo and a private draft term. Verify the draft is absent and results point to published content. If Ask AI is enabled, choose a supported router and primary model in Admin, review the selected provider's data handling and spend settings, then ask a question with and without matching published evidence. Check verified source links, off-state rejection and ordinary Search after an AI failure. Do not call a successful model response proof that every statement is correct.
+Search published Doc and lesson text, including a typo and a private draft term. Verify the draft is absent and results point to published content. If Ask AI is enabled, configure the supported router in the deployment environment, then choose the primary model, published sources, guidance and enabled state in Admin. Review the router and selected model provider's data handling and spend settings, then ask a question with and without matching published evidence. Check verified source links, off-state rejection and ordinary Search after an AI failure. Do not call a successful model response proof that every statement is correct.
 
 If MCP is enabled, use a real OAuth client. Call `get_capabilities` first. Test a publisher's draft/revision/publish flow, manager-scoped reports, optional verified file transfer, consent for added capabilities, token expiry and revocation. Confirm an unsupported settings or account operation points to a manual Fieldbook destination. A login token alone must not grant an unapproved tool. See [MCP setup](mcp-setup.md).
 
@@ -58,7 +58,7 @@ If MCP is enabled, use a real OAuth client. Call `get_capabilities` first. Test 
 1. Preserve the initial deployment, migration ledger, database backup and separate media copy. Add representative people, assignments, progress, content, feedback and media before upgrading.
 2. Rehearse the target version's **missing** migrations in a second isolated project with representative data. Check the release's required order and old-code compatibility. Never replay a migration merely because its timestamp or SQL-editor ledger differs.
 3. Upgrade code only after the required database work is applied and verified in the target environment. Check identity, content, reports, assignments, progress, media and cleanup again. Record any step that required undocumented knowledge.
-4. Restore the database and media into a third isolated destination. Reconfigure secrets, callbacks, canonical origin and cleanup endpoint for that destination. Check the restored owner, learner progress, draft/published snapshots, private objects and signed reads. Do not point restored worker jobs or OAuth redirects at production.
+4. Use a third isolated destination with application traffic and cleanup schedules stopped. Pause any existing destination cleanup job before import; if the restore recreates a job, keep it disabled until its destination is checked. Restore the database and media, then rotate or replace secrets and set destination-specific callbacks, canonical origin and direct cleanup endpoint before admitting users or resuming the job. Review pending deletion deadlines and reconcile Auth identities and Storage objects with the restored database. Check the owner, learner progress, draft/published snapshots, private objects and signed reads. Confirm no worker URL or OAuth redirect points to production, then verify one destination worker request before resuming its schedule.
 5. Explain the tested rollback boundary. A Vercel code rollback does not reverse schema or media changes; an older backup can lose later writes or Auth changes.
 
 A final proof report should identify what worked, what failed, exactly which public instructions changed, and what remains untested. Passing this exercise is strong installation evidence; it is not a security certification or a guarantee for every provider plan and browser.

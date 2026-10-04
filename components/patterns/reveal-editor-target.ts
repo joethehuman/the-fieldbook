@@ -4,13 +4,13 @@ const activeReveals = new WeakMap<HTMLElement, () => void>();
 
 /** Reveal one field within its owning scroll area, then an offscreen stacked panel if needed. */
 export function revealEditorTarget(target: HTMLElement, {
-  container = target.closest<HTMLElement>(".writing-scroll-area, .editor-frame-details, .editor-frame-outline, .editor-frame-canvas")
+  container = target.closest<HTMLElement>('.writing-scroll-area, .editor-frame-details, .editor-frame-outline, .editor-frame-canvas, [data-slot="scroll-region"]')
     || target.closest<HTMLElement>(".main-content"),
   context = target.closest<HTMLElement>('[data-slot="field"]') || target,
   focus = true,
 }: { container?: HTMLElement | null; context?: HTMLElement; focus?: boolean } = {}) {
   const owner = target.closest<HTMLElement>(".main-content") || container;
-  const bounded = !!target.closest('.editor[data-scroll-layout="workspace"]');
+  const bounded = !!target.closest('.editor[data-scroll-layout="workspace"], [data-slot="dialog-content"]');
   // Stacked panels and the natural writing body belong to the page. A native
   // Markdown textarea can still own its text scrolling in the page layout.
   if (!bounded && !container?.matches("textarea")) container = owner;
@@ -18,7 +18,7 @@ export function revealEditorTarget(target: HTMLElement, {
   activeReveals.get(container)?.();
   if (focus) target.focus({ preventScroll: true });
   const writing = container.matches(".writing-scroll-area");
-  const local = writing || container.matches(".editor-frame-details, .editor-frame-outline");
+  const local = writing || container.matches('.editor-frame-details, .editor-frame-outline, [data-slot="scroll-region"]');
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
   const gap = rem * 1.5;
   const start = container.scrollTop;

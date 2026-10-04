@@ -16,7 +16,7 @@ An external corporate policy must cover this deployment. Google brand verificati
 - Purposes: authentication, learning continuity, content delivery, administration, security, and support. Explain additional purposes actually used by your organization.
 - Access and recipients: administrators, infrastructure providers, approved AI connections, and external media providers. Describe employee reporting where applicable.
 - Browser storage: session cookies and local guest progress; explain analytics/cookies if added.
-- Retention and deletion: state actual retention schedules and a working request process. The current app has no automated retention cleanup or self-service account deletion. Content audit snapshots and storage objects need separate review when deleting an account; deleting the auth user alone is insufficient.
+- Retention and deletion: state actual retention schedules and a working request process. Recoverable deletion has a 30-day window and an hourly worker for eligible permanent cleanup, but the worker must be configured and verified for each installation. It is not comprehensive retention cleanup for every record or abandoned upload, and there is no self-service account deletion. Content audit snapshots and storage objects need separate review when deleting an account; deleting the auth user alone is insufficient.
 - Rights, applicable legal basis, international processing, and children's use: operator must determine requirements for its audience and jurisdictions.
 - Changes: publication date and how material updates are communicated.
 
