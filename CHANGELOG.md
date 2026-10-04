@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Add one installation-branded Open Graph/Twitter image for every link, using only public name, canonical domain and accent. Use the Paper design with four evenly spaced page lines; private content remains protected. Keep the shared template separate for future customization, without new Admin controls. Patch Next.js to 16.3.6 for the image-renderer security fix.
+
 - Simplify curriculum cards with a quiet metadata footer, edit-linked names and one action menu. Align shared menu highlights and nested team highlights with their containing corners. Add course search, status filters and newest-assigned sorting to person progress details, keeping CSV exports aligned with the displayed rows. Move Curricula into Publishing, reorder Organization settings, rename People & courses to People & Progress and Learning groups to Groups in the interface, explain their role alongside team assignments, and clarify membership metrics as teams linked and direct users linked.
 
 - Refine administrative tables and People progress with compact shared rows, quieter record metadata and persistent row-action menus. Make names edit links, show reporting teams in People, simplify row completion to a ring and percentage, and keep action menus visible while horizontally scrolling. Add direct Learning-group membership and assignment shortcuts, align Teams selection into a compact list, and use labeled icon counts for membership and hierarchy.

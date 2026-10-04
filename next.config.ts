@@ -7,6 +7,12 @@ const config: NextConfig = {
   // Resolve access, existence and metadata before committing HTTP status.
   htmlLimitedBots: /.*/,
   outputFileTracingRoot: path.resolve(__dirname),
+  outputFileTracingIncludes: {
+    "/api/og": [
+      "./node_modules/geist/dist/fonts/geist-sans/Geist-Regular.ttf",
+      "./node_modules/geist/dist/fonts/geist-sans/Geist-Medium.ttf",
+    ],
+  },
   images: { unoptimized: true },
   async headers() {
     return [

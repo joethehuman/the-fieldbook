@@ -26,6 +26,7 @@ import { orderedDocCategories, type DocLink } from "@/lib/docs-navigation";
 import { publicSettings } from "@/lib/settings";
 import { accountMenuLinks } from "@/lib/external-links";
 import type { Metadata } from "next";
+import { ogCardImages } from "@/lib/og-card";
 import { installation } from "./installation";
 import { contentPath } from "@/lib/navigation";
 import { headers } from "next/headers";
@@ -444,12 +445,14 @@ export function readerMetadata(
   const title = `${item.title} | ${context.branding.name}`;
   const description =
     item.summary.trim() || `${item.title} — ${context.branding.name}`;
+  const card = ogCardImages(installation().origin, context.branding.name);
   return {
     metadataBase: new URL(installation().origin),
     title,
     description,
     alternates: { canonical: contentPath(item.kind, item.id) },
     openGraph: {
+      ...card.openGraph,
       title,
       description,
       siteName: context.branding.name,
@@ -457,7 +460,7 @@ export function readerMetadata(
       url: contentPath(item.kind, item.id),
     },
     twitter: {
-      card: "summary",
+      ...card.twitter,
       title,
       description,
     },
