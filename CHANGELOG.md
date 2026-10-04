@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- The administrative Content table shows Name, Type, Status, Updated and Created. Dates use `04-Oct-2026` formatting, with the content version beside Updated; existing date sorts retain full timestamp precision.
+
 - Refine phone authoring with right-aligned Outline/Details buttons and smoothly animated bottom panels with safe-area breathing room, explicit selected-text formatting alongside native selection menus, and a canvas that stays in natural page flow from its empty first paragraph, with keyboard clearance and smooth caret scrolling without resizing the canvas. Omit Focus mode on phones. Simplify the phone Administration picker and use a searchable Teams directory while retaining tablet and desktop layouts.
 
 - Updates use an unchecked Bring this update to the top choice in Details → Publishing. Republishing corrections preserves feed position and For you freshness; selecting the choice deliberately renews the feed date. First publication remains current. Demo, installed publishing and MCP share the rule; course versions and completions are unchanged.
