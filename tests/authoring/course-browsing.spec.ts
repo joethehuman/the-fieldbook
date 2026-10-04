@@ -151,7 +151,7 @@ async function choose(page: Page, value: string) {
   await page.getByRole("option", { name: value, exact: true }).click();
 }
 
-test("homepage shows newest category courses then all published curricula", async ({
+test("homepage shows recently updated category courses then all published curricula", async ({
   page,
 }, info) => {
   await setup(page, info.project.name.startsWith("production"));
@@ -159,7 +159,7 @@ test("homepage shows newest category courses then all published curricula", asyn
     name: "Sort courses",
     exact: true,
   });
-  await expect(sort).toContainText("Newest courses first");
+  await expect(sort).toContainText("Updated: newest");
   await sort.click();
   await expect(
     page.getByRole("option", { name: "Recommended order", exact: true }),
@@ -173,10 +173,10 @@ test("homepage shows newest category courses then all published curricula", asyn
     exact: true,
   });
   await expect(row.locator("h3")).toHaveText([
-    "Optional course",
     "Alpha course",
-    "Beta course",
+    "Optional course",
     "Zulu course",
+    "Beta course",
   ]);
   const curricula = page.getByRole("region", {
     name: "Curricula",
@@ -211,15 +211,15 @@ test("homepage shows newest category courses then all published curricula", asyn
   ).toHaveCount(0);
   await page.getByRole("textbox", { name: "Filter courses" }).fill("");
   await page.reload();
-  await expect(sort).toContainText("Newest courses first");
+  await expect(sort).toContainText("Updated: newest");
 });
 
-test("For you defaults to assignment chronology on navigation and direct refresh", async ({
+test("For you defaults to due dates and supports assignment chronology on navigation and direct refresh", async ({
   page,
 }, info) => {
   const installed = info.project.name.startsWith("production");
   await setup(page, installed);
-  await choose(page, "Title A–Z");
+  await choose(page, "Title: A–Z");
   await page
     .getByRole("button", { name: "View all for you", exact: true })
     .click();
@@ -227,10 +227,12 @@ test("For you defaults to assignment chronology on navigation and direct refresh
     name: "Sort courses",
     exact: true,
   });
-  await expect(sort).toContainText("Oldest assignments first");
+  await expect(sort).toContainText("Due: earliest");
   const cards = page.locator(".library .course-card h3");
   await expect(cards).toHaveText(["Published curriculum", "Beta course"]);
-  await choose(page, "Newest assignments first");
+  await choose(page, "Assigned: oldest");
+  await expect(cards).toHaveText(["Published curriculum", "Beta course"]);
+  await choose(page, "Assigned: newest");
   await expect(cards).toHaveText(["Beta course", "Published curriculum"]);
   await sort.click();
   await expect(
@@ -241,13 +243,13 @@ test("For you defaults to assignment chronology on navigation and direct refresh
     page.getByRole("button", { name: "Browse curricula" }),
   ).toHaveCount(0);
   await page.reload();
-  await expect(sort).toContainText("Oldest assignments first");
+  await expect(sort).toContainText("Due: earliest");
   await expect(cards).toHaveText(["Published curriculum", "Beta course"]);
   await page.getByRole("textbox", { name: "Filter courses" }).fill("Beta");
   await expect(cards).toHaveText(["Beta course"]);
   await page.screenshot({ path: info.outputPath("for-you-sorting.png") });
   await page.goto(installed ? "/courses/for-you" : "/#courses/for-you");
-  await expect(sort).toContainText("Oldest assignments first");
+  await expect(sort).toContainText("Due: earliest");
 });
 
 test("curriculum keeps authored default, supports alternate sorting and returns home", async ({
@@ -264,7 +266,7 @@ test("curriculum keeps authored default, supports alternate sorting and returns 
     page.getByRole("combobox", { name: "Sort courses", exact: true }),
   ).toContainText("Recommended order");
   await expect(cards).toHaveText(["Zulu course", "Alpha course"]);
-  await choose(page, "Newest courses first");
+  await choose(page, "Title: A–Z");
   await expect(cards).toHaveText(["Alpha course", "Zulu course"]);
   await choose(page, "Recommended order");
   await expect(cards).toHaveText(["Zulu course", "Alpha course"]);
@@ -289,11 +291,12 @@ test("For you uses the saved effective assignment date across overlapping source
   await page
     .getByRole("button", { name: "View all for you", exact: true })
     .click();
+  await choose(page, "Assigned: oldest");
   await expect(page.locator(".library .course-card h3")).toHaveText([
     "Beta course",
     "Published curriculum",
   ]);
-  await choose(page, "Newest assignments first");
+  await choose(page, "Assigned: newest");
   await expect(page.locator(".library .course-card h3")).toHaveText([
     "Published curriculum",
     "Beta course",

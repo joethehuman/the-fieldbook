@@ -42,7 +42,7 @@ To clear an existing manager or hire date, or rename a team, use the ordinary ma
 
 ## Reviewing hundreds of rows
 
-The noninteractive badges summarize new, changed and unchanged people and teams across the whole proposal. People, Teams and Issues select the record type; use Filters to narrow the change type. Each section has search, sorting and 25-row pages. People also includes existing members affected by a team change elsewhere in the file.
+The noninteractive badges summarize new, changed and unchanged people and teams across the whole proposal. People, Teams and Issues select the record type; use Filters to narrow the change type. Each section has search and 25-row pages. People and Teams offer both Name sort directions; Issues remain in CSV row order without a sort picker. People also includes existing members affected by a team change elsewhere in the file.
 
 The compact Users table separates user name, email, team and state. The Teams table shows team name, parent and manager. Expand Details for the complete proposed record, including hire date, hierarchy, manager, access and new-user window. Values identify whether they came from CSV, stayed unchanged or were calculated; changed values also show the current value. Learning and reporting consequences remain in the same detail panel. A team change summarizes affected people together, with its own pages, rather than asking for hundreds of separate approvals. Courses retained through overlapping assignment sources are counted once. Continuous requirements keep their existing deadlines and progress.
 
@@ -70,6 +70,6 @@ This implementation was written with AI assistance. Its validation evidence incl
 
 ## Recently added people
 
-People and Demo profiles offer **Recently added** sorting. It uses the time a roster entry was saved, independently of hire date and first sign-in. Imports, individual pre-registration and new verified sign-ups capture it; editing, CSV updates and later sign-in preserve it. People created before this capture was introduced have unknown dates and follow dated entries, ordered by name. No historical dates are invented.
+People and Demo profiles offer **Added: newest** and **Added: oldest** sorting. It uses the time a roster entry was saved, independently of hire date and first sign-in. Imports, individual pre-registration and new verified sign-ups capture it; editing, CSV updates and later sign-in preserve it. People created before this capture was introduced have unknown dates and follow dated entries, ordered by name. No historical dates are invented.
 
 Apply `20261003162418_roster_added_at.sql` before deploying this refinement. It adds a nullable roster timestamp and a private trigger that assigns it on insertion and preserves it on updates. Existing application data, functions, access policies and learning clocks remain unchanged.

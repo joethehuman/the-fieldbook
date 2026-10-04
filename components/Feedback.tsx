@@ -1,4 +1,5 @@
 "use client";
+import { SortPicker } from "./patterns/sort-picker";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { Card, CardContent, CardFooter } from "./ui/card";
 import { Badge } from "./ui/badge";
@@ -107,13 +108,12 @@ export function FeedbackAdmin({ data }: { data: Workspace }) {
         { value: "all", label: "All" }, { value: "doc", label: "Docs" }, { value: "brief", label: "Updates" }, { value: "course", label: "Courses" }, { value: "general", label: "General" },
       ]} />
       <CollectionControls
-        sortLabel={sort === "newest" ? "Newest first" : "Oldest first"}
-        sort={        <FormField label="Sort feedback">
-          <SelectField value={sort} onValueChange={(value) => setSort(value)}>
+        sort={
+          <SortPicker label="Sort feedback" value={sort} onValueChange={setSort}>
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
-          </SelectField>
-        </FormField>}
+          </SortPicker>
+        }
         onClear={clearFilters}
         filters={[
           ...(query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => setQuery("") }] : []),

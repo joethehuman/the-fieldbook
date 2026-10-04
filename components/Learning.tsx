@@ -1,4 +1,10 @@
 "use client";
+import {
+  learningSortOptions,
+  compareLearningRecords,
+  type LearningSortRecord,
+} from "@/lib/learning-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { FormField } from "@/components/patterns/form-field";
 import { CountBadge } from "@/components/ui/badge";
 import { SearchField } from "./patterns/search-field";
@@ -45,6 +51,7 @@ import {
   completionPercent,
   learningState,
   requiredSequence,
+  learningTarget,
 } from "@/lib/learning";
 import type { SiteSettings } from "@/lib/settings";
 import { CourseCard } from "./CourseCard";
@@ -88,14 +95,20 @@ export default function Learning({
     view: LearningView;
     value: string;
   } | null>(null);
-  const sort =
-    sortChoice?.view === view
-      ? sortChoice.value
-      : view === "assigned"
-        ? "assigned-oldest"
-        : "added";
-  const setSort = (value: string) => setSortChoice({ view, value });
   const useDueDates = !guest && settings?.dueDatesEnabled !== false;
+  const sortOptions = learningSortOptions(view, guest, useDueDates);
+  const defaultSort =
+    view === "home" || view === "all"
+      ? "updated"
+      : view === "assigned" && useDueDates
+        ? "due-earliest"
+        : "title";
+  const sort =
+    sortChoice?.view === view &&
+    sortOptions.some((option) => option.value === sortChoice.value)
+      ? sortChoice.value
+      : defaultSort;
+  const setSort = (value: string) => setSortChoice({ view, value });
   const state = learningState(courses, user, groups, progress, settings);
   const completed = assigned.filter((c) => isComplete(c, progress));
   const completedCourseCount = courses.filter((c) =>
@@ -198,35 +211,44 @@ export default function Learning({
         .toLowerCase()
         .includes(query.trim().toLowerCase()),
   );
-  const assignedDates = new Map(
-    assigned.map((course) => [
-      course.id,
-      assignmentInfo(course, user, groups).assignedAt,
-    ]),
-  );
-  const cardDate = (item: LearningCardItem) =>
-    cardCourses(item)
-      .map((course) =>
-        sort.startsWith("assigned-")
-          ? assignedDates.get(course.id)
-          : sort === "added"
-            ? course.createdAt || course.updatedAt
-            : course.updatedAt,
-      )
-      .filter((date): date is string => !!date)
-      .sort()
-      .at(sort.startsWith("assigned-") ? 0 : -1);
-  browserCards.sort((a, b) => {
-    if (sort === "title") return cardTitle(a).localeCompare(cardTitle(b));
-    const aDate = cardDate(a),
-      bDate = cardDate(b);
-    if (!aDate || !bDate)
-      return aDate ? -1 : bDate ? 1 : cardTitle(a).localeCompare(cardTitle(b));
-    return (
-      (sort === "oldest" || sort === "assigned-oldest" ? 1 : -1) *
-        aDate.localeCompare(bDate) || cardTitle(a).localeCompare(cardTitle(b))
-    );
+  const sortRecord = (course: Content): LearningSortRecord => ({
+    id: course.id,
+    title: course.title,
+    updatedAt: course.updatedAt,
+    assignedAt:
+      assignedIds.has(course.id) && !guest
+        ? assignmentInfo(course, user, groups).assignedAt
+        : undefined,
+    dueDate:
+      assignedIds.has(course.id) && !isComplete(course, progress)
+        ? learningTarget(course, user, groups, settings)
+        : undefined,
   });
+  const cardRecord = (item: LearningCardItem): LearningSortRecord => {
+    const records = cardCourses(item).map(sortRecord);
+    return {
+      id: item.kind === "course" ? item.course.id : item.curriculum.id,
+      title: cardTitle(item),
+      // A curriculum's actionable date is its earliest unfinished assigned deadline.
+      assignedAt: records
+        .flatMap((record) => (record.assignedAt ? [record.assignedAt] : []))
+        .sort()[0],
+      dueDate: records
+        .flatMap((record) => (record.dueDate ? [record.dueDate] : []))
+        .sort()[0],
+    };
+  };
+  browserCards.sort((a, b) =>
+    compareLearningRecords(
+      cardRecord(a),
+      cardRecord(b),
+      view === "home" || view === "curricula"
+        ? view === "curricula"
+          ? sort
+          : "title"
+        : sort,
+    ),
+  );
   const nextCourse = state.remaining[0];
   const viewTitle =
     view === "curricula"
@@ -245,17 +267,9 @@ export default function Learning({
               ? "Completed"
               : "All courses";
   const ordered = (items: Content[]) =>
-    [...items].sort((a, b) => {
-      if (sort === "added")
-        return (b.createdAt || b.updatedAt).localeCompare(
-          a.createdAt || a.updatedAt,
-        );
-      return sort === "updated"
-        ? b.updatedAt.localeCompare(a.updatedAt)
-        : sort === "oldest"
-          ? a.updatedAt.localeCompare(b.updatedAt)
-          : a.title.localeCompare(b.title);
-    });
+    [...items].sort((a, b) =>
+      compareLearningRecords(sortRecord(a), sortRecord(b), sort),
+    );
   const filtered = ordered(
     source.filter(
       (c) =>
@@ -495,24 +509,17 @@ export default function Learning({
               ))}
             </SelectField>
           </FormField>
-          <FormField label="Sort courses">
-            <SelectField value={sort} onValueChange={setSort}>
-              {view === "assigned" && (
-                <>
-                  <option value="assigned-oldest">
-                    Oldest assignments first
-                  </option>
-                  <option value="assigned-newest">
-                    Newest assignments first
-                  </option>
-                </>
-              )}
-              <option value="added">Newest courses first</option>
-              <option value="title">Title A–Z</option>
-              <option value="updated">Recently updated</option>
-              <option value="oldest">Oldest update first</option>
-            </SelectField>
-          </FormField>
+          <SortPicker
+            label={view === "curricula" ? "Sort curricula" : "Sort courses"}
+            value={sort}
+            onValueChange={setSort}
+          >
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </SortPicker>
         </BrowseToolbar>
         {view === "assigned" || view === "curricula" ? (
           <CardGrid>{browserCards.map(displayCard)}</CardGrid>

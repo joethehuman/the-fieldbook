@@ -75,8 +75,10 @@ test("installed group content discovery keeps selections until the final review 
     exact: true,
   });
   await expect(
-    picker.getByRole("button", { name: "Sort: Updated newest", exact: true }),
-  ).toBeVisible();
+    picker.getByRole("combobox", { name: "Sort content", exact: true }),
+  ).toContainText("Sort: Title: A–Z");
+  await picker.getByRole("combobox", { name: "Sort content", exact: true }).click();
+  await page.getByRole("option", { name: "Title: Z–A", exact: true }).click();
   await picker.getByRole("checkbox", { name: /^Course 099/ }).check();
   await picker.getByRole("searchbox").fill("pager escalation");
   await expect(
@@ -91,23 +93,20 @@ test("installed group content discovery keeps selections until the final review 
     picker.getByRole("checkbox", { name: /^Course 099/ }),
   ).toBeChecked();
   await picker
-    .getByRole("button", { name: "Review assignment", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
-  const review = page.getByRole("dialog", {
-    name: "Review changes",
-    exact: true,
-  });
+  const review = picker;
   await expect(review).toBeVisible();
   expect(writes).toBe(0);
-  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  await review.getByRole("button", { name: "← Back", exact: true }).click();
   await expect(
     picker.getByRole("checkbox", { name: /^Course 099/ }),
   ).toBeChecked();
   await picker
-    .getByRole("button", { name: "Review assignment", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
   await review
-    .getByRole("button", { name: "Apply changes", exact: true })
+    .getByRole("button", { name: "Save assignments", exact: true })
     .click();
   await expect(picker).not.toBeVisible();
   expect(writes).toBe(1);

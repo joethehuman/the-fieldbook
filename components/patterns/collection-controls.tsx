@@ -1,6 +1,6 @@
 "use client";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
-import { ArrowDownWideNarrow, SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { Button } from "../ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { EmptyState } from "./layout";
@@ -11,7 +11,6 @@ export function CollectionControls({
   search,
   children,
   sort,
-  sortLabel,
   filters = [],
   onClear,
   actions,
@@ -22,7 +21,6 @@ export function CollectionControls({
   search: ReactNode;
   children?: ReactNode;
   sort?: ReactNode;
-  sortLabel?: string;
   filters?: AppliedFilter[];
   onClear?: () => void;
   actions?: ReactNode;
@@ -52,23 +50,7 @@ export function CollectionControls({
           </PopoverContent>
         </Popover>
       )}
-      {sort && (
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button type="button" variant="outline">
-              <ArrowDownWideNarrow aria-hidden="true" />
-              Sort: {sortLabel}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent
-            align="end"
-            className="grid gap-4 p-4"
-            aria-label="Collection sort"
-          >
-            {sort}
-          </PopoverContent>
-        </Popover>
-      )}
+      {sort}
       {actions}
     </>
   );

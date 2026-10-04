@@ -4,7 +4,8 @@ export type GroupBrowseSort =
   | "updated-oldest"
   | "created-newest"
   | "created-oldest"
-  | "title";
+  | "title"
+  | "title-desc";
 
 type BrowseItem = {
   id: string;
@@ -27,7 +28,7 @@ export function sortGroupBrowseItems<T extends BrowseItem>(
   return [...items].sort((a, b) => {
     if (sort === "assigned-first" && !!a.assigned !== !!b.assigned)
       return a.assigned ? -1 : 1;
-    if (sort !== "title") {
+    if (sort !== "title" && sort !== "title-desc") {
       const field = sort.startsWith("created") ? "createdAt" : "updatedAt";
       const first = date(a[field]);
       const second = date(b[field]);
@@ -36,6 +37,8 @@ export function sortGroupBrowseItems<T extends BrowseItem>(
       if (first !== null && second === null) return -1;
       if (first === null && second !== null) return 1;
     }
-    return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
+    return (
+      (sort === "title-desc" ? -1 : 1) * a.name.localeCompare(b.name) || a.id.localeCompare(b.id)
+    );
   });
 }

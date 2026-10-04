@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Unify collection sorting with one compact design-system picker that opens options directly, shows its label inside the trigger and wraps cleanly on narrow screens. Use concise shared terms and paired useful directions across learner libraries, administration, reports and assignment/import dialogs. Add saved-deadline sorting, retain Assigned sorting in Your courses, keep unknown values last, and remove misleading curriculum dates, redundant recovery ordering and the one-option CSV issue picker. Preserve authored curriculum order, search relevance and report/export consistency.
+
 - Prevent the demo account picker from flashing during session refresh. Check the saved profile before first paint and retain an inactive workspace shell until restoration finishes; first visits, explicit profile switching and storage recovery keep the picker.
 
 - Align Admin row and bulk menus across content, people, teams, groups, curricula, Docs sections and recovery. Bulk actions require at least two selected records; individual menus retain applicable commands for a single record and reuse existing reviews and safeguards.

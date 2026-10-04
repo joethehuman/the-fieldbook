@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "@/components/patterns/sort-picker";
 import { ScrollRegion } from "@/components/patterns/scroll-region";
 import { GroupedSearch } from "@/components/patterns/grouped-search";
 import { ProgressOverview } from "@/components/patterns/progress-overview";
@@ -118,6 +120,7 @@ function AudienceSelectionExample() {
 }
 
 export function LibraryExamples() {
+  const [memberSort, setMemberSort] = useState("name");
   const [progressStatus, setProgressStatus] = useState("all");
   const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
   const [browserBranch, setBrowserBranch] = useState("");
@@ -512,13 +515,15 @@ export function LibraryExamples() {
               <Plus aria-hidden="true" /> Add Members
             </Button>
           }
-          sortLabel="Name A–Z"
           sort={
-            <FormField label="Example member order">
-              <SelectField value="name" onValueChange={() => {}}>
-                <option value="name">Name A–Z</option>
-              </SelectField>
-            </FormField>
+            <SortPicker
+              label="Sort example team members"
+              value={memberSort}
+              onValueChange={setMemberSort}
+            >
+              <option value="name">{sortLabels.nameAsc}</option>
+              <option value="reverse">{sortLabels.nameDesc}</option>
+            </SortPicker>
           }
         />
         <HierarchyList
@@ -776,17 +781,15 @@ function GroupRosterExample() {
             />
           </FormField>
         }
-        sortLabel={reverse ? "Name Z–A" : "Name A–Z"}
         sort={
-          <FormField label="Sort example members">
-            <SelectField
-              value={reverse ? "reverse" : "name"}
-              onValueChange={(value) => setReverse(value === "reverse")}
-            >
-              <option value="name">Name A–Z</option>
-              <option value="reverse">Name Z–A</option>
-            </SelectField>
-          </FormField>
+          <SortPicker
+            label="Sort example members"
+            value={reverse ? "reverse" : "name"}
+            onValueChange={(value) => setReverse(value === "reverse")}
+          >
+            <option value="name">{sortLabels.nameAsc}</option>
+            <option value="reverse">{sortLabels.nameDesc}</option>
+          </SortPicker>
         }
         filters={
           source
@@ -946,8 +949,14 @@ function GroupIndexExample() {
     )
     .sort(
       (a, b) =>
-        (sort === "people" ? b.people - a.people : 0) ||
-        a.name.localeCompare(b.name),
+        (sort === "people" ? b.people - a.people : sort === "people-fewest"
+            ? a.people - b.people
+            : sort === "courses"
+              ? b.courses - a.courses
+              : sort === "courses-fewest"
+                ? a.courses - b.courses
+                : 0) ||
+        (sort === "reverse" ? -1 : 1) * a.name.localeCompare(b.name),
     );
   const selection = useBulkSelection(
     query + people,
@@ -982,14 +991,15 @@ function GroupIndexExample() {
             />
           </FormField>
         }
-        sortLabel={sort === "people" ? "People: most first" : "Name A–Z"}
         sort={
-          <FormField label="Sort example groups">
-            <SelectField value={sort} onValueChange={setSort}>
-              <option value="name">Name A–Z</option>
-              <option value="people">People: most first</option>
-            </SelectField>
-          </FormField>
+          <SortPicker label="Sort example groups" value={sort} onValueChange={setSort}>
+            <option value="name">{sortLabels.nameAsc}</option>
+            <option value="reverse">{sortLabels.nameDesc}</option>
+            <option value="people">{sortLabels.peopleMost}</option>
+            <option value="people-fewest">{sortLabels.peopleFewest}</option>
+            <option value="courses">{sortLabels.coursesMost}</option>
+            <option value="courses-fewest">{sortLabels.coursesFewest}</option>
+          </SortPicker>
         }
         filters={
           people

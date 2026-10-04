@@ -351,7 +351,7 @@ test("progress filters, keyboard download, member details and empty report", asy
   );
   await screenshot(page, info, "member-assignments");
   const courseRows = page.locator('table[data-layout="progressAssignments"] tbody tr');
-  await expect(page.getByRole("button", { name: "Sort: Newest assigned", exact: true })).toBeVisible();
+  await expect(page.getByRole("combobox", { name: "Sort assignments", exact: true })).toContainText("Assigned: newest");
   // Check the rendered order against dates in the actual export, rather than fixture array order.
   const assignedColumn = detail.rows[0].indexOf("Assigned at");
   const datedRows = detail.rows.slice(1).filter((row) => row[assignedColumn]);
@@ -374,8 +374,7 @@ test("progress filters, keyboard download, member details and empty report", asy
   await expect(courseRows).toHaveCount(1);
   await expect(courseRows).toContainText("Start with the customer");
   await page.getByRole("button", { name: "Remove Complete filter", exact: true }).click();
-  await page.getByRole("button", { name: "Sort: Newest assigned", exact: true }).click();
-  await select(page, "Sort assignments", "Course A–Z");
+  await select(page, "Sort assignments", "Title: A–Z");
   await page.keyboard.press("Escape");
   await expect(courseRows.locator("td:first-child strong")).toHaveText([
     "From discovery to next steps", "Know the platform", "Start with the customer",
@@ -432,9 +431,6 @@ test("feedback filters and sorting preserve text, formula protection and timesta
 }, info) => {
   await setup(page, info);
   await section(page, "Feedback");
-  await page
-    .getByRole("button", { name: "Sort: Newest first", exact: true })
-    .click();
   await select(page, "Sort feedback", "Oldest first");
   await page.keyboard.press("Escape");
   const result = await download(
@@ -931,10 +927,7 @@ test("person back preserves page, sort, filter and scroll", async ({
   await setup(page, info, "admin", data);
   await section(page, "Progress");
   await searchPeople(page, "Preserved person");
-  await page
-    .getByRole("button", { name: "Sort: Name A–Z", exact: true })
-    .click();
-  await select(page, "Sort team members", "Name Z–A");
+  await select(page, "Sort team members", "Name: Z–A");
   await page.keyboard.press("Escape");
   const pages = page.getByRole("navigation", { name: "People progress pages" });
   await pages.getByRole("button", { name: "Next", exact: true }).click();

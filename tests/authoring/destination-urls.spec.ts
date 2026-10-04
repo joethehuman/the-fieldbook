@@ -368,15 +368,10 @@ test("Admin and Team progress person destinations survive refresh and respect sc
     const overview = path.startsWith("/admin") ? "/admin/progress" : "/team";
     await page.goto(destination(production, overview));
     await page
-      .getByRole("button", { name: "Sort: Name A–Z", exact: true })
-      .click();
-    await page
       .getByRole("combobox", { name: "Sort team members", exact: true })
       .click();
-    await page.getByRole("option", { name: "Name Z–A", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Sort: Name Z–A", exact: true })
-      .click();
+    await page.getByRole("option", { name: "Name: Z–A", exact: true }).click();
+    await page.keyboard.press("Escape");
     await page.locator(`[data-person-id="${id}"]`).click();
     await at(page, production, path);
     await page
@@ -384,8 +379,8 @@ test("Admin and Team progress person destinations survive refresh and respect sc
       .click();
     await at(page, production, overview);
     await expect(
-      page.getByRole("button", { name: "Sort: Name Z–A", exact: true }),
-    ).toBeVisible();
+      page.getByRole("combobox", { name: "Sort team members", exact: true }),
+    ).toContainText("Sort: Name: Z–A");
   }
   if (production)
     expect(
