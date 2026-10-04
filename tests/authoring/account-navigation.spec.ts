@@ -8,8 +8,14 @@ async function setup(
   manager = false,
   external = false,
   contributor = false,
+  focusLinks = false,
 ) {
   const data = freshWorkspace();
+  if (focusLinks) data.settings!.externalLinks = [{
+    id: "00000000-0000-4000-8000-000000000001",
+    label: "Focus test link",
+    url: "https://example.test/focus",
+  }];
   const actor = data.users.find(
     (user) => user.id === (manager ? "demo-manager" : "demo-admin"),
   )!;
@@ -53,7 +59,7 @@ async function setup(
   }
   data.teams = [{ id: "managed", name: "Managed team", managerId: actor.id }];
   if (installed) {
-    await page.request.post("http://127.0.0.1:3130/fixture", {
+    await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, {
       data: {
         settings: data.settings,
         teams: data.teams,
@@ -98,6 +104,63 @@ async function setup(
   );
   return data;
 }
+
+test("account menu clears pointer focus after external links and role navigation", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), false, false, false, true);
+  await navigation(page);
+  const trigger = page.getByRole("button", { name: "Account menu", exact: true });
+  await trigger.click();
+  await page.route("https://example.test/**", route => route.fulfill({ body: "Synthetic external link" }));
+  const popup = page.waitForEvent("popup");
+  await page.getByRole("menuitem", { name: /Focus test link/ }).click();
+  await (await popup).close();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(trigger).not.toBeFocused();
+  expect(await trigger.evaluate(el => el.matches(":focus-visible"))).toBe(false);
+  await page.screenshot({ path: info.outputPath("account-pointer-link.png") });
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
+  await expect(page.getByRole("menu")).toHaveCount(0);
+  await expect(trigger).not.toBeFocused();
+});
+
+test("account menu preserves keyboard focus and dialog ownership", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), false, false, false, true);
+  await navigation(page);
+  const trigger = page.getByRole("button", { name: "Account menu", exact: true });
+  await trigger.click();
+  await expect(page.getByRole("menu")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(trigger).toBeFocused();
+  expect(await trigger.evaluate(el => el.matches(":focus-visible"))).toBe(true);
+  await page.screenshot({ path: info.outputPath("account-keyboard-escape.png") });
+  await trigger.press("Enter");
+  await page.route("https://example.test/**", route => route.fulfill({ body: "Synthetic external link" }));
+  await page.getByRole("menuitem", { name: /Focus test link/ }).focus();
+  const popup = page.waitForEvent("popup");
+  await page.keyboard.press("Enter");
+  await (await popup).close();
+  await expect(trigger).toBeFocused();
+  expect(await trigger.evaluate(el => el.matches(":focus-visible"))).toBe(true);
+  await trigger.click();
+  await page.getByRole("menuitem", { name: "Feedback", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await expect.poll(() => dialog.evaluate(el => el.contains(document.activeElement))).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  await navigation(page);
+  await trigger.press("Enter");
+  await page.getByRole("menuitem", { name: "Manage organization", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  if (info.project.name.endsWith("phone")) {
+    // The mobile shell closes its navigation drawer after role navigation.
+    await expect(trigger).not.toBeVisible();
+  } else {
+    await expect(trigger).toBeFocused();
+    expect(await trigger.evaluate(el => el.matches(":focus-visible"))).toBe(true);
+  }
+});
 
 async function navigation(page: Page) {
   const trigger = page.getByRole("button", {
@@ -407,7 +470,7 @@ test("server roles still deny Admin entry and manager reports exclude other team
       group_joined_at: {},
     })),
   });
-  await page.request.post("http://127.0.0.1:3130/fixture", { data: fixture() });
+  await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, { data: fixture() });
   await page.reload();
   await expect(
     page.getByText("Visible team member", { exact: true }),
@@ -424,7 +487,7 @@ test("server roles still deny Admin entry and manager reports exclude other team
     page.getByRole("menuitem", { name: "My team’s progress", exact: true }),
   ).toBeVisible();
   for (const role of ["manager", "learner"]) {
-    await page.request.post("http://127.0.0.1:3130/fixture", {
+    await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, {
       data: fixture(role),
     });
     expect((await page.request.get("/admin")).status()).toBe(404);
@@ -432,7 +495,7 @@ test("server roles still deny Admin entry and manager reports exclude other team
       (await page.request.get("/api/admin/snapshot?scope=content")).status(),
     ).toBe(403);
   }
-  await page.request.post("http://127.0.0.1:3130/fixture", {
+  await page.request.post(`http://127.0.0.1:${process.env.FIELDBOOK_BACKEND_TEST_PORT || 3130}/fixture`, {
     data: fixture("admin", false),
   });
   expect(
