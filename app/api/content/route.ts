@@ -31,6 +31,8 @@ export async function POST(req: Request) {
     if (Number(req.headers.get("content-length")) > 2000000)
       throw new HttpError(413, "Content is too large.");
     const a = await req.json();
+    if (a.renewUpdate !== undefined && typeof a.renewUpdate !== "boolean")
+      throw new HttpError(400, "Choose whether to renew the Update feed date.");
     if (!Number.isInteger(a.expected) || a.expected < 0)
       throw new HttpError(400, "A revision is required.");
     const saved = await saveContent(
@@ -40,6 +42,7 @@ export async function POST(req: Request) {
       a.publish === true,
       "web",
       a.unpublish === true,
+      { renewUpdate: a.renewUpdate === true },
     );
     if (a.publish === true || a.unpublish === true) invalidatePublishedReader();
     return Response.json(saved);

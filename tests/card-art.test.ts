@@ -9,7 +9,6 @@ import {
   CARD_ART_VERSION,
   cardPalettePresets,
   graphemeCount,
-  isArtworkOnlyUpdate,
   randomArtSeed,
   resolvedCardArt,
   resolvedCardPalette,
@@ -314,14 +313,11 @@ test("published Update artwork corrections retain feed time in demo snapshots", 
   const item = next.content.find((entry) => entry.id === live.id)!;
   item.cardArt = { ...resolvedCardArt(item.id, item.title), seed: 1234 };
   item.updatedAt = "2026-09-27T12:00:00.000Z";
-  assert.equal(isArtworkOnlyUpdate(item, live), true);
   const result = reconcileDemoPublication(before, next);
   assert.equal(
     result.publishedContent!.find((entry) => entry.id === live.id)!.feedAt,
     live.updatedAt,
   );
-  item.summary = "Real editorial change";
-  assert.equal(isArtworkOnlyUpdate(item, live), false);
 });
 
 test("v4 keeps bounded structural choices and renders deterministic artwork for every recipe", () => {

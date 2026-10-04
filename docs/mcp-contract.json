@@ -1264,7 +1264,7 @@
     },
     {
       "name": "publish_content",
-      "description": "Publish the current draft only on explicit user intent. Validates complete lessons, image alternative text and quizzes. Set new_course_version=true only for a substantive course change that starts a new completion requirement; minor corrections preserve the version.",
+      "description": "Publish the current draft only on explicit user intent. Validates complete lessons, image alternative text and quizzes. Set new_course_version=true only for a substantive course change that starts a new completion requirement. Update corrections preserve feed position; set renew_update=true only to bring an Update forward in Updates and For you. First publication is current by default.",
       "capability": "content:write",
       "annotations": {
         "readOnlyHint": false,
@@ -1286,6 +1286,10 @@
             "maximum": 9007199254740991
           },
           "new_course_version": {
+            "default": false,
+            "type": "boolean"
+          },
+          "renew_update": {
             "default": false,
             "type": "boolean"
           }

@@ -28,6 +28,7 @@ import { WritingTitle } from "./patterns/writing-title";
 import { useEditorLayout } from "./patterns/use-editor-layout";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
+import type { PublicationOptions } from "@/lib/content-publication";
 import { contentSignature, hasUnpublishedEdits } from "@/lib/demo-publication";
 import { resumeDraft, revertToPublished } from "@/lib/draft-recovery";
 import {
@@ -282,7 +283,7 @@ type Props = {
   onPrepareAssignments?: () => Promise<Workspace>;
   onOpenPersonProgress?: (id: string) => Promise<void>;
   onEdit?: (id: string) => Promise<Content>;
-  onSaveContent?: (content: Content, intent: SaveIntent) => Promise<Content>;
+  onSaveContent?: (content: Content, intent: SaveIntent, options?: PublicationOptions) => Promise<Content>;
   onUnpublish?: (id: string) => Promise<void>;
   onChange: (
     d: Workspace,
@@ -920,9 +921,9 @@ export default function Admin({
       writingHistory.current = false;
     }
   }
-  async function save(c: Content, intent: SaveIntent = "draft") {
+  async function save(c: Content, intent: SaveIntent = "draft", options?: PublicationOptions) {
     if (onSaveContent) {
-      const saved = await onSaveContent(c, intent);
+      const saved = await onSaveContent(c, intent, options);
       await savedDestination(saved);
       return saved;
     }
@@ -2053,6 +2054,7 @@ export function Editor({
   onSave: (
     c: Content,
     intent?: SaveIntent,
+    options?: PublicationOptions,
   ) => Content | void | Promise<Content | void>;
   onCancel: () => void;
   onLearning?: LearningHandler;
@@ -2089,6 +2091,7 @@ export function Editor({
     })),
     [error, setError] = useState(""),
     [refresh, setRefresh] = useState(false),
+    [renewUpdate, setRenewUpdate] = useState(false),
     [saving, setSaving] = useState(false),
     [uploadCount, setUploadCount] = useState(0);
   const { confirm } = useInteractionDialog();
@@ -2101,11 +2104,12 @@ export function Editor({
   const [recovering, setRecovering] = useState(false);
   const recoveringNow = useRef(false);
   const attemptedSave = useRef<Content | undefined>(undefined);
+  const attemptedRenewUpdate = useRef(false);
   const busy = uploadCount > 0 || recovering;
   const current = useRef(c);
   current.current = c;
-  const callbacks = useRef({ onSave, data, refresh });
-  callbacks.current = { onSave, data, refresh };
+  const callbacks = useRef({ onSave, data, refresh, renewUpdate });
+  callbacks.current = { onSave, data, refresh, renewUpdate };
   const queue = useRef<ReturnType<typeof createDraftSaveQueue> | null>(null);
   if (!queue.current)
     queue.current = createDraftSaveQueue({
@@ -2132,7 +2136,10 @@ export function Editor({
         savingNow.current = true;
         setSaving(true);
         attemptedSave.current = saved;
-        return (await callbacks.current.onSave(saved, intent)) || saved;
+        attemptedRenewUpdate.current = intent === "published" && snapshot.kind === "brief" && callbacks.current.renewUpdate;
+        return (await callbacks.current.onSave(saved, intent, {
+          renewUpdate: attemptedRenewUpdate.current,
+        })) || saved;
       },
       acknowledge: (persisted, snapshot, intent) => {
         original.current = persisted;
@@ -2151,7 +2158,9 @@ export function Editor({
         setC(next);
         if (intent === "published") {
           callbacks.current.refresh = false;
+          callbacks.current.renewUpdate = false;
           setRefresh(false);
+          setRenewUpdate(false);
           notify(
             `${persisted.kind === "doc" ? "Doc" : persisted.kind === "brief" ? "Update" : "Course"} published.`,
           );
@@ -2298,6 +2307,7 @@ export function Editor({
       queue.current!.reset(latest);
       setC(latest);
       setRefresh(false);
+      setRenewUpdate(false);
       setError("");
       setSavedMessage("Saved");
     } catch (error) {
@@ -2322,14 +2332,19 @@ export function Editor({
         attemptedSave.current,
         latest,
       );
+      const publishedAttemptConfirmed = latest?.publishedSignature === contentSignature(attemptedSave.current || baseline.current) &&
+        (!attemptedRenewUpdate.current ||
+          (latest.publishedRevision || 0) > (attemptedSave.current?.revision || 0));
       if (latest) {
         original.current = latest;
         baseline.current = latest;
       }
       queue.current!.reset(latest || baseline.current);
       // A lost Publish acknowledgement must never cause another publication or version bump.
-      if (latest?.publishedSignature === contentSignature(attemptedSave.current || baseline.current))
+      if (publishedAttemptConfirmed) {
         setRefresh(false);
+        setRenewUpdate(false);
+      }
       current.current = next;
       setC(next);
       setError("");
@@ -2378,6 +2393,7 @@ export function Editor({
       current.current = next;
       setC(next);
       setRefresh(false);
+      setRenewUpdate(false);
       setError("");
     } catch (failure) {
       setError((failure as Error).message);
@@ -2524,7 +2540,7 @@ export function Editor({
       c,
       data.publishedContent?.find((item) => item.id === c.id),
     ) ||
-    refresh;
+    refresh || renewUpdate;
   async function submit(e: React.FormEvent, intent: SaveIntent = "published") {
     e.preventDefault();
     if (busy || queue.current!.blocked || publishingNow.current) return;
@@ -2816,6 +2832,23 @@ export function Editor({
             </EditorDetailsGroup>
           )}
         </>
+      )}
+      {c.kind === "brief" && !!c.publishedRevision && (
+        <EditorDetailsGroup id="update-publication" title="Publishing">
+          <Field orientation="horizontal">
+            <Checkbox
+              checked={renewUpdate}
+              disabled={saving || publishing || needsRecovery}
+              aria-describedby="update-publication-help"
+              onCheckedChange={(checked) => setRenewUpdate(checked === true)}
+            />
+            Bring this update to the top
+          </Field>
+          <FieldDescription id="update-publication-help">
+            Move this update forward in Updates and For you when published.
+            Keep this unchecked for minor corrections.
+          </FieldDescription>
+        </EditorDetailsGroup>
       )}
       {!!c.publishedRevision && (
         <ActionGroup>

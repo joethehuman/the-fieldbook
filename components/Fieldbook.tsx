@@ -738,7 +738,7 @@ export default function Fieldbook() {
               if (token) { const next = recalculateDeadlines(current, token); saveWorkspace(next); setData(next); }
               return review;
             }}
-            onSaveContent={async (content, intent) => {
+            onSaveContent={async (content, intent, options) => {
               try {
                 const before = loadWorkspace();
                 const previous = before.content.find(
@@ -768,7 +768,7 @@ export default function Fieldbook() {
                           stamp,
                       },
                     ],
-                  }),
+                  }, intent === "published" && options?.renewUpdate ? content.id : undefined),
                 );
                 saveWorkspace(next);
                 setData(next);

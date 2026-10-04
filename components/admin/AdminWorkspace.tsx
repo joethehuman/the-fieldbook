@@ -151,9 +151,9 @@ export function AdminWorkspace({
             setError("");
             return saved;
           }}
-          onSaveContent={async (content, intent) => {
+          onSaveContent={async (content, intent, options) => {
             try {
-              const saved = await runtime.saveContent(content, intent);
+              const saved = await runtime.saveContent(content, intent, options);
               setData((current) => mergeSavedContent(current, saved));
               setReportIssue(undefined);
               return saved;
