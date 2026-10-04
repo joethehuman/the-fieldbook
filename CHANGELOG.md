@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Prevent the account menu's ellipsis focus ring from lingering after pointer selection, while preserving keyboard focus restoration and dialog focus.
+
 - Preconfigure fresh and reset demos with codebase and thefieldbook.org links through the existing External links settings and account menu. Preserve saved browser settings until Reset demo.
 
 - Restore and reactivate exact-email Recently deleted users through CSV Import, with a non-blocking review warning and stable identity/history. Keep purge, inactive-user and access guards. Apply `20261003222648_roster_import_reactivation.sql` before deployment; it rewrites no existing data.
