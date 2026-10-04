@@ -6,7 +6,7 @@ Fieldbook brings three kinds of content together:
 
 - **Updates:** updates, launch briefs, and newsletters.
 - **Courses:** courses with text, video, quizzes, and saved progress.
-- **Docs:** evergreen articles organized in a nested knowledge base.
+- **Docs:** maintained reference articles in a two-level navigation hierarchy.
 
 Run your own installation, maintain content in the built-in admin panel, and optionally connect an AI client to edit content through MCP. Each installation has its own accounts, data, domain, and configuration. No separate CMS is required.
 
@@ -66,6 +66,7 @@ The production application includes:
 - Persistent learner progress, server-graded quizzes, and optional browser-progress import.
 - Feedback from signed-in members and public visitors, administrator progress/feedback views, branding, and privacy-policy settings.
 - Role-aware MCP tools for rich content, verified media uploads, scoped learning/feedback reports and administrator course assignments, with explicit connection permissions and a portable versioned contract.
+- Optional Ask AI from Search, off until an administrator configures a supported router and selects a model. Answers use published text and can cite verified internal source links; conversations stay in browser memory, while router and model providers have their own data policies.
 
 **Production governance** includes people administration, pre-registered Google accounts, direct team and learning-group assignments, learning groups with live team links, reusable curricula, onboarding/catch-up windows, nested reporting teams and server-scoped manager reporting. See [roles and permissions](docs/permissions.md). Navigation labels are currently fixed. Published search uses PostgreSQL indexes across the full published library and returns the best 30 content matches, including lesson destinations. See [search behavior and setup](docs/search.md). Catalog, feedback and aggregate reporting reads paginate past the database API response cap and fail if a page cannot be retrieved. MCP draft search includes lesson prose across the complete library and uses cursors; search, media and named reports return up to 100 rows per page. Follow cursors until complete, and restart report exports if their data or reporting scope changes.
 
@@ -75,7 +76,7 @@ The production application includes:
 - [Hosting recipes and service providers](docs/providers.md)
 - [Connect your own MCP client](docs/mcp-setup.md)
 - [Configure or change your domain](docs/domains.md)
-- [Set up published-content search](docs/search.md)
+- [Set up published-content search](docs/search.md) and [optional Ask AI](docs/ask-ai.md)
 - [Configure installation and account branding](docs/branding.md)
 - [Configure your privacy policy](docs/privacy-setup.md)
 - [Select a version and upgrade](docs/upgrading.md)
@@ -84,6 +85,7 @@ The production application includes:
 - [Optional guest recommendations](docs/guest-recommendations.md)
 - [Reports and CSV exports](docs/reporting.md)
 - [Import people and teams from CSV](docs/roster-import.md)
+- [Administration guide](docs/administration.md) and [installation proof checklist](docs/installation-proof.md)
 - [Roles and permissions](docs/permissions.md)
 - [Server-rendered reading pages, metadata and caching](docs/reading-pages.md)
 - [Writing Docs and Updates](docs/authoring.md)
@@ -91,7 +93,7 @@ The production application includes:
 - [Interface standards](docs/design-system.md) and [agent contribution instructions](AGENTS.md)
 - [Changelog](CHANGELOG.md)
 - [Contributing and local development](CONTRIBUTING.md)
-- [Optional AI authoring instructions](docs/ai-authoring.md)
+- [Optional AI authoring instructions](docs/ai-authoring.md) and [operator-agent handoff](docs/agent-operator-guide.md)
 
 ## Run locally
 
@@ -128,3 +130,4 @@ For interface changes, also run `pnpm check:ui` and `pnpm test:ui` after install
 Fieldbook is source available under the [Elastic License 2.0 (ELv2)](LICENSE). You may use, modify and redistribute the software subject to its terms, including for your own internal installation. ELv2 restricts providing substantial Fieldbook functionality to others as a hosted or managed service, circumventing license-key functionality, and removing or obscuring license, copyright or other notices. See [licensing](docs/licensing.md) for scope and third-party notices.
 
 This is a small independent project. Bug reports should include the version and reproduction steps, without credentials or learner data. A private vulnerability-reporting channel must be established before release. There is no promised release schedule, long-term-support branch, or feature roadmap.
+

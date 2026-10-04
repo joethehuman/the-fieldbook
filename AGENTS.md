@@ -49,13 +49,7 @@ Use the Node.js and pnpm versions specified in `package.json`. Install dependenc
 - `pnpm dev:demo` runs the browser-local demo.
 - `pnpm dev` runs the server application (`dev:production` remains a compatibility alias) with the development environment described in `docs/installation.md`.
 
-For runtime changes, run:
-
-```sh
-pnpm test
-pnpm build
-pnpm build:demo
-```
+For runtime changes, select focused tests and builds according to the behavior and risk. Use broader checks for substantial changes and release candidates. Review the exact diff and avoid rerunning successful checks without a concrete reason. Do not manually trigger or rerun CI merely for routine preview evidence.
 
 Add or update meaningful tests for changed behavior, particularly authorization, data persistence, and learning-progress rules. For interface changes, check affected user flows, keyboard interaction, and relevant screen sizes. Documentation-only changes need checks against the implementation and valid relative links; they do not require new behavior tests.
 
@@ -79,3 +73,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+

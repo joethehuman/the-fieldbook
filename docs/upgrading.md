@@ -183,3 +183,13 @@ Rehearse against an isolated backend and verify current role/branch boundaries, 
 Apply `20261003140729_roster_csv_import.sql` after the combined assignment/Organization and governance-safeguard migrations, before deploying the Import workflow. It adds one private receipt table and two service-only functions; it preserves existing functions, roster, content, progress, assignments and deadlines. Rehearse the upgrade and both failed/successful imports in isolation. Direct browser, anonymous and authenticated database roles cannot access receipts or call the import functions.
 
 Previously deployed code remains compatible because these objects are additive. A code rollback leaves unused receipts and functions; do not replay the migration or remove committed retry receipts as part of an application rollback. Uploaded files are not retained, abandoned reviews expire after a day, and committed receipts hold hashes, actor references and aggregate counts. Person deletion clears the actor reference. Back up and follow the operator's environment-specific authorization before hosted application.
+
+## Roster import follow-up migrations
+
+The current migration directory continues after `20261003140729_roster_csv_import.sql` with these files, in filename order:
+
+1. `20261003162418_roster_added_at.sql` records the roster's immutable added-at time independently of hire date and first sign-in.
+2. `20261003212205_roster_team_deletion.sql` preserves the import and team-deletion contract used by the current application.
+3. `20261003222648_roster_import_reactivation.sql` supports guarded restoration/reactivation of a recoverable person matched by exact normalized email during an import.
+
+Apply each only if missing from **this installation's** ledger, after all earlier files and before deploying code that calls it. Rehearse against representative existing people, teams, assignments, roles and Recently deleted records. Check the full source SQL and dependency order from the selected commit; a later release may add further files. Record each environment separately. A migration's presence in this repository, or a successful local rehearsal, does not mean it ran in a hosted project. See [roster import](roster-import.md) and [independent installation proof](installation-proof.md).

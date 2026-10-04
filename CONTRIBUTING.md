@@ -17,7 +17,7 @@ pnpm dev:demo
 pnpm dev
 ```
 
-Before proposing runtime changes, run `pnpm test`, `pnpm build`, and `pnpm build:demo`. CI runs these checks on pull requests. For documentation-only changes, check instructions against the code and verify relative links; no new behavior tests are necessary.
+Choose checks for the changed behavior and risk. Small documentation changes need source review and valid relative links, not behavior tests or builds. For substantial runtime changes, run focused tests and the affected builds; before a release, use the broader release-candidate checks in `docs/releases.md`. Do not manually trigger or rerun CI merely to collect routine preview evidence.
 
 Never commit secrets, exports containing personal data, `.env.local`, or provider credentials. Examples must use placeholder domains and keys. Shared UI changes should be checked in both applications. Production authorization belongs on the server, not in hidden buttons or client state. Database changes require a new migration and upgrade guidance; do not rewrite an already-applied migration.
 
@@ -46,3 +46,4 @@ The documented stack is Vercel, hosted Supabase, and Google sign-in. Do not desc
 For guest recommendation changes, also run `pnpm test:guests` after both builds with the synthetic production build variables above. It covers demo/production desktop and phone settings, explicit group creation, recommendation states, local progress and simulated sign-in transitions. See [guest recommendation verification](docs/guest-recommendations.md#verification).
 
 For reading-route, metadata or request-time access changes, run `pnpm test:reading` after both builds with the same synthetic production build variables. It checks HTTP responses, page payload redaction, no-JavaScript reading, publication/access transitions and simulated authenticated sessions on desktop and phone. Run it sequentially with account tests because they share fixture ports. See [reading pages](docs/reading-pages.md).
+
