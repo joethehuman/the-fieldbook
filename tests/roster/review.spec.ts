@@ -869,13 +869,10 @@ test("individual person creation saves once, returns to People, and rejects a du
     .getByRole("searchbox", { name: "Search profiles", exact: true })
     .fill("");
   await page
-    .getByRole("button", { name: "Sort: Name A–Z", exact: true })
-    .click();
-  await page
     .getByRole("combobox", { name: "Sort profiles", exact: true })
     .click();
   await page
-    .getByRole("option", { name: "Recently added", exact: true })
+    .getByRole("option", { name: "Added (newest)", exact: true })
     .click();
   await page.keyboard.press("Escape");
   await expect(

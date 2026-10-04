@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "@/components/patterns/sort-picker";
 import { EditorFrame, EditorDetailsGroup } from "@/components/patterns/editor-frame";
 import { NavigationButton } from "@/components/patterns/navigation-button";
 import { ResponsiveTabsNavigation } from "@/components/patterns/responsive-tabs-navigation";
@@ -32,7 +34,6 @@ import { Clock3, BookOpen, ListChecks } from "lucide-react";
 import { LearningCardFact, LearningCard } from "@/components/patterns/learning-card";
 import { CardArtwork } from "@/components/patterns/card-artwork";
 import { CARD_ART_VERSION } from "@/lib/card-art";
-import { BrowseToolbar } from "@/components/patterns/layout";
 import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
 
@@ -118,6 +119,7 @@ export default function ComponentCatalog() {
   const [catalogFilter, setCatalogFilter] = useState("all");
   const [catalogCategory, setCatalogCategory] = useState("all");
   const [catalogStatus, setCatalogStatus] = useState("all");
+  const [browserSort, setBrowserSort] = useState("recommended");
   const [catalogSort, setCatalogSort] = useState("newest");
   const [collectionQuery, setCollectionQuery] = useState("");
   const [collectionStatus, setCollectionStatus] = useState("all");
@@ -163,14 +165,17 @@ export default function ComponentCatalog() {
               <Input type="search" placeholder="Search content by title" />
             </FormField>
           }
-          sortLabel={catalogSort === "newest" ? "Newest created" : "Title A–Z"}
           sort={
-            <FormField label="Sort content">
-              <SelectField value={catalogSort} onValueChange={setCatalogSort}>
-                <option value="newest">Newest created</option>
-                <option value="title">Title A–Z</option>
-              </SelectField>
-            </FormField>
+            <SortPicker
+              label="Sort content"
+              value={catalogSort}
+              onValueChange={setCatalogSort}
+            >
+              <option value="newest">{sortLabels.createdNewest}</option>
+              <option value="created-oldest">{sortLabels.createdOldest}</option>
+              <option value="title">{sortLabels.titleAsc}</option>
+              <option value="title-desc">{sortLabels.titleDesc}</option>
+            </SortPicker>
           }
           filters={[
             ...(catalogCategory === "all" ? [] : [{ id: "category", label: "Sales", onRemove: () => setCatalogCategory("all") }]),
@@ -429,7 +434,11 @@ export default function ComponentCatalog() {
               }
               description="Shared spacing, readable descriptions and aligned actions."
               metadata={
-                value === 33 ? <LearningCardFact icon={BookOpen}>1 of 3 courses complete</LearningCardFact> : <><LearningCardFact icon={Clock3}>5 min</LearningCardFact><LearningCardFact icon={BookOpen}>2 lessons</LearningCardFact><LearningCardFact icon={ListChecks}>Quiz</LearningCardFact></>
+                value === 33 ? (
+                  <LearningCardFact icon={BookOpen}>1 of 3 courses complete</LearningCardFact>
+                ) : (
+                  <><LearningCardFact icon={Clock3}>5 min</LearningCardFact><LearningCardFact icon={BookOpen}>2 lessons</LearningCardFact><LearningCardFact icon={ListChecks}>Quiz</LearningCardFact></>
+                )
               }
               status={{
                 percent: value,
@@ -450,26 +459,35 @@ export default function ComponentCatalog() {
             />
           ))}
         </CourseRow>
-        <BrowseToolbar>
-          <Field>
-            Search
+        <CollectionControls
+          search={
             <SearchField>
-              <Input placeholder="Find a course…" />
+              <Input aria-label="Find a course" placeholder="Find a course…" />
             </SearchField>
-          </Field>
+          }
+          sort={
+            <SortPicker
+              label="Sort example courses"
+              value={browserSort}
+              onValueChange={setBrowserSort}
+            >
+              <option value="recommended">Recommended order</option>
+              <option value="title">{sortLabels.titleAsc}</option>
+              <option value="title-desc">{sortLabels.titleDesc}</option>
+            </SortPicker>
+          }
+        >
           <Field>
             Category
-            <SelectField value="all" onValueChange={() => {}}>
+            <SelectField
+              aria-label="Example course category"
+              value="all"
+              onValueChange={() => {}}
+            >
               <option value="all">All categories</option>
             </SelectField>
           </Field>
-          <Field>
-            Sort
-            <SelectField value="recommended" onValueChange={() => {}}>
-              <option value="recommended">Recommended order</option>
-            </SelectField>
-          </Field>
-        </BrowseToolbar>
+        </CollectionControls>
         <LaunchList
           items={[
             {
@@ -650,19 +668,17 @@ export default function ComponentCatalog() {
                 onChange={(event) => setCollectionQuery(event.target.value)}
               />
             }
-            sortLabel={
-              collectionSort === "newest" ? "Newest created" : "Title A–Z"
-            }
             sort={
-              <FormField label="Sort content">
-                <SelectField
-                  value={collectionSort}
-                  onValueChange={setCollectionSort}
-                >
-                  <option value="newest">Newest created</option>
-                  <option value="title">Title A–Z</option>
-                </SelectField>
-              </FormField>
+              <SortPicker
+                label="Sort content"
+                value={collectionSort}
+                onValueChange={setCollectionSort}
+              >
+                <option value="newest">{sortLabels.createdNewest}</option>
+                <option value="created-oldest">{sortLabels.createdOldest}</option>
+                <option value="title">{sortLabels.titleAsc}</option>
+                <option value="title-desc">{sortLabels.titleDesc}</option>
+              </SortPicker>
             }
             filters={
               collectionStatus === "all"
@@ -861,7 +877,9 @@ export default function ComponentCatalog() {
 
 function AskAiSettingsExample() {
   const [value, setValue] = useState(defaultAskAiSettings);
-  return <AskAiSettingsPanel value={value} onChange={setValue} production={false} busy={false} actions={<Button type="button" disabled>Save settings</Button>} />;
+  return (
+    <AskAiSettingsPanel value={value} onChange={setValue} production={false} busy={false} actions={<Button type="button" disabled>Save settings</Button>} />
+  );
 }
 
 function SearchPanelExample() {

@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { RegisterLandingNavigation } from "@/lib/navigation-guard";
 import type { Workspace } from "@/lib/store";
@@ -93,10 +95,12 @@ export function TeamProgress({
       status: "all",
     }));
   const assignmentSortLabels: Record<string, string> = {
-    newest: "Newest assigned",
-    oldest: "Oldest assigned",
-    name: "Course A–Z",
-    reverse: "Course Z–A",
+    newest: sortLabels.assignedNewest,
+    oldest: sortLabels.assignedOldest,
+    name: sortLabels.titleAsc,
+    reverse: sortLabels.titleDesc,
+    "due-earliest": sortLabels.dueEarliest,
+    "due-latest": sortLabels.dueLatest,
   };
   const host = useRef<HTMLDivElement>(null),
     savedScroll = useRef(0),
@@ -132,7 +136,8 @@ export function TeamProgress({
         ? "all"
         : filters.status,
   };
-  const rows = filterProgress(all, teams, safeFilters, sort);
+  const rows = filterProgress(all, teams, safeFilters,
+    !deadlines && sort.startsWith("overdue") ? "name" : sort);
   const summaryRows = filterProgress(all, teams, {
     ...safeFilters,
     status: "all",
@@ -142,6 +147,10 @@ export function TeamProgress({
   const detailDeadlines = detail?.deadlinesEnabled ?? deadlines;
   const safeAssignmentFilters = {
     ...assignmentFilters,
+    sort:
+      !detailDeadlines && assignmentFilters.sort.startsWith("due-")
+        ? "newest"
+        : assignmentFilters.sort,
     status:
       !detailDeadlines && assignmentFilters.status === "overdue"
         ? "all"
@@ -260,7 +269,9 @@ export function TeamProgress({
         progressPeople(fresh, user),
         fresh.teams,
         safeFilters,
-        sort,
+        fresh.settings?.dueDatesEnabled === false && sort.startsWith("overdue")
+          ? "name"
+          : sort,
       ),
       fresh.settings?.dueDatesEnabled !== false,
     );
@@ -373,10 +384,12 @@ export function TeamProgress({
     }
   }
   const sorts: Record<string, string> = {
-    name: "Name A–Z",
-    reverse: "Name Z–A",
-    completion: "Completion, lowest first",
-    overdue: "Overdue, most first",
+    name: sortLabels.nameAsc,
+    reverse: sortLabels.nameDesc,
+    completion: sortLabels.completionLowest,
+    "completion-highest": sortLabels.completionHighest,
+    overdue: sortLabels.pastDueMost,
+    "overdue-fewest": sortLabels.pastDueFewest,
   };
   return (
     <div ref={host} className="grid min-w-0 gap-6">
@@ -453,25 +466,23 @@ export function TeamProgress({
               }
               filters={applied}
               onClear={clear}
-              sortLabel={sorts[sort]}
               sort={
-                <FormField label="Sort team members">
-                  <SelectField
-                    value={sort}
-                    onValueChange={(v) => {
-                      setSort(v);
-                      setPage(1);
-                    }}
-                  >
-                    {Object.entries(sorts)
-                      .filter(([k]) => deadlines || k !== "overdue")
-                      .map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                  </SelectField>
-                </FormField>
+                <SortPicker
+                  label="Sort team members"
+                  value={!deadlines && sort.startsWith("overdue") ? "name" : sort}
+                  onValueChange={(v) => {
+                    setSort(v);
+                    setPage(1);
+                  }}
+                >
+                  {Object.entries(sorts)
+                    .filter(([k]) => deadlines || !k.startsWith("overdue"))
+                    .map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
+                    ))}
+                </SortPicker>
               }
             >
               <FormField
@@ -702,27 +713,25 @@ export function TeamProgress({
                     />
                   </FormField>
                 }
-                sortLabel={assignmentSortLabels[assignmentFilters.sort]}
                 sort={
-                  <FormField label="Sort assignments">
-                    <SelectField
-                      value={assignmentFilters.sort}
-                      onValueChange={(sort) =>
-                        setAssignmentFilters((current) => ({
-                          ...current,
-                          sort,
-                        }))
-                      }
-                    >
-                      {Object.entries(assignmentSortLabels).map(
-                        ([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ),
-                      )}
-                    </SelectField>
-                  </FormField>
+                  <SortPicker
+                    label="Sort assignments"
+                    value={safeAssignmentFilters.sort}
+                    onValueChange={(sort) =>
+                      setAssignmentFilters((current) => ({
+                        ...current,
+                        sort,
+                      }))
+                    }
+                  >
+                    {Object.entries(assignmentSortLabels)
+                      .filter(([value]) => detailDeadlines || !value.startsWith("due-"))
+                      .map(([value, label]) => (
+                        <option key={value} value={value}>
+                          {label}
+                        </option>
+                      ))}
+                  </SortPicker>
                 }
                 filters={[
                   ...(assignmentFilters.query

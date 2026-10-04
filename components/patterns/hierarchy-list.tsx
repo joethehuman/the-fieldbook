@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./sort-picker";
 import { useState, type ReactNode } from "react";
 import { ChevronRight } from "lucide-react";
 import { canBulkSelect, SelectRows } from "./bulk-selection";
@@ -11,7 +13,6 @@ import {
   CollapsibleTrigger,
 } from "../ui/collapsible";
 import { CollectionControls, CollectionEmpty } from "./collection-controls";
-import { SelectField } from "../ui/select";
 import { FormField } from "./form-field";
 import { cn } from "@/lib/utils";
 
@@ -251,14 +252,15 @@ export function HierarchyList({
               />
             </FormField>
           }
-          sortLabel={sort === "reverse" ? "Name Z–A" : "Name A–Z"}
           sort={
-            <FormField label={`Sort ${label.toLowerCase()}`}>
-              <SelectField value={sort} onValueChange={setSort}>
-                <option value="name">Name A–Z</option>
-                <option value="reverse">Name Z–A</option>
-              </SelectField>
-            </FormField>
+            <SortPicker
+              label={`Sort ${label.toLowerCase()}`}
+              value={sort}
+              onValueChange={setSort}
+            >
+              <option value="name">{sortLabels.nameAsc}</option>
+              <option value="reverse">{sortLabels.nameDesc}</option>
+            </SortPicker>
           }
           filters={
             query

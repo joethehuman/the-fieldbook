@@ -1,6 +1,6 @@
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { useState } from "react";
-import { FormField } from "./patterns/form-field";
-import { SelectField } from "./ui/select";
 import type { Content, Curriculum, Progress, User, Group } from "@/lib/types";
 import type { SiteSettings } from "@/lib/settings";
 import { learningState } from "@/lib/learning";
@@ -44,15 +44,10 @@ export function CurriculumPage({
   const assignedIds = new Set(learning?.required.map((c) => c.id));
   const overdueIds = new Set(learning?.overdue.map((c) => c.id));
   if (sort !== "recommended")
-    items.sort((a, b) => {
-      if (sort === "title") return a.title.localeCompare(b.title);
-      const aDate = sort === "added" ? a.createdAt || a.updatedAt : a.updatedAt;
-      const bDate = sort === "added" ? b.createdAt || b.updatedAt : b.updatedAt;
-      return (
-        (sort === "oldest" ? 1 : -1) * aDate.localeCompare(bDate) ||
-        a.title.localeCompare(b.title)
-      );
-    });
+    items.sort((a, b) =>
+      (sort === "title-desc" ? -1 : 1) * a.title.localeCompare(b.title) ||
+      a.id.localeCompare(b.id),
+    );
   return (
     <div className="grid w-full gap-6">
       <PageHeader>
@@ -73,15 +68,11 @@ export function CurriculumPage({
         <h1>{curriculum.name}</h1>
         <p>{curriculum.description}</p>
       </PageHeader>
-      <FormField label="Sort courses">
-        <SelectField value={sort} onValueChange={setSort}>
-          <option value="recommended">Recommended order</option>
-          <option value="added">Newest courses first</option>
-          <option value="title">Title A–Z</option>
-          <option value="updated">Recently updated</option>
-          <option value="oldest">Oldest update first</option>
-        </SelectField>
-      </FormField>
+      <SortPicker label="Sort courses" value={sort} onValueChange={setSort}>
+        <option value="recommended">Recommended order</option>
+        <option value="title">{sortLabels.titleAsc}</option>
+        <option value="title-desc">{sortLabels.titleDesc}</option>
+      </SortPicker>
       <CardGrid>
         {items.map((course) => (
           <CourseCard
