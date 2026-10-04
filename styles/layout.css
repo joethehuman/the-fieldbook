@@ -1004,8 +1004,6 @@
   .course-video { display: grid; gap: var(--space-3); min-width: 0; position: relative; }
   .course-video-loading { position: absolute; z-index: 1; top: var(--space-4); left: var(--space-4); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--background); color: var(--foreground); font-size: .875rem; pointer-events: none; }
   .course-video video, .course-video iframe { display: block; width: 100%; max-height: 70dvh; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius); background: var(--foreground); }
-  .course-video.theater { width: min(85vw, 90rem); max-width: none; margin-inline: calc((100% - min(85vw, 90rem)) / 2); }
-  .course-video.theater video, .course-video.theater iframe { max-height: 82dvh; }
   .course-video-actions { justify-content: flex-end; }
   .course-video-speed { display: flex; align-items: center; gap: var(--space-2); font-size: .875rem; }
   .course-video-speed [data-slot="select-trigger"] { min-width: 5rem; }
@@ -1021,6 +1019,5 @@
     .course-lesson, .course-quiz, .course-finish-card { padding-top: 0; scroll-margin-block-start: 0; }
     .course-about details { display: block; }
     .course-desktop-summary { display: none; }
-    .course-video.theater { width: 100%; margin-inline: 0; }
   }
 }
