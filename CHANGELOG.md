@@ -9,6 +9,8 @@ No versions have been released. Package and MCP version strings do not constitut
 - Refine administrative tables and People progress with compact shared rows, quieter record metadata and persistent row-action menus. Make names edit links, show reporting teams in People, simplify row completion to a ring and percentage, and keep action menus visible while horizontally scrolling. Add direct Learning-group membership and assignment shortcuts, align Teams selection into a compact list, and use labeled icon counts for membership and hierarchy.
 
 
+- Prevent the account menu's ellipsis focus ring from lingering after pointer selection, while preserving keyboard focus restoration and dialog focus.
+
 - Preconfigure fresh and reset demos with codebase and thefieldbook.org links through the existing External links settings and account menu. Preserve saved browser settings until Reset demo.
 
 - Restore and reactivate exact-email Recently deleted users through CSV Import, with a non-blocking review warning and stable identity/history. Keep purge, inactive-user and access guards. Apply `20261003222648_roster_import_reactivation.sql` before deployment; it rewrites no existing data.
