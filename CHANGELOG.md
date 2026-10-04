@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Refine generated artwork across the original ten motif families and thirty recipes. Seed-driven rhythm, proportion and placement vary each composition; quieter linework and unoutlined color shapes add depth while preserving coherent geometry. Shuffle selects version 6; saved versions 1–5 and the version 2 fallback remain stable. Keep Identity palettes, text overlays, card layouts and save/upload behavior unchanged.
+- Refine generated artwork across the original ten motif families and thirty recipes. Seed-driven rhythm, proportion and placement vary each composition; quieter linework and unoutlined color shapes add depth while preserving coherent geometry. Refresh existing generated cards and automatic defaults to version 6 while preserving seeds and short titles; uploaded images remain unchanged. The refresh stays deterministic and needs no data rewrite. Keep Identity palettes, text overlays, card layouts and save/upload behavior unchanged.
 
 - Add one installation-branded Open Graph/Twitter image for every link, using only public name, canonical domain and accent. Use the Paper design with four evenly spaced page lines; private content remains protected. Keep the shared template separate for future customization, without new Admin controls. Patch Next.js to 16.3.6 for the image-renderer security fix.
 

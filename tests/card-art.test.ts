@@ -36,7 +36,7 @@ test("art seeds and fallback titles stay tied to an item, with many distinct arr
   const title = "Very long launch announcement for everyone";
   const a = resolvedCardArt("course-a", title);
   assert.equal(a.seed, stableArtSeed("course-a"));
-  assert.equal(a.version, 2);
+  assert.equal(a.version, 6);
   assert.equal(CARD_ART_VERSION, 6);
   assert.deepEqual(a, resolvedCardArt("course-a", title));
   assert.notEqual(a.seed, resolvedCardArt("course-b", title).seed);
@@ -56,7 +56,7 @@ test("art seeds and fallback titles stay tied to an item, with many distinct arr
   );
 });
 
-test("saved artwork versions and absent-art fallbacks are not silently upgraded", () => {
+test("generated artwork refreshes once to v6 without changing seeds, titles or uploads", () => {
   for (const version of [1, 2, 3, 4, 5, 6] as const) {
     const saved: CardArt = {
       source: "generated",
@@ -64,7 +64,13 @@ test("saved artwork versions and absent-art fallbacks are not silently upgraded"
       version,
       seed: 4294967295,
     };
-    assert.strictEqual(resolvedCardArt("item", "Renamed title", saved), saved);
+    const refreshed = resolvedCardArt("item", "Renamed title", saved);
+    assert.deepEqual(refreshed, { ...saved, version: 6 });
+    assert.equal(saved.version, version);
+    assert.strictEqual(
+      resolvedCardArt("item", "Renamed again", refreshed),
+      refreshed,
+    );
     const uploaded = {
       ...saved,
       source: "upload" as const,
@@ -76,7 +82,7 @@ test("saved artwork versions and absent-art fallbacks are not silently upgraded"
     );
   }
   const legacy = resolvedCardArt("item", "Original title");
-  assert.equal(legacy.version, 2);
+  assert.equal(legacy.version, 6);
   assert.equal(resolvedCardArt("item", "Renamed title").seed, legacy.seed);
   assert.equal(
     resolvedCardArt("item", "Renamed title").shortTitle,
@@ -87,6 +93,44 @@ test("saved artwork versions and absent-art fallbacks are not silently upgraded"
       .version,
     2,
   );
+});
+
+test("existing cards render the refreshed collection while catalog baselines remain historical", () => {
+  for (const kind of ["brief", "course", "curriculum"] as const) {
+    const props = { id: "existing-item", title: "Unchanged title", kind };
+    const saved: CardArt = {
+      source: "generated",
+      shortTitle: "A saved short title",
+      seed: 1234567890,
+      version: 6,
+    };
+    const expected = renderToStaticMarkup(
+      createElement(CardArtwork, { ...props, art: saved }),
+    );
+    for (const version of [1, 2, 3, 4, 5, 6] as const) {
+      const art = { ...saved, version };
+      assert.equal(
+        renderToStaticMarkup(createElement(CardArtwork, { ...props, art })),
+        expected,
+      );
+      assert.equal(art.version, version);
+    }
+    const historical = renderToStaticMarkup(
+      createElement(CardArtwork, {
+        ...props,
+        art: { ...saved, version: 5 },
+        preserveVersion: true,
+      }),
+    );
+    assert.match(historical, /data-generation="5"/);
+    assert.notEqual(historical, expected);
+    const automatic = renderToStaticMarkup(createElement(CardArtwork, props));
+    assert.match(automatic, /data-generation="6"/);
+    assert.equal(
+      automatic,
+      renderToStaticMarkup(createElement(CardArtwork, props)),
+    );
+  }
 });
 
 test("legacy SVG geometry matches the pre-v3 rendering fixtures", () => {
@@ -109,6 +153,7 @@ test("legacy SVG geometry matches the pre-v3 rendering fixtures", () => {
             title: "A title",
             kind: "course",
             category: "Build the essentials",
+            preserveVersion: true,
             art: {
               source: "generated",
               shortTitle: "Choose a problem worth solving",
@@ -360,7 +405,7 @@ test("current generator uses only the original thirty recipes and remains repeat
   }
 });
 
-test("locally saved prototype v4 choices stay frozen while Shuffle moves to the current version", () => {
+test("historical v4 geometry stays available for comparison and upload fallbacks", () => {
   const frames = [...Array.from({ length: 56 }, (_, i) => i), 4294967295].map(
     (seed) =>
       renderToStaticMarkup(
@@ -377,7 +422,7 @@ test("locally saved prototype v4 choices stay frozen while Shuffle moves to the 
   );
 });
 
-test("saved v5 drawings remain byte-stable after motif refinement", () => {
+test("historical v5 geometry stays available for comparison and upload fallbacks", () => {
   const frames = [...Array.from({ length: 30 }, (_, i) => i), 4294967295].map(
     (seed) =>
       renderToStaticMarkup(

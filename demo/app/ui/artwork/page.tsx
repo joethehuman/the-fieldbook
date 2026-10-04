@@ -109,6 +109,7 @@ function Comparison({
               kind="course"
               category={category}
               palette={palette}
+              preserveVersion={index === 0}
               art={{
                 source: "generated",
                 shortTitle: title,

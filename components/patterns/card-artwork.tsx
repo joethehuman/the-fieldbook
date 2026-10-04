@@ -651,6 +651,7 @@ export function CardArtwork({
   legacyCover,
   settings,
   palette,
+  preserveVersion = false,
 }: {
   id: string;
   title: string;
@@ -660,8 +661,13 @@ export function CardArtwork({
   legacyCover?: string;
   settings?: Pick<SiteSettings, "accent" | "cardPalette">;
   palette?: CardPalette;
+  /** Historical comparisons in the component catalog only. */
+  preserveVersion?: boolean;
 }) {
-  const resolved = resolvedCardArt(id, title, art, legacyCover);
+  const resolved =
+    preserveVersion && art
+      ? art
+      : resolvedCardArt(id, title, art, legacyCover);
   const colors = palette || resolvedCardPalette(settings);
   const dark = (resolved.seed >>> 8) % 3 !== 0;
   const surface = dark

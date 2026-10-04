@@ -225,6 +225,10 @@ for (const version of [2, 3, 4, 5, 6] as const) {
     await source.click();
     await page.getByRole("option", { name: "Generated", exact: true }).click();
     await expect(editor.locator(".card-artwork-geometry")).toBeVisible();
+    await expect(editor.locator(".card-artwork-geometry")).toHaveAttribute(
+      "data-generation",
+      "6",
+    );
     const generated = { ...item.cardArt, source: "generated" };
     await expect.poll(() => storedArt(page, item.id)).toEqual(generated);
     const rendered = await editor.locator(".card-artwork-geometry").innerHTML();

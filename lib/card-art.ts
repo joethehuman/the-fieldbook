@@ -2,6 +2,9 @@ import type { SiteSettings } from "./settings";
 import type { Content } from "./types";
 
 export const CARD_ART_VERSION = 6;
+// Deliberate collection refresh. Keep this floor fixed when future versions
+// are added so later releases do not silently redraw saved choices again.
+const CARD_ART_REFRESH_VERSION = 6;
 export const CARD_ART_COMPOSITIONS = 30;
 export type CardArt = {
   source: "generated" | "upload";
@@ -88,13 +91,15 @@ export function resolvedCardArt(
   art?: CardArt,
   legacyCover?: string,
 ): CardArt {
+  if (art?.source === "generated" && art.version < CARD_ART_REFRESH_VERSION)
+    return { ...art, version: CARD_ART_REFRESH_VERSION };
   return (
     art || {
       source: legacyCover ? "upload" : "generated",
       shortTitle: shortTitleFallback(title),
-      // Missing artwork predates a saved generator choice. Keep that visual
-      // fallback stable; Shuffle explicitly opts into CARD_ART_VERSION.
-      version: 2,
+      // Refresh generated defaults, retaining the deterministic item seed.
+      // Legacy uploads and their failure fallback keep their prior behavior.
+      version: legacyCover ? 2 : CARD_ART_REFRESH_VERSION,
       seed: stableArtSeed(id),
       imageUrl: legacyCover,
     }
