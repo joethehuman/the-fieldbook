@@ -138,23 +138,3 @@ export function resolvedCardPalette(
     accent2: mix(accent, "#ffffff", 0.35),
   };
 }
-export function isArtworkOnlyUpdate(
-  next: Content,
-  published: Content,
-): boolean {
-  if (next.kind !== "brief" || published.kind !== "brief") return false;
-  const editorial = (item: Content) =>
-    JSON.stringify([
-      item.title,
-      item.summary,
-      item.body,
-      item.category,
-      item.folder,
-      item.groups,
-      item.updateTeams || [],
-      item.lessons,
-      item.questions,
-      item.version,
-    ]);
-  return editorial(next) === editorial(published);
-}

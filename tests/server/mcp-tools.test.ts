@@ -304,6 +304,25 @@ test("real MCP content tools preserve drafts, normalize idempotent retries, enfo
         .path,
       "Guides / Setup",
     );
+    const updateDraft = await call(session.client, "create_content", {
+      request_id: id(3), content: { kind: "brief", title: "News", summary: "A useful update", category: "News", body: "The original text." },
+    });
+    assert.equal(updateDraft.error, false);
+    const updateFirst = await call(session.client, "publish_content", { id: id(3), expected_revision: 1 });
+    assert.equal(updateFirst.error, false);
+    docs.get(id(3))!.published!.feedAt = "2026-01-01T00:00:00.000Z";
+    const updateEdit = await call(session.client, "update_content", {
+      content: { ...updateFirst.value, body: "Corrected typo." }, expected_revision: 2,
+    });
+    assert.equal(updateEdit.error, false);
+    const updateCorrection = await call(session.client, "publish_content", { id: id(3), expected_revision: 3 });
+    assert.equal(updateCorrection.error, false);
+    assert.equal(updateCorrection.value.feedAt, "2026-01-01T00:00:00.000Z");
+    const updateRenewed = await call(session.client, "publish_content", { id: id(3), expected_revision: 4, renew_update: true });
+    assert.equal(updateRenewed.error, false);
+    assert.equal(updateRenewed.value.feedAt, updateRenewed.value.updatedAt);
+    assert.notEqual(updateRenewed.value.feedAt, updateCorrection.value.feedAt);
+    assert.equal((await call(session.client, "publish_content", { id: id(1), expected_revision: 3, renew_update: true })).error, true);
     const bumped = await call(session.client, "publish_content", {
       id: id(1),
       expected_revision: 3,

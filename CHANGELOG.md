@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Updates use an unchecked Bring this update to the top choice in Details → Publishing. Republishing corrections preserves feed position and For you freshness; selecting the choice deliberately renews the feed date. First publication remains current. Demo, installed publishing and MCP share the rule; course versions and completions are unchanged.
+
 - Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering and cross-section moves with drag origin/destination feedback, individual and bulk Move to actions, and a sticky Unsaved changes bar with Save/Discard. The bar opens smoothly as a connected header with continuous container borders and an immediate reduced-motion fallback; brief footer guidance spans the full grey area. Navigation changes preserve document drafts and published editorial content.
 
 - Size application table columns to content up to shared maximum measures, wrap long names and metadata, and reserve surplus width between the last data column and the pinned action menu. Apply the same sizing across administrative, reporting and review tables.

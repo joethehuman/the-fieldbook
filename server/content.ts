@@ -5,7 +5,10 @@ import { data as dataStore } from "./data";
 import { requirePublisher, HttpError } from "./auth";
 import { contentSignature } from "@/lib/demo-publication";
 import { contentDraftSchema, contentSchema } from "./schemas";
-import { isArtworkOnlyUpdate } from "@/lib/card-art";
+import {
+  publishedUpdateFeedDate,
+  type PublicationOptions,
+} from "@/lib/content-publication";
 import { videoSource } from "@/lib/video";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import {
@@ -56,11 +59,20 @@ export const canRead = cache(async (user: User | null) => {
   assertCanRead(user, config);
   return config;
 });
-export async function getContent(id: string, user: User | null, draft = false, publishedForEditing = false) {
+export async function getContent(
+  id: string,
+  user: User | null,
+  draft = false,
+  publishedForEditing = false,
+) {
   await canRead(user);
   if (draft || publishedForEditing) requirePublisher(user);
   const data = await dataStore().findDocument(id);
-  if (!data || data.deleted_at || ((!draft || publishedForEditing) && !data.published))
+  if (
+    !data ||
+    data.deleted_at ||
+    ((!draft || publishedForEditing) && !data.published)
+  )
     throw new HttpError(404, "Content not found.");
   if (publishedForEditing)
     return document({ ...data, draft: data.published }, true);
@@ -74,6 +86,7 @@ export async function saveContent(
   publish = false,
   source = "web",
   unpublish = false,
+  options: PublicationOptions = {},
 ) {
   requirePublisher(user);
   const parsed = (publish ? contentSchema : contentDraftSchema).safeParse(
@@ -85,6 +98,11 @@ export async function saveContent(
       parsed.error.issues.map((i) => i.message).join(" "),
     );
   const c = parsed.data;
+  if (options.renewUpdate && (c.kind !== "brief" || !publish))
+    throw new HttpError(
+      400,
+      "Only publishing an Update can renew its feed date.",
+    );
   const contributor = user.role === "contributor";
   if (publish && !c.summary.trim())
     throw new HttpError(400, "Add a short description before publishing.");
@@ -129,21 +147,39 @@ export async function saveContent(
     }
   }
   if (
-    c.assignments?.some((a) => (!a.groupId && !a.teamId) || (!!a.groupId && !!a.teamId) || a.userId || a.due.type !== "none")
+    c.assignments?.some(
+      (a) =>
+        (!a.groupId && !a.teamId) ||
+        (!!a.groupId && !!a.teamId) ||
+        a.userId ||
+        a.due.type !== "none",
+    )
   )
     throw new HttpError(
       400,
       "Assigned courses use teams or learning groups and organization windows.",
     );
   const old = await dataStore().findDocument(c.id);
-  if (contributor && c.kind === "brief" && JSON.stringify([...(c.updateTeams || [])].sort()) !== JSON.stringify([...(old?.draft.updateTeams || [])].sort()))
-    throw new HttpError(403, "Only administrators can change Update team assignments.");
+  if (
+    contributor &&
+    c.kind === "brief" &&
+    JSON.stringify([...(c.updateTeams || [])].sort()) !==
+      JSON.stringify([...(old?.draft.updateTeams || [])].sort())
+  )
+    throw new HttpError(
+      403,
+      "Only administrators can change Update team assignments.",
+    );
   if (c.updateTeams?.length && c.kind !== "brief")
     throw new HttpError(400, "Team recommendations apply only to Updates.");
   if (c.kind === "brief" && c.updateTeams?.length) {
     const config = await dataStore().readConfiguration();
     if (
-      c.updateTeams.some((id) => !config.teams.some((team) => team.id === id) && !old?.draft.updateTeams?.includes(id))
+      c.updateTeams.some(
+        (id) =>
+          !config.teams.some((team) => team.id === id) &&
+          !old?.draft.updateTeams?.includes(id),
+      )
     )
       throw new HttpError(
         400,
@@ -201,12 +237,19 @@ export async function saveContent(
     const audience = (groups: string[] = []) =>
       JSON.stringify([...groups].sort());
     const rules = (value: Content["assignments"] = []) =>
-      JSON.stringify(value.map(a => a.groupId ? `group:${a.groupId}` : `team:${a.teamId}`).sort());
+      JSON.stringify(
+        value
+          .map((a) => (a.groupId ? `group:${a.groupId}` : `team:${a.teamId}`))
+          .sort(),
+      );
     if (
       audience(c.groups) !== audience(old?.draft.groups) ||
       rules(c.assignments) !== rules(old?.draft.assignments)
     )
-      throw new HttpError(400, "Use the assignment picker to manage course audiences.");
+      throw new HttpError(
+        400,
+        "Use the assignment picker to manage course audiences.",
+      );
   }
   if (
     old &&
@@ -270,10 +313,6 @@ export async function saveContent(
     }
   }
   const now = new Date().toISOString();
-  const artOnlyUpdate =
-    publish &&
-    old?.published &&
-    isArtworkOnlyUpdate(c as Content, old.published as Content);
   const { revision, publishedRevision, ...clean } = c;
   const draft = {
     ...clean,
@@ -282,9 +321,11 @@ export async function saveContent(
     updatedAt: now,
     ...(c.kind === "brief"
       ? {
-          feedAt: artOnlyUpdate
-            ? old.published!.feedAt || old.published!.updatedAt
-            : now,
+          feedAt: publishedUpdateFeedDate(
+            old?.published as Content | null,
+            now,
+            options.renewUpdate,
+          ),
         }
       : {}),
   };

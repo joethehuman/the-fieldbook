@@ -58,7 +58,7 @@ Roles and team responsibilities are checked again on every request. A learning-g
 | `get_capabilities` | Discover effective permissions, missing consent, supported formats and manual guidance |
 | `search`, `fetch`, `get_authoring_options` | Find/read current drafts and select existing Docs sections and categories |
 | `create_content`, `update_content` | Save Docs, Updates and Courses as drafts with revision checks |
-| `publish_content`, `unpublish_content` | Explicit publication; major course changes can start a new version |
+| `publish_content`, `unpublish_content` | Explicit publication; major course changes can start a new version; Update corrections preserve feed date unless `renew_update=true` |
 | `list_media`, `prepare_media_upload`, `complete_media_upload` | Reuse ready media or prepare and verify an owned upload |
 | `get_reporting_scopes`, `learning_report` | Named learning reports filtered by teams, learning groups and courses |
 | `feedback_report` | Content/general feedback with names and comments |

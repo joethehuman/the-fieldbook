@@ -59,7 +59,7 @@ async function setup(
     }, data);
   }
   await page.goto(installed ? "/admin" : "/#admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("link", { name: item.title, exact: true }).click();
   await page
     .getByRole("textbox", {
       name:
@@ -91,6 +91,62 @@ async function setup(
         );
   return { read, before: item, data };
 }
+
+test("Update corrections preserve freshness and the Publishing checkbox renews only the next explicit Publish", async ({ page }, info) => {
+  const installed = info.project.name.startsWith("production");
+  const { read, before } = await setup(page, installed, "brief");
+  const feedDate = before.feedAt || before.updatedAt;
+  const details = page.getByRole("button", { name: /^Details/ });
+  const renewal = page.getByRole("checkbox", { name: "Bring this update to the top" });
+  const publish = page.getByRole("button", { name: "Publish", exact: true });
+  await details.click();
+  await expect(renewal).not.toBeChecked();
+  await page.screenshot({ path: info.outputPath("update-publishing.png"), fullPage: true });
+  await details.click();
+  await page.getByLabel("Title", { exact: true }).fill("A typo correction");
+  await expect.poll(async () => (await read()).title).toBe("A typo correction");
+  expect((await read(true)).title).toBe(before.title);
+  await publish.click();
+  await expect.poll(async () => (await read(true)).title).toBe("A typo correction");
+  expect((await read(true)).feedAt).toBe(feedDate);
+  await details.click();
+  await renewal.check();
+  await details.click();
+  await page.getByLabel("Title", { exact: true }).fill("An intentional renewed update");
+  await expect.poll(async () => (await read()).title).toBe("An intentional renewed update");
+  expect((await read(true)).feedAt).toBe(feedDate);
+  await details.click();
+  await expect(renewal).toBeChecked();
+  await details.click();
+  await publish.click();
+  await expect.poll(async () => (await read(true)).feedAt).not.toBe(feedDate);
+  const renewedDate = (await read(true)).feedAt;
+  await details.click();
+  await expect(renewal).not.toBeChecked();
+  await details.click();
+  await page.getByLabel("Title", { exact: true }).fill("A later minor correction");
+  await expect.poll(async () => (await read()).title).toBe("A later minor correction");
+  await publish.click();
+  await expect.poll(async () => (await read(true)).title).toBe("A later minor correction");
+  expect((await read(true)).feedAt).toBe(renewedDate);
+  if (installed) {
+    await details.click();
+    await renewal.check();
+    await details.click();
+    let publications = 0;
+    await page.route("**/api/content", async (route) => {
+      if (route.request().method() !== "POST" || !route.request().postDataJSON().publish) return route.continue();
+      publications++;
+      await route.fetch();
+      await route.abort("failed");
+    });
+    await publish.click();
+    await page.getByRole("button", { name: "Retry saving", exact: true }).click();
+    await details.click();
+    await expect(renewal).not.toBeChecked();
+    expect(publications).toBe(1);
+  }
+});
 
 test("Docs, Updates and Courses quietly save incomplete drafts, revert to Published and explicitly publish current edits", async ({
   page,
