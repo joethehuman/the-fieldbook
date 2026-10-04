@@ -1,9 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  MoreHorizontal,
   Plus,
-  Trash2,
   Network,
   UserRoundPlus,
 } from "lucide-react";
@@ -34,7 +32,11 @@ import {
 import { SaveRecoveryError } from "@/lib/save-recovery";
 import type { LearningHandler } from "./Assignments";
 import { Button } from "./ui/button";
-import { BulkActions } from "./patterns/bulk-actions";
+import {
+  BulkActions,
+  ItemActions,
+  type BulkCommand,
+} from "./patterns/bulk-actions";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { Input } from "./ui/input";
 import { Alert } from "./ui/alert";
@@ -51,13 +53,6 @@ import {
   DialogFooter,
 } from "./ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "./ui/dropdown-menu";
-import {
   TableBody,
   TableCell,
   TableHead,
@@ -69,7 +64,6 @@ import { useToast } from "./ui/toast";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { RecordName, RecordMeta } from "./patterns/record-row";
-import { RowActions } from "./patterns/row-actions";
 import { CountMetric } from "./ui/count-metric";
 import { DataTable } from "./patterns/data-table";
 import { OrderedLearning } from "./patterns/ordered-learning";
@@ -137,7 +131,10 @@ export default function LearningGroups({
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const [selected, setSelected] = useState(initialGroup || "");
-  const [indexAction, setIndexAction] = useState<{ id: string; kind: "people" | "courses" | "updates" } | null>(null);
+  const [indexAction, setIndexAction] = useState<{
+    id: string;
+    kind: "people" | "courses" | "updates";
+  } | null>(null);
   const startedIndexAction = useRef<typeof indexAction>(null);
   const [tab, setTab] = useState<string>(initialTab || "people");
   const [indexQuery, setIndexQuery] = useState("");
@@ -164,7 +161,9 @@ export default function LearningGroups({
   const notify = useToast();
   const { confirm } = useInteractionDialog();
   const destination = useRevealTarget<HTMLElement>();
-  const group = data.groups.find((candidate) => candidate.id === (indexAction?.id || selected));
+  const group = data.groups.find(
+    (candidate) => candidate.id === (indexAction?.id || selected),
+  );
   const teams = data.teams || [];
   const content = data.publishedContent || data.content;
   const published = content.filter((item) => item.status === "published");
@@ -381,6 +380,14 @@ export default function LearningGroups({
         updateSort,
       )
     : [];
+  const courseSelection = useBulkSelection(
+    `${group?.id}:courses:${query}`,
+    filteredItems.map(key),
+  );
+  const updateSelection = useBulkSelection(
+    `${group?.id}:updates:${query}`,
+    updates.map((item) => item.id),
+  );
   const count = tab === "people" ? filteredMembers.length : updates.length;
   const currentPage = Math.min(page, Math.max(1, Math.ceil(count / PAGE_SIZE)));
   const pageMembers = filteredMembers.slice(
@@ -591,35 +598,6 @@ export default function LearningGroups({
     setSourceTab("people");
     open(draft);
   }
-  async function deleteGroup() {
-    if (!group) return;
-    if (
-      await save(
-        {
-          ...data,
-          groups: data.groups.filter((candidate) => candidate.id !== group.id),
-          users: data.users.map((person) => ({
-            ...person,
-            groups: person.groups.filter((id) => id !== group.id),
-          })),
-        },
-        "Learning group deleted.",
-        {
-          review: {
-            title: `Delete ${group.name}?`,
-            description:
-              "Remove this learning group and its audience links. Courses and saved completions remain.",
-            confirmLabel: "Delete group",
-            always: true,
-          },
-        },
-      )
-    ) {
-      if (onDestinationChange) await onDestinationChange();
-      setSelected("");
-      destination.reveal();
-    }
-  }
   async function applyEditor() {
     if (!editor) return;
     if (editor.kind === "create" || editor.kind === "rename") {
@@ -788,10 +766,323 @@ export default function LearningGroups({
     if (!indexAction || startedIndexAction.current === indexAction) return;
     startedIndexAction.current = indexAction;
     if (indexAction.kind === "people") openMembership();
-    else if (indexAction.kind === "updates") open({ kind: "updates", ids: [], snapshot: learningSnapshot() });
+    else if (indexAction.kind === "updates")
+      open({ kind: "updates", ids: [], snapshot: learningSnapshot() });
     else void editAssignments("add").finally(() => setIndexAction(null));
   }, [indexAction]);
 
+  function groupCommands(selectedIds: string[]): BulkCommand[] {
+    return [
+      ...groupAudienceCommands(selectedIds),
+      ...[
+        {
+          id: "delete-groups",
+          label: "Delete groups",
+          itemLabel: "Delete group",
+          description:
+            "Remove selected groups and their audience links. Courses and saved completions remain.",
+          destructive: true,
+          externalReview: true,
+          disabledReason:
+            busy || needsConversion
+              ? "Finish the current change first."
+              : undefined,
+          successMessage: "Groups deleted.",
+          apply: async (_: string[], ids: string[] = []) => {
+            if (
+              currentIndexSnapshot.current !== indexSnapshot ||
+              ids.some(
+                (id) => !data.groups.some((candidate) => candidate.id === id),
+              )
+            )
+              throw new Error(
+                "Groups, people or learning changed. Review the current list before retrying.",
+              );
+            if (saving.current)
+              throw new Error("Finish the current change first.");
+            saving.current = true;
+            setBusy(true);
+            try {
+              const deleting = new Set(ids);
+              await onChange(
+                {
+                  ...data,
+                  groups: data.groups.filter(
+                    (candidate) => !deleting.has(candidate.id),
+                  ),
+                  users: data.users.map((person) => ({
+                    ...person,
+                    groups: person.groups.filter((id) => !deleting.has(id)),
+                  })),
+                },
+                {
+                  locallyHandled: true,
+                  validateCurrent: () => {
+                    if (currentIndexSnapshot.current !== indexSnapshot)
+                      throw new Error(
+                        "Groups, people or learning changed. Review the current list before retrying.",
+                      );
+                  },
+                  review: {
+                    title: `Delete ${ids.length} learning ${ids.length === 1 ? "group" : "groups"}?`,
+                    description: `${data.groups
+                      .filter((candidate) => deleting.has(candidate.id))
+                      .map((candidate) => candidate.name)
+                      .join(
+                        ", ",
+                      )}. Remove these groups and their audience links. Courses and saved completions remain.`,
+                    confirmLabel:
+                      ids.length === 1 ? "Delete group" : "Delete groups",
+                    destructive: true,
+                    always: true,
+                  },
+                },
+              );
+              if (ids.includes(selected)) {
+                if (onDestinationChange) await onDestinationChange();
+                setSelected("");
+                destination.reveal();
+              }
+            } finally {
+              saving.current = false;
+              setBusy(false);
+            }
+          },
+        },
+      ],
+    ];
+  }
+  function memberCommands(selectedIds: string[]): BulkCommand[] {
+    if (!group) return [];
+    return [
+      {
+        id: "remove-direct",
+        label: "Remove direct members",
+        itemLabel: "Remove direct membership",
+        description:
+          "Remove individual membership. Linked team membership stays in place.",
+        externalReview: true,
+        destructive: true,
+        successMessage: "Direct membership removed.",
+        disabledReason:
+          busy || needsConversion
+            ? "Finish the current change first."
+            : selectedIds.some(
+                  (id) =>
+                    !members
+                      .find((person) => person.id === id)
+                      ?.groups.includes(group.id),
+                )
+              ? "Select only people with Direct membership. Team membership is managed through linked teams."
+              : undefined,
+        apply: async (_: string[], ids: string[] = []) => {
+          if (currentOrganization.current !== rosterSnapshot)
+            throw new Error(
+              "People, teams or groups changed. Review the current list before retrying.",
+            );
+          if (saving.current)
+            throw new Error("Finish the current change first.");
+          saving.current = true;
+          setBusy(true);
+          try {
+            await onChange(
+              {
+                ...data,
+                users: data.users.map((person) =>
+                  ids.includes(person.id)
+                    ? {
+                        ...person,
+                        groups: person.groups.filter((id) => id !== group.id),
+                      }
+                    : person,
+                ),
+              },
+              {
+                locallyHandled: true,
+                review: {
+                  title: "Remove direct members?",
+                  confirmLabel: "Remove direct members",
+                  description:
+                    "Remove individual membership from this group. Anyone also included through a linked team stays in the group.",
+                  always: true,
+                },
+              },
+            );
+          } finally {
+            saving.current = false;
+            setBusy(false);
+          }
+        },
+      },
+    ];
+  }
+  function assignedCourseCommands(ids: string[]): BulkCommand[] {
+    return [
+      {
+        id: "remove",
+        label: "Remove courses",
+        itemLabel: "Remove assignment",
+        description:
+          "Remove these direct course or curriculum assignments. Other audience sources and saved history remain.",
+        externalReview: true,
+        disabledReason:
+          busy || needsConversion
+            ? "Finish the current change first."
+            : undefined,
+        apply: async () => {
+          if (group)
+            await assignmentPicker.open(
+              {
+                kind: "audiences",
+                keys: [`group:${group.id}`],
+                mode: "remove",
+                selected: ids,
+              },
+              group.name,
+            );
+        },
+      },
+    ];
+  }
+  function assignedUpdateCommands(ids: string[]): BulkCommand[] {
+    return [
+      {
+        id: "remove",
+        label: "Remove updates",
+        itemLabel: "Remove update",
+        description:
+          "Remove these relevant Updates from the group. Published Updates remain available throughout the installation.",
+        disabledReason:
+          busy || needsConversion
+            ? "Finish the current change first."
+            : undefined,
+        apply: async () => {
+          if (group)
+            await learnMany(
+              ids.map((contentId) => ({
+                operation: "untarget",
+                contentId,
+                groupId: group.id,
+                expected:
+                  data.content.find((item) => item.id === contentId)
+                    ?.revision || 0,
+              })),
+            );
+        },
+      },
+    ];
+  }
+  function groupAudienceCommands(selectedIds: string[]): BulkCommand[] {
+    const disabledReason =
+      busy || needsConversion ? "Finish the current change first." : undefined;
+    return [
+      ...([true, false] as const).map((add): BulkCommand => ({
+        id: add ? "add-people" : "remove-people",
+        label: add ? "Add people" : "Remove people",
+        disabledReason,
+        description:
+          "Change direct users and linked teams for these groups. Other membership sources and saved learning history remain. Linked teams include their subteams.",
+        options: [
+          ...teams.map((team) => ({
+            id: `team:${team.id}`,
+            label: `Team: ${teamPath(team.id, teams)}`,
+          })),
+          ...data.users.map((user) => ({
+            id: `user:${user.id}`,
+            label: user.name,
+            description: user.email,
+          })),
+        ],
+        apply: async (values) => {
+          if (currentIndexSnapshot.current !== indexSnapshot)
+            throw new Error(
+              "Groups, people or learning changed. Review the current list before retrying.",
+            );
+          const userIds = values
+            .filter((id) => id.startsWith("user:"))
+            .map((id) => id.slice(5));
+          const teamIds = values
+            .filter((id) => id.startsWith("team:"))
+            .map((id) => id.slice(5));
+          await onChange({
+            ...data,
+            groups: data.groups.map((g) => {
+              if (!selectedIds.includes(g.id)) return g;
+              const links = groupTeamLinks(g);
+              const subtree = links
+                .filter((link) => link.scope === "subtree")
+                .map((link) => link.teamId);
+              const direct = links
+                .filter((link) => link.scope === "direct")
+                .map((link) => link.teamId);
+              return {
+                ...g,
+                teamLinkScope: "subtree",
+                teamIds: add
+                  ? [...new Set([...subtree, ...teamIds])]
+                  : subtree.filter((id) => !teamIds.includes(id)),
+                legacyDirectTeamIds: direct.filter(
+                  (id) => !teamIds.includes(id),
+                ),
+              };
+            }),
+            users: data.users.map((user) =>
+              !userIds.includes(user.id)
+                ? user
+                : {
+                    ...user,
+                    groups: add
+                      ? [...new Set([...user.groups, ...selectedIds])]
+                      : user.groups.filter((id) => !selectedIds.includes(id)),
+                  },
+            ),
+          });
+        },
+      })),
+      ...([true, false] as const).map((add): BulkCommand => ({
+        id: add ? "assign-courses" : "remove-courses",
+        label: add ? "Assign courses" : "Remove courses",
+        disabledReason,
+        description:
+          "Change direct course or curriculum assignments. Other audience sources and saved history remain.",
+        externalReview: true,
+        apply: async () => {
+          await assignmentPicker.open(
+            {
+              kind: "audiences",
+              keys: selectedIds.map((id) => `group:${id}`),
+              mode: add ? "add" : "remove",
+            },
+            `${selectedIds.length} ${selectedIds.length === 1 ? "group" : "groups"}`,
+          );
+        },
+      })),
+      ...([true, false] as const).map((add): BulkCommand => ({
+        id: add ? "assign-updates" : "remove-updates",
+        label: add ? "Assign updates" : "Remove updates",
+        disabledReason,
+        description:
+          "Change relevant Updates for these groups. Published Updates remain available throughout the installation.",
+        options: published
+          .filter((item) => item.kind === "brief")
+          .map((item) => ({ id: item.id, label: item.title })),
+        apply: async (values) => {
+          await learnMany(
+            values.flatMap((contentId) =>
+              selectedIds.map((groupId) => ({
+                operation: add ? "target" : "untarget",
+                contentId,
+                groupId,
+                expected:
+                  data.content.find((item) => item.id === contentId)
+                    ?.revision || 0,
+              })),
+            ),
+          );
+        },
+      })),
+    ];
+  }
   return (
     <section
       {...destination.targetProps}
@@ -802,8 +1093,8 @@ export default function LearningGroups({
       {notice && !editor && <Alert variant="destructive">{notice}</Alert>}
       {needsConversion && (
         <Alert>
-          These groups still use the previous hierarchy. Convert groups
-          before editing their audiences or learning.
+          These groups still use the previous hierarchy. Convert groups before
+          editing their audiences or learning.
         </Alert>
       )}
       {!selected || !group ? (
@@ -888,7 +1179,6 @@ export default function LearningGroups({
           <BulkActions
             selected={groupSelection.actionIds}
             collectionSize={groups.length}
-            singleItemActions={false}
             noun="groups"
             range={
               groups.length
@@ -896,78 +1186,7 @@ export default function LearningGroups({
                 : "0 groups"
             }
             onSelectionChange={groupSelection.setSelected}
-            commands={[
-              {
-                id: "delete-groups",
-                label: "Delete groups",
-                description:
-                  "Remove selected groups and their audience links. Courses and saved completions remain.",
-                destructive: true,
-                externalReview: true,
-                disabledReason:
-                  busy || needsConversion
-                    ? "Finish the current change first."
-                    : undefined,
-                successMessage: "Groups deleted.",
-                apply: async (_, ids = []) => {
-                  if (
-                    currentIndexSnapshot.current !== indexSnapshot ||
-                    ids.some(
-                      (id) =>
-                        !data.groups.some((candidate) => candidate.id === id),
-                    )
-                  )
-                    throw new Error(
-                      "Groups, people or learning changed. Review the current list before retrying.",
-                    );
-                  if (saving.current)
-                    throw new Error("Finish the current change first.");
-                  saving.current = true;
-                  setBusy(true);
-                  try {
-                    const deleting = new Set(ids);
-                    await onChange(
-                      {
-                        ...data,
-                        groups: data.groups.filter(
-                          (candidate) => !deleting.has(candidate.id),
-                        ),
-                        users: data.users.map((person) => ({
-                          ...person,
-                          groups: person.groups.filter(
-                            (id) => !deleting.has(id),
-                          ),
-                        })),
-                      },
-                      {
-                        locallyHandled: true,
-                        validateCurrent: () => {
-                          if (currentIndexSnapshot.current !== indexSnapshot)
-                            throw new Error(
-                              "Groups, people or learning changed. Review the current list before retrying.",
-                            );
-                        },
-                        review: {
-                          title: `Delete ${ids.length} learning ${ids.length === 1 ? "group" : "groups"}?`,
-                          description: `${data.groups
-                            .filter((candidate) => deleting.has(candidate.id))
-                            .map((candidate) => candidate.name)
-                            .join(
-                              ", ",
-                            )}. Remove these groups and their audience links. Courses and saved completions remain.`,
-                          confirmLabel:
-                            ids.length === 1 ? "Delete group" : "Delete groups",
-                          always: true,
-                        },
-                      },
-                    );
-                  } finally {
-                    saving.current = false;
-                    setBusy(false);
-                  }
-                },
-              },
-            ]}
+            commands={groupCommands(groupSelection.actionIds)}
           >
             {groupSelection.canSelect &&
               pageGroups.every((candidate) =>
@@ -1084,18 +1303,26 @@ export default function LearningGroups({
                           {courseCount(candidate)}
                         </TableCell>
                         <TableCell>
-                          <RowActions
+                          <ItemActions
+                            id={candidate.id}
                             label={candidate.name}
                             disabled={busy}
+                            noun="groups"
                             actions={[
                               {
                                 label: "Edit group",
                                 onSelect: () => openGroup(candidate.id),
                               },
-                              { label: "Add people", separator: true, disabled: needsConversion, onSelect: () => setIndexAction({ id: candidate.id, kind: "people" }) },
-                              { label: "Assign courses", disabled: needsConversion || !learningSelectionOptions(data, { kind: "audiences", keys: [`group:${candidate.id}`], mode: "add" }).length, onSelect: () => setIndexAction({ id: candidate.id, kind: "courses" }) },
-                              { label: "Assign updates", disabled: needsConversion || !published.some((item) => item.kind === "brief" && !item.groups.includes(candidate.id)), onSelect: () => setIndexAction({ id: candidate.id, kind: "updates" }) },
                             ]}
+                            commands={groupCommands([candidate.id])}
+                            onSelectionChange={(ids) => {
+                              if (!ids.length)
+                                groupSelection.setSelected(
+                                  groupSelection.selected.filter(
+                                    (id) => id !== candidate.id,
+                                  ),
+                                );
+                            }}
                           />
                         </TableCell>
                       </TableRow>
@@ -1146,39 +1373,24 @@ export default function LearningGroups({
             title={<h2>{group.name}</h2>}
             description={`${members.length} ${members.length === 1 ? "user" : "users"} · ${courseCount(group)} ${courseCount(group) === 1 ? "course" : "courses"}`}
           >
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Group settings"
-                  disabled={busy || needsConversion}
-                >
-                  <MoreHorizontal aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onSelect={() =>
+            <ItemActions
+              id={group.id}
+              label={group.name}
+              disabled={busy || needsConversion}
+              noun="groups"
+              commands={groupCommands([group.id])}
+              actions={[
+                {
+                  label: "Rename group",
+                  onSelect: () =>
                     open({
                       kind: "rename",
                       name: group.name,
                       original: group.name,
-                    })
-                  }
-                >
-                  Rename group
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onSelect={() => void deleteGroup()}
-                >
-                  Delete group
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                    }),
+                },
+              ]}
+            />
           </SectionHeader>
           <Tabs
             value={tab}
@@ -1234,7 +1446,33 @@ export default function LearningGroups({
                     </Button>
                   }
                 />
+                <BulkActions
+                  collectionSize={courseSelection.collectionSize}
+                  selected={courseSelection.actionIds}
+                  onSelectionChange={courseSelection.setSelected}
+                  noun="assignments"
+                  commands={assignedCourseCommands(courseSelection.actionIds)}
+                />
                 <OrderedLearning
+                  selected={courseSelection.selected}
+                  onSelectionChange={courseSelection.setSelected}
+                  renderActions={(item, actions) => (
+                    <ItemActions
+                      id={item.id}
+                      label={item.label}
+                      disabled={busy || needsConversion}
+                      actions={actions.filter((a) => a.label !== "Remove")}
+                      commands={assignedCourseCommands([item.id])}
+                      onSelectionChange={(ids) => {
+                        if (!ids.length)
+                          courseSelection.setSelected(
+                            courseSelection.selected.filter(
+                              (id) => id !== item.id,
+                            ),
+                          );
+                      }}
+                    />
+                  )}
                   items={filteredItems.map((item) => {
                     const curriculum =
                       item.kind === "curriculum"
@@ -1391,7 +1629,6 @@ export default function LearningGroups({
                 <BulkActions
                   selected={rosterSelection.actionIds}
                   collectionSize={filteredMembers.length}
-                  singleItemActions={false}
                   noun="people"
                   range={
                     filteredMembers.length
@@ -1399,68 +1636,7 @@ export default function LearningGroups({
                       : "0 people"
                   }
                   onSelectionChange={rosterSelection.setSelected}
-                  commands={[
-                    {
-                      id: "remove-direct",
-                      label: "Remove direct members",
-                      description:
-                        "Remove individual membership. Linked team membership stays in place.",
-                      externalReview: true,
-                      destructive: true,
-                      successMessage: "Direct membership removed.",
-                      disabledReason:
-                        busy || needsConversion
-                          ? "Finish the current change first."
-                          : rosterSelection.actionIds.some(
-                                (id) =>
-                                  !members
-                                    .find((person) => person.id === id)
-                                    ?.groups.includes(group.id),
-                              )
-                            ? "Select only people with Direct membership. Team membership is managed through linked teams."
-                            : undefined,
-                      apply: async (_, ids = []) => {
-                        if (currentOrganization.current !== rosterSnapshot)
-                          throw new Error(
-                            "People, teams or groups changed. Review the current list before retrying.",
-                          );
-                        if (saving.current)
-                          throw new Error("Finish the current change first.");
-                        saving.current = true;
-                        setBusy(true);
-                        try {
-                          await onChange(
-                            {
-                              ...data,
-                              users: data.users.map((person) =>
-                                ids.includes(person.id)
-                                  ? {
-                                      ...person,
-                                      groups: person.groups.filter(
-                                        (id) => id !== group.id,
-                                      ),
-                                    }
-                                  : person,
-                              ),
-                            },
-                            {
-                              locallyHandled: true,
-                              review: {
-                                title: "Remove direct members?",
-                                confirmLabel: "Remove direct members",
-                                description:
-                                  "Remove individual membership from this group. Anyone also included through a linked team stays in the group.",
-                                always: true,
-                              },
-                            },
-                          );
-                        } finally {
-                          saving.current = false;
-                          setBusy(false);
-                        }
-                      },
-                    },
-                  ]}
+                  commands={memberCommands(rosterSelection.actionIds)}
                 >
                   {rosterSelection.canSelect &&
                     pageMembers.every((person) =>
@@ -1503,6 +1679,9 @@ export default function LearningGroups({
                           <TableHead>User</TableHead>
                           <TableHead>Reporting team</TableHead>
                           <TableHead>Included through</TableHead>
+                          <TableHead>
+                            <span className="sr-only">Actions</span>
+                          </TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -1558,6 +1737,23 @@ export default function LearningGroups({
                                 )?.name || "No direct team"}
                               </TableCell>
                               <TableCell>{sources.join(" · ")}</TableCell>
+                              <TableCell>
+                                <ItemActions
+                                  id={person.id}
+                                  label={person.name}
+                                  disabled={busy}
+                                  noun="people"
+                                  commands={memberCommands([person.id])}
+                                  onSelectionChange={(ids) => {
+                                    if (!ids.length)
+                                      rosterSelection.setSelected(
+                                        rosterSelection.selected.filter(
+                                          (id) => id !== person.id,
+                                        ),
+                                      );
+                                  }}
+                                />
+                              </TableCell>
                             </TableRow>
                           );
                         })}
@@ -1650,6 +1846,13 @@ export default function LearningGroups({
                     </FormField>
                   }
                 />
+                <BulkActions
+                  collectionSize={updateSelection.collectionSize}
+                  selected={updateSelection.actionIds}
+                  onSelectionChange={updateSelection.setSelected}
+                  noun="updates"
+                  commands={assignedUpdateCommands(updateSelection.actionIds)}
+                />
                 {updates.length ? (
                   <TableContainer>
                     <DataTable
@@ -1658,6 +1861,21 @@ export default function LearningGroups({
                     >
                       <TableHeader>
                         <TableRow>
+                          <TableHead>
+                            {updateSelection.canSelect && (
+                              <SelectRows
+                                ids={updates
+                                  .slice(
+                                    (currentPage - 1) * PAGE_SIZE,
+                                    currentPage * PAGE_SIZE,
+                                  )
+                                  .map((item) => item.id)}
+                                value={updateSelection.selected}
+                                onChange={updateSelection.setSelected}
+                                label="Select this page of Updates"
+                              />
+                            )}
+                          </TableHead>
                           <TableHead>Update</TableHead>
                           <TableHead>Category</TableHead>
                           <TableHead>
@@ -1673,36 +1891,40 @@ export default function LearningGroups({
                           )
                           .map((item) => (
                             <TableRow key={item.id}>
+                              <TableCell>
+                                {updateSelection.canSelect && (
+                                  <Checkbox
+                                    aria-label={`Select ${item.title}`}
+                                    disabled={busy || needsConversion}
+                                    checked={updateSelection.selected.includes(
+                                      item.id,
+                                    )}
+                                    onCheckedChange={(value) =>
+                                      updateSelection.toggle(
+                                        item.id,
+                                        value === true,
+                                      )
+                                    }
+                                  />
+                                )}
+                              </TableCell>
                               <TableCell>{item.title}</TableCell>
                               <TableCell>{item.category || "—"}</TableCell>
                               <TableCell className="text-right">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="icon"
+                                <ItemActions
+                                  id={item.id}
+                                  label={item.title}
                                   disabled={busy || needsConversion}
-                                  aria-label={`Remove ${item.title} from group`}
-                                  onClick={() =>
-                                    void run(
-                                      () =>
-                                        learnMany([
-                                          {
-                                            operation: "untarget",
-                                            contentId: item.id,
-                                            groupId: group.id,
-                                            expected:
-                                              data.content.find(
-                                                (candidate) =>
-                                                  candidate.id === item.id,
-                                              )?.revision || 0,
-                                          },
-                                        ]),
-                                      "Update removed from group.",
-                                    )
-                                  }
-                                >
-                                  <Trash2 aria-hidden="true" />
-                                </Button>
+                                  commands={assignedUpdateCommands([item.id])}
+                                  onSelectionChange={(ids) => {
+                                    if (!ids.length)
+                                      updateSelection.setSelected(
+                                        updateSelection.selected.filter(
+                                          (id) => id !== item.id,
+                                        ),
+                                      );
+                                  }}
+                                />
                               </TableCell>
                             </TableRow>
                           ))}

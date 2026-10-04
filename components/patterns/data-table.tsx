@@ -16,15 +16,15 @@ const layouts = {
     "w-16",
   ],
   peopleSelection: ["w-12", "w-[28%]", "w-[24%]", "w-28", "", "w-16"],
-  deleted: ["w-12", "w-[30%]", "w-[20%]", "w-[20%]", "w-[24%]"],
+  deleted: ["w-12", "w-[30%]", "w-[20%]", "w-[20%]", "", "w-16"],
   progress: ["w-[28%]", "w-[17%]", "w-[17%]", "w-[12%]", "w-[11%]", "w-[15%]"],
   content: ["w-[33%]", "w-[12%]", "w-[15%]", "w-[10%]", "w-[30%]"],
   people: ["w-[26%]", "w-[12%]", "w-[23%]", "w-[11%]", "w-[28%]"],
   learningGroupsSelectable: ["w-12", "", "w-[18%]", "w-[18%]", "w-16"],
   learningGroups: ["w-[64%]", "w-[18%]", "w-[18%]"],
-  groupMembersSelectable: ["w-12", "w-[36%]", "w-[25%]", "w-[33%]"],
+  groupMembersSelectable: ["w-12", "w-[36%]", "w-[25%]", "", "w-16"],
   groupMembers: ["w-[40%]", "w-[25%]", "w-[35%]"],
-  groupUpdates: ["w-[65%]", "w-[25%]", "w-[10%]"],
+  groupUpdates: ["w-12", "", "w-[25%]", "w-16"],
   assignmentGroups: ["w-10", "w-[70%]", "w-[20%]"],
   teamBranches: ["", "w-[32%]", "w-[20%]", "w-16"],
   teamMembers: ["", "w-[35%]", "w-16"],
@@ -53,6 +53,9 @@ export function DataTable({
       data-layout={layout}
       density={density}
       pinActions={[
+        "groupUpdates",
+        "deleted",
+        "groupMembersSelectable",
         "contentSelection",
         "peopleSelection",
         "learningGroupsSelectable",
@@ -92,7 +95,8 @@ export function DataTable({
             : "min-w-208",
         (layout === "rosterReviewPeople" || layout === "rosterReviewTeams") &&
           "min-w-144",
-        density === "compact" && layout.startsWith("roster") &&
+        density === "compact" &&
+          layout.startsWith("roster") &&
           "text-caption [&_td]:px-2 [&_td]:py-2 [&_th]:whitespace-nowrap [&_th]:px-2 [&_th]:py-2",
         className,
       )}

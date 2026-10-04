@@ -1,12 +1,16 @@
 "use client";
 import { DetailNavigation } from "./patterns/detail-navigation";
 
-import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
+import {
+  BulkActions,
+  ItemActions,
+  type BulkCommand,
+} from "./patterns/bulk-actions";
 import { Checkbox } from "./ui/choice";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import {
@@ -32,13 +36,6 @@ import {
   HierarchyBrowser,
   hierarchyBrowserMatches,
 } from "./patterns/hierarchy-browser";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "./ui/dropdown-menu";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { SelectField } from "./ui/select";
@@ -429,74 +426,6 @@ export function TeamsAdmin({
       );
     }
   }
-  async function deleteTeam(value: Team) {
-    if (!(await guard.current())) return;
-    resetDraft();
-    let next: Workspace;
-    try {
-      next = deleteTeams(data, [value.id]);
-    } catch (error) {
-      setNotice((error as Error).message);
-      destination.reveal();
-      return;
-    }
-    const count = data.users.filter((user) => user.teamId === value.id).length;
-    const snapshot = teamMutationSnapshot(data);
-    if (
-      await commit(
-        next,
-        "Team deleted. Its direct users moved to Organization.",
-        false,
-        {
-          validateCurrent: () => {
-            if (teamMutationSnapshot(latestData.current) !== snapshot)
-              throw new Error(
-                "The organization changed. Reload and review the team deletion again.",
-              );
-            deleteTeams(latestData.current, [value.id]);
-          },
-          review: {
-            title: `Delete ${value.name}?`,
-            description: `Permanently remove this team. ${count} direct users will move to Organization, not its parent team. Surviving subteams move to Organization with their users and nested branches. Accounts and history remain. Deleted teams cannot be restored.`,
-            confirmLabel: "Delete team",
-            always: true,
-          },
-        },
-      )
-    ) {
-      if (onDestinationChange) await onDestinationChange();
-      setSelected("");
-      setBrowseId(
-        value.parentId === organization?.id ? "" : value.parentId || "",
-      );
-      setHierarchyQuery("");
-      setBrowserReveal(undefined);
-      browserTarget.reveal();
-    }
-  }
-  async function removeMember(user: User) {
-    if (!team || user.teamId !== team.id || saving.current) return;
-    if (
-      await commit(
-        {
-          ...data,
-          users: data.users.map((u) =>
-            u.id === user.id ? { ...u, teamId: undefined } : u,
-          ),
-        },
-        "Member returned to Organization.",
-        false,
-        {
-          review: {
-            title: "Review membership changes",
-            description: `Remove ${user.name} from ${team.name}. They return to Organization. Their account and saved progress are kept.`,
-            confirmLabel: "Remove member",
-          },
-        },
-      )
-    )
-      memberList.reveal();
-  }
   const memberTeam = (user: User) => reportingTeamId(user.teamId, teams);
   const direct = data.users.filter((u) => memberTeam(u) === selected);
   const descendants = new Set(
@@ -551,6 +480,247 @@ export function TeamsAdmin({
     teams.find((team) => team.id === reportingTeamId(id, teams))?.name ||
     "No team";
 
+  function teamCommands(selectedIds: string[]): BulkCommand[] {
+    return [
+      ...([true, false] as const).map((add) => ({
+        id: add ? "add-groups" : "remove-groups",
+        label: add ? "Add to groups" : "Remove from groups",
+        description:
+          "Linked teams include all subteams. Review assignment changes before saving; accounts and saved progress are preserved.",
+        options: data.groups.map((g) => ({
+          id: g.id,
+          label: groupPath(g.id, data.groups),
+        })),
+        apply: async (ids: string[]) => {
+          if (
+            !(await commit(
+              {
+                ...data,
+                groups: data.groups.map((g) => {
+                  if (!ids.includes(g.id)) return g;
+                  const links = groupTeamLinks(g);
+                  const subtree = links
+                    .filter((link) => link.scope === "subtree")
+                    .map((link) => link.teamId);
+                  const directOnly = links
+                    .filter((link) => link.scope === "direct")
+                    .map((link) => link.teamId);
+                  return {
+                    ...g,
+                    teamLinkScope: "subtree" as const,
+                    teamIds: add
+                      ? [...new Set([...subtree, ...selectedIds])]
+                      : subtree.filter((id) => !selectedIds.includes(id)),
+                    legacyDirectTeamIds: directOnly.filter(
+                      (id) => !selectedIds.includes(id),
+                    ),
+                  };
+                }),
+              },
+              "Team links updated.",
+              true,
+            ))
+          )
+            throw new Error("Could not save team links.");
+        },
+      })),
+      {
+        id: "move",
+        label: "Move selected teams",
+        itemLabel: "Move team",
+        description:
+          "Move each selected team with its subteams. Direct members, learning-group links, and history stay attached; manager reporting access follows the new hierarchy.",
+        options: [
+          {
+            id: "root",
+            label: organization?.name || "Top level",
+          },
+          ...teams
+            .filter((t) => t.id !== organization?.id)
+            .map((t) => ({
+              id: t.id,
+              label: teamPath(t.id, teams),
+            })),
+        ],
+        selectionMode: "single" as const,
+        review: (values: string[], ids: string[]) => {
+          try {
+            if (
+              ids.some((id) =>
+                [...ancestorIds(id, teams)].some(
+                  (ancestor) => ancestor !== id && ids.includes(ancestor),
+                ),
+              )
+            )
+              throw new Error("Select a parent or a subteam, not both.");
+            const destination = values[0] === "root" ? "" : values[0];
+            let working = data;
+            const impacts = ids.map((id) => {
+              const impact = teamMoveImpact(working, id, destination);
+              working = { ...working, teams: impact.next };
+              return impact;
+            });
+            return (
+              <ul className="text-copy">
+                {impacts.map((impact) => (
+                  <li key={impact.from}>
+                    {impact.from} → {impact.to}
+                  </li>
+                ))}
+              </ul>
+            );
+          } catch (error) {
+            return <p role="alert">{(error as Error).message}</p>;
+          }
+        },
+        apply: async (values: string[], ids: string[] = []) => {
+          if (
+            ids.some((id) =>
+              [...ancestorIds(id, teams)].some(
+                (ancestor) => ancestor !== id && ids.includes(ancestor),
+              ),
+            )
+          )
+            throw new Error("Select a parent or a subteam, not both.");
+          const destination = values[0] === "root" ? "" : values[0];
+          let next = teams;
+          for (const id of ids) next = moveTeam(next, id, destination);
+          if (
+            !(await commit(
+              { ...data, teams: next },
+              "Team branches moved.",
+              true,
+            ))
+          )
+            throw new Error("Could not save the team move.");
+        },
+      },
+      {
+        id: "delete",
+        label: "Delete selected teams",
+        itemLabel: "Delete team",
+        description:
+          "Direct users and surviving subteams move to Organization. Accounts and their history remain. Deleted teams cannot be restored.",
+        destructive: true,
+        externalReview: true,
+        successMessage:
+          "Teams deleted. Their direct users moved to Organization.",
+        apply: async (_values: string[], ids: string[] = []) => {
+          const snapshot = teamMutationSnapshot(data);
+          const next = deleteTeams(data, ids);
+          const count = data.users.filter(
+            (user) => user.teamId && ids.includes(user.teamId),
+          ).length;
+          const validateCurrent = () => {
+            if (teamMutationSnapshot(latestData.current) !== snapshot)
+              throw new Error(
+                "The organization changed. Reload and review the team deletion again.",
+              );
+            deleteTeams(latestData.current, ids);
+          };
+          if (
+            !(await commit(next, "Teams deleted.", true, {
+              validateCurrent,
+              review: {
+                title: `Delete ${ids.length} ${ids.length === 1 ? "team" : "teams"}?`,
+                description: `Permanently remove these selected teams. ${count} direct users will move to Organization, not the deleted teams' parents. Surviving subteams move to Organization with their users and nested branches. Accounts and history remain. Deleted teams cannot be restored.`,
+                confirmLabel: "Delete teams",
+                destructive: true,
+                always: true,
+              },
+            }))
+          )
+            throw new Error("Could not delete the teams.");
+          setBrowseId("");
+          if (ids.includes(selected)) {
+            if (onDestinationChange) await onDestinationChange();
+            setSelected("");
+            setHierarchyQuery("");
+            setBrowserReveal(undefined);
+            browserTarget.reveal();
+          }
+        },
+      },
+    ] as BulkCommand[];
+  }
+  function memberCommands(selectedIds: string[]): BulkCommand[] {
+    if (!team) return [];
+    return [
+      {
+        id: "remove",
+        label: "Remove from team",
+        description:
+          "Return direct members to Organization. Reporting and team-linked assignments change; saved history remains.",
+        disabledReason: managingOrganization
+          ? "People without a named team always belong to Organization. Move them to a team instead."
+          : undefined,
+        apply: async () => {
+          if (
+            !(await commit(
+              {
+                ...data,
+                users: data.users.map((u) =>
+                  selectedIds.includes(u.id) && memberTeam(u) === team.id
+                    ? { ...u, teamId: undefined }
+                    : u,
+                ),
+              },
+              "Members returned to Organization.",
+              true,
+              {
+                review: {
+                  title: "Review membership changes",
+                  confirmLabel: "Remove members",
+                },
+              },
+            ))
+          )
+            throw new Error("Could not save members.");
+        },
+      },
+      {
+        id: "move",
+        label: "Move to team",
+        description:
+          "Move these direct members to one destination team. Manager reporting and team-linked assignments change; saved history remains.",
+        selectionMode: "single",
+        options: teams
+          .filter((t) => t.id !== team.id)
+          .map((t) => ({
+            id: t.id,
+            label: teamPath(t.id, teams),
+          })),
+        apply: async (ids) => {
+          if (
+            !(await commit(
+              {
+                ...data,
+                users: data.users.map((u) =>
+                  selectedIds.includes(u.id) && memberTeam(u) === team.id
+                    ? {
+                        ...u,
+                        teamId:
+                          ids[0] === organization?.id ? undefined : ids[0],
+                      }
+                    : u,
+                ),
+              },
+              "Members moved.",
+              true,
+              {
+                review: {
+                  title: "Review membership changes",
+                  confirmLabel: "Move members",
+                },
+              },
+            ))
+          )
+            throw new Error("Could not save members.");
+        },
+      },
+    ];
+  }
+
   function teamTable(rows: Team[]) {
     return rows.length ? (
       <TableContainer>
@@ -588,14 +758,18 @@ export function TeamsAdmin({
                   {data.users.filter((u) => u.teamId === t.id).length}
                 </TableCell>
                 <TableCell>
-                  <RowActions
+                  <ItemActions
+                    id={t.id}
                     label={t.name}
                     disabled={busy}
+                    noun="teams"
+                    commands={teamCommands([t.id])}
                     actions={[
                       {
                         label: "Manage team",
                         onSelect: () => void openTeam(t.id),
                       },
+                      { label: "Edit team", onSelect: () => void editTeam(t) },
                     ]}
                   />
                 </TableCell>
@@ -684,191 +858,11 @@ export function TeamsAdmin({
           selectionActions={
             selectTeams ? (
               <BulkActions
-                singleItemActions={false}
                 collectionSize={teamSelection.collectionSize}
                 selected={teamSelection.actionIds}
                 onSelectionChange={teamSelection.setSelected}
                 noun="teams"
-                commands={
-                  [
-                    ...([true, false] as const).map((add) => ({
-                      id: add ? "add-groups" : "remove-groups",
-                      label: add
-                        ? "Add to groups"
-                        : "Remove from groups",
-                      description:
-                        "Linked teams include all subteams. Review assignment changes before saving; accounts and saved progress are preserved.",
-                      options: data.groups.map((g) => ({
-                        id: g.id,
-                        label: groupPath(g.id, data.groups),
-                      })),
-                      apply: async (ids: string[]) => {
-                        if (
-                          !(await commit(
-                            {
-                              ...data,
-                              groups: data.groups.map((g) => {
-                                if (!ids.includes(g.id)) return g;
-                                const links = groupTeamLinks(g);
-                                const subtree = links
-                                  .filter((link) => link.scope === "subtree")
-                                  .map((link) => link.teamId);
-                                const directOnly = links
-                                  .filter((link) => link.scope === "direct")
-                                  .map((link) => link.teamId);
-                                return {
-                                  ...g,
-                                  teamLinkScope: "subtree" as const,
-                                  teamIds: add
-                                    ? [
-                                        ...new Set([
-                                          ...subtree,
-                                          ...teamSelection.actionIds,
-                                        ]),
-                                      ]
-                                    : subtree.filter(
-                                        (id) =>
-                                          !teamSelection.actionIds.includes(id),
-                                      ),
-                                  legacyDirectTeamIds: directOnly.filter(
-                                    (id) =>
-                                      !teamSelection.actionIds.includes(id),
-                                  ),
-                                };
-                              }),
-                            },
-                            "Team links updated.",
-                            true,
-                          ))
-                        )
-                          throw new Error("Could not save team links.");
-                      },
-                    })),
-                    {
-                      id: "move",
-                      label: "Move selected teams",
-                      description:
-                        "Move each selected team with its subteams. Direct members, learning-group links, and history stay attached; manager reporting access follows the new hierarchy.",
-                      options: [
-                        {
-                          id: "root",
-                          label: organization?.name || "Top level",
-                        },
-                        ...teams
-                          .filter((t) => t.id !== organization?.id)
-                          .map((t) => ({
-                            id: t.id,
-                            label: teamPath(t.id, teams),
-                          })),
-                      ],
-                      selectionMode: "single" as const,
-                      review: (values: string[], ids: string[]) => {
-                        try {
-                          if (
-                            ids.some((id) =>
-                              [...ancestorIds(id, teams)].some(
-                                (ancestor) =>
-                                  ancestor !== id && ids.includes(ancestor),
-                              ),
-                            )
-                          )
-                            throw new Error(
-                              "Select a parent or a subteam, not both.",
-                            );
-                          const destination =
-                            values[0] === "root" ? "" : values[0];
-                          let working = data;
-                          const impacts = ids.map((id) => {
-                            const impact = teamMoveImpact(
-                              working,
-                              id,
-                              destination,
-                            );
-                            working = { ...working, teams: impact.next };
-                            return impact;
-                          });
-                          return (
-                            <ul className="text-copy">
-                              {impacts.map((impact) => (
-                                <li key={impact.from}>
-                                  {impact.from} → {impact.to}
-                                </li>
-                              ))}
-                            </ul>
-                          );
-                        } catch (error) {
-                          return <p role="alert">{(error as Error).message}</p>;
-                        }
-                      },
-                      apply: async (values: string[], ids: string[] = []) => {
-                        if (
-                          ids.some((id) =>
-                            [...ancestorIds(id, teams)].some(
-                              (ancestor) =>
-                                ancestor !== id && ids.includes(ancestor),
-                            ),
-                          )
-                        )
-                          throw new Error(
-                            "Select a parent or a subteam, not both.",
-                          );
-                        const destination =
-                          values[0] === "root" ? "" : values[0];
-                        let next = teams;
-                        for (const id of ids)
-                          next = moveTeam(next, id, destination);
-                        if (
-                          !(await commit(
-                            { ...data, teams: next },
-                            "Team branches moved.",
-                            true,
-                          ))
-                        )
-                          throw new Error("Could not save the team move.");
-                      },
-                    },
-                    {
-                      id: "delete",
-                      label: "Delete selected teams",
-                      description:
-                        "Direct users and surviving subteams move to Organization. Accounts and their history remain. Deleted teams cannot be restored.",
-                      destructive: true,
-                      externalReview: true,
-                      successMessage:
-                        "Teams deleted. Their direct users moved to Organization.",
-                      apply: async (_values: string[], ids: string[] = []) => {
-                        const snapshot = teamMutationSnapshot(data);
-                        const next = deleteTeams(data, ids);
-                        const count = data.users.filter(
-                          (user) => user.teamId && ids.includes(user.teamId),
-                        ).length;
-                        const validateCurrent = () => {
-                          if (
-                            teamMutationSnapshot(latestData.current) !==
-                            snapshot
-                          )
-                            throw new Error(
-                              "The organization changed. Reload and review the team deletion again.",
-                            );
-                          deleteTeams(latestData.current, ids);
-                        };
-                        if (
-                          !(await commit(next, "Teams deleted.", true, {
-                            validateCurrent,
-                            review: {
-                              title: `Delete ${ids.length} ${ids.length === 1 ? "team" : "teams"}?`,
-                              description: `Permanently remove these selected teams. ${count} direct users will move to Organization, not the deleted teams' parents. Surviving subteams move to Organization with their users and nested branches. Accounts and history remain. Deleted teams cannot be restored.`,
-                              confirmLabel: "Delete teams",
-                              always: true,
-                            },
-                          }))
-                        )
-                          throw new Error("Could not delete the teams.");
-                        setBrowseId("");
-                      },
-                    },
-                  ] as BulkCommand[]
-                }
+                commands={teamCommands(teamSelection.actionIds)}
               />
             ) : undefined
           }
@@ -882,6 +876,16 @@ export function TeamsAdmin({
           onEdit={(id) =>
             void editTeam(teams.find((value) => value.id === id)!)
           }
+          renderActions={(item, actions) => (
+            <ItemActions
+              id={item.id}
+              label={item.label}
+              disabled={busy}
+              noun="teams"
+              actions={actions}
+              commands={teamCommands([item.id])}
+            />
+          )}
           items={hierarchyItems}
         />
       </div>
@@ -921,45 +925,28 @@ export function TeamsAdmin({
                   {managingOrganization ? "Edit manager" : "Edit team details"}
                 </Button>
                 {!managingOrganization && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        disabled={busy}
-                        aria-label="Team actions"
-                      >
-                        <MoreHorizontal aria-hidden="true" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onSelect={() => void startMove("out", team.id)}
-                      >
-                        Move team
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() =>
+                  <ItemActions
+                    id={team.id}
+                    label={team.name}
+                    disabled={busy}
+                    noun="teams"
+                    commands={teamCommands([team.id])}
+                    actions={[
+                      {
+                        label: "Create subteam",
+                        onSelect: () =>
                           void editTeam({
                             id: crypto.randomUUID(),
                             name: "",
                             parentId: team.id,
-                          })
-                        }
-                      >
-                        Create subteam
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => void startMove("into", team.id)}
-                      >
-                        Move existing team here
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onSelect={() => void deleteTeam(team)}>
-                        Delete team
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                          }),
+                      },
+                      {
+                        label: "Move existing team here",
+                        onSelect: () => void startMove("into", team.id),
+                      },
+                    ]}
+                  />
                 )}
               </ActionGroup>
             </SectionHeader>
@@ -1106,7 +1093,6 @@ export function TeamsAdmin({
                 }
               />
               <BulkActions
-                singleItemActions={managingOrganization}
                 collectionSize={rosterSelection.collectionSize}
                 selected={rosterSelection.actionIds}
                 onSelectionChange={rosterSelection.setSelected}
@@ -1116,84 +1102,7 @@ export function TeamsAdmin({
                     ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, members.length)} of ${members.length} people`
                     : "0 people"
                 }
-                commands={[
-                  {
-                    id: "remove",
-                    label: "Remove from team",
-                    description:
-                      "Return direct members to Organization. Reporting and team-linked assignments change; saved history remains.",
-                    disabledReason: managingOrganization
-                      ? "People without a named team always belong to Organization. Move them to a team instead."
-                      : undefined,
-                    apply: async () => {
-                      if (
-                        !(await commit(
-                          {
-                            ...data,
-                            users: data.users.map((u) =>
-                              rosterSelection.actionIds.includes(u.id) &&
-                              memberTeam(u) === team.id
-                                ? { ...u, teamId: undefined }
-                                : u,
-                            ),
-                          },
-                          "Members returned to Organization.",
-                          true,
-                          {
-                            review: {
-                              title: "Review membership changes",
-                              confirmLabel: "Remove members",
-                            },
-                          },
-                        ))
-                      )
-                        throw new Error("Could not save members.");
-                    },
-                  },
-                  {
-                    id: "move",
-                    label: "Move to team",
-                    description:
-                      "Move these direct members to one destination team. Manager reporting and team-linked assignments change; saved history remains.",
-                    selectionMode: "single",
-                    options: teams
-                      .filter((t) => t.id !== team.id)
-                      .map((t) => ({
-                        id: t.id,
-                        label: teamPath(t.id, teams),
-                      })),
-                    apply: async (ids) => {
-                      if (
-                        !(await commit(
-                          {
-                            ...data,
-                            users: data.users.map((u) =>
-                              rosterSelection.actionIds.includes(u.id) &&
-                              memberTeam(u) === team.id
-                                ? {
-                                    ...u,
-                                    teamId:
-                                      ids[0] === organization?.id
-                                        ? undefined
-                                        : ids[0],
-                                  }
-                                : u,
-                            ),
-                          },
-                          "Members moved.",
-                          true,
-                          {
-                            review: {
-                              title: "Review membership changes",
-                              confirmLabel: "Move members",
-                            },
-                          },
-                        ))
-                      )
-                        throw new Error("Could not save members.");
-                    },
-                  },
-                ]}
+                commands={memberCommands(rosterSelection.actionIds)}
               />
               {members.length ? (
                 <TableContainer>
@@ -1280,28 +1189,33 @@ export function TeamsAdmin({
                                   : teamName(u.teamId)}
                             </TableCell>
                             <TableCell>
-                              {!managingOrganization && (
+                              {memberTeam(u) === team.id ? (
+                                <ItemActions
+                                  id={u.id}
+                                  label={u.name}
+                                  disabled={busy}
+                                  noun="people"
+                                  commands={memberCommands([u.id])}
+                                  onSelectionChange={(ids) => {
+                                    if (!ids.length)
+                                      rosterSelection.setSelected(
+                                        rosterSelection.selected.filter(
+                                          (id) => id !== u.id,
+                                        ),
+                                      );
+                                  }}
+                                />
+                              ) : (
                                 <RowActions
                                   label={u.name}
                                   disabled={busy}
-                                  actions={
-                                    memberTeam(u) === selected
-                                      ? [
-                                          {
-                                            label: "Remove from team",
-                                            destructive: true,
-                                            onSelect: () =>
-                                              void removeMember(u),
-                                          },
-                                        ]
-                                      : [
-                                          {
-                                            label: "Manage team",
-                                            onSelect: () =>
-                                              void openTeam(memberTeam(u)!),
-                                          },
-                                        ]
-                                  }
+                                  actions={[
+                                    {
+                                      label: "Manage team",
+                                      onSelect: () =>
+                                        void openTeam(memberTeam(u)!),
+                                    },
+                                  ]}
                                 />
                               )}
                             </TableCell>

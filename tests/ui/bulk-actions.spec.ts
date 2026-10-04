@@ -30,21 +30,24 @@ test("content selection, explicit deletion, recovery and clean navigation", asyn
   await expect(
     page.getByRole("region", { name: "Selected items" }),
   ).toContainText("1 selected");
-  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
-  await page.getByRole("menuitem", { name: "Delete selected" }).click();
+  await expect(
+    page.getByRole("button", { name: "Bulk actions", exact: true }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: `Actions for ${original.title}`, exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Delete" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toContainText("30 days");
   await expect(
-    dialog.getByRole("button", { name: "Delete selected", exact: true }),
+    dialog.getByRole("button", { name: "Delete", exact: true }),
   ).toBeDisabled();
   await dialog.getByRole("checkbox").check();
   await expect(
-    dialog.getByRole("button", { name: "Delete selected", exact: true }),
+    dialog.getByRole("button", { name: "Delete", exact: true }),
   ).toBeEnabled();
   await page.screenshot({ path: info.outputPath("delete-warning.png") });
-  await dialog
-    .getByRole("button", { name: "Delete selected", exact: true })
-    .click();
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(
     page.getByRole("checkbox", {
       name: "Select Bulk recovery fixture",
@@ -59,7 +62,9 @@ test("content selection, explicit deletion, recovery and clean navigation", asyn
   await expect(
     page.getByRole("button", { name: "Bulk actions", exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "Actions", exact: true }).click();
+  await page
+    .getByRole("button", { name: `Actions for ${original.title}`, exact: true })
+    .click();
   await page.getByRole("menuitem", { name: "Restore", exact: true }).click();
   await page
     .getByRole("dialog")
@@ -312,10 +317,10 @@ test("collection size controls bulk visibility and keeps single-item actions", a
   await example
     .getByRole("checkbox", { name: "Select Example course 1", exact: true })
     .check();
-  // One selected out of three still has the bulk menu.
+  // One selected out of three retains a disabled bulk menu.
   await expect(
     example.getByRole("button", { name: "Bulk actions", exact: true }),
-  ).toBeVisible();
+  ).toBeDisabled();
   await example
     .getByRole("checkbox", { name: "Select Example course 2", exact: true })
     .check();
@@ -333,7 +338,9 @@ test("collection size controls bulk visibility and keeps single-item actions", a
   await expect(
     example.getByRole("region", { name: "Selected items" }),
   ).toHaveCount(0);
-  await example.getByRole("button", { name: "Actions", exact: true }).click();
+  await example
+    .getByRole("button", { name: "Actions for Example course 3", exact: true })
+    .click();
   await page
     .getByRole("menuitem", { name: "Remove from example", exact: true })
     .click();

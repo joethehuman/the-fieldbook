@@ -52,10 +52,7 @@ export function useBulkSelection(
   }, [ids.length, selected.length]);
   return {
     selected: selected.filter((id) => eligibleIds.includes(id)),
-    actionIds:
-      ids.length === 1
-        ? eligibleIds
-        : selected.filter((id) => eligibleIds.includes(id)),
+    actionIds: selected.filter((id) => eligibleIds.includes(id)),
     collectionSize: ids.length,
     canSelect: canBulkSelect(ids.length),
     setSelected,

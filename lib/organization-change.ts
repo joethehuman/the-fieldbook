@@ -14,6 +14,7 @@ export type OrganizationChangeOptions = {
     title?: string;
     description?: string;
     confirmLabel?: string;
+    destructive?: boolean;
     /** Destructive changes still require confirmation when there are no assignment effects. */
     always?: boolean;
   };

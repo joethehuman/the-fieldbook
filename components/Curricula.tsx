@@ -4,7 +4,11 @@ import {
   CollectionEmpty,
 } from "./patterns/collection-controls";
 import { DetailNavigation } from "./patterns/detail-navigation";
-import { BulkActions } from "./patterns/bulk-actions";
+import {
+  BulkActions,
+  ItemActions,
+  type BulkCommand,
+} from "./patterns/bulk-actions";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { Checkbox } from "./ui/choice";
 import { curriculumGroupCommands } from "./bulk-relationships";
@@ -37,7 +41,6 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Plus, GraduationCap, Users } from "lucide-react";
 import { RecordName, RecordValues } from "./patterns/record-row";
 import { RecordCardFooter, RecordCardDetail } from "./patterns/record-card";
-import { RowActions, type RowAction } from "./patterns/row-actions";
 import { audienceOptions, contentAudienceKey } from "@/lib/content-audiences";
 import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
 import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
@@ -225,43 +228,107 @@ export default function Curricula({
       setBusy(false);
     }
   }
-  async function remove(c: Curriculum) {
-    setBusy(true);
-    try {
-      await onChange(
-        {
-          ...data,
-          teams: data.teams?.map((team) => ({
-            ...team,
-            learningItems: team.learningItems?.filter(
-              (item) => item.kind !== "curriculum" || item.id !== c.id,
+  function draftCourseCommands(ids: string[]): BulkCommand[] {
+    if (!editing) return [];
+    return [
+      {
+        id: "remove",
+        label: "Remove from curriculum",
+        successMessage:
+          "Course links removed from this draft. Save the curriculum to apply.",
+        description:
+          "Remove these course links. Course content and history remain. Save the curriculum to apply the changes.",
+        apply: () =>
+          setEditing({
+            ...editing,
+            courseIds: editing.courseIds.filter((id) => !ids.includes(id)),
+          }),
+      },
+    ];
+  }
+  function curriculumCommands(ids: string[]): BulkCommand[] {
+    return [
+      ...([true, false] as const).map((published) => ({
+        id: published ? "publish" : "unpublish",
+        label: published ? "Publish selected" : "Unpublish selected",
+        description: published
+          ? "Make these curricula available in the library. Each must contain published courses."
+          : "Return these curricula to draft. Remove their team and group links first. Course history is preserved.",
+        apply: async () => {
+          if (
+            published &&
+            all.some(
+              (c) =>
+                ids.includes(c.id) &&
+                (!c.courseIds.length ||
+                  c.courseIds.some(
+                    (id) =>
+                      !content.some(
+                        (p) => p.id === id && p.status === "published",
+                      ),
+                  )),
+            )
+          )
+            throw new Error(
+              "Each curriculum needs at least one published course and no unavailable courses.",
+            );
+          if (!published && ids.some((id) => linked(id).length))
+            throw new Error(
+              "Remove team and group links before unpublishing these curricula.",
+            );
+          await onChange({
+            ...data,
+            curricula: all.map((c) =>
+              ids.includes(c.id)
+                ? { ...c, status: published ? "published" : "draft" }
+                : c,
             ),
-          })),
-          curricula: all.filter((x) => x.id !== c.id),
-          groups: data.groups.map((g) => ({
-            ...g,
-            learningItems: groupItems(g, content).filter(
-              (i) => i.kind !== "curriculum" || i.id !== c.id,
-            ),
-          })),
+          });
         },
-        {
-          review: {
-            title: `Delete ${c.name}?`,
-            description:
-              "Its team and group links are removed. Course content and saved completion stay available.",
-            confirmLabel: "Delete curriculum",
-            always: true,
-          },
+      })),
+      ...curriculumGroupCommands(data, ids, onChange, assignmentPicker.open),
+      {
+        id: "delete",
+        label: "Delete selected curricula",
+        itemLabel: "Delete curriculum",
+        description:
+          "Remove curricula and their team and group links. Course content and saved learning history remain.",
+        destructive: true,
+        externalReview: true,
+        apply: async () => {
+          await onChange(
+            {
+              ...data,
+              curricula: all.filter((c) => !ids.includes(c.id)),
+              teams: data.teams?.map((team) => ({
+                ...team,
+                learningItems: team.learningItems?.filter(
+                  (item) =>
+                    item.kind !== "curriculum" || !ids.includes(item.id),
+                ),
+              })),
+              groups: data.groups.map((g) => ({
+                ...g,
+                learningItems: groupItems(g, content).filter(
+                  (item) =>
+                    item.kind !== "curriculum" || !ids.includes(item.id),
+                ),
+              })),
+            },
+            {
+              review: {
+                title: `Delete ${ids.length} ${ids.length === 1 ? "curriculum" : "curricula"}?`,
+                description:
+                  "Their team and group links are removed. Course content and saved completion stay available.",
+                confirmLabel: "Delete curricula",
+                destructive: true,
+                always: true,
+              },
+            },
+          );
         },
-      );
-      setNotice("");
-      notify("Curriculum deleted. Learning history preserved.");
-    } catch (e) {
-      if (!isOrganizationChangeCanceled(e)) setNotice((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
+      },
+    ];
   }
   return (
     <section
@@ -359,29 +426,29 @@ export default function Curricula({
               />
             </ActionGroup>
             <BulkActions
-              singleItemActions={false}
               collectionSize={selection.collectionSize}
               selected={selection.actionIds}
               onSelectionChange={selection.setSelected}
-              commands={[
-                {
-                  id: "remove",
-                  label: "Remove from curriculum",
-                  successMessage:
-                    "Course links removed from this draft. Save the curriculum to apply.",
-                  description:
-                    "Remove these course links. Course content and history remain. Save the curriculum to apply the changes.",
-                  apply: () =>
-                    setEditing({
-                      ...editing,
-                      courseIds: editing.courseIds.filter(
-                        (id) => !selection.actionIds.includes(id),
-                      ),
-                    }),
-                },
-              ]}
+              commands={draftCourseCommands(selection.actionIds)}
             />
             <OrderedLearning
+              renderActions={(item, actions) => (
+                <ItemActions
+                  id={item.id}
+                  label={item.label}
+                  disabled={busy}
+                  actions={actions.filter(
+                    (action) => action.label !== "Remove",
+                  )}
+                  commands={draftCourseCommands([item.id])}
+                  onSelectionChange={(ids) => {
+                    if (!ids.length)
+                      selection.setSelected(
+                        selection.selected.filter((id) => id !== item.id),
+                      );
+                  }}
+                />
+              )}
               selected={selection.selected}
               onSelectionChange={selection.setSelected}
               items={editing.courseIds.map((id) => ({
@@ -523,60 +590,11 @@ export default function Curricula({
             </FormField>
           </CollectionControls>
           <BulkActions
-            singleItemActions={false}
             collectionSize={selection.collectionSize}
             selected={selection.actionIds}
             onSelectionChange={selection.setSelected}
             noun="curricula"
-            commands={[
-              ...([true, false] as const).map((published) => ({
-                id: published ? "publish" : "unpublish",
-                label: published ? "Publish selected" : "Unpublish selected",
-                description: published
-                  ? "Make these curricula available in the library. Each must contain published courses."
-                  : "Return these curricula to draft. Remove their team and group links first. Course history is preserved.",
-                apply: async () => {
-                  if (
-                    published &&
-                    all.some(
-                      (c) =>
-                        selection.actionIds.includes(c.id) &&
-                        (!c.courseIds.length ||
-                          c.courseIds.some(
-                            (id) =>
-                              !content.some(
-                                (p) => p.id === id && p.status === "published",
-                              ),
-                          )),
-                    )
-                  )
-                    throw new Error(
-                      "Each curriculum needs at least one published course and no unavailable courses.",
-                    );
-                  if (
-                    !published &&
-                    selection.actionIds.some((id) => linked(id).length)
-                  )
-                    throw new Error(
-                      "Remove team and group links before unpublishing these curricula.",
-                    );
-                  await onChange({
-                    ...data,
-                    curricula: all.map((c) =>
-                      selection.actionIds.includes(c.id)
-                        ? { ...c, status: published ? "published" : "draft" }
-                        : c,
-                    ),
-                  });
-                },
-              })),
-              ...curriculumGroupCommands(
-                data,
-                selection.actionIds,
-                onChange,
-                assignmentPicker.open,
-              ),
-            ]}
+            commands={curriculumCommands(selection.actionIds)}
           />
           {selection.canSelect && (
             <div className="flex items-center gap-3">
@@ -614,23 +632,28 @@ export default function Curricula({
                     : audience.name;
               });
               const actions = (assign?: () => void, loading = false) => (
-                <RowActions
+                <ItemActions
+                  id={c.id}
                   label={c.name}
                   disabled={busy || loading}
-                  actions={
-                    [
-                      { label: "Edit curriculum", onSelect: edit },
-                      ...(assign
-                        ? [{ label: "Edit audience", onSelect: assign }]
-                        : []),
-                      {
-                        label: "Delete curriculum",
-                        onSelect: () => void remove(c),
-                        destructive: true,
-                        separator: true,
-                      },
-                    ] satisfies RowAction[]
-                  }
+                  noun="curricula"
+                  actions={[
+                    { label: "Edit curriculum", onSelect: edit },
+                    ...(assign
+                      ? [{ label: "Edit audience", onSelect: assign }]
+                      : []),
+                  ]}
+                  commands={curriculumCommands([c.id]).filter(
+                    (command) =>
+                      command.id !==
+                      (c.status === "published" ? "publish" : "unpublish"),
+                  )}
+                  onSelectionChange={(ids) => {
+                    if (!ids.length)
+                      selection.setSelected(
+                        selection.selected.filter((id) => id !== c.id),
+                      );
+                  }}
                 />
               );
               const footer = (assign?: () => void, loading = false) => (

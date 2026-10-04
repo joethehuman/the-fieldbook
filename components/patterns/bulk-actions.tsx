@@ -6,7 +6,6 @@ import {
   SearchableSelectionList,
   type SelectionOption,
 } from "./searchable-selection-list";
-import { ActionGroup } from "../ui/action-group";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/choice";
 import { Field } from "../ui/field";
@@ -30,9 +29,11 @@ import {
   DropdownMenuSeparator,
 } from "../ui/dropdown-menu";
 import { useToast } from "../ui/toast";
+import { RowActions, type RowAction } from "./row-actions";
 export type BulkCommand = {
   id: string;
   label: string;
+  itemLabel?: string;
   description: string;
   successMessage?: string;
   applyLabel?: string;
@@ -60,7 +61,7 @@ export function BulkActions({
   selected,
   collectionSize,
   range,
-  singleItemActions = true,
+  item,
   onSelectionChange,
   commands,
   noun = "items",
@@ -69,13 +70,14 @@ export function BulkActions({
   selected: string[];
   collectionSize: number;
   range?: string;
-  /** Omit the fallback when ordinary row/editor actions already cover this collection. */
-  singleItemActions?: boolean;
+  /** Individual entry point using the same commands and consequence reviews. */
+  item?: { label: string; actions?: RowAction[]; disabled?: boolean };
   onSelectionChange: (ids: string[]) => void;
   commands: BulkCommand[];
   noun?: string;
   children?: ReactNode;
 }) {
+  selected = [...new Set(selected)];
   const [active, setActive] = useState<{
     command: BulkCommand;
     ids: string[];
@@ -93,7 +95,23 @@ export function BulkActions({
   } | null>(null);
   const command = active?.command;
   const commandLabel = (c: BulkCommand) =>
-    collectionSize === 1 ? c.label.replace(/\bselected ?/, "").trim() : c.label;
+    item ? c.itemLabel || c.label.replace(/\bselected ?/, "").trim() : c.label;
+  const choose = (c: BulkCommand) => {
+    if (!item && new Set(selected).size < 2) return;
+    if (c.disabledReason || running.current) return;
+    if (c.externalReview && !c.options && !c.field && !c.acknowledgment) {
+      void applyExternal(c, [...selected]);
+      return;
+    }
+    setActive({
+      command: { ...c, label: commandLabel(c) },
+      ids: [...selected],
+    });
+    setResultNotice(null);
+    setValues([]);
+    setAck(false);
+    setError("");
+  };
   const applyExternal = async (command: BulkCommand, ids: string[]) => {
     if (running.current) return;
     running.current = true;
@@ -128,9 +146,9 @@ export function BulkActions({
           ref={menuTrigger}
           type="button"
           variant="outline"
-          disabled={busy || !selected.length}
+          disabled={busy || new Set(selected).size < 2}
         >
-          {collectionSize > 1 ? "Bulk actions" : "Actions"}
+          Bulk actions
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent>
@@ -146,25 +164,7 @@ export function BulkActions({
                   ? "text-destructive focus:text-destructive"
                   : undefined
               }
-              onSelect={() => {
-                if (
-                  c.externalReview &&
-                  !c.options &&
-                  !c.field &&
-                  !c.acknowledgment
-                ) {
-                  void applyExternal(c, [...selected]);
-                  return;
-                }
-                setActive({
-                  command: { ...c, label: commandLabel(c) },
-                  ids: [...selected],
-                });
-                setResultNotice(null);
-                setValues([]);
-                setAck(false);
-                setError("");
-              }}
+              onSelect={() => choose(c)}
             >
               {commandLabel(c)}
             </DropdownMenuItem>
@@ -180,7 +180,25 @@ export function BulkActions({
   );
   return (
     <>
-      {collectionSize > 1 ? (
+      {item ? (
+        <RowActions
+          label={item.label}
+          disabled={busy || item.disabled}
+          actions={[
+            ...(item.actions || []),
+            ...commands.map((c, i) => ({
+              label: commandLabel(c),
+              disabled: !!c.disabledReason,
+              disabledReason: c.disabledReason,
+              destructive: c.destructive,
+              separator:
+                (i === 0 && !!item.actions?.length) ||
+                (!!c.destructive && !commands[i - 1]?.destructive),
+              onSelect: () => choose(c),
+            })),
+          ]}
+        />
+      ) : collectionSize > 1 ? (
         <BulkSelectionBar
           count={selected.length}
           total={collectionSize}
@@ -195,9 +213,6 @@ export function BulkActions({
           <p role="status" className="text-copy text-muted-foreground">
             {range || `${collectionSize} ${noun}`}
           </p>
-          {singleItemActions &&
-            collectionSize === 1 &&
-            selected.length === 1 && <ActionGroup>{menu}</ActionGroup>}
         </div>
       )}
       {resultNotice && (
@@ -229,7 +244,8 @@ export function BulkActions({
           >
             <DialogTitle>{command.label}</DialogTitle>
             <DialogDescription>
-              {active.ids.length} {noun} selected. {command.description}
+              {item ? item.label : `${active.ids.length} ${noun} selected`}.{" "}
+              {command.description}
             </DialogDescription>
             {error && <Alert variant="destructive">{error}</Alert>}
             {command.options &&
@@ -341,5 +357,35 @@ export function BulkActions({
         )}
       </Dialog>
     </>
+  );
+}
+
+/** Individual menu; collection selection never determines this record target. */
+export function ItemActions({
+  id,
+  label,
+  commands,
+  actions,
+  disabled,
+  noun = "items",
+  onSelectionChange = () => {},
+}: {
+  id: string;
+  label: string;
+  commands: BulkCommand[];
+  actions?: RowAction[];
+  disabled?: boolean;
+  noun?: string;
+  onSelectionChange?: (ids: string[]) => void;
+}) {
+  return (
+    <BulkActions
+      selected={[id]}
+      collectionSize={1}
+      onSelectionChange={onSelectionChange}
+      commands={commands}
+      noun={noun}
+      item={{ label, actions, disabled }}
+    />
   );
 }

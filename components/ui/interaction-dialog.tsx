@@ -20,6 +20,7 @@ type PromptOptions = {
   title?: string;
   description?: string;
   submitLabel?: string;
+  destructive?: boolean;
 };
 type Request = {
   options?: PromptOptions;
@@ -28,7 +29,7 @@ type Request = {
   initial?: string;
 };
 type Interactions = {
-  confirm: (message: string) => Promise<boolean>;
+  confirm: (message: string, options?: PromptOptions) => Promise<boolean>;
   prompt: (
     message: string,
     initial?: string,
@@ -68,8 +69,8 @@ export function InteractionDialogProvider({
     [],
   );
   const confirm = useCallback(
-    async (message: string) =>
-      (await ask({ kind: "confirm", message })) === true,
+    async (message: string, options?: PromptOptions) =>
+      (await ask({ kind: "confirm", message, options })) === true,
     [ask],
   );
   const prompt = useCallback(
@@ -104,7 +105,7 @@ export function InteractionDialogProvider({
             onCloseAutoFocus={restoreFocus}
           >
             <AlertDialog.Title className="text-lg font-semibold tracking-tight">
-              Confirm action
+              {request?.options?.title || "Confirm action"}
             </AlertDialog.Title>
             <AlertDialog.Description className="text-sm leading-relaxed text-muted-foreground">
               {request?.message}
@@ -120,8 +121,12 @@ export function InteractionDialogProvider({
                 </Button>
               </AlertDialog.Cancel>
               <AlertDialog.Action asChild>
-                <Button type="button" onClick={() => finish(true)}>
-                  Confirm
+                <Button
+                  type="button"
+                  variant={request?.options?.destructive ? "destructive" : "default"}
+                  onClick={() => finish(true)}
+                >
+                  {request?.options?.submitLabel || "Confirm"}
                 </Button>
               </AlertDialog.Action>
             </DialogFooter>

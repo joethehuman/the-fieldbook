@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/choice";
 import { Input } from "../ui/input";
-import { RowActions } from "./row-actions";
+import { RowActions, type RowAction } from "./row-actions";
 import { RecordName, RecordMeta, RecordListRow } from "./record-row";
 import { CountMetric } from "../ui/count-metric";
 import {
@@ -137,6 +137,7 @@ export function HierarchyBrowser({
   onBrowse,
   onOpen,
   onEdit,
+  renderActions,
   query,
   onQueryChange,
   disabled = false,
@@ -153,6 +154,10 @@ export function HierarchyBrowser({
   onBrowse: (id: string) => void | Promise<void>;
   onOpen: (id: string) => void | Promise<void>;
   onEdit: (id: string) => void | Promise<void>;
+  renderActions?: (
+    item: HierarchyBrowserItem,
+    actions: RowAction[],
+  ) => ReactNode;
   query: string;
   onQueryChange: (query: string) => void;
   disabled?: boolean;
@@ -440,18 +445,17 @@ export function HierarchyBrowser({
         />
       </>
     );
-    const actions = (
-      <RowActions
-        label={item.label}
-        disabled={disabled}
-        actions={[
-          { label: "Open team", onSelect: () => void onOpen(item.id) },
-          { label: "Edit team", onSelect: () => void onEdit(item.id) },
-          ...(flat && childCount > 0
-            ? [{ label: "Browse subteams", onSelect: () => browse(item.id) }]
-            : []),
-        ]}
-      />
+    const rowActions: RowAction[] = [
+      { label: "Open team", onSelect: () => void onOpen(item.id) },
+      { label: "Edit team", onSelect: () => void onEdit(item.id) },
+      ...(flat && childCount > 0
+        ? [{ label: "Browse subteams", onSelect: () => browse(item.id) }]
+        : []),
+    ];
+    const actions = renderActions ? (
+      renderActions(item, rowActions)
+    ) : (
+      <RowActions label={item.label} disabled={disabled} actions={rowActions} />
     );
     if (flat) {
       const parentPath = pathFor(item.id, byId)

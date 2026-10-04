@@ -80,7 +80,6 @@ export default function Connections({ branding }: { branding: Branding }) {
         </div>
       )}
       <BulkActions
-        singleItemActions={false}
         collectionSize={selection.collectionSize}
         selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
