@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { Component, createContext, useContext, useLayoutEffect, type ReactNode, useMemo, useState } from "react";
+import { Component, createContext, useContext, useLayoutEffect, type ReactNode, useMemo, useState, useRef } from "react";
 import { Textarea } from "../ui/textarea";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
@@ -12,6 +12,7 @@ import { EditorFocusControls } from "./editor-focus";
 import { WritingTitleContext } from "./writing-title";
 import { useScrollFade } from "./use-scroll-fade";
 import { revealEditorTarget } from "./reveal-editor-target";
+import { usePhoneWritingViewport } from "./use-phone-writing-viewport";
 import "../../styles/writing-editor.css";
 
 // Next's loading component does not receive the lazy editor's props.
@@ -93,6 +94,8 @@ export function WritingEditor({
   downloadName = label,
   ...props
 }: WritingEditorProps) {
+  const root = useRef<HTMLElement>(null);
+  usePhoneWritingViewport(root);
   const [mode, setMode] = useState("write");
   const [issue, setIssue] = useState("");
   const [failureDetail, setFailureDetail] = useState("");
@@ -108,7 +111,8 @@ export function WritingEditor({
     <MarkdownDownloadContext.Provider value={{ value: props.value, name: downloadName }}>
     <WritingTitleContext.Provider value={title}>
     <EditorViewContext.Provider value={viewControls}>
-        <section className="writing-root flex min-w-0 flex-col gap-3" aria-label={`${label} editor`} onFocusCapture={(event) => {
+        <section ref={root} className="writing-root flex min-w-0 flex-col gap-3" aria-label={`${label} editor`} onFocusCapture={(event) => {
+          if (window.matchMedia("(max-width: 767px)").matches) return;
           const target = event.target;
           if (!(target instanceof HTMLElement) || !target.matches('[contenteditable], textarea, [role="tabpanel"]')) return;
           const surface = target.closest<HTMLElement>(".writing-surface");

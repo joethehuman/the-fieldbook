@@ -48,15 +48,18 @@ export function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   size?:
-    "default" | "media" | "picker" | "selection" | "workflow" | "workflow-list";
+    "default" | "media" | "picker" | "selection" | "workflow" | "workflow-list" | "sheet";
 }) {
   const returnFocus = React.useRef<HTMLElement | null>(null);
   const modal = React.useContext(DialogModalContext);
   const content = (
     <DialogPrimitive.Content
       data-slot="dialog-content"
+      data-size={size}
       className={cn(
         dialogContentClass,
+        size === "sheet" &&
+          "top-auto bottom-[var(--phone-panel-bottom,0px)] left-0 flex max-h-[calc(var(--phone-panel-height,100dvh)-1rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none pb-[calc(var(--space-8)+env(safe-area-inset-bottom))]",
         size === "media" &&
           "h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
         size === "selection" &&
@@ -92,6 +95,7 @@ export function DialogContent({
         // Keep portaled popup events within Radix's scroll-lock React tree.
         <DialogPrimitive.Overlay
           data-slot="dialog-overlay"
+          data-size={size}
           className={dialogOverlayClass}
         >
           {content}

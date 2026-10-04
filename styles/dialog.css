@@ -1,0 +1,32 @@
+/* Radix keeps the sheet and its containing overlay mounted through exit. */
+[data-slot="dialog-content"][data-size="sheet"][data-state="open"] {
+  animation: dialog-sheet-enter 280ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-slot="dialog-content"][data-size="sheet"][data-state="closed"] {
+  animation: dialog-sheet-exit 220ms cubic-bezier(0.4, 0, 1, 1);
+}
+[data-slot="dialog-overlay"][data-size="sheet"][data-state="open"] {
+  animation: dialog-sheet-overlay-enter 280ms ease-out;
+}
+[data-slot="dialog-overlay"][data-size="sheet"][data-state="closed"] {
+  animation: dialog-sheet-overlay-exit 220ms ease-in;
+}
+@keyframes dialog-sheet-enter {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes dialog-sheet-exit {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+@keyframes dialog-sheet-overlay-enter {
+  from { background-color: transparent; }
+  to { background-color: var(--overlay); }
+}
+@keyframes dialog-sheet-overlay-exit {
+  from { background-color: var(--overlay); }
+  to { background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-size="sheet"][data-state]:is([data-slot="dialog-content"], [data-slot="dialog-overlay"]) { animation: none; }
+}

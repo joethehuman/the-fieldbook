@@ -346,10 +346,20 @@
   .editor-frame [data-slot="input"], .editor-frame [data-slot="textarea"], .course-builder-panel {
     scroll-margin-block-start: var(--space-4);
   }
+  @media (max-width: 767px) {
+    .main-content:has(> .editor) { padding-block-end: calc(var(--workspace-inset-block) + var(--phone-keyboard-space, 0px)); }
+    .main-content[data-phone-keyboard-closing="true"] { transition: padding-block-end 180ms ease-out; }
+    .editor-panel-context { display: none; }
+    .editor-frame-controls { flex-wrap: nowrap; min-height: var(--space-8); padding-block: 0; }
+    .editor-frame-controls[data-heading="true"] { flex-wrap: wrap; }
+    .editor-frame[data-panels] > .editor-frame-body { display: flex; flex-direction: column; }
+    .editor[data-scroll-layout="workspace"] .editor-frame-canvas { flex: 1 1 0; }
+  }
   .editor-frame-heading [data-slot="input"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }
   .editor-details-content { gap: var(--space-4); }
   .editor-details-group { display: grid; gap: var(--space-3); padding-block-end: var(--space-4); border-bottom: 1px solid var(--border); }
   @media (prefers-reduced-motion: reduce) {
+    .main-content[data-phone-keyboard-closing="true"] { transition: none; }
     .editor-frame-body { transition: none; }
     .editor-frame-panel, .editor-frame-panel[data-open="false"], .editor-frame-outline, .editor-frame-details { transition: none; }
   }

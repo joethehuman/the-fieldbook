@@ -8,6 +8,7 @@ import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { createWritingBlock, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu } from "./writing-selection-menu";
+import { usePhoneLayout } from "./use-phone-layout";
 import { WritingLinkDialog } from "./writing-link-dialog";
 import { WritingTitleContext, WritingTitleEnterContext } from "./writing-title";
 import { WritingInteractionContext } from "./writing-interaction";
@@ -170,6 +171,7 @@ function WritingToolbar({
   disabled: boolean;
   viewControls: ReactNode;
 }) {
+  const phone = usePhoneLayout();
   const editor = useCellValue(activeEditor$);
   const code = usePublisher(insertCodeBlock$);
   const divider = usePublisher(insertThematicBreak$);
@@ -245,15 +247,15 @@ function WritingToolbar({
             </Tooltip>
           ))}
         </div>
-        <Button type="button" size="sm" variant="outline" disabled={disabled}
+        <Button type="button" size={phone ? "icon" : "sm"} variant="outline" disabled={disabled}
           aria-label="Commands: insert blocks or format selected text"
           onMouseDown={(event) => event.preventDefault()}
           onClick={(event) => onInsert(event.currentTarget, event.detail === 0)}>
-          <Plus /> Commands
+          <Plus /><span className="writing-command-label">Commands</span>
         </Button>
       </div>
-      {viewControls}
       <WritingSelectionMenu disabled={disabled} onReady={onSelectionReady} />
+      {viewControls}
     </div>
   );
 }

@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine phone authoring with right-aligned Outline/Details buttons and smoothly animated bottom panels with safe-area breathing room, explicit selected-text formatting alongside native selection menus, and a canvas that stays in natural page flow from its empty first paragraph, with keyboard clearance and smooth caret scrolling without resizing the canvas. Omit Focus mode on phones. Simplify the phone Administration picker and use a searchable Teams directory while retaining tablet and desktop layouts.
+
 - Updates use an unchecked Bring this update to the top choice in Details → Publishing. Republishing corrections preserves feed position and For you freshness; selecting the choice deliberately renews the feed date. First publication remains current. Demo, installed publishing and MCP share the rule; course versions and completions are unchanged.
 
 - Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering and cross-section moves with drag origin/destination feedback, individual and bulk Move to actions, and a sticky Unsaved changes bar with Save/Discard. The bar opens smoothly as a connected header with continuous container borders and an immediate reduced-motion fallback; brief footer guidance spans the full grey area. Navigation changes preserve document drafts and published editorial content.
