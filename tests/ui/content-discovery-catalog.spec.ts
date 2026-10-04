@@ -8,13 +8,19 @@ test("catalog content discovery retains choices across a 100-item library", asyn
   await page.goto("/ui#catalog-content-selection");
   const picker = page.locator("#catalog-content-selection");
   await expect(
-    picker.getByRole("button", { name: "Sort: Updated newest", exact: true }),
-  ).toBeVisible();
+    picker.getByRole("combobox", { name: "Sort content", exact: true }),
+  ).toContainText("Sort: Title (A–Z)");
+  await picker.getByRole("button", { name: /^Filters/ }).click();
+  await page.getByRole("combobox", { name: "Content type", exact: true }).click();
+  await page.getByRole("option", { name: "Courses", exact: true }).click();
+  await page.getByRole("dialog", { name: "Collection filters", exact: true }).press("Escape");
+  await picker.getByRole("combobox", { name: "Sort content", exact: true }).click();
+  await page.getByRole("option", { name: "Updated (newest)", exact: true }).click();
   const newest = picker.getByRole("checkbox", {
     name: /^Product knowledge 100/,
   });
   await newest.check();
-  await picker.getByRole("button", { name: "Filters", exact: true }).click();
+  await picker.getByRole("button", { name: /^Filters/ }).click();
   const filters = page.getByRole("dialog", {
     name: "Collection filters",
     exact: true,
@@ -40,9 +46,7 @@ test("catalog content discovery retains choices across a 100-item library", asyn
   ).toBeChecked();
   await expect(picker).toContainText("2 selected");
   expect(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth + 1,
-    ),
+    await picker.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
   ).toBe(true);
   await picker.scrollIntoViewIfNeeded();
   await picker.screenshot({

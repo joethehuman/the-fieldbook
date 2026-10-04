@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
@@ -287,12 +289,12 @@ export default function LearningGroups({
       },
     });
   const indexSortLabels: Record<string, string> = {
-    name: "Name A–Z",
-    "name-reverse": "Name Z–A",
-    "people-most": "People: most first",
-    "people-fewest": "People: fewest first",
-    "courses-most": "Courses: most first",
-    "courses-fewest": "Courses: fewest first",
+    name: sortLabels.nameAsc,
+    "name-reverse": sortLabels.nameDesc,
+    "people-most": sortLabels.peopleMost,
+    "people-fewest": sortLabels.peopleFewest,
+    "courses-most": sortLabels.coursesMost,
+    "courses-fewest": sortLabels.coursesFewest,
   };
   const filteredMembers = members
     .filter(
@@ -1107,23 +1109,21 @@ export default function LearningGroups({
           <CollectionControls
             filters={indexFilters}
             onClear={clearIndexFilters}
-            sortLabel={indexSortLabels[indexSort]}
             sort={
-              <FormField label="Sort groups">
-                <SelectField
-                  value={indexSort}
-                  onValueChange={(value) => {
-                    setIndexSort(value);
-                    setIndexPage(1);
-                  }}
-                >
-                  {Object.entries(indexSortLabels).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </SelectField>
-              </FormField>
+              <SortPicker
+                label="Sort groups"
+                value={indexSort}
+                onValueChange={(value) => {
+                  setIndexSort(value);
+                  setIndexPage(1);
+                }}
+              >
+                {Object.entries(indexSortLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </SortPicker>
             }
             primaryAction={
               <Button
@@ -1546,17 +1546,15 @@ export default function LearningGroups({
                 <CollectionControls
                   filters={peopleFilters}
                   onClear={resetPeopleFilters}
-                  sortLabel={peopleSort === "name" ? "Name A–Z" : "Name Z–A"}
                   sort={
-                    <FormField label="Sort people">
-                      <SelectField
-                        value={peopleSort}
-                        onValueChange={setPeopleSort}
-                      >
-                        <option value="name">Name A–Z</option>
-                        <option value="reverse">Name Z–A</option>
-                      </SelectField>
-                    </FormField>
+                    <SortPicker
+                      label="Sort people"
+                      value={peopleSort}
+                      onValueChange={setPeopleSort}
+                    >
+                      <option value="name">{sortLabels.nameAsc}</option>
+                      <option value="reverse">{sortLabels.nameDesc}</option>
+                    </SortPicker>
                   }
                   primaryAction={
                     <Button
@@ -1819,31 +1817,20 @@ export default function LearningGroups({
                       />
                     </FormField>
                   }
-                  sortLabel={
-                    updateSort === "title"
-                      ? "Title A–Z"
-                      : updateSort === "updated-newest"
-                        ? "Updated newest"
-                        : "Created newest"
-                  }
                   sort={
-                    <FormField label="Sort Updates">
-                      <SelectField
-                        value={updateSort}
-                        onValueChange={(value) => {
-                          setUpdateSort(value as GroupBrowseSort);
-                          setPage(1);
-                        }}
-                      >
-                        <option value="updated-newest">
-                          Updated newest first
-                        </option>
-                        <option value="created-newest">
-                          Created newest first
-                        </option>
-                        <option value="title">Title A–Z</option>
-                      </SelectField>
-                    </FormField>
+                    <SortPicker
+                      label="Sort Updates"
+                      value={updateSort}
+                      onValueChange={(value) => {
+                        setUpdateSort(value as GroupBrowseSort);
+                        setPage(1);
+                      }}
+                    >
+                      <option value="updated-newest">{sortLabels.updatedNewest}</option>
+                      <option value="updated-oldest">{sortLabels.updatedOldest}</option>
+                      <option value="title">{sortLabels.titleAsc}</option>
+                      <option value="title-desc">{sortLabels.titleDesc}</option>
+                    </SortPicker>
                   }
                 />
                 <BulkActions

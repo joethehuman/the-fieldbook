@@ -2,6 +2,7 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
+import "../../styles/dialog.css";
 const DialogModalContext = React.createContext(true);
 export function Dialog({
   modal = true,
@@ -55,10 +56,11 @@ export function DialogContent({
   const content = (
     <DialogPrimitive.Content
       data-slot="dialog-content"
+      data-size={size}
       className={cn(
         dialogContentClass,
         size === "sheet" &&
-          "top-auto bottom-[var(--phone-panel-bottom,0px)] left-0 flex max-h-[calc(var(--phone-panel-height,100dvh)-1rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none pb-[max(var(--space-4),env(safe-area-inset-bottom))]",
+          "top-auto bottom-[var(--phone-panel-bottom,0px)] left-0 flex max-h-[calc(var(--phone-panel-height,100dvh)-1rem)] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-b-none pb-[calc(var(--space-8)+env(safe-area-inset-bottom))]",
         size === "media" &&
           "h-[calc(100dvh-3rem)] w-[calc(100vw-2rem)] max-w-[var(--page-width)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden",
         size === "selection" &&
@@ -94,6 +96,7 @@ export function DialogContent({
         // Keep portaled popup events within Radix's scroll-lock React tree.
         <DialogPrimitive.Overlay
           data-slot="dialog-overlay"
+          data-size={size}
           className={dialogOverlayClass}
         >
           {content}

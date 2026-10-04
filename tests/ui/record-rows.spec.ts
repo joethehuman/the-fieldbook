@@ -102,18 +102,18 @@ test("content row menus preserve assignment selection and canceled publication c
   const table = page.locator('table[data-layout="contentSelection"]');
   const row = table.locator("tbody tr").first();
   const widths = await table
-    .locator("th")
+    .locator("thead [data-slot=table-cell-content]")
     .evaluateAll((cells) =>
-      cells.map((cell) => cell.getBoundingClientRect().width),
+      cells.map((cell) => getComputedStyle(cell).maxWidth),
     );
   await page
     .getByRole("searchbox", { name: "Search content", exact: true })
     .fill("");
   expect(
     await table
-      .locator("th")
+      .locator("thead [data-slot=table-cell-content]")
       .evaluateAll((cells) =>
-        cells.map((cell) => cell.getBoundingClientRect().width),
+        cells.map((cell) => getComputedStyle(cell).maxWidth),
       ),
   ).toEqual(widths);
   await screenshot(page, info, "content");
@@ -199,8 +199,8 @@ test("team selection is independent of row menus and browsing", async ({
   page,
 }, info) => {
   await start(page, "teams");
-  await page.getByRole("button", { name: "Select teams", exact: true }).click();
-  const row = page.locator('[data-slot="record-list-row"]').first();
+  await page.getByRole("button", { name: "Select multiple", exact: true }).click();
+  const row = page.locator('table[data-layout="teamDirectory"] tbody tr').first();
   const check = row.getByRole("checkbox");
   await check.check();
   await expect(check).toBeChecked();

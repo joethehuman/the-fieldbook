@@ -154,19 +154,19 @@ export function EditorFrame({
     <section ref={frame} className="editor-frame" data-panels={open} aria-label="Writing workspace">
       <div ref={controls} className="editor-frame-controls" data-heading={heading ? "true" : undefined}>
         {outline && (
-          <Button ref={outlineToggle} type="button" variant="ghost" size="sm"
+          <Button ref={outlineToggle} type="button" variant={phone ? "outline" : "ghost"} size={phone ? "default" : "sm"} className={phone ? "ml-auto" : undefined}
             disabled={disabled}
             aria-controls={outlineId} aria-expanded={panels.outline}
             onClick={() => setPanels((current) => ({
               outline: !current.outline,
               details: wide.current ? current.details : false,
             }))}>
-            {panels.outline ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />}
+            {!phone && (panels.outline ? <PanelLeftClose aria-hidden="true" /> : <PanelLeftOpen aria-hidden="true" />)}
             Outline{outlineContext && <span className="editor-panel-context text-muted-foreground">· {outlineContext}</span>}
           </Button>
         )}
         {heading && <div className="editor-frame-heading">{heading}</div>}
-        <Button ref={detailsToggle} type="button" variant="ghost" size="sm" className="ml-auto"
+        <Button ref={detailsToggle} type="button" variant={phone ? "outline" : "ghost"} size={phone ? "default" : "sm"} className={phone && outline ? undefined : "ml-auto"}
           disabled={disabled}
           aria-controls={detailsId} aria-expanded={panels.details}
           onClick={() => setPanels((current) => ({
@@ -174,7 +174,7 @@ export function EditorFrame({
             details: !current.details,
           }))}>
           Details{requirementsCount > 0 && <span className="editor-panel-context text-muted-foreground" role="status">· {requirementsCount} required</span>}
-          {panels.details ? <PanelRightClose aria-hidden="true" /> : <PanelRightOpen aria-hidden="true" />}
+          {!phone && (panels.details ? <PanelRightClose aria-hidden="true" /> : <PanelRightOpen aria-hidden="true" />)}
         </Button>
       </div>
       <div className="editor-frame-body">

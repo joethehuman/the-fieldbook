@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "@/components/patterns/sort-picker";
 import { ScrollRegion } from "@/components/patterns/scroll-region";
 import { GroupedSearch } from "@/components/patterns/grouped-search";
 import { ProgressOverview } from "@/components/patterns/progress-overview";
@@ -42,7 +44,7 @@ import { ContentSelectionList } from "@/components/patterns/content-selection-li
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
-import { Settings, Plus } from "lucide-react";
+import { Settings, Plus, ListChecks, X } from "lucide-react";
 import { CollectionControls } from "@/components/patterns/collection-controls";
 import { Input } from "@/components/ui/input";
 import { FilePicker } from "@/components/ui/file-picker";
@@ -118,6 +120,7 @@ function AudienceSelectionExample() {
 }
 
 export function LibraryExamples() {
+  const [memberSort, setMemberSort] = useState("name");
   const [progressStatus, setProgressStatus] = useState("all");
   const [selectedTeam, setSelectedTeam] = useState<string[]>([]);
   const [browserBranch, setBrowserBranch] = useState("");
@@ -413,7 +416,7 @@ export function LibraryExamples() {
       <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
-        guidance="Compact teams form one horizontal chart across every explored level. Choose a sibling to replace the downstream branch; scroll back to any earlier level. Open and Edit are explicit actions. Search and bulk selection use a flat list."
+        guidance="Compact teams form one horizontal chart across every explored level. Choose a sibling to replace the downstream branch; scroll back to any earlier level. Open and Edit are explicit actions. Search and bulk selection use the standard paginated table."
       >
         <HierarchyBrowser
           label="Example reporting teams"
@@ -429,25 +432,40 @@ export function LibraryExamples() {
           query={browserQuery}
           onQueryChange={setBrowserQuery}
           primaryAction={
-            <Button
-              onClick={() => setMessage("Create a team in this example.")}
-            >
-              <Plus aria-hidden="true" /> Add team
-            </Button>
-          }
-          secondaryActions={
-            <Button
-              variant="ghost"
-              onClick={() => setSelectBrowserTeams(!selectBrowserTeams)}
-            >
-              {selectBrowserTeams ? "Done selecting" : "Select teams"}
-            </Button>
+            <ActionGroup>
+              <Button
+                variant="outline"
+                aria-pressed={selectBrowserTeams}
+                onClick={() => {
+                  setSelectBrowserTeams(!selectBrowserTeams);
+                  setBrowserSelection([]);
+                }}
+              >
+                {selectBrowserTeams ? <X aria-hidden="true" /> : <ListChecks aria-hidden="true" />}
+                {selectBrowserTeams ? "Done selecting" : "Select multiple"}
+              </Button>
+              <Button onClick={() => setMessage("Create a team in this example.")}>
+                <Plus aria-hidden="true" /> Add team
+              </Button>
+            </ActionGroup>
           }
           selected={selectBrowserTeams ? browserSelection : undefined}
           onSelectionChange={setBrowserSelection}
           selectionActions={
-            selectBrowserTeams ? (
-              <p role="status">{browserSelection.length} selected</p>
+            selectBrowserTeams ? (range, total) => (
+              <BulkActions
+                collectionSize={total}
+                range={range}
+                selected={browserSelection}
+                onSelectionChange={setBrowserSelection}
+                noun="teams"
+                commands={[{
+                  id: "example-move",
+                  label: "Move selected teams",
+                  description: "This example reviews the selected teams without changing stored data.",
+                  apply: () => setMessage("Example team move reviewed."),
+                }]}
+              />
             ) : undefined
           }
           items={[
@@ -455,12 +473,14 @@ export function LibraryExamples() {
               id: "revenue",
               label: "Revenue",
               description: "Manager: Alex Morgan",
+              managerName: "Alex Morgan",
               directMemberCount: 120,
             },
             {
               id: "success",
               label: "Customer success",
               description: "Manager: Sam Lee",
+              managerName: "Sam Lee",
               directMemberCount: 45,
             },
             {
@@ -468,6 +488,7 @@ export function LibraryExamples() {
               parentId: "revenue",
               label: "Europe, Middle East and Africa",
               description: "Manager: Jordan Lee",
+              managerName: "Jordan Lee",
               directMemberCount: 52,
             },
             {
@@ -475,6 +496,7 @@ export function LibraryExamples() {
               parentId: "emea",
               label: "Enterprise customer teams across Europe",
               description: "Manager: Jordan Lee",
+              managerName: "Jordan Lee",
               directMemberCount: 18,
             },
             ...Array.from({ length: 12 }, (_, index) => ({
@@ -485,6 +507,7 @@ export function LibraryExamples() {
                   ? "North America"
                   : `Level ${index + 1} regional team`,
               description: "Manager: Casey Rivera",
+              managerName: "Casey Rivera",
               directMemberCount: index === 11 ? 6 : 68,
             })),
             ...Array.from({ length: 18 }, (_, index) => ({
@@ -492,6 +515,7 @@ export function LibraryExamples() {
               parentId: "level-2",
               label: `Enterprise territory ${index + 1}`,
               description: "Manager: Unassigned",
+              managerName: "Unassigned",
               directMemberCount: 4,
             })),
           ]}
@@ -512,13 +536,15 @@ export function LibraryExamples() {
               <Plus aria-hidden="true" /> Add Members
             </Button>
           }
-          sortLabel="Name A–Z"
           sort={
-            <FormField label="Example member order">
-              <SelectField value="name" onValueChange={() => {}}>
-                <option value="name">Name A–Z</option>
-              </SelectField>
-            </FormField>
+            <SortPicker
+              label="Sort example team members"
+              value={memberSort}
+              onValueChange={setMemberSort}
+            >
+              <option value="name">{sortLabels.nameAsc}</option>
+              <option value="reverse">{sortLabels.nameDesc}</option>
+            </SortPicker>
           }
         />
         <HierarchyList
@@ -776,17 +802,15 @@ function GroupRosterExample() {
             />
           </FormField>
         }
-        sortLabel={reverse ? "Name Z–A" : "Name A–Z"}
         sort={
-          <FormField label="Sort example members">
-            <SelectField
-              value={reverse ? "reverse" : "name"}
-              onValueChange={(value) => setReverse(value === "reverse")}
-            >
-              <option value="name">Name A–Z</option>
-              <option value="reverse">Name Z–A</option>
-            </SelectField>
-          </FormField>
+          <SortPicker
+            label="Sort example members"
+            value={reverse ? "reverse" : "name"}
+            onValueChange={(value) => setReverse(value === "reverse")}
+          >
+            <option value="name">{sortLabels.nameAsc}</option>
+            <option value="reverse">{sortLabels.nameDesc}</option>
+          </SortPicker>
         }
         filters={
           source
@@ -946,8 +970,14 @@ function GroupIndexExample() {
     )
     .sort(
       (a, b) =>
-        (sort === "people" ? b.people - a.people : 0) ||
-        a.name.localeCompare(b.name),
+        (sort === "people" ? b.people - a.people : sort === "people-fewest"
+            ? a.people - b.people
+            : sort === "courses"
+              ? b.courses - a.courses
+              : sort === "courses-fewest"
+                ? a.courses - b.courses
+                : 0) ||
+        (sort === "reverse" ? -1 : 1) * a.name.localeCompare(b.name),
     );
   const selection = useBulkSelection(
     query + people,
@@ -982,14 +1012,15 @@ function GroupIndexExample() {
             />
           </FormField>
         }
-        sortLabel={sort === "people" ? "People: most first" : "Name A–Z"}
         sort={
-          <FormField label="Sort example groups">
-            <SelectField value={sort} onValueChange={setSort}>
-              <option value="name">Name A–Z</option>
-              <option value="people">People: most first</option>
-            </SelectField>
-          </FormField>
+          <SortPicker label="Sort example groups" value={sort} onValueChange={setSort}>
+            <option value="name">{sortLabels.nameAsc}</option>
+            <option value="reverse">{sortLabels.nameDesc}</option>
+            <option value="people">{sortLabels.peopleMost}</option>
+            <option value="people-fewest">{sortLabels.peopleFewest}</option>
+            <option value="courses">{sortLabels.coursesMost}</option>
+            <option value="courses-fewest">{sortLabels.coursesFewest}</option>
+          </SortPicker>
         }
         filters={
           people

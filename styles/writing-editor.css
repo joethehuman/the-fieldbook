@@ -190,7 +190,7 @@
   gap: var(--space-1);
 }
 @media (max-width: 767px) {
-  .app[data-phone-keyboard="true"] .writing-content { padding-block-end: calc(var(--space-6) + 3rem); }
+  .app[data-phone-writer="true"] .writing-content { padding-block-end: calc(var(--space-6) + 3rem + var(--phone-writing-clearance, 0px)); }
   .writing-command-label, .writing-focus-label { display: none; }
   .writing-toolbar-controls { gap: var(--space-1); flex-wrap: nowrap; }
   .writing-phone-format { flex-shrink: 0; }

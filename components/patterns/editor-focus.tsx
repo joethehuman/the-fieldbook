@@ -148,7 +148,13 @@ export function useEditorFocus(ref: RefObject<HTMLFormElement | null>) {
 export function EditorFocusControls() {
   const phone = usePhoneLayout();
   const focus = useContext(EditorFocusContext);
-  if (!focus) return null;
+  const exitFocus = useRef(focus?.toggle);
+  exitFocus.current = focus?.toggle;
+  useEffect(() => {
+    // Restore the surrounding controls when a focused tablet rotates to a phone.
+    if (phone && focus?.active) exitFocus.current?.();
+  }, [phone, focus?.active]);
+  if (!focus || phone) return null;
   return (
     <>
       {focus.active && (
@@ -162,7 +168,7 @@ export function EditorFocusControls() {
       <Button
         type="button"
         variant="ghost"
-        size={phone ? "icon" : "sm"}
+        size="sm"
         aria-pressed={focus.active}
         aria-label={focus.active ? "Exit focus mode" : "Focus mode"}
         onMouseDown={(event) => event.preventDefault()}

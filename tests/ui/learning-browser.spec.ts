@@ -118,7 +118,22 @@ test("For you uses curriculum cards, one category picker and a simple ordered pa
   await expect(
     page.getByRole("group", { name: "Course categories" }),
   ).toHaveCount(0);
+  const controls = page.locator('[data-slot="collection-controls"]');
+  await expect(controls).toHaveCount(1);
+  await expect(controls.locator("label")).toHaveCount(0);
+  await expect(
+    controls.getByRole("textbox", { name: "Filter courses" }),
+  ).toHaveAttribute("placeholder", "Find a course…");
+  await controls.getByRole("button", { name: "Filters", exact: true }).click();
   await expect(page.getByRole("combobox", { name: "Category" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await noOverflow(page);
+  await controls.screenshot({ path: info.outputPath("course-controls.png") });
+  const search = controls.getByRole("textbox", { name: "Filter courses" });
+  await search.fill("Optional exploration");
+  await expect(page.locator(".library .course-card")).toHaveCount(1);
+  await expect(page.locator(".library .course-card")).toContainText("Optional exploration");
+  await search.fill("");
   await expect(
     page.getByRole("button", { name: "View in progress" }),
   ).toHaveCount(0);
@@ -139,11 +154,29 @@ test("For you uses curriculum cards, one category picker and a simple ordered pa
   await expect(library.locator(".course-card")).toHaveCount(1);
   await page.getByRole("switch", { name: "Hide completed" }).check();
   await expect(library.locator(".course-card")).toHaveCount(1);
+  await controls.getByRole("button", { name: "Filters", exact: true }).click();
   await page.getByRole("combobox", { name: "Category", exact: true }).click();
   await page
     .getByRole("option", { name: "Sales foundations", exact: true })
     .click();
   await expect(library.locator(".course-card")).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(
+    controls.getByRole("button", { name: "Filters (1)", exact: true }),
+  ).toBeVisible();
+  await controls
+    .getByRole("button", {
+      name: "Remove Category: Sales foundations filter",
+      exact: true,
+    })
+    .click();
+  await expect(
+    controls.getByRole("button", { name: "Filters", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Clear all", exact: true }),
+  ).toHaveCount(0);
+  await noOverflow(page);
   await library.locator(".course-card").click();
   await expect(page).toHaveURL(/#curricula\/sales-foundations$/);
   await expect(
@@ -157,7 +190,9 @@ test("For you uses curriculum cards, one category picker and a simple ordered pa
   await expect(rows.nth(0)).toContainText("Start with the customer");
   await expect(rows.nth(1)).toContainText("Know the platform");
   await expect(rows.nth(2)).toContainText("From discovery to next steps");
-  await expect(page.getByRole("combobox", { name: "Sort courses" })).toContainText("Recommended order");
+  await expect(
+    page.getByRole("combobox", { name: "Sort courses" }),
+  ).toContainText("Recommended order");
   await page.reload();
   await rows.nth(1).click();
   await expect(
@@ -210,10 +245,10 @@ test("optional activity is resumable and all completions remain available at 100
   await library.screenshot({ path: info.outputPath("your-courses.png") });
   await expect(
     library.locator(".course-card").filter({ hasText: "Optional exploration" }),
-  ).not.toContainText("Assigned");
+  ).not.toContainText("For you");
   await expect(
     library.locator(".course-card").filter({ hasText: "Know the platform" }),
-  ).toContainText("Assigned");
+  ).toContainText("For you");
   await views.getByRole("button", { name: "Assigned", exact: true }).click();
   await expect(library.locator(".course-card")).toContainText("Completed");
   await page.getByRole("switch", { name: "Hide completed" }).check();

@@ -347,7 +347,7 @@
     scroll-margin-block-start: var(--space-4);
   }
   @media (max-width: 767px) {
-    .app[data-phone-keyboard="true"] { top: var(--phone-writing-top, 0px); bottom: auto; height: var(--phone-writing-height, 100dvh); }
+    .app[data-phone-writer="true"] { top: var(--phone-writing-top, 0px); bottom: auto; height: var(--phone-writing-height, 100dvh); transition: height 180ms ease-out; }
     .editor-panel-context { display: none; }
     .editor-frame-controls { flex-wrap: nowrap; min-height: var(--space-8); padding-block: 0; }
     .editor-frame-controls[data-heading="true"] { flex-wrap: wrap; }
@@ -358,6 +358,7 @@
   .editor-details-content { gap: var(--space-4); }
   .editor-details-group { display: grid; gap: var(--space-3); padding-block-end: var(--space-4); border-bottom: 1px solid var(--border); }
   @media (prefers-reduced-motion: reduce) {
+    .app[data-phone-writer="true"] { transition: none; }
     .editor-frame-body { transition: none; }
     .editor-frame-panel, .editor-frame-panel[data-open="false"], .editor-frame-outline, .editor-frame-details { transition: none; }
   }
