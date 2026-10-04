@@ -308,6 +308,9 @@ for (const app of ["demo", "production"] as const) {
     page,
     request,
   }, info) => {
+    // A centered article needs room for equal margins beside the wide outline.
+    if (info.project.name === "desktop")
+      await page.setViewportSize({ width: 1600, height: 1000 });
     await fixture(request);
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
