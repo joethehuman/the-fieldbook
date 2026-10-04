@@ -6,6 +6,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 - Unify collection sorting with one compact design-system picker that opens options directly, shows its label inside the trigger and wraps cleanly on narrow screens. Use concise shared terms with directions in parentheses, such as Sort: Updated (newest) and Title (A–Z), and paired useful directions across learner libraries, administration, reports and assignment/import dialogs. Add saved-deadline sorting, retain Assigned sorting in Your courses, keep unknown values last, and remove misleading curriculum dates, redundant recovery ordering and the one-option CSV issue picker. Preserve authored curriculum order, search relevance and report/export consistency. Align the Courses home and full browser with shared inline search, Filters and Sort controls; show active categories as removable chips.
 
+- Simulate Ask AI in the browser-local demo with the shared thinking indicator, streamed canned replies and working Stop control. The first two questions receive Hoolibook/Gavin replies, with a link to thefieldbook.org in the first; later questions receive the demo-unavailable message. No model requests are made.
+
 - Prevent the demo account picker from flashing during session refresh. Check the saved profile before first paint and retain an inactive workspace shell until restoration finishes; first visits, explicit profile switching and storage recovery keep the picker.
 
 - Align Admin row and bulk menus across content, people, teams, groups, curricula, Docs sections and recovery. Bulk actions require at least two selected records; individual menus retain applicable commands for a single record and reuse existing reviews and safeguards.
