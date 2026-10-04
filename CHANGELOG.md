@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Preconfigure fresh and reset demos with codebase and thefieldbook.org links through the existing External links settings and account menu. Preserve saved browser settings until Reset demo.
+
 - Restore and reactivate exact-email Recently deleted users through CSV Import, with a non-blocking review warning and stable identity/history. Keep purge, inactive-user and access guards. Apply `20261003222648_roster_import_reactivation.sql` before deployment; it rewrites no existing data.
 
 - Compact People and CSV review tables, use User labels and show complete proposed records in import details. Disable browser saved-form suggestions by default in shared text controls. Review manager deletion without requiring a replacement, and add reviewed bulk team deletion that returns direct users and surviving immediate subteams to Organization. Surviving branches retain their users and nested subteams. Apply `20261003212205_roster_team_deletion.sql` before deployment; the upgrade preserves existing data.
