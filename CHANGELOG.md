@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Keep phone lesson-player Previous and Next actions aligned on one row, hiding destination titles while retaining tablet and desktop navigation.
+
 - Keep Docs articles centered with or without headings. On this page sits in the right margin when space permits and remains a collapsible outline above the article on narrower layouts.
 
 - The administrative Content table shows Name, Type, Status, Updated and Created. Dates use `04-Oct-2026` formatting, with the content version beside Updated; existing date sorts retain full timestamp precision.

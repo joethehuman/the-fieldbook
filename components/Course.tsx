@@ -244,10 +244,10 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
         </section>}
         {(lesson || previousLesson) && <nav className="course-continue reading-pagination" aria-label="Continue course">
           {previousLesson && <Button variant="ghost" data-direction="previous" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={previous} disabled={busy}>
-            <ChevronLeft aria-hidden="true" size={16} /><span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">Previous lesson</span><span className="[overflow-wrap:anywhere]">{previousLesson.title}</span></span>
+            <ChevronLeft aria-hidden="true" size={16} /><span className="grid min-w-0 gap-1"><span className="course-continue-label text-xs font-normal text-muted-foreground">Previous lesson</span><span className="course-continue-title [overflow-wrap:anywhere]">{previousLesson.title}</span></span>
           </Button>}
           {lesson && <Button variant="ghost" data-direction="next" className="reading-pagination-link h-auto min-w-0 whitespace-normal" onClick={next} loading={busy}>
-            <span className="grid min-w-0 gap-1"><span className="text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish course"}</span><span className="[overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Course complete"}</span></span><ChevronRight aria-hidden="true" size={16} />
+            <span className="grid min-w-0 gap-1"><span className="course-continue-label text-xs font-normal text-muted-foreground">{step < course.lessons.length - 1 ? "Next lesson" : course.questions.length ? "Quiz" : "Finish course"}</span><span className="course-continue-title [overflow-wrap:anywhere]">{step < course.lessons.length - 1 ? course.lessons[step + 1].title : course.questions.length ? "Check your knowledge" : "Course complete"}</span></span><ChevronRight aria-hidden="true" size={16} />
           </Button>}
         </nav>}
       </div>
