@@ -345,11 +345,42 @@ test("progress filters, keyboard download, member details and empty report", asy
     "member",
   );
   expect(detail.rows).toHaveLength(4);
-  expect(detail.rows[1][5]).toBe("Complete");
+  expect(detail.rows.slice(1).filter((row) => row[5] === "Complete")).toHaveLength(1);
   expect(detail.rows.flat().join(" ")).not.toContain(
     "Self-directed exploration",
   );
   await screenshot(page, info, "member-assignments");
+  const courseRows = page.locator('table[data-layout="progressAssignments"] tbody tr');
+  await expect(page.getByRole("button", { name: "Sort: Newest assigned", exact: true })).toBeVisible();
+  // Check the rendered order against dates in the actual export, rather than fixture array order.
+  const assignedColumn = detail.rows[0].indexOf("Assigned at");
+  const datedRows = detail.rows.slice(1).filter((row) => row[assignedColumn]);
+  expect(datedRows.map((row) => row[assignedColumn])).toEqual(
+    datedRows.map((row) => row[assignedColumn]).sort((a, b) => Date.parse(b) - Date.parse(a)),
+  );
+  expect(await courseRows.locator("td:first-child strong").allTextContents()).toEqual(detail.rows.slice(1).map((row) => row[2]));
+  await page.getByRole("searchbox", { name: "Search courses", exact: true }).fill("platform");
+  await expect(courseRows).toHaveCount(1);
+  await expect(courseRows).toContainText("Know the platform");
+  const filtered = await download(page, page.getByRole("button", { name: "Export CSV", exact: true }), info, "member-filtered");
+  expect(filtered.rows).toHaveLength(2);
+  expect(filtered.rows[1][2]).toBe("Know the platform");
+  await page.getByRole("searchbox", { name: "Search courses", exact: true }).fill("no matching course");
+  await expect(courseRows).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Search courses", exact: true }).fill("");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await select(page, "Course status", "Complete");
+  await page.keyboard.press("Escape");
+  await expect(courseRows).toHaveCount(1);
+  await expect(courseRows).toContainText("Start with the customer");
+  await page.getByRole("button", { name: "Remove Complete filter", exact: true }).click();
+  await page.getByRole("button", { name: "Sort: Newest assigned", exact: true }).click();
+  await select(page, "Sort assignments", "Course A–Z");
+  await page.keyboard.press("Escape");
+  await expect(courseRows.locator("td:first-child strong")).toHaveText([
+    "From discovery to next steps", "Know the platform", "Start with the customer",
+  ]);
+
   await page.getByRole("button", { name: "Back to progress" }).click();
   await searchPeople(page, "no-match");
   const empty = await download(

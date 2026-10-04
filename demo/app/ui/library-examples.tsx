@@ -990,7 +990,7 @@ function GroupIndexExample() {
         <DataTable
           layout="learningGroupsSelectable"
           density="compact"
-          aria-label="Example learning groups"
+          aria-label="Example groups"
         >
           <TableHeader>
             <TableRow>

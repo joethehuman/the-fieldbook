@@ -62,7 +62,7 @@ test("installed group content discovery keeps selections until the final review 
     return route.fulfill({ json: { revision: 13 } });
   });
   await page.goto("/admin");
-  await section(page, "Learning groups");
+  await section(page, "Groups");
   await page.getByRole("button", { name: "Pilot", exact: true }).click();
   await page
     .getByRole("tab", { name: "Assigned Courses", exact: true })

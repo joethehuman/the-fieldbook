@@ -432,3 +432,11 @@ Use `RecordName` for a visible primary link (pass `href` and guarded `onNavigate
 People rosters prioritize identity, reporting team, access and group membership. Content names edit the item; retain all permitted row actions, including Assign for published courses. Learning-group names open group management; index shortcuts reuse existing membership and course/Update assignment workflows and preserve index filters.
 
 The `/ui` catalog includes compact records, list selection, complete/partial/overdue progress, pinned row actions and menu-to-dialog focus behavior.
+
+`RecordCardFooter` keeps administrative cards light: a white surface, quiet icon-led details and one persistent `RowActions` menu. `RecordCardDetail` owns icon size and alignment; names open editing, selection stays independent, and additional audiences use `RecordValues` to reveal their complete names. Keep publication and audience eligibility with the feature.
+
+Dropdown menus use an even inset and an inner item radius that follows their outer corners. Short menus do not reserve an empty scrollbar gutter; overflowing menus retain native scrolling and containment. The hierarchy browser clips header highlights to its outer card corners and uses an inset focus ring, keeping the header-to-footer boundary straight.
+
+Person assignment details reuse `CollectionControls`: search course titles, filter completion or overdue status, and default to newest assignment first. Unknown assignment dates sort last. Incomplete includes all unfinished courses; Overdue narrows that set when deadlines are enabled. Export the same filtered and sorted rows after the existing fresh-data check. Learning-group membership metrics say “teams linked” and “direct users linked,” with singular forms for one.
+
+Administration groups Curricula beneath Content in Publishing. People & Progress contains People, Teams, Groups and Progress. Organization settings follow Identity, Access, Docs navigation, External links, Due dates, Ask AI, MCP, Privacy and Recently deleted. Groups combine teams and direct members into reusable audiences; Teams define reporting scope as well as course assignment and Update relevance. Neither creates a content access boundary.

@@ -62,14 +62,14 @@ test("installed group directory cancels bulk deletion intact and sends one revis
   if (await section.isVisible()) {
     await section.click();
     await page
-      .getByRole("option", { name: "Learning groups", exact: true })
+      .getByRole("option", { name: "Groups", exact: true })
       .click();
   } else
     await page
-      .getByRole("tab", { name: "Learning groups", exact: true })
+      .getByRole("tab", { name: "Groups", exact: true })
       .click();
   const table = page.getByRole("table", {
-    name: "Learning groups",
+    name: "Groups",
     exact: true,
   });
   for (const name of ["Audience A", "Audience B"])

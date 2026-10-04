@@ -520,7 +520,7 @@ export function HierarchyBrowser({
       >
         <div
           className={cn(
-            "grid min-w-0 gap-1 rounded-control border border-border bg-background",
+            "grid min-w-0 gap-1 overflow-hidden rounded-xl border border-border bg-background",
             !flat &&
               activePath.has(item.id) &&
               "border-control-border bg-muted",
@@ -550,7 +550,7 @@ export function HierarchyBrowser({
                     )
                   : browse(item.id)
               }
-              className="shadow-none flex min-w-0 flex-1 items-start justify-between gap-2 border-0 bg-transparent px-2 py-2 text-label"
+              className="shadow-none flex min-w-0 flex-1 items-start justify-between gap-2 rounded-none border-0 bg-transparent px-2 py-2 text-label"
             >
               <span className="grid min-w-0 gap-1 [overflow-wrap:anywhere]">
                 <span className="line-clamp-2 font-semibold" title={item.label}>

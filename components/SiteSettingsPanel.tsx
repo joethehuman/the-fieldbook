@@ -510,7 +510,7 @@ export default function SiteSettingsPanel({
                         guestGroupId: id,
                       }));
                       setNotice(
-                        `${name} created and selected. Save settings to use it for guests. Add courses and updates in Learning groups.`,
+                        `${name} created and selected. Save settings to use it for guests. Add courses and updates in Groups.`,
                       );
                     } catch (error) {
                       setNotice((error as Error).message);

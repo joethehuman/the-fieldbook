@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { Network, Users } from "lucide-react";
+import { GraduationCap, Network, Users } from "lucide-react";
 import { DataTable } from "@/components/patterns/data-table";
 import {
   RecordListRow,
@@ -8,6 +8,12 @@ import {
   RecordName,
   RecordProgress,
 } from "@/components/patterns/record-row";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  RecordCardDetail,
+  RecordCardFooter,
+} from "@/components/patterns/record-card";
 import { RowActions } from "@/components/patterns/row-actions";
 import {
   TableBody,
@@ -149,6 +155,44 @@ export function RecordExamples() {
           }
         />
       </div>
+      <Card
+        className="flex max-w-sm flex-col p-0 sm:p-0"
+        aria-label="Curriculum card example"
+      >
+        <CardContent className="grid gap-4">
+          <Badge variant="success">Published</Badge>
+          <h3>
+            <RecordName onClick={() => setOpen(true)}>
+              Company foundations
+            </RecordName>
+          </h3>
+          <p>Find your way around and build good working habits.</p>
+        </CardContent>
+        <RecordCardFooter
+          actions={
+            <RowActions
+              label="Company foundations"
+              actions={[
+                { label: "Edit curriculum", onSelect: () => setOpen(true) },
+                { label: "Edit audience", onSelect: () => setOpen(true) },
+                {
+                  label: "Delete curriculum",
+                  destructive: true,
+                  separator: true,
+                  onSelect: () => setOpen(true),
+                },
+              ]}
+            />
+          }
+        >
+          <RecordCardDetail icon={<GraduationCap aria-hidden="true" />}>
+            3 courses
+          </RecordCardDetail>
+          <RecordCardDetail icon={<Users aria-hidden="true" />}>
+            Everyone in the organization
+          </RecordCardDetail>
+        </RecordCardFooter>
+      </Card>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogBody>

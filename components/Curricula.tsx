@@ -15,7 +15,7 @@ import { FormField } from "@/components/patterns/form-field";
 import { useToast } from "./ui/toast";
 import { SelectField } from "./ui/select";
 import { useRevealTarget } from "./patterns/use-reveal-target";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { SectionHeader } from "@/components/patterns/layout";
 import { ActionGroup } from "@/components/ui/action-group";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,7 +34,11 @@ import { CardArtEditor } from "./patterns/card-art-editor";
 import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
 import type { UploadMedia } from "./MarkdownEditor";
 import { useInteractionDialog } from "./ui/interaction-dialog";
-import { Plus } from "lucide-react";
+import { Plus, GraduationCap, Users } from "lucide-react";
+import { RecordName, RecordValues } from "./patterns/record-row";
+import { RecordCardFooter, RecordCardDetail } from "./patterns/record-card";
+import { RowActions, type RowAction } from "./patterns/row-actions";
+import { audienceOptions, contentAudienceKey } from "@/lib/content-audiences";
 import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
 import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
 import { assignmentAudiences } from "@/lib/assignment-audiences";
@@ -48,12 +52,14 @@ export default function Curricula({
   initialCurriculum,
   createNew,
   onDestinationChange,
+  hrefForCurriculum,
   data,
   onChange,
   onUpload,
   registerNavigationGuard,
   onPrepareAssignments,
 }: {
+  hrefForCurriculum?: (id: string) => string;
   initialCurriculum?: string;
   createNew?: boolean;
   onDestinationChange?: (id?: string, create?: boolean) => Promise<boolean>;
@@ -141,8 +147,10 @@ export default function Curricula({
     editing ? editing.courseIds : visibleCurricula.map((c) => c.id),
   );
   const content = data.publishedContent || data.content;
+  const assignmentOptions = audienceOptions(data);
+  const savedAudiences = assignmentAudiences(data);
   const linked = (id: string) =>
-    assignmentAudiences(data).filter((audience) =>
+    savedAudiences.filter((audience) =>
       audience.items.some(
         (item) => item.kind === "curriculum" && item.id === id,
       ),
@@ -285,7 +293,7 @@ export default function Curricula({
                     : "New curriculum"}
                 </h2>
               }
-              description="A playlist of courses, in the order you recommend."
+              description="A course list, in the order you recommend."
             >
               <Button type="button" variant="outline" onClick={closeEditor}>
                 Cancel
@@ -430,7 +438,9 @@ export default function Curricula({
             variant="page"
             title={<h2>Curricula</h2>}
             description={
-              <>Create reusable playlists, then add them to teams or groups.</>
+              <>
+                Create reusable course lists, then add them to teams or groups.
+              </>
             }
           />
           <CollectionControls
@@ -580,73 +590,120 @@ export default function Curricula({
             </div>
           )}
           <div className="group-grid">
-            {visibleCurricula.map((c) => (
-              <Card className="flex flex-col p-0 sm:p-0" key={c.id}>
-                <CardContent className="grid gap-4">
-                  <Badge
-                    variant={c.status === "published" ? "success" : "default"}
-                  >
-                    {c.status === "published" ? "Published" : "Draft"}
-                  </Badge>
-                  <div className="flex items-center gap-3">
-                    {selection.canSelect && (
-                      <Checkbox
-                        aria-label={`Select ${c.name}`}
-                        checked={selection.selected.includes(c.id)}
-                        onCheckedChange={(v) =>
-                          selection.toggle(c.id, v === true)
+            {visibleCurricula.map((c) => {
+              const edit = () => {
+                if (onDestinationChange) {
+                  void onDestinationChange(c.id);
+                  return;
+                }
+                savedCurriculum.current = structuredClone(c);
+                setEditing(structuredClone(c));
+                destination.reveal();
+                setNotice("");
+              };
+              const audiences = linked(c.id).map((audience) => {
+                const option = assignmentOptions.find(
+                  (item) =>
+                    contentAudienceKey(item) ===
+                    `${audience.kind}:${audience.id}`,
+                );
+                return option?.organization
+                  ? "Everyone in the organization"
+                  : option?.publicGuests
+                    ? "Public guests"
+                    : audience.name;
+              });
+              const actions = (assign?: () => void, loading = false) => (
+                <RowActions
+                  label={c.name}
+                  disabled={busy || loading}
+                  actions={
+                    [
+                      { label: "Edit curriculum", onSelect: edit },
+                      ...(assign
+                        ? [{ label: "Edit audience", onSelect: assign }]
+                        : []),
+                      {
+                        label: "Delete curriculum",
+                        onSelect: () => void remove(c),
+                        destructive: true,
+                        separator: true,
+                      },
+                    ] satisfies RowAction[]
+                  }
+                />
+              );
+              const footer = (assign?: () => void, loading = false) => (
+                <RecordCardFooter actions={actions(assign, loading)}>
+                  <RecordCardDetail icon={<GraduationCap aria-hidden="true" />}>
+                    {c.courseIds.length}{" "}
+                    {c.courseIds.length === 1 ? "course" : "courses"}
+                  </RecordCardDetail>
+                  <RecordCardDetail icon={<Users aria-hidden="true" />}>
+                    <RecordValues
+                      values={audiences}
+                      label="audiences"
+                      empty={
+                        c.status === "published"
+                          ? "No audience assigned"
+                          : "Publish to assign an audience"
+                      }
+                    />
+                  </RecordCardDetail>
+                </RecordCardFooter>
+              );
+              return (
+                <Card className="flex flex-col p-0 sm:p-0" key={c.id}>
+                  <CardContent className="grid gap-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <Badge
+                        variant={
+                          c.status === "published" ? "success" : "default"
                         }
-                      />
-                    )}
-                    <h3>{c.name}</h3>
-                  </div>
-                  <p>{c.description}</p>
-                </CardContent>
-                <CardFooter className="mt-auto">
-                  <p className="text-copy text-muted-foreground">
-                    {c.courseIds.length} courses · {linked(c.id).length} teams
-                    or groups
-                  </p>
-                  <div className="grid gap-3">
-                    {c.status === "published" && (
-                      <LearningAssignmentPicker
-                        data={data}
-                        item={{ kind: "curriculum", id: c.id }}
-                        title={c.name}
-                        onChange={onChange}
-                        onPrepare={onPrepareAssignments}
-                        registerNavigationGuard={registerAssignmentGuard}
-                      />
-                    )}
-                    <ActionGroup>
-                      <Button
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => {
-                          if (onDestinationChange) {
-                            void onDestinationChange(c.id);
-                            return;
+                      >
+                        {c.status === "published" ? "Published" : "Draft"}
+                      </Badge>
+                      {selection.canSelect && (
+                        <Checkbox
+                          aria-label={`Select ${c.name}`}
+                          checked={selection.selected.includes(c.id)}
+                          onCheckedChange={(v) =>
+                            selection.toggle(c.id, v === true)
                           }
-                          savedCurriculum.current = structuredClone(c);
-                          setEditing(structuredClone(c));
-                          destination.reveal();
-                          setNotice("");
-                        }}
-                      >
-                        Edit {c.name}
-                      </Button>
-                      <Button
-                        variant="ghost"
+                        />
+                      )}
+                    </div>
+                    <h3>
+                      <RecordName
                         disabled={busy}
-                        onClick={() => remove(c)}
+                        href={hrefForCurriculum?.(c.id)}
+                        onNavigate={edit}
+                        onClick={edit}
                       >
-                        Delete
-                      </Button>
-                    </ActionGroup>
-                  </div>
-                </CardFooter>
-              </Card>
-            ))}
+                        {c.name}
+                      </RecordName>
+                    </h3>
+                    <p>{c.description}</p>
+                  </CardContent>
+                  {c.status === "published" ? (
+                    <LearningAssignmentPicker
+                      data={data}
+                      item={{ kind: "curriculum", id: c.id }}
+                      title={c.name}
+                      onChange={onChange}
+                      onPrepare={onPrepareAssignments}
+                      registerNavigationGuard={registerAssignmentGuard}
+                      compact
+                      renderTrigger={({ onClick, loading }) =>
+                        footer(onClick, loading)
+                      }
+                    />
+                  ) : (
+                    footer()
+                  )}
+                </Card>
+              );
+            })}
           </div>
           <CollectionEmpty
             count={visibleCurricula.length}

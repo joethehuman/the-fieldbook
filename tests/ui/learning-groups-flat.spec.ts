@@ -9,11 +9,11 @@ async function section(page: Page) {
   if (await picker.isVisible()) {
     await picker.click();
     await page
-      .getByRole("option", { name: "Learning groups", exact: true })
+      .getByRole("option", { name: "Groups", exact: true })
       .click();
   } else
     await page
-      .getByRole("tab", { name: "Learning groups", exact: true })
+      .getByRole("tab", { name: "Groups", exact: true })
       .click();
 }
 async function saved(page: Page): Promise<Workspace> {
@@ -183,7 +183,7 @@ test("flat groups retain curriculum links and deduplicate learning across audien
     expect.arrayContaining(["flat-course-0", "flat-course-1", "flat-course-2"]),
   );
   await page
-    .getByRole("button", { name: "All learning groups", exact: true })
+    .getByRole("button", { name: "All groups", exact: true })
     .click();
   await expect(
     page.getByRole("searchbox", { name: "Find a group", exact: true }),
@@ -576,7 +576,7 @@ test("People filters and bulk direct removal preserve team membership and cancel
 });
 
 async function indexChoice(page: Page, field: string, option: string) {
-  const sort = field === "Sort learning groups";
+  const sort = field === "Sort groups";
   await page
     .getByRole("button", { name: sort ? /^Sort:/ : /^Filters/ })
     .click();
@@ -604,7 +604,7 @@ test("group index keeps selection across pages and creation reveals the new row 
   );
   await start(page, data);
   const table = page.getByRole("table", {
-    name: "Learning groups",
+    name: "Groups",
     exact: true,
   });
   await expect(table).toHaveAttribute(
@@ -627,7 +627,7 @@ test("group index keeps selection across pages and creation reveals the new row 
   await expect(
     page.getByRole("region", { name: "Selected items", exact: true }),
   ).toContainText("29 selected");
-  await indexChoice(page, "Sort learning groups", "Name Z–A");
+  await indexChoice(page, "Sort groups", "Name Z–A");
   await expect(
     table.getByRole("checkbox", { name: "Select Pilot", exact: true }),
   ).toBeChecked();
@@ -693,7 +693,7 @@ test("group index sorts real counts and filters membership and assigned courses 
   });
   await start(page, data);
   const table = page.getByRole("table", {
-    name: "Learning groups",
+    name: "Groups",
     exact: true,
   });
   const widths = () =>
@@ -703,15 +703,15 @@ test("group index sorts real counts and filters membership and assigned courses 
         columns.map((column) => column.getBoundingClientRect().width),
       );
   const original = await widths();
-  await indexChoice(page, "Sort learning groups", "Courses: fewest first");
+  await indexChoice(page, "Sort groups", "Courses: fewest first");
   await expect(table.getByRole("row").nth(1)).toContainText("Empty audience");
-  await indexChoice(page, "Sort learning groups", "Courses: most first");
+  await indexChoice(page, "Sort groups", "Courses: most first");
   await expect(table.getByRole("row").nth(1)).toContainText(
     "Account executives",
   );
-  await indexChoice(page, "Sort learning groups", "People: fewest first");
+  await indexChoice(page, "Sort groups", "People: fewest first");
   await expect(table.getByRole("row").nth(1)).toContainText("Empty audience");
-  await indexChoice(page, "Sort learning groups", "People: most first");
+  await indexChoice(page, "Sort groups", "People: most first");
   await expect(table.getByRole("row").nth(1)).toContainText(
     "Account executives",
   );
@@ -783,7 +783,7 @@ test("bulk group deletion reviews once, cancels intact, and preserves content hi
     () => (window as typeof window & { groupWrites: number }).groupWrites,
   );
   const table = page.getByRole("table", {
-    name: "Learning groups",
+    name: "Groups",
     exact: true,
   });
   for (const name of ["Account executives", "Pilot"])

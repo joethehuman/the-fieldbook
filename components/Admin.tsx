@@ -161,6 +161,12 @@ const adminSections = [
         icon: FileText,
       },
       {
+        id: "curricula",
+        name: "Curricula",
+        description: "Build reusable course lists.",
+        icon: Layers,
+      },
+      {
         id: "feedback",
         name: "Feedback",
         description: "See what readers and learners are telling you.",
@@ -169,7 +175,7 @@ const adminSections = [
     ],
   },
   {
-    label: "People & courses",
+    label: "People & Progress",
     items: [
       {
         id: "people",
@@ -185,14 +191,8 @@ const adminSections = [
       },
       {
         id: "groups",
-        name: "Learning groups",
+        name: "Groups",
         description: "Manage people, assigned courses, and relevant updates.",
-        icon: Layers,
-      },
-      {
-        id: "curricula",
-        name: "Curricula",
-        description: "Build reusable playlists of courses.",
         icon: Layers,
       },
       {
@@ -213,10 +213,10 @@ const adminSections = [
         icon: Settings,
       },
       {
-        id: "settings-links",
-        name: "External links",
-        description: "Add up to three links to everyone’s account menu.",
-        icon: Settings,
+        id: "settings-access",
+        name: "Access",
+        description: "Manage browsing access and account registration.",
+        icon: Users,
       },
       {
         id: "settings-docs",
@@ -225,22 +225,16 @@ const adminSections = [
         icon: FileText,
       },
       {
+        id: "settings-links",
+        name: "External links",
+        description: "Add up to three links to everyone’s account menu.",
+        icon: Settings,
+      },
+      {
         id: "settings-courses",
         name: "Due dates",
         description: "Choose whether group-selected courses have due dates.",
         icon: Layers,
-      },
-      {
-        id: "settings-access",
-        name: "Access",
-        description: "Manage browsing access and account registration.",
-        icon: Users,
-      },
-      {
-        id: "settings-privacy",
-        name: "Privacy",
-        description: "Maintain and publish your organization’s privacy policy.",
-        icon: FileText,
       },
       {
         id: "settings-ai",
@@ -253,6 +247,12 @@ const adminSections = [
         name: "MCP",
         description: "Connect your AI tools to Fieldbook.",
         icon: Settings,
+      },
+      {
+        id: "settings-privacy",
+        name: "Privacy",
+        description: "Maintain and publish your organization’s privacy policy.",
+        icon: FileText,
       },
       {
         id: "deleted",
@@ -1019,7 +1019,7 @@ export default function Admin({
           {
             label: detailScope.userId
               ? "Back to people"
-              : "Back to learning groups",
+              : "Back to groups",
             onSelect: async () => {
               if (openingTab || openingItem) return;
               if (detailScope.userId && onOpenTab) {
@@ -1798,6 +1798,9 @@ export default function Admin({
               <Curricula
                 key={adminHref(destination)}
                 initialCurriculum={destination.id}
+                hrefForCurriculum={(id) =>
+                  recordHref({ tab: "curricula", id, view: "edit" })
+                }
                 createNew={destination.create === "curriculum"}
                 onDestinationChange={(id, create) =>
                   navigateDestination(

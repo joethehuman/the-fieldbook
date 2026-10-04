@@ -186,7 +186,7 @@ test("people and groups keep compact identities and direct navigation", async ({
   const group = page
     .locator('table[data-layout="learningGroupsSelectable"] tbody tr')
     .first();
-  await expect(group.getByRole("img", { name: /linked teams/ })).toBeVisible();
+  await expect(group.getByRole("img", { name: /teams linked/ })).toBeVisible();
   await screenshot(page, info, "learning-groups");
   const groupName = await group.locator("a[data-group-id]").innerText();
   await group.locator("a[data-group-id]").click();

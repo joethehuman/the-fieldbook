@@ -101,7 +101,7 @@ test("contributors share publishing editors with four permitted destinations on 
   await page.getByRole("button", { name: "Course", exact: true }).click();
   await openContentSettings(page);
   await expect(page.getByRole("button", { name: "Manage assigned courses", exact: true })).toHaveCount(0);
-  await expect(page.getByText("Learning groups", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Groups", { exact: true })).toHaveCount(0);
 });
 
 test("contributor Update audience offers groups without team or Organization controls", async ({

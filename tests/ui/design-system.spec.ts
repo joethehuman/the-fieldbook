@@ -140,7 +140,7 @@ test("learning groups: shared controls, save and reload", async ({
   page,
 }, testInfo) => {
   await admin(page);
-  await adminSection(page, "Learning groups");
+  await adminSection(page, "Groups");
   const search = page.getByRole("searchbox", {
     name: "Find a group",
     exact: true,
@@ -167,7 +167,7 @@ test("learning groups: shared controls, save and reload", async ({
   });
   await expect(createdGroup).toBeFocused();
   await expect(
-    page.getByRole("table", { name: "Learning groups", exact: true }),
+    page.getByRole("table", { name: "Groups", exact: true }),
   ).toBeVisible();
   await createdGroup.click();
   await expect(
@@ -189,7 +189,7 @@ test("learning groups: shared controls, save and reload", async ({
     fullPage: true,
   });
   await page.reload();
-  await adminSection(page, "Learning groups");
+  await adminSection(page, "Groups");
   await search.fill("Sales design test");
   await page
     .getByRole("button", { name: "Sales design test", exact: true })
@@ -352,7 +352,7 @@ test("admin destinations and editor render without overflow or errors", async ({
     "Content",
     "Feedback",
     "Demo profiles",
-    "Learning groups",
+    "Groups",
     "Teams",
     "Curricula",
     "Progress",

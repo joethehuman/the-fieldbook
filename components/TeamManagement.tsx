@@ -626,6 +626,7 @@ export function TeamsAdmin({
         <SectionHeader
           variant="page"
           title={<h2 {...browserTarget.targetProps}>Teams</h2>}
+          description="Use teams to manage reporting visibility, assign courses, and target relevant updates."
         >
           {organization && (
             <Button
@@ -693,8 +694,8 @@ export function TeamsAdmin({
                     ...([true, false] as const).map((add) => ({
                       id: add ? "add-groups" : "remove-groups",
                       label: add
-                        ? "Add to learning groups"
-                        : "Remove from learning groups",
+                        ? "Add to groups"
+                        : "Remove from groups",
                       description:
                         "Linked teams include all subteams. Review assignment changes before saving; accounts and saved progress are preserved.",
                       options: data.groups.map((g) => ({

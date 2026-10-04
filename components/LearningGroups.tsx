@@ -796,13 +796,13 @@ export default function LearningGroups({
     <section
       {...destination.targetProps}
       className="learning-admin"
-      aria-label={(selected && group?.name) || "Learning groups"}
+      aria-label={(selected && group?.name) || "Groups"}
     >
       {assignmentPicker.picker}
       {notice && !editor && <Alert variant="destructive">{notice}</Alert>}
       {needsConversion && (
         <Alert>
-          These groups still use the previous hierarchy. Convert learning groups
+          These groups still use the previous hierarchy. Convert groups
           before editing their audiences or learning.
         </Alert>
       )}
@@ -810,15 +810,15 @@ export default function LearningGroups({
         <>
           <SectionHeader
             variant="page"
-            title={<h2>Learning groups</h2>}
-            description="Choose an audience, then choose its learning. Published content remains available to everyone with access."
+            title={<h2>Groups</h2>}
+            description="Assign learning to teams directly. Use groups to combine teams and individual people into a custom audience."
           />
           <CollectionControls
             filters={indexFilters}
             onClear={clearIndexFilters}
             sortLabel={indexSortLabels[indexSort]}
             sort={
-              <FormField label="Sort learning groups">
+              <FormField label="Sort groups">
                 <SelectField
                   value={indexSort}
                   onValueChange={(value) => {
@@ -901,14 +901,14 @@ export default function LearningGroups({
                 id: "delete-groups",
                 label: "Delete groups",
                 description:
-                  "Remove selected learning groups and their audience links. Courses and saved completions remain.",
+                  "Remove selected groups and their audience links. Courses and saved completions remain.",
                 destructive: true,
                 externalReview: true,
                 disabledReason:
                   busy || needsConversion
                     ? "Finish the current change first."
                     : undefined,
-                successMessage: "Learning groups deleted.",
+                successMessage: "Groups deleted.",
                 apply: async (_, ids = []) => {
                   if (
                     currentIndexSnapshot.current !== indexSnapshot ||
@@ -993,7 +993,7 @@ export default function LearningGroups({
               <DataTable
                 layout="learningGroupsSelectable"
                 density="compact"
-                aria-label="Learning groups"
+                aria-label="Groups"
               >
                 <TableHeader>
                   <TableRow>
@@ -1059,7 +1059,7 @@ export default function LearningGroups({
                                   />
                                 }
                                 value={links.length}
-                                label={`${links.length} linked teams`}
+                                label={`${links.length} ${links.length === 1 ? "team" : "teams"} linked`}
                               />
                             )}
                             {direct > 0 && (
@@ -1071,7 +1071,7 @@ export default function LearningGroups({
                                   />
                                 }
                                 value={direct}
-                                label={`${direct} individually added`}
+                                label={`${direct} direct ${direct === 1 ? "user" : "users"} linked`}
                               />
                             )}
                             {!links.length && !direct && "No members yet"}
@@ -1108,13 +1108,13 @@ export default function LearningGroups({
             <CollectionEmpty
               count={0}
               total={data.groups.length}
-              noun="learning groups"
+              noun="groups"
               onClear={clearIndexFilters}
             />
           )}
           <Pagination
             showCount={false}
-            label="Learning groups"
+            label="Groups"
             page={groupPage}
             pageSize={PAGE_SIZE}
             total={groups.length}
@@ -1128,7 +1128,7 @@ export default function LearningGroups({
             disabled={busy}
             items={[
               {
-                label: "All learning groups",
+                label: "All groups",
                 onSelect: () => {
                   if (onDestinationChange) {
                     void onDestinationChange();

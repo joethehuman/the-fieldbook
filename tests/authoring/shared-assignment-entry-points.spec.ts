@@ -223,7 +223,7 @@ test("group course list scrolls without moving search, filters, pagination or mo
 }, info) => {
   const installed = info.project.name.startsWith("production");
   await setup(page, installed, true);
-  await section(page, "Learning groups");
+  await section(page, "Groups");
   await page
     .getByRole("button", { name: "Account executives", exact: true })
     .click();
@@ -337,7 +337,7 @@ test("group-context selection retains search on Back, guards discard, and review
 }, info) => {
   const installed = info.project.name.startsWith("production"),
     state = await setup(page, installed);
-  await section(page, "Learning groups");
+  await section(page, "Groups");
   await page
     .getByRole("button", { name: "Account executives", exact: true })
     .click();

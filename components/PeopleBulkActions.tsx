@@ -63,7 +63,7 @@ export function peopleCommands(
     ...(["add", "remove"] as const).map((op) => ({
       id: op,
       label:
-        op === "add" ? "Add to learning groups" : "Remove from learning groups",
+        op === "add" ? "Add to groups" : "Remove from groups",
       description:
         op === "add"
           ? "Add direct memberships. Overlapping assignments count once."
