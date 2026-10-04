@@ -4,7 +4,8 @@ import { canBulkSelect, SelectRows } from "./bulk-selection";
 import { ReorderRow } from "./reorder-row";
 import type { ReactNode } from "react";
 import { useRowReorder } from "./use-row-reorder";
-import { ArrowDown, ArrowUp, GripVertical, Trash2 } from "lucide-react";
+import { GripVertical } from "lucide-react";
+import { RowActions, type RowAction } from "./row-actions";
 import { Button } from "../ui/button";
 export function OrderedLearning({
   items,
@@ -14,6 +15,7 @@ export function OrderedLearning({
   reorderDisabled = false,
   selected,
   onSelectionChange,
+  renderActions,
 }: {
   items: { id: string; label: string; detail?: ReactNode }[];
   onReorder: (ids: string[]) => void;
@@ -23,6 +25,10 @@ export function OrderedLearning({
   reorderDisabled?: boolean;
   selected?: string[];
   onSelectionChange?: (ids: string[]) => void;
+  renderActions?: (
+    item: { id: string; label: string },
+    actions: RowAction[],
+  ) => ReactNode;
 }) {
   const drag = useRowReorder(
     items,
@@ -126,42 +132,36 @@ export function OrderedLearning({
               </div>
             }
             detail={item.detail}
-            actions={
-              <>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Move ${item.label} up`}
-                  disabled={disabled || reorderDisabled || index === 0}
-                  onClick={() => move(item.id, index - 1)}
-                >
-                  <ArrowUp size={16} />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label={`Move ${item.label} down`}
-                  disabled={
-                    disabled || reorderDisabled || index === items.length - 1
-                  }
-                  onClick={() => move(item.id, index + 1)}
-                >
-                  <ArrowDown size={16} />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
+            actions={(() => {
+              const actions: RowAction[] = [
+                {
+                  label: "Move up",
+                  disabled: disabled || reorderDisabled || index === 0,
+                  onSelect: () => move(item.id, index - 1),
+                },
+                {
+                  label: "Move down",
+                  disabled:
+                    disabled || reorderDisabled || index === items.length - 1,
+                  onSelect: () => move(item.id, index + 1),
+                },
+                {
+                  label: "Remove",
+                  destructive: true,
+                  separator: true,
+                  onSelect: () => onRemove(item.id),
+                },
+              ];
+              return renderActions ? (
+                renderActions(item, actions)
+              ) : (
+                <RowActions
+                  label={item.label}
                   disabled={disabled}
-                  aria-label={`Remove ${item.label}`}
-                  onClick={() => onRemove(item.id)}
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </>
-            }
+                  actions={actions}
+                />
+              );
+            })()}
           />
         ))}
       </ol>

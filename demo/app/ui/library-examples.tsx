@@ -19,7 +19,11 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { BulkActions } from "@/components/patterns/bulk-actions";
+import {
+  BulkActions,
+  ItemActions,
+  type BulkCommand,
+} from "@/components/patterns/bulk-actions";
 import {
   SelectRows,
   useBulkSelection,
@@ -729,6 +733,32 @@ function GroupRosterExample() {
     JSON.stringify([query, source]),
     matches.map((row) => row.id),
   );
+  function rosterCommands(ids: string[]): BulkCommand[] {
+    return [
+      {
+        id: "remove",
+        label: "Remove direct members",
+        description:
+          "Linked-team inclusion remains after removing a direct link.",
+        destructive: true,
+        disabledReason: ids.some(
+          (id) => !rows.find((row) => row.id === id)?.direct,
+        )
+          ? "Select only people with Direct membership."
+          : undefined,
+        apply: (_, ids = []) =>
+          setRows((current) =>
+            current.flatMap((row) =>
+              !ids.includes(row.id)
+                ? [row]
+                : row.team
+                  ? [{ ...row, direct: false }]
+                  : [],
+            ),
+          ),
+      },
+    ];
+  }
   return (
     <SettingsSection
       id="catalog-group-roster"
@@ -785,33 +815,9 @@ function GroupRosterExample() {
       <BulkActions
         selected={selection.actionIds}
         collectionSize={matches.length}
-        singleItemActions={false}
         noun="people"
         onSelectionChange={selection.setSelected}
-        commands={[
-          {
-            id: "remove",
-            label: "Remove direct members",
-            description:
-              "Linked-team inclusion remains after removing a direct link.",
-            destructive: true,
-            disabledReason: selection.actionIds.some(
-              (id) => !rows.find((row) => row.id === id)?.direct,
-            )
-              ? "Select only people with Direct membership."
-              : undefined,
-            apply: (_, ids = []) =>
-              setRows((current) =>
-                current.flatMap((row) =>
-                  !ids.includes(row.id)
-                    ? [row]
-                    : row.team
-                      ? [{ ...row, direct: false }]
-                      : [],
-                ),
-              ),
-          },
-        ]}
+        commands={rosterCommands(selection.actionIds)}
       />
       <TableContainer>
         <DataTable
@@ -832,6 +838,9 @@ function GroupRosterExample() {
               <TableHead>Person</TableHead>
               <TableHead>Reporting team</TableHead>
               <TableHead>Included through</TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -856,6 +865,13 @@ function GroupRosterExample() {
                   {[row.direct ? "Direct" : "", row.team ? "Team" : ""]
                     .filter(Boolean)
                     .join(" · ")}
+                </TableCell>
+                <TableCell>
+                  <ItemActions
+                    id={row.id}
+                    label={row.name}
+                    commands={rosterCommands([row.id])}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -937,6 +953,18 @@ function GroupIndexExample() {
     query + people,
     matches.map((row) => row.id),
   );
+  function indexCommands(ids: string[]): BulkCommand[] {
+    return [
+      {
+        id: "delete",
+        label: "Delete example groups",
+        description: "Remove selected example audiences.",
+        destructive: true,
+        apply: (_, ids = []) =>
+          setRows((current) => current.filter((row) => !ids.includes(row.id))),
+      },
+    ];
+  }
   return (
     <SettingsSection
       id="catalog-group-index"
@@ -990,21 +1018,9 @@ function GroupIndexExample() {
       <BulkActions
         selected={selection.actionIds}
         collectionSize={matches.length}
-        singleItemActions={false}
         noun="groups"
         onSelectionChange={selection.setSelected}
-        commands={[
-          {
-            id: "delete",
-            label: "Delete example groups",
-            description: "Remove selected example audiences.",
-            destructive: true,
-            apply: (_, ids = []) =>
-              setRows((current) =>
-                current.filter((row) => !ids.includes(row.id)),
-              ),
-          },
-        ]}
+        commands={indexCommands(selection.actionIds)}
       />
       <TableContainer>
         <DataTable
@@ -1026,7 +1042,9 @@ function GroupIndexExample() {
               <TableHead>Group</TableHead>
               <TableHead align="right">People</TableHead>
               <TableHead align="right">Courses</TableHead>
-              <TableHead><span className="sr-only">Actions</span></TableHead>
+              <TableHead>
+                <span className="sr-only">Actions</span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1046,7 +1064,13 @@ function GroupIndexExample() {
                 <TableCell>{row.name}</TableCell>
                 <TableCell align="right">{row.people}</TableCell>
                 <TableCell align="right">{row.courses}</TableCell>
-                <TableCell><RowActions label={row.name} actions={[{ label: "Select group", onSelect: () => selection.toggle(row.id, true) }]} /></TableCell>
+                <TableCell>
+                  <ItemActions
+                    id={row.id}
+                    label={row.name}
+                    commands={indexCommands([row.id])}
+                  />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

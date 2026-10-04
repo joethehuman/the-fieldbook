@@ -7,9 +7,9 @@ import { Spinner } from "./ui/spinner";
 import { Pagination } from "./patterns/pagination";
 import { contentRelationshipCommands } from "./bulk-relationships";
 import type { BulkHandler } from "@/lib/bulk-actions";
-import { AdminBulkActions } from "./AdminBulkActions";
+import { AdminBulkActions, adminCommands } from "./AdminBulkActions";
 import { RecentlyDeleted } from "./RecentlyDeleted";
-import { PeopleBulkActions } from "./PeopleBulkActions";
+import { PeopleBulkActions, peopleCommands } from "./PeopleBulkActions";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { CreatableCombobox } from "./ui/creatable-combobox";
 import { DocSectionPicker } from "./DocSectionPicker";
@@ -41,7 +41,7 @@ import { FormField } from "@/components/patterns/form-field";
 import { FilterOptions } from "./patterns/filter-options";
 import { useToast } from "./ui/toast";
 import { RecordName, RecordMeta, RecordValues } from "./patterns/record-row";
-import { RowActions } from "./patterns/row-actions";
+import { ItemActions } from "./patterns/bulk-actions";
 import { DataTable } from "./patterns/data-table";
 import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation";
 import {
@@ -1094,9 +1094,16 @@ export default function Admin({
     assign?: { onClick: () => void; loading: boolean },
   ) {
     return (
-      <RowActions
+      <ItemActions
+        id={c.id}
         label={c.title || "Untitled"}
         disabled={openingItem === c.id || assign?.loading}
+        onSelectionChange={(ids) => {
+          if (!ids.length)
+            selection.setSelected(
+              selection.selected.filter((id) => id !== c.id),
+            );
+        }}
         actions={[
           {
             label: "Edit",
@@ -1108,36 +1115,24 @@ export default function Admin({
               });
             },
           },
-          ...(assign ? [{ label: "Assign", onSelect: assign.onClick }] : []),
-          ...(c.publishedRevision
-            ? [
-                {
-                  label: "Unpublish",
-                  separator: true,
-                  onSelect: async () => {
-                    if (
-                      !(await confirm(
-                        "Unpublish this item? Its draft and history will be kept.",
-                      ))
-                    )
-                      return;
-                    try {
-                      if (onUnpublish) await onUnpublish(c.id);
-                      else
-                        await onChange({
-                          ...data,
-                          content: data.content.filter((x) => x.id !== c.id),
-                        });
-                      setNotice("");
-                      notify("Content unpublished.");
-                    } catch (e) {
-                      setNotice((e as Error).message);
-                    }
-                  },
-                },
-              ]
-            : []),
         ]}
+        commands={adminCommands({
+          data,
+          selected: [c.id],
+          onBulk,
+          extraCommands: admin
+            ? contentRelationshipCommands(
+                data,
+                [c.id],
+                onChange,
+                manageLearningMany,
+                assignmentPicker.open,
+              )
+            : [],
+        }).filter((command) =>
+          command.id === "unpublish" ? !!c.publishedRevision :
+          command.id === "publish" ? !c.publishedRevision || hasUnpublishedEdits(c, production ? undefined : data.publishedContent?.find((live) => live.id === c.id)) : true,
+        ).map((command) => command.id === "publish" && c.publishedRevision ? { ...command, itemLabel: "Publish changes" } : command)}
       />
     );
   }
@@ -1517,7 +1512,8 @@ export default function Admin({
                               <RecordName
                                 disabled={openingItem === c.id}
                                 href={contentEditHref(c.id)}
-                                onNavigate={() => void navigateDestination({ tab: "content", id: c.id, view: "edit" })}
+                                onNavigate={() => void navigateDestination({ tab: "content", id: c.id, view: "edit",
+                                  })}
                               >
                                 {c.title || "Untitled"}
                               </RecordName>
@@ -1550,7 +1546,8 @@ export default function Admin({
                             <TableCell>
                               {admin &&
                               c.kind === "course" &&
-                              (!!c.publishedRevision || c.status === "published" || data.publishedContent?.some((live) => live.id === c.id && live.status === "published")) ? (
+                              (!!c.publishedRevision || c.status === "published" || data.publishedContent?.some((live) => live.id === c.id && live.status === "published",
+                                )) ? (
                                 <LearningAssignmentPicker
                                   data={data}
                                   item={{ kind: "course", id: c.id }}
@@ -1753,22 +1750,66 @@ export default function Admin({
                             </TableCell>
                             <TableCell>
                               <RecordName
-                                href={recordHref({ tab: "people", id: u.id, view: "edit" })}
-                                onNavigate={() => openPerson(structuredClone(u))}
+                                href={recordHref({ tab: "people", id: u.id, view: "edit",
+                                })}
+                                onNavigate={() =>
+                                  openPerson(structuredClone(u))
+                                }
                               >
                                 {u.name}
                               </RecordName>
                               <RecordMeta title={u.email}>{u.email}</RecordMeta>
                             </TableCell>
-                            <TableCell>{data.teams?.find((team) => team.id === reportingTeamId(u.teamId, data.teams))?.name || "No team"}</TableCell>
+                            <TableCell>
+                              {data.teams?.find(
+                                (team) =>
+                                  team.id ===
+                                  reportingTeamId(u.teamId, data.teams),
+                              )?.name || "No team"}
+                            </TableCell>
                             <TableCell>{roleLabel(u.role)}</TableCell>
                             <TableCell>
-                              <RecordValues label="groups" empty="No groups" values={data.groups.filter((g) => effectiveGroups(u, data.groups).has(g.id)).map((g) => g.name)} />
+                              <RecordValues
+                                label="groups"
+                                empty="No groups"
+                                values={data.groups
+                                  .filter((g) =>
+                                    effectiveGroups(u, data.groups).has(g.id),
+                                  )
+                                  .map((g) => g.name)}
+                              />
                             </TableCell>
 
                             <TableCell>
-                              <RowActions
+                              <ItemActions
+                                id={u.id}
                                 label={u.name}
+                                noun="users"
+                                onSelectionChange={(ids) => {
+                                  if (!ids.length)
+                                    selection.setSelected(
+                                      selection.selected.filter(
+                                        (id) => id !== u.id,
+                                      ),
+                                    );
+                                }}
+                                commands={adminCommands({
+                                  data,
+                                  selected: [u.id],
+                                  entity: "user",
+                                  onBulk,
+                                  extraCommands: peopleCommands(
+                                    data,
+                                    [u.id],
+                                    onChange,
+                                    false,
+                                    user.id,
+                                  ),
+                                }).filter(
+                                  (command) =>
+                                    command.id !==
+                                    (u.active ? "active" : "inactive"),
+                                )}
                                 disabled={!!openingTab || !!openingItem}
                                 actions={[
                                   {
@@ -2800,7 +2841,8 @@ export function Editor({
     </FieldGroup>
   );
   return (
-    <EditorFocusContext.Provider value={{ active: focus.active, toggle: focus.toggle, status: needsRecovery ? "Not saved" : saveStatus }}>
+    <EditorFocusContext.Provider value={{ active: focus.active, toggle: focus.toggle, status: needsRecovery ? "Not saved" : saveStatus,
+      }}>
     <form
       ref={form}
       className="editor"
@@ -2952,34 +2994,48 @@ export function Editor({
             revealDetails={detailsReveal}
             incompleteSteps={[
               ...new Set(
-                requirements.flatMap((item) => (item.step ? [item.step] : [])),
-              ),
-            ]}
-            revealStep={revealStep}
-            onChange={(updater) => setC(updater)}
-            onUpload={upload}
-            disabled={busy}
-          />
-        ) : (
-          <EditorFrame
-            details={details}
-            requirementsCount={requirements.length}
-            revealDetails={detailsReveal}
-            disabled={busy}
-          >
-            <WritingEditor
-              downloadName={c.title}
-              label={c.kind === "doc" ? "Doc content" : "Update content"}
-              title={focus.active ? <WritingTitle aria-label="Title" maxLength={160} value={c.title} onChange={(event) => set("title", event.target.value.replace(/\n/g, " "))} placeholder={`Untitled ${c.kind === "doc" ? "doc" : "update"}`} /> : undefined}
-              value={c.body}
-              onChange={(value) => set("body", value)}
+                requirements.flatMap((item) =>
+                    item.step ? [item.step] : [],
+                  ),
+                ),
+              ]}
+              revealStep={revealStep}
+              onChange={(updater) => setC(updater)}
               onUpload={upload}
               disabled={busy}
             />
-          </EditorFrame>
-        )}
-      </FieldGroup>
-    </form>
+          ) : (
+            <EditorFrame
+              details={details}
+              requirementsCount={requirements.length}
+              revealDetails={detailsReveal}
+              disabled={busy}
+            >
+              <WritingEditor
+                downloadName={c.title}
+                label={c.kind === "doc" ? "Doc content" : "Update content"}
+                title={
+                  focus.active ? (
+                    <WritingTitle
+                      aria-label="Title"
+                      maxLength={160}
+                      value={c.title}
+                      onChange={(event) =>
+                        set("title", event.target.value.replace(/\n/g, " "))
+                      }
+                      placeholder={`Untitled ${c.kind === "doc" ? "doc" : "update"}`}
+                    />
+                  ) : undefined
+                }
+                value={c.body}
+                onChange={(value) => set("body", value)}
+                onUpload={upload}
+                disabled={busy}
+              />
+            </EditorFrame>
+          )}
+        </FieldGroup>
+      </form>
     </EditorFocusContext.Provider>
   );
 }

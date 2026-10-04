@@ -17,6 +17,7 @@ export type RowAction = {
   icon?: ReactNode;
   onSelect: () => void;
   disabled?: boolean;
+  disabledReason?: string;
   destructive?: boolean;
   separator?: boolean;
 };
@@ -78,6 +79,11 @@ export function RowActions({
               {action.icon}
               {action.label}
             </DropdownMenuItem>
+            {action.disabledReason && (
+              <p className="px-3 pb-2 text-xs text-muted-foreground">
+                {action.disabledReason}
+              </p>
+            )}
           </Fragment>
         ))}
       </DropdownMenuContent>

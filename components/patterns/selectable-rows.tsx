@@ -12,6 +12,7 @@ export function SelectableRows({
   label,
   scope = "",
   empty,
+  renderActions,
 }: {
   rows: {
     id: string;
@@ -24,6 +25,7 @@ export function SelectableRows({
   label: string;
   scope?: string;
   empty?: ReactNode;
+  renderActions?: (row: { id: string; label: string }) => ReactNode;
 }) {
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [scope]);
@@ -110,6 +112,9 @@ export function SelectableRows({
                 </p>
               )}
             </div>
+            {renderActions && (
+              <div className="ms-auto shrink-0">{renderActions(r)}</div>
+            )}
           </li>
         ))}
       </ul>

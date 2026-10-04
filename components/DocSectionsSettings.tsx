@@ -293,6 +293,7 @@ export function DocSectionsSettings({
                     if (
                       await confirm(
                         `Delete empty section ${sectionPath(section, sections)}?`,
+                        { submitLabel: "Delete section", destructive: true },
                       )
                     )
                       act(() => next);
@@ -332,7 +333,6 @@ export function DocSectionsSettings({
         </Button>
       </div>
       <BulkActions
-        singleItemActions={false}
         collectionSize={selection.collectionSize}
         selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
@@ -340,6 +340,10 @@ export function DocSectionsSettings({
         commands={[
           {
             id: "move",
+            disabledReason:
+              disabled || conflict
+                ? conflict || "Finish the current change first."
+                : undefined,
             label: "Move selected sections",
             description:
               "Move the selected sections to one destination. Their documents and subsections remain attached. Review the new paths before saving settings.",
@@ -400,6 +404,25 @@ export function DocSectionsSettings({
               let next = sections;
               for (const id of ids)
                 next = moveDocSection(next, id, destination);
+              onChange(next);
+            },
+          },
+          {
+            id: "delete",
+            label: "Delete selected sections",
+            destructive: true,
+            description:
+              "Delete empty sections and selected empty subsections. Documents stay in place. Save settings to apply the changes.",
+            apply: (_, ids = []) => {
+              if (disabled || conflict)
+                throw new Error(conflict || "Finish the current change first.");
+              let next = sections;
+              const ordered = [...ids].sort(
+                (a, b) =>
+                  Number(!!sections.find((s) => s.id === b)?.parentId) -
+                  Number(!!sections.find((s) => s.id === a)?.parentId),
+              );
+              for (const id of ordered) next = deleteDocSection(next, id, docs);
               onChange(next);
             },
           },

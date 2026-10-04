@@ -4,12 +4,9 @@ import type { BulkHandler, BulkOperation } from "@/lib/bulk-actions";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
 import { ScrollRegion } from "./patterns/scroll-region";
-export function AdminBulkActions({
+export function adminCommands({
   data,
   selected,
-  collectionSize,
-  range,
-  onSelectionChange,
   onBulk,
   entity = "content",
   recovery = false,
@@ -17,14 +14,11 @@ export function AdminBulkActions({
 }: {
   data: Workspace;
   selected: string[];
-  collectionSize: number;
-  range?: string;
-  onSelectionChange: (ids: string[]) => void;
   onBulk: BulkHandler;
   entity?: "content" | "user";
   recovery?: boolean;
   extraCommands?: BulkCommand[];
-}) {
+}): BulkCommand[] {
   const items = data.content.filter((c) => selected.includes(c.id));
   const managedTeams = (data.teams || []).filter(
     (team) => team.managerId && selected.includes(team.managerId),
@@ -57,13 +51,13 @@ export function AdminBulkActions({
       label,
       description,
       ...other,
-      apply: async (values) => {
+      apply: async (values, sourceIds = selected) => {
         const results = await onBulk({
           entity,
           operation,
           value: values[0],
           governanceExpected: data.governanceRevision,
-          items: selected.map((id) => ({
+          items: sourceIds.map((id) => ({
             id,
             expected: recovery
               ? data.deletedItems?.find((d) => d.id === id)?.revision || 0
@@ -161,6 +155,37 @@ export function AdminBulkActions({
           },
         ),
       ];
+  return commands;
+}
+export function AdminBulkActions({
+  data,
+  selected,
+  collectionSize,
+  range,
+  onSelectionChange,
+  onBulk,
+  entity = "content",
+  recovery = false,
+  extraCommands = [],
+}: {
+  data: Workspace;
+  selected: string[];
+  collectionSize: number;
+  range?: string;
+  onSelectionChange: (ids: string[]) => void;
+  onBulk: BulkHandler;
+  entity?: "content" | "user";
+  recovery?: boolean;
+  extraCommands?: BulkCommand[];
+}) {
+  const commands = adminCommands({
+    data,
+    selected,
+    onBulk,
+    entity,
+    recovery,
+    extraCommands,
+  });
   return (
     <BulkActions
       collectionSize={collectionSize}

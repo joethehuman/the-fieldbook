@@ -358,7 +358,11 @@ export function useOrganizationChangeReview() {
           <Button type="button" variant="ghost" onClick={() => close(false)}>
             Cancel
           </Button>
-          <Button type="button" onClick={() => close(true)}>
+          <Button
+            type="button"
+            variant={pending?.context?.destructive ? "destructive" : "default"}
+            onClick={() => close(true)}
+          >
             {pending?.context?.confirmLabel || "Apply changes"}
           </Button>
         </DialogFooter>
