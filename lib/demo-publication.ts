@@ -1,6 +1,6 @@
 import type { Workspace } from "./store";
 import type { Content } from "./types";
-import { isArtworkOnlyUpdate } from "./card-art";
+import { publishedUpdateFeedDate } from "./content-publication";
 
 /** Compare author-controlled content, not persistence bookkeeping. */
 export function contentSignature(item: Content) {
@@ -58,28 +58,38 @@ export function withPublishedSnapshots(data: Workspace): Workspace {
 export function reconcileDemoPublication(
   before: Workspace,
   after: Workspace,
+  renewUpdateId?: string,
 ): Workspace {
   const source = withPublishedSnapshots(before);
   let published = [...source.publishedContent!];
   const content = after.content.map((item) => {
     const old = source.content.find((entry) => entry.id === item.id);
-    if (old && JSON.stringify(item) === JSON.stringify(old)) return item;
+    if (
+      old &&
+      JSON.stringify(item) === JSON.stringify(old) &&
+      item.id !== renewUpdateId
+    )
+      return item;
     const revision = (old?.revision || 0) + 1;
     const live = published.find((entry) => entry.id === item.id);
     const saved = {
       ...item,
       ...(item.status === "published" && item.kind === "brief"
         ? {
-            feedAt:
-              live && isArtworkOnlyUpdate(item, live)
-                ? live.feedAt || live.updatedAt
-                : item.updatedAt,
+            feedAt: publishedUpdateFeedDate(
+              live,
+              item.updatedAt,
+              item.id === renewUpdateId,
+            ),
           }
         : {}),
       revision,
-      publishedSignature: item.status === "published"
-        ? contentSignature(item)
-        : live ? contentSignature(live) : undefined,
+      publishedSignature:
+        item.status === "published"
+          ? contentSignature(item)
+          : live
+            ? contentSignature(live)
+            : undefined,
       publishedRevision:
         item.status === "published" ||
         (live && contentSignature(live) === contentSignature(item))

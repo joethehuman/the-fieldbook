@@ -2,7 +2,6 @@
 import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { cn } from "@/lib/utils";
-import "../../styles/dialog.css";
 const DialogModalContext = React.createContext(true);
 export function Dialog({
   modal = true,

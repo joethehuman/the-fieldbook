@@ -8,9 +8,14 @@ import type { LearningAction } from "./learning";
 import type { Workspace } from "./store";
 import type { Content, User } from "./types";
 import type { SaveIntent } from "./draft-save-queue";
+import type { PublicationOptions } from "./content-publication";
 import { mergeSavedContent } from "./content-save";
 import { SaveRecoveryError } from "./save-recovery";
 import { uploadMediaFile } from "./upload-media";
+import {
+  createDocsNavigationSaver,
+  type SaveDocsNavigation,
+} from "./docs-navigation-save";
 import { createSettingsSaver } from "./settings-save";
 import type { SiteSettings } from "./settings";
 export type AdminRuntime = {
@@ -19,7 +24,12 @@ export type AdminRuntime = {
     before: Workspace,
     settings: SiteSettings,
   ) => Promise<Workspace>;
-  saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
+  saveDocsNavigation: SaveDocsNavigation;
+  saveContent: (
+    content: Content,
+    intent: SaveIntent,
+    options?: PublicationOptions,
+  ) => Promise<Content>;
   publishedContent: (id: string) => Promise<Content>;
   refresh: () => Promise<Workspace>;
   reviewDeadlines: (
@@ -96,7 +106,9 @@ export function createAdminRuntime(initial: {
     let data = state.data as Workspace;
     if (
       openItem &&
-      (target === "content" || target === "people" || target === "governance") &&
+      (target === "content" ||
+        target === "people" ||
+        target === "governance") &&
       data.content.some((entry) => entry.id === openItem)
     ) {
       const item = await request(
@@ -126,16 +138,26 @@ export function createAdminRuntime(initial: {
   }
   const saver = createWorkspaceSaver(request, fresh);
   const settingsSaver = createSettingsSaver(request, fresh);
+  const docsNavigationSaver = createDocsNavigationSaver(request, fresh);
   return {
     upload: uploadMediaFile,
-    saveSettings: (before, settings) => mutate(async () => {
-      const saved = await settingsSaver(before, settings);
-      clearCached();
-      cached.set(scope, saved);
-      return saved;
-    }),
-    publishedContent: (id) => request(`/api/content?id=${encodeURIComponent(id)}&snapshot=published`),
-    saveContent: (content, intent) =>
+    saveSettings: (before, settings) =>
+      mutate(async () => {
+        const saved = await settingsSaver(before, settings);
+        clearCached();
+        cached.set(scope, saved);
+        return saved;
+      }),
+    saveDocsNavigation: (before, settings, moves) =>
+      mutate(async () => {
+        const result = await docsNavigationSaver(before, settings, moves);
+        clearCached();
+        cached.set(scope, result.data);
+        return result;
+      }),
+    publishedContent: (id) =>
+      request(`/api/content?id=${encodeURIComponent(id)}&snapshot=published`),
+    saveContent: (content, intent, options) =>
       mutate(async () => {
         if (contentSaveInFlight)
           throw new Error("Wait for the current save to finish.");
@@ -151,6 +173,8 @@ export function createAdminRuntime(initial: {
             content: draft,
             expected: content.revision || 0,
             publish: intent === "published",
+            renewUpdate:
+              intent === "published" && options?.renewUpdate === true,
           })) as Content;
           const updated = mergeSavedContent(
             cached.get("content") || initial.data,

@@ -8,10 +8,14 @@ export function useRowReorder<T extends { id: string }>(
   onMove: (id: string, targetIndex: number) => void,
   disabled = false,
   previewLabel?: (item: T) => string,
+  onDropTarget?: (
+    id: string,
+    destination: { id: string; side: "before" | "after" | "inside" },
+  ) => void,
 ) {
   const [drag, setDrag] = useState<{
     active: string;
-    destination?: { id: string; side: "before" | "after" };
+    destination?: { id: string; side: "before" | "after" | "inside" };
   } | null>(null);
   const [recentlyMoved, setRecentlyMoved] = useState("");
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -25,6 +29,7 @@ export function useRowReorder<T extends { id: string }>(
 
   function start(event: DragEvent<HTMLElement>, id: string) {
     if (disabled) return event.preventDefault();
+    event.stopPropagation();
     const item = items.find((candidate) => candidate.id === id);
     if (item) {
       const preview = document.createElement("div");
@@ -42,6 +47,7 @@ export function useRowReorder<T extends { id: string }>(
   function over(event: DragEvent<HTMLElement>, id: string) {
     if (!drag || disabled) return;
     event.preventDefault();
+    event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
     if (drag.active === id)
       return setDrag((current) =>
@@ -60,6 +66,17 @@ export function useRowReorder<T extends { id: string }>(
   function drop(event: DragEvent<HTMLElement>) {
     if (!drag) return;
     event.preventDefault();
+    event.stopPropagation();
+    if (onDropTarget) {
+      if (drag.destination) {
+        onDropTarget(drag.active, drag.destination);
+        setRecentlyMoved(drag.active);
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+        flashTimer.current = setTimeout(() => setRecentlyMoved(""), 1000);
+      }
+      setDrag(null);
+      return;
+    }
     const from = sourceIds.indexOf(drag.active);
     const to = drag.destination ? sourceIds.indexOf(drag.destination.id) : -1;
     const insertion =
@@ -80,6 +97,22 @@ export function useRowReorder<T extends { id: string }>(
     recentlyMoved,
     start,
     over,
+    overInside: (event: DragEvent<HTMLElement>, id: string) => {
+      if (!drag || disabled) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = "move";
+      setDrag(
+        (current) =>
+          current &&
+          (current.destination?.id === id &&
+          current.destination.side === "inside"
+            ? current
+            : { ...current, destination: { id, side: "inside" } }),
+      );
+    },
+    clearDestination: () =>
+      setDrag((current) => (current ? { active: current.active } : null)),
     drop,
     cancel: () => setDrag(null),
   };

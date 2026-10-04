@@ -218,7 +218,10 @@ const handlers: Handlers = {
       ),
     );
   },
-  async publish_content(ctx, { id, expected_revision, new_course_version }) {
+  async publish_content(
+    ctx,
+    { id, expected_revision, new_course_version, renew_update },
+  ) {
     const c = await getContent(id, ctx.user, true);
     if (new_course_version) {
       if (c.kind !== "course")
@@ -240,6 +243,8 @@ const handlers: Handlers = {
       expected_revision,
       true,
       `mcp:${ctx.clientId}`,
+      false,
+      { renewUpdate: renew_update },
     );
     ctx.invalidatePublishedReader();
     return mutationResult(ctx, saved);

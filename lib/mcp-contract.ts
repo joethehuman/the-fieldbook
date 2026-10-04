@@ -100,8 +100,12 @@ export const mcpContract = {
   ),
   publish_content: tool(
     "content:write",
-    "Publish the current draft only on explicit user intent. Validates complete lessons, image alternative text and quizzes. Set new_course_version=true only for a substantive course change that starts a new completion requirement; minor corrections preserve the version.",
-    { ...revision, new_course_version: z.boolean().default(false) },
+    "Publish the current draft only on explicit user intent. Validates complete lessons, image alternative text and quizzes. Set new_course_version=true only for a substantive course change that starts a new completion requirement. Update corrections preserve feed position; set renew_update=true only to bring an Update forward in Updates and For you. First publication is current by default.",
+    {
+      ...revision,
+      new_course_version: z.boolean().default(false),
+      renew_update: z.boolean().default(false),
+    },
     sideEffect,
   ),
   unpublish_content: tool(
