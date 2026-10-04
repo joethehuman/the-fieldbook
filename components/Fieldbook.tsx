@@ -4,6 +4,7 @@ import { courseLibraryView, courseViewPaths, type LearningView } from "@/lib/cou
 import { adminHref, parseAdminDestination } from "@/lib/admin-destination";
 import { reconcileDemoPublication } from "@/lib/demo-publication";
 import { WorkspaceFrame } from "./patterns/workspace-frame";
+import { DemoStartup } from "./DemoStartup";
 import { DocumentTree } from "./patterns/document-tree";
 import { DocsEmpty } from "./patterns/docs-empty";
 import { Article } from "./patterns/reading";
@@ -101,6 +102,7 @@ export default function Fieldbook() {
     }
   }
   const [data, setData] = useState<Workspace | null>(null),
+    [restored, setRestored] = useState(false),
     [uid, setUid] = useState<string | null>(null),
     [view, setView] = useState<View>("learn"),
     [teamPerson, setTeamPerson] = useState<string | undefined>(),
@@ -121,12 +123,12 @@ export default function Fieldbook() {
   useEffect(() => {
     try {
       const workspace = loadWorkspace();
+      const savedProfile = sessionStorage.getItem(SESSION);
       setData(workspace);
       if (!window.location.hash)
         setView(
           resolveSection(homePath(workspace.settings).slice(1)) || "learn",
         );
-      const savedProfile = sessionStorage.getItem(SESSION);
       setUid(
         savedProfile &&
           (DEMO_PROFILE_IDS.includes(savedProfile) || savedProfile === "guest")
@@ -135,6 +137,8 @@ export default function Fieldbook() {
       );
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setRestored(true);
     }
   }, []);
   useEffect(() => {
@@ -346,8 +350,8 @@ export default function Fieldbook() {
   const landingPath = homePath(branding);
   const landingView = resolveSection(landingPath.slice(1)) || "learn";
   const policyHref = privacyHref(branding);
-  if (!data || !user)
-    return (
+  if (!restored || !data || !user) {
+    const picker = (
       <BrandedAccount branding={brandingFromSettings(branding)}>
         <Badge variant="default">INTERACTIVE DEMO</Badge>
         <h1>Choose a demo profile</h1>
@@ -398,6 +402,10 @@ export default function Fieldbook() {
         </div>
       </BrandedAccount>
     );
+    return restored ? picker : (
+      <DemoStartup name={branding.name} accent={branding.accent} picker={picker} />
+    );
+  }
   const learningGroups = demoGuest?.groups || data.groups;
   const visible = (
     demoGuest?.content ||
