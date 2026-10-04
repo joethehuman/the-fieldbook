@@ -200,7 +200,6 @@
     border-radius: var(--radius);
     background: var(--primary);
   }
-
 }
 
 /* Shared document navigation and reading composition. */
@@ -280,9 +279,6 @@
     container: reading / inline-size;
     min-width: 0;
     width: 100%;
-    max-width: calc(
-      var(--reading-width) + var(--outline-width) + var(--space-12)
-    );
     margin-inline: auto;
   }
   .reading-columns {
@@ -422,18 +418,21 @@
   .markdown-table {
     max-width: 100%;
   }
-  @container reading (min-width: 60rem) {
+  /* 44rem article + two (13rem outline + 3rem gap) margins. */
+  @container reading (min-width: 76rem) {
     .has-outline > .reading-columns {
-      max-width: calc(
-        var(--reading-width) + var(--outline-width) + var(--space-12)
-      );
-      grid-template-columns: minmax(0, var(--reading-width)) var(
-          --outline-width
-        );
-      gap: var(--space-12);
+      max-width: none;
+      grid-template-columns: minmax(0, 1fr) var(--reading-width) minmax(0, 1fr);
+      gap: 0;
+    }
+    .has-outline > .reading-columns > .article {
+      grid-column: 2;
+      grid-row: 1;
     }
     .reading-outline {
-      grid-column: 2;
+      grid-column: 3;
+      width: var(--outline-width);
+      margin-inline-start: var(--space-12);
       grid-row: 1;
       align-self: start;
       position: sticky;

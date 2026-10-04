@@ -1,6 +1,6 @@
 # Third-party source notices
 
-Fieldbook owns and adapts its component source. Avatar, Card composition, Checkbox, Collapsible, Popover and Switch include adaptations of the public [shadcn/ui](https://github.com/shadcn-ui/ui) registry. Imports use the individual Radix packages already used by Fieldbook; styling and supported exports are tailored to this library. The adapted upstream portions retain their MIT license and notice below. Fieldbook's original code is licensed under [ELv2](../LICENSE); see [licensing](licensing.md). Dependencies retain their own licenses and notices.
+Fieldbook owns and adapts its component source. Avatar, Card composition, Checkbox, Collapsible, Popover and Switch include adaptations of the public [shadcn/ui](https://github.com/shadcn-ui/ui) registry. Imports use the individual Radix packages already used by Fieldbook; styling and supported exports are tailored to this library. The adapted upstream portions retain their MIT license and notice below. Fieldbook's original code is licensed under [ELv2](../LICENSE). Dependencies retain their own licenses and notices.
 
 ## shadcn/ui
 

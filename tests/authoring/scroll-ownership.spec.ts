@@ -216,6 +216,8 @@ test("editor Details and reader outlines contain native wheel input", async ({
   await page.screenshot({
     path: info.outputPath("editor-details-contained.png"),
   });
+  // Exercise the wide outline without reducing the centered article's measure.
+  await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto(
     installed
       ? "/docs/00000000-0000-4000-8000-000000000200"
