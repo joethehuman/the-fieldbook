@@ -20,6 +20,14 @@
     width: 100%;
     height: 100%;
   }
+  /* Reserve the existing copy area in newer geometry alone. Older versions,
+     the palette, wash and text layers retain their original rendering. */
+  .card-artwork-geometry[data-generation="3"],
+  .card-artwork-geometry[data-generation="4"],
+  .card-artwork-geometry[data-generation="5"],
+  .card-artwork-geometry[data-generation="6"] {
+    mask-image: linear-gradient(90deg, transparent 18%, #000 68%);
+  }
   .card-artwork-image {
     object-fit: cover;
   }

@@ -22,6 +22,16 @@ In the document editor, **Details → Docs section** has one searchable picker w
 
 Section IDs and order live in optional `docSections` settings JSON; documents may reference a section ID. Legacy category and folder values remain readable without rewriting documents. Saving a hierarchy with an existing folder deeper than a subsection reports the affected document and path. No database migration or additional dependency is required.
 
+## Generated card artwork
+
+Updates, Courses and Curricula share generated SVG artwork. **Shuffle artwork** selects generator version 6, with thirty recipes across the original ten motif families. Three seed-derived parameters vary each recipe: rhythm couples shape count with spacing; proportion changes dimensions or curvature; placement moves the focal anchor within a bounded area. Each family interprets these parameters within its own constraints. The parameters are part of the generated choice, not additional editor controls.
+
+The geometry uses consistent curves and nested shapes. Line banks have a gentle opacity hierarchy rather than equal visual weight throughout. Broad color shapes have no border strokes; rounded frame dimensions and corner radii grow together; arcs share a center with endpoints outside the card. Waves use moderate curvature, and the diagonal family includes a simple ascending sweep. Faint nested fields add depth to closed shapes without outlined strips. Artwork fades toward the existing title area.
+
+The collection refresh renders all existing generated cards from versions 1–5 with version 6 while preserving each saved seed and short title. Automatic defaults use version 6 with their stable item-ID-derived seed. Results stay deterministic after the refresh. Stored records are not rewritten on read; an artwork edit can save the resolved version. Uploaded images and legacy covers keep their existing behavior. The refresh floor is fixed at version 6, so a future generator version does not automatically redraw these choices. The catalog keeps historical versions only for before/after comparisons. Draft saving and publication keep their existing separate behavior. There is no bulk data rewrite or database migration.
+
+Identity palette settings continue to recolor all generated artwork without changing geometry. Generated/upload modes, the short-title and metadata overlays, card dimensions and Shuffle's recent-design history are unchanged. A legacy course image remains an upload; a failed image uses the fallback associated with its artwork version.
+
 ## Course covers
 
 In the course editor, **Details → Card artwork** lets an administrator or contributor upload or replace an image. **Remove image** restores generated artwork. Draft autosave keeps the choice; publish it to change the public card. A saved draft does not replace the published cover.

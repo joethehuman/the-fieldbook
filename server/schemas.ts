@@ -19,7 +19,14 @@ export const cardArtSchema = z
   .object({
     source: z.enum(["generated", "upload"]),
     shortTitle: text(160),
-    version: z.union([z.literal(1), z.literal(2)]),
+    version: z.union([
+      z.literal(1),
+      z.literal(2),
+      z.literal(3),
+      z.literal(4),
+      z.literal(5),
+      z.literal(6),
+    ]),
     seed: z.number().int().min(0).max(4294967295),
     imageUrl: cardImageReference.optional(),
   })
@@ -133,7 +140,14 @@ export const contentDraftSchema = contentBaseSchema
       .object({
         source: z.enum(["generated", "upload"]),
         shortTitle: text(160),
-        version: z.union([z.literal(1), z.literal(2)]),
+        version: z.union([
+          z.literal(1),
+          z.literal(2),
+          z.literal(3),
+          z.literal(4),
+          z.literal(5),
+          z.literal(6),
+        ]),
         seed: z.number().int().min(0).max(4294967295),
         imageUrl: cardImageReference.optional(),
       })

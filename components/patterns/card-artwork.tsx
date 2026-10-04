@@ -8,6 +8,10 @@ import {
 import type { SiteSettings } from "@/lib/settings";
 import { Badge } from "../ui/badge";
 import { CardImage } from "./card-image";
+import { CardArtworkV3 } from "./card-artwork-v3";
+import { CardArtworkV4 } from "./card-artwork-v4";
+import { CardArtworkV5 } from "./card-artwork-v5";
+import { CardArtworkV6 } from "./card-artwork-v6";
 
 function mix(a: string, b: string, weight: number) {
   return `#${[1, 3, 5]
@@ -177,7 +181,7 @@ function geometryV1(seed: number, color1: string, color2: string) {
 }
 
 function geometryV2(seed: number, color1: string, color2: string) {
-  const slot = artComposition(seed);
+  const slot = artComposition(seed, 2);
   const family = slot % 10;
   const variant = Math.floor(slot / 10);
   const drift = ((seed >>> 12) % 49) - 24;
@@ -648,6 +652,7 @@ export function CardArtwork({
   legacyCover,
   settings,
   palette,
+  preserveVersion = false,
   relevance,
 }: {
   id: string;
@@ -658,9 +663,14 @@ export function CardArtwork({
   legacyCover?: string;
   settings?: Pick<SiteSettings, "accent" | "cardPalette">;
   palette?: CardPalette;
+  /** Historical comparisons in the component catalog only. */
+  preserveVersion?: boolean;
   relevance?: "For you" | "Past due";
 }) {
-  const resolved = resolvedCardArt(id, title, art, legacyCover);
+  const resolved =
+    preserveVersion && art
+      ? art
+      : resolvedCardArt(id, title, art, legacyCover);
   const colors = palette || resolvedCardPalette(settings);
   const dark = (resolved.seed >>> 8) % 3 !== 0;
   const surface = dark
@@ -699,13 +709,31 @@ export function CardArtwork({
     <>
       <svg
         className="card-artwork-geometry"
+        data-generation={
+          resolved.version === 3 ||
+          resolved.version === 4 ||
+          resolved.version === 5 ||
+          resolved.version === 6
+            ? String(resolved.version)
+            : undefined
+        }
         viewBox="0 0 600 300"
         preserveAspectRatio="xMidYMid slice"
         aria-hidden="true"
       >
-        {resolved.version === 1
-          ? geometryV1(resolved.seed, line, detail)
-          : geometryV2(resolved.seed, line, detail)}
+        {resolved.version === 1 ? (
+          geometryV1(resolved.seed, line, detail)
+        ) : resolved.version === 6 ? (
+          <CardArtworkV6 seed={resolved.seed} line={line} detail={detail} />
+        ) : resolved.version === 5 ? (
+          <CardArtworkV5 seed={resolved.seed} line={line} detail={detail} />
+        ) : resolved.version === 4 ? (
+          <CardArtworkV4 seed={resolved.seed} line={line} detail={detail} />
+        ) : resolved.version === 3 ? (
+          <CardArtworkV3 seed={resolved.seed} line={line} detail={detail} />
+        ) : (
+          geometryV2(resolved.seed, line, detail)
+        )}
       </svg>
       <div className="card-artwork-wash" aria-hidden="true" />
       <div className="card-artwork-copy">
@@ -724,7 +752,13 @@ export function CardArtwork({
     <div
       className="card-artwork"
       data-art-composition={
-        resolved.version === 2 ? artComposition(resolved.seed) : undefined
+        resolved.version === 2 ||
+        resolved.version === 3 ||
+        resolved.version === 4 ||
+        resolved.version === 5 ||
+        resolved.version === 6
+          ? artComposition(resolved.seed, resolved.version)
+          : undefined
       }
       data-tone={dark ? "dark" : "light"}
       data-kind={kind}

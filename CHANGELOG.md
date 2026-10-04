@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine generated artwork across the original ten motif families and thirty recipes. Seed-driven rhythm, proportion and placement vary each composition; quieter linework and unoutlined color shapes add depth while preserving coherent geometry. Refresh existing generated cards and automatic defaults to version 6 while preserving seeds and short titles; uploaded images remain unchanged. The refresh stays deterministic and needs no data rewrite. Keep Identity palettes, text overlays, card layouts and save/upload behavior unchanged.
+
 - Refine course and curriculum cards with type/category labels, centered For you or soft red Past due badges, icon-led learning details and a compact progress/action footer. Use existing assignment deadlines consistently across the library and curriculum pages.
 
 - Replace About this demo with the reset confirmation instead of stacking dialogs; Cancel returns to About without changing sample data.
