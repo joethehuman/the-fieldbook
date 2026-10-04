@@ -34,7 +34,6 @@ import { Clock3, BookOpen, ListChecks } from "lucide-react";
 import { LearningCardFact, LearningCard } from "@/components/patterns/learning-card";
 import { CardArtwork } from "@/components/patterns/card-artwork";
 import { CARD_ART_VERSION } from "@/lib/card-art";
-import { BrowseToolbar } from "@/components/patterns/layout";
 import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
 
@@ -460,29 +459,35 @@ export default function ComponentCatalog() {
             />
           ))}
         </CourseRow>
-        <BrowseToolbar>
-          <Field>
-            Search
+        <CollectionControls
+          search={
             <SearchField>
-              <Input placeholder="Find a course…" />
+              <Input aria-label="Find a course" placeholder="Find a course…" />
             </SearchField>
-          </Field>
+          }
+          sort={
+            <SortPicker
+              label="Sort example courses"
+              value={browserSort}
+              onValueChange={setBrowserSort}
+            >
+              <option value="recommended">Recommended order</option>
+              <option value="title">{sortLabels.titleAsc}</option>
+              <option value="title-desc">{sortLabels.titleDesc}</option>
+            </SortPicker>
+          }
+        >
           <Field>
             Category
-            <SelectField value="all" onValueChange={() => {}}>
+            <SelectField
+              aria-label="Example course category"
+              value="all"
+              onValueChange={() => {}}
+            >
               <option value="all">All categories</option>
             </SelectField>
           </Field>
-          <SortPicker
-            label="Sort example courses"
-            value={browserSort}
-            onValueChange={setBrowserSort}
-          >
-            <option value="recommended">Recommended order</option>
-            <option value="title">{sortLabels.titleAsc}</option>
-            <option value="title-desc">{sortLabels.titleDesc}</option>
-          </SortPicker>
-        </BrowseToolbar>
+        </CollectionControls>
         <LaunchList
           items={[
             {

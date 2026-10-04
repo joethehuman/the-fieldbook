@@ -10,7 +10,7 @@ import { CountBadge } from "@/components/ui/badge";
 import { SearchField } from "./patterns/search-field";
 import { Card } from "./ui/card";
 import { ProgressRing } from "./ui/progress";
-import { BrowseToolbar } from "./patterns/layout";
+import { CollectionControls } from "./patterns/collection-controls";
 import { CardGrid } from "./patterns/learning-card";
 import { CurriculumCard } from "./CurriculumCard";
 import {
@@ -484,9 +484,8 @@ export default function Learning({
             </Field>
           )}
         </SectionHeader>
-        <BrowseToolbar>
-          <Field>
-            Search
+        <CollectionControls
+          search={
             <SearchField>
               <Input
                 aria-label="Filter courses"
@@ -495,7 +494,33 @@ export default function Learning({
                 onChange={(e) => setQuery(e.target.value)}
               />
             </SearchField>
-          </Field>
+          }
+          sort={
+            <SortPicker
+              label={view === "curricula" ? "Sort curricula" : "Sort courses"}
+              value={sort}
+              onValueChange={setSort}
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </SortPicker>
+          }
+          filters={
+            topic === "All categories"
+              ? []
+              : [
+                  {
+                    id: "category",
+                    label: `Category: ${topic}`,
+                    onRemove: () => setTopic("All categories"),
+                  },
+                ]
+          }
+          onClear={() => setTopic("All categories")}
+        >
           <FormField label="Category">
             <SelectField
               aria-label="Category"
@@ -509,18 +534,7 @@ export default function Learning({
               ))}
             </SelectField>
           </FormField>
-          <SortPicker
-            label={view === "curricula" ? "Sort curricula" : "Sort courses"}
-            value={sort}
-            onValueChange={setSort}
-          >
-            {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </SortPicker>
-        </BrowseToolbar>
+        </CollectionControls>
         {view === "assigned" || view === "curricula" ? (
           <CardGrid>{browserCards.map(displayCard)}</CardGrid>
         ) : (
