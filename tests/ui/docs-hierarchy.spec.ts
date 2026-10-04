@@ -561,13 +561,19 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
     const card = document.getElementById("settings-docs")!.getBoundingClientRect();
     return {
       left: outer.left, right: outer.right, top: outer.top,
-      barTop: inner.top, cardLeft: card.left, cardRight: card.right,
+      bottom: outer.bottom, barTop: inner.top, barBottom: inner.bottom,
+      barLeft: inner.left, barRight: inner.right, cardLeft: card.left, cardRight: card.right,
       background: getComputedStyle(region).backgroundColor,
     };
   });
   expect(frame.left).toBeLessThan(frame.cardLeft);
   expect(frame.right).toBeGreaterThan(frame.cardRight);
   expect(frame.barTop).toBeGreaterThan(frame.top);
+  expect(frame.barLeft).toBe(frame.cardLeft);
+  expect(frame.barRight).toBe(frame.cardRight);
+  expect(frame.barBottom).toBe(frame.bottom);
+  await expect(bar).toHaveCSS("border-bottom-left-radius", "0px");
+  await expect(bar).toHaveCSS("border-bottom-right-radius", "0px");
   expect(frame.background).not.toBe("rgba(0, 0, 0, 0)");
   await page.screenshot({
     path: info.outputPath("sticky-unsaved-changes.png"),
@@ -667,7 +673,7 @@ async function pendingTransitionHeights(action: Locator) {
   }));
 }
 
-test("pending save bar opens and closes smoothly without a dormant gap, and respects reduced motion", async ({ page }) => {
+test("pending save bar opens and closes smoothly without a dormant gap, and respects reduced motion", async ({ page }, info) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await openOrderingFixture(page);
   const bar = page.locator('[data-slot="pending-changes-bar"]');
@@ -689,11 +695,22 @@ test("pending save bar opens and closes smoothly without a dormant gap, and resp
   expect(opening.some((height) => height > 1 && height < expanded - 1)).toBe(true);
   await expect(bar).toHaveCSS("opacity", "1");
   expect((await footer.boundingBox())!.height).toBe(footerHeight);
+  await page.locator(".admin-panel").evaluate((owner) => { owner.scrollTop = 0; });
+  const card = page.locator("#settings-docs");
+  const headerBox = (await bar.boundingBox())!;
+  const cardBox = (await card.boundingBox())!;
+  expect(cardBox.y).toBe(headerBox.y + headerBox.height);
+  expect(cardBox.x).toBe(headerBox.x);
+  expect(cardBox.width).toBe(headerBox.width);
+  await expect(card).toHaveCSS("border-top-width", "0px");
+  await page.screenshot({ path: info.outputPath("connected-save-header.png") });
 
   const closing = await pendingTransitionHeights(bar.getByRole("button", { name: "Discard changes", exact: true }));
   expect(closing.at(-1)).toBe(0);
   expect(closing.some((height) => height > 1 && height < expanded - 1)).toBe(true);
   await expect(bar).toBeHidden();
+  await expect(card).toHaveCSS("border-top-width", "1px");
+  await expect(card).not.toHaveCSS("border-top-left-radius", "0px");
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.getByRole("button", { name: "Actions for Start", exact: true }).click();

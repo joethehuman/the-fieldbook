@@ -329,6 +329,7 @@ export default function SiteSettingsPanel({
           <SettingsGroup
             measure="full"
             id="settings-docs"
+            className={dirty || busy ? "rounded-t-none border-t-0" : undefined}
             title={<h3>Document sections</h3>}
             description="Organize top-level sections and their subsections. Documents can sit at either level."
             guidance="Drag to reorder, or drop documents and subsections onto their destination section. Show documents to arrange pages. Row and bulk actions offer Move to…; documents can sit at either level, and subsections belong under top-level sections. Save settings to apply changes. Empty sections remain available in the editor; readers see sections with published documents."
