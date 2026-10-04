@@ -303,6 +303,8 @@ export default function Fieldbook() {
   }
   async function reset() {
     if (!(await canLeave())) return;
+    const returnToDemo = showDemo;
+    setShowDemo(false);
     if (
       await confirm(
         "Reset this browser’s sample content, profiles, and progress?",
@@ -313,6 +315,8 @@ export default function Fieldbook() {
       logout();
       setShowDemo(false);
       navigate("learn");
+    } else {
+      setShowDemo(returnToDemo);
     }
   }
   function exportData() {
