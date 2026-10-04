@@ -1,12 +1,12 @@
 import type { SiteSettings } from "./settings";
 import type { Content } from "./types";
 
-export const CARD_ART_VERSION = 2;
+export const CARD_ART_VERSION = 6;
 export const CARD_ART_COMPOSITIONS = 30;
 export type CardArt = {
   source: "generated" | "upload";
   shortTitle: string;
-  version: 1 | 2;
+  version: 1 | 2 | 3 | 4 | 5 | 6;
   seed: number;
   imageUrl?: string;
 };
@@ -51,8 +51,11 @@ export function stableArtSeed(id: string): number {
   for (const char of id) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
   return hash >>> 0;
 }
-export function artComposition(seed: number): number {
-  return seed % CARD_ART_COMPOSITIONS;
+export function artComposition(
+  seed: number,
+  version: CardArt["version"] = CARD_ART_VERSION,
+): number {
+  return seed % (version === 4 ? 56 : 30);
 }
 
 function secureArtSeed(): number {
@@ -63,7 +66,7 @@ export function randomArtSeed(
   recentSeeds: number[],
   randomUint32: () => number = secureArtSeed,
 ): number {
-  const recent = recentSeeds.slice(-25).map(artComposition);
+  const recent = recentSeeds.slice(-25).map((seed) => artComposition(seed));
   const recentFamilies = recent.slice(-2).map((slot) => slot % 10);
   for (let attempt = 0; attempt < 100; attempt++) {
     const candidate = randomUint32() >>> 0;
@@ -89,7 +92,9 @@ export function resolvedCardArt(
     art || {
       source: legacyCover ? "upload" : "generated",
       shortTitle: shortTitleFallback(title),
-      version: CARD_ART_VERSION,
+      // Missing artwork predates a saved generator choice. Keep that visual
+      // fallback stable; Shuffle explicitly opts into CARD_ART_VERSION.
+      version: 2,
       seed: stableArtSeed(id),
       imageUrl: legacyCover,
     }

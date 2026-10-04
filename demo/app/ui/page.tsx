@@ -30,6 +30,7 @@ import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
 import { LearningCard } from "@/components/patterns/learning-card";
 import { CardArtwork } from "@/components/patterns/card-artwork";
+import { CARD_ART_VERSION } from "@/lib/card-art";
 import { BrowseToolbar } from "@/components/patterns/layout";
 import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
@@ -265,11 +266,15 @@ export default function ComponentCatalog() {
       <section className="grid gap-4" aria-label="Generated card artwork">
         <SectionHeader
           title={<h2>Generated card artwork</h2>}
-          description="Thirty curated compositions use ten motif families. A saved seed keeps each design stable while the palette can recolor it."
-        />
+          description="Thirty compositions use ten motif families, with seeded rhythm, proportion and focal placement. Saved designs keep their renderer version and palette behavior."
+        >
+          <Button variant="outline" asChild>
+            <a href="/ui/artwork">Compare artwork before and after</a>
+          </Button>
+        </SectionHeader>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 30 }, (_, slot) => {
-            const seed = slot + 300 * (slot % 3);
+            const seed = slot + 300 * (slot % 5);
             return (
               <CardArtwork
                 key={slot}
@@ -286,7 +291,7 @@ export default function ComponentCatalog() {
                 art={{
                   source: "generated",
                   shortTitle: `Design ${slot + 1}`,
-                  version: 2,
+                  version: CARD_ART_VERSION,
                   seed,
                 }}
               />

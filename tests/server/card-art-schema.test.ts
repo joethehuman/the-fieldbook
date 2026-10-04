@@ -1,9 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { contentSchema, settingsSchema } from "../../server/schemas";
+import {
+  contentSchema,
+  contentDraftSchema,
+  settingsSchema,
+} from "../../server/schemas";
 import { governanceSchema } from "../../server/governance-schema";
 import { defaultSettings } from "../../lib/settings";
 import { seedContent } from "../../lib/seed";
+import { mcpContract } from "../../lib/mcp-contract";
 
 const art = {
   source: "generated" as const,
@@ -59,10 +64,54 @@ test("artwork schema accepts older items and validates saved titles and images",
     true,
   );
   assert.equal(
-    contentSchema.safeParse({ ...update, cardArt: { ...art, version: 3 } })
+    contentSchema.safeParse({ ...update, cardArt: { ...art, version: 7 } })
       .success,
     false,
   );
+});
+
+test("published, draft and MCP schemas preserve v1-v6 artwork and reject unknown versions", () => {
+  for (const version of [1, 2, 3, 4, 5, 6]) {
+    const cardArt = { ...art, version, seed: 4294967295 };
+    assert.deepEqual(
+      contentSchema.parse({ ...update, cardArt }).cardArt,
+      cardArt,
+    );
+    assert.deepEqual(
+      contentDraftSchema.parse({ ...update, cardArt }).cardArt,
+      cardArt,
+    );
+    const parsed = mcpContract.create_content.inputSchema.parse({
+      content: { kind: "course", cardArt },
+    });
+    assert.deepEqual(parsed.content.cardArt, cardArt);
+  }
+  for (const version of [0, 7, -1, 1.5, "3"]) {
+    const cardArt = { ...art, version };
+    assert.equal(
+      contentSchema.safeParse({ ...update, cardArt }).success,
+      false,
+    );
+    assert.equal(
+      contentDraftSchema.safeParse({ ...update, cardArt }).success,
+      false,
+    );
+    assert.equal(
+      mcpContract.create_content.inputSchema.safeParse({
+        content: { kind: "course", cardArt },
+      }).success,
+      false,
+    );
+  }
+  for (const seed of [-1, 4294967296, 0.5]) {
+    assert.equal(
+      contentDraftSchema.safeParse({
+        ...update,
+        cardArt: { ...art, version: 6, seed },
+      }).success,
+      false,
+    );
+  }
 });
 
 test("palette schema validates custom colors and preset keys", () => {
@@ -112,11 +161,19 @@ test("curriculum schema keeps artwork optional for older MCP clients", () => {
     users: [],
   };
   assert.equal(governanceSchema.safeParse(base).success, true);
+  for (const version of [1, 2, 3, 4, 5, 6]) {
+    const cardArt = { ...art, version };
+    const parsed = governanceSchema.parse({
+      ...base,
+      curricula: [{ ...base.curricula[0], cardArt }],
+    });
+    assert.deepEqual(parsed.curricula![0].cardArt, cardArt);
+  }
   assert.equal(
     governanceSchema.safeParse({
       ...base,
-      curricula: [{ ...base.curricula[0], cardArt: art }],
+      curricula: [{ ...base.curricula[0], cardArt: { ...art, version: 7 } }],
     }).success,
-    true,
+    false,
   );
 });

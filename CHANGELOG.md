@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine generated artwork across the original ten motif families and thirty recipes. Seed-driven rhythm, proportion and placement vary each composition; quieter linework and unoutlined color shapes add depth while preserving coherent geometry. Shuffle selects version 6; saved versions 1–5 and the version 2 fallback remain stable. Keep Identity palettes, text overlays, card layouts and save/upload behavior unchanged.
+
 - Add one installation-branded Open Graph/Twitter image for every link, using only public name, canonical domain and accent. Use the Paper design with four evenly spaced page lines; private content remains protected. Keep the shared template separate for future customization, without new Admin controls. Patch Next.js to 16.3.6 for the image-renderer security fix.
 
 - Simplify curriculum cards with a quiet metadata footer, edit-linked names and one action menu. Align shared menu highlights and nested team highlights with their containing corners. Add course search, status filters and newest-assigned sorting to person progress details, keeping CSV exports aligned with the displayed rows. Move Curricula into Publishing, reorder Organization settings, rename People & courses to People & Progress and Learning groups to Groups in the interface, explain their role alongside team assignments, and clarify membership metrics as teams linked and direct users linked.
