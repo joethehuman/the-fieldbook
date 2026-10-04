@@ -306,6 +306,44 @@ export function localProgressDetail(data: Workspace, u: User): ProgressDetail {
     }),
   };
 }
+/** The person table and its export share the same course discovery controls. */
+export function filterProgressAssignments(
+  detail: ProgressDetail,
+  filters: { query: string; status: string; sort: string },
+  deadlines = detail.deadlinesEnabled !== false,
+): ProgressDetail {
+  const search = filters.query.trim().toLocaleLowerCase();
+  const asOf = detail.asOf || todayUTC();
+  return {
+    ...detail,
+    courses: detail.courses
+      .filter((course) => {
+        const overdue =
+          !course.complete &&
+          deadlines &&
+          !!course.dueDate &&
+          course.dueDate < asOf;
+        return (
+          course.title.toLocaleLowerCase().includes(search) &&
+          (filters.status === "all" ||
+            (filters.status === "complete" && course.complete) ||
+            (filters.status === "incomplete" && !course.complete) ||
+            (filters.status === "overdue" && overdue))
+        );
+      })
+      .sort((a, b) => {
+        const name = a.title.localeCompare(b.title) || a.id.localeCompare(b.id);
+        if (filters.sort === "name") return name;
+        if (filters.sort === "reverse") return -name;
+        // Unknown assignment dates belong last in both date orders.
+        if (!a.assignedAt || !b.assignedAt)
+          return Number(!a.assignedAt) - Number(!b.assignedAt) || name;
+        const date = Date.parse(a.assignedAt) - Date.parse(b.assignedAt);
+        return (filters.sort === "oldest" ? date : -date) || name;
+      }),
+  };
+}
+
 export function progressDetailCsv(
   detail: ProgressDetail,
   row: ProgressRow,

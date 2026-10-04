@@ -40,6 +40,8 @@ import { FieldDescription } from "./ui/field";
 import { FormField } from "@/components/patterns/form-field";
 import { FilterOptions } from "./patterns/filter-options";
 import { useToast } from "./ui/toast";
+import { RecordName, RecordMeta, RecordValues } from "./patterns/record-row";
+import { RowActions } from "./patterns/row-actions";
 import { DataTable } from "./patterns/data-table";
 import { ResponsiveTabsNavigation } from "./patterns/responsive-tabs-navigation";
 import {
@@ -90,7 +92,7 @@ import {
   type DocSection,
 } from "@/lib/docs-navigation";
 import { defaultSettings } from "@/lib/settings";
-import { learningStage, onboardingClockTarget } from "@/lib/learning";
+import { onboardingClockTarget } from "@/lib/learning";
 import { PendingPeople } from "./PendingPeople";
 import { PersonFields } from "./PersonFields";
 import { ScrollRegion } from "./patterns/scroll-region";
@@ -161,6 +163,12 @@ const adminSections = [
         icon: FileText,
       },
       {
+        id: "curricula",
+        name: "Curricula",
+        description: "Build reusable course lists.",
+        icon: Layers,
+      },
+      {
         id: "feedback",
         name: "Feedback",
         description: "See what readers and learners are telling you.",
@@ -169,7 +177,7 @@ const adminSections = [
     ],
   },
   {
-    label: "People & courses",
+    label: "People & Progress",
     items: [
       {
         id: "people",
@@ -185,14 +193,8 @@ const adminSections = [
       },
       {
         id: "groups",
-        name: "Learning groups",
+        name: "Groups",
         description: "Manage people, assigned courses, and relevant updates.",
-        icon: Layers,
-      },
-      {
-        id: "curricula",
-        name: "Curricula",
-        description: "Build reusable playlists of courses.",
         icon: Layers,
       },
       {
@@ -213,10 +215,10 @@ const adminSections = [
         icon: Settings,
       },
       {
-        id: "settings-links",
-        name: "External links",
-        description: "Add up to three links to everyone’s account menu.",
-        icon: Settings,
+        id: "settings-access",
+        name: "Access",
+        description: "Manage browsing access and account registration.",
+        icon: Users,
       },
       {
         id: "settings-docs",
@@ -225,22 +227,16 @@ const adminSections = [
         icon: FileText,
       },
       {
+        id: "settings-links",
+        name: "External links",
+        description: "Add up to three links to everyone’s account menu.",
+        icon: Settings,
+      },
+      {
         id: "settings-courses",
         name: "Due dates",
         description: "Choose whether group-selected courses have due dates.",
         icon: Layers,
-      },
-      {
-        id: "settings-access",
-        name: "Access",
-        description: "Manage browsing access and account registration.",
-        icon: Users,
-      },
-      {
-        id: "settings-privacy",
-        name: "Privacy",
-        description: "Maintain and publish your organization’s privacy policy.",
-        icon: FileText,
       },
       {
         id: "settings-ai",
@@ -253,6 +249,12 @@ const adminSections = [
         name: "MCP",
         description: "Connect your AI tools to Fieldbook.",
         icon: Settings,
+      },
+      {
+        id: "settings-privacy",
+        name: "Privacy",
+        description: "Maintain and publish your organization’s privacy policy.",
+        icon: FileText,
       },
       {
         id: "deleted",
@@ -1031,7 +1033,7 @@ export default function Admin({
           {
             label: detailScope.userId
               ? "Back to people"
-              : "Back to learning groups",
+              : "Back to groups",
             onSelect: async () => {
               if (openingTab || openingItem) return;
               if (detailScope.userId && onOpenTab) {
@@ -1083,6 +1085,62 @@ export default function Admin({
       )}
     </div>
   );
+
+  const recordHref = (destination: AdminDestination) => production ? adminHref(destination) : `#${adminHref(destination).slice(1)}`;
+  const contentEditHref = (id: string) => recordHref({ tab: "content", id, view: "edit" });
+
+  function contentActions(
+    c: Workspace["content"][number],
+    assign?: { onClick: () => void; loading: boolean },
+  ) {
+    return (
+      <RowActions
+        label={c.title || "Untitled"}
+        disabled={openingItem === c.id || assign?.loading}
+        actions={[
+          {
+            label: "Edit",
+            onSelect: () => {
+              void navigateDestination({
+                tab: "content",
+                id: c.id,
+                view: "edit",
+              });
+            },
+          },
+          ...(assign ? [{ label: "Assign", onSelect: assign.onClick }] : []),
+          ...(c.publishedRevision
+            ? [
+                {
+                  label: "Unpublish",
+                  separator: true,
+                  onSelect: async () => {
+                    if (
+                      !(await confirm(
+                        "Unpublish this item? Its draft and history will be kept.",
+                      ))
+                    )
+                      return;
+                    try {
+                      if (onUnpublish) await onUnpublish(c.id);
+                      else
+                        await onChange({
+                          ...data,
+                          content: data.content.filter((x) => x.id !== c.id),
+                        });
+                      setNotice("");
+                      notify("Content unpublished.");
+                    } catch (e) {
+                      setNotice((e as Error).message);
+                    }
+                  },
+                },
+              ]
+            : []),
+        ]}
+      />
+    );
+  }
 
   async function changeAdminTab(next: string, approved = false) {
     if (next === tab && !destination.id && !destination.create) return false;
@@ -1415,7 +1473,7 @@ export default function Admin({
                 />
                 {!!contentRows.length && (
                   <TableContainer>
-                    <DataTable layout="contentSelection">
+                    <DataTable layout="contentSelection" density="compact">
                       <TableHeader>
                         <TableRow>
                           <TableHead>
@@ -1456,11 +1514,17 @@ export default function Admin({
                               )}
                             </TableCell>
                             <TableCell>
-                              <strong>{c.title || "Untitled"}</strong>
-                              <small>
+                              <RecordName
+                                disabled={openingItem === c.id}
+                                href={contentEditHref(c.id)}
+                                onNavigate={() => void navigateDestination({ tab: "content", id: c.id, view: "edit" })}
+                              >
+                                {c.title || "Untitled"}
+                              </RecordName>
+                              <RecordMeta>
                                 {c.category}
                                 {c.folder ? " / " + c.folder : ""}
-                              </small>
+                              </RecordMeta>
                             </TableCell>
                             <TableCell>
                               {c.kind === "doc"
@@ -1484,72 +1548,24 @@ export default function Admin({
                             </TableCell>
                             <TableCell>v{c.version}</TableCell>
                             <TableCell>
-                              <ActionGroup variant="text">
-                                <Button
-                                  variant="link"
-                                  disabled={openingItem === c.id}
-                                  onClick={() => {
-                                    void navigateDestination({
-                                      tab: "content",
-                                      id: c.id,
-                                      view: "edit",
-                                    });
-                                  }}
-                                >
-                                  {openingItem === c.id ? "Opening…" : "Edit"}
-                                </Button>
-
-                                {admin &&
-                                  c.kind === "course" &&
-                                  (data.publishedContent ?? data.content).some(
-                                    (live) =>
-                                      live.id === c.id &&
-                                      live.status === "published",
-                                  ) && (
-                                    <LearningAssignmentPicker
-                                      data={data}
-                                      item={{ kind: "course", id: c.id }}
-                                      title={c.title}
-                                      compact
-                                      triggerLabel="Assign"
-                                      onChange={onChange}
-                                      onPrepare={onPrepareAssignments}
-                                      registerNavigationGuard={
-                                        registerAdminGuard
-                                      }
-                                    />
-                                  )}
-                                {!!c.publishedRevision && (
-                                  <Button
-                                    variant="link"
-                                    onClick={async () => {
-                                      if (
-                                        !(await confirm(
-                                          "Unpublish this item? Its draft and history will be kept.",
-                                        ))
-                                      )
-                                        return;
-                                      try {
-                                        if (onUnpublish)
-                                          await onUnpublish(c.id);
-                                        else
-                                          await onChange({
-                                            ...data,
-                                            content: data.content.filter(
-                                              (x) => x.id !== c.id,
-                                            ),
-                                          });
-                                        setNotice("");
-                                        notify("Content unpublished.");
-                                      } catch (e) {
-                                        setNotice((e as Error).message);
-                                      }
-                                    }}
-                                  >
-                                    Unpublish
-                                  </Button>
-                                )}
-                              </ActionGroup>
+                              {admin &&
+                              c.kind === "course" &&
+                              (!!c.publishedRevision || c.status === "published" || data.publishedContent?.some((live) => live.id === c.id && live.status === "published")) ? (
+                                <LearningAssignmentPicker
+                                  data={data}
+                                  item={{ kind: "course", id: c.id }}
+                                  title={c.title}
+                                  compact
+                                  renderTrigger={(trigger) =>
+                                    contentActions(c, trigger)
+                                  }
+                                  onChange={onChange}
+                                  onPrepare={onPrepareAssignments}
+                                  registerNavigationGuard={registerAdminGuard}
+                                />
+                              ) : (
+                                contentActions(c)
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1713,13 +1729,9 @@ export default function Admin({
                             )}
                           </TableHead>
                           <TableHead>User</TableHead>
-                          <TableHead>Email</TableHead>
                           <TableHead>Team</TableHead>
                           <TableHead>Access</TableHead>
                           <TableHead>Groups</TableHead>
-                          <TableHead>User type</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Sign-in</TableHead>
                           <TableHead>
                             <span className="sr-only">Actions</span>
                           </TableHead>
@@ -1740,66 +1752,50 @@ export default function Admin({
                               )}
                             </TableCell>
                             <TableCell>
-                              <strong>{u.name}</strong>
+                              <RecordName
+                                href={recordHref({ tab: "people", id: u.id, view: "edit" })}
+                                onNavigate={() => openPerson(structuredClone(u))}
+                              >
+                                {u.name}
+                              </RecordName>
+                              <RecordMeta title={u.email}>{u.email}</RecordMeta>
                             </TableCell>
-                            <TableCell>{u.email}</TableCell>
-                            <TableCell>
-                              {data.teams?.find((team) => team.id === u.teamId)
-                                ?.name || "Organization"}
-                            </TableCell>
+                            <TableCell>{data.teams?.find((team) => team.id === reportingTeamId(u.teamId, data.teams))?.name || "No team"}</TableCell>
                             <TableCell>{roleLabel(u.role)}</TableCell>
                             <TableCell>
-                              {data.groups
-                                .filter((g) =>
-                                  effectiveGroups(u, data.groups).has(g.id),
-                                )
-                                .map((g) => g.name)
-                                .join(", ") || "No groups"}
+                              <RecordValues label="groups" empty="No groups" values={data.groups.filter((g) => effectiveGroups(u, data.groups).has(g.id)).map((g) => g.name)} />
                             </TableCell>
+
                             <TableCell>
-                              {learningStage(u, data.settings)}
-                            </TableCell>
-                            <TableCell>
-                              {u.active ? "Active" : "Inactive"}
-                            </TableCell>
-                            <TableCell>
-                              {production
-                                ? u.registered === false
-                                  ? "Pending"
-                                  : "Signed in"
-                                : "Simulated"}
-                            </TableCell>
-                            <TableCell>
-                              <ActionGroup variant="text">
-                                <Button
-                                  variant="link"
-                                  onClick={() => openPerson(structuredClone(u))}
-                                >
-                                  Edit
-                                </Button>
-                                <Button
-                                  variant="link"
-                                  loading={openingItem === u.id}
-                                  disabled={!!openingTab || !!openingItem}
-                                  onClick={async () => {
-                                    setOpeningItem(u.id);
-                                    try {
-                                      await navigateDestination({
-                                        tab: "people",
-                                        id: u.id,
-                                      });
-                                      setNotice("");
-                                      adminPanel.reveal();
-                                    } catch (error) {
-                                      setNotice((error as Error).message);
-                                    } finally {
-                                      setOpeningItem(null);
-                                    }
-                                  }}
-                                >
-                                  Progress
-                                </Button>
-                              </ActionGroup>
+                              <RowActions
+                                label={u.name}
+                                disabled={!!openingTab || !!openingItem}
+                                actions={[
+                                  {
+                                    label: "Edit",
+                                    onSelect: () =>
+                                      openPerson(structuredClone(u)),
+                                  },
+                                  {
+                                    label: "Progress",
+                                    onSelect: async () => {
+                                      setOpeningItem(u.id);
+                                      try {
+                                        await navigateDestination({
+                                          tab: "people",
+                                          id: u.id,
+                                        });
+                                        setNotice("");
+                                        adminPanel.reveal();
+                                      } catch (error) {
+                                        setNotice((error as Error).message);
+                                      } finally {
+                                        setOpeningItem(null);
+                                      }
+                                    },
+                                  },
+                                ]}
+                              />
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1838,6 +1834,9 @@ export default function Admin({
               <Curricula
                 key={adminHref(destination)}
                 initialCurriculum={destination.id}
+                hrefForCurriculum={(id) =>
+                  recordHref({ tab: "curricula", id, view: "edit" })
+                }
                 createNew={destination.create === "curriculum"}
                 onDestinationChange={(id, create) =>
                   navigateDestination(
@@ -1862,6 +1861,7 @@ export default function Admin({
               <LearningGroups
                 key={adminHref(destination)}
                 initialGroup={destination.id}
+                hrefForGroup={(id) => recordHref({ tab: "groups", id })}
                 initialTab={destination.panel}
                 onDestinationChange={(id, panel) =>
                   navigateDestination(

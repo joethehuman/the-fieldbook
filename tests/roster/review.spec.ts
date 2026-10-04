@@ -650,7 +650,7 @@ test("Import commits the complete file and returns to the updated People roster 
     .getByRole("searchbox", { name: "Search profiles", exact: true })
     .fill("csv-person@example.test");
   await expect(
-    page.getByRole("cell", {
+    page.getByRole("link", {
       name: /^CSV Person$/,
       exact: true,
     }),
@@ -859,7 +859,7 @@ test("individual person creation saves once, returns to People, and rejects a du
     .getByRole("searchbox", { name: "Search profiles", exact: true })
     .fill("single-person@example.test");
   await expect(
-    page.getByRole("cell", {
+    page.getByRole("link", {
       name: /^Single Person$/,
       exact: true,
     }),

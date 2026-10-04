@@ -9,6 +9,7 @@ import { request, RequestError } from "@/lib/workspace-save";
 import {
   emptyProgressFilters,
   filterProgress,
+  filterProgressAssignments,
   localProgressDetail,
   progressDetailCsv,
   progressPeople,
@@ -32,6 +33,8 @@ import {
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { CsvExport } from "./patterns/csv-export";
 import { FormField } from "./patterns/form-field";
+import { RecordName, RecordMeta, RecordProgress } from "./patterns/record-row";
+import { RowActions } from "./patterns/row-actions";
 import { DataTable } from "./patterns/data-table";
 import { Pagination } from "./patterns/pagination";
 import { EmptyState, SectionHeader } from "./patterns/layout";
@@ -45,6 +48,7 @@ import {
 } from "./ui/table";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
+import { Input } from "./ui/input";
 import { Alert } from "./ui/alert";
 import { Spinner } from "./ui/spinner";
 export { TeamsAdmin } from "./TeamManagement";
@@ -77,6 +81,23 @@ export function TeamProgress({
   const [person, setPerson] = useState<ProgressRow | null>(null),
     [detail, setDetail] = useState<ProgressDetail | null>(null),
     [error, setError] = useState("");
+  const [assignmentFilters, setAssignmentFilters] = useState({
+    query: "",
+    status: "all",
+    sort: "newest",
+  });
+  const clearAssignmentFilters = () =>
+    setAssignmentFilters((current) => ({
+      ...current,
+      query: "",
+      status: "all",
+    }));
+  const assignmentSortLabels: Record<string, string> = {
+    newest: "Newest assigned",
+    oldest: "Oldest assigned",
+    name: "Course A–Z",
+    reverse: "Course Z–A",
+  };
   const host = useRef<HTMLDivElement>(null),
     savedScroll = useRef(0),
     detailEpoch = useRef(0),
@@ -119,6 +140,16 @@ export function TeamProgress({
   const summary = progressSummary(summaryRows);
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / 25)));
   const detailDeadlines = detail?.deadlinesEnabled ?? deadlines;
+  const safeAssignmentFilters = {
+    ...assignmentFilters,
+    status:
+      !detailDeadlines && assignmentFilters.status === "overdue"
+        ? "all"
+        : assignmentFilters.status,
+  };
+  const visibleAssignments = detail
+    ? filterProgressAssignments(detail, safeAssignmentFilters, detailDeadlines)
+    : null;
   const visible = rows.slice((currentPage - 1) * 25, currentPage * 25);
   const scrollOwner = () =>
     host.current?.closest<HTMLElement>(".admin-panel") ||
@@ -135,7 +166,10 @@ export function TeamProgress({
       ?.focus({ preventScroll: true });
   }, [person]);
   function back(restoring = false) {
-    if (onDestinationChange && !restoring) { void onDestinationChange(); return; }
+    if (onDestinationChange && !restoring) {
+      void onDestinationChange();
+      return;
+    }
     detailEpoch.current++;
     returnToPerson.current = person?.u.id || null;
     setPerson(null);
@@ -172,8 +206,13 @@ export function TeamProgress({
     if (row) void open(row, true);
   }, [initialPerson]);
   async function open(row: ProgressRow, restoring = false) {
-    if (onDestinationChange && !restoring) { await onDestinationChange(row.u.id); return; }
+    if (onDestinationChange && !restoring) {
+      await onDestinationChange(row.u.id);
+      return;
+    }
     if (!person) savedScroll.current = scrollOwner()?.scrollTop || 0;
+    if (person?.u.id !== row.u.id)
+      setAssignmentFilters({ query: "", status: "all", sort: "newest" });
     setPerson(row);
     setDetail(null);
     setError("");
@@ -443,7 +482,7 @@ export function TeamProgress({
                   value={filters.group}
                   onValueChange={(v) => change("group", v)}
                 >
-                  <option value="all">All learning groups</option>
+                  <option value="all">All groups</option>
                   {data.groups
                     .filter((g) => all.some((r) => r.groupIds.includes(g.id)))
                     .map((g) => (
@@ -497,6 +536,7 @@ export function TeamProgress({
             {
               <TableContainer aria-label="People progress">
                 <DataTable
+                  density="compact"
                   layout={
                     deadlines ? "progressPeople" : "progressPeopleNoDates"
                   }
@@ -506,7 +546,7 @@ export function TeamProgress({
                       <TableHead>User</TableHead>
                       <TableHead>Reporting team</TableHead>
                       <TableHead>User type</TableHead>
-                      <TableHead align="right">Completion</TableHead>
+                      <TableHead>Completion</TableHead>
                       {deadlines && (
                         <TableHead align="right">Overdue</TableHead>
                       )}
@@ -519,29 +559,38 @@ export function TeamProgress({
                     {visible.map((r) => (
                       <TableRow key={r.u.id}>
                         <TableCell>
-                          <strong>{r.u.name}</strong>
-                          <small>{r.u.email}</small>
+                          <RecordName
+                            data-person-id={r.u.id}
+                            onClick={() => void open(r)}
+                          >
+                            {r.u.name}
+                          </RecordName>
+                          <RecordMeta title={r.u.email}>{r.u.email}</RecordMeta>
                         </TableCell>
                         <TableCell>{r.team}</TableCell>
                         <TableCell>{r.stage}</TableCell>
-                        <TableCell align="right">
-                          {r.percent === null ? "—" : `${r.percent}%`}
-                          <small>
-                            {r.completed} of {r.assigned} courses
-                          </small>
-                          <small>{statusLabels[r.status]}</small>
+                        <TableCell>
+                          <RecordProgress
+                            percent={r.percent}
+                            completed={r.completed}
+                            assigned={r.assigned}
+                            status={statusLabels[r.status]}
+                            overdue={deadlines ? r.overdue : 0}
+                          />
                         </TableCell>
                         {deadlines && (
                           <TableCell align="right">{r.overdue}</TableCell>
                         )}
                         <TableCell>
-                          <Button
-                            variant="link"
-                            data-person-id={r.u.id}
-                            onClick={() => void open(r)}
-                          >
-                            View courses
-                          </Button>
+                          <RowActions
+                            label={r.u.name}
+                            actions={[
+                              {
+                                label: "View courses",
+                                onSelect: () => void open(r),
+                              },
+                            ]}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}
@@ -611,7 +660,15 @@ export function TeamProgress({
                   throw new Error(
                     "Assignments changed. Reopen them before exporting.",
                   );
-                return result;
+                return progressDetailCsv(
+                  filterProgressAssignments(
+                    fresh,
+                    safeAssignmentFilters,
+                    fresh.deadlinesEnabled ?? deadlines,
+                  ),
+                  person,
+                  fresh.deadlinesEnabled ?? deadlines,
+                );
               }}
             />
           </SectionHeader>
@@ -628,49 +685,153 @@ export function TeamProgress({
               Loading assignments…
             </p>
           ) : detail.courses.length ? (
-            <TableContainer aria-label="User course assignments">
-              <DataTable layout="progressAssignments">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Course</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>
-                      {detailDeadlines ? "Due date" : "Assigned"}
-                    </TableHead>
-                    <TableHead>Assigned through</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {detail.courses.map((c) => (
-                    <TableRow key={c.id}>
-                      <TableCell>
-                        <strong>{c.title}</strong>
-                        <small>
-                          {c.category} · v{c.version}
-                        </small>
-                      </TableCell>
-                      <TableCell>
-                        {c.complete
-                          ? "Complete"
-                          : detailDeadlines &&
-                              c.dueDate &&
-                              c.dueDate < (detail.asOf || todayUTC())
-                            ? "Overdue"
-                            : "Incomplete"}
-                      </TableCell>
-                      <TableCell>
-                        {(detailDeadlines
-                          ? c.dueDate
-                          : c.assignedAt?.slice(0, 10)) || "—"}
-                      </TableCell>
-                      <TableCell>
-                        {c.sources.join(", ") || "Direct assignment"}
-                      </TableCell>
+            <>
+              <CollectionControls
+                search={
+                  <FormField label="Search courses" visuallyHiddenLabel>
+                    <Input
+                      type="search"
+                      placeholder="Search courses"
+                      value={assignmentFilters.query}
+                      onChange={(event) =>
+                        setAssignmentFilters((current) => ({
+                          ...current,
+                          query: event.target.value,
+                        }))
+                      }
+                    />
+                  </FormField>
+                }
+                sortLabel={assignmentSortLabels[assignmentFilters.sort]}
+                sort={
+                  <FormField label="Sort assignments">
+                    <SelectField
+                      value={assignmentFilters.sort}
+                      onValueChange={(sort) =>
+                        setAssignmentFilters((current) => ({
+                          ...current,
+                          sort,
+                        }))
+                      }
+                    >
+                      {Object.entries(assignmentSortLabels).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </SelectField>
+                  </FormField>
+                }
+                filters={[
+                  ...(assignmentFilters.query
+                    ? [
+                        {
+                          id: "query",
+                          label: `Search: ${assignmentFilters.query}`,
+                          onRemove: () =>
+                            setAssignmentFilters((current) => ({
+                              ...current,
+                              query: "",
+                            })),
+                        },
+                      ]
+                    : []),
+                  ...(safeAssignmentFilters.status !== "all"
+                    ? [
+                        {
+                          id: "status",
+                          label:
+                            safeAssignmentFilters.status === "complete"
+                              ? "Complete"
+                              : safeAssignmentFilters.status === "overdue"
+                                ? "Overdue"
+                                : "Incomplete",
+                          onRemove: () =>
+                            setAssignmentFilters((current) => ({
+                              ...current,
+                              status: "all",
+                            })),
+                        },
+                      ]
+                    : []),
+                ]}
+                onClear={clearAssignmentFilters}
+              >
+                <FormField label="Course status">
+                  <SelectField
+                    value={safeAssignmentFilters.status}
+                    onValueChange={(status) =>
+                      setAssignmentFilters((current) => ({
+                        ...current,
+                        status,
+                      }))
+                    }
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="complete">Complete</option>
+                    <option value="incomplete">Incomplete</option>
+                    {detailDeadlines && (
+                      <option value="overdue">Overdue</option>
+                    )}
+                  </SelectField>
+                </FormField>
+              </CollectionControls>
+              <p className="text-xs text-muted-foreground" role="status">
+                {visibleAssignments!.courses.length} of {detail.courses.length}{" "}
+                {detail.courses.length === 1 ? "course" : "courses"}
+              </p>
+              <TableContainer aria-label="User course assignments">
+                <DataTable density="compact" layout="progressAssignments">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Course</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>
+                        {detailDeadlines ? "Due date" : "Assigned"}
+                      </TableHead>
+                      <TableHead>Assigned through</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </DataTable>
-            </TableContainer>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleAssignments!.courses.map((c) => (
+                      <TableRow key={c.id}>
+                        <TableCell>
+                          <strong>{c.title}</strong>
+                          <small>
+                            {c.category} · v{c.version}
+                          </small>
+                        </TableCell>
+                        <TableCell>
+                          {c.complete
+                            ? "Complete"
+                            : detailDeadlines &&
+                                c.dueDate &&
+                                c.dueDate < (detail.asOf || todayUTC())
+                              ? "Overdue"
+                              : "Incomplete"}
+                        </TableCell>
+                        <TableCell>
+                          {(detailDeadlines
+                            ? c.dueDate
+                            : c.assignedAt?.slice(0, 10)) || "—"}
+                        </TableCell>
+                        <TableCell>
+                          {c.sources.join(", ") || "Direct assignment"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </DataTable>
+              </TableContainer>
+              <CollectionEmpty
+                count={visibleAssignments!.courses.length}
+                total={detail.courses.length}
+                noun="courses"
+                onClear={clearAssignmentFilters}
+              />
+            </>
           ) : (
             <EmptyState>No assigned courses.</EmptyState>
           )}

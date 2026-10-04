@@ -91,7 +91,7 @@ test("content selection, explicit deletion, recovery and clean navigation", asyn
   ).toBe(true);
   await page.screenshot({ path: info.outputPath("admin-bulk-content.png") });
   await section(page, "MCP");
-  await section(page, "Learning groups");
+  await section(page, "Groups");
 });
 test("all matching selection crosses pages and group pickers wait for Apply", async ({
   page,
@@ -141,7 +141,7 @@ test("all matching selection crosses pages and group pickers wait for Apply", as
   await expect(
     page.getByRole("region", { name: "Selected items" }),
   ).toContainText("26 selected");
-  await section(page, "Learning groups");
+  await section(page, "Groups");
   await page
     .getByRole("button", { name: /^Manage / })
     .first()
@@ -226,7 +226,7 @@ test("existing categories, mixed types and one People menu", async ({
     page.getByRole("button", { name: "Bulk actions", exact: true }),
   ).toHaveCount(1);
   await expect(
-    page.getByRole("button", { name: "Add to learning groups", exact: true }),
+    page.getByRole("button", { name: "Add to groups", exact: true }),
   ).toHaveCount(0);
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await expect(page.getByRole("menuitem").last()).toHaveText("Delete selected");
@@ -252,7 +252,7 @@ test("group learning, Updates and linked teams use selected rows", async ({
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   }, data);
   await page.goto("/#admin");
-  await section(page, "Learning groups");
+  await section(page, "Groups");
   await page
     .getByRole("button", { name: `Manage ${group.name}`, exact: true })
     .click();
@@ -421,7 +421,7 @@ test("single curriculum and empty or single linked teams have no bulk controls",
     page.getByRole("button", { name: "Create curriculum", exact: true }),
   ).toBeVisible();
   await page.screenshot({ path: info.outputPath("single-curriculum.png") });
-  await section(page, "Learning groups");
+  await section(page, "Groups");
   await page
     .getByRole("button", { name: `Manage ${group.name}`, exact: true })
     .click();

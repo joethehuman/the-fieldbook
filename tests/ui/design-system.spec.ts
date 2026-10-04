@@ -140,7 +140,7 @@ test("learning groups: shared controls, save and reload", async ({
   page,
 }, testInfo) => {
   await admin(page);
-  await adminSection(page, "Learning groups");
+  await adminSection(page, "Groups");
   const search = page.getByRole("searchbox", {
     name: "Find a group",
     exact: true,
@@ -161,13 +161,13 @@ test("learning groups: shared controls, save and reload", async ({
     .getByRole("button", { name: "Create group", exact: true })
     .click();
   await expect(createDialog).not.toBeVisible();
-  const createdGroup = page.getByRole("button", {
+  const createdGroup = page.getByRole("link", {
     name: "Sales design test",
     exact: true,
   });
   await expect(createdGroup).toBeFocused();
   await expect(
-    page.getByRole("table", { name: "Learning groups", exact: true }),
+    page.getByRole("table", { name: "Groups", exact: true }),
   ).toBeVisible();
   await createdGroup.click();
   await expect(
@@ -189,11 +189,9 @@ test("learning groups: shared controls, save and reload", async ({
     fullPage: true,
   });
   await page.reload();
-  await adminSection(page, "Learning groups");
-  await search.fill("Sales design test");
-  await page
-    .getByRole("button", { name: "Sales design test", exact: true })
-    .click();
+  await expect(
+    page.getByRole("heading", { name: "Sales design test", exact: true }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Group settings", exact: true })
     .click();
@@ -206,7 +204,7 @@ test("learning groups: shared controls, save and reload", async ({
   });
   await rename
     .getByRole("textbox", { name: "Group name", exact: true })
-    .fill("Account executives");
+    .fill(freshWorkspace().groups[0].name);
   await rename.getByRole("button", { name: "Save name", exact: true }).click();
   await expect(rename.getByRole("alert")).toContainText("already in use");
   await rename
@@ -352,7 +350,7 @@ test("admin destinations and editor render without overflow or errors", async ({
     "Content",
     "Feedback",
     "Demo profiles",
-    "Learning groups",
+    "Groups",
     "Teams",
     "Curricula",
     "Progress",
@@ -370,7 +368,11 @@ test("admin destinations and editor render without overflow or errors", async ({
     await noOverflow(page);
   }
   await adminSection(page, "Content");
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page
+    .locator('table[data-layout="contentSelection"] tbody')
+    .getByRole("link")
+    .first()
+    .click();
   await expect(
     page.getByRole("textbox", { name: "Title", exact: true }),
   ).toBeVisible();

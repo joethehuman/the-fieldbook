@@ -69,8 +69,8 @@ test("review subtree assignments, keep defaults future-only, cancel and apply de
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
   }, data);
   await page.goto("/#admin");
-  await section(page, "Learning groups");
-  await page.getByRole("button", { name: "Sales", exact: true }).click();
+  await section(page, "Groups");
+  await page.getByRole("link", { name: "Sales", exact: true }).click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
   await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const membership = page.getByRole("dialog", {

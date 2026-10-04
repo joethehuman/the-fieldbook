@@ -65,6 +65,8 @@ import {
 } from "./ui/table";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { useToast } from "./ui/toast";
+import { RecordName, RecordMeta } from "./patterns/record-row";
+import { RowActions } from "./patterns/row-actions";
 import { DataTable } from "./patterns/data-table";
 import { FormField } from "./patterns/form-field";
 import {
@@ -552,7 +554,11 @@ export function TeamsAdmin({
   function teamTable(rows: Team[]) {
     return rows.length ? (
       <TableContainer>
-        <DataTable layout="teamBranches" aria-label="Subteams">
+        <DataTable
+          density="compact"
+          layout="teamBranches"
+          aria-label="Subteams"
+        >
           <TableHeader>
             <TableRow>
               <TableHead>Team</TableHead>
@@ -567,7 +573,12 @@ export function TeamsAdmin({
             {rows.map((t) => (
               <TableRow key={t.id}>
                 <TableCell>
-                  <strong>{t.name}</strong>
+                  <RecordName
+                    disabled={busy}
+                    onClick={() => void openTeam(t.id)}
+                  >
+                    {t.name}
+                  </RecordName>
                 </TableCell>
                 <TableCell>
                   {data.users.find((u) => u.id === t.managerId)?.name ||
@@ -577,14 +588,16 @@ export function TeamsAdmin({
                   {data.users.filter((u) => u.teamId === t.id).length}
                 </TableCell>
                 <TableCell>
-                  <Button
-                    variant="link"
+                  <RowActions
+                    label={t.name}
                     disabled={busy}
-                    onClick={() => void openTeam(t.id)}
-                    aria-label={`Manage ${t.name}`}
-                  >
-                    Manage team
-                  </Button>
+                    actions={[
+                      {
+                        label: "Manage team",
+                        onSelect: () => void openTeam(t.id),
+                      },
+                    ]}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -613,6 +626,7 @@ export function TeamsAdmin({
         <SectionHeader
           variant="page"
           title={<h2 {...browserTarget.targetProps}>Teams</h2>}
+          description="Use teams to manage reporting visibility, assign courses, and target relevant updates."
         >
           {organization && (
             <Button
@@ -680,8 +694,8 @@ export function TeamsAdmin({
                     ...([true, false] as const).map((add) => ({
                       id: add ? "add-groups" : "remove-groups",
                       label: add
-                        ? "Add to learning groups"
-                        : "Remove from learning groups",
+                        ? "Add to groups"
+                        : "Remove from groups",
                       description:
                         "Linked teams include all subteams. Review assignment changes before saving; accounts and saved progress are preserved.",
                       options: data.groups.map((g) => ({
@@ -1183,7 +1197,11 @@ export function TeamsAdmin({
               />
               {members.length ? (
                 <TableContainer>
-                  <DataTable layout="teamMembers" aria-label="Team members">
+                  <DataTable
+                    density="compact"
+                    layout="teamMembers"
+                    aria-label="Team members"
+                  >
                     <TableHeader>
                       <TableRow>
                         <TableHead>
@@ -1248,7 +1266,7 @@ export function TeamsAdmin({
                                   Manage membership in {teamName(u.teamId)}.
                                 </span>
                               )}
-                              <small>{u.email}</small>
+                              <RecordMeta title={u.email}>{u.email}</RecordMeta>
                               {!u.active && <Badge>Inactive</Badge>}
                               {u.active && u.registered === false && (
                                 <Badge>Not signed in</Badge>
@@ -1262,25 +1280,29 @@ export function TeamsAdmin({
                                   : teamName(u.teamId)}
                             </TableCell>
                             <TableCell>
-                              {managingOrganization ? null : memberTeam(u) ===
-                                selected ? (
-                                <Button
-                                  variant="link"
+                              {!managingOrganization && (
+                                <RowActions
+                                  label={u.name}
                                   disabled={busy}
-                                  aria-label={`Remove ${u.name} from team`}
-                                  onClick={() => void removeMember(u)}
-                                >
-                                  Remove
-                                </Button>
-                              ) : (
-                                <Button
-                                  variant="link"
-                                  disabled={busy}
-                                  aria-label={`Manage ${u.name}'s team`}
-                                  onClick={() => void openTeam(memberTeam(u)!)}
-                                >
-                                  Manage team
-                                </Button>
+                                  actions={
+                                    memberTeam(u) === selected
+                                      ? [
+                                          {
+                                            label: "Remove from team",
+                                            destructive: true,
+                                            onSelect: () =>
+                                              void removeMember(u),
+                                          },
+                                        ]
+                                      : [
+                                          {
+                                            label: "Manage team",
+                                            onSelect: () =>
+                                              void openTeam(memberTeam(u)!),
+                                          },
+                                        ]
+                                  }
+                                />
                               )}
                             </TableCell>
                           </TableRow>

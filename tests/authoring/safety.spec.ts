@@ -374,9 +374,9 @@ test("failed learning-group save shows one concise inline error", async ({
     await page
       .getByRole("combobox", { name: "Administration section" })
       .click();
-    await page.getByRole("option", { name: "Learning groups" }).click();
+    await page.getByRole("option", { name: "Groups" }).click();
   } else {
-    await page.getByRole("tab", { name: "Learning groups" }).click();
+    await page.getByRole("tab", { name: "Groups" }).click();
   }
   await page
     .getByRole("button", { name: `Manage ${state.groups[0].name}` })

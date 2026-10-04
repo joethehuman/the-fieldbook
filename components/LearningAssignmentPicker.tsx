@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Workspace } from "@/lib/store";
 import type { LearningItem } from "@/lib/types";
 import { ContentSelectionList } from "./patterns/content-selection-list";
@@ -49,6 +49,7 @@ export function LearningAssignmentPicker({
   registerNavigationGuard,
   onPrepare,
   triggerLabel = "Edit audience",
+  renderTrigger,
   compact = false,
   draftAudiences,
   onDraftChange,
@@ -58,6 +59,10 @@ export function LearningAssignmentPicker({
 }: {
   onPrepare?: () => Promise<Workspace | null>;
   triggerLabel?: string;
+  renderTrigger?: (props: {
+    onClick: () => void;
+    loading: boolean;
+  }) => ReactNode;
   compact?: boolean;
   data: Workspace;
   onFinish?: (saved: boolean, error?: Error) => void;
@@ -373,17 +378,20 @@ export function LearningAssignmentPicker({
   }, [target]);
   return (
     <>
-      {!target && (
-        <Button
-          type="button"
-          variant={compact ? "link" : "outline"}
-          size={compact ? "sm" : "default"}
-          loading={busy && !open}
-          onClick={() => void begin()}
-        >
-          {triggerLabel}
-        </Button>
-      )}
+      {!target &&
+        (renderTrigger ? (
+          renderTrigger({ onClick: () => void begin(), loading: busy && !open })
+        ) : (
+          <Button
+            type="button"
+            variant={compact ? "link" : "outline"}
+            size={compact ? "sm" : "default"}
+            loading={busy && !open}
+            onClick={() => void begin()}
+          >
+            {triggerLabel}
+          </Button>
+        ))}
       {!open && error && <Alert variant="destructive">{error}</Alert>}
       {!compact && !target && (
         <p className="text-sm text-muted-foreground">

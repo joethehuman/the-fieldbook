@@ -40,7 +40,7 @@ export function GroupPicker({
       </legend>
       {showDescription && (
         <FieldDescription>
-          Learning groups personalize courses and updates. Everyone can explore
+          Groups personalize courses and updates. Everyone can explore
           the library.
         </FieldDescription>
       )}

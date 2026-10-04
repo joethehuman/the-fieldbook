@@ -105,7 +105,7 @@ test("bulk group edits preserve the organization and preregistered people use th
     .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await page
-    .getByRole("menuitem", { name: "Add to learning groups", exact: true })
+    .getByRole("menuitem", { name: "Add to groups", exact: true })
     .click();
   await dialog.getByRole("checkbox", { name: group.name, exact: true }).check();
   await dialog

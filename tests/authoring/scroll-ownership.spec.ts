@@ -334,7 +334,7 @@ test("membership picker results scroll independently and retain search across ta
   page,
 }, info) => {
   await setup(page, info.project.name.startsWith("production"));
-  await section(page, "Learning groups");
+  await section(page, "Groups");
   await page.getByRole("button", { name: "Audience 00", exact: true }).click();
   await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const dialog = page.getByRole("dialog");
@@ -425,7 +425,7 @@ test("short and enlarged membership layouts retain usable content and reachable 
   page,
 }, info) => {
   await setup(page, info.project.name.startsWith("production"));
-  await section(page, "Learning groups");
+  await section(page, "Groups");
   await page.getByRole("button", { name: "Audience 00", exact: true }).click();
   await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const dialog = page.getByRole("dialog");

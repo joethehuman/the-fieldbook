@@ -8,13 +8,8 @@ async function section(page: Page) {
   });
   if (await picker.isVisible()) {
     await picker.click();
-    await page
-      .getByRole("option", { name: "Learning groups", exact: true })
-      .click();
-  } else
-    await page
-      .getByRole("tab", { name: "Learning groups", exact: true })
-      .click();
+    await page.getByRole("option", { name: "Groups", exact: true }).click();
+  } else await page.getByRole("tab", { name: "Groups", exact: true }).click();
 }
 async function saved(page: Page): Promise<Workspace> {
   return page.evaluate(() =>
@@ -113,7 +108,7 @@ test("flat groups retain curriculum links and deduplicate learning across audien
     .getByRole("searchbox", { name: "Find a group", exact: true })
     .fill("Account");
   await page
-    .getByRole("button", { name: "Account executives", exact: true })
+    .getByRole("link", { name: "Account executives", exact: true })
     .click();
   await expect(
     page.getByRole("tab", { name: "People", exact: true }),
@@ -135,14 +130,14 @@ test("flat groups retain curriculum links and deduplicate learning across audien
   });
   await picker.getByRole("checkbox", { name: /Discovery/ }).check();
   await picker
-    .getByRole("button", { name: "Review assignment", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
-  const review = page.getByRole("dialog", {
-    name: "Review changes",
-    exact: true,
-  });
-  await expect(review).toBeVisible();
-  await review.getByRole("button", { name: "Cancel", exact: true }).click();
+  const review = picker;
+  await expect(
+    review.getByRole("button", { name: "Save assignments", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(1);
+  await review.getByRole("button", { name: "← Back", exact: true }).click();
   await expect(picker).toBeVisible();
   await expect(picker.getByRole("alert")).toHaveCount(0);
   expect(
@@ -150,10 +145,10 @@ test("flat groups retain curriculum links and deduplicate learning across audien
       .learningItems,
   ).toEqual([{ kind: "curriculum", id: "foundation" }]);
   await picker
-    .getByRole("button", { name: "Review assignment", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
   await review
-    .getByRole("button", { name: "Apply changes", exact: true })
+    .getByRole("button", { name: "Save assignments", exact: true })
     .click();
   await expect(picker).not.toBeVisible();
   expect(
@@ -165,6 +160,12 @@ test("flat groups retain curriculum links and deduplicate learning across audien
   ]);
   await page
     .getByRole("button", { name: "Remove GTM foundation", exact: true })
+    .click();
+  await picker
+    .getByRole("button", { name: "Review changes", exact: true })
+    .click();
+  await picker
+    .getByRole("button", { name: "Save assignments", exact: true })
     .click();
   await expect
     .poll(
@@ -182,9 +183,7 @@ test("flat groups retain curriculum links and deduplicate learning across audien
   ).toEqual(
     expect.arrayContaining(["flat-course-0", "flat-course-1", "flat-course-2"]),
   );
-  await page
-    .getByRole("button", { name: "All learning groups", exact: true })
-    .click();
+  await page.getByRole("button", { name: "All groups", exact: true }).click();
   await expect(
     page.getByRole("searchbox", { name: "Find a group", exact: true }),
   ).toHaveValue("Account");
@@ -198,7 +197,7 @@ test("branch membership stays staged and explains overlapping sources", async ({
   page,
 }, info) => {
   await start(page, fixture());
-  await page.getByRole("button", { name: "Pilot", exact: true }).click();
+  await page.getByRole("link", { name: "Pilot", exact: true }).click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
   await page.getByRole("button", { name: "Add Members", exact: true }).click();
   const membership = page.getByRole("dialog", {
@@ -258,8 +257,9 @@ test("branch membership stays staged and explains overlapping sources", async ({
     fullPage: true,
   });
   await page.reload();
-  await section(page);
-  await page.getByRole("button", { name: "Pilot", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Pilot", exact: true }),
+  ).toBeVisible();
   await page.getByRole("tab", { name: "People", exact: true }).click();
   await expect(
     page.getByRole("row").filter({ hasText: "Alex Edwards" }),
@@ -271,7 +271,7 @@ test("large group roster is paginated, searchable and contained on narrow screen
 }, info) => {
   await start(page, fixture(true));
   await page
-    .getByRole("button", { name: "Account executives", exact: true })
+    .getByRole("link", { name: "Account executives", exact: true })
     .click();
   await page.getByRole("tab", { name: "People", exact: true }).click();
   const table = page.getByRole("table", { name: "Group members" });
@@ -324,7 +324,7 @@ test("group workspace starts with people and clearly separates assigned content 
   );
   await start(page, data);
   await page
-    .getByRole("button", { name: "Account executives", exact: true })
+    .getByRole("link", { name: "Account executives", exact: true })
     .click();
   const tabs = page.getByRole("tablist", { name: "Learning group sections" });
   await expect(tabs.getByRole("tab")).toHaveText([
@@ -449,7 +449,7 @@ test("People filters and bulk direct removal preserve team membership and cancel
   });
   await start(page, data);
   await page
-    .getByRole("button", { name: "Account executives", exact: true })
+    .getByRole("link", { name: "Account executives", exact: true })
     .click();
   const table = page.getByRole("table", { name: "Group members" });
   await expect(table).toHaveAttribute("data-layout", "groupMembersSelectable");
@@ -576,7 +576,7 @@ test("People filters and bulk direct removal preserve team membership and cancel
 });
 
 async function indexChoice(page: Page, field: string, option: string) {
-  const sort = field === "Sort learning groups";
+  const sort = field === "Sort groups";
   await page
     .getByRole("button", { name: sort ? /^Sort:/ : /^Filters/ })
     .click();
@@ -604,7 +604,7 @@ test("group index keeps selection across pages and creation reveals the new row 
   );
   await start(page, data);
   const table = page.getByRole("table", {
-    name: "Learning groups",
+    name: "Groups",
     exact: true,
   });
   await expect(table).toHaveAttribute(
@@ -618,7 +618,7 @@ test("group index keeps selection across pages and creation reveals the new row 
     .getByRole("button", { name: "Select all 29 matching", exact: true })
     .click();
   await page
-    .getByRole("navigation", { name: "Learning groups pages", exact: true })
+    .getByRole("navigation", { name: "Groups pages", exact: true })
     .getByRole("button", { name: "Next", exact: true })
     .click();
   await expect(
@@ -627,7 +627,7 @@ test("group index keeps selection across pages and creation reveals the new row 
   await expect(
     page.getByRole("region", { name: "Selected items", exact: true }),
   ).toContainText("29 selected");
-  await indexChoice(page, "Sort learning groups", "Name Z–A");
+  await indexChoice(page, "Sort groups", "Name Z–A");
   await expect(
     table.getByRole("checkbox", { name: "Select Pilot", exact: true }),
   ).toBeChecked();
@@ -651,7 +651,7 @@ test("group index keeps selection across pages and creation reveals the new row 
     .getByRole("button", { name: "Create group", exact: true })
     .click();
   await expect(create).not.toBeVisible();
-  const created = table.getByRole("button", {
+  const created = table.getByRole("link", {
     name: "AAA new audience",
     exact: true,
   });
@@ -693,7 +693,7 @@ test("group index sorts real counts and filters membership and assigned courses 
   });
   await start(page, data);
   const table = page.getByRole("table", {
-    name: "Learning groups",
+    name: "Groups",
     exact: true,
   });
   const widths = () =>
@@ -703,15 +703,15 @@ test("group index sorts real counts and filters membership and assigned courses 
         columns.map((column) => column.getBoundingClientRect().width),
       );
   const original = await widths();
-  await indexChoice(page, "Sort learning groups", "Courses: fewest first");
+  await indexChoice(page, "Sort groups", "Courses: fewest first");
   await expect(table.getByRole("row").nth(1)).toContainText("Empty audience");
-  await indexChoice(page, "Sort learning groups", "Courses: most first");
+  await indexChoice(page, "Sort groups", "Courses: most first");
   await expect(table.getByRole("row").nth(1)).toContainText(
     "Account executives",
   );
-  await indexChoice(page, "Sort learning groups", "People: fewest first");
+  await indexChoice(page, "Sort groups", "People: fewest first");
   await expect(table.getByRole("row").nth(1)).toContainText("Empty audience");
-  await indexChoice(page, "Sort learning groups", "People: most first");
+  await indexChoice(page, "Sort groups", "People: most first");
   await expect(table.getByRole("row").nth(1)).toContainText(
     "Account executives",
   );
@@ -726,7 +726,7 @@ test("group index sorts real counts and filters membership and assigned courses 
   await expect(table.getByRole("row")).toHaveCount(3);
   await indexChoice(page, "Group courses", "No assigned courses");
   await expect(
-    page.getByText("No learning groups match these filters.", { exact: true }),
+    page.getByText("No groups match these filters.", { exact: true }),
   ).toBeVisible();
   await page
     .getByRole("button", { name: "Clear filters", exact: true })
@@ -783,7 +783,7 @@ test("bulk group deletion reviews once, cancels intact, and preserves content hi
     () => (window as typeof window & { groupWrites: number }).groupWrites,
   );
   const table = page.getByRole("table", {
-    name: "Learning groups",
+    name: "Groups",
     exact: true,
   });
   for (const name of ["Account executives", "Pilot"])
@@ -832,7 +832,7 @@ test("bulk group deletion reviews once, cancels intact, and preserves content hi
     .click();
   await expect(review).not.toBeVisible();
   await expect(
-    table.getByRole("button", { name: "All GTM", exact: true }),
+    table.getByRole("link", { name: "All GTM", exact: true }),
   ).toBeVisible();
   await expect(table.getByRole("checkbox")).toHaveCount(0);
   const after = await saved(page);

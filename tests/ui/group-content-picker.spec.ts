@@ -98,14 +98,14 @@ async function start(page: Page, kind: "courses" | "updates" = "courses") {
   if (await section.isVisible()) {
     await section.click();
     await page
-      .getByRole("option", { name: "Learning groups", exact: true })
+      .getByRole("option", { name: "Groups", exact: true })
       .click();
   } else
     await page
-      .getByRole("tab", { name: "Learning groups", exact: true })
+      .getByRole("tab", { name: "Groups", exact: true })
       .click();
   await page
-    .getByRole("button", { name: "Picker audience", exact: true })
+    .getByRole("link", { name: "Picker audience", exact: true })
     .click();
   await page
     .getByRole("tab", {

@@ -13,7 +13,8 @@ import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Checkbox } from "../ui/choice";
 import { Input } from "../ui/input";
-import { ActionGroup } from "../ui/action-group";
+import { RowActions } from "./row-actions";
+import { RecordName, RecordMeta, RecordListRow } from "./record-row";
 import { CountMetric } from "../ui/count-metric";
 import {
   ConnectorLine,
@@ -70,6 +71,7 @@ function BrowserColumn({
   id,
   title,
   className,
+  compact = false,
   positions,
   headingRef,
   children,
@@ -77,6 +79,7 @@ function BrowserColumn({
   id: string;
   title: string;
   className?: string;
+  compact?: boolean;
   positions: Map<string, number>;
   headingRef: (node: HTMLHeadingElement | null) => void;
   children: ReactNode;
@@ -107,7 +110,12 @@ function BrowserColumn({
       <ul
         ref={fade.ref}
         data-slot="hierarchy-column-list"
-        className="scroll-fade grid min-h-0 min-w-0 content-start gap-2 overflow-y-auto overscroll-y-contain pe-2 pb-1 [scrollbar-gutter:stable]"
+        className={cn(
+          "scroll-fade grid min-h-0 min-w-0 content-start overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]",
+          compact
+            ? "divide-y divide-border rounded-lg border border-border"
+            : "gap-2 pe-2 pb-1",
+        )}
         data-scroll-fade-before={fade.edges.before}
         data-scroll-fade-after={fade.edges.after}
         onScroll={(event) => {
@@ -411,11 +419,98 @@ export function HierarchyBrowser({
     pendingRowFocus.current = focusRow || null;
     void onBrowse(id);
   }
-  function row(item: HierarchyBrowserItem, showPath = false) {
+  function row(item: HierarchyBrowserItem) {
     const childCount = items.filter(
       (child) => child.parentId === item.id,
     ).length;
     const expanded = !flat && columns.some((column) => column.id === item.id);
+    const metrics = (
+      <>
+        {item.directMemberCount !== undefined && (
+          <CountMetric
+            icon={<Users className="size-3" aria-hidden="true" />}
+            value={item.directMemberCount}
+            label={`${item.directMemberCount} direct ${item.directMemberCount === 1 ? "member" : "members"}`}
+          />
+        )}
+        <CountMetric
+          icon={<Network className="size-3" aria-hidden="true" />}
+          value={childCount}
+          label={`${childCount} ${childCount === 1 ? "subteam" : "subteams"}`}
+        />
+      </>
+    );
+    const actions = (
+      <RowActions
+        label={item.label}
+        disabled={disabled}
+        actions={[
+          { label: "Open team", onSelect: () => void onOpen(item.id) },
+          { label: "Edit team", onSelect: () => void onEdit(item.id) },
+          ...(flat && childCount > 0
+            ? [{ label: "Browse subteams", onSelect: () => browse(item.id) }]
+            : []),
+        ]}
+      />
+    );
+    if (flat) {
+      const parentPath = pathFor(item.id, byId)
+        .slice(0, -1)
+        .map((part) => part.label)
+        .join(" / ");
+      return (
+        <li
+          key={item.id}
+          data-hierarchy-id={item.id}
+          data-parent-id={item.parentId}
+          className="min-w-0"
+        >
+          <RecordListRow
+            selection={
+              selected &&
+              onSelectionChange &&
+              canBulkSelect(matches.length) && (
+                <Checkbox
+                  aria-label={`Select ${item.label}`}
+                  checked={selected.includes(item.id)}
+                  disabled={disabled}
+                  onCheckedChange={(checked) =>
+                    onSelectionChange(
+                      checked === true
+                        ? [...selected, item.id]
+                        : selected.filter((id) => id !== item.id),
+                    )
+                  }
+                />
+              )
+            }
+            identity={
+              <>
+                <RecordName
+                  disabled={disabled}
+                  onClick={() => void onOpen(item.id)}
+                >
+                  {item.label}
+                </RecordName>
+                {parentPath && (
+                  <RecordMeta title={parentPath}>{parentPath}</RecordMeta>
+                )}
+                <RecordMeta className="sm:hidden">
+                  {item.description}
+                </RecordMeta>
+              </>
+            }
+            detail={
+              <span className="line-clamp-2" title={item.description}>
+                {item.description}
+              </span>
+            }
+            metrics={metrics}
+            actions={actions}
+          />
+        </li>
+      );
+    }
     return (
       <li
         key={item.id}
@@ -425,28 +520,13 @@ export function HierarchyBrowser({
       >
         <div
           className={cn(
-            "grid min-w-0 gap-1 rounded-control border border-border bg-background",
+            "grid min-w-0 gap-1 overflow-hidden rounded-xl border border-border bg-background",
             !flat &&
               activePath.has(item.id) &&
               "border-control-border bg-muted",
           )}
         >
           <div className="flex min-w-0 items-start gap-2">
-            {selected && onSelectionChange && canBulkSelect(matches.length) && (
-              <Checkbox
-                className="ms-2 mt-2"
-                aria-label={`Select ${item.label}`}
-                checked={selected.includes(item.id)}
-                disabled={disabled}
-                onCheckedChange={(checked) =>
-                  onSelectionChange(
-                    checked === true
-                      ? [...selected, item.id]
-                      : selected.filter((id) => id !== item.id),
-                  )
-                }
-              />
-            )}
             <ContentAction
               ref={(node) => {
                 if (node) rowRefs.current.set(item.id, node);
@@ -470,19 +550,12 @@ export function HierarchyBrowser({
                     )
                   : browse(item.id)
               }
-              className="flex min-w-0 flex-1 items-start justify-between gap-2 border-0 bg-transparent px-2 py-2 text-label"
+              className="shadow-none flex min-w-0 flex-1 items-start justify-between gap-2 rounded-none border-0 bg-transparent px-2 py-2 text-label"
             >
               <span className="grid min-w-0 gap-1 [overflow-wrap:anywhere]">
                 <span className="line-clamp-2 font-semibold" title={item.label}>
                   {item.label}
                 </span>
-                {showPath && (
-                  <span className="text-xs text-muted-foreground">
-                    {pathFor(item.id, byId)
-                      .map((part) => part.label)
-                      .join(" / ")}
-                  </span>
-                )}
                 {item.description && (
                   <span
                     data-slot="hierarchy-manager"
@@ -505,42 +578,8 @@ export function HierarchyBrowser({
             data-slot="hierarchy-card-footer"
             className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-2 pb-2"
           >
-            <div className="flex items-center gap-3">
-              {item.directMemberCount !== undefined && (
-                <CountMetric
-                  icon={<Users className="size-3" aria-hidden="true" />}
-                  value={item.directMemberCount}
-                  label={`${item.directMemberCount} direct ${item.directMemberCount === 1 ? "member" : "members"}`}
-                />
-              )}
-              <CountMetric
-                icon={<Network className="size-3" aria-hidden="true" />}
-                value={childCount}
-                label={`${childCount} ${childCount === 1 ? "subteam" : "subteams"}`}
-              />
-            </div>
-            <ActionGroup variant="text" className="ms-auto justify-end">
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                disabled={disabled}
-                aria-label={`Open ${item.label}`}
-                onClick={() => void onOpen(item.id)}
-              >
-                Open
-              </Button>
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                disabled={disabled}
-                aria-label={`Edit ${item.label}`}
-                onClick={() => void onEdit(item.id)}
-              >
-                Edit
-              </Button>
-            </ActionGroup>
+            <div className="flex items-center gap-3">{metrics}</div>
+            {actions}
           </div>
         </div>
       </li>
@@ -593,6 +632,7 @@ export function HierarchyBrowser({
             {matches.length ? (
               <BrowserColumn
                 id="results"
+                compact
                 title={
                   search
                     ? `${matches.length} matching ${label.toLowerCase()}`
@@ -601,7 +641,7 @@ export function HierarchyBrowser({
                 positions={positions.current}
                 headingRef={() => undefined}
               >
-                {matches.map((item) => row(item, true))}
+                {matches.map((item) => row(item))}
               </BrowserColumn>
             ) : (
               <CollectionEmpty

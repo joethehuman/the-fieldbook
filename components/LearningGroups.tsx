@@ -1,6 +1,12 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import {
+  MoreHorizontal,
+  Plus,
+  Trash2,
+  Network,
+  UserRoundPlus,
+} from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import {
   isOrganizationChangeCanceled,
@@ -62,6 +68,9 @@ import {
 import { useToast } from "./ui/toast";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { DetailNavigation } from "./patterns/detail-navigation";
+import { RecordName, RecordMeta } from "./patterns/record-row";
+import { RowActions } from "./patterns/row-actions";
+import { CountMetric } from "./ui/count-metric";
 import { DataTable } from "./patterns/data-table";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
@@ -103,6 +112,7 @@ export default function LearningGroups({
   onLearningMany,
   initialGroup,
   initialTab,
+  hrefForGroup,
   onDestinationChange,
   registerNavigationGuard,
   onPrepareAssignments,
@@ -118,6 +128,7 @@ export default function LearningGroups({
     actions: import("@/lib/learning").LearningAction[],
   ) => Promise<void>;
   initialGroup?: string;
+  hrefForGroup?: (id: string) => string;
   initialTab?: import("@/lib/admin-destination").AdminDestination["panel"];
   onDestinationChange?: (
     id?: string,
@@ -126,6 +137,8 @@ export default function LearningGroups({
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const [selected, setSelected] = useState(initialGroup || "");
+  const [indexAction, setIndexAction] = useState<{ id: string; kind: "people" | "courses" | "updates" } | null>(null);
+  const startedIndexAction = useRef<typeof indexAction>(null);
   const [tab, setTab] = useState<string>(initialTab || "people");
   const [indexQuery, setIndexQuery] = useState("");
   const [indexPage, setIndexPage] = useState(1);
@@ -151,7 +164,7 @@ export default function LearningGroups({
   const notify = useToast();
   const { confirm } = useInteractionDialog();
   const destination = useRevealTarget<HTMLElement>();
-  const group = data.groups.find((candidate) => candidate.id === selected);
+  const group = data.groups.find((candidate) => candidate.id === (indexAction?.id || selected));
   const teams = data.teams || [];
   const content = data.publishedContent || data.content;
   const published = content.filter((item) => item.status === "published");
@@ -441,7 +454,7 @@ export default function LearningGroups({
     if (group || !returnToGroup) return;
     const frame = requestAnimationFrame(() => {
       const row = Array.from(
-        destination.targetProps.ref.current?.querySelectorAll<HTMLButtonElement>(
+        destination.targetProps.ref.current?.querySelectorAll<HTMLElement>(
           "[data-group-id]",
         ) || [],
       ).find((button) => button.dataset.groupId === returnToGroup);
@@ -535,9 +548,13 @@ export default function LearningGroups({
     setNotice("");
     setEditor(next);
   }
+  function finishEditor() {
+    setEditor(null);
+    setIndexAction(null);
+  }
   async function close() {
     if (await guard.current()) {
-      setEditor(null);
+      finishEditor();
       setNotice("");
     }
   }
@@ -638,7 +655,7 @@ export default function LearningGroups({
             : "Learning group renamed.",
         )
       ) {
-        setEditor(null);
+        finishEditor();
         if (editor.kind === "create") {
           clearIndexFilters();
           setSelected("");
@@ -692,7 +709,7 @@ export default function LearningGroups({
           "Membership saved.",
         )
       )
-        setEditor(null);
+        finishEditor();
       return;
     }
     if (editor.kind !== "updates") return;
@@ -718,7 +735,7 @@ export default function LearningGroups({
         "Updates added.",
       )
     )
-      setEditor(null);
+      finishEditor();
   }
   const learningOptions = group
     ? learningSelectionOptions(data, {
@@ -766,33 +783,42 @@ export default function LearningGroups({
           ? "Review changes"
           : "Review changes";
 
+  // Index shortcuts use the same editors, while keeping the index and its filters mounted.
+  useEffect(() => {
+    if (!indexAction || startedIndexAction.current === indexAction) return;
+    startedIndexAction.current = indexAction;
+    if (indexAction.kind === "people") openMembership();
+    else if (indexAction.kind === "updates") open({ kind: "updates", ids: [], snapshot: learningSnapshot() });
+    else void editAssignments("add").finally(() => setIndexAction(null));
+  }, [indexAction]);
+
   return (
     <section
       {...destination.targetProps}
       className="learning-admin"
-      aria-label={group?.name || "Learning groups"}
+      aria-label={(selected && group?.name) || "Groups"}
     >
       {assignmentPicker.picker}
       {notice && !editor && <Alert variant="destructive">{notice}</Alert>}
       {needsConversion && (
         <Alert>
-          These groups still use the previous hierarchy. Convert learning groups
+          These groups still use the previous hierarchy. Convert groups
           before editing their audiences or learning.
         </Alert>
       )}
-      {!group ? (
+      {!selected || !group ? (
         <>
           <SectionHeader
             variant="page"
-            title={<h2>Learning groups</h2>}
-            description="Choose an audience, then choose its learning. Published content remains available to everyone with access."
+            title={<h2>Groups</h2>}
+            description="Assign learning to teams directly. Use groups to combine teams and individual people into a custom audience."
           />
           <CollectionControls
             filters={indexFilters}
             onClear={clearIndexFilters}
             sortLabel={indexSortLabels[indexSort]}
             sort={
-              <FormField label="Sort learning groups">
+              <FormField label="Sort groups">
                 <SelectField
                   value={indexSort}
                   onValueChange={(value) => {
@@ -875,14 +901,14 @@ export default function LearningGroups({
                 id: "delete-groups",
                 label: "Delete groups",
                 description:
-                  "Remove selected learning groups and their audience links. Courses and saved completions remain.",
+                  "Remove selected groups and their audience links. Courses and saved completions remain.",
                 destructive: true,
                 externalReview: true,
                 disabledReason:
                   busy || needsConversion
                     ? "Finish the current change first."
                     : undefined,
-                successMessage: "Learning groups deleted.",
+                successMessage: "Groups deleted.",
                 apply: async (_, ids = []) => {
                   if (
                     currentIndexSnapshot.current !== indexSnapshot ||
@@ -966,7 +992,8 @@ export default function LearningGroups({
             <TableContainer>
               <DataTable
                 layout="learningGroupsSelectable"
-                aria-label="Learning groups"
+                density="compact"
+                aria-label="Groups"
               >
                 <TableHeader>
                   <TableRow>
@@ -983,6 +1010,9 @@ export default function LearningGroups({
                     <TableHead>Group</TableHead>
                     <TableHead className="text-right">People</TableHead>
                     <TableHead className="text-right">Courses</TableHead>
+                    <TableHead>
+                      <span className="sr-only">Actions</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1011,31 +1041,62 @@ export default function LearningGroups({
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            type="button"
-                            variant="link"
+                          <RecordName
                             data-group-id={candidate.id}
+                            href={hrefForGroup?.(candidate.id)}
+                            onNavigate={() => openGroup(candidate.id)}
                             onClick={() => openGroup(candidate.id)}
                           >
                             {candidate.name}
-                          </Button>
-                          <p className="text-copy text-muted-foreground">
-                            {links.length
-                              ? `${links.length} linked ${links.length === 1 ? "team" : "teams"}`
-                              : ""}
-                            {links.length && direct ? " · " : ""}
-                            {direct
-                              ? `${direct} individually added`
-                              : !links.length
-                                ? "No members yet"
-                                : ""}
-                          </p>
+                          </RecordName>
+                          <RecordMeta className="flex items-center gap-3">
+                            {links.length > 0 && (
+                              <CountMetric
+                                icon={
+                                  <Network
+                                    className="size-3"
+                                    aria-hidden="true"
+                                  />
+                                }
+                                value={links.length}
+                                label={`${links.length} ${links.length === 1 ? "team" : "teams"} linked`}
+                              />
+                            )}
+                            {direct > 0 && (
+                              <CountMetric
+                                icon={
+                                  <UserRoundPlus
+                                    className="size-3"
+                                    aria-hidden="true"
+                                  />
+                                }
+                                value={direct}
+                                label={`${direct} direct ${direct === 1 ? "user" : "users"} linked`}
+                              />
+                            )}
+                            {!links.length && !direct && "No members yet"}
+                          </RecordMeta>
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {membersOf(candidate).length}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {courseCount(candidate)}
+                        </TableCell>
+                        <TableCell>
+                          <RowActions
+                            label={candidate.name}
+                            disabled={busy}
+                            actions={[
+                              {
+                                label: "Edit group",
+                                onSelect: () => openGroup(candidate.id),
+                              },
+                              { label: "Add people", separator: true, disabled: needsConversion, onSelect: () => setIndexAction({ id: candidate.id, kind: "people" }) },
+                              { label: "Assign courses", disabled: needsConversion || !learningSelectionOptions(data, { kind: "audiences", keys: [`group:${candidate.id}`], mode: "add" }).length, onSelect: () => setIndexAction({ id: candidate.id, kind: "courses" }) },
+                              { label: "Assign updates", disabled: needsConversion || !published.some((item) => item.kind === "brief" && !item.groups.includes(candidate.id)), onSelect: () => setIndexAction({ id: candidate.id, kind: "updates" }) },
+                            ]}
+                          />
                         </TableCell>
                       </TableRow>
                     );
@@ -1047,13 +1108,13 @@ export default function LearningGroups({
             <CollectionEmpty
               count={0}
               total={data.groups.length}
-              noun="learning groups"
+              noun="groups"
               onClear={clearIndexFilters}
             />
           )}
           <Pagination
             showCount={false}
-            label="Learning groups"
+            label="Groups"
             page={groupPage}
             pageSize={PAGE_SIZE}
             total={groups.length}
@@ -1067,7 +1128,7 @@ export default function LearningGroups({
             disabled={busy}
             items={[
               {
-                label: "All learning groups",
+                label: "All groups",
                 onSelect: () => {
                   if (onDestinationChange) {
                     void onDestinationChange();

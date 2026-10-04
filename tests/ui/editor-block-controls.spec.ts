@@ -117,7 +117,7 @@ test("image settings use the shared dialog and preserve Cancel versus Save", asy
   await expect(dialog).toHaveAttribute("data-slot", "dialog-content");
   await dialog.getByLabel("Alternative text").fill("Cancelled description");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
-  await expect(writer.getByRole("img")).toHaveAttribute(
+  await expect(writer.locator("img")).toHaveAttribute(
     "alt",
     "A landscape illustration",
   );
@@ -127,7 +127,7 @@ test("image settings use the shared dialog and preserve Cancel versus Save", asy
   await dialog.getByLabel("Title (optional)").fill("Updated title");
   await page.screenshot({ path: info.outputPath("image-settings.png") });
   await dialog.getByRole("button", { name: "Save image", exact: true }).click();
-  await expect(writer.getByRole("img")).toHaveAttribute(
+  await expect(writer.locator("img")).toHaveAttribute(
     "alt",
     "A useful description",
   );

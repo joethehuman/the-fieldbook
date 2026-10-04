@@ -334,11 +334,10 @@ test("progress filters, keyboard download, member details and empty report", asy
     "Subteam",
   ]);
   expect(rows[1].slice(4, 7)).toEqual(["3", "1", "33"]);
-  await expect(displayed).toContainText(
-    rows[1][rows[0].indexOf("Learning status")],
-  );
+  await expect(displayed.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "33");
   await screenshot(page, info, "team-filtered");
-  await page.getByRole("button", { name: "View courses", exact: true }).click();
+  await page.locator("button[data-person-id]").click();
+  await expect(page.getByRole("heading", { name: /’s assignments$/ })).toBeVisible();
   const detail = await download(
     page,
     page.getByRole("button", { name: "Export CSV", exact: true }),
@@ -346,11 +345,42 @@ test("progress filters, keyboard download, member details and empty report", asy
     "member",
   );
   expect(detail.rows).toHaveLength(4);
-  expect(detail.rows[1][5]).toBe("Complete");
+  expect(detail.rows.slice(1).filter((row) => row[5] === "Complete")).toHaveLength(1);
   expect(detail.rows.flat().join(" ")).not.toContain(
     "Self-directed exploration",
   );
   await screenshot(page, info, "member-assignments");
+  const courseRows = page.locator('table[data-layout="progressAssignments"] tbody tr');
+  await expect(page.getByRole("button", { name: "Sort: Newest assigned", exact: true })).toBeVisible();
+  // Check the rendered order against dates in the actual export, rather than fixture array order.
+  const assignedColumn = detail.rows[0].indexOf("Assigned at");
+  const datedRows = detail.rows.slice(1).filter((row) => row[assignedColumn]);
+  expect(datedRows.map((row) => row[assignedColumn])).toEqual(
+    datedRows.map((row) => row[assignedColumn]).sort((a, b) => Date.parse(b) - Date.parse(a)),
+  );
+  expect(await courseRows.locator("td:first-child strong").allTextContents()).toEqual(detail.rows.slice(1).map((row) => row[2]));
+  await page.getByRole("searchbox", { name: "Search courses", exact: true }).fill("platform");
+  await expect(courseRows).toHaveCount(1);
+  await expect(courseRows).toContainText("Know the platform");
+  const filtered = await download(page, page.getByRole("button", { name: "Export CSV", exact: true }), info, "member-filtered");
+  expect(filtered.rows).toHaveLength(2);
+  expect(filtered.rows[1][2]).toBe("Know the platform");
+  await page.getByRole("searchbox", { name: "Search courses", exact: true }).fill("no matching course");
+  await expect(courseRows).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Search courses", exact: true }).fill("");
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
+  await select(page, "Course status", "Complete");
+  await page.keyboard.press("Escape");
+  await expect(courseRows).toHaveCount(1);
+  await expect(courseRows).toContainText("Start with the customer");
+  await page.getByRole("button", { name: "Remove Complete filter", exact: true }).click();
+  await page.getByRole("button", { name: "Sort: Newest assigned", exact: true }).click();
+  await select(page, "Sort assignments", "Course A–Z");
+  await page.keyboard.press("Escape");
+  await expect(courseRows.locator("td:first-child strong")).toHaveText([
+    "From discovery to next steps", "Know the platform", "Start with the customer",
+  ]);
+
   await page.getByRole("button", { name: "Back to progress" }).click();
   await searchPeople(page, "no-match");
   const empty = await download(
@@ -452,8 +482,9 @@ test("person course list, assignment details and optional history agree with tab
   await page
     .getByRole("row")
     .filter({ hasText: "zoe@example.test" })
-    .getByRole("button", { name: "Progress" })
+    .getByRole("button", { name: /^Actions for/ })
     .click();
+  await page.getByRole("menuitem", { name: "Progress", exact: true }).click();
   const buttons = page.getByRole("button", { name: "Export CSV", exact: true });
   const list = await download(page, buttons.first(), info, "assigned");
   const courseRows = page.locator('table[data-layout="courses"] tbody tr');
@@ -513,7 +544,7 @@ test("large reports download every row in displayed order", async ({
   await expect(displayed).toHaveCount(25);
   const exportedNames = result.rows.slice(1).map((row) => row[0]);
   expect(exportedNames.slice(0, 25)).toEqual(
-    await displayed.locator("td:first-child strong").allTextContents(),
+    await displayed.locator("td:first-child button[data-person-id]").allTextContents(),
   );
   expect(new Set(exportedNames)).toEqual(
     new Set(Array.from({ length: 1205 }, (_, i) => `Large person ${i}`)),
@@ -634,8 +665,9 @@ test("failed progress update disables exports until the complete report reloads"
   await page
     .getByRole("row")
     .filter({ hasText: "zoe@example.test" })
-    .getByRole("button", { name: "Progress" })
+    .getByRole("button", { name: /^Actions for/ })
     .click();
+  await page.getByRole("menuitem", { name: "Progress", exact: true }).click();
   await page
     .getByRole("button", { name: "View progress", exact: true })
     .nth(1)
@@ -762,7 +794,7 @@ test("People connects hire-date guidance and preregistration to the shared roste
   await page
     .getByRole("row")
     .filter({ hasText: data.users[0].email })
-    .getByRole("button", { name: "Edit", exact: true })
+    .getByRole("link", { name: data.users[0].name, exact: true })
     .click();
   const dialog = page.getByRole("dialog");
   await expect(
@@ -868,7 +900,7 @@ test("due dates off removes overdue language and no assignments stays N/A", asyn
     'table[data-layout="progressPeopleNoDates"] tbody tr',
   );
   await expect(row).toHaveCount(1);
-  await expect(row).toContainText("No assigned courses");
+  await expect(row.getByRole("img", { name: /^No assigned courses/ })).toBeVisible();
   await expect(row).toContainText("—");
   const result = await download(
     page,
@@ -909,10 +941,10 @@ test("person back preserves page, sort, filter and scroll", async ({
   await expect(pages).toContainText("Page 2 of 3");
   const table = page.locator('table[data-layout="progressPeople"]');
   const names = await table
-    .locator("tbody td:first-child strong")
+    .locator("tbody td:first-child button[data-person-id]")
     .allTextContents();
   const open = table
-    .getByRole("button", { name: "View courses", exact: true })
+    .locator("button[data-person-id]")
     .first();
   await open.scrollIntoViewIfNeeded();
   const panel = page.locator(".admin-panel");
@@ -924,7 +956,7 @@ test("person back preserves page, sort, filter and scroll", async ({
   await page.getByRole("button", { name: "Back to progress" }).click();
   await expect(pages).toContainText("Page 2 of 3");
   expect(
-    await table.locator("tbody td:first-child strong").allTextContents(),
+    await table.locator("tbody td:first-child button[data-person-id]").allTextContents(),
   ).toEqual(names);
   expect(await panel.evaluate((el) => el.scrollTop)).toBeCloseTo(position, 0);
   await expect(open).toBeFocused();
@@ -972,7 +1004,7 @@ test("changed saved report blocks CSV until refresh and revoked access blocks de
     route.fulfill({ status: 403, json: { error: "Reporting access changed" } }),
   );
   await page
-    .getByRole("button", { name: "View courses", exact: true })
+    .locator("button[data-person-id]")
     .first()
     .click();
   await expect(
@@ -1045,7 +1077,7 @@ test("progress scope is distinct from optional people filters and stays stable",
   await expect(rows).toHaveCount(1);
   await expect(rows).toContainText("zoe@example.test");
   // This group assigns no courses. Its members still report all their assignments.
-  await expect(rows).toContainText("1 of 3 courses");
+  await expect(rows.getByRole("progressbar", { name: /^1 of 3 courses complete/ })).toBeVisible();
   await expect(rows).not.toContainText("SECRET OUTSIDER");
   await expect(rows).not.toContainText("Onboarding");
   await expect(rows).not.toContainText("Signed in");

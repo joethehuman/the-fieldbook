@@ -255,7 +255,7 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
     await select();
     await page.getByRole("button", { name: "Confirm", exact: true }).click();
     await expect(
-      page.getByRole("button", { name: "Edit", exact: true }).first(),
+      page.locator('table[data-layout="contentSelection"] tbody').getByRole("link").first(),
     ).toBeVisible();
     if (entry === "account menu") {
       await navigation(page);
@@ -291,7 +291,7 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
     );
     await setup(page, info.project.name.startsWith("production"), true);
     await page
-      .getByRole("button", { name: "View courses", exact: true })
+      .locator("button[data-person-id]")
       .first()
       .click();
     const details = page.getByRole("heading", {
@@ -342,7 +342,7 @@ test("Contributor team progress keeps a failed editor on Cancel and opens the ma
 }, info) => {
   const installed = info.project.name.startsWith("production");
   await setup(page, installed, false, false, true);
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page.locator('table[data-layout="contentSelection"] tbody').getByRole("link").first().click();
   if (installed)
     await page.route("**/api/content*", (route) =>
       route.request().method() === "GET"

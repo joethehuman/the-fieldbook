@@ -120,8 +120,9 @@ test("Content course assignment has one final review and keeps choices after can
   await page
     .getByRole("row")
     .filter({ hasText: "Discovery course" })
-    .getByRole("button", { name: "Assign", exact: true })
+    .getByRole("button", { name: "Actions for Discovery course", exact: true })
     .click();
+  await page.getByRole("menuitem", { name: "Assign", exact: true }).click();
   const picker = assignmentDialog(page);
   await expect(picker).toBeVisible();
   await picker
@@ -198,7 +199,7 @@ test("course Details edits the same links without replacing the editor or resett
   await page
     .getByRole("row")
     .filter({ hasText: "Foundation course" })
-    .getByRole("button", { name: "Edit", exact: true })
+    .getByRole("link", { name: "Foundation course", exact: true })
     .click();
   await expect(
     page.getByRole("textbox", { name: "Title", exact: true }),
@@ -280,7 +281,10 @@ test("published Curricula assigns its reference through the shared audience pick
   await start(page);
   await section(page, "Curricula");
   await page
-    .getByRole("button", { name: "Edit audience", exact: true })
+    .getByRole("button", { name: "Actions for GTM foundation", exact: true })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Edit audience", exact: true })
     .click();
   const picker = assignmentDialog(page);
   await expect(
