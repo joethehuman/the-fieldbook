@@ -84,6 +84,8 @@ Both app roots use the same source and theme. Keep noninteractive primitives ser
 
 The root and demo manifests must resolve matching Next/React peers. Browser testing is declared in both because Next has an optional Playwright peer; mismatched peer sets can create separate Next module instances in this shared-source repository. Keep the lockfile reproducible with the repository's pnpm version.
 
+`PendingChangesBar` keeps the pending status and Save/Discard actions sticky within the owning settings scroll area. Use semantic surfaces, wrapping action groups and the same submit operation as the footer; do not create a second save baseline. Inside-section drag targets use a highlighted row with a named destination, while before/after targets retain insertion lines.
+
 ## Component catalog and checks
 
 The demo-only `/ui` route is the reference catalog. It uses synthetic examples of actions, field states, choices, dropdowns, tabs, a dialog containing a Select, a table and an ordered list. No catalog route is added to the server application. Extend this catalog when adding reusable patterns.

@@ -140,6 +140,11 @@ export function AdminWorkspace({
             setError("");
             setReportIssue(undefined);
           }}
+          onSaveDocsNavigation={async (before, settings, moves) => {
+            const result = await runtime.saveDocsNavigation(before, settings, moves);
+            setData(result.data);
+            return result;
+          }}
           onSaveSettings={async (before, settings) => {
             const saved = await runtime.saveSettings(before, settings);
             setData(saved);

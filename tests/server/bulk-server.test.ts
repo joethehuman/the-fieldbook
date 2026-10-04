@@ -218,3 +218,33 @@ test("mixed-type category requests are rejected before any write", async () => {
     },
   );
 });
+
+test("section moves use revision-checked metadata only and preserve separate draft and published bodies", async () => {
+  const draft = { ...seedContent.find((item) => item.kind === "doc")!, id, sectionId: "source", category: "Source", folder: "", body: "Draft edits", status: "published" as const };
+  const published = { ...draft, body: "Published copy" };
+  let patches = 0;
+  await fixture((url, method, body) => {
+    if (url.pathname.endsWith("fb_config")) return { settings: { docSections: [{ id: "source", name: "Source" }, { id: "target", name: "Target" }, { id: "child", name: "Nested", parentId: "target" }] }, revision: 8, governance_revision: 1, groups: [], teams: [], curricula: [] };
+    if (url.pathname.endsWith("fb_documents")) {
+      if (url.searchParams.get("select") === "*") return { id, revision: 3, published_revision: 1, draft, published };
+      return [{ ...draft, revision: 3, published_revision: 1, updated_at: draft.updatedAt }];
+    }
+    if (url.pathname.endsWith("fb_deleted_items")) return [];
+    if (url.pathname.endsWith("fb_cleanup_config")) return { endpoint: "https://example.test/cleanup", last_run: null };
+    if (url.pathname.endsWith("fb_bulk_content")) {
+      patches++;
+      assert.equal(body.p_expected, 3);
+      assert.equal(body.p_settings_expected, 8);
+      assert.equal(body.p_operation, "metadata");
+      assert.deepEqual(body.p_patch, { sectionId: "child", category: "Target", folder: "Nested" });
+      assert.equal(draft.body, "Draft edits");
+      assert.equal(published.body, "Published copy");
+      return "changed";
+    }
+    throw new Error(`Unexpected ${method} ${url.pathname}`);
+  }, async () => {
+    const result = await bulkAction(admin, { entity: "content", operation: "section", value: "child", items: [{ id, expected: 3 }] });
+    assert.deepEqual(result, [{ id, status: "changed" }]);
+    assert.equal(patches, 1);
+  });
+});

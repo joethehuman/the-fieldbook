@@ -56,6 +56,8 @@ import {
   Download,
   RotateCcw,
 } from "lucide-react";
+import { saveDocsNavigation } from "@/lib/docs-navigation-save";
+import { equalJson } from "@/lib/equal-json";
 import { applyDemoBulk } from "@/lib/bulk-actions";
 import { sectionPaths, resolveSection, homePath } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
@@ -714,6 +716,22 @@ export default function Fieldbook() {
               return true;
             }}
             onChange={persist}
+            onSaveDocsNavigation={async (before, settings, moves) => {
+              let current = loadWorkspace();
+              if (!equalJson(current.settings, before.settings))
+                throw new Error("Settings changed in another tab. Reload and review before saving. Your edits remain open.");
+              const result = await saveDocsNavigation(before, settings, moves,
+                async (_, next) => { current = { ...current, settings: next }; return current; },
+                async (request) => {
+                  const result = applyDemoBulk(current, user, request);
+                  current = result.data;
+                  return result;
+                },
+              );
+              saveWorkspace(result.data);
+              setData(result.data);
+              return result;
+            }}
             onReviewDeadlines={async (token) => {
               const current = loadWorkspace();
               const review = reviewDeadlines(current);

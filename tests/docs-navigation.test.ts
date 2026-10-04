@@ -7,6 +7,7 @@ import {
   docSections,
   legacySectionConflict,
   moveDocSection,
+  moveDocumentsInNavigation,
   orderedDocs,
   orderedSectionDocs,
   renameDocSection,
@@ -314,4 +315,23 @@ test("public document ordering excludes draft-only and unrelated document IDs", 
       ]),
     /unique document IDs/,
   );
+});
+
+
+test("cross-section staging removes source order and inserts at a destination without editing snapshots", () => {
+  const sections = [
+    { id: "a", name: "A", docOrder: ["first", "second"] },
+    { id: "b", name: "B", docOrder: ["third"] },
+    { id: "child", name: "Child", parentId: "b" },
+  ];
+  const docs = [doc("first", "A", "", "a"), doc("second", "A", "", "a"), doc("third", "B", "", "b")];
+  const original = structuredClone(docs);
+  const next = moveDocumentsInNavigation(sections, docs, ["second"], "b", 0);
+  assert.deepEqual(next.find((s) => s.id === "a")?.docOrder, ["first"]);
+  assert.deepEqual(next.find((s) => s.id === "b")?.docOrder, ["second", "third"]);
+  assert.deepEqual(docs, original);
+  const nested = moveDocumentsInNavigation(sections, docs, ["first", "second"], "child");
+  assert.deepEqual(nested.find((s) => s.id === "child")?.docOrder, ["first", "second"]);
+  assert.throws(() => moveDocumentsInNavigation(sections, docs, ["first"], "missing"), /existing/);
+  assert.throws(() => moveDocumentsInNavigation(sections, docs, ["missing"], "b"), /unavailable/);
 });

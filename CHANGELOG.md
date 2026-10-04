@@ -4,7 +4,7 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering with drag origin/destination feedback and keyboard-accessible move actions. Saving navigation order preserves document drafts and published content.
+- Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering and cross-section moves with drag origin/destination feedback, individual and bulk Move to actions, and a sticky Unsaved changes bar with Save/Discard. Navigation changes preserve document drafts and published editorial content.
 
 - Prevent the demo account picker from flashing during session refresh. Check the saved profile before first paint and retain an inactive workspace shell until restoration finishes; first visits, explicit profile switching and storage recovery keep the picker.
 

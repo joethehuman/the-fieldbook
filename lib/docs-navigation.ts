@@ -276,6 +276,31 @@ export function reorderDocInSection(
   validateDocSections(next);
   return next;
 }
+
+/** Stage placement and order together. The save operation applies metadata only. */
+export function moveDocumentsInNavigation(
+  sections: DocSection[],
+  docs: DocLink[],
+  ids: string[],
+  destination: string,
+  targetIndex?: number,
+): DocSection[] {
+  if (!sections.some((section) => section.id === destination))
+    throw new Error("Choose an existing Docs section.");
+  const moving = new Set(ids);
+  if (!ids.length || ids.some((id) => !docs.some((doc) => doc.id === id)))
+    throw new Error("A document is unavailable. Reload before moving it.");
+  const sources = new Set(docs.filter((doc) => moving.has(doc.id)).map((doc) => sectionForDoc(doc, sections)?.id));
+  const target = orderedSectionDocs(docs, sections, destination).map((doc) => doc.id).filter((id) => !moving.has(id));
+  target.splice(Math.max(0, Math.min(targetIndex ?? target.length, target.length)), 0, ...ids);
+  const next = sections.map((section) => section.id === destination
+    ? { ...section, docOrder: target }
+    : sources.has(section.id)
+      ? { ...section, docOrder: orderedSectionDocs(docs, sections, section.id).map((doc) => doc.id).filter((id) => !moving.has(id)) }
+      : section);
+  validateDocSections(next);
+  return next;
+}
 export function deleteDocSection(
   sections: DocSection[],
   id: string,

@@ -16,7 +16,7 @@ async function openSettings(page: Page) {
       .click();
 }
 
-async function openOrderingFixture(page: Page) {
+async function openOrderingFixture(page: Page, long = false) {
   const data = freshWorkspace();
   const base = data.content.find((item) => item.kind === "doc")!;
   data.content = [
@@ -84,6 +84,13 @@ async function openOrderingFixture(page: Page) {
       { id: "troubleshooting", name: "Troubleshooting", parentId: "start" },
     ],
   };
+  if (long)
+    data.settings.docSections!.push(
+      ...Array.from({ length: 28 }, (_, index) => ({
+        id: `extra-${index}`,
+        name: `Extra section ${index + 1}`,
+      })),
+    );
   await page.addInitScript((workspace) => {
     if (!localStorage.getItem("fieldbook.workspace.v1"))
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
@@ -370,7 +377,14 @@ test("Docs settings move and rename a subsection without losing published placem
     .getByRole("dialog")
     .getByRole("button", { name: "Move section" })
     .click();
-  await page.getByRole("button", { name: "Expand Reference" }).click();
+  if (
+    await page
+      .getByRole("button", { name: "Expand Reference", exact: true })
+      .isVisible()
+  )
+    await page
+      .getByRole("button", { name: "Expand Reference", exact: true })
+      .click();
   await expect(
     page.getByRole("button", { name: "Actions for Reference → Install" }),
   ).toBeVisible();
@@ -471,4 +485,259 @@ test("Docs settings move and rename a subsection without losing published placem
     path: info.outputPath("docs-hierarchy.png"),
     fullPage: true,
   });
+});
+
+async function chooseMoveDestination(
+  page: Page,
+  rowAction: string,
+  destination: string,
+  document = false,
+) {
+  await page.getByRole("button", { name: rowAction, exact: true }).click();
+  await page.getByRole("menuitem", { name: "Move to…", exact: true }).click();
+  const dialog = page.getByRole("dialog", {
+    name: document ? "Move document" : "Move section",
+    exact: true,
+  });
+  await dialog
+    .getByRole("combobox", { name: "Destination", exact: true })
+    .click();
+  await page.getByRole("option", { name: destination, exact: true }).click();
+  await dialog
+    .getByRole("button", {
+      name: document ? "Move document" : "Move section",
+      exact: true,
+    })
+    .click();
+}
+
+test("cross-section row and mixed bulk moves remain pending, discard and save, with sticky actions on a long page", async ({
+  page,
+}, info) => {
+  const before = await openOrderingFixture(page, true);
+  await page
+    .getByRole("button", { name: "Show documents", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Expand Start", exact: true }).click();
+  await chooseMoveDestination(
+    page,
+    "Actions for document First guide",
+    "Start → Usage",
+    true,
+  );
+  await expect(
+    page.getByRole("list", { name: "Documents in Start → Usage", exact: true }),
+  ).toContainText("First guide");
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(
+          localStorage.getItem("fieldbook.workspace.v1")!,
+        ).content.find((doc: any) => doc.id === "first").sectionId,
+    ),
+  ).toBe("start");
+  const bar = page.locator('[data-slot="pending-changes-bar"]');
+  await expect(bar).toContainText("Unsaved changes");
+  await page.evaluate(() => {
+    let owner: HTMLElement | null = document.querySelector(
+      '[data-slot="pending-changes-bar"]',
+    )!.parentElement;
+    while (
+      owner &&
+      !(
+        owner.scrollHeight > owner.clientHeight &&
+        /(auto|scroll)/.test(getComputedStyle(owner).overflowY)
+      )
+    )
+      owner = owner.parentElement;
+    const scroller = owner || document.scrollingElement!;
+    scroller.scrollTop = scroller.scrollHeight;
+  });
+  await expect(bar).toBeInViewport();
+  await page.screenshot({
+    path: info.outputPath("sticky-unsaved-changes.png"),
+  });
+  await bar
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
+  await expect(bar).toHaveCount(0);
+  await expect(
+    page.getByRole("list", { name: "Documents in Start", exact: true }),
+  ).toContainText("First guide");
+  await page
+    .getByRole("checkbox", { name: "Select document First guide", exact: true })
+    .check();
+  await page
+    .getByRole("checkbox", { name: "Select Start → Install", exact: true })
+    .check();
+  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Move to…", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("combobox", { name: "Destination", exact: true })
+    .click();
+  await page
+    .getByRole("option", {
+      name: "Reference with a longer section name",
+      exact: true,
+    })
+    .click();
+  await dialog
+    .getByRole("button", { name: "Apply changes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", {
+      name: "Actions for Reference with a longer section name → Install",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("list", {
+      name: "Documents in Reference with a longer section name",
+      exact: true,
+    }),
+  ).toContainText("First guide");
+  await bar.getByRole("button", { name: "Save settings", exact: true }).click();
+  await expect(
+    page.getByText("Settings saved.", { exact: true }),
+  ).toBeVisible();
+  await expect(bar).toHaveCount(0);
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
+  );
+  expect(saved.content.find((doc: any) => doc.id === "first").sectionId).toBe(
+    "reference",
+  );
+  expect(
+    saved.publishedContent.find((doc: any) => doc.id === "first").sectionId,
+  ).toBe("reference");
+  expect(saved.content.find((doc: any) => doc.id === "first").body).toBe(
+    before.content.find((doc) => doc.id === "first")!.body,
+  );
+  expect(saved.content.find((doc: any) => doc.id === "draft").status).toBe(
+    "draft",
+  );
+  expect(
+    saved.settings.docSections.find((section: any) => section.id === "install")
+      .parentId,
+  ).toBe("reference");
+  expect(
+    saved.content.find((doc: any) => doc.id === "child-first").sectionId,
+  ).toBe("install");
+  await page.reload();
+  await openSettings(page);
+  await page
+    .getByRole("button", { name: "Show documents", exact: true })
+    .click();
+  await expect(
+    page.getByRole("list", {
+      name: "Documents in Reference with a longer section name",
+      exact: true,
+    }),
+  ).toContainText("First guide");
+});
+
+async function dragInto(
+  page: Page,
+  source: Locator,
+  target: Locator,
+  screenshot: string,
+  branch = false,
+) {
+  await source.scrollIntoViewIfNeeded();
+  const from = await source.boundingBox(),
+    to = await target.boundingBox();
+  expect(from && to).toBeTruthy();
+  await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(
+    from!.x + from!.width / 2 + 12,
+    from!.y + from!.height / 2 + 12,
+    { steps: 5 },
+  );
+  await expect(
+    source.locator("xpath=ancestor::li[@data-sortable-preview][1]"),
+  ).toHaveAttribute(branch ? "data-branch-dragging" : "data-dragging", "true");
+  await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, {
+    steps: 12,
+  });
+  await page.mouse.move(to!.x + to!.width / 2 + 1, to!.y + to!.height / 2 + 1);
+  await expect(target).toHaveAttribute("data-drop-inside", "true");
+  await expect(target).toContainText("Move to");
+  await page.screenshot({ path: screenshot });
+  await page.mouse.up();
+}
+
+test("native drag moves documents and subsection branches into another section, including an empty destination", async ({
+  page,
+}, info) => {
+  test.skip(
+    info.project.name !== "desktop",
+    "Native mouse drag; menus cover phone and tablet.",
+  );
+  await openOrderingFixture(page);
+  await page
+    .getByRole("button", { name: "Show documents", exact: true })
+    .click();
+
+  const reference = page
+    .getByRole("button", {
+      name: "Actions for Reference with a longer section name",
+      exact: true,
+    })
+    .locator('xpath=ancestor::li[@data-slot="reorder-row"][1]');
+  await dragInto(
+    page,
+    page.getByRole("button", { name: /^Reorder document First guide;/ }),
+    reference,
+    info.outputPath("cross-document-destination.png"),
+  );
+  await expect(
+    page.getByRole("list", {
+      name: "Documents in Reference with a longer section name",
+      exact: true,
+    }),
+  ).toContainText("First guide");
+  await page
+    .getByRole("button", { name: "Hide documents", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Expand Start", exact: true }).click();
+  await dragInto(
+    page,
+    page.getByRole("button", { name: /^Reorder Start → Install;/ }),
+    reference,
+    info.outputPath("cross-subsection-destination.png"),
+    true,
+  );
+  await page
+    .getByRole("button", { name: "Show documents", exact: true })
+    .click();
+  await expect(
+    page.getByRole("list", {
+      name: "Documents in Reference with a longer section name → Install",
+      exact: true,
+    }),
+  ).toContainText("Install first");
+  await expect(
+    page.getByRole("list", {
+      name: "Documents in Reference with a longer section name → Install",
+      exact: true,
+    }),
+  ).toContainText("Install second");
+  await page
+    .getByRole("button", { name: "Save settings", exact: true })
+    .click();
+  await expect(
+    page.getByText("Settings saved.", { exact: true }),
+  ).toBeVisible();
+  const saved = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
+  );
+  expect(saved.content.find((doc: any) => doc.id === "first").sectionId).toBe(
+    "reference",
+  );
+  expect(
+    saved.settings.docSections.find((section: any) => section.id === "install")
+      .parentId,
+  ).toBe("reference");
 });

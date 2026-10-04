@@ -11,6 +11,7 @@ import type { SaveIntent } from "./draft-save-queue";
 import { mergeSavedContent } from "./content-save";
 import { SaveRecoveryError } from "./save-recovery";
 import { uploadMediaFile } from "./upload-media";
+import { createDocsNavigationSaver, type SaveDocsNavigation } from "./docs-navigation-save";
 import { createSettingsSaver } from "./settings-save";
 import type { SiteSettings } from "./settings";
 export type AdminRuntime = {
@@ -19,6 +20,7 @@ export type AdminRuntime = {
     before: Workspace,
     settings: SiteSettings,
   ) => Promise<Workspace>;
+  saveDocsNavigation: SaveDocsNavigation;
   saveContent: (content: Content, intent: SaveIntent) => Promise<Content>;
   publishedContent: (id: string) => Promise<Content>;
   refresh: () => Promise<Workspace>;
@@ -126,6 +128,7 @@ export function createAdminRuntime(initial: {
   }
   const saver = createWorkspaceSaver(request, fresh);
   const settingsSaver = createSettingsSaver(request, fresh);
+  const docsNavigationSaver = createDocsNavigationSaver(request, fresh);
   return {
     upload: uploadMediaFile,
     saveSettings: (before, settings) => mutate(async () => {
@@ -133,6 +136,12 @@ export function createAdminRuntime(initial: {
       clearCached();
       cached.set(scope, saved);
       return saved;
+    }),
+    saveDocsNavigation: (before, settings, moves) => mutate(async () => {
+      const result = await docsNavigationSaver(before, settings, moves);
+      clearCached();
+      cached.set(scope, result.data);
+      return result;
     }),
     publishedContent: (id) => request(`/api/content?id=${encodeURIComponent(id)}&snapshot=published`),
     saveContent: (content, intent) =>

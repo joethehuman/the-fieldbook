@@ -8,6 +8,7 @@ import { CountBadge } from "@/components/ui/badge";
 import { ActionGroup } from "@/components/ui/action-group";
 import { FieldGroup } from "@/components/ui/field";
 import { TextField } from "@/components/patterns/text-field";
+import { PendingChangesBar } from "@/components/patterns/pending-changes-bar";
 import { SettingsSection } from "@/components/patterns/settings-section";
 import { SectionHeader } from "@/components/patterns/layout";
 
@@ -161,6 +162,7 @@ export function ControlExamples() {
           required
         />
       </SettingsSection>
+      <PendingChangesBar actions={<><Button type="button" variant="outline" onClick={() => setStatus("Example changes discarded.")}>Discard changes</Button><Button type="button" onClick={() => setStatus("Example changes saved.")}>Save settings</Button></>}>Unsaved changes · example</PendingChangesBar>
       <Card>
         <form
           className="grid gap-4"
