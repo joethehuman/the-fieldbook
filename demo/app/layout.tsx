@@ -6,6 +6,8 @@ import localFont from "next/font/local";
 import type { Metadata } from "next";
 import { Telemetry } from "../../server/telemetry";
 import "../../styles/globals.css";
+import { demoOgOrigin } from "../og-card";
+import { ogCardSize } from "../../lib/og-card";
 
 // Keep the first paint's font when the preloaded Geist asset arrives late.
 const GeistSans = localFont({
@@ -15,9 +17,18 @@ const GeistSans = localFont({
   display: "optional",
 });
 
+const ogOrigin = demoOgOrigin();
+const ogImage = {
+  url: "/og.png",
+  ...ogCardSize,
+  alt: "The Fieldbook — Updates, Courses and Docs",
+};
 export const metadata: Metadata = {
   title: "The Fieldbook · Interactive demo",
   description: "A lightweight home for docs, updates, and courses.",
+  ...(ogOrigin ? { metadataBase: new URL(ogOrigin) } : {}),
+  openGraph: { title: "The Fieldbook", type: "website", images: [ogImage] },
+  twitter: { card: "summary_large_image", images: [ogImage] },
 };
 export default function RootLayout({
   children,

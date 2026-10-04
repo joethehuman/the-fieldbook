@@ -12,6 +12,8 @@ The application has no footer or tagline setting. A published privacy policy app
 
 Save settings to apply branding. Settings writes require an active administrator, a same-origin request and the current settings revision. If another administrator changes the settings, reload and review before saving again. Names and descriptions are text, not HTML or Markdown.
 
+The same deliberately public name and accent appear on the installation's [link-sharing card](og-cards.md), together with its configured domain. Every link uses this one card, including links into a private installation. No page-specific information enters the image. There are no card-customization controls yet.
+
 ## Public and private installations
 
 A public installation remains browsable without signing in. Choosing sign-in opens “Sign in to [installation name]” with “Sign in to save your progress across devices” and a return-to-browsing link.
