@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Simulate Ask AI in the browser-local demo with the shared thinking indicator, streamed canned replies and working Stop control. The first two questions receive Hoolibook/Gavin replies, with a link to thefieldbook.org in the first; later questions receive the demo-unavailable message. No model requests are made.
+
 - Prevent the demo account picker from flashing during session refresh. Check the saved profile before first paint and retain an inactive workspace shell until restoration finishes; first visits, explicit profile switching and storage recovery keep the picker.
 
 - Align Admin row and bulk menus across content, people, teams, groups, curricula, Docs sections and recovery. Bulk actions require at least two selected records; individual menus retain applicable commands for a single record and reuse existing reviews and safeguards.

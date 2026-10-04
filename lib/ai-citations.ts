@@ -58,19 +58,27 @@ export function answerCitations(
   return { byId, sources: [...byHref.values()] };
 }
 
-/** Only this plugin creates active citation links; model-written links stay inert. */
+/** Verified citations and the explicit demo link are active; model links stay inert. */
 export function citationLinks({
   numbers,
   pending = false,
+  demo = false,
 }: {
   numbers: Readonly<Record<string, number>>;
   pending?: boolean;
+  demo?: boolean;
 }) {
   return (tree: MarkdownNode) => {
     function visit(node: MarkdownNode) {
       if (!node.children) return;
       node.children = node.children.flatMap((child) => {
         if (child.type === "link" || child.type === "linkReference") {
+          if (
+            demo &&
+            child.type === "link" &&
+            child.url === "https://thefieldbook.org/"
+          )
+            return child;
           // Neutralize even a model-written link imitating our citation URL.
           return child.children || [];
         }
