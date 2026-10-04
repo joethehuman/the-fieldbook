@@ -4,7 +4,9 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Replace course-video theater mode with a compact fullscreen/close control over the video, preserving playback and lesson layout.
+- Remove course-video theater mode and custom resizing controls; rely on native browser and embedded-provider controls for fullscreen.
+
+- Prevent the account menu's ellipsis focus ring from lingering after pointer selection, while preserving keyboard focus restoration and dialog focus.
 
 - Preconfigure fresh and reset demos with codebase and thefieldbook.org links through the existing External links settings and account menu. Preserve saved browser settings until Reset demo.
 

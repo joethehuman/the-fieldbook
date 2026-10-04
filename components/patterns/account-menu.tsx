@@ -81,6 +81,7 @@ export function AccountMenu({
   onFeedbackClose?: () => void;
 }) {
   const trigger = useRef<HTMLButtonElement>(null);
+  const pointerInteraction = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const links = accountMenuLinks(externalLinks);
@@ -120,6 +121,12 @@ export function AccountMenu({
               className="sidebar-account-trigger rounded-full transition-transform duration-[180ms] hover:bg-muted-hover focus-visible:bg-muted-hover @max-[13rem]:col-start-2 @max-[13rem]:row-start-1"
               aria-label="Account menu"
               title="Account menu"
+              onPointerDownCapture={() => {
+                pointerInteraction.current = true;
+              }}
+              onKeyDownCapture={() => {
+                pointerInteraction.current = false;
+              }}
             >
               <MoreHorizontal aria-hidden="true" />
             </Button>
@@ -128,7 +135,24 @@ export function AccountMenu({
             side="top"
             align="end"
             className="w-64"
-            onEscapeKeyDown={(event) => event.stopPropagation()}
+            onEscapeKeyDown={(event) => {
+              pointerInteraction.current = false;
+              event.stopPropagation();
+            }}
+            onPointerDownCapture={() => {
+              pointerInteraction.current = true;
+            }}
+            onKeyDownCapture={() => {
+              pointerInteraction.current = false;
+            }}
+            onCloseAutoFocus={(event) => {
+              // Pointer dismissal should not restore keyboard focus to the trigger.
+              // Keyboard dismissal retains Radix's normal focus restoration.
+              if (pointerInteraction.current) {
+                event.preventDefault();
+                if (document.activeElement === trigger.current) trigger.current?.blur();
+              }
+            }}
           >
             <div className="min-w-0 px-3 py-2">
               <p className="break-words text-sm font-semibold">{name}</p>
