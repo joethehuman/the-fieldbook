@@ -70,6 +70,6 @@ This implementation was written with AI assistance. Its validation evidence incl
 
 ## Recently added people
 
-People and Demo profiles offer **Added: newest** and **Added: oldest** sorting. It uses the time a roster entry was saved, independently of hire date and first sign-in. Imports, individual pre-registration and new verified sign-ups capture it; editing, CSV updates and later sign-in preserve it. People created before this capture was introduced have unknown dates and follow dated entries, ordered by name. No historical dates are invented.
+People and Demo profiles offer **Added (newest)** and **Added (oldest)** sorting. It uses the time a roster entry was saved, independently of hire date and first sign-in. Imports, individual pre-registration and new verified sign-ups capture it; editing, CSV updates and later sign-in preserve it. People created before this capture was introduced have unknown dates and follow dated entries, ordered by name. No historical dates are invented.
 
 Apply `20261003162418_roster_added_at.sql` before deploying this refinement. It adds a nullable roster timestamp and a private trigger that assigns it on insertion and preserves it on updates. Existing application data, functions, access policies and learning clocks remain unchanged.

@@ -76,9 +76,9 @@ test("installed group content discovery keeps selections until the final review 
   });
   await expect(
     picker.getByRole("combobox", { name: "Sort content", exact: true }),
-  ).toContainText("Sort: Title: A–Z");
+  ).toContainText("Sort: Title (A–Z)");
   await picker.getByRole("combobox", { name: "Sort content", exact: true }).click();
-  await page.getByRole("option", { name: "Title: Z–A", exact: true }).click();
+  await page.getByRole("option", { name: "Title (Z–A)", exact: true }).click();
   await picker.getByRole("checkbox", { name: /^Course 099/ }).check();
   await picker.getByRole("searchbox").fill("pager escalation");
   await expect(

@@ -35,18 +35,18 @@ test("admin sorts open direct options and reverse the visible records", async ({
   data.content = data.content.filter((item) => ["course-1", "course-2", "course-3"].includes(item.id));
   await seed(page, "demo-admin", data);
   await page.goto("/#admin/content");
-  const picker = await choose(page, "Sort content", "Title: A–Z");
+  const picker = await choose(page, "Sort content", "Title (A–Z)");
   const titles = () =>
     page
       .locator('table[data-layout="contentSelection"] tbody td:nth-child(2) a')
       .allTextContents();
   const ascending = await titles();
   expect(ascending.length).toBeGreaterThan(1);
-  await choose(page, "Sort content", "Title: Z–A");
+  await choose(page, "Sort content", "Title (Z–A)");
   expect(await titles()).toEqual([...ascending].reverse());
   await picker.click();
   await expect(
-    page.getByRole("option", { name: "Created: oldest", exact: true }),
+    page.getByRole("option", { name: "Created (oldest)", exact: true }),
   ).toBeVisible();
   await page.screenshot({ path: info.outputPath("admin-direct-sort.png") });
   await page.keyboard.press("Escape");
@@ -65,21 +65,21 @@ test("Your courses retains Assigned, adds Due and omits authoring dates", async 
   });
   await picker.click();
   await expect(
-    page.getByRole("option", { name: "Assigned: oldest", exact: true }),
+    page.getByRole("option", { name: "Assigned (oldest)", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("option", { name: "Assigned: newest", exact: true }),
+    page.getByRole("option", { name: "Assigned (newest)", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("option", { name: "Due: earliest", exact: true }),
+    page.getByRole("option", { name: "Due (earliest)", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("option", { name: /Created|Updated/ }),
   ).toHaveCount(0);
   await page
-    .getByRole("option", { name: "Assigned: oldest", exact: true })
+    .getByRole("option", { name: "Assigned (oldest)", exact: true })
     .click();
-  await choose(page, "Sort courses", "Due: latest");
+  await choose(page, "Sort courses", "Due (latest)");
   await page.screenshot({ path: info.outputPath("personal-sort.png") });
   await noOverflow(page);
 });
@@ -99,7 +99,7 @@ test("curriculum uses compact sort and preserves authored order on return", asyn
   const titles = () => page.locator(".course-card h3").allTextContents();
   const authored = await titles();
   expect(authored).toHaveLength(3);
-  await choose(page, "Sort courses", "Title: Z–A");
+  await choose(page, "Sort courses", "Title (Z–A)");
   await choose(page, "Sort courses", "Recommended order");
   expect(await titles()).toEqual(authored);
   await picker.click();
@@ -138,19 +138,19 @@ test("Due uses saved unfinished deadlines and reverses the same curriculum deadl
   }));
   await seed(page, "demo-learner", data);
   await page.goto("/#courses/yours");
-  await choose(page, "Sort courses", "Due: earliest");
+  await choose(page, "Sort courses", "Due (earliest)");
   const titles = page.locator(".library .course-card h3");
   await expect(titles).toHaveText([
     "Know the platform", "Standalone assignment", "From discovery to next steps", "Start with the customer",
   ]);
-  await choose(page, "Sort courses", "Due: latest");
+  await choose(page, "Sort courses", "Due (latest)");
   await expect(titles).toHaveText([
     "From discovery to next steps", "Standalone assignment", "Know the platform", "Start with the customer",
   ]);
   await page.goto("/#courses/for-you");
-  await choose(page, "Sort courses", "Due: earliest");
+  await choose(page, "Sort courses", "Due (earliest)");
   await expect(titles).toHaveText(["Account executive foundations", "Standalone assignment"]);
-  await choose(page, "Sort courses", "Due: latest");
+  await choose(page, "Sort courses", "Due (latest)");
   await expect(titles).toHaveText(["Standalone assignment", "Account executive foundations"]);
 });
 
@@ -163,7 +163,7 @@ test("catalog mixed picker uses Title and offers Updated only for Courses", asyn
     name: "Sort content",
     exact: true,
   });
-  await expect(picker).toContainText("Sort: Title: A–Z");
+  await expect(picker).toContainText("Sort: Title (A–Z)");
   await picker.click();
   await expect(page.getByRole("option", { name: /Updated:/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
@@ -179,10 +179,10 @@ test("catalog mixed picker uses Title and offers Updated only for Courses", asyn
   await filter.press("Escape");
   await picker.click();
   await expect(
-    page.getByRole("option", { name: "Updated: newest", exact: true }),
+    page.getByRole("option", { name: "Updated (newest)", exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("option", { name: "Updated: oldest", exact: true })
+    .getByRole("option", { name: "Updated (oldest)", exact: true })
     .click();
   await section
     .getByRole("searchbox", { name: "Find content", exact: true })

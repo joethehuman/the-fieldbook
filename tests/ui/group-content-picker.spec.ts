@@ -146,8 +146,8 @@ test("100 content choices keep selections through discovery and cancel without s
   });
   await expect(
     picker.getByRole("combobox", { name: "Sort content", exact: true }),
-  ).toContainText("Sort: Title: A–Z");
-  await choose(page, picker, "Sort content", "Title: Z–A");
+  ).toContainText("Sort: Title (A–Z)");
+  await choose(page, picker, "Sort content", "Title (Z–A)");
   await expect(
     picker.getByRole("checkbox", { name: /^Course/ }).first(),
   ).toHaveAccessibleName(/^Course 097\b/);
@@ -175,11 +175,11 @@ test("100 content choices keep selections through discovery and cancel without s
   await expect(
     picker.getByRole("checkbox", { name: /^Course 097\b/ }),
   ).toBeChecked();
-  await choose(page, picker, "Sort content", "Title: A–Z");
+  await choose(page, picker, "Sort content", "Title (A–Z)");
   await expect(
     picker.getByRole("checkbox", { name: /^Course/ }).first(),
   ).toHaveAccessibleName(/^Course 001\b/);
-  await choose(page, picker, "Sort content", "Title: Z–A");
+  await choose(page, picker, "Sort content", "Title (Z–A)");
   await expect(
     picker.getByRole("checkbox", { name: /^Course/ }).first(),
   ).toHaveAccessibleName(/^Course 097\b/);
@@ -263,7 +263,7 @@ test("course selections apply in displayed sort order and find curriculum child 
   await picker.getByRole("checkbox", { name: /^Course 003\b/ }).check();
   await search.fill("Course 097");
   await picker.getByRole("checkbox", { name: /^Course 097\b/ }).check();
-  await choose(page, picker, "Sort content", "Title: A–Z");
+  await choose(page, picker, "Sort content", "Title (A–Z)");
   await picker
     .getByRole("button", { name: "Review selected", exact: true })
     .click();
@@ -287,7 +287,7 @@ test("100 Updates expose real categories and searchable descriptions without a c
   page,
 }, info) => {
   const picker = await start(page, "updates");
-  await choose(page, picker, "Sort content", "Updated: newest");
+  await choose(page, picker, "Sort content", "Updated (newest)");
   await expect(
     picker.getByRole("checkbox", { name: /^Update/ }).first(),
   ).toHaveAccessibleName(/^Update 099\b/);
@@ -449,7 +449,7 @@ test("changing title sort during search applies additions in the visible relevan
   await picker
     .getByRole("checkbox", { name: /^Foundation curriculum/ })
     .check();
-  await choose(page, picker, "Sort content", "Title: Z–A");
+  await choose(page, picker, "Sort content", "Title (Z–A)");
   await expect(
     picker.getByRole("checkbox", { name: /^(Course|Foundation)/ }).first(),
   ).toHaveAccessibleName(/^Course 003\b/);
@@ -470,11 +470,11 @@ test("changing title sort during search applies additions in the visible relevan
 test("leaving course-only dates keeps applied selections in the displayed title order", async ({ page }) => {
   const picker = await start(page);
   await choose(page, picker, "Content type", "Courses");
-  await choose(page, picker, "Sort content", "Updated: newest");
+  await choose(page, picker, "Sort content", "Updated (newest)");
   await picker.getByRole("checkbox", { name: /^Course 097\b/ }).check();
   await picker.getByRole("checkbox", { name: /^Course 095\b/ }).check();
   await choose(page, picker, "Content type", "Curricula");
-  await expect(picker.getByRole("combobox", { name: "Sort content", exact: true })).toContainText("Title: A–Z");
+  await expect(picker.getByRole("combobox", { name: "Sort content", exact: true })).toContainText("Title (A–Z)");
   await picker.getByRole("button", { name: "Review selected", exact: true }).click();
   await expect(picker.getByRole("checkbox", { name: /^Course/ }).first()).toHaveAccessibleName(/^Course 095\b/);
   await picker.getByRole("button", { name: "Review changes", exact: true }).click();

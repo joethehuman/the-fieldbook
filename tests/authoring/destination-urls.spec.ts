@@ -370,7 +370,7 @@ test("Admin and Team progress person destinations survive refresh and respect sc
     await page
       .getByRole("combobox", { name: "Sort team members", exact: true })
       .click();
-    await page.getByRole("option", { name: "Name: Z–A", exact: true }).click();
+    await page.getByRole("option", { name: "Name (Z–A)", exact: true }).click();
     await page.keyboard.press("Escape");
     await page.locator(`[data-person-id="${id}"]`).click();
     await at(page, production, path);
@@ -380,7 +380,7 @@ test("Admin and Team progress person destinations survive refresh and respect sc
     await at(page, production, overview);
     await expect(
       page.getByRole("combobox", { name: "Sort team members", exact: true }),
-    ).toContainText("Sort: Name: Z–A");
+    ).toContainText("Sort: Name (Z–A)");
   }
   if (production)
     expect(

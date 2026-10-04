@@ -513,7 +513,7 @@ test("People filters and bulk direct removal preserve team membership and cancel
   await page
     .getByRole("combobox", { name: "Sort people", exact: true })
     .click();
-  await page.getByRole("option", { name: "Name: Z–A", exact: true }).click();
+  await page.getByRole("option", { name: "Name (Z–A)", exact: true }).click();
   await expect(table.getByRole("row").nth(1)).toContainText("Zoe Direct");
   await table
     .getByRole("checkbox", { name: "Select page (2)", exact: true })
@@ -615,7 +615,7 @@ test("group index keeps selection across pages and creation reveals the new row 
   await expect(
     page.getByRole("region", { name: "Selected items", exact: true }),
   ).toContainText("29 selected");
-  await indexChoice(page, "Sort groups", "Name: Z–A");
+  await indexChoice(page, "Sort groups", "Name (Z–A)");
   await expect(
     table.getByRole("checkbox", { name: "Select Pilot", exact: true }),
   ).toBeChecked();
@@ -691,15 +691,15 @@ test("group index sorts real counts and filters membership and assigned courses 
         columns.map((column) => column.getBoundingClientRect().width),
       );
   const original = await widths();
-  await indexChoice(page, "Sort groups", "Courses: fewest");
+  await indexChoice(page, "Sort groups", "Courses (fewest)");
   await expect(table.getByRole("row").nth(1)).toContainText("Empty audience");
-  await indexChoice(page, "Sort groups", "Courses: most");
+  await indexChoice(page, "Sort groups", "Courses (most)");
   await expect(table.getByRole("row").nth(1)).toContainText(
     "Account executives",
   );
-  await indexChoice(page, "Sort groups", "People: fewest");
+  await indexChoice(page, "Sort groups", "People (fewest)");
   await expect(table.getByRole("row").nth(1)).toContainText("Empty audience");
-  await indexChoice(page, "Sort groups", "People: most");
+  await indexChoice(page, "Sort groups", "People (most)");
   await expect(table.getByRole("row").nth(1)).toContainText(
     "Account executives",
   );
