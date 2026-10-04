@@ -3,6 +3,7 @@ import type { Workspace } from "@/lib/store";
 import type { BulkHandler, BulkOperation } from "@/lib/bulk-actions";
 import { availableDocSections } from "@/lib/docs-navigation";
 import { BulkActions, type BulkCommand } from "./patterns/bulk-actions";
+import { ScrollRegion } from "./patterns/scroll-region";
 export function AdminBulkActions({
   data,
   selected,
@@ -25,6 +26,9 @@ export function AdminBulkActions({
   extraCommands?: BulkCommand[];
 }) {
   const items = data.content.filter((c) => selected.includes(c.id));
+  const managedTeams = (data.teams || []).filter(
+    (team) => team.managerId && selected.includes(team.managerId),
+  );
   const kind = items[0]?.kind;
   const homogeneous =
     items.length === selected.length &&
@@ -131,6 +135,27 @@ export function AdminBulkActions({
           `You are deleting ${entity === "user" ? "users. Access ends immediately" : "content. Selected content is unpublished immediately"}. Restore is available in Organization Settings → Recently deleted for 30 days. After 30 days, these records and associated learning history, quiz attempts and feedback are permanently erased.`,
           {
             destructive: true,
+            review:
+              entity === "user" && managedTeams.length
+                ? () => (
+                    <div className="grid gap-3 text-copy">
+                      <p>
+                        Deleting the selected managers leaves{" "}
+                        {managedTeams.length} teams without a manager. Teams and
+                        their remaining members stay in place. Protected
+                        accounts cannot be deleted. Delete teams separately from
+                        the Teams page.
+                      </p>
+                      <ScrollRegion className="max-h-48 overscroll-auto">
+                        <ul className="list-disc pl-5">
+                          {managedTeams.map((team) => (
+                            <li key={team.id}>{team.name}</li>
+                          ))}
+                        </ul>
+                      </ScrollRegion>
+                    </div>
+                  )
+                : undefined,
             acknowledgment:
               "I understand that deletion becomes permanent after 30 days and erases associated learning history.",
           },

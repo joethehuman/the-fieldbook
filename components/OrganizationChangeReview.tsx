@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import type { Workspace } from "@/lib/store";
+import { teamPath } from "@/lib/team-hierarchy";
+import { ScrollRegion } from "./patterns/scroll-region";
 import { assignmentDeadline } from "@/lib/assignment-episodes";
 import {
   organizationChangeSummary,
@@ -38,6 +40,8 @@ type Review = {
   after: Workspace;
   context?: OrganizationChangeOptions["review"];
   stamp: string;
+  removedTeams: { id: string; path: string }[];
+  promotedTeams: { id: string; path: string }[];
 };
 type ReviewRow = {
   key: string;
@@ -80,6 +84,24 @@ export function useOrganizationChangeReview() {
       after,
       context: options?.review,
       stamp: new Date().toISOString(),
+      promotedTeams: (after.teams || [])
+        .filter((team) => {
+          const old = before.teams?.find((value) => value.id === team.id);
+          return (
+            old?.parentId &&
+            !after.teams?.some((value) => value.id === old.parentId)
+          );
+        })
+        .map((team) => ({
+          id: team.id,
+          path: teamPath(team.id, after.teams || []),
+        })),
+      removedTeams: (before.teams || [])
+        .filter((team) => !after.teams?.some((next) => next.id === team.id))
+        .map((team) => ({
+          id: team.id,
+          path: teamPath(team.id, before.teams || []),
+        })),
     });
     return new Promise<boolean>((done) => {
       resolve.current = done;
@@ -181,12 +203,36 @@ export function useOrganizationChangeReview() {
           {pending?.context?.description ||
             "Check who is affected, then apply these changes."}
         </DialogDescription>
+        {!!pending?.removedTeams.length && (
+          <ScrollRegion className="max-h-40 overscroll-auto" aria-label="Teams to delete">
+            <ul className="grid gap-2 text-copy">
+              {pending.removedTeams.map((team) => (
+                <li key={team.id}>{team.path}</li>
+              ))}
+            </ul>
+          </ScrollRegion>
+        )}
+        {!!pending?.promotedTeams.length && (
+          <div className="grid gap-2">
+            <p className="font-medium">Subteams moving to Organization</p>
+            <ScrollRegion
+              className="max-h-40 overscroll-auto"
+              aria-label="Subteams moving to Organization"
+            >
+              <ul className="grid gap-2 text-copy">
+                {pending.promotedTeams.map((team) => (
+                  <li key={team.id}>{team.path}</li>
+                ))}
+              </ul>
+            </ScrollRegion>
+          </div>
+        )}
         <div className="grid gap-3" aria-label="Change summary">
           {!!summary?.peopleGaining && (
             <div>
               <p>
                 New assignments: {summary.peopleGaining}{" "}
-                {summary.peopleGaining === 1 ? "person" : "people"} ·{" "}
+                {summary.peopleGaining === 1 ? "user" : "users"} ·{" "}
                 {summary.coursesGained}{" "}
                 {summary.coursesGained === 1 ? "course" : "courses"}.
               </p>
@@ -199,7 +245,7 @@ export function useOrganizationChangeReview() {
             <div>
               <p>
                 Removed assignments: {summary.peopleLosing}{" "}
-                {summary.peopleLosing === 1 ? "person" : "people"} ·{" "}
+                {summary.peopleLosing === 1 ? "user" : "users"} ·{" "}
                 {summary.coursesLost}{" "}
                 {summary.coursesLost === 1 ? "course" : "courses"}.
               </p>
@@ -217,7 +263,7 @@ export function useOrganizationChangeReview() {
                 : "managers"}{" "}
               and {new Set(summary.reporting.map((r) => r.person.id)).size}{" "}
               {new Set(summary.reporting.map((r) => r.person.id)).size === 1
-                ? "person"
+                ? "user"
                 : "people"}
               .
             </p>
@@ -265,7 +311,7 @@ export function useOrganizationChangeReview() {
                     setPage(1);
                   }}
                   placeholder="Search people, courses or managers"
-                  aria-label="Find a person, course or manager"
+                  aria-label="Find a user, course or manager"
                 />
               </SearchField>
               <TableContainer>
@@ -275,7 +321,7 @@ export function useOrganizationChangeReview() {
                 >
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Person</TableHead>
+                      <TableHead>User</TableHead>
                       <TableHead>Learning or report</TableHead>
                       <TableHead>Change</TableHead>
                       <TableHead>Estimated due</TableHead>

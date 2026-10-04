@@ -129,7 +129,7 @@ test("expiry erases course progress and feedback exactly at the deadline", () =>
   );
   assert.equal(restore.results[0].status, "failed");
 });
-test("users restore inactive without privileges; self and manager deletion are protected", () => {
+test("users restore inactive without privileges; self deletion is protected and deleted managers leave teams unassigned", () => {
   const { data, actor } = fixture();
   const u = data.users.find((u) => u.role === "learner")!;
   const manager = data.users.find((u) => u.role === "manager")!;
@@ -145,7 +145,15 @@ test("users restore inactive without privileges; self and manager deletion are p
   );
   assert.deepEqual(
     result.results.map((r) => r.status),
-    ["failed", "failed", "changed"],
+    ["failed", "changed", "changed"],
+  );
+  assert.deepEqual(
+    result.data.teams,
+    data.teams?.map((team) => {
+      if (team.managerId !== manager.id) return team;
+      const { managerId: _manager, ...unassigned } = team;
+      return unassigned;
+    }),
   );
   const restore = applyDemoBulk(
     result.data,

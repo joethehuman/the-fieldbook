@@ -26,7 +26,7 @@ import {
   moveTeam,
   teamMoveImpact,
   teamPath,
-  teamDeletionBlockers,
+  deleteTeams,
 } from "@/lib/team-hierarchy";
 import {
   HierarchyBrowser,
@@ -105,7 +105,10 @@ export function TeamsAdmin({
 }: {
   initialTeam?: string;
   initialTab?: import("@/lib/admin-destination").AdminDestination["panel"];
-  onDestinationChange?: (id?: string, panel?: import("@/lib/admin-destination").AdminDestination["panel"]) => Promise<boolean>;
+  onDestinationChange?: (
+    id?: string,
+    panel?: import("@/lib/admin-destination").AdminDestination["panel"],
+  ) => Promise<boolean>;
   data: Workspace;
   onChange: (
     data: Workspace,
@@ -429,35 +432,32 @@ export function TeamsAdmin({
   async function deleteTeam(value: Team) {
     if (!(await guard.current())) return;
     resetDraft();
-    const blockers = teamDeletionBlockers(data, value.id);
-    const reasons = [
-      blockers.learning.length &&
-        `${blockers.learning.length} assigned courses or curricula`,
-      blockers.members.length &&
-        `${blockers.members.length} direct members (including inactive accounts)`,
-      blockers.pending.length &&
-        `${blockers.pending.length} pending accounts in People`,
-      blockers.children.length &&
-        `${blockers.children.length} immediate subteams`,
-      blockers.groups.length &&
-        `learning-group links: ${blockers.groups.map((group) => group.name).join(", ")}`,
-    ].filter(Boolean);
-    if (reasons.length) {
-      setNotice(
-        `Cannot delete ${value.name}: it still has ${reasons.join("; ")}. Move or remove these links first. To keep the team but detach it, use Move team → Organization.`,
-      );
+    let next: Workspace;
+    try {
+      next = deleteTeams(data, [value.id]);
+    } catch (error) {
+      setNotice((error as Error).message);
       destination.reveal();
       return;
     }
+    const count = data.users.filter((user) => user.teamId === value.id).length;
+    const snapshot = teamMutationSnapshot(data);
     if (
       await commit(
-        { ...data, teams: teams.filter((item) => item.id !== value.id) },
-        "Empty team deleted.",
+        next,
+        "Team deleted. Its direct users moved to Organization.",
         false,
         {
+          validateCurrent: () => {
+            if (teamMutationSnapshot(latestData.current) !== snapshot)
+              throw new Error(
+                "The organization changed. Reload and review the team deletion again.",
+              );
+            deleteTeams(latestData.current, [value.id]);
+          },
           review: {
             title: `Delete ${value.name}?`,
-            description: "This permanently removes the empty team.",
+            description: `Permanently remove this team. ${count} direct users will move to Organization, not its parent team. Surviving subteams move to Organization with their users and nested branches. Accounts and history remain. Deleted teams cannot be restored.`,
             confirmLabel: "Delete team",
             always: true,
           },
@@ -827,6 +827,46 @@ export function TeamsAdmin({
                           throw new Error("Could not save the team move.");
                       },
                     },
+                    {
+                      id: "delete",
+                      label: "Delete selected teams",
+                      description:
+                        "Direct users and surviving subteams move to Organization. Accounts and their history remain. Deleted teams cannot be restored.",
+                      destructive: true,
+                      externalReview: true,
+                      successMessage:
+                        "Teams deleted. Their direct users moved to Organization.",
+                      apply: async (_values: string[], ids: string[] = []) => {
+                        const snapshot = teamMutationSnapshot(data);
+                        const next = deleteTeams(data, ids);
+                        const count = data.users.filter(
+                          (user) => user.teamId && ids.includes(user.teamId),
+                        ).length;
+                        const validateCurrent = () => {
+                          if (
+                            teamMutationSnapshot(latestData.current) !==
+                            snapshot
+                          )
+                            throw new Error(
+                              "The organization changed. Reload and review the team deletion again.",
+                            );
+                          deleteTeams(latestData.current, ids);
+                        };
+                        if (
+                          !(await commit(next, "Teams deleted.", true, {
+                            validateCurrent,
+                            review: {
+                              title: `Delete ${ids.length} ${ids.length === 1 ? "team" : "teams"}?`,
+                              description: `Permanently remove these selected teams. ${count} direct users will move to Organization, not the deleted teams' parents. Surviving subteams move to Organization with their users and nested branches. Accounts and history remain. Deleted teams cannot be restored.`,
+                              confirmLabel: "Delete teams",
+                              always: true,
+                            },
+                          }))
+                        )
+                          throw new Error("Could not delete the teams.");
+                        setBrowseId("");
+                      },
+                    },
                   ] as BulkCommand[]
                 }
               />
@@ -916,7 +956,7 @@ export function TeamsAdmin({
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onSelect={() => void deleteTeam(team)}>
-                        Delete empty team
+                        Delete team
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -943,7 +983,13 @@ export function TeamsAdmin({
             }
             onValueChange={async (value) => {
               if (!(await guard.current())) return;
-              if (onDestinationChange) { await onDestinationChange(selected, value as "members" | "subteams"); return; }
+              if (onDestinationChange) {
+                await onDestinationChange(
+                  selected,
+                  value as "members" | "subteams",
+                );
+                return;
+              }
               resetDraft();
               setTab(value);
               destination.reveal(false);
@@ -1174,7 +1220,7 @@ export function TeamsAdmin({
                                 onChange={rosterSelection.setSelected}
                               />
                             )}
-                            Person
+                            User
                           </div>
                         </TableHead>
                         <TableHead>Included through</TableHead>

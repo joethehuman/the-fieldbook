@@ -239,7 +239,7 @@ export function progressPeopleCsv(
 ): CsvReport {
   return {
     headings: [
-      "Person",
+      "User",
       "Email",
       "Reporting team",
       "User type",
@@ -351,7 +351,7 @@ export function progressDetailCsv(
 ): CsvReport {
   return {
     headings: [
-      "Person",
+      "User",
       "Email",
       "Course",
       "Category",

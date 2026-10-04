@@ -20,7 +20,7 @@ export function OnboardingFields({
   const target = onboardingClockTarget(user, settings);
   return (
     <FieldGroup>
-      <legend>Onboarding</legend>
+      <legend>User type</legend>
       <FormField label="Hire date">
         <Input
           aria-describedby={helpId}
@@ -32,13 +32,12 @@ export function OnboardingFields({
       <FieldDescription id={helpId}>
         {learningStage(user, settings)}
         {target
-          ? ` · Onboarding ends ${target}.`
-          : " · No onboarding clock."}{" "}
-        The clock starts on the hire date and uses the configured onboarding
-        window. First sign-in does not start it. The stage changes automatically
-        when the window ends.
+          ? ` · New-user window ends ${target}.`
+          : " · No hire date set."}{" "}
+        A hire date determines the new-user window. Leave it blank for an
+        existing user. Signing in does not start this window.
         {user.onboardingStart &&
-          ` Recorded onboarding start: ${user.onboardingStart}. This history is retained; a confirmed hire date takes precedence.`}
+          ` Previously recorded start: ${user.onboardingStart}. This history is retained; a confirmed hire date takes precedence.`}
       </FieldDescription>
     </FieldGroup>
   );

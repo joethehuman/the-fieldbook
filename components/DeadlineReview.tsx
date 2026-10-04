@@ -116,7 +116,7 @@ export function DeadlineReview({
               {error}
             </Alert>
           )}
-          <FormField label="Find a person or course">
+          <FormField label="Find a user or course">
             <Input
               value={query}
               onChange={(e) => {
@@ -129,7 +129,7 @@ export function DeadlineReview({
             <DataTable layout="deadlineReview" aria-label="Deadline changes">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Person</TableHead>
+                  <TableHead>User</TableHead>
                   <TableHead>Clock or course</TableHead>
                   <TableHead>Current date</TableHead>
                   <TableHead>Proposed date</TableHead>

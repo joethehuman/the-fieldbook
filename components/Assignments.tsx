@@ -252,7 +252,7 @@ export function Assignments({
           <DataTable layout="assignments">
             <TableHeader>
               <TableRow>
-                <TableHead>Person</TableHead>
+                <TableHead>User</TableHead>
                 <TableHead>Course status</TableHead>
                 <TableHead>Progress</TableHead>
                 <TableHead>Actions</TableHead>
@@ -329,7 +329,7 @@ export function Assignments({
   return (
     <section className="assignments-panel">
       <SectionHeader
-        title={<h2>{person ? "Courses & progress" : "Assigned courses"}</h2>}
+        title={<h2>{person ? "Progress" : "Assigned courses"}</h2>}
         description={
           <>
             {person
@@ -344,7 +344,7 @@ export function Assignments({
           report={() => ({
             headings: [
               "Learning group",
-              "Person",
+              "User",
               "Email",
               "Course",
               "Published version",

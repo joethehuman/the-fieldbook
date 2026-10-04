@@ -24,6 +24,10 @@ export const hooliDemoData: {
   settings: {
     "organizationTeamId": "fieldbook-organization",
     "guestGroupId": "guest-recommendations",
+    "externalLinks": [
+      {"id":"00000000-0000-4000-8000-000000000001","label":"codebase","url":"https://github.com/joethehuman/the-fieldbook"},
+      {"id":"00000000-0000-4000-8000-000000000002","label":"thefieldbook.org","url":"http://thefieldbook.org"},
+    ],
   },
   // prettier-ignore
   teams: [

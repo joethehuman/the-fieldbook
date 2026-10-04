@@ -86,8 +86,8 @@ export function ProgressOverview({
             </p>
             <p className="text-sm text-muted-foreground">
               {summary.unassigned}{" "}
-              {summary.unassigned === 1 ? "person has" : "people have"} no
-              assigned courses.
+              {summary.unassigned === 1 ? "user has" : "users have"} no assigned
+              courses.
             </p>
           </div>
         </div>

@@ -259,8 +259,6 @@ export function applyDemoBulk(
         if (!user) throw new Error("Account not found.");
         if (user.id === actor.id)
           throw new Error("You cannot delete your own account.");
-        if (data.teams?.some((t) => t.managerId === user.id))
-          throw new Error("Reassign this person’s managed teams first.");
         if (
           user.role === "admin" &&
           !data.users.some(
@@ -279,6 +277,11 @@ export function applyDemoBulk(
           deletedBy: actor.name,
         });
         data.users = data.users.filter((u) => u.id !== user.id);
+        data.teams = data.teams?.map((team) => {
+          if (team.managerId !== user.id) return team;
+          const { managerId: _manager, ...unassigned } = team;
+          return unassigned;
+        });
       }
       results.push({ id: target.id, status: "changed" });
     } catch (e) {

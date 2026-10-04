@@ -177,3 +177,9 @@ The endpoint and client registration remain unchanged. Approve added permissions
 Apply `20261002232135_progress_report.sql` after all preceding migrations, including `20261002222355_mcp_scoped_reports.sql`, before deploying the matching server application. It adds the service-only `fb_progress_report` function and does not alter existing functions, roster data, saved assignments, deadlines or progress. It reuses the current explicit reporting-scope helpers. Browser and authenticated database clients cannot execute it directly.
 
 Rehearse against an isolated backend and verify current role/branch boundaries, pending roster people, current-version completion and due-date settings. A code rollback leaves this additive function unused and preserves the previous reporting reads. Do not replay the migration: keep its application in your migration ledger.
+
+## People and team CSV import
+
+Apply `20261003140729_roster_csv_import.sql` after the combined assignment/Organization and governance-safeguard migrations, before deploying the Import workflow. It adds one private receipt table and two service-only functions; it preserves existing functions, roster, content, progress, assignments and deadlines. Rehearse the upgrade and both failed/successful imports in isolation. Direct browser, anonymous and authenticated database roles cannot access receipts or call the import functions.
+
+Previously deployed code remains compatible because these objects are additive. A code rollback leaves unused receipts and functions; do not replay the migration or remove committed retry receipts as part of an application rollback. Uploaded files are not retained, abandoned reviews expire after a day, and committed receipts hold hashes, actor references and aggregate counts. Person deletion clears the actor reference. Back up and follow the operator's environment-specific authorization before hosted application.

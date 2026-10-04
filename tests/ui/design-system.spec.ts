@@ -161,7 +161,7 @@ test("learning groups: shared controls, save and reload", async ({
     .getByRole("button", { name: "Create group", exact: true })
     .click();
   await expect(createDialog).not.toBeVisible();
-  const createdGroup = page.getByRole("button", {
+  const createdGroup = page.getByRole("link", {
     name: "Sales design test",
     exact: true,
   });
@@ -189,11 +189,9 @@ test("learning groups: shared controls, save and reload", async ({
     fullPage: true,
   });
   await page.reload();
-  await adminSection(page, "Groups");
-  await search.fill("Sales design test");
-  await page
-    .getByRole("button", { name: "Sales design test", exact: true })
-    .click();
+  await expect(
+    page.getByRole("heading", { name: "Sales design test", exact: true }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Group settings", exact: true })
     .click();
@@ -206,7 +204,7 @@ test("learning groups: shared controls, save and reload", async ({
   });
   await rename
     .getByRole("textbox", { name: "Group name", exact: true })
-    .fill("Account executives");
+    .fill(freshWorkspace().groups[0].name);
   await rename.getByRole("button", { name: "Save name", exact: true }).click();
   await expect(rename.getByRole("alert")).toContainText("already in use");
   await rename
@@ -370,7 +368,11 @@ test("admin destinations and editor render without overflow or errors", async ({
     await noOverflow(page);
   }
   await adminSection(page, "Content");
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page
+    .locator('table[data-layout="contentSelection"] tbody')
+    .getByRole("link")
+    .first()
+    .click();
   await expect(
     page.getByRole("textbox", { name: "Title", exact: true }),
   ).toBeVisible();
@@ -884,7 +886,7 @@ test("hire-date guidance labels the date and stage is derived", async ({
   const dialog = page.getByRole("dialog");
   const date = dialog.getByLabel("Hire date", { exact: true });
   await expect(date).toHaveAccessibleDescription(
-    /First sign-in does not start it/,
+    /Signing in does not start this window/,
   );
   await date.fill("2020-01-01");
   await expect(dialog).toContainText("Existing user");

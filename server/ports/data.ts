@@ -53,6 +53,8 @@ export type ProfileRecord = {
   role: User["role"];
   active: boolean;
   groups: string[];
+  added_at?: string | null;
+  auth_user_id?: string | null;
   team_id?: string | null;
   onboarding_start?: string | null;
   group_joined_at?: Record<string, string>;
@@ -218,12 +220,35 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
     last_run: string | null;
   } | null>;
   listProfiles(): Promise<ProfileRecord[]>;
+  listDeletedRosterProfiles(): Promise<
+    {
+      id: string;
+      email: string | null;
+      purge_after: string;
+      purging: boolean;
+      auth_locked: boolean;
+    }[]
+  >;
   readProfileNames(
     ids: string[],
   ): Promise<Pick<ProfileRecord, "id" | "name">[]>;
   findOwnerProfile(email: string): Promise<{ id: string } | null>;
   ensureLearningSetup(): Promise<void>;
   ensureOnboardingSetup(): Promise<void>;
+  rosterImportOperation(
+    actorId: string,
+    fileHash: string,
+    run?: string,
+    payload?: {
+      users: (typeof governanceSchema)["_output"]["users"];
+      teams: Team[];
+    },
+  ): Promise<{
+    id: string;
+    day?: string;
+    baseline?: string;
+    result?: import("@/lib/roster-import").RosterImportResult;
+  }>;
   saveGovernance(
     actorId: string,
     expected: number,

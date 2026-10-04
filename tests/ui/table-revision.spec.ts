@@ -225,7 +225,7 @@ test("group row membership and assignment saves affect the chosen group and reta
     exact: true,
   });
   await membership
-    .getByRole("searchbox", { name: "Find a person", exact: true })
+    .getByRole("searchbox", { name: "Find a user", exact: true })
     .fill(person.email);
   await membership.getByRole("checkbox").check();
   expect(

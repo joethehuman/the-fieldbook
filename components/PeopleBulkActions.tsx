@@ -109,7 +109,7 @@ export function peopleCommands(
       id: "date",
       label: "Set hire date",
       description:
-        "Start each person's onboarding clock from this hire date using their applied window. Existing completion history is preserved.",
+        "Start each user's onboarding clock from this hire date using their applied window. Existing completion history is preserved.",
       field: "date",
       apply: (ids) => apply("date", ids),
     },

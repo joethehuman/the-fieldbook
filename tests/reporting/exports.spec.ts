@@ -482,8 +482,9 @@ test("person course list, assignment details and optional history agree with tab
   await page
     .getByRole("row")
     .filter({ hasText: "zoe@example.test" })
-    .getByRole("button", { name: "Courses & progress" })
+    .getByRole("button", { name: /^Actions for/ })
     .click();
+  await page.getByRole("menuitem", { name: "Progress", exact: true }).click();
   const buttons = page.getByRole("button", { name: "Export CSV", exact: true });
   const list = await download(page, buttons.first(), info, "assigned");
   const courseRows = page.locator('table[data-layout="courses"] tbody tr');
@@ -664,8 +665,9 @@ test("failed progress update disables exports until the complete report reloads"
   await page
     .getByRole("row")
     .filter({ hasText: "zoe@example.test" })
-    .getByRole("button", { name: "Courses & progress" })
+    .getByRole("button", { name: /^Actions for/ })
     .click();
+  await page.getByRole("menuitem", { name: "Progress", exact: true }).click();
   await page
     .getByRole("button", { name: "View progress", exact: true })
     .nth(1)
@@ -777,13 +779,17 @@ test("People connects hire-date guidance and preregistration to the shared roste
     page.getByRole("button", { name: "New user defaults", exact: true }),
   ).toHaveCount(0);
   if (production) {
-    const add = page.getByRole("region", { name: "Add people", exact: true });
-    await expect(add.locator('[data-slot="card-footer"]')).toContainText(
-      "No email is sent.",
-    );
-    await expect(
-      add.getByRole("button", { name: "Pre-register person" }),
-    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Pre-register user", exact: true })
+      .click();
+    const registration = page.getByRole("dialog", {
+      name: "Pre-register user",
+      exact: true,
+    });
+    await expect(registration).toContainText("No email is sent.");
+    await registration
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
   }
   await page
     .getByRole("row")
@@ -793,7 +799,7 @@ test("People connects hire-date guidance and preregistration to the shared roste
   const dialog = page.getByRole("dialog");
   await expect(
     dialog.getByLabel("Hire date", { exact: true }),
-  ).toHaveAccessibleDescription(/First sign-in does not start it/);
+  ).toHaveAccessibleDescription(/Signing in does not start this window/);
   await screenshot(page, info, "people-hire-date-guidance");
 });
 
@@ -1078,7 +1084,7 @@ test("progress scope is distinct from optional people filters and stays stable",
   await page.getByRole("button", { name: "Clear all", exact: true }).click();
   const activePeople = data.users.filter((user) => user.active).length;
   await expect(
-    page.getByText(`Organization · ${activePeople} people.`, { exact: false }),
+    page.getByText(`Organization · ${activePeople} users.`, { exact: false }),
   ).toBeVisible();
   await expect(rows).toHaveCount(activePeople);
   await screenshot(page, info, "progress-refined-scope");
@@ -1090,7 +1096,7 @@ test("refreshed Hooli organization reports all 200 people through bounded pages 
   await setup(page, info, "admin", freshWorkspace());
   await section(page, "Progress");
   await expect(
-    page.getByText("Organization · 200 people.", { exact: false }),
+    page.getByText("Organization · 200 users.", { exact: false }),
   ).toBeVisible();
   const table = page.getByRole("region", {
     name: "People progress",
@@ -1185,7 +1191,7 @@ test("two-chart overview stays bounded with fifty teams and filter row appears l
   // Team discovery still reaches a later result among more than fifty teams.
   await searchTeam(page, "Regional team 50");
   await expect(
-    page.getByText("Regional team 50 · 0 people.", { exact: false }),
+    page.getByText("Regional team 50 · 0 users.", { exact: false }),
   ).toBeVisible();
   await searchTeam(page, "Organization");
   await screenshot(page, info, "compact-progress-fifty-teams");
@@ -1247,7 +1253,7 @@ test("unified search groups results, commits a person by identity, and keeps hig
   await searchTeam(page, "Sales team");
   await expect(rows).toHaveCount(5);
   await expect(
-    page.getByText("Sales team · 5 people. Includes all subteams.", {
+    page.getByText("Sales team · 5 users. Includes all subteams.", {
       exact: true,
     }),
   ).toBeVisible();
@@ -1263,7 +1269,7 @@ test("manager unified search never offers sibling people or teams", async ({
     exact: true,
   });
   await expect(
-    page.getByText("Sales team · 5 people. Includes all subteams.", {
+    page.getByText("Sales team · 5 users. Includes all subteams.", {
       exact: true,
     }),
   ).toBeVisible();
@@ -1301,14 +1307,14 @@ for (const scope of ["multiple roots", "Organization"]) {
     const rows = page.locator('table[data-layout="progressPeople"] tbody tr');
     await expect(rows).toHaveCount(count);
     await expect(
-      page.getByText(`${label} · ${count} people.`, { exact: false }),
+      page.getByText(`${label} · ${count} users.`, { exact: false }),
     ).toBeVisible();
     await searchTeam(page, "Sales team");
     await expect(rows).toHaveCount(5);
     await page.getByRole("button", { name: "Clear all", exact: true }).click();
     await expect(rows).toHaveCount(count);
     await expect(
-      page.getByText(`${label} · ${count} people.`, { exact: false }),
+      page.getByText(`${label} · ${count} users.`, { exact: false }),
     ).toBeVisible();
     await screenshot(page, info, `manager-highest-${scope.replace(" ", "-")}`);
   });

@@ -1,5 +1,8 @@
 "use client";
 
+import { WritingImageDialog, WritingImageToolbar } from "./writing-image";
+import { WritingBlockActions, blockActions } from "./writing-block-actions";
+import { writingTableControlsPlugin } from "./writing-table-controls";
 import { writingVideoPlugin } from "./writing-video";
 import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
@@ -33,6 +36,7 @@ import {
   readOnly$,
   $createTableNode,
   insertCodeBlock$,
+  insertThematicBreak$,
   useCodeBlockEditorContext,
   type CodeBlockEditorProps,
 } from "@mdxeditor/editor";
@@ -67,6 +71,7 @@ import {
   Plus,
   Table,
   CodeXml,
+  Minus,
   Image as ImageIcon,
   Video,
 } from "lucide-react";
@@ -122,7 +127,7 @@ function PlainCodeEditor({
   language,
   focusEmitter,
 }: CodeBlockEditorProps) {
-  const { setCode } = useCodeBlockEditorContext();
+  const { setCode, parentEditor, lexicalNode } = useCodeBlockEditorContext();
   const readOnly = useCellValue(readOnly$);
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(
@@ -130,6 +135,8 @@ function PlainCodeEditor({
     [focusEmitter],
   );
   return (
+    <div className="writing-code-block" contentEditable={false}>
+    <WritingBlockActions label="Code block" disabled={readOnly} {...blockActions(parentEditor, lexicalNode.getKey())} />
     <Textarea
       ref={input}
       aria-label={`${language || "Plain text"} code block`}
@@ -140,12 +147,14 @@ function PlainCodeEditor({
       className="writing-code font-mono"
       rows={Math.max(2, code.split("\n").length)}
     />
+    </div>
   );
 }
 
 type WritingActions = {
   block: (kind: WritingBlock) => void;
   codeBlock: () => void;
+  divider: () => void;
 };
 
 function WritingToolbar({
@@ -163,6 +172,7 @@ function WritingToolbar({
 }) {
   const editor = useCellValue(activeEditor$);
   const code = usePublisher(insertCodeBlock$);
+  const divider = usePublisher(insertThematicBreak$);
   const [canUndo, setCanUndo] = useState(false),
     [canRedo, setCanRedo] = useState(false);
   useEffect(() => {
@@ -175,8 +185,9 @@ function WritingToolbar({
     onEditorReady(editor, {
       block: convert,
       codeBlock: () => code({ code: "", language: "" }),
+      divider: () => divider(),
     });
-  }, [editor, onEditorReady, code]);
+  }, [editor, onEditorReady, code, divider]);
   useEffect(() => {
     if (!editor) return;
     const undo = editor.registerCommand(
@@ -540,6 +551,7 @@ export default function WritingEditorEngine({
     ...writingBlockStyles.map(({ kind, ...command }) => ({ ...command, group: "Basic blocks", run: () => chooseBlock(kind) })),
     { name: "Table", group: "Basic blocks", icon: Table, terms: "table grid rows columns", run: insertTableAtCaret },
     { name: "Code block", group: "Basic blocks", icon: CodeXml, terms: "code block", run: () => { setSlashOpen(false); writingActions.current?.codeBlock(); } },
+    { name: "Divider", group: "Basic blocks", icon: Minus, terms: "divider separator horizontal rule line", run: () => { setSlashOpen(false); writingActions.current?.divider(); } },
     { name: "Image", group: "Media", icon: ImageIcon, terms: "image photo", run: () => openMedia("image") },
     { name: "Upload video", group: "Media", icon: Video, terms: "video upload file", run: () => openMedia("video") },
     { name: "Embed video link", group: "Media", icon: Link, terms: "video embed link", run: () => openMedia("video", "link") },
@@ -664,9 +676,12 @@ export default function WritingEditorEngine({
     linkDialogPlugin({ LinkDialog: WritingLinkDialog }),
     imagePlugin({
       disableImageResize: true,
+      ImageDialog: WritingImageDialog,
+      EditImageToolbar: WritingImageToolbar,
       imageUploadHandler: onUpload ? upload : undefined,
     }),
     tablePlugin(),
+    writingTableControlsPlugin(),
     codeBlockPlugin({
       codeBlockEditorDescriptors: [
         { priority: 0, match: () => true, Editor: PlainCodeEditor },
