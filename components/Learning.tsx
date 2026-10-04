@@ -34,6 +34,7 @@ import {
 } from "@/lib/course-progress";
 import { ArrowRight, BookOpen } from "lucide-react";
 import {
+  assignmentInfo,
   isComplete,
   type Content,
   type User,
@@ -83,7 +84,17 @@ export default function Learning({
   const [hideCompleted, setHideCompleted] = useState(false);
   const [query, setQuery] = useState("");
   const [topic, setTopic] = useState("All categories");
-  const [sort, setSort] = useState("recommended");
+  const [sortChoice, setSortChoice] = useState<{
+    view: LearningView;
+    value: string;
+  } | null>(null);
+  const sort =
+    sortChoice?.view === view
+      ? sortChoice.value
+      : view === "assigned"
+        ? "assigned-oldest"
+        : "added";
+  const setSort = (value: string) => setSortChoice({ view, value });
   const useDueDates = !guest && settings?.dueDatesEnabled !== false;
   const state = learningState(courses, user, groups, progress, settings);
   const completed = assigned.filter((c) => isComplete(c, progress));
@@ -148,7 +159,7 @@ export default function Learning({
       />
     );
   const browserCards = (
-    view === "curricula"
+    view === "curricula" || view === "home"
       ? curricula
           .filter((c) => c.status === "published")
           .map((curriculum) => ({
@@ -173,28 +184,35 @@ export default function Learning({
         .toLowerCase()
         .includes(query.trim().toLowerCase()),
   );
-  if (sort !== "recommended")
-    browserCards.sort((a, b) =>
-      sort === "title"
-        ? cardTitle(a).localeCompare(cardTitle(b))
-        : (sort === "oldest" ? 1 : -1) *
-          (
-            cardCourses(a)
-              .map((c) =>
-                sort === "added" ? c.createdAt || c.updatedAt : c.updatedAt,
-              )
-              .sort()
-              .at(-1) || ""
-          ).localeCompare(
-            cardCourses(b)
-              .map((c) =>
-                sort === "added" ? c.createdAt || c.updatedAt : c.updatedAt,
-              )
-              .sort()
-              .at(-1) || "",
-          ),
+  const assignedDates = new Map(
+    assigned.map((course) => [
+      course.id,
+      assignmentInfo(course, user, groups).assignedAt,
+    ]),
+  );
+  const cardDate = (item: LearningCardItem) =>
+    cardCourses(item)
+      .map((course) =>
+        sort.startsWith("assigned-")
+          ? assignedDates.get(course.id)
+          : sort === "added"
+            ? course.createdAt || course.updatedAt
+            : course.updatedAt,
+      )
+      .filter((date): date is string => !!date)
+      .sort()
+      .at(sort.startsWith("assigned-") ? 0 : -1);
+  browserCards.sort((a, b) => {
+    if (sort === "title") return cardTitle(a).localeCompare(cardTitle(b));
+    const aDate = cardDate(a),
+      bDate = cardDate(b);
+    if (!aDate || !bDate)
+      return aDate ? -1 : bDate ? 1 : cardTitle(a).localeCompare(cardTitle(b));
+    return (
+      (sort === "oldest" || sort === "assigned-oldest" ? 1 : -1) *
+        aDate.localeCompare(bDate) || cardTitle(a).localeCompare(cardTitle(b))
     );
-  const ranks = new Map(sequence.map((c, i) => [c.id, i]));
+  });
   const nextCourse = state.remaining[0];
   const viewTitle =
     view === "curricula"
@@ -214,11 +232,6 @@ export default function Learning({
               : "All courses";
   const ordered = (items: Content[]) =>
     [...items].sort((a, b) => {
-      if (sort === "recommended") {
-        const ai = ranks.get(a.id) ?? 99999,
-          bi = ranks.get(b.id) ?? 99999;
-        return ai - bi || a.title.localeCompare(b.title);
-      }
       if (sort === "added")
         return (b.createdAt || b.updatedAt).localeCompare(
           a.createdAt || a.updatedAt,
@@ -254,7 +267,9 @@ export default function Learning({
       }
       onClick={linkedNavigation ? undefined : () => onOpen(c.id)}
       href={
-        linkedNavigation ? `/courses/${encodeURIComponent(c.id)}?from=${encodeURIComponent(courseViewPaths[view])}` : undefined
+        linkedNavigation
+          ? `/courses/${encodeURIComponent(c.id)}?from=${encodeURIComponent(courseViewPaths[view])}`
+          : undefined
       }
     />
   );
@@ -401,7 +416,11 @@ export default function Learning({
               ...(!guest ? [{ value: "yours", label: "Your courses" }] : []),
               {
                 value: "assigned",
-                label: guest ? "For you" : useDueDates ? "Assigned" : "Recommended",
+                label: guest
+                  ? "For you"
+                  : useDueDates
+                    ? "Assigned"
+                    : "Recommended",
               },
               { value: "in-progress", label: "In progress" },
               { value: "completed", label: "Completed" },
@@ -413,9 +432,7 @@ export default function Learning({
           title={
             <h2 className="flex items-center gap-2">
               {view === "home" ? "All courses" : viewTitle}
-              {view === "home" && (
-                <CountBadge>{courses.length}</CountBadge>
-              )}
+              {view === "home" && <CountBadge>{courses.length}</CountBadge>}
             </h2>
           }
         >
@@ -437,12 +454,6 @@ export default function Learning({
               Hide completed
             </Field>
           )}
-          {curricula.some((c) => c.status === "published") &&
-            view !== "curricula" && (
-              <Button variant="link" onClick={() => changeView("curricula")}>
-                Browse curricula <ArrowRight size={16} />
-              </Button>
-            )}
         </SectionHeader>
         <BrowseToolbar>
           <Field>
@@ -471,8 +482,17 @@ export default function Learning({
           </FormField>
           <FormField label="Sort courses">
             <SelectField value={sort} onValueChange={setSort}>
-              <option value="recommended">Recommended order</option>
-              <option value="added">Recently added</option>
+              {view === "assigned" && (
+                <>
+                  <option value="assigned-oldest">
+                    Oldest assignments first
+                  </option>
+                  <option value="assigned-newest">
+                    Newest assignments first
+                  </option>
+                </>
+              )}
+              <option value="added">Newest courses first</option>
               <option value="title">Title A–Z</option>
               <option value="updated">Recently updated</option>
               <option value="oldest">Oldest update first</option>
@@ -507,9 +527,14 @@ export default function Learning({
               </div>
             ))
         )}
+        {view === "home" && browserCards.length > 0 && (
+          <CourseRow title="Curricula">
+            {browserCards.map(displayCard)}
+          </CourseRow>
+        )}
         {!(view === "assigned" || view === "curricula"
           ? browserCards.length
-          : filtered.length) && (
+          : filtered.length + (view === "home" ? browserCards.length : 0)) && (
           <EmptyState>
             <h3>
               {query || topic !== "All categories"

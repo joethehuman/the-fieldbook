@@ -157,7 +157,7 @@ test("For you uses curriculum cards, one category picker and a simple ordered pa
   await expect(rows.nth(0)).toContainText("Start with the customer");
   await expect(rows.nth(1)).toContainText("Know the platform");
   await expect(rows.nth(2)).toContainText("From discovery to next steps");
-  await expect(page.getByRole("combobox")).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Sort courses" })).toContainText("Recommended order");
   await page.reload();
   await rows.nth(1).click();
   await expect(
