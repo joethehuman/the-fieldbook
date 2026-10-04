@@ -31,8 +31,12 @@ test("fullscreen and Close preserve the iframe and inline geometry", async ({
   const close = player.getByRole("button", { name: "Close fullscreen video" });
   await expect(close).toBeVisible();
   const expanded = await frame.boundingBox();
-  expect(expanded!.width).toBe(page.viewportSize()!.width);
-  expect(expanded!.height).toBe(page.viewportSize()!.height);
+  const viewport = await page.evaluate(() => ({
+    width: innerWidth,
+    height: innerHeight,
+  }));
+  expect(expanded!.width).toBe(viewport.width);
+  expect(expanded!.height).toBe(viewport.height);
   await close.click();
   await expect
     .poll(() => page.evaluate(() => document.fullscreenElement === null))
