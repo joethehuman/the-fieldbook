@@ -11,6 +11,7 @@ import {
 } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "../ui/button";
+import { usePhoneLayout } from "./use-phone-layout";
 
 export const EditorFocusContext = createContext<{
   active: boolean;
@@ -145,6 +146,7 @@ export function useEditorFocus(ref: RefObject<HTMLFormElement | null>) {
 }
 
 export function EditorFocusControls() {
+  const phone = usePhoneLayout();
   const focus = useContext(EditorFocusContext);
   if (!focus) return null;
   return (
@@ -160,7 +162,7 @@ export function EditorFocusControls() {
       <Button
         type="button"
         variant="ghost"
-        size="sm"
+        size={phone ? "icon" : "sm"}
         aria-pressed={focus.active}
         aria-label={focus.active ? "Exit focus mode" : "Focus mode"}
         onMouseDown={(event) => event.preventDefault()}
@@ -171,7 +173,7 @@ export function EditorFocusControls() {
         ) : (
           <Maximize2 aria-hidden="true" />
         )}
-        <span>{focus.active ? "Exit focus" : "Focus mode"}</span>
+        <span className="writing-focus-label">{focus.active ? "Exit focus" : "Focus mode"}</span>
       </Button>
     </>
   );

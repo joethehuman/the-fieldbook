@@ -4,12 +4,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { activeEditor$, applyFormat$, applyListType$, convertSelectionToNode$, currentBlockType$, currentFormat$, currentListType$, openLinkEditDialog$ } from "@mdxeditor/editor";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
 import { $addUpdateTag, $createRangeSelection, $getSelection, $isRangeSelection, $setSelection, SKIP_SCROLL_INTO_VIEW_TAG, type LexicalEditor, type RangeSelection } from "lexical";
-import { Bold, Check, ChevronRight, Code, Italic, Link } from "lucide-react";
+import { Bold, Check, ChevronRight, Code, Italic, Link, Type } from "lucide-react";
 import { Button } from "../ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { createWritingBlock, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
 import { useWritingInteraction } from "./writing-interaction";
+import { usePhoneLayout } from "./use-phone-layout";
 
 type SelectionMenuController = (keyboard: boolean) => boolean;
 
@@ -19,6 +20,9 @@ export function WritingSelectionMenu({ disabled, onReady }: {
   onReady: (controller: SelectionMenuController | null) => void;
 }) {
   const editor = useCellValue(activeEditor$);
+  const phone = usePhoneLayout();
+  const phoneTrigger = useRef<HTMLButtonElement>(null);
+  const [hasSelection, setHasSelection] = useState(false);
   const format = useCellValue(currentFormat$);
   const blockType = useCellValue(currentBlockType$);
   const listType = useCellValue(currentListType$);
@@ -60,9 +64,11 @@ export function WritingSelectionMenu({ disabled, onReady }: {
     range.current = selected;
     saved.current = selection;
     savedEditor.current = editor;
-    virtualAnchor.current = { getBoundingClientRect: () => range.current?.getBoundingClientRect() || new DOMRect(), contextElement: surface };
+    virtualAnchor.current = { getBoundingClientRect: () => phone
+      ? phoneTrigger.current?.getBoundingClientRect() || new DOMRect()
+      : range.current?.getBoundingClientRect() || new DOMRect(), contextElement: surface };
     return true;
-  }, [editor, disabled]);
+  }, [editor, disabled, phone]);
 
   const stamp = () => {
     const selection = saved.current;
@@ -87,7 +93,7 @@ export function WritingSelectionMenu({ disabled, onReady }: {
       cancelAnimationFrame(pending);
       pending = requestAnimationFrame(() => {
         const active = document.activeElement;
-        if (active instanceof Element && active.closest("[data-writing-selection-menu]")) return;
+        if (active instanceof Element && active.closest("[data-writing-selection-menu], .writing-phone-format")) return;
         const domSelection = window.getSelection();
         const surface = editor?.getRootElement();
         if (!domSelection || domSelection.isCollapsed || !surface?.contains(domSelection.anchorNode)) {
@@ -96,6 +102,7 @@ export function WritingSelectionMenu({ disabled, onReady }: {
           savedEditor.current = null;
           range.current = null;
           setOpen(false);
+          setHasSelection(false);
           return;
         }
         if (!snapshot()) {
@@ -103,9 +110,12 @@ export function WritingSelectionMenu({ disabled, onReady }: {
           savedEditor.current = null;
           range.current = null;
           setOpen(false);
+          setHasSelection(false);
         } else if (stamp() !== dismissed.current) {
+          setHasSelection(true);
           keyboardOpen.current = false;
-          setOpen(true);
+          // Native touch selection owns its menu; Fieldbook opens only on Format.
+          if (!phone) setOpen(true);
         }
       });
     };
@@ -118,7 +128,8 @@ export function WritingSelectionMenu({ disabled, onReady }: {
       document.removeEventListener("pointerup", update);
       unregister?.();
     };
-  }, [editor, snapshot]);
+  }, [editor, snapshot, phone]);
+  useEffect(() => { setOpen(false); }, [phone]);
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
 
   function restore() {
@@ -162,9 +173,13 @@ export function WritingSelectionMenu({ disabled, onReady }: {
   }
   const currentStyle = writingBlockStyles.find(({ kind }) => kind === (listType || blockType)) || writingBlockStyles[0];
 
-  return <Popover open={open && !disabled} onOpenChange={(next) => { if (!next) dismiss(); }}>
+  return <>
+    {phone && <Button ref={phoneTrigger} type="button" variant="ghost" size="icon" className="writing-phone-format"
+      aria-label="Format selected text" aria-expanded={open} disabled={disabled || !hasSelection}
+      onPointerDown={(event) => event.preventDefault()} onClick={(event) => show(event.detail === 0)}><Type aria-hidden="true" /></Button>}
+    <Popover open={open && !disabled} onOpenChange={(next) => { if (!next) dismiss(); }}>
     <PopoverAnchor virtualRef={virtualAnchor} />
-    <PopoverContent data-writing-selection-menu="true" className="w-auto min-w-50 overflow-visible p-1" side="top" align="start" updatePositionStrategy="always"
+    <PopoverContent data-writing-selection-menu="true" className="w-auto min-w-50 overflow-visible p-1" side={phone ? "bottom" : "top"} align="start" updatePositionStrategy="always"
       aria-label="Format selected text"
       onOpenAutoFocus={(event) => { event.preventDefault(); if (keyboardOpen.current) firstControl.current?.focus({ preventScroll: true }); }}
       onCloseAutoFocus={(event) => event.preventDefault()}
@@ -179,7 +194,7 @@ export function WritingSelectionMenu({ disabled, onReady }: {
             <currentStyle.icon aria-hidden="true" />{currentStyle.name}<ChevronRight aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent data-writing-selection-menu="true" side="right" align="start" onCloseAutoFocus={(event) => event.preventDefault()}
+        <DropdownMenuContent data-writing-selection-menu="true" side={phone ? "bottom" : "right"} align="start" onCloseAutoFocus={(event) => event.preventDefault()}
           onEscapeKeyDown={() => firstControl.current?.focus({ preventScroll: true })}>
           {writingBlockStyles.map(({ kind, name, icon: Icon }) => <DropdownMenuItem key={kind} onSelect={() => style(kind)}>
             <Icon className="size-4" aria-hidden="true" />{name}{kind === currentStyle.kind && <Check className="ml-auto size-4" aria-hidden="true" />}
@@ -201,5 +216,5 @@ export function WritingSelectionMenu({ disabled, onReady }: {
           }}><Link aria-hidden="true" /></Button>
       </div>
     </PopoverContent>
-  </Popover>;
+  </Popover></>;
 }

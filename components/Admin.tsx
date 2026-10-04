@@ -2508,7 +2508,7 @@ export function Editor({
         target: item.target,
         questionId: item.questionId,
       });
-    } else if (item.field?.startsWith("editor-")) {
+    } else if (item.field?.startsWith("editor-") && !window.matchMedia("(max-width: 767px)").matches) {
       const field = document.getElementById(item.field);
       if (field) revealEditorTarget(field);
     } else {

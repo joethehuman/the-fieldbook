@@ -189,6 +189,12 @@
   align-items: center;
   gap: var(--space-1);
 }
+@media (max-width: 767px) {
+  .app[data-phone-keyboard="true"] .writing-content { padding-block-end: calc(var(--space-6) + 3rem); }
+  .writing-command-label, .writing-focus-label { display: none; }
+  .writing-toolbar-controls { gap: var(--space-1); flex-wrap: nowrap; }
+  .writing-phone-format { flex-shrink: 0; }
+}
 .writing-editor .writing-content {
   padding: var(--space-6);
   padding-inline: var(--editor-content-padding, var(--space-6));

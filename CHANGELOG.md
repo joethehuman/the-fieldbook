@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine phone authoring with compact Outline/Details controls and separate bottom panels, explicit selected-text formatting alongside native selection menus, and writing space that follows the visible keyboard viewport. Simplify the phone Administration picker and use a searchable Teams directory while retaining tablet and desktop layouts.
+
 - Simulate Ask AI in the browser-local demo with the shared thinking indicator, streamed canned replies and working Stop control. The first two questions receive Hoolibook/Gavin replies, with a link to thefieldbook.org in the first; later questions receive the demo-unavailable message. No model requests are made.
 
 - Prevent the demo account picker from flashing during session refresh. Check the saved profile before first paint and retain an inactive workspace shell until restoration finishes; first visits, explicit profile switching and storage recovery keep the picker.

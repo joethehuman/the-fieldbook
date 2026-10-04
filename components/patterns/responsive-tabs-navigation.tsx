@@ -2,6 +2,9 @@
 import type { ReactNode } from "react";
 import { Field } from "../ui/field";
 import { SelectField } from "../ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/select";
+import { PanelsTopLeft } from "lucide-react";
+import { usePhoneLayout } from "./use-phone-layout";
 import { TabsList } from "../ui/tabs";
 import { useScrollFade } from "./use-scroll-fade";
 
@@ -22,9 +25,21 @@ export function ResponsiveTabsNavigation({
   children: ReactNode;
 }) {
   const fade = useScrollFade<HTMLDivElement>();
+  const phone = usePhoneLayout();
   return (
     <div data-slot="admin-navigation" className="min-w-0">
-      <Field className="@min-[48rem]/workspace:hidden">
+      {phone ? <div className="grid min-w-0 gap-2">
+        <Select value={value} onValueChange={onValueChange}>
+          <SelectTrigger aria-label={label}>
+            <PanelsTopLeft className="size-4" aria-hidden="true" />
+            <span className="flex-1"><SelectValue /></span>
+          </SelectTrigger>
+          <SelectContent>{options.map((option) => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent>
+        </Select>
+        <span role="status" className={pendingValue ? "text-label text-muted-foreground" : "sr-only"}>
+          {pendingValue ? `Opening ${options.find((option) => option.id === pendingValue)?.name || "section"}…` : ""}
+        </span>
+      </div> : <Field className="@min-[48rem]/workspace:hidden">
         {label}
         <SelectField value={value} onValueChange={onValueChange}>
           {options.map((option) => (
@@ -41,7 +56,7 @@ export function ResponsiveTabsNavigation({
             ? `Opening ${options.find((option) => option.id === pendingValue)?.name || "section"}…`
             : ""}
         </span>
-      </Field>
+      </Field>}
       <div
         className="hidden min-h-0 @min-[48rem]/workspace:grid"
         data-slot="admin-navigation-desktop"

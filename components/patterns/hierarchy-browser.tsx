@@ -25,6 +25,7 @@ import { FormField } from "./form-field";
 import { canBulkSelect, SelectRows } from "./bulk-selection";
 import { useScrollFade } from "./use-scroll-fade";
 import { ContentAction } from "./content-action";
+import { usePhoneLayout } from "./use-phone-layout";
 
 export type HierarchyBrowserItem = {
   id: string;
@@ -147,6 +148,7 @@ export function HierarchyBrowser({
   onSelectionChange,
   selectionActions,
   reveal,
+  phoneList = false,
 }: {
   items: HierarchyBrowserItem[];
   label: string;
@@ -167,7 +169,9 @@ export function HierarchyBrowser({
   onSelectionChange?: (ids: string[]) => void;
   selectionActions?: ReactNode;
   reveal?: { id: string; token: number };
+  phoneList?: boolean;
 }) {
+  const phone = usePhoneLayout();
   const positions = useRef(new Map<string, number>());
   const rootRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -190,7 +194,8 @@ export function HierarchyBrowser({
   const path = pathFor(branchId, byId);
   const activePath = new Set(path.map((item) => item.id));
   const search = query.trim().toLowerCase();
-  const flat = !!search || selected !== undefined;
+  const phoneDirectory = phoneList && phone;
+  const flat = phoneDirectory || !!search || selected !== undefined;
   const matches = hierarchyBrowserMatches(ordered, query);
   const roots = ordered.filter(
     (item) => !item.parentId || !byId.has(item.parentId),
@@ -448,7 +453,7 @@ export function HierarchyBrowser({
     const rowActions: RowAction[] = [
       { label: "Open team", onSelect: () => void onOpen(item.id) },
       { label: "Edit team", onSelect: () => void onEdit(item.id) },
-      ...(flat && childCount > 0
+      ...(flat && !phoneDirectory && childCount > 0
         ? [{ label: "Browse subteams", onSelect: () => browse(item.id) }]
         : []),
     ];

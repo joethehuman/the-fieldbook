@@ -346,6 +346,14 @@
   .editor-frame [data-slot="input"], .editor-frame [data-slot="textarea"], .course-builder-panel {
     scroll-margin-block-start: var(--space-4);
   }
+  @media (max-width: 767px) {
+    .app[data-phone-keyboard="true"] { top: var(--phone-writing-top, 0px); bottom: auto; height: var(--phone-writing-height, 100dvh); }
+    .editor-panel-context { display: none; }
+    .editor-frame-controls { flex-wrap: nowrap; min-height: var(--space-8); padding-block: 0; }
+    .editor-frame-controls[data-heading="true"] { flex-wrap: wrap; }
+    .editor-frame[data-panels] > .editor-frame-body { display: flex; flex-direction: column; }
+    .editor[data-scroll-layout="workspace"] .editor-frame-canvas { flex: 1 1 0; }
+  }
   .editor-frame-heading [data-slot="input"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }
   .editor-details-content { gap: var(--space-4); }
   .editor-details-group { display: grid; gap: var(--space-3); padding-block-end: var(--space-4); border-bottom: 1px solid var(--border); }

@@ -234,7 +234,7 @@ export default function ComponentCatalog() {
       <ScrollingExamples />
       <section className="grid gap-4" aria-label="Content editor frame">
         <SectionHeader title={<h2>Content editor frame</h2>}
-          description="Persistent Outline and Details controls reveal in-page panels. The writing canvas stays mounted when either panel changes." />
+          description="Outline and Details use in-page panels on tablets and desktops, and a bottom panel on phones. The writing canvas stays mounted when either panel changes." />
         <EditorFrame revealCanvas={canvasRequest}
           outlineContext={catalogLesson === "welcome" ? "Lesson 1 of 2" : "Lesson 2 of 2"}
           heading={<Input variant="lesson-title" aria-label="Example lesson title" placeholder="Untitled lesson" value={catalogTitle} onChange={(event) => setCatalogTitle(event.target.value)} />}
