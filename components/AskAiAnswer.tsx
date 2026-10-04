@@ -37,11 +37,13 @@ function openSource(
 
 export function AskAiAnswer({
   message,
+  demo = false,
   complete,
   animating,
   onSource,
 }: {
   message: AskAiMessage;
+  demo?: boolean;
   complete: boolean;
   animating: boolean;
   onSource: (source: AiCitation) => void;
@@ -64,6 +66,7 @@ export function AskAiAnswer({
           citationLinks,
           {
             pending: !complete,
+            demo,
             numbers: Object.fromEntries(
               [...citations.byId].map(([id, citation]) => [
                 id,
@@ -75,6 +78,12 @@ export function AskAiAnswer({
       ] satisfies NonNullable<MessageResponseProps["remarkPlugins"]>,
       components: {
         a: ({ href, children }: React.ComponentProps<"a">) => {
+          if (demo && href === "https://thefieldbook.org/")
+            return (
+              <a href={href} target="_blank" rel="noopener noreferrer">
+                {children}
+              </a>
+            );
           const citation = citations.sources.find(
             (item) => href === `/__fieldbook-citation/${item.number}`,
           );
@@ -96,7 +105,7 @@ export function AskAiAnswer({
         img: () => null,
       },
     }),
-    [citations, onSource, complete],
+    [citations, onSource, complete, demo],
   );
   return (
     <>

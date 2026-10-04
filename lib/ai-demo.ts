@@ -2,7 +2,7 @@ import type { ChatTransport, UIMessageChunk } from "ai";
 import { demoAiReply, type AskAiMessage } from "./ai-chat";
 
 const replies = [
-  "Hoolibook is just a demo, and Gavin didn’t approve the budget for a real model. Visit thefieldbook.org to try production Ask AI.",
+  "Hoolibook is just a demo, and Gavin didn’t approve the budget for a real model. Visit [thefieldbook.org](https://thefieldbook.org/) to try production Ask AI.",
   "I escalated your request. Gavin approved a second canned response. That’s this one.",
 ];
 

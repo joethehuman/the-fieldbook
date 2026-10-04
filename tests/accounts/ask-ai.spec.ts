@@ -621,6 +621,12 @@ test("Ask AI demo responds locally, respects composition and clears on profile c
   await expect(page.getByRole("log")).toContainText(
     "Visit thefieldbook.org to try production Ask AI.",
   );
+  const productionLink = page.getByRole("log").getByRole("link", {
+    name: "thefieldbook.org",
+    exact: true,
+  });
+  await expect(productionLink).toHaveAttribute("href", "https://thefieldbook.org/");
+  await expect(productionLink).toHaveAttribute("target", "_blank");
   expect(calls).toBe(0);
   await page.screenshot({ path: info.outputPath("ask-ai-demo.png") });
   await input.press("Escape");

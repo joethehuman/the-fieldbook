@@ -112,6 +112,7 @@ export function useAskAi(mode: "demo" | "installed" | "off") {
   );
   return {
     ...chat,
+    demo: mode === "demo",
     busy,
     notice,
     completion,

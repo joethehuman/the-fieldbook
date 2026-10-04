@@ -93,6 +93,7 @@ export function AskAiConversation({
                       <>
                         <AskAiAnswer
                           message={message}
+                          demo={chat.demo}
                           complete={complete}
                           animating={
                             chat.busy && message === chat.messages.at(-1)

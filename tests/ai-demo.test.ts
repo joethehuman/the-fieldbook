@@ -28,7 +28,9 @@ async function answer(
   for (let word = 0; word < 80; word++) context.mock.timers.tick(45);
   let text = "";
   let finished = false;
-  for await (const chunk of stream) {
+  const reader = stream.getReader();
+  for (let part = await reader.read(); !part.done; part = await reader.read()) {
+    const chunk = part.value;
     if (chunk.type === "text-delta") text += chunk.delta;
     if (chunk.type === "finish") finished = true;
   }
@@ -71,7 +73,7 @@ test("demo sequence survives cleared history, retries and stays isolated to a se
   const first = await answer(context, transport, "one");
   assert.equal(
     first,
-    "Hoolibook is just a demo, and Gavin didn’t approve the budget for a real model. Visit thefieldbook.org to try production Ask AI.",
+    "Hoolibook is just a demo, and Gavin didn’t approve the budget for a real model. Visit [thefieldbook.org](https://thefieldbook.org/) to try production Ask AI.",
   );
   assert.equal(await answer(context, transport, "one"), first);
   assert.equal(
@@ -119,4 +121,27 @@ test("consumer cancellation clears pending work and an already aborted send cons
   context.mock.timers.tick(10_000);
   assert.equal((await reader.read()).done, true);
   assert.match(await answer(context, transport, "one"), /^Hoolibook/);
+});
+
+test("the demo reply preserves its production link while installed answers retain citation-only links", async (context) => {
+  const { unified } = await import("unified");
+  const { default: remarkParse } = await import("remark-parse");
+  const { citationLinks } = await import("../lib/ai-citations");
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const text = await answer(context, createDemoAiTransport(), "one");
+  const parse = (demo: boolean, text: string) => {
+    const processor = unified()
+      .use(remarkParse)
+      .use(citationLinks, { numbers: {}, demo });
+    return JSON.stringify(processor.runSync(processor.parse(text)));
+  };
+  assert.match(parse(true, text), /"url":"https:\/\/thefieldbook\.org\/"/);
+  assert.doesNotMatch(parse(false, text), /"url":/);
+  assert.doesNotMatch(
+    parse(
+      true,
+      "Visit [another site](https://example.test) or [fake source](/__fieldbook-citation/1).",
+    ),
+    /"url":/,
+  );
 });
