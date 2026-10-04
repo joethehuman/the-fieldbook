@@ -36,6 +36,7 @@
   --accent: #eeeeee;
   --accent-foreground: #171717;
   --destructive: #b42318;
+  --destructive-soft: color-mix(in srgb, var(--destructive) 8%, var(--card));
   --destructive-foreground: #ffffff;
   --success: #16704a;
   --warning: #8b5908;
@@ -121,6 +122,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-warning: var(--warning);

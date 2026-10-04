@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Refine course and curriculum cards with type/category labels, centered For you or soft red Past due badges, icon-led learning details and a compact progress/action footer. Use existing assignment deadlines consistently across the library and curriculum pages.
+
 - Replace About this demo with the reset confirmation instead of stacking dialogs; Cancel returns to About without changing sample data.
 
 - Add one installation-branded Open Graph/Twitter image for every link, using only public name, canonical domain and accent. Use the Paper design with four evenly spaced page lines; private content remains protected. Keep the shared template separate for future customization, without new Admin controls. Patch Next.js to 16.3.6 for the image-renderer security fix.

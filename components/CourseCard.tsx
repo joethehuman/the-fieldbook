@@ -1,4 +1,5 @@
-import { LearningCard } from "./patterns/learning-card";
+import { Clock3, BookOpen, ListChecks } from "lucide-react";
+import { LearningCardFact, LearningCard } from "./patterns/learning-card";
 
 import type { courseProgress } from "@/lib/course-progress";
 
@@ -10,6 +11,7 @@ export function CourseCard({
   status,
   dueDate,
   assignmentLabel,
+  pastDue = false,
   onClick,
   href,
   settings,
@@ -18,6 +20,7 @@ export function CourseCard({
   status: ReturnType<typeof courseProgress>;
   dueDate?: string;
   assignmentLabel?: "Assigned" | "Recommended";
+  pastDue?: boolean;
   onClick?: () => void;
   href?: string;
   settings?: SiteSettings;
@@ -30,7 +33,17 @@ export function CourseCard({
       title={c.title}
       description={c.summary}
       status={status}
-      metadata={`${c.category} · ${c.duration} min · ${c.lessons.length} lessons${c.questions.length ? " · Quiz" : ""}${assignmentLabel ? ` · ${assignmentLabel}` : ""}`}
+      metadata={
+        <>
+          <LearningCardFact icon={Clock3}>{c.duration} min</LearningCardFact>
+          <LearningCardFact icon={BookOpen}>
+            {c.lessons.length} {c.lessons.length === 1 ? "lesson" : "lessons"}
+          </LearningCardFact>
+          {!!c.questions.length && (
+            <LearningCardFact icon={ListChecks}>Quiz</LearningCardFact>
+          )}
+        </>
+      }
       action={
         complete
           ? "Review course"
@@ -49,6 +62,13 @@ export function CourseCard({
           title={c.title}
           kind="course"
           category={c.category}
+          relevance={
+            assignmentLabel
+              ? pastDue && assignmentLabel === "Assigned" && !complete
+                ? "Past due"
+                : "For you"
+              : undefined
+          }
           art={c.cardArt}
           legacyCover={c.coverImageUrl}
           settings={settings}
