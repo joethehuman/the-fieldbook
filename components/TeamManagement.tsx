@@ -10,7 +10,7 @@ import { Checkbox } from "./ui/choice";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, ListChecks, X } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import {
@@ -823,47 +823,62 @@ export function TeamsAdmin({
           }}
           reveal={browserReveal}
           primaryAction={
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void editTeam({
-                  id: crypto.randomUUID(),
-                  name: "",
-                  parentId: browseId || organization?.id || undefined,
-                })
-              }
-            >
-              <Plus aria-hidden="true" />
-              Add team
-            </Button>
-          }
-          secondaryActions={
-            (hierarchyItems.length > 1 || selectTeams) && (
+            <ActionGroup>
+              {(hierarchyItems.length > 1 || selectTeams) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  aria-pressed={selectTeams}
+                  onClick={() => {
+                    setSelectTeams(!selectTeams);
+                    teamSelection.setSelected([]);
+                  }}
+                >
+                  {selectTeams ? (
+                    <X aria-hidden="true" />
+                  ) : (
+                    <ListChecks aria-hidden="true" />
+                  )}
+                  {selectTeams ? "Done selecting" : "Select multiple"}
+                </Button>
+              )}
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
                 disabled={busy}
-                aria-pressed={selectTeams}
-                onClick={() => {
-                  setSelectTeams(!selectTeams);
-                  teamSelection.setSelected([]);
-                }}
+                onClick={() =>
+                  void editTeam({
+                    id: crypto.randomUUID(),
+                    name: "",
+                    parentId: browseId || organization?.id || undefined,
+                  })
+                }
               >
-                {selectTeams ? "Done selecting" : "Select teams"}
+                <Plus aria-hidden="true" />
+                Add team
               </Button>
-            )
+            </ActionGroup>
           }
           selectionActions={
             selectTeams ? (
-              <BulkActions
-                collectionSize={teamSelection.collectionSize}
-                selected={teamSelection.actionIds}
-                onSelectionChange={teamSelection.setSelected}
-                noun="teams"
-                commands={teamCommands(teamSelection.actionIds)}
-              />
+              <div className="grid gap-2 rounded-xl border border-border bg-muted/30 px-4 pt-3 pb-1">
+                <div className="grid gap-1">
+                  <p className="text-label font-semibold">
+                    Select multiple teams
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Choose two or more teams to move them, change their group
+                    links, or delete them.
+                  </p>
+                </div>
+                <BulkActions
+                  collectionSize={teamSelection.collectionSize}
+                  selected={teamSelection.actionIds}
+                  onSelectionChange={teamSelection.setSelected}
+                  noun="teams"
+                  commands={teamCommands(teamSelection.actionIds)}
+                />
+              </div>
             ) : undefined
           }
           selected={selectTeams ? teamSelection.selected : undefined}
