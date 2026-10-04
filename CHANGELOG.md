@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Expand installation, administration, authoring, search, Ask AI and MCP documentation for human and agent operators. Add a fresh-account installation proof guide, and clarify current product behavior and verification boundaries across the README and contributor guidance.
+
 - Updates use an unchecked Bring this update to the top choice in Details → Publishing. Republishing corrections preserves feed position and For you freshness; selecting the choice deliberately renews the feed date. First publication remains current. Demo, installed publishing and MCP share the rule; course versions and completions are unchanged.
 
 - Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering and cross-section moves with drag origin/destination feedback, individual and bulk Move to actions, and a sticky Unsaved changes bar with Save/Discard. The bar opens smoothly as a connected header with continuous container borders and an immediate reduced-motion fallback; brief footer guidance spans the full grey area. Navigation changes preserve document drafts and published editorial content.
