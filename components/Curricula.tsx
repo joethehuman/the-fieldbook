@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import {
   CollectionControls,
   CollectionEmpty,
@@ -550,14 +552,11 @@ export default function Curricula({
                 Create curriculum
               </Button>
             }
-            sortLabel={sort === "name" ? "Name A–Z" : "Name Z–A"}
             sort={
-              <FormField label="Sort curricula">
-                <SelectField value={sort} onValueChange={setSort}>
-                  <option value="name">Name A–Z</option>
-                  <option value="reverse">Name Z–A</option>
-                </SelectField>
-              </FormField>
+              <SortPicker label="Sort curricula" value={sort} onValueChange={setSort}>
+                <option value="name">{sortLabels.nameAsc}</option>
+                <option value="reverse">{sortLabels.nameDesc}</option>
+              </SortPicker>
             }
             filters={[
               ...(query

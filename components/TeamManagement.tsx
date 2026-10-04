@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { DetailNavigation } from "./patterns/detail-navigation";
 
 import {
@@ -1051,20 +1053,18 @@ export function TeamsAdmin({
                     disabled={busy}
                   />
                 }
-                sortLabel={memberSort === "name" ? "Name A–Z" : "Name Z–A"}
                 sort={
-                  <FormField label="Sort team members">
-                    <SelectField
-                      value={memberSort}
-                      onValueChange={(value) => {
-                        setMemberSort(value);
-                        setPage(1);
-                      }}
-                    >
-                      <option value="name">Name A–Z</option>
-                      <option value="reverse">Name Z–A</option>
-                    </SelectField>
-                  </FormField>
+                  <SortPicker
+                    label="Sort team members"
+                    value={memberSort}
+                    onValueChange={(value) => {
+                      setMemberSort(value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="name">{sortLabels.nameAsc}</option>
+                    <option value="reverse">{sortLabels.nameDesc}</option>
+                  </SortPicker>
                 }
                 onClear={() => {
                   setQuery("");

@@ -1,4 +1,6 @@
 "use client";
+import { compareOptionalDates, sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./sort-picker";
 import { useMemo, useState } from "react";
 import {
   plainText,
@@ -25,17 +27,16 @@ export type ContentSelectionOption = {
   /** Published content passages, including course lessons and curriculum child courses. */
   searchText?: string;
 };
-type Sort = "newest" | "title" | "title-desc";
+type Sort = "newest" | "oldest" | "title" | "title-desc";
 function ordered(options: ContentSelectionOption[], sort: Sort) {
-  const timestamp = (value?: string) => {
-    const parsed = value ? Date.parse(value) : NaN;
-    return Number.isFinite(parsed) ? parsed : -Infinity;
-  };
   return [...options].sort((a, b) => {
-    if (sort === "newest") {
-      const first = timestamp(a.updatedAt),
-        second = timestamp(b.updatedAt);
-      if (first !== second) return second > first ? 1 : -1;
+    if (sort === "newest" || sort === "oldest") {
+      const date = compareOptionalDates(
+        a.updatedAt,
+        b.updatedAt,
+        sort === "newest",
+      );
+      if (date) return date;
     }
     const title = a.label.localeCompare(b.label);
     return (sort === "title-desc" ? -title : title) || a.id.localeCompare(b.id);
@@ -71,7 +72,16 @@ export function ContentSelectionList({
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("");
   const [type, setType] = useState("");
-  const [sort, setSort] = useState<Sort>("newest");
+  const [sortChoice, setSort] = useState<Sort>("title");
+  const canSortUpdatedFor = (nextType: string) =>
+    (nextType === "course" || nextType === "update" ||
+      (!nextType && options.every((option) => option.type !== "curriculum"))) &&
+    options.some((option) => (!nextType || option.type === nextType) && !!option.updatedAt);
+  const canSortUpdated = canSortUpdatedFor(type);
+  const sortForType = (nextType: string): Sort =>
+    !canSortUpdatedFor(nextType) && (sortChoice === "newest" || sortChoice === "oldest")
+      ? "title" : sortChoice;
+  const sort = sortForType(type);
   const words = searchWords(query);
   const passages = useMemo(
     () =>
@@ -162,7 +172,7 @@ export function ContentSelectionList({
     setQuery("");
     setCategory("");
     setType("");
-    keepDisplayedOrder(ordered(options, sort));
+    keepDisplayedOrder(ordered(options, sortForType("")));
   };
   const selectionInOrder = (ids: string[], order = sorted) => {
     const selected = new Set(ids);
@@ -178,6 +188,10 @@ export function ContentSelectionList({
     )
       onChange(next);
   };
+  const changeType = (nextType: string) => {
+    setType(nextType);
+    keepDisplayedOrder(ranked(options, sortForType(nextType), scores));
+  };
   const filters: AppliedFilter[] = [];
   if (category)
     filters.push({
@@ -189,7 +203,7 @@ export function ContentSelectionList({
     filters.push({
       id: "type",
       label: type === "course" ? "Courses" : "Curricula",
-      onRemove: () => setType(""),
+      onRemove: () => changeType(""),
     });
   return (
     <SearchableSelectionList
@@ -244,31 +258,27 @@ export function ContentSelectionList({
           }
           filters={filters}
           onClear={clearFilters}
-          sortLabel={
-            words.length
-              ? "Relevance"
-              : sort === "newest"
-                ? "Updated newest"
-                : sort === "title"
-                  ? "Title A–Z"
-                  : "Title Z–A"
-          }
           sort={
-            <FormField label="Sort content">
-              <SelectField
-                disabled={disabled}
-                value={sort}
-                onValueChange={(next) => {
-                  const nextSort = next as Sort;
-                  setSort(nextSort);
-                  keepDisplayedOrder(ranked(options, nextSort, scores));
-                }}
-              >
-                <option value="newest">Updated newest</option>
-                <option value="title">Title A–Z</option>
-                <option value="title-desc">Title Z–A</option>
-              </SelectField>
-            </FormField>
+            <SortPicker
+              label="Sort content"
+              displayLabel={words.length ? "Relevance" : undefined}
+              disabled={disabled}
+              value={sort}
+              onValueChange={(next) => {
+                const nextSort = next as Sort;
+                setSort(nextSort);
+                keepDisplayedOrder(ranked(options, nextSort, scores));
+              }}
+            >
+              {canSortUpdated && (
+                <>
+                  <option value="newest">{sortLabels.updatedNewest}</option>
+                  <option value="oldest">{sortLabels.updatedOldest}</option>
+                </>
+              )}
+              <option value="title">{sortLabels.titleAsc}</option>
+              <option value="title-desc">{sortLabels.titleDesc}</option>
+            </SortPicker>
           }
         >
           {(showTypeFilter || categories.length > 0) && (
@@ -279,7 +289,7 @@ export function ContentSelectionList({
                     disabled={disabled}
                     value={type || "all"}
                     onValueChange={(next) =>
-                      setType(next === "all" ? "" : next)
+                      changeType(next === "all" ? "" : next)
                     }
                   >
                     <option value="all">All</option>

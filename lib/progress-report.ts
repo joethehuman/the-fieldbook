@@ -1,3 +1,7 @@
+import {
+  compareOptionalDates,
+  compareOptionalNumbers,
+} from "./collection-sort";
 import type { Workspace } from "./store";
 import {
   ancestorIds,
@@ -170,10 +174,14 @@ export function filterProgress(
     )
     .sort(
       (a, b) =>
-        (sort === "completion"
-          ? (a.percent ?? -1) - (b.percent ?? -1)
-          : sort === "overdue"
-            ? b.overdue - a.overdue
+        (sort.startsWith("completion")
+          ? compareOptionalNumbers(
+              a.percent,
+              b.percent,
+              sort === "completion-highest",
+            )
+          : sort.startsWith("overdue")
+            ? (sort === "overdue-fewest" ? 1 : -1) * (a.overdue - b.overdue)
             : sort === "reverse"
               ? b.u.name.localeCompare(a.u.name)
               : 0) ||
@@ -336,10 +344,21 @@ export function filterProgressAssignments(
         if (filters.sort === "name") return name;
         if (filters.sort === "reverse") return -name;
         // Unknown assignment dates belong last in both date orders.
-        if (!a.assignedAt || !b.assignedAt)
-          return Number(!a.assignedAt) - Number(!b.assignedAt) || name;
-        const date = Date.parse(a.assignedAt) - Date.parse(b.assignedAt);
-        return (filters.sort === "oldest" ? date : -date) || name;
+        if (filters.sort.startsWith("due-") && deadlines)
+          return (
+            compareOptionalDates(
+              a.complete ? undefined : a.dueDate,
+              b.complete ? undefined : b.dueDate,
+              filters.sort === "due-latest",
+            ) || name
+          );
+        return (
+          compareOptionalDates(
+            a.assignedAt,
+            b.assignedAt,
+            filters.sort !== "oldest",
+          ) || name
+        );
       }),
   };
 }

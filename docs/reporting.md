@@ -84,3 +84,7 @@ Run `pnpm test`, both builds, `pnpm check:ui`, `pnpm test:ui`, and `pnpm test:re
 MCP reporting tests apply the real reporting migration to synthetic embedded PostgreSQL and call it through the server's provider adapter. They cover sibling/group isolation, explicit contributor management, role revocation, current-version completion, paused saved deadlines, safe feedback/discovery projections and changed/mismatched cursors. Pagination checks traverse more than 1,000 rows without duplication and aggregate a 500-person, 100-course installation while returning only the requested page. Provider adapters must preserve these authorization, projection and completeness guarantees.
 
 Assigned-through labels list every matching team and group source. A shared course counts once per person even when several audiences assign it; manager reporting authority remains independent of assignment-team membership.
+
+## Sort controls
+
+Progress offers paired Name, Completion and (when deadlines apply) Past due count sorts. People without assigned learning have no measured completion percentage and follow measured rows in either direction. Person assignment details offer paired Title and Assigned sorts plus applicable Due directions; completed courses and unknown deadlines follow unfinished dated assignments. CSV exports preserve this displayed ordering after their existing access/freshness checks. Feedback offers Newest first and Oldest first by latest feedback submission/edit.
