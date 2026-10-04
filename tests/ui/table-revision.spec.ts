@@ -355,3 +355,33 @@ test("group row membership and assignment saves affect the chosen group and reta
     after.groups.filter((item) => item.id !== group.id),
   );
 });
+
+
+test("shared table measures wrap unusual names and keep surplus before actions", async ({ page }, info) => {
+  await page.goto("/ui");
+  const table = page.getByRole("table", { name: "Example content-sized progress table", exact: true });
+  await table.scrollIntoViewIfNeeded();
+  const rows = table.locator("tbody tr");
+  const short = await rows.nth(0).locator("td:first-child strong").boundingBox();
+  const long = await rows.nth(1).locator("td:first-child strong").boundingBox();
+  expect(long!.height).toBeGreaterThan(short!.height);
+  const geometry = await table.evaluate((node) => {
+    const row = node.querySelector("tbody tr")!;
+    const contents = [...row.querySelectorAll<HTMLElement>("[data-slot=table-cell-content]")];
+    return {
+      columns: contents.map((el) => ({ width: el.getBoundingClientRect().width, max: parseFloat(getComputedStyle(el).maxWidth) })),
+      space: row.querySelector("[data-slot=table-space]")!.getBoundingClientRect().width,
+      dataRight: contents.at(-2)!.getBoundingClientRect().right,
+      actionLeft: contents.at(-1)!.getBoundingClientRect().left,
+    };
+  });
+  for (const column of geometry.columns) {
+    expect(Number.isFinite(column.max)).toBe(true);
+    expect(column.width).toBeLessThanOrEqual(column.max + 1);
+  }
+  if (info.project.use.viewport!.width >= 1024)
+    expect(geometry.space).toBeGreaterThan(20);
+  expect(geometry.actionLeft).toBeGreaterThanOrEqual(geometry.dataRight);
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: info.outputPath("content-sized-table.png") });
+});

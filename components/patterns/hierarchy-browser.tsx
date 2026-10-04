@@ -14,7 +14,7 @@ import { Button } from "../ui/button";
 import { Checkbox } from "../ui/choice";
 import { Input } from "../ui/input";
 import { RowActions, type RowAction } from "./row-actions";
-import { RecordName, RecordMeta, RecordListRow } from "./record-row";
+import { RecordName, RecordMeta } from "./record-row";
 import { CountMetric } from "../ui/count-metric";
 import {
   ConnectorLine,
@@ -25,6 +25,17 @@ import { FormField } from "./form-field";
 import { canBulkSelect, SelectRows } from "./bulk-selection";
 import { useScrollFade } from "./use-scroll-fade";
 import { ContentAction } from "./content-action";
+import { DataTable } from "./data-table";
+import { Pagination } from "./pagination";
+import { SelectionSummary } from "./selection-summary";
+import {
+  TableContainer,
+  TableHeader,
+  TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
+} from "../ui/table";
 
 export type HierarchyBrowserItem = {
   id: string;
@@ -32,6 +43,7 @@ export type HierarchyBrowserItem = {
   label: string;
   description?: string;
   directMemberCount?: number;
+  managerName?: string;
 };
 
 type BranchConnection = {
@@ -71,7 +83,6 @@ function BrowserColumn({
   id,
   title,
   className,
-  compact = false,
   positions,
   headingRef,
   children,
@@ -79,7 +90,6 @@ function BrowserColumn({
   id: string;
   title: string;
   className?: string;
-  compact?: boolean;
   positions: Map<string, number>;
   headingRef: (node: HTMLHeadingElement | null) => void;
   children: ReactNode;
@@ -110,12 +120,7 @@ function BrowserColumn({
       <ul
         ref={fade.ref}
         data-slot="hierarchy-column-list"
-        className={cn(
-          "scroll-fade grid min-h-0 min-w-0 content-start overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]",
-          compact
-            ? "divide-y divide-border rounded-lg border border-border"
-            : "gap-2 pe-2 pb-1",
-        )}
+        className="scroll-fade grid min-h-0 min-w-0 content-start gap-2 overflow-y-auto overscroll-y-contain pe-2 pb-1 [scrollbar-gutter:stable]"
         data-scroll-fade-before={fade.edges.before}
         data-scroll-fade-after={fade.edges.after}
         onScroll={(event) => {
@@ -165,9 +170,10 @@ export function HierarchyBrowser({
   secondaryActions?: ReactNode;
   selected?: string[];
   onSelectionChange?: (ids: string[]) => void;
-  selectionActions?: ReactNode;
+  selectionActions?: ReactNode | ((range: string, total: number) => ReactNode);
   reveal?: { id: string; token: number };
 }) {
+  const [page, setPage] = useState(1);
   const positions = useRef(new Map<string, number>());
   const rootRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -192,6 +198,23 @@ export function HierarchyBrowser({
   const search = query.trim().toLowerCase();
   const flat = !!search || selected !== undefined;
   const matches = hierarchyBrowserMatches(ordered, query);
+  const currentPage = Math.min(
+    page,
+    Math.max(1, Math.ceil(matches.length / 25)),
+  );
+  const pageItems = matches.slice((currentPage - 1) * 25, currentPage * 25);
+  const range = matches.length
+    ? `${(currentPage - 1) * 25 + 1}–${Math.min(currentPage * 25, matches.length)} of ${matches.length} shown`
+    : "0 results";
+  const selectionIds = selected ?? [];
+  const selectable =
+    selected !== undefined &&
+    !!onSelectionChange &&
+    canBulkSelect(matches.length);
+  const bulkToolbar =
+    typeof selectionActions === "function"
+      ? selectionActions(range, matches.length)
+      : selectionActions;
   const roots = ordered.filter(
     (item) => !item.parentId || !byId.has(item.parentId),
   );
@@ -424,6 +447,21 @@ export function HierarchyBrowser({
     pendingRowFocus.current = focusRow || null;
     void onBrowse(id);
   }
+  function actionsFor(item: HierarchyBrowserItem) {
+    const hasChildren = items.some((child) => child.parentId === item.id);
+    const actions: RowAction[] = [
+      { label: "Open team", onSelect: () => void onOpen(item.id) },
+      { label: "Edit team", onSelect: () => void onEdit(item.id) },
+      ...(flat && hasChildren
+        ? [{ label: "Browse subteams", onSelect: () => browse(item.id) }]
+        : []),
+    ];
+    return renderActions ? (
+      renderActions(item, actions)
+    ) : (
+      <RowActions label={item.label} disabled={disabled} actions={actions} />
+    );
+  }
   function row(item: HierarchyBrowserItem) {
     const childCount = items.filter(
       (child) => child.parentId === item.id,
@@ -445,76 +483,7 @@ export function HierarchyBrowser({
         />
       </>
     );
-    const rowActions: RowAction[] = [
-      { label: "Open team", onSelect: () => void onOpen(item.id) },
-      { label: "Edit team", onSelect: () => void onEdit(item.id) },
-      ...(flat && childCount > 0
-        ? [{ label: "Browse subteams", onSelect: () => browse(item.id) }]
-        : []),
-    ];
-    const actions = renderActions ? (
-      renderActions(item, rowActions)
-    ) : (
-      <RowActions label={item.label} disabled={disabled} actions={rowActions} />
-    );
-    if (flat) {
-      const parentPath = pathFor(item.id, byId)
-        .slice(0, -1)
-        .map((part) => part.label)
-        .join(" / ");
-      return (
-        <li
-          key={item.id}
-          data-hierarchy-id={item.id}
-          data-parent-id={item.parentId}
-          className="min-w-0"
-        >
-          <RecordListRow
-            selection={
-              selected &&
-              onSelectionChange &&
-              canBulkSelect(matches.length) && (
-                <Checkbox
-                  aria-label={`Select ${item.label}`}
-                  checked={selected.includes(item.id)}
-                  disabled={disabled}
-                  onCheckedChange={(checked) =>
-                    onSelectionChange(
-                      checked === true
-                        ? [...selected, item.id]
-                        : selected.filter((id) => id !== item.id),
-                    )
-                  }
-                />
-              )
-            }
-            identity={
-              <>
-                <RecordName
-                  disabled={disabled}
-                  onClick={() => void onOpen(item.id)}
-                >
-                  {item.label}
-                </RecordName>
-                {parentPath && (
-                  <RecordMeta title={parentPath}>{parentPath}</RecordMeta>
-                )}
-                <RecordMeta className="sm:hidden">
-                  {item.description}
-                </RecordMeta>
-              </>
-            }
-            detail={
-              <span className="line-clamp-2" title={item.description}>
-                {item.description}
-              </span>
-            }
-            metrics={metrics}
-            actions={actions}
-          />
-        </li>
-      );
-    }
+    const actions = actionsFor(item);
     return (
       <li
         key={item.id}
@@ -604,57 +573,162 @@ export function HierarchyBrowser({
               value={query}
               disabled={disabled}
               placeholder={`Find ${label.toLowerCase()}`}
-              onChange={(event) => onQueryChange(event.target.value)}
+              onChange={(event) => {
+                setPage(1);
+                onQueryChange(event.target.value);
+              }}
             />
           </FormField>
         }
         primaryAction={primaryAction}
         actions={secondaryActions}
       />
-      {selectionActions}
       {flat &&
-        selected &&
-        onSelectionChange &&
-        canBulkSelect(matches.length) && (
-          <div className="flex items-center gap-3">
-            <SelectRows
-              label={`Select all matching ${label.toLowerCase()}`}
-              ids={matches.map((item) => item.id)}
-              value={selected}
-              onChange={onSelectionChange}
-            />
-            Select all matching {label.toLowerCase()}
+        ((selectable && bulkToolbar) || (
+          <div className="min-h-12 border-b border-border py-2">
+            <SelectionSummary range={range} count={0} />
           </div>
-        )}
+        ))}
       <div
         ref={frameRef}
         data-slot="hierarchy-viewport"
-        className="h-[var(--hierarchy-height,24rem)] min-h-0 min-w-0 overflow-hidden"
+        className={
+          flat
+            ? "grid min-w-0 gap-6"
+            : "h-[var(--hierarchy-height,24rem)] min-h-0 min-w-0 overflow-hidden"
+        }
       >
         {flat ? (
           <>
             {matches.length ? (
-              <BrowserColumn
-                id="results"
-                compact
-                title={
-                  search
-                    ? `${matches.length} matching ${label.toLowerCase()}`
-                    : `All ${label.toLowerCase()}`
-                }
-                positions={positions.current}
-                headingRef={() => undefined}
-              >
-                {matches.map((item) => row(item))}
-              </BrowserColumn>
+              <TableContainer aria-label={`${label} table`}>
+                <DataTable layout="teamDirectory" density="compact">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>
+                        {selectable && (
+                          <SelectRows
+                            label={
+                              matches.length > pageItems.length
+                                ? `Select page (${pageItems.length})`
+                                : `Select all ${matches.length}`
+                            }
+                            ids={pageItems.map((item) => item.id)}
+                            value={selectionIds}
+                            onChange={(ids) => onSelectionChange?.(ids)}
+                          />
+                        )}
+                      </TableHead>
+                      <TableHead>Team</TableHead>
+                      <TableHead>Manager</TableHead>
+                      <TableHead align="right" title="Direct members">
+                        Members
+                      </TableHead>
+                      <TableHead align="right">Subteams</TableHead>
+                      <TableHead>
+                        <span className="sr-only">Actions</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pageItems.map((item) => {
+                      const parentPath = pathFor(item.id, byId)
+                        .slice(0, -1)
+                        .map((part) => part.label)
+                        .join(" / ");
+                      return (
+                        <TableRow
+                          key={item.id}
+                          data-hierarchy-id={item.id}
+                          data-parent-id={item.parentId}
+                        >
+                          <TableCell>
+                            {selectable && (
+                              <Checkbox
+                                aria-label={`Select ${item.label}`}
+                                checked={selectionIds.includes(item.id)}
+                                disabled={disabled}
+                                onCheckedChange={(checked) =>
+                                  onSelectionChange?.(
+                                    checked === true
+                                      ? [...selectionIds, item.id]
+                                      : selectionIds.filter(
+                                          (id) => id !== item.id,
+                                        ),
+                                  )
+                                }
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <RecordName
+                              disabled={disabled}
+                              onClick={() => void onOpen(item.id)}
+                            >
+                              {item.label}
+                            </RecordName>
+                            {parentPath && (
+                              <RecordMeta title={parentPath}>
+                                {parentPath}
+                              </RecordMeta>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {item.managerName ||
+                              item.description ||
+                              "Unassigned"}
+                          </TableCell>
+                          <TableCell align="right">
+                            {item.directMemberCount ?? 0}
+                          </TableCell>
+                          <TableCell align="right">
+                            {
+                              items.filter(
+                                (child) => child.parentId === item.id,
+                              ).length
+                            }
+                          </TableCell>
+                          <TableCell>{actionsFor(item)}</TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </DataTable>
+              </TableContainer>
             ) : (
               <CollectionEmpty
                 count={0}
                 total={items.length}
                 noun={label.toLowerCase()}
-                onClear={() => onQueryChange("")}
+                onClear={() => {
+                  setPage(1);
+                  onQueryChange("");
+                }}
               />
             )}
+            <Pagination
+              label={label}
+              showCount={false}
+              page={currentPage}
+              pageSize={25}
+              total={matches.length}
+              onPageChange={setPage}
+              disabled={disabled}
+            />
+            {selectable &&
+              matches.length > 25 &&
+              selectionIds.length > 0 &&
+              selectionIds.length < matches.length && (
+                <Button
+                  variant="link"
+                  disabled={disabled}
+                  onClick={() =>
+                    onSelectionChange?.(matches.map((item) => item.id))
+                  }
+                >
+                  Select all {matches.length} matching {label.toLowerCase()}
+                </Button>
+              )}
           </>
         ) : roots.length ? (
           <div

@@ -44,7 +44,7 @@ import { ContentSelectionList } from "@/components/patterns/content-selection-li
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
-import { Settings, Plus } from "lucide-react";
+import { Settings, Plus, ListChecks, X } from "lucide-react";
 import { CollectionControls } from "@/components/patterns/collection-controls";
 import { Input } from "@/components/ui/input";
 import { FilePicker } from "@/components/ui/file-picker";
@@ -416,7 +416,7 @@ export function LibraryExamples() {
       <SettingsSection
         id="catalog-hierarchy"
         title={<h3>Reporting hierarchy</h3>}
-        guidance="Compact teams form one horizontal chart across every explored level. Choose a sibling to replace the downstream branch; scroll back to any earlier level. Open and Edit are explicit actions. Search and bulk selection use a flat list."
+        guidance="Compact teams form one horizontal chart across every explored level. Choose a sibling to replace the downstream branch; scroll back to any earlier level. Open and Edit are explicit actions. Search and bulk selection use the standard paginated table."
       >
         <HierarchyBrowser
           label="Example reporting teams"
@@ -432,25 +432,40 @@ export function LibraryExamples() {
           query={browserQuery}
           onQueryChange={setBrowserQuery}
           primaryAction={
-            <Button
-              onClick={() => setMessage("Create a team in this example.")}
-            >
-              <Plus aria-hidden="true" /> Add team
-            </Button>
-          }
-          secondaryActions={
-            <Button
-              variant="ghost"
-              onClick={() => setSelectBrowserTeams(!selectBrowserTeams)}
-            >
-              {selectBrowserTeams ? "Done selecting" : "Select teams"}
-            </Button>
+            <ActionGroup>
+              <Button
+                variant="outline"
+                aria-pressed={selectBrowserTeams}
+                onClick={() => {
+                  setSelectBrowserTeams(!selectBrowserTeams);
+                  setBrowserSelection([]);
+                }}
+              >
+                {selectBrowserTeams ? <X aria-hidden="true" /> : <ListChecks aria-hidden="true" />}
+                {selectBrowserTeams ? "Done selecting" : "Select multiple"}
+              </Button>
+              <Button onClick={() => setMessage("Create a team in this example.")}>
+                <Plus aria-hidden="true" /> Add team
+              </Button>
+            </ActionGroup>
           }
           selected={selectBrowserTeams ? browserSelection : undefined}
           onSelectionChange={setBrowserSelection}
           selectionActions={
-            selectBrowserTeams ? (
-              <p role="status">{browserSelection.length} selected</p>
+            selectBrowserTeams ? (range, total) => (
+              <BulkActions
+                collectionSize={total}
+                range={range}
+                selected={browserSelection}
+                onSelectionChange={setBrowserSelection}
+                noun="teams"
+                commands={[{
+                  id: "example-move",
+                  label: "Move selected teams",
+                  description: "This example reviews the selected teams without changing stored data.",
+                  apply: () => setMessage("Example team move reviewed."),
+                }]}
+              />
             ) : undefined
           }
           items={[
@@ -458,12 +473,14 @@ export function LibraryExamples() {
               id: "revenue",
               label: "Revenue",
               description: "Manager: Alex Morgan",
+              managerName: "Alex Morgan",
               directMemberCount: 120,
             },
             {
               id: "success",
               label: "Customer success",
               description: "Manager: Sam Lee",
+              managerName: "Sam Lee",
               directMemberCount: 45,
             },
             {
@@ -471,6 +488,7 @@ export function LibraryExamples() {
               parentId: "revenue",
               label: "Europe, Middle East and Africa",
               description: "Manager: Jordan Lee",
+              managerName: "Jordan Lee",
               directMemberCount: 52,
             },
             {
@@ -478,6 +496,7 @@ export function LibraryExamples() {
               parentId: "emea",
               label: "Enterprise customer teams across Europe",
               description: "Manager: Jordan Lee",
+              managerName: "Jordan Lee",
               directMemberCount: 18,
             },
             ...Array.from({ length: 12 }, (_, index) => ({
@@ -488,6 +507,7 @@ export function LibraryExamples() {
                   ? "North America"
                   : `Level ${index + 1} regional team`,
               description: "Manager: Casey Rivera",
+              managerName: "Casey Rivera",
               directMemberCount: index === 11 ? 6 : 68,
             })),
             ...Array.from({ length: 18 }, (_, index) => ({
@@ -495,6 +515,7 @@ export function LibraryExamples() {
               parentId: "level-2",
               label: `Enterprise territory ${index + 1}`,
               description: "Manager: Unassigned",
+              managerName: "Unassigned",
               directMemberCount: 4,
             })),
           ]}
