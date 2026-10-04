@@ -193,12 +193,6 @@ export default function SiteSettingsPanel({
         }
       }}
     >
-      {section === "docs" && (dirty || busy) && (
-        <PendingChangesBar actions={<>
-          <Button type="button" variant="outline" disabled={busy} onClick={discard}>Discard changes</Button>
-          <Button type="submit" loading={busy}>{busy ? "Saving…" : "Save settings"}</Button>
-        </>}>{busy ? "Saving changes…" : "Unsaved changes"}</PendingChangesBar>
-      )}
       {section === "identity" && (
         <SettingsGroup
           tabIndex={-1}
@@ -327,38 +321,48 @@ export default function SiteSettingsPanel({
         </SettingsGroup>
       )}
       {section === "docs" && (
-        <SettingsGroup
-          measure="full"
-          id="settings-docs"
-          title={<h3>Document sections</h3>}
-          description="Organize top-level sections and their subsections. Documents can sit at either level."
-          guidance="Drag to reorder, or drop documents and subsections onto their destination section. Show documents to arrange pages. Row and bulk actions offer Move to…; documents can sit at either level, and subsections belong under top-level sections. Save settings to apply changes. Empty sections remain available in the editor; readers see sections with published documents."
-          actions={dirty || busy ? undefined : saveAction}
-        >
-          <DocSectionsSettings
-            sections={docSections}
-            docs={visibleDocs}
-            disabled={busy}
-            onChange={(next, moves = []) => {
-              setDocMoves((current) => {
-                const result = new Map(current.map((item) => [item.id, item]));
-                for (const move of moves) {
-                  const original = saveBase.current.content.find((item) => item.id === move.id);
-                  if (!original) continue;
-                  if (sectionForDoc(original, savedSettings.current.docSections || [])?.id === move.sectionId) result.delete(move.id);
-                  else result.set(move.id, { ...move, expected: current.find((item) => item.id === move.id)?.expected ?? original.revision ?? 0 });
-                }
-                return [...result.values()];
-              });
-              setSettings((current) => ({
-                ...current,
-                docSections: next,
-                docCategoryOrder: [],
-              }));
-              setNotice("");
-            }}
-          />
-        </SettingsGroup>
+        <div className="min-w-0">
+          <PendingChangesBar active={dirty || busy} actions={<>
+            <Button type="button" variant="outline" disabled={busy} onClick={discard}>Discard changes</Button>
+            <Button type="submit" loading={busy}>{busy ? "Saving…" : "Save settings"}</Button>
+          </>}>{busy ? "Saving changes…" : "Unsaved changes"}</PendingChangesBar>
+          <SettingsGroup
+            measure="full"
+            id="settings-docs"
+            title={<h3>Document sections</h3>}
+            description="Organize top-level sections and their subsections. Documents can sit at either level."
+            guidance="Drag to reorder, or drop documents and subsections onto their destination section. Show documents to arrange pages. Row and bulk actions offer Move to…; documents can sit at either level, and subsections belong under top-level sections. Save settings to apply changes. Empty sections remain available in the editor; readers see sections with published documents."
+            actions={
+              <div aria-hidden={dirty || busy} inert={dirty || busy} className={dirty || busy ? "invisible" : undefined}>
+                <Button type="submit" disabled={busy}>Save settings</Button>
+              </div>
+            }
+          >
+            <DocSectionsSettings
+              sections={docSections}
+              docs={visibleDocs}
+              disabled={busy}
+              onChange={(next, moves = []) => {
+                setDocMoves((current) => {
+                  const result = new Map(current.map((item) => [item.id, item]));
+                  for (const move of moves) {
+                    const original = saveBase.current.content.find((item) => item.id === move.id);
+                    if (!original) continue;
+                    if (sectionForDoc(original, savedSettings.current.docSections || [])?.id === move.sectionId) result.delete(move.id);
+                    else result.set(move.id, { ...move, expected: current.find((item) => item.id === move.id)?.expected ?? original.revision ?? 0 });
+                  }
+                  return [...result.values()];
+                });
+                setSettings((current) => ({
+                  ...current,
+                  docSections: next,
+                  docCategoryOrder: [],
+                }));
+                setNotice("");
+              }}
+            />
+          </SettingsGroup>
+        </div>
       )}
       {section === "courses" && (
         <SettingsGroup

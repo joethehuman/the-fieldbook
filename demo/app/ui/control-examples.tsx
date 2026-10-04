@@ -25,6 +25,7 @@ export function ControlExamples() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
+  const [pendingExample, setPendingExample] = useState(true);
   return (
     <section
       id="control-pilot"
@@ -162,7 +163,18 @@ export function ControlExamples() {
           required
         />
       </SettingsSection>
-      <PendingChangesBar actions={<><Button type="button" variant="outline" onClick={() => setStatus("Example changes discarded.")}>Discard changes</Button><Button type="button" onClick={() => setStatus("Example changes saved.")}>Save settings</Button></>}>Unsaved changes · example</PendingChangesBar>
+      <div className="min-w-0">
+        <PendingChangesBar active={pendingExample} actions={<>
+          <Button type="button" variant="outline" onClick={() => { setPendingExample(false); setStatus("Example changes discarded."); }}>Discard changes</Button>
+          <Button type="button" onClick={() => { setPendingExample(false); setStatus("Example changes saved."); }}>Save settings</Button>
+        </>}>Unsaved changes · example</PendingChangesBar>
+        <Card>
+          <SectionHeader title={<h3>Pending changes</h3>} description="The save bar opens smoothly above its content and covers the scrolling surface behind it. Reduced motion switches immediately." />
+          <ActionGroup>
+            <Button type="button" variant="outline" disabled={pendingExample} onClick={() => setPendingExample(true)}>Make example change</Button>
+          </ActionGroup>
+        </Card>
+      </div>
       <Card>
         <form
           className="grid gap-4"

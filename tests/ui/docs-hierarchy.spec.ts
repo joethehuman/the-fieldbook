@@ -554,13 +554,28 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
     scroller.scrollTop = scroller.scrollHeight;
   });
   await expect(bar).toBeInViewport();
+  await expect(bar).toHaveCSS("opacity", "1");
+  const frame = await page.locator('[data-slot="pending-changes-region"]').evaluate((region) => {
+    const outer = region.getBoundingClientRect();
+    const inner = region.querySelector('[data-slot="pending-changes-bar"]')!.getBoundingClientRect();
+    const card = document.getElementById("settings-docs")!.getBoundingClientRect();
+    return {
+      left: outer.left, right: outer.right, top: outer.top,
+      barTop: inner.top, cardLeft: card.left, cardRight: card.right,
+      background: getComputedStyle(region).backgroundColor,
+    };
+  });
+  expect(frame.left).toBeLessThan(frame.cardLeft);
+  expect(frame.right).toBeGreaterThan(frame.cardRight);
+  expect(frame.barTop).toBeGreaterThan(frame.top);
+  expect(frame.background).not.toBe("rgba(0, 0, 0, 0)");
   await page.screenshot({
     path: info.outputPath("sticky-unsaved-changes.png"),
   });
   await bar
     .getByRole("button", { name: "Discard changes", exact: true })
     .click();
-  await expect(bar).toHaveCount(0);
+  await expect(bar).toBeHidden();
   await expect(
     page.getByRole("list", { name: "Documents in Start", exact: true }),
   ).toContainText("First guide");
@@ -601,7 +616,7 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
   await expect(
     page.getByText("Settings saved.", { exact: true }),
   ).toBeVisible();
-  await expect(bar).toHaveCount(0);
+  await expect(bar).toBeHidden();
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
   );
@@ -635,6 +650,58 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
       exact: true,
     }),
   ).toContainText("First guide");
+});
+
+async function pendingTransitionHeights(action: Locator) {
+  return action.evaluate((element) => new Promise<number[]>((resolve) => {
+    const frame = document.querySelector('[data-slot="pending-changes-region"]')!;
+    const heights = [frame.getBoundingClientRect().height];
+    const started = performance.now();
+    (element as HTMLElement).click();
+    const sample = () => {
+      heights.push(frame.getBoundingClientRect().height);
+      if (performance.now() - started < 300) requestAnimationFrame(sample);
+      else resolve(heights);
+    };
+    requestAnimationFrame(sample);
+  }));
+}
+
+test("pending save bar opens and closes smoothly without a dormant gap, and respects reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await openOrderingFixture(page);
+  const bar = page.locator('[data-slot="pending-changes-bar"]');
+  const region = page.locator('[data-slot="pending-changes-region"]');
+  const footer = page.locator('#settings-docs [data-slot="card-footer"]');
+  const footerHeight = (await footer.boundingBox())!.height;
+  await expect(bar).toBeHidden();
+  await expect(page.getByRole("button", { name: "Save settings", exact: true })).toHaveCount(1);
+  expect(await bar.locator("button").first().evaluate((button) => {
+    button.focus();
+    return document.activeElement === button;
+  })).toBe(false);
+
+  await page.getByRole("button", { name: "Actions for Start", exact: true }).click();
+  const opening = await pendingTransitionHeights(page.getByRole("menuitem", { name: "Move down", exact: true }));
+  expect(opening[0]).toBe(0);
+  const expanded = opening.at(-1)!;
+  expect(expanded).toBeGreaterThan(40);
+  expect(opening.some((height) => height > 1 && height < expanded - 1)).toBe(true);
+  await expect(bar).toHaveCSS("opacity", "1");
+  expect((await footer.boundingBox())!.height).toBe(footerHeight);
+
+  const closing = await pendingTransitionHeights(bar.getByRole("button", { name: "Discard changes", exact: true }));
+  expect(closing.at(-1)).toBe(0);
+  expect(closing.some((height) => height > 1 && height < expanded - 1)).toBe(true);
+  await expect(bar).toBeHidden();
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: "Actions for Start", exact: true }).click();
+  const immediate = await pendingTransitionHeights(page.getByRole("menuitem", { name: "Move down", exact: true }));
+  expect(immediate[0]).toBe(0);
+  expect(immediate.slice(1).every((height) => Math.abs(height - expanded) < 1)).toBe(true);
+  await expect(region).toHaveCSS("transition-property", "none");
+  await expect(bar).toHaveCSS("opacity", "1");
 });
 
 async function dragInto(
