@@ -58,8 +58,11 @@ async function setup(
       sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     }, data);
   }
-  await page.goto(installed ? "/admin" : "/#admin");
-  await page.getByRole("link", { name: item.title, exact: true }).click();
+  if (installed) await page.goto(`/admin/content/${item.id}/edit`);
+  else {
+    await page.goto("/#admin");
+    await page.getByRole("link", { name: item.title, exact: true }).click();
+  }
   await page
     .getByRole("textbox", {
       name:
@@ -101,6 +104,9 @@ test("Update corrections preserve freshness and the Publishing checkbox renews o
   const publish = page.getByRole("button", { name: "Publish", exact: true });
   await details.click();
   await expect(renewal).not.toBeChecked();
+  await renewal.scrollIntoViewIfNeeded();
+  await expect(renewal).toBeInViewport();
+  await page.waitForTimeout(250); // Allow the Details panel transition to finish.
   await page.screenshot({ path: info.outputPath("update-publishing.png"), fullPage: true });
   await details.click();
   await page.getByLabel("Title", { exact: true }).fill("A typo correction");
@@ -161,7 +167,7 @@ test("Docs, Updates and Courses quietly save incomplete drafts, revert to Publis
     try {
       const { read, before } = await setup(current, installed, kind);
       await expect(
-        current.getByRole("button", { name: "Published", exact: true }),
+        current.getByRole("button", { name: "Publish", exact: true }),
       ).toBeDisabled();
       await current.waitForTimeout(1100); // Observe the autosave debounce without editing.
       expect((await read()).revision).toBe(1);
@@ -188,7 +194,7 @@ test("Docs, Updates and Courses quietly save incomplete drafts, revert to Publis
       await expect(details.getByRole("button", { name: "Add a title", exact: true })).toBeEnabled();
       await current.getByLabel("Title", { exact: true }).fill(before.title);
       await expect(
-        current.getByRole("button", { name: "Published", exact: true }),
+        current.getByRole("button", { name: "Publish", exact: true }),
       ).toBeDisabled();
       await current
         .getByLabel("Title", { exact: true })
@@ -200,7 +206,7 @@ test("Docs, Updates and Courses quietly save incomplete drafts, revert to Publis
         .poll(async () => (await read(true)).title)
         .toBe("Explicitly published latest title");
       await expect(
-        current.getByRole("button", { name: "Published", exact: true }),
+        current.getByRole("button", { name: "Publish", exact: true }),
       ).toBeDisabled();
       await expect(current.locator("form.editor")).toBeVisible();
       expect((await read()).version).toBe(before.version);
