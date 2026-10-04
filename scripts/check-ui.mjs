@@ -62,6 +62,18 @@ for (const file of [
           "Use DataTable with a declared column layout for application data.",
         );
 
+      const label = node.attributes.properties.find(
+        (attr) => ts.isJsxAttribute(attr) && ["label", "aria-label"].includes(attr.name.text),
+      );
+      const labelText = label?.initializer && ts.isStringLiteral(label.initializer)
+        ? label.initializer.text : "";
+      if (["FormField", "SelectField"].includes(tag) && /^Sort\b/i.test(labelText))
+        report(file, source, node, "Use SortPicker for compact, direct sort choices.");
+      if (node.attributes.properties.some(
+        (attr) => ts.isJsxAttribute(attr) && attr.name.text === "sortLabel",
+      ))
+        report(file, source, node, "SortPicker owns the selected sort label and trigger.");
+
       if (!primitive && rawControls.has(tag) && !(richTile && tag === "button"))
         report(file, source, node, `Use the shared ${tag} component.`);
       for (const attr of node.attributes.properties) {

@@ -681,7 +681,15 @@ test("pending save bar opens and closes smoothly without a dormant gap, and resp
   const footer = page.locator('#settings-docs [data-slot="card-footer"]');
   const footerHeight = (await footer.boundingBox())!.height;
   await expect(bar).toBeHidden();
-  await expect(page.getByRole("button", { name: "Save settings", exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Save settings", exact: true })).toHaveCount(0);
+  await expect(footer.getByRole("button")).toHaveCount(0);
+  const guidance = page.locator("#settings-docs-guidance");
+  await expect(guidance).toHaveText("Drag to reorder or move items between sections, or use Move to… in the menus.");
+  const footerContentWidth = await footer.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  });
+  expect((await guidance.boundingBox())!.width).toBeCloseTo(footerContentWidth, 1);
   expect(await bar.locator("button").first().evaluate((button) => {
     button.focus();
     return document.activeElement === button;

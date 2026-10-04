@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Download, Upload } from "lucide-react";
 import type { Workspace } from "@/lib/store";
@@ -247,7 +249,6 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
     )
     .sort(
       (a, b) =>
-        (sort === "status" ? a.status.localeCompare(b.status) : 0) ||
         (sort === "reverse" ? -1 : 1) * a.name.localeCompare(b.name) ||
         a.key.localeCompare(b.key),
     );
@@ -259,7 +260,7 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
           `${i.column} ${i.message} ${i.row}`.toLowerCase().includes(w),
         ),
     )
-    .sort((a, b) => (sort === "reverse" ? b.row - a.row : a.row - b.row));
+    .sort((a, b) => a.row - b.row);
   const total = tab === "issues" ? issues.length : rows.length;
   const current = Math.min(page, Math.max(1, Math.ceil(total / pageSize)));
   const clear = () => {
@@ -321,35 +322,20 @@ export function RosterReviewPanel({ review }: { review: RosterReview }) {
             />
           </FormField>
         }
-        sortLabel={
-          tab === "issues"
-            ? "CSV row"
-            : sort === "reverse"
-              ? "Name Z–A"
-              : sort === "status"
-                ? "Change type"
-                : "Name A–Z"
-        }
         sort={
-          <FormField label="Sort review">
-            <SelectField
+          tab !== "issues" ? (
+            <SortPicker
+              label="Sort review"
               value={sort}
               onValueChange={(v) => {
                 setSort(v);
                 setPage(1);
               }}
             >
-              <option value="name">
-                {tab === "issues" ? "CSV row" : "Name A–Z"}
-              </option>
-              {tab !== "issues" && (
-                <>
-                  <option value="reverse">Name Z–A</option>
-                  <option value="status">Change type</option>
-                </>
-              )}
-            </SelectField>
-          </FormField>
+              <option value="name">{sortLabels.nameAsc}</option>
+              <option value="reverse">{sortLabels.nameDesc}</option>
+            </SortPicker>
+          ) : undefined
         }
       >
         {tab === "issues" ? (

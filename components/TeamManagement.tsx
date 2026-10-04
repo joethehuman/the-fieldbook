@@ -1,4 +1,6 @@
 "use client";
+import { sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { DetailNavigation } from "./patterns/detail-navigation";
 
 import {
@@ -10,7 +12,7 @@ import { Checkbox } from "./ui/choice";
 import { SelectRows, useBulkSelection } from "./patterns/bulk-selection";
 import { BulkPicker } from "./patterns/bulk-selection";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, ListChecks, X } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import {
@@ -460,6 +462,7 @@ export function TeamsAdmin({
       parentId: item.parentId === organization?.id ? undefined : item.parentId,
       label: item.name,
       description: `Manager: ${data.users.find((user) => user.id === item.managerId)?.name || "Unassigned"}`,
+      managerName: data.users.find((user) => user.id === item.managerId)?.name || "Unassigned",
       directMemberCount: data.users.filter((user) => user.teamId === item.id)
         .length,
     }));
@@ -823,42 +826,47 @@ export function TeamsAdmin({
           }}
           reveal={browserReveal}
           primaryAction={
-            <Button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void editTeam({
-                  id: crypto.randomUUID(),
-                  name: "",
-                  parentId: browseId || organization?.id || undefined,
-                })
-              }
-            >
-              <Plus aria-hidden="true" />
-              Add team
-            </Button>
-          }
-          secondaryActions={
-            (hierarchyItems.length > 1 || selectTeams) && (
+            <ActionGroup>
+              {(hierarchyItems.length > 1 || selectTeams) && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  aria-pressed={selectTeams}
+                  onClick={() => {
+                    setSelectTeams(!selectTeams);
+                    teamSelection.setSelected([]);
+                  }}
+                >
+                  {selectTeams ? (
+                    <X aria-hidden="true" />
+                  ) : (
+                    <ListChecks aria-hidden="true" />
+                  )}
+                  {selectTeams ? "Done selecting" : "Select multiple"}
+                </Button>
+              )}
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
                 disabled={busy}
-                aria-pressed={selectTeams}
-                onClick={() => {
-                  setSelectTeams(!selectTeams);
-                  teamSelection.setSelected([]);
-                }}
+                onClick={() =>
+                  void editTeam({
+                    id: crypto.randomUUID(),
+                    name: "",
+                    parentId: browseId || organization?.id || undefined,
+                  })
+                }
               >
-                {selectTeams ? "Done selecting" : "Select teams"}
+                <Plus aria-hidden="true" />
+                Add team
               </Button>
-            )
+            </ActionGroup>
           }
           selectionActions={
-            selectTeams ? (
+            selectTeams ? (range) => (
               <BulkActions
                 collectionSize={teamSelection.collectionSize}
+                range={range}
                 selected={teamSelection.actionIds}
                 onSelectionChange={teamSelection.setSelected}
                 noun="teams"
@@ -1045,20 +1053,18 @@ export function TeamsAdmin({
                     disabled={busy}
                   />
                 }
-                sortLabel={memberSort === "name" ? "Name A–Z" : "Name Z–A"}
                 sort={
-                  <FormField label="Sort team members">
-                    <SelectField
-                      value={memberSort}
-                      onValueChange={(value) => {
-                        setMemberSort(value);
-                        setPage(1);
-                      }}
-                    >
-                      <option value="name">Name A–Z</option>
-                      <option value="reverse">Name Z–A</option>
-                    </SelectField>
-                  </FormField>
+                  <SortPicker
+                    label="Sort team members"
+                    value={memberSort}
+                    onValueChange={(value) => {
+                      setMemberSort(value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="name">{sortLabels.nameAsc}</option>
+                    <option value="reverse">{sortLabels.nameDesc}</option>
+                  </SortPicker>
                 }
                 onClear={() => {
                   setQuery("");

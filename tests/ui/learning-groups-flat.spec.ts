@@ -480,9 +480,9 @@ test("People filters and bulk direct removal preserve team membership and cancel
     page.getByRole("button", { name: "Bulk actions", exact: true }),
   ).toBeDisabled();
   const columns = await table
-    .locator("col")
+    .locator("thead [data-slot=table-cell-content]")
     .evaluateAll((items) =>
-      items.map((item) => item.getBoundingClientRect().width),
+      items.map((item) => getComputedStyle(item).maxWidth),
     );
   for (const [label, choice, reset] of [
     ["User status", "Inactive", "All statuses"],
@@ -498,9 +498,9 @@ test("People filters and bulk direct removal preserve team membership and cancel
     await expect(table.getByRole("checkbox")).toHaveCount(0);
     expect(
       await table
-        .locator("col")
+        .locator("thead [data-slot=table-cell-content]")
         .evaluateAll((items) =>
-          items.map((item) => item.getBoundingClientRect().width),
+          items.map((item) => getComputedStyle(item).maxWidth),
         ),
     ).toEqual(columns);
     await page.getByRole("button", { name: /^Filters/ }).click();
@@ -511,15 +511,9 @@ test("People filters and bulk direct removal preserve team membership and cancel
       .press("Escape");
   }
   await page
-    .getByRole("button", { name: "Sort: Name A–Z", exact: true })
-    .click();
-  await page
     .getByRole("combobox", { name: "Sort people", exact: true })
     .click();
-  await page.getByRole("option", { name: "Name Z–A", exact: true }).click();
-  await page
-    .getByRole("dialog", { name: "Collection sort", exact: true })
-    .press("Escape");
+  await page.getByRole("option", { name: "Name (Z–A)", exact: true }).click();
   await expect(table.getByRole("row").nth(1)).toContainText("Zoe Direct");
   await table
     .getByRole("checkbox", { name: "Select page (2)", exact: true })
@@ -577,17 +571,11 @@ test("People filters and bulk direct removal preserve team membership and cancel
 
 async function indexChoice(page: Page, field: string, option: string) {
   const sort = field === "Sort groups";
-  await page
-    .getByRole("button", { name: sort ? /^Sort:/ : /^Filters/ })
-    .click();
+  if (!sort) await page.getByRole("button", { name: /^Filters/ }).click();
   await page.getByRole("combobox", { name: field, exact: true }).click();
   await page.getByRole("option", { name: option, exact: true }).click();
-  await page
-    .getByRole("dialog", {
-      name: sort ? "Collection sort" : "Collection filters",
-      exact: true,
-    })
-    .press("Escape");
+  if (!sort)
+    await page.getByRole("dialog", { name: "Collection filters", exact: true }).press("Escape");
 }
 
 test("group index keeps selection across pages and creation reveals the new row without opening detail", async ({
@@ -627,7 +615,7 @@ test("group index keeps selection across pages and creation reveals the new row 
   await expect(
     page.getByRole("region", { name: "Selected items", exact: true }),
   ).toContainText("29 selected");
-  await indexChoice(page, "Sort groups", "Name Z–A");
+  await indexChoice(page, "Sort groups", "Name (Z–A)");
   await expect(
     table.getByRole("checkbox", { name: "Select Pilot", exact: true }),
   ).toBeChecked();
@@ -667,7 +655,7 @@ test("group index keeps selection across pages and creation reveals the new row 
     page.getByRole("searchbox", { name: "Find a group", exact: true }),
   ).toHaveValue("");
   await expect(
-    page.getByRole("button", { name: "Sort: Name Z–A", exact: true }),
+    page.getByRole("combobox", { name: "Sort groups", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("region", { name: "Selected items", exact: true }),
@@ -681,7 +669,7 @@ test("group index keeps selection across pages and creation reveals the new row 
   });
 });
 
-test("group index sorts real counts and filters membership and assigned courses with stable columns", async ({
+test("group index sorts real counts and filters membership and assigned courses with bounded column measures", async ({
   page,
 }) => {
   const data = fixture();
@@ -698,20 +686,20 @@ test("group index sorts real counts and filters membership and assigned courses 
   });
   const widths = () =>
     table
-      .locator("col")
+      .locator("thead [data-slot=table-cell-content]")
       .evaluateAll((columns) =>
-        columns.map((column) => column.getBoundingClientRect().width),
+        columns.map((column) => getComputedStyle(column).maxWidth),
       );
   const original = await widths();
-  await indexChoice(page, "Sort groups", "Courses: fewest first");
+  await indexChoice(page, "Sort groups", "Courses (fewest)");
   await expect(table.getByRole("row").nth(1)).toContainText("Empty audience");
-  await indexChoice(page, "Sort groups", "Courses: most first");
+  await indexChoice(page, "Sort groups", "Courses (most)");
   await expect(table.getByRole("row").nth(1)).toContainText(
     "Account executives",
   );
-  await indexChoice(page, "Sort groups", "People: fewest first");
+  await indexChoice(page, "Sort groups", "People (fewest)");
   await expect(table.getByRole("row").nth(1)).toContainText("Empty audience");
-  await indexChoice(page, "Sort groups", "People: most first");
+  await indexChoice(page, "Sort groups", "People (most)");
   await expect(table.getByRole("row").nth(1)).toContainText(
     "Account executives",
   );

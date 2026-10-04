@@ -1,4 +1,6 @@
 "use client";
+import { compareOptionalDates, sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { useOrganizationChangeReview } from "./OrganizationChangeReview";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { EditorSaveStatus } from "./patterns/editor-save-status";
@@ -637,18 +639,26 @@ export default function Admin({
           .toLowerCase()
           .includes(query.toLowerCase()),
     )
-    .sort((a, b) =>
-      contentSort === "title"
-        ? a.title.localeCompare(b.title) || a.id.localeCompare(b.id)
-        : contentSort === "created"
-          ? (b.createdAt || b.updatedAt).localeCompare(
-              a.createdAt || a.updatedAt,
-            ) || a.id.localeCompare(b.id)
-          : contentSort === "updated"
-            ? b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)
-            : a.updatedAt.localeCompare(b.updatedAt) ||
-              a.id.localeCompare(b.id),
-    );
+    .sort((a, b) => {
+      const title = a.title.localeCompare(b.title);
+      const dates = contentSort.startsWith("created")
+        ? compareOptionalDates(
+            a.createdAt,
+            b.createdAt,
+            contentSort === "created",
+          )
+        : contentSort === "updated" || contentSort === "oldest"
+          ? compareOptionalDates(
+              a.updatedAt,
+              b.updatedAt,
+              contentSort === "updated",
+            )
+          : 0;
+      return (
+        dates ||
+        (contentSort === "title-desc" ? -title : title) || a.id.localeCompare(b.id)
+      );
+    });
   const peopleRows = data.users
     .filter(
       (u) =>
@@ -662,15 +672,16 @@ export default function Admin({
           effectiveGroups(u, data.groups).has(peopleGroup)) &&
         (peopleStatus === "all" || u.active === (peopleStatus === "active")),
     )
-    .sort(
-      (a, b) =>
-        (peopleSort === "recent"
-          ? (Date.parse(b.addedAt || "") || 0) -
-              (Date.parse(a.addedAt || "") || 0) || a.name.localeCompare(b.name)
-          : peopleSort === "reverse"
-            ? b.name.localeCompare(a.name)
-            : a.name.localeCompare(b.name)) || a.id.localeCompare(b.id),
-    );
+    .sort((a, b) => {
+      const name = a.name.localeCompare(b.name);
+      return (
+        (peopleSort === "recent" || peopleSort === "added-oldest"
+          ? compareOptionalDates(a.addedAt, b.addedAt, peopleSort === "recent")
+          : 0) ||
+        (peopleSort === "reverse" ? -name : name) ||
+        a.id.localeCompare(b.id)
+      );
+    });
   const selection = useBulkSelection(
     [
       tab,
@@ -1359,27 +1370,19 @@ export default function Admin({
                 <CollectionControls
                   filters={contentFilters}
                   onClear={clearContentFilters}
-                  sortLabel={
-                    contentSort === "created"
-                      ? "Newest created"
-                      : contentSort === "title"
-                        ? "Title A–Z"
-                        : contentSort === "updated"
-                          ? "Recently updated"
-                          : "Oldest update first"
-                  }
                   sort={
-                    <FormField label="Sort content">
-                      <SelectField
-                        value={contentSort}
-                        onValueChange={setContentSort}
-                      >
-                        <option value="created">Newest created</option>
-                        <option value="title">Title A–Z</option>
-                        <option value="updated">Recently updated</option>
-                        <option value="oldest">Oldest update first</option>
-                      </SelectField>
-                    </FormField>
+                    <SortPicker
+                      label="Sort content"
+                      value={contentSort}
+                      onValueChange={setContentSort}
+                    >
+                      <option value="created">{sortLabels.createdNewest}</option>
+                      <option value="created-oldest">{sortLabels.createdOldest}</option>
+                      <option value="title">{sortLabels.titleAsc}</option>
+                      <option value="title-desc">{sortLabels.titleDesc}</option>
+                      <option value="updated">{sortLabels.updatedNewest}</option>
+                      <option value="oldest">{sortLabels.updatedOldest}</option>
+                    </SortPicker>
                   }
                   search={
                     <FormField label="Search content" visuallyHiddenLabel>
@@ -1612,24 +1615,17 @@ export default function Admin({
                 <CollectionControls
                   filters={peopleFilters}
                   onClear={clearPeopleFilters}
-                  sortLabel={
-                    peopleSort === "recent"
-                      ? "Recently added"
-                      : peopleSort === "reverse"
-                        ? "Name Z–A"
-                        : "Name A–Z"
-                  }
                   sort={
-                    <FormField label="Sort profiles">
-                      <SelectField
-                        value={peopleSort}
-                        onValueChange={setPeopleSort}
-                      >
-                        <option value="title">Name A–Z</option>
-                        <option value="reverse">Name Z–A</option>
-                        <option value="recent">Recently added</option>
-                      </SelectField>
-                    </FormField>
+                    <SortPicker
+                      label="Sort profiles"
+                      value={peopleSort}
+                      onValueChange={setPeopleSort}
+                    >
+                      <option value="title">{sortLabels.nameAsc}</option>
+                      <option value="reverse">{sortLabels.nameDesc}</option>
+                      <option value="recent">{sortLabels.addedNewest}</option>
+                      <option value="added-oldest">{sortLabels.addedOldest}</option>
+                    </SortPicker>
                   }
                   search={
                     <FormField label="Search profiles" visuallyHiddenLabel>

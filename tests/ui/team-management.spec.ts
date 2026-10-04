@@ -263,7 +263,7 @@ test("team detail retains browser search and optional selection on return", asyn
   await expect(
     page.getByRole("button", { name: "Open Other team", exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Select teams", exact: true }).click();
+  await page.getByRole("button", { name: "Select multiple", exact: true }).click();
   const choice = page.getByRole("checkbox", {
     name: "Select Sales team",
     exact: true,

@@ -85,7 +85,7 @@ export function SelectItem({
 
 // Preserve declarative option lists while moving interaction, focus, and typeahead to Radix.
 // Prefix every value so empty-string options are valid and cannot collide with real IDs.
-function options(children: React.ReactNode): React.ReactNode {
+export function selectOptions(children: React.ReactNode): React.ReactNode {
   return React.Children.map(children, (child) => {
     if (
       !React.isValidElement<{
@@ -95,7 +95,7 @@ function options(children: React.ReactNode): React.ReactNode {
       }>(child)
     )
       return null;
-    if (child.type === React.Fragment) return options(child.props.children);
+    if (child.type === React.Fragment) return selectOptions(child.props.children);
     const value =
       child.props.value ??
       (typeof child.props.children === "string" ? child.props.children : "");
@@ -146,7 +146,7 @@ export function SelectField({
       <SelectTrigger {...props}>
         <SelectValue />
       </SelectTrigger>
-      <SelectContent>{options(children)}</SelectContent>
+      <SelectContent>{selectOptions(children)}</SelectContent>
     </Select>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import { compareOptionalDates, sortLabels } from "@/lib/collection-sort";
+import { SortPicker } from "./patterns/sort-picker";
 import { Pagination } from "./patterns/pagination";
 import { FormField } from "./patterns/form-field";
 import {
@@ -6,7 +8,6 @@ import {
   CollectionEmpty,
 } from "./patterns/collection-controls";
 import { Input } from "./ui/input";
-import { SelectField } from "./ui/select";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import type { Workspace } from "@/lib/store";
@@ -59,13 +60,16 @@ export function RecentlyDeleted({
       .filter((d) => !d.purging && Date.parse(d.purgeAfter) > Date.now())
       .map((d) => d.id),
   );
-  rows.sort((a, b) =>
-    sort === "name"
-      ? a.name.localeCompare(b.name)
-      : sort === "deadline"
-        ? a.purgeAfter.localeCompare(b.purgeAfter)
-        : b.deletedAt.localeCompare(a.deletedAt),
-  );
+  rows.sort((a, b) => {
+    const name = a.name.localeCompare(b.name);
+    return (
+      (sort === "newest" || sort === "oldest"
+        ? compareOptionalDates(a.deletedAt, b.deletedAt, sort === "newest")
+        : 0) ||
+      (sort === "reverse" ? -name : name) ||
+      a.id.localeCompare(b.id)
+    );
+  });
   const currentPage = Math.min(page, Math.max(1, Math.ceil(rows.length / 25)));
   const visible = rows.slice((currentPage - 1) * 25, currentPage * 25);
   const restore: BulkHandler = async (request) => {
@@ -119,29 +123,34 @@ export function RecentlyDeleted({
           ]}
         />
       )}
-      <CollectionControls search={        <FormField className="min-w-[14rem] flex-1" label="Search recently deleted" visuallyHiddenLabel>
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setPage(1);
-            }}
-            placeholder="Search recently deleted"
-          />
-        </FormField>
-} sort={        <FormField className="w-full sm:w-64" label="Sort deleted items" visuallyHiddenLabel>
-          <SelectField value={sort} onValueChange={(value) => { setSort(value); setPage(1); }}>
-            <option value="newest">Recently deleted first</option>
-            <option value="deadline">Permanent deletion soonest</option>
-            <option value="name">Name A–Z</option>
-          </SelectField>
-        </FormField>
-} sortLabel={sort === "name" ? "Name A–Z" : sort === "deadline" ? "Permanent deletion soonest" : "Recently deleted first"} onClear={clearFilters} filters={query ? [{ id: "query", label: `Search: ${query}`, onRemove: () => { setQuery(""); setPage(1); },
-                },
-              ]
-            : []
+      <CollectionControls
+        search={
+          <FormField label="Search recently deleted" visuallyHiddenLabel>
+            <Input
+              type="search"
+              value={query}
+              onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+              placeholder="Search recently deleted"
+            />
+          </FormField>
         }
+        sort={
+          <SortPicker
+            label="Sort deleted items"
+            value={sort}
+            onValueChange={(value) => { setSort(value); setPage(1); }}
+          >
+            <option value="newest">{sortLabels.deletedNewest}</option>
+            <option value="oldest">{sortLabels.deletedOldest}</option>
+            <option value="name">{sortLabels.nameAsc}</option>
+            <option value="reverse">{sortLabels.nameDesc}</option>
+          </SortPicker>
+        }
+        onClear={clearFilters}
+        filters={query ? [{
+          id: "query", label: `Search: ${query}`,
+          onRemove: () => { setQuery(""); setPage(1); },
+        }] : []}
       />
       <AdminBulkActions
         data={displayData}

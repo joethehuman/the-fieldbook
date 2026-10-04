@@ -1,6 +1,6 @@
 # Ask AI
 
-Ask AI adds optional answers from published Fieldbook content using the AI SDK and a server-selected model router. Vercel AI Gateway is the first supported connector. It is **off by default** in installed applications. The search panel includes temporary conversations when enabled. Administrators configure it under **Organization Settings → Ask AI**. The browser-local demo shows the same controls with illustrative models; all answers remain local unavailable responses.
+Ask AI adds optional answers from published Fieldbook content using the AI SDK and a server-selected model router. Vercel AI Gateway is the first supported connector. It is **off by default** in installed applications. The search panel includes temporary conversations when enabled. Administrators configure it under **Organization Settings → Ask AI**. The browser-local demo shows the same controls with illustrative models and simulated local responses.
 
 ## Installation and configuration
 
@@ -113,4 +113,4 @@ Ask follow-up questions in the conversation field. Enter sends; Shift+Enter adds
 
 Guests in an enabled public installation can ask questions without signing in. Disabling AI restores basic search and cancels the local conversation when the changed setting reaches the shell. The server independently checks availability and access for each request.
 
-The browser-local demo shows these entry points by default, but answers every submission with “This feature is not available in the demo site.” It makes no AI network request. The demo’s illustrative Admin toggle affects this browser’s search UI only. The installed application stays off by default. Administrator controls and the existing revision-checked settings operations configure the same nonsecret object described above.
+The browser-local demo shows these entry points by default. It uses the same thinking indicator and answer display, with a brief pause followed by simulated word streaming. The first two questions receive canned Hoolibook/Gavin replies that disclose the simulation; the first links to thefieldbook.org in a new tab. Third and subsequent questions receive “This feature is not available in the demo site.” Stop cancels either the pause or streaming. The sequence belongs to the current demo profile session, survives closing the panel or choosing New conversation, and resets on reload, profile change or toggling Ask AI. Retrying a question does not advance it. It makes no AI network request. The demo’s illustrative Admin toggle affects this browser’s search UI only. The installed application stays off by default. Administrator controls and the existing revision-checked settings operations configure the same nonsecret object described above.

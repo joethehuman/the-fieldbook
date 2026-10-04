@@ -4,7 +4,15 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
-- Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering and cross-section moves with drag origin/destination feedback, individual and bulk Move to actions, and a sticky Unsaved changes bar with Save/Discard. The bar opens smoothly as a connected header with continuous container borders and an immediate reduced-motion fallback. Navigation changes preserve document drafts and published editorial content.
+- Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering and cross-section moves with drag origin/destination feedback, individual and bulk Move to actions, and a sticky Unsaved changes bar with Save/Discard. The bar opens smoothly as a connected header with continuous container borders and an immediate reduced-motion fallback; brief footer guidance spans the full grey area. Navigation changes preserve document drafts and published editorial content.
+
+- Size application table columns to content up to shared maximum measures, wrap long names and metadata, and reserve surplus width between the last data column and the pinned action menu. Apply the same sizing across administrative, reporting and review tables.
+
+- Clarify Teams bulk selection with an outlined Select multiple control beside search and Add team, a visible Done selecting exit, and the standard paginated table with header checkboxes and the existing bulk-action toolbar.
+
+- Unify collection sorting with one compact design-system picker that opens options directly, shows its label inside the trigger and wraps cleanly on narrow screens. Use concise shared terms with directions in parentheses, such as Sort: Updated (newest) and Title (A–Z), and paired useful directions across learner libraries, administration, reports and assignment/import dialogs. Add saved-deadline sorting, retain Assigned sorting in Your courses, keep unknown values last, and remove misleading curriculum dates, redundant recovery ordering and the one-option CSV issue picker. Preserve authored curriculum order, search relevance and report/export consistency. Align the Courses home and full browser with shared inline search, Filters and Sort controls; show active categories as removable chips.
+
+- Simulate Ask AI in the browser-local demo with the shared thinking indicator, streamed canned replies and working Stop control. The first two questions receive Hoolibook/Gavin replies, with a link to thefieldbook.org in the first; later questions receive the demo-unavailable message. No model requests are made.
 
 - Prevent the demo account picker from flashing during session refresh. Check the saved profile before first paint and retain an inactive workspace shell until restoration finishes; first visits, explicit profile switching and storage recovery keep the picker.
 
