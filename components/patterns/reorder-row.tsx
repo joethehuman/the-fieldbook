@@ -36,7 +36,7 @@ export function ReorderRow({
               ? "grid-cols-[auto_auto_minmax(0,1fr)] @min-[15rem]:grid-cols-[auto_auto_minmax(0,1fr)_auto]"
               : "grid-cols-[auto_auto_minmax(0,1fr)] @min-[20rem]:grid-cols-[auto_auto_minmax(0,1fr)_auto]"
             : compactActions
-              ? "grid-cols-[auto_minmax(0,1fr)] @min-[15rem]:grid-cols-[auto_minmax(0,1fr)_auto]"
+              ? "grid-cols-[auto_minmax(0,1fr)] @min-[12rem]:grid-cols-[auto_minmax(0,1fr)_auto]"
               : "grid-cols-[auto_minmax(0,1fr)] @min-[20rem]:grid-cols-[auto_minmax(0,1fr)_auto]",
         )}
       >
@@ -57,7 +57,9 @@ export function ReorderRow({
           className={cn(
             "flex flex-wrap items-center justify-end gap-2",
             compactActions
-              ? "@min-[15rem]:col-span-1"
+              ? selection
+                ? "@min-[15rem]:col-span-1"
+                : "@min-[12rem]:col-span-1"
               : "@min-[20rem]:col-span-1",
             selection ? "col-span-3" : "col-span-2",
           )}

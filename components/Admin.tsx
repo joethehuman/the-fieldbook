@@ -225,7 +225,7 @@ const adminSections = [
       {
         id: "settings-docs",
         name: "Docs navigation",
-        description: "Choose the section order for Docs.",
+        description: "Arrange sections, subsections and documents for Docs.",
         icon: FileText,
       },
       {
@@ -294,6 +294,7 @@ type Props = {
   registerNavigationGuard?: RegisterNavigationGuard;
   registerLandingNavigation?: RegisterLandingNavigation;
   onReload?: () => Promise<Workspace>;
+  onSaveDocsNavigation?: import("@/lib/docs-navigation-save").SaveDocsNavigation;
   onSaveSettings?: (
     before: Workspace,
     settings: import("@/lib/settings").SiteSettings,
@@ -375,6 +376,7 @@ export default function Admin({
   registerLandingNavigation,
   onReload,
   onSaveSettings,
+  onSaveDocsNavigation,
   onReviewDeadlines,
   onLoadPublished,
 }: Props) {
@@ -1309,6 +1311,7 @@ export default function Admin({
                 onChange={onChange}
                 production={production}
                 onSaveSettings={onSaveSettings}
+                onSaveDocsNavigation={onSaveDocsNavigation}
               />
             ) : tab === "feedback" ? (
               <FeedbackAdmin data={data} />

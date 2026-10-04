@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering and cross-section moves with drag origin/destination feedback, individual and bulk Move to actions, and a sticky Unsaved changes bar with Save/Discard. The bar opens smoothly as a connected header with continuous container borders and an immediate reduced-motion fallback; brief footer guidance spans the full grey area. Navigation changes preserve document drafts and published editorial content.
+
 - Size application table columns to content up to shared maximum measures, wrap long names and metadata, and reserve surplus width between the last data column and the pinned action menu. Apply the same sizing across administrative, reporting and review tables.
 
 - Clarify Teams bulk selection with an outlined Select multiple control beside search and Add team, a visible Done selecting exit, and the standard paginated table with header checkboxes and the existing bulk-action toolbar.

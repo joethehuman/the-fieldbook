@@ -1,12 +1,15 @@
 "use client";
-import { Fragment, useState, type DragEvent, type ReactNode } from "react";
+import { useState, type DragEvent } from "react";
 import { ChevronRight, GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import {
   availableDocSections,
   deleteDocSection,
   legacySectionConflict,
   moveDocSection,
+  moveDocumentsInNavigation,
+  orderedSectionDocs,
   renameDocSection,
+  reorderDocInSection,
   reorderDocSection,
   sectionForDoc,
   sectionPath,
@@ -38,64 +41,11 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-type DragControls = {
-  handle: ReactNode;
-  dragging: boolean;
-  dropPosition?: "before" | "after";
-  recentlyMoved: boolean;
-  onDragOver: (event: DragEvent<HTMLLIElement>) => void;
-  onDrop: (event: DragEvent<HTMLLIElement>) => void;
-};
-
-function SectionOrderRows({
-  items,
-  disabled,
-  onMove,
-  previewLabel,
-  renderRow,
-}: {
-  items: DocSection[];
-  disabled: boolean;
-  onMove: (id: string, index: number) => void;
-  previewLabel?: (section: DocSection) => string;
-  renderRow: (
-    section: DocSection,
-    siblings: DocSection[],
-    drag: DragControls,
-  ) => ReactNode;
-}) {
-  const drag = useRowReorder(
-    items,
-    onMove,
-    disabled,
-    previewLabel || ((section) => section.name),
-  );
-  return drag.ordered.map((section) =>
-    renderRow(section, items, {
-      handle: (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="order-handle"
-          draggable={!disabled}
-          disabled={disabled}
-          aria-label={`Reorder ${section.name}; use up or down buttons`}
-          onDragStart={(event) => drag.start(event, section.id)}
-          onDragEnd={drag.cancel}
-        >
-          <GripVertical aria-hidden="true" size={17} />
-        </Button>
-      ),
-      dragging: drag.active === section.id,
-      dropPosition:
-        drag.destination?.id === section.id ? drag.destination.side : undefined,
-      recentlyMoved: drag.recentlyMoved === section.id,
-      onDragOver: (event) => drag.over(event, section.id),
-      onDrop: drag.drop,
-    }),
-  );
-}
+type Placement = { id: string; sectionId: string };
+const sectionKey = (id: string) => `section:${id}`;
+const docKey = (id: string) => `doc:${id}`;
+const isDoc = (key: string) => key.startsWith("doc:");
+const itemId = (key: string) => key.slice(key.indexOf(":") + 1);
 
 export function DocSectionsSettings({
   sections,
@@ -106,7 +56,7 @@ export function DocSectionsSettings({
   sections: DocSection[];
   docs: DocLink[];
   disabled: boolean;
-  onChange: (sections: DocSection[]) => void;
+  onChange: (sections: DocSection[], moves?: Placement[]) => void;
 }) {
   const { confirm, prompt } = useInteractionDialog();
   const [error, setError] = useState("");
@@ -114,212 +64,516 @@ export function DocSectionsSettings({
   const [creatingUnder, setCreatingUnder] = useState("");
   const [creatingRoot, setCreatingRoot] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
-  const [movingSection, setMovingSection] = useState("");
-  const [moveTarget, setMoveTarget] = useState("root");
+  const [moving, setMoving] = useState("");
+  const [moveTarget, setMoveTarget] = useState("");
   const conflict = legacySectionConflict(docs);
+  const blocked = disabled || !!conflict;
   const uniqueDocs = [...new Map(docs.map((doc) => [doc.id, doc])).values()];
   const roots = sections.filter((section) => !section.parentId);
+  const allItems = [
+    ...sections.map((section) => ({
+      id: sectionKey(section.id),
+      label: sectionPath(section, sections),
+    })),
+    ...uniqueDocs.map((doc) => ({
+      id: docKey(doc.id),
+      label: `document ${doc.title}`,
+    })),
+  ];
   const selection = useBulkSelection(
-    "docs-sections",
-    sections.map((section) => section.id),
+    `docs-navigation-${showDocs}`,
+    allItems
+      .filter((item) => showDocs || !isDoc(item.id))
+      .map((item) => item.id),
   );
-  const act = (change: () => DocSection[]) => {
+  function act(change: () => { sections: DocSection[]; moves?: Placement[] }) {
     setError("");
     try {
-      if (conflict) throw new Error(conflict);
-      onChange(change());
+      if (blocked)
+        throw new Error(conflict || "Finish the current save first.");
+      const result = change();
+      onChange(result.sections, result.moves);
       return true;
     } catch (error) {
       setError((error as Error).message);
       return false;
     }
-  };
-  const row = (
-    section: DocSection,
-    siblings: DocSection[],
-    drag: DragControls,
-  ) => {
-    const index = siblings.findIndex((item) => item.id === section.id);
-    const children = sections.filter((item) => item.parentId === section.id);
-    const directDocs = uniqueDocs.filter(
-      (doc) => sectionForDoc(doc, sections)?.id === section.id,
-    );
-    const subtreeDocs =
-      directDocs.length +
-      children.reduce(
-        (total, child) =>
-          total +
-          uniqueDocs.filter(
-            (doc) => sectionForDoc(doc, sections)?.id === child.id,
-          ).length,
-        0,
+  }
+  const changeSections = (change: () => DocSection[]) =>
+    act(() => ({ sections: change() }));
+  function prepareMove(keys: string[], target: string) {
+    const sectionIds = keys.filter((key) => !isDoc(key)).map(itemId);
+    const docIds = keys.filter(isDoc).map(itemId);
+    if (!target) throw new Error("Choose a destination.");
+    if (target === "root" && docIds.length)
+      throw new Error("Documents must belong to a section or subsection.");
+    if (
+      sectionIds.some((id) =>
+        sections.some(
+          (child) => child.parentId === id && sectionIds.includes(child.id),
+        ),
+      )
+    )
+      throw new Error("Select either a parent or its subsection, not both.");
+    let next = sections;
+    for (const id of sectionIds)
+      next = moveDocSection(next, id, target === "root" ? undefined : target);
+    if (docIds.length)
+      next = moveDocumentsInNavigation(next, uniqueDocs, docIds, target);
+    return {
+      sections: next,
+      moves: docIds.map((id) => ({ id, sectionId: target })),
+    };
+  }
+  function revealDestination(id: string) {
+    const destination = sections.find((section) => section.id === id);
+    if (destination)
+      setExpanded((current) =>
+        new Set(current).add(destination.parentId || destination.id),
       );
-    const open = expanded.has(section.id);
-    return (
-      <ReorderRow
-        key={section.id}
-        data-sortable-preview={section.parentId ? true : undefined}
-        data-dragging={drag.dragging}
-        data-selected={selection.selected.includes(section.id)}
-        data-drop={section.parentId ? drag.dropPosition : undefined}
-        data-moved={section.parentId ? drag.recentlyMoved : undefined}
-        onDragOver={section.parentId ? drag.onDragOver : undefined}
-        onDrop={section.parentId ? drag.onDrop : undefined}
-        title={
-          <div className="flex min-w-0 items-center gap-2">
-            {children.length ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`${open ? "Collapse" : "Expand"} ${section.name}`}
-                aria-expanded={open}
-                onClick={() =>
-                  setExpanded((previous) => {
-                    const next = new Set(previous);
-                    if (next.has(section.id)) next.delete(section.id);
-                    else next.add(section.id);
-                    return next;
-                  })
-                }
-              >
-                <ChevronRight
-                  className={open ? "rotate-90" : ""}
-                  aria-hidden="true"
-                />
-              </Button>
-            ) : (
-              <span className="w-9 shrink-0" />
-            )}
-            <strong className="min-w-0 [overflow-wrap:anywhere]">
-              {section.name}
-            </strong>
-          </div>
+  }
+  function stageMove(keys: string[], target: string) {
+    const success = act(() => prepareMove(keys, target));
+    if (success) revealDestination(target);
+    return success;
+  }
+  function reorder(key: string, offset: number) {
+    if (!isDoc(key))
+      return changeSections(() =>
+        reorderDocSection(sections, itemId(key), offset),
+      );
+    const doc = uniqueDocs.find((item) => item.id === itemId(key));
+    const section = doc && sectionForDoc(doc, sections);
+    if (!section) return;
+    const siblings = orderedSectionDocs(uniqueDocs, sections, section.id);
+    changeSections(() =>
+      reorderDocInSection(
+        sections,
+        uniqueDocs,
+        section.id,
+        doc!.id,
+        siblings.findIndex((item) => item.id === doc!.id) + offset,
+      ),
+    );
+  }
+  function applyDrop(
+    key: string,
+    destination: { id: string; side: "before" | "after" | "inside" },
+  ) {
+    if (destination.side === "inside") {
+      stageMove([key], itemId(destination.id));
+      return;
+    }
+    if (isDoc(key) && isDoc(destination.id)) {
+      const target = uniqueDocs.find(
+        (doc) => doc.id === itemId(destination.id),
+      );
+      const parent = target && sectionForDoc(target, sections);
+      if (!parent) return;
+      const remaining = orderedSectionDocs(
+        uniqueDocs,
+        sections,
+        parent.id,
+      ).filter((doc) => doc.id !== itemId(key));
+      const index =
+        remaining.findIndex((doc) => doc.id === target!.id) +
+        (destination.side === "after" ? 1 : 0);
+      act(() => ({
+        sections: moveDocumentsInNavigation(
+          sections,
+          uniqueDocs,
+          [itemId(key)],
+          parent.id,
+          index,
+        ),
+        moves: [{ id: itemId(key), sectionId: parent.id }],
+      }));
+      revealDestination(parent.id);
+    } else if (!isDoc(key) && !isDoc(destination.id)) {
+      const target = sections.find(
+        (section) => section.id === itemId(destination.id),
+      );
+      if (!target) return;
+      changeSections(() => {
+        const source = sections.find((section) => section.id === itemId(key))!;
+        let next =
+          source.parentId === target.parentId
+            ? sections
+            : moveDocSection(sections, source.id, target.parentId);
+        const siblings = next.filter(
+          (section) => section.parentId === target.parentId,
+        );
+        const others = siblings.filter((section) => section.id !== source.id);
+        const index =
+          others.findIndex((section) => section.id === target.id) +
+          (destination.side === "after" ? 1 : 0);
+        return reorderDocSection(
+          next,
+          source.id,
+          index - siblings.findIndex((section) => section.id === source.id),
+        );
+      });
+      if (target.parentId) revealDestination(target.parentId);
+    }
+  }
+  const drag = useRowReorder(
+    allItems,
+    () => {},
+    blocked,
+    (item) => item.label,
+    applyDrop,
+  );
+  function over(event: DragEvent<HTMLElement>, key: string) {
+    if (!drag.active || blocked) return;
+    const sourceKey = drag.active;
+    if (sourceKey === key) {
+      drag.over(event, key);
+      return;
+    }
+    if (isDoc(sourceKey)) {
+      if (isDoc(key)) drag.over(event, key);
+      else drag.overInside(event, key);
+      return;
+    }
+    const source = sections.find((section) => section.id === itemId(sourceKey));
+    const target =
+      !isDoc(key) && sections.find((section) => section.id === itemId(key));
+    if (!source || !target) {
+      event.stopPropagation();
+      drag.clearDestination();
+      return;
+    }
+    if (source.parentId && !target.parentId) {
+      if (source.parentId !== target.id) drag.overInside(event, key);
+      else {
+        event.stopPropagation();
+        drag.clearDestination();
+      }
+    } else if (source.parentId || !target.parentId) drag.over(event, key);
+    else {
+      event.stopPropagation();
+      drag.clearDestination();
+    }
+  }
+  const handle = (key: string, label: string) => (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      className="order-handle"
+      draggable={!blocked}
+      disabled={blocked}
+      aria-label={`Reorder ${label}; use Move up, Move down or Move to in Actions`}
+      onDragStart={(event) => drag.start(event, key)}
+      onDragEnd={drag.cancel}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+          event.preventDefault();
+          reorder(key, event.key === "ArrowUp" ? -1 : 1);
         }
-        handle={drag.handle}
-        compactActions
-        selection={
-          selection.canSelect ? (
-            <Checkbox
-              aria-label={`Select ${sectionPath(section, sections)}`}
-              checked={selection.selected.includes(section.id)}
-              disabled={disabled || !!conflict}
-              onCheckedChange={(value) =>
-                selection.toggle(section.id, value === true)
+      }}
+    >
+      <GripVertical aria-hidden="true" size={17} />
+    </Button>
+  );
+  const select = (key: string, label: string) =>
+    selection.canSelect ? (
+      <Checkbox
+        aria-label={`Select ${label}`}
+        checked={selection.selected.includes(key)}
+        disabled={blocked}
+        onCheckedChange={(checked) => selection.toggle(key, checked === true)}
+      />
+    ) : undefined;
+  const openMove = (key: string) => {
+    setMoving(key);
+    setMoveTarget(
+      isDoc(key)
+        ? sectionForDoc(
+            uniqueDocs.find((doc) => doc.id === itemId(key))!,
+            sections,
+          )?.id || ""
+        : sections.find((section) => section.id === itemId(key))?.parentId ||
+            "root",
+    );
+  };
+  const moveOptions = (keys: string[]) =>
+    [
+      { id: "root", label: "Top level" },
+      ...sections.map((section) => ({
+        id: section.id,
+        label: sectionPath(section, sections),
+      })),
+    ].filter((option) => {
+      try {
+        prepareMove(keys, option.id);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+  const destination = drag.destination;
+  const dropSide = (key: string) =>
+    destination?.id === key && destination.side !== "inside"
+      ? destination.side
+      : undefined;
+  function documentRows(section: DocSection) {
+    const items = orderedSectionDocs(uniqueDocs, sections, section.id);
+    if (!showDocs || !items.length) return null;
+    return (
+      <li className="list-none">
+        <ol
+          className="doc-order-list ms-6 border-s border-border ps-3"
+          aria-label={`Documents in ${sectionPath(section, sections)}`}
+        >
+          {items.map((doc, index) => (
+            <ReorderRow
+              key={doc.id}
+              data-sortable-preview
+              data-dragging={drag.active === docKey(doc.id)}
+              data-selected={selection.selected.includes(docKey(doc.id))}
+              data-drop={dropSide(docKey(doc.id))}
+              data-moved={drag.recentlyMoved === docKey(doc.id)}
+              onDragOver={(event) => over(event, docKey(doc.id))}
+              onDrop={drag.drop}
+              handle={handle(docKey(doc.id), `document ${doc.title}`)}
+              selection={select(docKey(doc.id), `document ${doc.title}`)}
+              title={<span className="block text-left">{doc.title}</span>}
+              detail={doc.status === "published" ? "Published" : "Draft"}
+              compactActions
+              actions={
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={blocked}
+                      aria-label={`Actions for document ${doc.title}`}
+                    >
+                      <MoreHorizontal size={18} aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      disabled={index === 0}
+                      onSelect={() => reorder(docKey(doc.id), -1)}
+                    >
+                      Move up
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={index === items.length - 1}
+                      onSelect={() => reorder(docKey(doc.id), 1)}
+                    >
+                      Move down
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openMove(docKey(doc.id))}>
+                      Move to…
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               }
             />
-          ) : undefined
-        }
-        detail={
-          <span>
-            {children.length ? subtreeDocs : directDocs.length}{" "}
-            {children.length
-              ? subtreeDocs === 1
-                ? "doc total"
-                : "docs total"
-              : directDocs.length === 1
-                ? "doc"
-                : "docs"}
-            {children.length
-              ? ` · ${children.length} ${children.length === 1 ? "subsection" : "subsections"}`
-              : ""}
-          </span>
-        }
-        actions={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                disabled={disabled || !!conflict}
-                aria-label={`Actions for ${sectionPath(section, sections)}`}
-              >
-                <MoreHorizontal size={18} aria-hidden="true" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={index === 0}
-                onSelect={() =>
-                  act(() => reorderDocSection(sections, section.id, -1))
-                }
-              >
-                Move up
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={index === siblings.length - 1}
-                onSelect={() =>
-                  act(() => reorderDocSection(sections, section.id, 1))
-                }
-              >
-                Move down
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  setMovingSection(section.id);
-                  setMoveTarget(section.parentId || "root");
-                }}
-              >
-                Move to…
-              </DropdownMenuItem>
-              {!section.parentId && (
-                <DropdownMenuItem
-                  onSelect={() => {
-                    setCreatingUnder(section.id);
-                    setExpanded((previous) =>
-                      new Set(previous).add(section.id),
-                    );
-                  }}
-                >
-                  Add subsection
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onSelect={async () => {
-                  const name = await prompt("Rename section", section.name);
-                  if (name !== null)
-                    act(() => renameDocSection(sections, section.id, name));
-                }}
-              >
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={async () => {
-                  try {
-                    const next = deleteDocSection(sections, section.id, docs);
-                    if (
-                      await confirm(
-                        `Delete empty section ${sectionPath(section, sections)}?`,
-                        { submitLabel: "Delete section", destructive: true },
-                      )
-                    )
-                      act(() => next);
-                  } catch (error) {
-                    setError((error as Error).message);
-                  }
-                }}
-              >
-                Delete section
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        }
-      />
+          ))}
+        </ol>
+      </li>
     );
-  };
+  }
+  function sectionBranch(section: DocSection, siblings: DocSection[]) {
+    const key = sectionKey(section.id);
+    const index = siblings.findIndex((item) => item.id === section.id);
+    const children = sections.filter((item) => item.parentId === section.id);
+    const count = uniqueDocs.filter((doc) => {
+      const parent = sectionForDoc(doc, sections);
+      return (
+        parent?.id === section.id ||
+        children.some((child) => child.id === parent?.id)
+      );
+    }).length;
+    const open = expanded.has(section.id);
+    const inside = destination?.id === key && destination.side === "inside";
+    return (
+      <li
+        key={section.id}
+        className="list-none"
+        data-sortable-preview
+        data-drop={dropSide(key)}
+        data-moved={drag.recentlyMoved === key}
+        data-branch-dragging={drag.active === key}
+        onDragOver={(event) => over(event, key)}
+        onDrop={drag.drop}
+      >
+        <ol className="doc-order-list">
+          <ReorderRow
+            handle={handle(key, sectionPath(section, sections))}
+            selection={select(key, sectionPath(section, sections))}
+            compactActions
+            data-selected={selection.selected.includes(key)}
+            data-drop-inside={inside}
+            className="data-[drop-inside=true]:bg-selected data-[drop-inside=true]:border-primary"
+            onDragOver={(event) => over(event, key)}
+            onDrop={drag.drop}
+            title={
+              <strong className="block text-left [overflow-wrap:anywhere]">
+                {section.name}
+              </strong>
+            }
+            detail={
+              inside
+                ? `Move to ${sectionPath(section, sections)}`
+                : `${count} ${count === 1 ? "doc" : "docs"}`
+            }
+            actions={
+              <>
+                {children.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    disabled={blocked}
+                    aria-label={`${open ? "Collapse" : "Expand"} ${section.name}`}
+                    aria-expanded={open}
+                    onClick={() =>
+                      setExpanded((current) => {
+                        const next = new Set(current);
+                        if (open) next.delete(section.id);
+                        else next.add(section.id);
+                        return next;
+                      })
+                    }
+                  >
+                    <ChevronRight
+                      className={open ? "rotate-90" : ""}
+                      aria-hidden="true"
+                    />
+                  </Button>
+                )}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={blocked}
+                      aria-label={`Actions for ${sectionPath(section, sections)}`}
+                    >
+                      <MoreHorizontal size={18} aria-hidden="true" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      disabled={index === 0}
+                      onSelect={() => reorder(key, -1)}
+                    >
+                      Move up
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={index === siblings.length - 1}
+                      onSelect={() => reorder(key, 1)}
+                    >
+                      Move down
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => openMove(key)}>
+                      Move to…
+                    </DropdownMenuItem>
+                    {!section.parentId && (
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          setCreatingUnder(section.id);
+                          setExpanded((current) =>
+                            new Set(current).add(section.id),
+                          );
+                        }}
+                      >
+                        Add subsection
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onSelect={async () => {
+                        const name = await prompt(
+                          "Rename section",
+                          section.name,
+                        );
+                        if (name !== null)
+                          changeSections(() =>
+                            renameDocSection(sections, section.id, name),
+                          );
+                      }}
+                    >
+                      Rename
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-destructive focus:text-destructive"
+                      onSelect={async () => {
+                        try {
+                          const next = deleteDocSection(
+                            sections,
+                            section.id,
+                            docs,
+                          );
+                          if (
+                            await confirm(
+                              `Delete empty section ${sectionPath(section, sections)}?`,
+                              {
+                                submitLabel: "Delete section",
+                                destructive: true,
+                              },
+                            )
+                          )
+                            changeSections(() => next);
+                        } catch (error) {
+                          setError((error as Error).message);
+                        }
+                      }}
+                    >
+                      Delete section
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
+            }
+          />
+          {documentRows(section)}
+          {open && children.length > 0 && (
+            <li className="list-none">
+              <ol className="doc-order-list ms-6 border-s border-border ps-3">
+                {children.map((child) => sectionBranch(child, children))}
+              </ol>
+            </li>
+          )}
+          {creatingUnder === section.id && (
+            <li className="ms-6 border-s border-border ps-3">
+              <DocSectionCreate
+                sections={sections}
+                initialParentId={section.id}
+                disabled={blocked}
+                onCreate={(created) => {
+                  if (
+                    changeSections(() =>
+                      availableDocSections(docs, [], [...sections, created]),
+                    )
+                  )
+                    setCreatingUnder("");
+                }}
+                onCancel={() => setCreatingUnder("")}
+              />
+            </li>
+          )}
+        </ol>
+      </li>
+    );
+  }
   return (
     <div>
       {conflict && <p role="alert">{conflict}</p>}
       {error && <p role="alert">{error}</p>}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant={creatingRoot ? "outline" : "default"}
-          disabled={disabled || !!conflict}
-          onClick={() => setCreatingRoot((value) => !value)}
+          disabled={blocked}
+          onClick={() => setCreatingRoot((current) => !current)}
         >
           {!creatingRoot && <Plus aria-hidden="true" />}
           {creatingRoot ? "Cancel new section" : "New section"}
@@ -327,7 +581,9 @@ export function DocSectionsSettings({
         <Button
           type="button"
           variant="outline"
-          onClick={() => setShowDocs((value) => !value)}
+          disabled={blocked}
+          aria-pressed={showDocs}
+          onClick={() => setShowDocs((current) => !current)}
         >
           {showDocs ? "Hide documents" : "Show documents"}
         </Button>
@@ -336,51 +592,41 @@ export function DocSectionsSettings({
         collectionSize={selection.collectionSize}
         selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
-        noun="sections"
+        noun="items"
         commands={[
           {
             id: "move",
-            disabledReason:
-              disabled || conflict
-                ? conflict || "Finish the current change first."
-                : undefined,
-            label: "Move selected sections",
+            label: "Move to…",
             description:
-              "Move the selected sections to one destination. Their documents and subsections remain attached. Review the new paths before saving settings.",
-            options: [
-              { id: "root", label: "Top level" },
-              ...roots.map((root) => ({ id: root.id, label: root.name })),
-            ],
+              "Move selected documents and sections to one destination. Section documents stay attached. Review the paths, then save settings.",
+            successMessage:
+              "Navigation changes staged. Save settings to apply them.",
+            disabledReason: blocked
+              ? conflict || "Finish the current save first."
+              : undefined,
+            options: moveOptions(selection.actionIds),
             selectionMode: "single",
-            review: (values, ids) => {
-              const destination = values[0] === "root" ? undefined : values[0];
+            review: (values, keys) => {
               try {
-                if (
-                  ids.some((id) =>
-                    sections.some(
-                      (item) => item.parentId === id && ids.includes(item.id),
-                    ),
-                  )
-                )
-                  throw new Error(
-                    "Select either a parent or its subsection, not both.",
-                  );
-                let next = sections;
-                for (const id of ids)
-                  next = moveDocSection(next, id, destination);
+                const next = prepareMove(keys, values[0]);
                 return (
                   <ul className="text-copy">
-                    {ids.map((id) => (
-                      <li key={id}>
-                        {sectionPath(
-                          sections.find((item) => item.id === id)!,
-                          sections,
-                        )}{" "}
-                        →{" "}
-                        {sectionPath(
-                          next.find((item) => item.id === id)!,
-                          next,
-                        )}
+                    {keys.map((key) => (
+                      <li key={key}>
+                        {allItems.find((item) => item.id === key)?.label} →{" "}
+                        {isDoc(key)
+                          ? sectionPath(
+                              next.sections.find(
+                                (section) => section.id === values[0],
+                              )!,
+                              next.sections,
+                            )
+                          : sectionPath(
+                              next.sections.find(
+                                (section) => section.id === itemId(key),
+                              )!,
+                              next.sections,
+                            )}
                       </li>
                     ))}
                   </ul>
@@ -389,22 +635,11 @@ export function DocSectionsSettings({
                 return <p role="alert">{(error as Error).message}</p>;
               }
             },
-            apply: (values, ids = []) => {
-              const destination = values[0] === "root" ? undefined : values[0];
-              if (
-                ids.some((id) =>
-                  sections.some(
-                    (item) => item.parentId === id && ids.includes(item.id),
-                  ),
-                )
-              )
-                throw new Error(
-                  "Select either a parent or its subsection, not both.",
-                );
-              let next = sections;
-              for (const id of ids)
-                next = moveDocSection(next, id, destination);
-              onChange(next);
+            apply: (values, keys = []) => {
+              const next = prepareMove(keys, values[0]);
+              if (blocked) throw new Error("Finish the current save first.");
+              onChange(next.sections, next.moves);
+              revealDestination(values[0]);
             },
           },
           {
@@ -412,17 +647,28 @@ export function DocSectionsSettings({
             label: "Delete selected sections",
             destructive: true,
             description:
-              "Delete empty sections and selected empty subsections. Documents stay in place. Save settings to apply the changes.",
-            apply: (_, ids = []) => {
-              if (disabled || conflict)
-                throw new Error(conflict || "Finish the current change first.");
+              "Delete selected empty sections. Save settings to apply the changes.",
+            disabledReason: blocked
+              ? conflict || "Finish the current save first."
+              : selection.actionIds.some(isDoc)
+                ? "Select only sections to delete them here."
+                : undefined,
+            apply: (_, keys = []) => {
+              if (blocked || keys.some(isDoc))
+                throw new Error("Select only empty sections to delete them.");
               let next = sections;
-              const ordered = [...ids].sort(
-                (a, b) =>
-                  Number(!!sections.find((s) => s.id === b)?.parentId) -
-                  Number(!!sections.find((s) => s.id === a)?.parentId),
-              );
-              for (const id of ordered) next = deleteDocSection(next, id, docs);
+              const ids = keys
+                .map(itemId)
+                .sort(
+                  (a, b) =>
+                    Number(
+                      !!sections.find((section) => section.id === b)?.parentId,
+                    ) -
+                    Number(
+                      !!sections.find((section) => section.id === a)?.parentId,
+                    ),
+                );
+              for (const id of ids) next = deleteDocSection(next, id, docs);
               onChange(next);
             },
           },
@@ -430,117 +676,7 @@ export function DocSectionsSettings({
       />
       {sections.length ? (
         <ol className="doc-order-list">
-          <SectionOrderRows
-            items={roots}
-            disabled={disabled || !!conflict}
-            previewLabel={(section) =>
-              `${section.name} · ${sections.filter((child) => child.parentId === section.id).length} subsections`
-            }
-            onMove={(id, target) =>
-              act(() =>
-                reorderDocSection(
-                  sections,
-                  id,
-                  target - roots.findIndex((item) => item.id === id),
-                ),
-              )
-            }
-            renderRow={(root, siblings, drag) => (
-              <li
-                key={root.id}
-                className="list-none"
-                data-sortable-preview
-                data-drop={drag.dropPosition}
-                data-moved={drag.recentlyMoved}
-                data-branch-dragging={drag.dragging}
-                onDragOver={drag.onDragOver}
-                onDrop={drag.onDrop}
-              >
-                <ol className="doc-order-list">
-                  {row(root, siblings, drag)}
-                  {showDocs &&
-                    uniqueDocs
-                      .filter(
-                        (doc) => sectionForDoc(doc, sections)?.id === root.id,
-                      )
-                      .map((doc) => (
-                        <li
-                          key={doc.id}
-                          className="ms-10 text-copy text-muted-foreground"
-                        >
-                          {doc.title} · {doc.status}
-                        </li>
-                      ))}
-                  {expanded.has(root.id) && (
-                    <li className="list-none">
-                      <ol className="doc-order-list ms-6 border-s border-border ps-3">
-                        <SectionOrderRows
-                          items={sections.filter(
-                            (section) => section.parentId === root.id,
-                          )}
-                          disabled={disabled || !!conflict}
-                          onMove={(id, target) => {
-                            const children = sections.filter(
-                              (section) => section.parentId === root.id,
-                            );
-                            act(() =>
-                              reorderDocSection(
-                                sections,
-                                id,
-                                target -
-                                  children.findIndex((item) => item.id === id),
-                              ),
-                            );
-                          }}
-                          renderRow={(child, siblings, childDrag) => (
-                            <Fragment key={child.id}>
-                              {row(child, siblings, childDrag)}
-                              {showDocs &&
-                                uniqueDocs
-                                  .filter(
-                                    (doc) =>
-                                      sectionForDoc(doc, sections)?.id ===
-                                      child.id,
-                                  )
-                                  .map((doc) => (
-                                    <li
-                                      key={doc.id}
-                                      className="ms-10 text-copy text-muted-foreground"
-                                    >
-                                      {doc.title} · {doc.status}
-                                    </li>
-                                  ))}
-                            </Fragment>
-                          )}
-                        />
-                      </ol>
-                    </li>
-                  )}
-                  {creatingUnder === root.id && (
-                    <li className="ms-6 border-s border-border ps-3">
-                      <DocSectionCreate
-                        key={root.id}
-                        sections={sections}
-                        initialParentId={root.id}
-                        disabled={disabled || !!conflict}
-                        onCreate={(section) => {
-                          act(() =>
-                            availableDocSections(
-                              docs,
-                              [],
-                              [...sections, section],
-                            ),
-                          );
-                          setCreatingUnder("");
-                        }}
-                        onCancel={() => setCreatingUnder("")}
-                      />
-                    </li>
-                  )}
-                </ol>
-              </li>
-            )}
-          />
+          {roots.map((root) => sectionBranch(root, roots))}
         </ol>
       ) : (
         <p>No sections yet. Create one below.</p>
@@ -548,10 +684,12 @@ export function DocSectionsSettings({
       {creatingRoot && (
         <DocSectionCreate
           sections={sections}
-          disabled={disabled || !!conflict}
-          onCreate={(section) => {
+          disabled={blocked}
+          onCreate={(created) => {
             if (
-              act(() => availableDocSections(docs, [], [...sections, section]))
+              changeSections(() =>
+                availableDocSections(docs, [], [...sections, created]),
+              )
             )
               setCreatingRoot(false);
           }}
@@ -559,79 +697,51 @@ export function DocSectionsSettings({
         />
       )}
       <Dialog
-        open={!!movingSection}
+        open={!!moving}
         onOpenChange={(open) => {
-          if (!open) setMovingSection("");
+          if (!open) setMoving("");
         }}
       >
-        {movingSection && (
+        {moving && (
           <DialogContent>
-            <DialogTitle>Move section</DialogTitle>
+            <DialogTitle>
+              {isDoc(moving) ? "Move document" : "Move section"}
+            </DialogTitle>
             <DialogDescription>
-              Choose one top-level destination. A section’s documents and
-              subsections keep their IDs. Save settings after moving.
+              Choose a destination. Documents can sit at either level;
+              subsections belong under top-level sections. Save settings to
+              apply this move.
             </DialogDescription>
             <FormField label="Destination">
               <SelectField value={moveTarget} onValueChange={setMoveTarget}>
-                <option value="root">Top level</option>
-                {roots
-                  .filter((root) => root.id !== movingSection)
-                  .map((root) => (
-                    <option key={root.id} value={root.id}>
-                      {root.name}
-                    </option>
-                  ))}
+                {moveOptions([moving]).map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
               </SelectField>
             </FormField>
-            <p className="text-copy text-muted-foreground">
-              {sectionPath(
-                sections.find((item) => item.id === movingSection)!,
-                sections,
-              )}{" "}
-              →{" "}
-              {moveTarget === "root"
-                ? sections.find((item) => item.id === movingSection)?.name
-                : `${roots.find((item) => item.id === moveTarget)?.name} / ${sections.find((item) => item.id === movingSection)?.name}`}
-            </p>
-            {sections.some((item) => item.parentId === movingSection) &&
-              moveTarget !== "root" && (
-                <p role="alert">
-                  Move this section’s subsections first. Docs supports two
-                  levels.
-                </p>
-              )}
             <DialogFooter>
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setMovingSection("")}
+                onClick={() => setMoving("")}
               >
                 Cancel
               </Button>
               <Button
                 type="button"
                 disabled={
-                  disabled ||
-                  (moveTarget === "root"
-                    ? !sections.find((item) => item.id === movingSection)
-                        ?.parentId
-                    : moveTarget ===
-                        sections.find((item) => item.id === movingSection)
-                          ?.parentId ||
-                      sections.some((item) => item.parentId === movingSection))
+                  blocked ||
+                  !moveOptions([moving]).some(
+                    (option) => option.id === moveTarget,
+                  )
                 }
                 onClick={() => {
-                  act(() =>
-                    moveDocSection(
-                      sections,
-                      movingSection,
-                      moveTarget === "root" ? undefined : moveTarget,
-                    ),
-                  );
-                  setMovingSection("");
+                  if (stageMove([moving], moveTarget)) setMoving("");
                 }}
               >
-                Move section
+                {isDoc(moving) ? "Move document" : "Move section"}
               </Button>
             </DialogFooter>
           </DialogContent>

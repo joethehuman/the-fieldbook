@@ -90,9 +90,11 @@ export function publicSettings(
     settings.docSections,
   );
   const sectionIds = new Set<string>();
+  const publishedPlacements = new Map<string, string>();
   for (const doc of docs) {
     const section = sectionForDoc(doc, all);
     if (section) {
+      publishedPlacements.set(doc.id, section.id);
       sectionIds.add(section.id);
       if (section.parentId) sectionIds.add(section.parentId);
     }
@@ -104,9 +106,18 @@ export function publicSettings(
     docCategoryOrder: settings.docCategoryOrder?.filter((name) =>
       docs.some((doc) => doc.category === name),
     ),
-    docSections: settings.docSections?.filter((section) =>
-      sectionIds.has(section.id),
-    ),
+    docSections: settings.docSections
+      ?.filter((section) => sectionIds.has(section.id))
+      .map((section) => ({
+        ...section,
+        ...(section.docOrder
+          ? {
+              docOrder: section.docOrder.filter(
+                (id) => publishedPlacements.get(id) === section.id,
+              ),
+            }
+          : {}),
+      })),
     privacy: settings.privacy
       ? {
           ...settings.privacy,
