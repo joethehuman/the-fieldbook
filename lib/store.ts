@@ -1,3 +1,4 @@
+import { DEMO_PROFILE_IDS } from "./demo-session";
 import { reconcileLearning } from "./learning-groups";
 import { reconcileAssignments } from "./assignment-episodes";
 import { flattenLearningGroups } from "./group-conversion";
@@ -44,13 +45,7 @@ export type Workspace = {
   progress: Record<string, Progress[]>;
 };
 const KEY = "fieldbook.workspace.v1";
-export const SESSION = "fieldbook.profile.v1";
-export const DEMO_PROFILE_IDS = [
-  "demo-learner",
-  "demo-manager",
-  "demo-contributor",
-  "demo-admin",
-];
+export { SESSION, DEMO_PROFILE_IDS } from "./demo-session";
 export function freshWorkspace(): Workspace {
   const { settings, contentOverrides, ...sample } =
     structuredClone(hooliDemoData);

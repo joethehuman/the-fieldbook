@@ -1,0 +1,10 @@
+/* The parsing-time session hint chooses presentation until restoration settles. */
+[data-demo-startup-shell] {
+  display: none;
+}
+html[data-demo-session="resume"] [data-demo-startup-shell] {
+  display: block;
+}
+html[data-demo-session="resume"] [data-demo-startup-picker] {
+  display: none;
+}

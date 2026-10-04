@@ -8,6 +8,8 @@ import { Telemetry } from "../../server/telemetry";
 import "../../styles/globals.css";
 import { demoOgOrigin } from "../og-card";
 import { ogCardSize } from "../../lib/og-card";
+import { demoSessionScript } from "../../lib/demo-session";
+import "../startup.css";
 
 // Keep the first paint's font when the preloaded Geist asset arrives late.
 const GeistSans = localFont({
@@ -36,7 +38,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={GeistSans.variable}>
+    <html lang="en" className={GeistSans.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: demoSessionScript }} />
+      </head>
       <body>
         <DesktopSidebarProvider>
           <TooltipProvider>
