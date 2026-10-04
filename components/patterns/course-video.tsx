@@ -1,6 +1,5 @@
 "use client";
 import { useRef, useState } from "react";
-import { Maximize2, Minimize2 } from "lucide-react";
 import { videoSource } from "@/lib/video";
 import { Button } from "../ui/button";
 import { SelectField } from "../ui/select";
@@ -8,17 +7,16 @@ import { ActionGroup } from "../ui/action-group";
 import { Note } from "../ui/note";
 import { Field } from "../ui/field";
 
-export function CourseVideo({ url, title, posterUrl, allowTheater = true }: { url: string; title: string; posterUrl?: string; allowTheater?: boolean }) {
+export function CourseVideo({ url, title, posterUrl }: { url: string; title: string; posterUrl?: string }) {
   const source = videoSource(url);
   const ref = useRef<HTMLVideoElement>(null);
-  const [theater, setTheater] = useState(false);
   const [speed, setSpeed] = useState("1.2");
   const [retry, setRetry] = useState(0);
   const [failed, setFailed] = useState(false);
   const [ready, setReady] = useState(false);
   const position = useRef(0);
   if (!source) return <Note>This video URL is not supported. Ask an editor to update it.</Note>;
-  return <span className={theater ? "course-video theater" : "course-video"}>
+  return <span className="course-video">
     {source.type === "file" && !ready && !failed && <span className="course-video-loading" role="status">Loading video…</span>}
     {source.type === "embed" ? <iframe
       src={source.url} title={title} loading="lazy" allowFullScreen
@@ -36,7 +34,7 @@ export function CourseVideo({ url, title, posterUrl, allowTheater = true }: { ur
         setFailed(false);
       }}
     >Your browser does not support video playback.</video>}
-    <ActionGroup asChild className="course-video-actions"><span>
+    {source.type === "file" && <ActionGroup asChild className="course-video-actions"><span>
       {failed && source.type === "file" && <Button type="button" variant="outline" size="sm" onClick={() => { setRetry((value) => value + 1); setFailed(false); setReady(false); }}>Retry video</Button>}
       {source.type === "file" && <Field orientation="horizontal" className="course-video-speed">
         <span>Speed</span>
@@ -47,10 +45,6 @@ export function CourseVideo({ url, title, posterUrl, allowTheater = true }: { ur
           {["0.75", "1", "1.2", "1.5", "2"].map((value) => <option key={value} value={value}>{value}×</option>)}
         </SelectField>
       </Field>}
-      {allowTheater && <Button type="button" variant="outline" size="sm" onClick={() => setTheater(!theater)}>
-        {theater ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-        {theater ? "Exit theater" : "Theater view"}
-      </Button>}
-    </span></ActionGroup>
+    </span></ActionGroup>}
   </span>;
 }
