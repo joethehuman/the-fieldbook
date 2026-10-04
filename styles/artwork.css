@@ -95,4 +95,38 @@
     border-radius: var(--radius);
     overflow: hidden;
   }
+  .card-artwork[data-kind="course"],
+  .card-artwork[data-kind="curriculum"] {
+    height: auto;
+    min-height: 11.25rem;
+    display: flex;
+  }
+  .card-artwork[data-kind="course"] .card-artwork-copy,
+  .card-artwork[data-kind="curriculum"] .card-artwork-copy {
+    min-height: 11.25rem;
+    height: auto;
+    gap: 1.25rem;
+    padding: 1rem 1.25rem;
+  }
+  .card-artwork-learning-header .card-artwork-type {
+    max-width: none;
+    line-height: 1.5rem;
+  }
+  .card-artwork-category {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  .card-artwork-upload-header {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    min-height: 11.25rem;
+    padding: 1rem 1.25rem;
+    color: #ffffff;
+    background: linear-gradient(180deg, rgb(5 17 29 / 75%) 60%, transparent);
+  }
 }

@@ -6,20 +6,25 @@ import { useState, type ReactNode } from "react";
 export function CardImage({
   src,
   fallback,
+  overlay,
 }: {
   src: string;
   fallback: ReactNode;
+  overlay?: ReactNode;
 }) {
   const [failed, setFailed] = useState<string | null>(null);
   return failed === src ? (
     fallback
   ) : (
-    <img
-      className="card-artwork-image"
-      src={src}
-      alt=""
-      loading="lazy"
-      onError={() => setFailed(src)}
-    />
+    <>
+      <img
+        className="card-artwork-image"
+        src={src}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(src)}
+      />
+      {overlay}
+    </>
   );
 }

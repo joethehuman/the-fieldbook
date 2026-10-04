@@ -163,10 +163,12 @@ export function ProgressStatus({
   value,
   complete,
   started,
+  size = "default",
 }: {
   value: number;
   complete: boolean;
   started: boolean;
+  size?: "default" | "compact";
 }) {
   const percent = complete ? 100 : Math.min(99, percentage(value));
   const label = complete
@@ -182,11 +184,14 @@ export function ProgressStatus({
       {complete ? (
         <CheckCircle2
           aria-hidden="true"
-          className="size-5 shrink-0 text-success"
+          className={cn(
+            size === "compact" ? "size-4" : "size-5",
+            "shrink-0 text-success",
+          )}
         />
       ) : (
         <span role="img" aria-label={`${percent}% complete`}>
-          <RingGraphic value={percent} />
+          <RingGraphic value={percent} compact={size === "compact"} />
         </span>
       )}
       {label}

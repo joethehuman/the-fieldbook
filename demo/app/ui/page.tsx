@@ -28,7 +28,8 @@ import {
 } from "@/components/patterns/search-result";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
-import { LearningCard } from "@/components/patterns/learning-card";
+import { Clock3, BookOpen, ListChecks } from "lucide-react";
+import { LearningCardFact, LearningCard } from "@/components/patterns/learning-card";
 import { CardArtwork } from "@/components/patterns/card-artwork";
 import { CARD_ART_VERSION } from "@/lib/card-art";
 import { BrowseToolbar } from "@/components/patterns/layout";
@@ -428,7 +429,7 @@ export default function ComponentCatalog() {
               }
               description="Shared spacing, readable descriptions and aligned actions."
               metadata={
-                value === 33 ? "1 of 3 courses complete" : "2 lessons · Quiz"
+                value === 33 ? <LearningCardFact icon={BookOpen}>1 of 3 courses complete</LearningCardFact> : <><LearningCardFact icon={Clock3}>5 min</LearningCardFact><LearningCardFact icon={BookOpen}>2 lessons</LearningCardFact><LearningCardFact icon={ListChecks}>Quiz</LearningCardFact></>
               }
               status={{
                 percent: value,
@@ -441,6 +442,7 @@ export default function ComponentCatalog() {
                   title="Example course"
                   kind={value === 33 ? "curriculum" : "course"}
                   category={value === 33 ? undefined : "Product"}
+                  relevance={value === 100 ? undefined : value === 0 ? "Past due" : "For you"}
                 />
               }
               action={value === 33 ? "View curriculum" : "Start course"}
