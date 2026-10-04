@@ -4,6 +4,8 @@ No versions have been released. Package and MCP version strings do not constitut
 
 ## Unreleased
 
+- Docs navigation settings align section names and document counts, group the display toggle with section creation, and support document and subsection reordering with drag origin/destination feedback and keyboard-accessible move actions. Saving navigation order preserves document drafts and published content.
+
 - Prevent the demo account picker from flashing during session refresh. Check the saved profile before first paint and retain an inactive workspace shell until restoration finishes; first visits, explicit profile switching and storage recovery keep the picker.
 
 - Align Admin row and bulk menus across content, people, teams, groups, curricula, Docs sections and recovery. Bulk actions require at least two selected records; individual menus retain applicable commands for a single record and reuse existing reviews and safeguards.

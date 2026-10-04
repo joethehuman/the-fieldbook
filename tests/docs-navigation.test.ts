@@ -8,8 +8,10 @@ import {
   legacySectionConflict,
   moveDocSection,
   orderedDocs,
+  orderedSectionDocs,
   renameDocSection,
   reorderDocSection,
+  reorderDocInSection,
   sectionForDoc,
   sectionPath,
   validateDocSections,
@@ -118,9 +120,17 @@ test("drag insertion order matches the preview across three or more siblings", (
     { id: "d", name: "D" },
   ];
   const moved = reorderDocSection(sections, "a", 3);
-  assert.deepEqual(moved.filter((section) => !section.parentId).map((section) => section.id), ["b", "c", "d", "a"]);
+  assert.deepEqual(
+    moved.filter((section) => !section.parentId).map((section) => section.id),
+    ["b", "c", "d", "a"],
+  );
   assert.equal(moved.find((section) => section.id === "a1")?.parentId, "a");
-  assert.deepEqual(reorderDocSection(moved, "a", -3).filter((section) => !section.parentId).map((section) => section.id), ["a", "b", "c", "d"]);
+  assert.deepEqual(
+    reorderDocSection(moved, "a", -3)
+      .filter((section) => !section.parentId)
+      .map((section) => section.id),
+    ["a", "b", "c", "d"],
+  );
 });
 
 test("write validation rejects invalid depth, cycles, parents and sibling duplicates", () => {
@@ -186,10 +196,20 @@ test("one legacy folder is a subsection; deeper legacy paths are reported", () =
 
 test("a document keeps its placement visible if a concurrent edit removes its section", () => {
   const placed = doc("one", "Start", "Install", "missing");
-  const sections = availableDocSections([placed], [], [{ id: "root", name: "Start", legacyCategory: "Start" }]);
+  const sections = availableDocSections(
+    [placed],
+    [],
+    [{ id: "root", name: "Start", legacyCategory: "Start" }],
+  );
   assert.equal(sectionForDoc(placed, sections)?.id, "missing");
-  assert.equal(sectionPath(sectionForDoc(placed, sections)!, sections), "Start → Install");
-  assert.deepEqual(orderedDocs([placed], [], sections).map((item) => item.id), ["one"]);
+  assert.equal(
+    sectionPath(sectionForDoc(placed, sections)!, sections),
+    "Start → Install",
+  );
+  assert.deepEqual(
+    orderedDocs([placed], [], sections).map((item) => item.id),
+    ["one"],
+  );
 });
 
 test("public settings expose only sections needed by published Docs", () => {
@@ -212,4 +232,86 @@ test("public settings expose only sections needed by published Docs", () => {
     ["a", "x"],
   );
   assert.deepEqual(visible.docCategoryOrder, []);
+});
+
+test("document reordering saves navigation only and keeps publication, placement and other branches", () => {
+  const sections = [
+    { id: "a", name: "Start" },
+    { id: "x", name: "Install", parentId: "a" },
+    { id: "b", name: "Reference" },
+  ];
+  const docs = [
+    { ...doc("first", "Start", "", "a"), sectionOrder: 2 },
+    { ...doc("second", "Start", "", "a"), sectionOrder: 1 },
+    doc("draft", "Start", "", "a", "draft"),
+    doc("child", "Start", "Install", "x"),
+    doc("other", "Reference", "", "b"),
+  ];
+  const before = structuredClone(docs);
+  assert.deepEqual(
+    orderedSectionDocs(docs, sections, "a").map((item) => item.id),
+    ["draft", "second", "first"],
+  );
+  const moved = reorderDocInSection(sections, docs, "a", "first", 0);
+  assert.deepEqual(moved[0].docOrder, ["first", "draft", "second"]);
+  assert.deepEqual(
+    orderedDocs(docs, [], moved).map((item) => item.id),
+    ["first", "second", "child", "other"],
+  );
+  assert.deepEqual(docs, before);
+  assert.strictEqual(moved[1], sections[1]);
+  assert.strictEqual(moved[2], sections[2]);
+  assert.strictEqual(reorderDocInSection(moved, docs, "a", "child", 0), moved);
+  assert.strictEqual(reorderDocInSection(moved, docs, "a", "first", -1), moved);
+  assert.strictEqual(reorderDocInSection(moved, docs, "a", "first", 8), moved);
+});
+
+test("saved order tolerates missing documents and appends new pages using existing order", () => {
+  const sections = [
+    { id: "a", name: "Start", docOrder: ["gone", "second", "first"] },
+  ];
+  const docs = [
+    doc("first", "Start", "", "a"),
+    doc("new", "Start", "", "a"),
+    doc("second", "Start", "", "a"),
+  ];
+  assert.deepEqual(
+    orderedDocs(docs, [], sections).map((item) => item.id),
+    ["second", "first", "new"],
+  );
+  const moved = reorderDocInSection(sections, docs, "a", "new", 0);
+  assert.deepEqual(moved[0].docOrder, ["new", "second", "first"]);
+});
+
+test("public document ordering excludes draft-only and unrelated document IDs", () => {
+  const sections = [
+    {
+      id: "a",
+      name: "Start",
+      docOrder: ["draft", "other", "second", "first", "gone"],
+    },
+    { id: "b", name: "Reference" },
+  ];
+  const docs = [
+    doc("first", "Start", "", "a"),
+    doc("second", "Start", "", "a"),
+    doc("draft", "Start", "", "a", "draft"),
+    doc("other", "Reference", "", "b"),
+  ];
+  const visible = publicSettings(
+    { ...defaultSettings, docSections: sections },
+    docs,
+  );
+  assert.deepEqual(visible.docSections?.[0].docOrder, ["second", "first"]);
+  assert.deepEqual(
+    orderedDocs(docs, [], visible.docSections).map((item) => item.id),
+    ["second", "first", "other"],
+  );
+  assert.throws(
+    () =>
+      validateDocSections([
+        { id: "a", name: "Start", docOrder: ["first", "first"] },
+      ]),
+    /unique document IDs/,
+  );
 });

@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 
-test("reordering shows the whole row in motion and retains arrow controls", async ({
+test("reordering shows the whole row in motion and retains keyboard controls", async ({
   page,
 }, info) => {
   await page.goto("/ui");
-  await page.getByRole("tab", { name: "Learning", exact: true }).click();
+  await page.getByRole("tab", { name: "Assigned Courses", exact: true }).click();
   const rows = page.locator(".learning-order [data-slot=reorder-row]");
   await expect(rows.first()).toContainText("Company essentials");
   const handle = rows
@@ -37,8 +37,8 @@ test("reordering shows the whole row in motion and retains arrow controls", asyn
   await expect(rows.first()).toContainText("Customer conversations");
   await rows
     .nth(1)
-    .getByRole("button", { name: "Move Company essentials up" })
-    .click();
+    .getByRole("button", { name: /Reorder Company essentials/ })
+    .press("ArrowUp");
   await expect(rows.first()).toContainText("Company essentials");
 });
 

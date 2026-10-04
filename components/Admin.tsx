@@ -223,7 +223,7 @@ const adminSections = [
       {
         id: "settings-docs",
         name: "Docs navigation",
-        description: "Choose the section order for Docs.",
+        description: "Arrange sections, subsections and documents for Docs.",
         icon: FileText,
       },
       {

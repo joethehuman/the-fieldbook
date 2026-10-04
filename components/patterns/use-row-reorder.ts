@@ -25,6 +25,7 @@ export function useRowReorder<T extends { id: string }>(
 
   function start(event: DragEvent<HTMLElement>, id: string) {
     if (disabled) return event.preventDefault();
+    event.stopPropagation();
     const item = items.find((candidate) => candidate.id === id);
     if (item) {
       const preview = document.createElement("div");
@@ -42,6 +43,7 @@ export function useRowReorder<T extends { id: string }>(
   function over(event: DragEvent<HTMLElement>, id: string) {
     if (!drag || disabled) return;
     event.preventDefault();
+    event.stopPropagation();
     event.dataTransfer.dropEffect = "move";
     if (drag.active === id)
       return setDrag((current) =>
@@ -60,6 +62,7 @@ export function useRowReorder<T extends { id: string }>(
   function drop(event: DragEvent<HTMLElement>) {
     if (!drag) return;
     event.preventDefault();
+    event.stopPropagation();
     const from = sourceIds.indexOf(drag.active);
     const to = drag.destination ? sourceIds.indexOf(drag.destination.id) : -1;
     const insertion =

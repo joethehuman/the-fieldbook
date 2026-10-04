@@ -307,7 +307,7 @@ export default function SiteSettingsPanel({
           id="settings-docs"
           title={<h3>Document sections</h3>}
           description="Organize top-level sections and their subsections. Documents can sit at either level."
-          guidance="Expand a section to see its subsections. Reorder within a level, or use Move to… to change a section’s parent. Move documents and subsections before deleting a section. Empty sections remain available in the editor; readers see sections with published documents."
+          guidance="Drag sections and subsections within their level. Show documents to reorder pages within each section. Row actions also offer Move up and Move down; use Move to… to change a section’s parent. Save settings to apply the navigation order. Empty sections remain available in the editor; readers see sections with published documents."
           actions={saveAction}
         >
           <DocSectionsSettings
@@ -325,7 +325,7 @@ export default function SiteSettingsPanel({
                 docSections: next,
                 docCategoryOrder: [],
               }));
-              setNotice("Save settings to apply the section changes.");
+              setNotice("Save settings to apply the navigation changes.");
             }}
           />
         </SettingsGroup>

@@ -1,12 +1,14 @@
 "use client";
-import { Fragment, useState, type DragEvent, type ReactNode } from "react";
+import { useState, type DragEvent, type ReactNode } from "react";
 import { ChevronRight, GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import {
   availableDocSections,
   deleteDocSection,
   legacySectionConflict,
   moveDocSection,
+  orderedSectionDocs,
   renameDocSection,
+  reorderDocInSection,
   reorderDocSection,
   sectionForDoc,
   sectionPath,
@@ -47,29 +49,20 @@ type DragControls = {
   onDrop: (event: DragEvent<HTMLLIElement>) => void;
 };
 
-function SectionOrderRows({
+function NavigationOrderRows<T extends { id: string }>({
   items,
   disabled,
   onMove,
   previewLabel,
   renderRow,
 }: {
-  items: DocSection[];
+  items: T[];
   disabled: boolean;
   onMove: (id: string, index: number) => void;
-  previewLabel?: (section: DocSection) => string;
-  renderRow: (
-    section: DocSection,
-    siblings: DocSection[],
-    drag: DragControls,
-  ) => ReactNode;
+  previewLabel: (item: T) => string;
+  renderRow: (section: T, siblings: T[], drag: DragControls) => ReactNode;
 }) {
-  const drag = useRowReorder(
-    items,
-    onMove,
-    disabled,
-    previewLabel || ((section) => section.name),
-  );
+  const drag = useRowReorder(items, onMove, disabled, previewLabel);
   return drag.ordered.map((section) =>
     renderRow(section, items, {
       handle: (
@@ -80,7 +73,7 @@ function SectionOrderRows({
           className="order-handle"
           draggable={!disabled}
           disabled={disabled}
-          aria-label={`Reorder ${section.name}; use up or down buttons`}
+          aria-label={`Reorder ${previewLabel(section)}; use Move up or Move down in Actions`}
           onDragStart={(event) => drag.start(event, section.id)}
           onDragEnd={drag.cancel}
         >
@@ -141,9 +134,7 @@ export function DocSectionsSettings({
   ) => {
     const index = siblings.findIndex((item) => item.id === section.id);
     const children = sections.filter((item) => item.parentId === section.id);
-    const directDocs = uniqueDocs.filter(
-      (doc) => sectionForDoc(doc, sections)?.id === section.id,
-    );
+    const directDocs = orderedSectionDocs(uniqueDocs, sections, section.id);
     const subtreeDocs =
       directDocs.length +
       children.reduce(
@@ -158,43 +149,11 @@ export function DocSectionsSettings({
     return (
       <ReorderRow
         key={section.id}
-        data-sortable-preview={section.parentId ? true : undefined}
-        data-dragging={drag.dragging}
         data-selected={selection.selected.includes(section.id)}
-        data-drop={section.parentId ? drag.dropPosition : undefined}
-        data-moved={section.parentId ? drag.recentlyMoved : undefined}
-        onDragOver={section.parentId ? drag.onDragOver : undefined}
-        onDrop={section.parentId ? drag.onDrop : undefined}
         title={
-          <div className="flex min-w-0 items-center gap-2">
-            {children.length ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                aria-label={`${open ? "Collapse" : "Expand"} ${section.name}`}
-                aria-expanded={open}
-                onClick={() =>
-                  setExpanded((previous) => {
-                    const next = new Set(previous);
-                    if (next.has(section.id)) next.delete(section.id);
-                    else next.add(section.id);
-                    return next;
-                  })
-                }
-              >
-                <ChevronRight
-                  className={open ? "rotate-90" : ""}
-                  aria-hidden="true"
-                />
-              </Button>
-            ) : (
-              <span className="w-9 shrink-0" />
-            )}
-            <strong className="min-w-0 [overflow-wrap:anywhere]">
-              {section.name}
-            </strong>
-          </div>
+          <strong className="block text-left [overflow-wrap:anywhere]">
+            {section.name}
+          </strong>
         }
         handle={drag.handle}
         compactActions
@@ -226,95 +185,190 @@ export function DocSectionsSettings({
           </span>
         }
         actions={
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+          <>
+            {!!children.length && (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                disabled={disabled || !!conflict}
-                aria-label={`Actions for ${sectionPath(section, sections)}`}
+                aria-label={`${open ? "Collapse" : "Expand"} ${section.name}`}
+                aria-expanded={open}
+                onClick={() =>
+                  setExpanded((previous) => {
+                    const next = new Set(previous);
+                    if (next.has(section.id)) next.delete(section.id);
+                    else next.add(section.id);
+                    return next;
+                  })
+                }
               >
-                <MoreHorizontal size={18} aria-hidden="true" />
+                <ChevronRight
+                  className={open ? "rotate-90" : ""}
+                  aria-hidden="true"
+                />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={index === 0}
-                onSelect={() =>
-                  act(() => reorderDocSection(sections, section.id, -1))
-                }
-              >
-                Move up
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={index === siblings.length - 1}
-                onSelect={() =>
-                  act(() => reorderDocSection(sections, section.id, 1))
-                }
-              >
-                Move down
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onSelect={() => {
-                  setMovingSection(section.id);
-                  setMoveTarget(section.parentId || "root");
-                }}
-              >
-                Move to…
-              </DropdownMenuItem>
-              {!section.parentId && (
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  disabled={disabled || !!conflict}
+                  aria-label={`Actions for ${sectionPath(section, sections)}`}
+                >
+                  <MoreHorizontal size={18} aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  disabled={index === 0}
+                  onSelect={() =>
+                    act(() => reorderDocSection(sections, section.id, -1))
+                  }
+                >
+                  Move up
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={index === siblings.length - 1}
+                  onSelect={() =>
+                    act(() => reorderDocSection(sections, section.id, 1))
+                  }
+                >
+                  Move down
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() => {
-                    setCreatingUnder(section.id);
-                    setExpanded((previous) =>
-                      new Set(previous).add(section.id),
-                    );
+                    setMovingSection(section.id);
+                    setMoveTarget(section.parentId || "root");
                   }}
                 >
-                  Add subsection
+                  Move to…
                 </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                onSelect={async () => {
-                  const name = await prompt("Rename section", section.name);
-                  if (name !== null)
-                    act(() => renameDocSection(sections, section.id, name));
-                }}
-              >
-                Rename
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onSelect={async () => {
-                  try {
-                    const next = deleteDocSection(sections, section.id, docs);
-                    if (
-                      await confirm(
-                        `Delete empty section ${sectionPath(section, sections)}?`,
-                        { submitLabel: "Delete section", destructive: true },
+                {!section.parentId && (
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      setCreatingUnder(section.id);
+                      setExpanded((previous) =>
+                        new Set(previous).add(section.id),
+                      );
+                    }}
+                  >
+                    Add subsection
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuItem
+                  onSelect={async () => {
+                    const name = await prompt("Rename section", section.name);
+                    if (name !== null)
+                      act(() => renameDocSection(sections, section.id, name));
+                  }}
+                >
+                  Rename
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onSelect={async () => {
+                    try {
+                      const next = deleteDocSection(sections, section.id, docs);
+                      if (
+                        await confirm(
+                          `Delete empty section ${sectionPath(section, sections)}?`,
+                          { submitLabel: "Delete section", destructive: true },
+                        )
                       )
-                    )
-                      act(() => next);
-                  } catch (error) {
-                    setError((error as Error).message);
-                  }
-                }}
-              >
-                Delete section
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                        act(() => next);
+                    } catch (error) {
+                      setError((error as Error).message);
+                    }
+                  }}
+                >
+                  Delete section
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         }
       />
+    );
+  };
+
+  const documentRows = (section: DocSection) => {
+    const items = orderedSectionDocs(uniqueDocs, sections, section.id);
+    if (!showDocs || !items.length) return null;
+    const move = (id: string, target: number) =>
+      act(() =>
+        reorderDocInSection(sections, uniqueDocs, section.id, id, target),
+      );
+    return (
+      <li className="list-none">
+        <ol
+          className="doc-order-list ms-6 border-s border-border ps-3"
+          aria-label={`Documents in ${sectionPath(section, sections)}`}
+        >
+          <NavigationOrderRows
+            items={items}
+            disabled={disabled || !!conflict}
+            previewLabel={(doc) => `document ${doc.title}`}
+            onMove={move}
+            renderRow={(doc, siblings, drag) => {
+              const index = siblings.findIndex((item) => item.id === doc.id);
+              return (
+                <ReorderRow
+                  key={doc.id}
+                  data-sortable-preview
+                  data-dragging={drag.dragging}
+                  data-drop={drag.dropPosition}
+                  data-moved={drag.recentlyMoved}
+                  onDragOver={drag.onDragOver}
+                  onDrop={drag.onDrop}
+                  handle={drag.handle}
+                  title={<span className="block text-left">{doc.title}</span>}
+                  detail={doc.status === "published" ? "Published" : "Draft"}
+                  compactActions
+                  actions={
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={disabled || !!conflict}
+                          aria-label={`Actions for document ${doc.title}`}
+                        >
+                          <MoreHorizontal size={18} aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          disabled={index === 0}
+                          onSelect={() => move(doc.id, index - 1)}
+                        >
+                          Move up
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          disabled={index === siblings.length - 1}
+                          onSelect={() => move(doc.id, index + 1)}
+                        >
+                          Move down
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  }
+                />
+              );
+            }}
+          />
+        </ol>
+      </li>
     );
   };
   return (
     <div>
       {conflict && <p role="alert">{conflict}</p>}
       {error && <p role="alert">{error}</p>}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant={creatingRoot ? "outline" : "default"}
@@ -327,6 +381,7 @@ export function DocSectionsSettings({
         <Button
           type="button"
           variant="outline"
+          aria-pressed={showDocs}
           onClick={() => setShowDocs((value) => !value)}
         >
           {showDocs ? "Hide documents" : "Show documents"}
@@ -430,7 +485,7 @@ export function DocSectionsSettings({
       />
       {sections.length ? (
         <ol className="doc-order-list">
-          <SectionOrderRows
+          <NavigationOrderRows
             items={roots}
             disabled={disabled || !!conflict}
             previewLabel={(section) =>
@@ -458,27 +513,18 @@ export function DocSectionsSettings({
               >
                 <ol className="doc-order-list">
                   {row(root, siblings, drag)}
-                  {showDocs &&
-                    uniqueDocs
-                      .filter(
-                        (doc) => sectionForDoc(doc, sections)?.id === root.id,
-                      )
-                      .map((doc) => (
-                        <li
-                          key={doc.id}
-                          className="ms-10 text-copy text-muted-foreground"
-                        >
-                          {doc.title} · {doc.status}
-                        </li>
-                      ))}
+                  {documentRows(root)}
                   {expanded.has(root.id) && (
                     <li className="list-none">
                       <ol className="doc-order-list ms-6 border-s border-border ps-3">
-                        <SectionOrderRows
+                        <NavigationOrderRows
                           items={sections.filter(
                             (section) => section.parentId === root.id,
                           )}
                           disabled={disabled || !!conflict}
+                          previewLabel={(section) =>
+                            sectionPath(section, sections)
+                          }
                           onMove={(id, target) => {
                             const children = sections.filter(
                               (section) => section.parentId === root.id,
@@ -493,24 +539,21 @@ export function DocSectionsSettings({
                             );
                           }}
                           renderRow={(child, siblings, childDrag) => (
-                            <Fragment key={child.id}>
-                              {row(child, siblings, childDrag)}
-                              {showDocs &&
-                                uniqueDocs
-                                  .filter(
-                                    (doc) =>
-                                      sectionForDoc(doc, sections)?.id ===
-                                      child.id,
-                                  )
-                                  .map((doc) => (
-                                    <li
-                                      key={doc.id}
-                                      className="ms-10 text-copy text-muted-foreground"
-                                    >
-                                      {doc.title} · {doc.status}
-                                    </li>
-                                  ))}
-                            </Fragment>
+                            <li
+                              key={child.id}
+                              className="list-none"
+                              data-sortable-preview
+                              data-drop={childDrag.dropPosition}
+                              data-moved={childDrag.recentlyMoved}
+                              data-branch-dragging={childDrag.dragging}
+                              onDragOver={childDrag.onDragOver}
+                              onDrop={childDrag.onDrop}
+                            >
+                              <ol className="doc-order-list">
+                                {row(child, siblings, childDrag)}
+                                {documentRows(child)}
+                              </ol>
+                            </li>
                           )}
                         />
                       </ol>

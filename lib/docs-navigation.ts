@@ -4,6 +4,8 @@ export type DocSection = {
   id: string;
   name: string;
   parentId?: string;
+  /** Navigation order only; document draft and publication snapshots stay intact. */
+  docOrder?: string[];
   // Retain the original path for old draft and published snapshots.
   legacyCategory?: string;
   legacyFolder?: string;
@@ -108,6 +110,15 @@ export function validateDocSections(sections: DocSection[]): void {
     if (!section.id || section.id.length > 1500 || ids.has(section.id))
       throw new Error("Docs sections need unique, stable IDs.");
     ids.add(section.id);
+    if (
+      section.docOrder &&
+      (section.docOrder.length > 5000 ||
+        new Set(section.docOrder).size !== section.docOrder.length ||
+        section.docOrder.some((id) => !id || id.length > 80))
+    )
+      throw new Error(
+        "Document order needs unique document IDs (up to 5,000 per section).",
+      );
     if (
       !section.name.trim() ||
       section.name !== section.name.trim() ||
@@ -218,6 +229,53 @@ export function sectionForDoc(
       (section.legacyFolder ?? "") === folder,
   );
 }
+
+export function orderedSectionDocs(
+  docs: DocLink[],
+  sections: DocSection[],
+  sectionId: string,
+): DocLink[] {
+  const order =
+    sections.find((section) => section.id === sectionId)?.docOrder || [];
+  const positions = new Map(order.map((id, index) => [id, index]));
+  return docs
+    .filter((doc) => sectionForDoc(doc, sections)?.id === sectionId)
+    .sort((a, b) => {
+      const first = positions.get(a.id),
+        second = positions.get(b.id);
+      if (first !== undefined || second !== undefined)
+        return (first ?? order.length) - (second ?? order.length);
+      return (a.sectionOrder || 0) - (b.sectionOrder || 0);
+    });
+}
+
+export function reorderDocInSection(
+  sections: DocSection[],
+  docs: DocLink[],
+  sectionId: string,
+  id: string,
+  targetIndex: number,
+): DocSection[] {
+  const ordered = orderedSectionDocs(docs, sections, sectionId).map(
+    (doc) => doc.id,
+  );
+  const from = ordered.indexOf(id);
+  if (
+    from < 0 ||
+    !Number.isInteger(targetIndex) ||
+    targetIndex < 0 ||
+    targetIndex >= ordered.length ||
+    from === targetIndex
+  )
+    return sections;
+  ordered.splice(from, 1);
+  ordered.splice(targetIndex, 0, id);
+  const next = sections.map((section) =>
+    section.id === sectionId ? { ...section, docOrder: ordered } : section,
+  );
+  validateDocSections(next);
+  return next;
+}
 export function deleteDocSection(
   sections: DocSection[],
   id: string,
@@ -296,9 +354,7 @@ export function docSections(
   const branch = (section: DocSection): DocBranch => ({
     id: section.id,
     name: section.name,
-    docs: published
-      .filter((doc) => sectionForDoc(doc, sections)?.id === section.id)
-      .sort((a, b) => (a.sectionOrder || 0) - (b.sectionOrder || 0)),
+    docs: orderedSectionDocs(published, sections, section.id),
     folders: sections
       .filter((item) => item.parentId === section.id)
       .map(branch),
