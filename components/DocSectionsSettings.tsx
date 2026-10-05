@@ -1,6 +1,14 @@
 "use client";
 import { useRef, useState, type DragEvent } from "react";
-import { ChevronRight, GripVertical, MoreHorizontal, Plus } from "lucide-react";
+import {
+  ChevronRight,
+  FileText,
+  Folder,
+  FolderOpen,
+  GripVertical,
+  MoreHorizontal,
+  Plus,
+} from "lucide-react";
 import {
   availableDocSections,
   deleteDocSection,
@@ -20,6 +28,7 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { ReorderRow } from "./patterns/reorder-row";
+import { PublicationStatus } from "./patterns/publication-status";
 import { useRowReorder } from "./patterns/use-row-reorder";
 import { FormField } from "./patterns/form-field";
 import DocSectionCreate from "./DocSectionCreate";
@@ -361,8 +370,11 @@ export function DocSectionsSettings({
               onDrop={drag.drop}
               handle={handle(docKey(doc.id), `document ${doc.title}`)}
               selection={select(docKey(doc.id), `document ${doc.title}`)}
+              icon={<FileText className="size-4" />}
               title={<span className="block text-left">{doc.title}</span>}
-              detail={doc.status === "published" ? "Published" : "Draft"}
+              detail={
+                <PublicationStatus published={doc.status === "published"} />
+              }
               compactActions
               actions={
                 <DropdownMenu>
@@ -433,6 +445,13 @@ export function DocSectionsSettings({
             handle={handle(key, sectionPath(section, sections))}
             selection={select(key, sectionPath(section, sections))}
             compactActions
+            icon={
+              open ? (
+                <FolderOpen className="size-4" />
+              ) : (
+                <Folder className="size-4" />
+              )
+            }
             data-selected={selection.selected.includes(key)}
             data-drop-inside={inside}
             className="data-[drop-inside=true]:bg-selected data-[drop-inside=true]:border-primary"

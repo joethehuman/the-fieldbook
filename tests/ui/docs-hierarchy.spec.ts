@@ -197,6 +197,33 @@ test("section expansion reveals direct Docs and subsections together while child
     .getByRole("button", { name: "Expand Nested", exact: true })
     .click();
   await expect(nestedDocs).toContainText("Nested guide");
+  const rows = page.locator('[data-slot="reorder-row"]');
+  const root = rows.filter({ has: page.getByRole("button", { name: "Actions for Start", exact: true }) });
+  await expect(root.locator('[data-slot="reorder-icon"] .lucide-folder-open')).toHaveCount(1);
+  await expect(directDocs.locator('[data-slot="reorder-icon"] .lucide-file-text')).toHaveCount(3);
+  await expect(directDocs.locator('[data-slot="badge"]')).toHaveText(["Published", "Published", "Draft"]);
+  const alignment = await rows.evaluateAll((elements) => elements.map((row) => {
+    const checkbox = row.querySelector('[role="checkbox"]')!.getBoundingClientRect();
+    const icon = row.querySelector('[data-slot="reorder-icon"] svg')!.getBoundingClientRect();
+    const title = row.querySelector('[data-slot="reorder-title"] > *')!;
+    const titleBox = title.getBoundingClientRect();
+    const detail = row.querySelector('[data-slot="reorder-detail"]')!.getBoundingClientRect();
+    const firstLineCenter = titleBox.top + parseFloat(getComputedStyle(title).lineHeight) / 2;
+    return {
+      checkboxOffset: Math.abs(checkbox.top + checkbox.height / 2 - firstLineCenter),
+      iconOffset: Math.abs(icon.top + icon.height / 2 - firstLineCenter),
+      metadataOffset: Math.abs(detail.left - titleBox.left),
+      metadataBelowTitle: detail.top >= titleBox.bottom,
+      overflow: row.scrollWidth - row.clientWidth,
+    };
+  }));
+  for (const row of alignment) {
+    expect(row.checkboxOffset).toBeLessThan(1);
+    expect(row.iconOffset).toBeLessThan(1);
+    expect(row.metadataOffset).toBeLessThan(1);
+    expect(row.metadataBelowTitle).toBe(true);
+    expect(row.overflow).toBe(0);
+  }
   await page.screenshot({
     path: info.outputPath("docs-expanded-hierarchy.png"),
     fullPage: true,
