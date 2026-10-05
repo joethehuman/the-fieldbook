@@ -26,7 +26,7 @@ test("all reading surfaces render video blocks while ordinary references remain 
     assert.match(html, /<iframe[^>]+youtube-nocookie/);
     assert.match(html, /i\.ytimg\.com\/vi\/69V__a49xtw\/maxresdefault\.jpg/);
     assert.match(html, /<iframe[^>]+loading="lazy"/);
-    assert.match(html, /Loading video…/);
+    assert.doesNotMatch(html, /Loading video…/);
     assert.match(html, /<video[^>]+00000000-0000-4000-8000-000000000001.mp4/);
     assert.match(html, /<a[^>]+>Reference/);
     assert.doesNotMatch(html, /<div\b/);
@@ -42,5 +42,6 @@ test("active course video loads its player and thumbnail immediately without aut
   assert.match(html, /i\.ytimg\.com\/vi\/69V__a49xtw\/maxresdefault\.jpg/);
   assert.match(html, /<iframe[^>]+loading="eager"/);
   assert.match(html, /<iframe[^>]+aria-hidden="true"/);
+  assert.doesNotMatch(html, /Loading video…/);
   assert.doesNotMatch(html, /autoplay=1/);
 });
