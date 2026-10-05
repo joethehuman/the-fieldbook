@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { canPublish, canAdminister, canOpenAdminTab } from "../lib/permissions";
 import { reportTeamIds, type User } from "../lib/types";
+import { availableDocSections, sectionForDoc } from "../lib/docs-navigation";
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -187,6 +188,8 @@ test("contributor migration preserves records and enforces publishing, recovery,
       ]),
       /Revision conflict/,
     );
+    // Removing an empty section must not destroy a deleted Doc's recovery path.
+    await pg.exec(`reset role; update fb_config set settings=jsonb_set(settings,'{docSections}','[]'); set role service_role;`);
     assert.equal(
       await query("select fb_restore_deleted($1,'content',$2,3) value", [
         id(2),
@@ -200,6 +203,11 @@ test("contributor migration preserves records and enforces publishing, recovery,
     );
     assert.equal(restored.published, null);
     assert.equal(restored.draft.status, "draft");
+    assert.equal(restored.deleted_at, null);
+    assert.equal(restored.draft.sectionId, "guide");
+    const recoveredSections = availableDocSections([restored.draft], [], []);
+    assert.equal(sectionForDoc(restored.draft, recoveredSections)?.name, "Guides");
+    assert.equal(await query("select count(*)::int value from fb_deleted_items where entity='content' and id=$1", [id(11)]), 0);
     const scoped = await query("select fb_governance_snapshot($1) value", [
       id(2),
     ]);

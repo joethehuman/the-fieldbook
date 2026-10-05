@@ -100,6 +100,7 @@ export function BulkSelectionBar({
   noun,
   range,
   onClear,
+  summaryControl,
   children,
 }: {
   count: number;
@@ -107,6 +108,7 @@ export function BulkSelectionBar({
   noun: string;
   range?: string;
   onClear: () => void;
+  summaryControl?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -115,7 +117,14 @@ export function BulkSelectionBar({
       role="region"
       aria-label="Selected items"
     >
-      <SelectionSummary range={range || `${total} ${noun}`} count={count} />
+      {summaryControl ? (
+        <div className="flex min-w-0 items-center gap-2">
+          {summaryControl}
+          <SelectionSummary range={range || `${total} ${noun}`} count={count} />
+        </div>
+      ) : (
+        <SelectionSummary range={range || `${total} ${noun}`} count={count} />
+      )}
       <ActionGroup className="ms-auto justify-end">
         {count > 0 && (
           <Button variant="ghost" onClick={onClear}>

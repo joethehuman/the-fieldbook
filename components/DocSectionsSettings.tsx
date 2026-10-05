@@ -1,6 +1,16 @@
 "use client";
-import { useState, type DragEvent } from "react";
-import { ChevronRight, GripVertical, MoreHorizontal, Plus } from "lucide-react";
+import { useRef, useState, type DragEvent } from "react";
+import {
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  FileText,
+  Folder,
+  FolderOpen,
+  GripVertical,
+  MoreHorizontal,
+  Plus,
+} from "lucide-react";
 import {
   availableDocSections,
   deleteDocSection,
@@ -18,8 +28,10 @@ import {
 } from "@/lib/docs-navigation";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
+import { Tooltip } from "./ui/tooltip";
 import { SelectField } from "./ui/select";
 import { ReorderRow } from "./patterns/reorder-row";
+import { PublicationStatus } from "./patterns/publication-status";
 import { useRowReorder } from "./patterns/use-row-reorder";
 import { FormField } from "./patterns/form-field";
 import DocSectionCreate from "./DocSectionCreate";
@@ -41,6 +53,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
+export type DocNavigationIssue = { title: string; message: string };
 type Placement = { id: string; sectionId: string };
 const sectionKey = (id: string) => `section:${id}`;
 const docKey = (id: string) => `doc:${id}`;
@@ -52,24 +65,48 @@ export function DocSectionsSettings({
   docs,
   disabled,
   onChange,
+  onError,
 }: {
   sections: DocSection[];
   docs: DocLink[];
   disabled: boolean;
   onChange: (sections: DocSection[], moves?: Placement[]) => void;
+  onError: (issue: DocNavigationIssue) => void;
 }) {
   const { confirm, prompt } = useInteractionDialog();
-  const [error, setError] = useState("");
+  const menuIssue = useRef<DocNavigationIssue | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [creatingUnder, setCreatingUnder] = useState("");
-  const [creatingRoot, setCreatingRoot] = useState(false);
-  const [showDocs, setShowDocs] = useState(false);
+  const [creating, setCreating] = useState<{ parentId: string } | null>(null);
+  const createTrigger = useRef<HTMLElement | null>(null);
+  const sectionTriggers = useRef(new Map<string, HTMLButtonElement>());
+  const createCompleted = useRef(false);
+  const createdRow = useRef<HTMLLIElement | null>(null);
+  const [createdId, setCreatedId] = useState("");
   const [moving, setMoving] = useState("");
   const [moveTarget, setMoveTarget] = useState("");
   const conflict = legacySectionConflict(docs);
   const blocked = disabled || !!conflict;
   const uniqueDocs = [...new Map(docs.map((doc) => [doc.id, doc])).values()];
   const roots = sections.filter((section) => !section.parentId);
+  const expandableRoots = roots.filter(
+    (root) =>
+      sections.some((section) => section.parentId === root.id) ||
+      uniqueDocs.some((doc) => sectionForDoc(doc, sections)?.id === root.id),
+  );
+  const allRootsExpanded =
+    expandableRoots.length > 0 &&
+    expandableRoots.every((root) => expanded.has(root.id));
+  const sectionVisible = (section: DocSection) =>
+    !section.parentId || expanded.has(section.parentId);
+  const visibleIds = [
+    ...sections.filter(sectionVisible).map((section) => sectionKey(section.id)),
+    ...uniqueDocs
+      .filter((doc) => {
+        const section = sectionForDoc(doc, sections);
+        return section && sectionVisible(section) && expanded.has(section.id);
+      })
+      .map((doc) => docKey(doc.id)),
+  ];
   const allItems = [
     ...sections.map((section) => ({
       id: sectionKey(section.id),
@@ -81,13 +118,11 @@ export function DocSectionsSettings({
     })),
   ];
   const selection = useBulkSelection(
-    `docs-navigation-${showDocs}`,
-    allItems
-      .filter((item) => showDocs || !isDoc(item.id))
-      .map((item) => item.id),
+    "docs-navigation",
+    allItems.map((item) => item.id),
+    visibleIds,
   );
   function act(change: () => { sections: DocSection[]; moves?: Placement[] }) {
-    setError("");
     try {
       if (blocked)
         throw new Error(conflict || "Finish the current save first.");
@@ -95,7 +130,10 @@ export function DocSectionsSettings({
       onChange(result.sections, result.moves);
       return true;
     } catch (error) {
-      setError((error as Error).message);
+      onError({
+        title: "Couldn’t update navigation",
+        message: (error as Error).message,
+      });
       return false;
     }
   }
@@ -128,9 +166,11 @@ export function DocSectionsSettings({
   function revealDestination(id: string) {
     const destination = sections.find((section) => section.id === id);
     if (destination)
-      setExpanded((current) =>
-        new Set(current).add(destination.parentId || destination.id),
-      );
+      setExpanded((current) => {
+        const next = new Set(current).add(destination.id);
+        if (destination.parentId) next.add(destination.parentId);
+        return next;
+      });
   }
   function stageMove(keys: string[], target: string) {
     const success = act(() => prepareMove(keys, target));
@@ -319,7 +359,7 @@ export function DocSectionsSettings({
       : undefined;
   function documentRows(section: DocSection) {
     const items = orderedSectionDocs(uniqueDocs, sections, section.id);
-    if (!showDocs || !items.length) return null;
+    if (!expanded.has(section.id) || !items.length) return null;
     return (
       <li className="list-none">
         <ol
@@ -338,8 +378,11 @@ export function DocSectionsSettings({
               onDrop={drag.drop}
               handle={handle(docKey(doc.id), `document ${doc.title}`)}
               selection={select(docKey(doc.id), `document ${doc.title}`)}
+              icon={<FileText className="size-4" />}
               title={<span className="block text-left">{doc.title}</span>}
-              detail={doc.status === "published" ? "Published" : "Draft"}
+              detail={
+                <PublicationStatus published={doc.status === "published"} />
+              }
               compactActions
               actions={
                 <DropdownMenu>
@@ -405,9 +448,18 @@ export function DocSectionsSettings({
       >
         <ol className="doc-order-list">
           <ReorderRow
+            ref={createdId === section.id ? createdRow : undefined}
+            tabIndex={createdId === section.id ? -1 : undefined}
             handle={handle(key, sectionPath(section, sections))}
             selection={select(key, sectionPath(section, sections))}
             compactActions
+            icon={
+              open ? (
+                <FolderOpen className="size-4" />
+              ) : (
+                <Folder className="size-4" />
+              )
+            }
             data-selected={selection.selected.includes(key)}
             data-drop-inside={inside}
             className="data-[drop-inside=true]:bg-selected data-[drop-inside=true]:border-primary"
@@ -425,7 +477,7 @@ export function DocSectionsSettings({
             }
             actions={
               <>
-                {children.length > 0 && (
+                {(children.length > 0 || count > 0) && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -456,11 +508,25 @@ export function DocSectionsSettings({
                       size="icon"
                       disabled={blocked}
                       aria-label={`Actions for ${sectionPath(section, sections)}`}
+                      ref={(button) => {
+                        if (button)
+                          sectionTriggers.current.set(section.id, button);
+                        else sectionTriggers.current.delete(section.id);
+                      }}
                     >
                       <MoreHorizontal size={18} aria-hidden="true" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent
+                    align="end"
+                    onCloseAutoFocus={(event) => {
+                      const issue = menuIssue.current;
+                      if (!issue) return;
+                      menuIssue.current = null;
+                      event.preventDefault();
+                      onError(issue);
+                    }}
+                  >
                     <DropdownMenuItem
                       disabled={index === 0}
                       onSelect={() => reorder(key, -1)}
@@ -479,10 +545,11 @@ export function DocSectionsSettings({
                     {!section.parentId && (
                       <DropdownMenuItem
                         onSelect={() => {
-                          setCreatingUnder(section.id);
-                          setExpanded((current) =>
-                            new Set(current).add(section.id),
-                          );
+                          createTrigger.current =
+                            sectionTriggers.current.get(section.id) || null;
+                          createCompleted.current = false;
+                          setCreatedId("");
+                          setCreating({ parentId: section.id });
                         }}
                       >
                         Add subsection
@@ -523,7 +590,10 @@ export function DocSectionsSettings({
                           )
                             changeSections(() => next);
                         } catch (error) {
-                          setError((error as Error).message);
+                          menuIssue.current = {
+                            title: `Can’t delete “${sectionPath(section, sections)}”`,
+                            message: (error as Error).message,
+                          };
                         }
                       }}
                     >
@@ -542,50 +612,25 @@ export function DocSectionsSettings({
               </ol>
             </li>
           )}
-          {creatingUnder === section.id && (
-            <li className="ms-6 border-s border-border ps-3">
-              <DocSectionCreate
-                sections={sections}
-                initialParentId={section.id}
-                disabled={blocked}
-                onCreate={(created) => {
-                  if (
-                    changeSections(() =>
-                      availableDocSections(docs, [], [...sections, created]),
-                    )
-                  )
-                    setCreatingUnder("");
-                }}
-                onCancel={() => setCreatingUnder("")}
-              />
-            </li>
-          )}
         </ol>
       </li>
     );
   }
   return (
     <div>
-      {conflict && <p role="alert">{conflict}</p>}
-      {error && <p role="alert">{error}</p>}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          variant={creatingRoot ? "outline" : "default"}
           disabled={blocked}
-          onClick={() => setCreatingRoot((current) => !current)}
+          onClick={(event) => {
+            createTrigger.current = event.currentTarget;
+            createCompleted.current = false;
+            setCreatedId("");
+            setCreating({ parentId: "" });
+          }}
         >
-          {!creatingRoot && <Plus aria-hidden="true" />}
-          {creatingRoot ? "Cancel new section" : "New section"}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={blocked}
-          aria-pressed={showDocs}
-          onClick={() => setShowDocs((current) => !current)}
-        >
-          {showDocs ? "Hide documents" : "Show documents"}
+          <Plus aria-hidden="true" />
+          New section
         </Button>
       </div>
       <BulkActions
@@ -593,6 +638,39 @@ export function DocSectionsSettings({
         selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
         noun="items"
+        summaryControl={
+          <Tooltip
+            content={allRootsExpanded ? "Collapse sections" : "Expand sections"}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground"
+              disabled={blocked || !expandableRoots.length}
+              aria-label={
+                allRootsExpanded ? "Collapse sections" : "Expand sections"
+              }
+              aria-expanded={allRootsExpanded}
+              onClick={() =>
+                setExpanded((current) =>
+                  allRootsExpanded
+                    ? new Set()
+                    : new Set([
+                        ...current,
+                        ...expandableRoots.map((root) => root.id),
+                      ]),
+                )
+              }
+            >
+              {allRootsExpanded ? (
+                <ChevronsDownUp aria-hidden="true" />
+              ) : (
+                <ChevronsUpDown aria-hidden="true" />
+              )}
+            </Button>
+          </Tooltip>
+        }
         commands={[
           {
             id: "move",
@@ -675,27 +753,72 @@ export function DocSectionsSettings({
         ]}
       />
       {sections.length ? (
-        <ol className="doc-order-list">
+        <ol className="doc-order-list mt-3">
           {roots.map((root) => sectionBranch(root, roots))}
         </ol>
       ) : (
-        <p>No sections yet. Create one below.</p>
+        <p>No sections yet. Create a section to get started.</p>
       )}
-      {creatingRoot && (
-        <DocSectionCreate
-          sections={sections}
-          disabled={blocked}
-          onCreate={(created) => {
-            if (
-              changeSections(() =>
-                availableDocSections(docs, [], [...sections, created]),
-              )
-            )
-              setCreatingRoot(false);
-          }}
-          onCancel={() => setCreatingRoot(false)}
-        />
-      )}
+      <Dialog
+        open={!!creating}
+        onOpenChange={(open) => {
+          if (!open) setCreating(null);
+        }}
+      >
+        {creating && (
+          <DialogContent
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              if (!createCompleted.current) {
+                createTrigger.current?.focus({ preventScroll: true });
+                return;
+              }
+              // Reveal only after the modal releases focus and the new row mounts.
+              requestAnimationFrame(() => {
+                const row = createdRow.current;
+                if (!row?.isConnected) return;
+                row.focus({ preventScroll: true });
+                row.scrollIntoView({
+                  block: "center",
+                  behavior: window.matchMedia(
+                    "(prefers-reduced-motion: reduce)",
+                  ).matches
+                    ? "instant"
+                    : "smooth",
+                });
+              });
+            }}
+          >
+            <DialogTitle>
+              {creating.parentId ? "New subsection" : "New section"}
+            </DialogTitle>
+            <DialogDescription>
+              Create a section, then save settings to apply your navigation
+              changes.
+            </DialogDescription>
+            <DocSectionCreate
+              sections={sections}
+              initialParentId={creating.parentId}
+              disabled={blocked}
+              onCreate={(created) => {
+                if (blocked)
+                  throw new Error(conflict || "Finish the current save first.");
+                onChange(
+                  availableDocSections(docs, [], [...sections, created]),
+                );
+                if (created.parentId)
+                  setExpanded((current) =>
+                    new Set(current).add(created.parentId!),
+                  );
+                createCompleted.current = true;
+                setCreatedId(created.id);
+                setCreating(null);
+              }}
+              onCancel={() => setCreating(null)}
+            />
+          </DialogContent>
+        )}
+      </Dialog>
       <Dialog
         open={!!moving}
         onOpenChange={(open) => {

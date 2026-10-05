@@ -65,6 +65,7 @@ export function BulkActions({
   onSelectionChange,
   commands,
   noun = "items",
+  summaryControl,
   children,
 }: {
   selected: string[];
@@ -75,6 +76,7 @@ export function BulkActions({
   onSelectionChange: (ids: string[]) => void;
   commands: BulkCommand[];
   noun?: string;
+  summaryControl?: ReactNode;
   children?: ReactNode;
 }) {
   selected = [...new Set(selected)];
@@ -198,15 +200,16 @@ export function BulkActions({
             })),
           ]}
         />
-      ) : collectionSize > 1 ? (
+      ) : collectionSize > 1 || summaryControl ? (
         <BulkSelectionBar
           count={selected.length}
           total={collectionSize}
           noun={noun}
           range={range}
+          summaryControl={summaryControl}
           onClear={() => onSelectionChange([])}
         >
-          {menu}
+          {collectionSize > 1 && menu}
         </BulkSelectionBar>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-3">

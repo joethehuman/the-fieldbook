@@ -634,8 +634,9 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
   const rows = page.locator(
     ".doc-order-list > li > .doc-order-list > [data-slot=reorder-row]:first-child",
   );
+  // Empty sections have no expansion chevron; their Actions buttons still align.
   const actionX = await rows
-    .locator("[data-slot=reorder-actions]")
+    .getByRole("button", { name: /^Actions for / })
     .evaluateAll((nodes) => nodes.map((n) => n.getBoundingClientRect().x));
   expect(Math.max(...actionX) - Math.min(...actionX)).toBeLessThan(1);
   const firstText = await rows.first().locator("strong").innerText();

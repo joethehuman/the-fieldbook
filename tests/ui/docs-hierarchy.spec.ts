@@ -16,7 +16,11 @@ async function openSettings(page: Page) {
       .click();
 }
 
-async function openOrderingFixture(page: Page, long = false) {
+async function openOrderingFixture(
+  page: Page,
+  long = false,
+  expansion = false,
+) {
   const data = freshWorkspace();
   const base = data.content.find((item) => item.kind === "doc")!;
   data.content = [
@@ -84,6 +88,31 @@ async function openOrderingFixture(page: Page, long = false) {
       { id: "troubleshooting", name: "Troubleshooting", parentId: "start" },
     ],
   };
+  if (expansion) {
+    data.settings.docSections!.push(
+      { id: "docs-only", name: "Direct Docs" },
+      { id: "children-only", name: "Subsections only" },
+      { id: "nested", name: "Nested", parentId: "children-only" },
+    );
+    data.content.push(
+      {
+        ...data.content[0],
+        id: "direct",
+        title: "Direct guide",
+        sectionId: "docs-only",
+        category: "Direct Docs",
+        folder: "",
+      },
+      {
+        ...data.content[0],
+        id: "nested-doc",
+        title: "Nested guide",
+        sectionId: "nested",
+        category: "Subsections only",
+        folder: "Nested",
+      },
+    );
+  }
   if (long)
     data.settings.docSections!.push(
       ...Array.from({ length: 28 }, (_, index) => ({
@@ -101,25 +130,159 @@ async function openOrderingFixture(page: Page, long = false) {
   return data;
 }
 
+test("section expansion reveals direct Docs and subsections together while child Docs expand independently", async ({
+  page,
+}, info) => {
+  const before = await openOrderingFixture(page, false, true);
+  const directDocs = page.getByRole("list", {
+    name: "Documents in Start",
+    exact: true,
+  });
+  const childDocs = page.getByRole("list", {
+    name: "Documents in Start → Install",
+    exact: true,
+  });
+  const childRow = page.getByRole("button", {
+    name: "Actions for Start → Install",
+    exact: true,
+  });
+  await expect(directDocs).toHaveCount(0);
+  await expect(childRow).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Expand Reference with a longer section name",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "Expand Start", exact: true }).click();
+  await expect(directDocs).toContainText("Draft guide");
+  await expect(childRow).toBeVisible();
+  await expect(childDocs).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Expand Install", exact: true })
+    .click();
+  await expect(childDocs).toContainText("Install first");
+  await page
+    .getByRole("button", { name: "Collapse Install", exact: true })
+    .click();
+  await expect(childDocs).toHaveCount(0);
+  await expect(directDocs).toBeVisible();
+  await page
+    .getByRole("button", { name: "Collapse Start", exact: true })
+    .click();
+  await expect(directDocs).toHaveCount(0);
+  await expect(childRow).toHaveCount(0);
+
+  await page
+    .getByRole("button", { name: "Expand sections", exact: true })
+    .click();
+  await expect(directDocs).toBeVisible();
+  await expect(childRow).toBeVisible();
+  await expect(
+    page.getByRole("list", { name: "Documents in Direct Docs", exact: true }),
+  ).toContainText("Direct guide");
+  await expect(
+    page.getByRole("button", {
+      name: "Actions for Subsections only → Nested",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(childDocs).toHaveCount(0);
+  const nestedDocs = page.getByRole("list", {
+    name: "Documents in Subsections only → Nested",
+    exact: true,
+  });
+  await expect(nestedDocs).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Expand Nested", exact: true })
+    .click();
+  await expect(nestedDocs).toContainText("Nested guide");
+  const rows = page.locator('[data-slot="reorder-row"]');
+  const root = rows.filter({ has: page.getByRole("button", { name: "Actions for Start", exact: true }) });
+  await expect(root.locator('[data-slot="reorder-icon"] .lucide-folder-open')).toHaveCount(1);
+  await expect(directDocs.locator('[data-slot="reorder-icon"] .lucide-file-text')).toHaveCount(3);
+  await expect(directDocs.locator('[data-slot="badge"]')).toHaveText(["Published", "Published", "Draft"]);
+  const alignment = await rows.evaluateAll((elements) => elements.map((row) => {
+    const checkbox = row.querySelector('[role="checkbox"]')!.getBoundingClientRect();
+    const icon = row.querySelector('[data-slot="reorder-icon"] svg')!.getBoundingClientRect();
+    const title = row.querySelector('[data-slot="reorder-title"] > *')!;
+    const titleBox = title.getBoundingClientRect();
+    const detail = row.querySelector('[data-slot="reorder-detail"]')!.getBoundingClientRect();
+    const firstLineCenter = titleBox.top + parseFloat(getComputedStyle(title).lineHeight) / 2;
+    return {
+      checkboxOffset: Math.abs(checkbox.top + checkbox.height / 2 - firstLineCenter),
+      iconOffset: Math.abs(icon.top + icon.height / 2 - firstLineCenter),
+      inlineMetadata: detail.left > titleBox.right && Math.abs(detail.top + detail.height / 2 - firstLineCenter) < 1,
+      height: row.getBoundingClientRect().height,
+      overflow: row.scrollWidth - row.clientWidth,
+    };
+  }));
+  for (const row of alignment) {
+    expect(row.checkboxOffset).toBeLessThan(1);
+    expect(row.iconOffset).toBeLessThan(1);
+    if (info.project.name !== "phone") {
+      expect(row.inlineMetadata).toBe(true);
+      expect(row.height).toBeLessThanOrEqual(54);
+    }
+    expect(row.overflow).toBe(0);
+  }
+  await root.evaluate((el) => el.scrollIntoView({ block: "start", behavior: "instant" }));
+  await page.screenshot({
+    path: info.outputPath("docs-expanded-hierarchy.png"),
+    fullPage: true,
+  });
+  await page
+    .getByRole("button", { name: "Collapse sections", exact: true })
+    .click();
+  await expect(page.getByRole("list", { name: /^Documents in / })).toHaveCount(
+    0,
+  );
+  await expect(childRow).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Expand sections", exact: true })
+    .click();
+  await expect(childDocs).toHaveCount(0);
+  await expect(nestedDocs).toHaveCount(0);
+  await expect(page.locator('[data-slot="pending-changes-bar"]')).toBeHidden();
+  const stored = await page.evaluate(() =>
+    JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
+  );
+  expect(stored.settings.docSections).toEqual(before.settings!.docSections);
+});
+
 test("document move actions stage, discard and save the reader order without changing drafts", async ({
   page,
 }, info) => {
   const fixture = await openOrderingFixture(page);
-  const first = page.getByRole("button", { name: "New section", exact: true });
   const toggle = page.getByRole("button", {
-    name: "Show documents",
+    name: "Expand sections",
     exact: true,
   });
-  const firstBox = await first.boundingBox(),
-    toggleBox = await toggle.boundingBox();
-  expect(Math.abs(firstBox!.y - toggleBox!.y)).toBeLessThan(1);
+  const toolbar = page.getByRole("region", { name: "Selected items", exact: true });
+  const toggleBox = await toggle.boundingBox(),
+    summaryBox = await toolbar.getByRole("status").first().boundingBox(),
+    toolbarBox = await toolbar.boundingBox();
+  expect(toggleBox!.x + toggleBox!.width).toBeLessThan(summaryBox!.x);
+  expect(
+    Math.abs(
+      toggleBox!.y + toggleBox!.height / 2 - summaryBox!.y - summaryBox!.height / 2,
+    ),
+  ).toBeLessThan(1);
   const header = page
     .locator('[data-slot="reorder-row"]')
     .filter({ has: page.getByText("Start", { exact: true }) });
+  const headerBox = await header.boundingBox();
+  expect(
+    headerBox!.y - toolbarBox!.y - toolbarBox!.height,
+  ).toBeGreaterThanOrEqual(12);
   const title = await header.locator("strong").boundingBox(),
     count = await header.locator("small").boundingBox();
-  expect(Math.abs(title!.x - count!.x)).toBeLessThan(1);
+  expect(count!.x).toBeGreaterThan(title!.x + title!.width);
+  expect(Math.abs(title!.y + title!.height / 2 - count!.y - count!.height / 2)).toBeLessThan(1);
+  await page.screenshot({ path: info.outputPath("docs-navigation-toolbar.png") });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click();
+  await expect(page.getByRole("button", { name: "Collapse sections", exact: true })).toHaveAttribute("aria-expanded", "true");
   const documents = page.getByRole("list", {
     name: "Documents in Start",
     exact: true,
@@ -175,7 +338,7 @@ test("document move actions stage, discard and save the reader order without cha
   await page.reload();
   await openSettings(page);
   await page
-    .getByRole("button", { name: "Show documents", exact: true })
+    .getByRole("button", { name: "Expand sections", exact: true })
     .click();
   await expect(
     documents.locator('[data-slot="reorder-row"]').first(),
@@ -190,7 +353,7 @@ test("document move actions stage, discard and save the reader order without cha
     fullPage: true,
   });
   await page
-    .getByRole("button", { name: "Hide documents", exact: true })
+    .getByRole("button", { name: "Collapse sections", exact: true })
     .click();
   await expect(documents).toHaveCount(0);
   const docsButton = page.getByRole("button", { name: "Docs", exact: true });
@@ -266,9 +429,6 @@ test("subsection and document drags show their origin and insertion destination 
   const children = child("Usage").locator("xpath=..");
   await expect(children.locator(":scope > li").nth(0)).toContainText("Usage");
   await expect(children.locator(":scope > li").nth(1)).toContainText("Install");
-  await page
-    .getByRole("button", { name: "Show documents", exact: true })
-    .click();
   const documents = page.getByRole("list", {
     name: "Documents in Start",
     exact: true,
@@ -286,6 +446,9 @@ test("subsection and document drags show their origin and insertion destination 
     name: "Documents in Start → Install",
     exact: true,
   });
+  await page
+    .getByRole("button", { name: "Expand Install", exact: true })
+    .click();
   await childDocuments.scrollIntoViewIfNeeded();
   await dragAfter(
     page,
@@ -428,6 +591,10 @@ test("Docs settings move and rename a subsection without losing published placem
     page.getByText("Sections under the same parent need different names."),
   ).toBeVisible();
   await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await page
     .getByRole("button", { name: "Actions for Reference → Installation" })
     .click();
   await page.getByRole("menuitem", { name: "Delete section" }).click();
@@ -516,9 +683,8 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
 }, info) => {
   const before = await openOrderingFixture(page, true);
   await page
-    .getByRole("button", { name: "Show documents", exact: true })
+    .getByRole("button", { name: "Expand sections", exact: true })
     .click();
-  await page.getByRole("button", { name: "Expand Start", exact: true }).click();
   await chooseMoveDestination(
     page,
     "Actions for document First guide",
@@ -555,17 +721,30 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
   });
   await expect(bar).toBeInViewport();
   await expect(bar).toHaveCSS("opacity", "1");
-  const frame = await page.locator('[data-slot="pending-changes-region"]').evaluate((region) => {
-    const outer = region.getBoundingClientRect();
-    const inner = region.querySelector('[data-slot="pending-changes-bar"]')!.getBoundingClientRect();
-    const card = document.getElementById("settings-docs")!.getBoundingClientRect();
-    return {
-      left: outer.left, right: outer.right, top: outer.top,
-      bottom: outer.bottom, barTop: inner.top, barBottom: inner.bottom,
-      barLeft: inner.left, barRight: inner.right, cardLeft: card.left, cardRight: card.right,
-      background: getComputedStyle(region).backgroundColor,
-    };
-  });
+  const frame = await page
+    .locator('[data-slot="pending-changes-region"]')
+    .evaluate((region) => {
+      const outer = region.getBoundingClientRect();
+      const inner = region
+        .querySelector('[data-slot="pending-changes-bar"]')!
+        .getBoundingClientRect();
+      const card = document
+        .getElementById("settings-docs")!
+        .getBoundingClientRect();
+      return {
+        left: outer.left,
+        right: outer.right,
+        top: outer.top,
+        bottom: outer.bottom,
+        barTop: inner.top,
+        barBottom: inner.bottom,
+        barLeft: inner.left,
+        barRight: inner.right,
+        cardLeft: card.left,
+        cardRight: card.right,
+        background: getComputedStyle(region).backgroundColor,
+      };
+    });
   expect(frame.left).toBeLessThan(frame.cardLeft);
   expect(frame.right).toBeGreaterThan(frame.cardRight);
   expect(frame.barTop).toBeGreaterThan(frame.top);
@@ -648,7 +827,7 @@ test("cross-section row and mixed bulk moves remain pending, discard and save, w
   await page.reload();
   await openSettings(page);
   await page
-    .getByRole("button", { name: "Show documents", exact: true })
+    .getByRole("button", { name: "Expand sections", exact: true })
     .click();
   await expect(
     page.getByRole("list", {
@@ -690,10 +869,11 @@ test("pending save bar opens and closes smoothly without a dormant gap, and resp
     return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   });
   expect((await guidance.boundingBox())!.width).toBeCloseTo(footerContentWidth, 1);
-  expect(await bar.locator("button").first().evaluate((button) => {
+  await expect(region).toHaveAttribute("inert", "");
+  expect(await bar.evaluate((element) => [...element.querySelectorAll("button")].some((button) => {
     button.focus();
     return document.activeElement === button;
-  })).toBe(false);
+  }))).toBe(false);
 
   await page.getByRole("button", { name: "Actions for Start", exact: true }).click();
   const opening = await pendingTransitionHeights(page.getByRole("menuitem", { name: "Move down", exact: true }));
@@ -737,9 +917,8 @@ async function dragInto(
   branch = false,
 ) {
   await source.scrollIntoViewIfNeeded();
-  const from = await source.boundingBox(),
-    to = await target.boundingBox();
-  expect(from && to).toBeTruthy();
+  const from = await source.boundingBox();
+  expect(from).toBeTruthy();
   await page.mouse.move(from!.x + from!.width / 2, from!.y + from!.height / 2);
   await page.mouse.down();
   await page.mouse.move(
@@ -750,6 +929,10 @@ async function dragInto(
   await expect(
     source.locator("xpath=ancestor::li[@data-sortable-preview][1]"),
   ).toHaveAttribute(branch ? "data-branch-dragging" : "data-dragging", "true");
+  // Expanded subsections can put the destination below the viewport.
+  await target.scrollIntoViewIfNeeded();
+  const to = await target.boundingBox();
+  expect(to).toBeTruthy();
   await page.mouse.move(to!.x + to!.width / 2, to!.y + to!.height / 2, {
     steps: 12,
   });
@@ -769,7 +952,7 @@ test("native drag moves documents and subsection branches into another section, 
   );
   await openOrderingFixture(page);
   await page
-    .getByRole("button", { name: "Show documents", exact: true })
+    .getByRole("button", { name: "Expand sections", exact: true })
     .click();
 
   const reference = page
@@ -791,7 +974,7 @@ test("native drag moves documents and subsection branches into another section, 
     }),
   ).toContainText("First guide");
   await page
-    .getByRole("button", { name: "Hide documents", exact: true })
+    .getByRole("button", { name: "Collapse sections", exact: true })
     .click();
   await page.getByRole("button", { name: "Expand Start", exact: true }).click();
   await dragInto(
@@ -802,7 +985,7 @@ test("native drag moves documents and subsection branches into another section, 
     true,
   );
   await page
-    .getByRole("button", { name: "Show documents", exact: true })
+    .getByRole("button", { name: "Expand Install", exact: true })
     .click();
   await expect(
     page.getByRole("list", {
