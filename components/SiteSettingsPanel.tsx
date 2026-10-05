@@ -1,7 +1,7 @@
 "use client";
 import { PendingChangesBar } from "./patterns/pending-changes-bar";
 import type { DocNavigationMove, SaveDocsNavigation } from "@/lib/docs-navigation-save";
-import { sectionForDoc } from "@/lib/docs-navigation";
+import { legacySectionConflict, sectionForDoc } from "@/lib/docs-navigation";
 import { DeadlineReview } from "./DeadlineReview";
 import { FormField } from "@/components/patterns/form-field";
 import { TextField } from "./patterns/text-field";
@@ -14,9 +14,9 @@ import { Field, FieldGroup, FieldDescription } from "@/components/ui/field";
 import { Button } from "./ui/button";
 import { SelectField } from "./ui/select";
 import { Switch } from "./ui/switch";
-import { DocSectionsSettings } from "./DocSectionsSettings";
+import { DocSectionsSettings, type DocNavigationIssue } from "./DocSectionsSettings";
 import { ActionGroup } from "./ui/action-group";
-import { Plus } from "lucide-react";
+import { CircleAlert, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { CardPaletteSettings } from "./CardPaletteSettings";
@@ -59,7 +59,7 @@ export default function SiteSettingsPanel({
 }) {
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
-  const saveError = useRevealTarget({ block: section === "docs" ? "nearest" : "start" });
+  const saveError = useRevealTarget({ scroll: section !== "docs" });
   const loadedSettings = (workspace: Workspace) => {
     const saved = (workspace.settings || {}) as Partial<typeof defaultSettings> & {
       logoUrl?: string;
@@ -79,12 +79,17 @@ export default function SiteSettingsPanel({
   const saveBase = useRef(data);
   const savedSettings = useRef(settings);
   const [docMoves, setDocMoves] = useState<DocNavigationMove[]>([]);
+  const [docsIssue, setDocsIssue] = useState<DocNavigationIssue | null>(null);
+  const docsEditor = useRef<HTMLDivElement>(null);
   const dirty = docMoves.length > 0 || !equalJson(settings, savedSettings.current);
-  const docsSaveActive = dirty || busy || !!notice;
   const visibleDocs = [...data.content, ...(data.publishedContent || [])].filter((item) => item.kind === "doc").map((doc) => {
     const move = docMoves.find((item) => item.id === doc.id);
     return move ? { ...doc, sectionId: move.sectionId } : doc;
   });
+  const docsConflict = legacySectionConflict(visibleDocs);
+  const docsFeedback = docsIssue || (notice ? { title: "Couldn’t save navigation", message: notice } :
+    docsConflict ? { title: "Navigation needs attention", message: docsConflict } : null);
+  const docsSaveActive = dirty || busy || !!docsFeedback;
   const guard = useRef(async () => true);
   guard.current = async () =>
     !busy &&
@@ -123,7 +128,7 @@ export default function SiteSettingsPanel({
     savedSettings.current = latest;
     setSettings(latest);
   }
-  const discard = () => { setSettings(savedSettings.current); setDocMoves([]); setNotice(""); };
+  const discard = () => { setSettings(savedSettings.current); setDocMoves([]); setNotice(""); setDocsIssue(null); };
   const saveAction = (
     <ActionGroup>
       {dirty && <span role="status" className="text-caption text-muted-foreground">Unsaved changes</span>}
@@ -160,6 +165,7 @@ export default function SiteSettingsPanel({
         }
         setBusy(true);
         setNotice("");
+        setDocsIssue(null);
         try {
           const next =
             section === "docs"
@@ -323,17 +329,29 @@ export default function SiteSettingsPanel({
       )}
       {section === "docs" && (
         <div className="min-w-0 [overflow-anchor:none]">
-          <PendingChangesBar active={docsSaveActive} feedback={notice ? (
-            <Alert variant="destructive" role="alert" {...saveError.targetProps}>
-              {notice}
+          <PendingChangesBar active={docsSaveActive} feedback={docsFeedback ? (
+            <Alert variant="destructive" role="alert" {...saveError.targetProps}
+              className="grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-s-2">
+              <CircleAlert aria-hidden="true" className="mt-0.5 size-5" />
+              <div className="min-w-0">
+                <strong className="block font-semibold">{docsFeedback.title}</strong>
+                <p className="mt-1">{docsFeedback.message}</p>
+              </div>
+              {(docsIssue || notice) && <Button type="button" variant="ghost" size="icon" aria-label="Dismiss navigation warning" onClick={() => {
+                setDocsIssue(null);
+                setNotice("");
+                docsEditor.current?.focus({ preventScroll: true });
+              }}><X aria-hidden="true" /></Button>}
             </Alert>
-          ) : undefined} actions={<>
+          ) : undefined} actions={dirty || busy ? <>
             <Button type="button" variant="outline" disabled={busy} onClick={discard}>Discard changes</Button>
             <Button type="submit" loading={busy}>{busy ? "Saving…" : "Save settings"}</Button>
-          </>}>{busy ? "Saving changes…" : "Unsaved changes"}</PendingChangesBar>
+          </> : null}>{busy ? "Saving changes…" : dirty ? "Unsaved changes" : null}</PendingChangesBar>
           <SettingsGroup
             measure="full"
             id="settings-docs"
+            ref={docsEditor}
+            tabIndex={-1}
             className={docsSaveActive ? "rounded-t-none border-t-0" : undefined}
             title={<h3>Document sections</h3>}
             description="Organize top-level sections and their subsections. Documents can sit at either level."
@@ -343,7 +361,13 @@ export default function SiteSettingsPanel({
               sections={docSections}
               docs={visibleDocs}
               disabled={busy}
+              onError={(issue) => {
+                setDocsIssue(issue);
+                // Let the previously hidden sticky bar enter before focusing its alert.
+                requestAnimationFrame(() => saveError.reveal());
+              }}
               onChange={(next, moves = []) => {
+                setDocsIssue(null);
                 setDocMoves((current) => {
                   const result = new Map(current.map((item) => [item.id, item]));
                   for (const move of moves) {

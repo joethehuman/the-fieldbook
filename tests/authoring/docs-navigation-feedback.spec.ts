@@ -6,9 +6,24 @@ import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 const failure =
   "Move this section's draft and published documents before deleting it. Reference: 00000000-0000-4000-8000-000000000099.";
 
-async function setup(page: Page, production: boolean) {
+async function setup(page: Page, production: boolean, withDocs = false) {
   const data = freshWorkspace();
-  data.content = [];
+  const baseDoc = data.content.find((item) => item.kind === "doc")!;
+  data.content = withDocs
+    ? [
+        {
+          ...baseDoc,
+          id: "blocked-doc",
+          title: "Test guide",
+          sectionId: "section-11",
+          category: "Section 12",
+          folder: "",
+          status: "draft",
+          publishedRevision: undefined,
+          revision: 1,
+        },
+      ]
+    : [];
   data.publishedContent = [];
   data.settings = {
     ...defaultSettings,
@@ -251,4 +266,71 @@ test("Docs save errors expand smoothly beside sticky actions, preserve alignment
   await expect(
     page.getByText("Settings saved.", { exact: true }),
   ).toBeVisible();
+});
+
+test("blocked section deletion appears in the sticky callout without changing navigation", async ({
+  page,
+}, info) => {
+  await setup(page, info.project.name.startsWith("production"), true);
+  const bar = page.locator('[data-slot="pending-changes-bar"]');
+  const alert = bar.getByRole("alert");
+  const remove = async () => {
+    await page
+      .getByRole("button", { name: "Actions for Section 12", exact: true })
+      .click();
+    const before = await scrollTop(page);
+    await page
+      .getByRole("menuitem", { name: "Delete section", exact: true })
+      .click();
+    await expect(alert).toBeInViewport();
+    await expect(alert).toBeFocused();
+    await expect(bar.locator('[data-slot="pending-changes-feedback"]')).toHaveCSS("opacity", "1");
+    await expect(alert).toContainText("Can’t delete “Section 12”");
+    await expect(alert).toContainText(
+      "Move this section's documents before deleting it.",
+    );
+    expect(Math.abs((await scrollTop(page)) - before)).toBeLessThan(3);
+    await expect(
+      page.locator(".settings-panel").getByRole("alert"),
+    ).toHaveCount(1);
+    await expect(
+      page.getByRole("button", { name: "Actions for Section 12", exact: true }),
+    ).toBeVisible();
+  };
+  await remove();
+  await expect(page.getByText("Unsaved changes", { exact: true })).toHaveCount(
+    0,
+  );
+  await expect(
+    bar.getByRole("button", { name: "Save settings", exact: true }),
+  ).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("blocked-delete-clean.png") });
+  await alert
+    .getByRole("button", { name: "Dismiss navigation warning" })
+    .click();
+  await expect(bar).toBeHidden();
+  await expect(page.locator("#settings-docs")).toBeFocused();
+
+  await page
+    .getByRole("button", { name: "Actions for Section 20", exact: true })
+    .click();
+  await page.getByRole("menuitem", { name: "Move up", exact: true }).click();
+  await expect(bar).toContainText("Unsaved changes");
+  await remove();
+  await expect(
+    bar.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeVisible();
+  await page.screenshot({
+    path: info.outputPath("blocked-delete-unsaved.png"),
+  });
+  await alert
+    .getByRole("button", { name: "Dismiss navigation warning" })
+    .click();
+  await expect(bar).toBeVisible();
+  await expect(bar).toContainText("Unsaved changes");
+  await expect(alert).toHaveCount(0);
+  await bar
+    .getByRole("button", { name: "Discard changes", exact: true })
+    .click();
+  await expect(bar).toBeHidden();
 });

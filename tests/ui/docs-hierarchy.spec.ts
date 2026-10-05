@@ -212,18 +212,21 @@ test("section expansion reveals direct Docs and subsections together while child
     return {
       checkboxOffset: Math.abs(checkbox.top + checkbox.height / 2 - firstLineCenter),
       iconOffset: Math.abs(icon.top + icon.height / 2 - firstLineCenter),
-      metadataOffset: Math.abs(detail.left - titleBox.left),
-      metadataBelowTitle: detail.top >= titleBox.bottom,
+      inlineMetadata: detail.left > titleBox.right && Math.abs(detail.top + detail.height / 2 - firstLineCenter) < 1,
+      height: row.getBoundingClientRect().height,
       overflow: row.scrollWidth - row.clientWidth,
     };
   }));
   for (const row of alignment) {
     expect(row.checkboxOffset).toBeLessThan(1);
     expect(row.iconOffset).toBeLessThan(1);
-    expect(row.metadataOffset).toBeLessThan(1);
-    expect(row.metadataBelowTitle).toBe(true);
+    if (info.project.name !== "phone") {
+      expect(row.inlineMetadata).toBe(true);
+      expect(row.height).toBeLessThanOrEqual(54);
+    }
     expect(row.overflow).toBe(0);
   }
+  await root.evaluate((el) => el.scrollIntoView({ block: "start", behavior: "instant" }));
   await page.screenshot({
     path: info.outputPath("docs-expanded-hierarchy.png"),
     fullPage: true,
@@ -264,7 +267,8 @@ test("document move actions stage, discard and save the reader order without cha
     .filter({ has: page.getByText("Start", { exact: true }) });
   const title = await header.locator("strong").boundingBox(),
     count = await header.locator("small").boundingBox();
-  expect(Math.abs(title!.x - count!.x)).toBeLessThan(1);
+  expect(count!.x).toBeGreaterThan(title!.x + title!.width);
+  expect(Math.abs(title!.y + title!.height / 2 - count!.y - count!.height / 2)).toBeLessThan(1);
   await toggle.click();
   const documents = page.getByRole("list", {
     name: "Documents in Start",
@@ -852,10 +856,11 @@ test("pending save bar opens and closes smoothly without a dormant gap, and resp
     return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   });
   expect((await guidance.boundingBox())!.width).toBeCloseTo(footerContentWidth, 1);
-  expect(await bar.locator("button").first().evaluate((button) => {
+  await expect(region).toHaveAttribute("inert", "");
+  expect(await bar.evaluate((element) => [...element.querySelectorAll("button")].some((button) => {
     button.focus();
     return document.activeElement === button;
-  })).toBe(false);
+  }))).toBe(false);
 
   await page.getByRole("button", { name: "Actions for Start", exact: true }).click();
   const opening = await pendingTransitionHeights(page.getByRole("menuitem", { name: "Move down", exact: true }));

@@ -15,7 +15,7 @@ export function ReorderRow({
 }: Omit<ComponentProps<"li">, "title"> & {
   handle: ReactNode;
   selection?: ReactNode;
-  /** Align selection and type icon with the title, with metadata below. */
+  /** Compact title and metadata line with aligned selection and type icon. */
   icon?: ReactNode;
   compactActions?: boolean;
   title: ReactNode;
@@ -27,6 +27,7 @@ export function ReorderRow({
       data-slot="reorder-row"
       className={cn(
         "@container relative min-w-0 rounded-lg border border-border bg-card p-3 data-[dragging=true]:border-input data-[dragging=true]:bg-surface data-[dragging=true]:opacity-45 data-[selected=true]:bg-selected/40",
+        icon && "py-2",
         className,
       )}
       {...props}
@@ -63,33 +64,31 @@ export function ReorderRow({
             >
               {icon}
             </span>
-            <div
-              data-slot="reorder-title"
-              className="min-w-0 py-2 text-copy leading-5 [overflow-wrap:anywhere]"
-            >
-              {title}
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 py-1.5 text-copy leading-6">
+              <div
+                data-slot="reorder-title"
+                className="min-w-0 [overflow-wrap:anywhere]"
+              >
+                {title}
+              </div>
+              {detail && (
+                <small
+                  data-slot="reorder-detail"
+                  className="inline-flex h-6 shrink-0 items-center gap-2 text-xs text-muted-foreground"
+                >
+                  <span aria-hidden="true">·</span>
+                  {detail}
+                </small>
+              )}
             </div>
           </div>
-          {detail && (
-            <small
-              data-slot="reorder-detail"
-              className={cn(
-                "row-start-2 ms-6 min-w-0 self-center text-muted-foreground",
-                selection
-                  ? "col-start-3 col-end-5 @min-[15rem]:col-end-4"
-                  : "col-start-2 col-end-4 @min-[15rem]:col-end-3",
-              )}
-            >
-              {detail}
-            </small>
-          )}
           <div
             data-slot="reorder-actions"
             className={cn(
-              "row-start-3 flex flex-wrap items-center justify-end gap-2 @min-[15rem]:row-start-2 @min-[20rem]:row-start-1",
+              "row-start-2 flex flex-wrap items-center justify-end gap-2 @min-[20rem]:row-start-1",
               selection
-                ? "col-start-3 col-end-5 @min-[15rem]:col-start-4"
-                : "col-start-2 col-end-4 @min-[15rem]:col-start-3",
+                ? "col-start-3 col-end-5 @min-[20rem]:col-start-4"
+                : "col-start-2 col-end-4 @min-[20rem]:col-start-3",
             )}
           >
             {actions}

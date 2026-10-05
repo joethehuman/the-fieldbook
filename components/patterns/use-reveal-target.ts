@@ -7,10 +7,13 @@ export function useRevealTarget<T extends HTMLElement = HTMLDivElement>({
   context = false,
   scrollContainer,
   block = "start",
+  scroll = true,
 }: {
   context?: boolean;
   scrollContainer?: string;
   block?: "start" | "nearest";
+  /** Sticky feedback is already visible and only needs focus. */
+  scroll?: boolean;
 } = {}) {
   const ref = useRef<T>(null);
   const [request, setRequest] = useState<{ focus: boolean } | null>(null);
@@ -21,6 +24,7 @@ export function useRevealTarget<T extends HTMLElement = HTMLDivElement>({
       const target = ref.current;
       if (!target) return;
       if (request.focus) target.focus({ preventScroll: true });
+      if (!scroll) return;
       const scrollTarget = context
         ? target.closest<HTMLElement>("[data-reveal-context]") || target
         : target;
@@ -48,7 +52,7 @@ export function useRevealTarget<T extends HTMLElement = HTMLDivElement>({
       }
     });
     return () => cancelAnimationFrame(frame);
-  }, [request, context, scrollContainer, block]);
+  }, [request, context, scrollContainer, block, scroll]);
   return {
     targetProps: { ref, tabIndex: -1, "data-reveal-target": true as const },
     reveal: (focus = true) => setRequest({ focus }),

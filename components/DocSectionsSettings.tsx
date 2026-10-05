@@ -50,6 +50,7 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
+export type DocNavigationIssue = { title: string; message: string };
 type Placement = { id: string; sectionId: string };
 const sectionKey = (id: string) => `section:${id}`;
 const docKey = (id: string) => `doc:${id}`;
@@ -61,14 +62,16 @@ export function DocSectionsSettings({
   docs,
   disabled,
   onChange,
+  onError,
 }: {
   sections: DocSection[];
   docs: DocLink[];
   disabled: boolean;
   onChange: (sections: DocSection[], moves?: Placement[]) => void;
+  onError: (issue: DocNavigationIssue) => void;
 }) {
   const { confirm, prompt } = useInteractionDialog();
-  const [error, setError] = useState("");
+  const menuIssue = useRef<DocNavigationIssue | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [creating, setCreating] = useState<{ parentId: string } | null>(null);
   const createTrigger = useRef<HTMLElement | null>(null);
@@ -117,7 +120,6 @@ export function DocSectionsSettings({
     visibleIds,
   );
   function act(change: () => { sections: DocSection[]; moves?: Placement[] }) {
-    setError("");
     try {
       if (blocked)
         throw new Error(conflict || "Finish the current save first.");
@@ -125,7 +127,10 @@ export function DocSectionsSettings({
       onChange(result.sections, result.moves);
       return true;
     } catch (error) {
-      setError((error as Error).message);
+      onError({
+        title: "Couldn’t update navigation",
+        message: (error as Error).message,
+      });
       return false;
     }
   }
@@ -509,7 +514,16 @@ export function DocSectionsSettings({
                       <MoreHorizontal size={18} aria-hidden="true" />
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent
+                    align="end"
+                    onCloseAutoFocus={(event) => {
+                      const issue = menuIssue.current;
+                      if (!issue) return;
+                      menuIssue.current = null;
+                      event.preventDefault();
+                      onError(issue);
+                    }}
+                  >
                     <DropdownMenuItem
                       disabled={index === 0}
                       onSelect={() => reorder(key, -1)}
@@ -573,7 +587,10 @@ export function DocSectionsSettings({
                           )
                             changeSections(() => next);
                         } catch (error) {
-                          setError((error as Error).message);
+                          menuIssue.current = {
+                            title: `Can’t delete “${sectionPath(section, sections)}”`,
+                            message: (error as Error).message,
+                          };
                         }
                       }}
                     >
@@ -598,8 +615,6 @@ export function DocSectionsSettings({
   }
   return (
     <div>
-      {conflict && <p role="alert">{conflict}</p>}
-      {error && <p role="alert">{error}</p>}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button
           type="button"

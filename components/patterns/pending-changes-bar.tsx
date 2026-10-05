@@ -20,6 +20,13 @@ export function PendingChangesBar({
   useEffect(() => {
     if (feedback) setRetainedFeedback(feedback);
   }, [feedback]);
+  // Preserve the header while the entire bar closes, including feedback-only states.
+  const [retainedHeader, setRetainedHeader] = useState({ children, actions });
+  useEffect(() => {
+    if (active) setRetainedHeader({ children, actions });
+  }, [active, children, actions]);
+  const header = active ? { children, actions } : retainedHeader;
+  const hasHeader = !!(header.children || header.actions);
   return (
     <div
       data-slot="pending-changes-region"
@@ -34,12 +41,14 @@ export function PendingChangesBar({
             data-slot="pending-changes-bar"
             className={`rounded-t-xl border border-border bg-card p-3 shadow-surface transition-[opacity,visibility] duration-200 ease-out motion-reduce:transition-none ${active ? "visible opacity-100" : "invisible opacity-0"}`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <span role="status" className="text-copy font-medium">
-                {children}
-              </span>
-              <ActionGroup>{actions}</ActionGroup>
-            </div>
+            {hasHeader && (
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <span role="status" className="text-copy font-medium">
+                  {header.children}
+                </span>
+                <ActionGroup>{header.actions}</ActionGroup>
+              </div>
+            )}
             <div
               data-slot="pending-changes-feedback"
               data-active={!!feedback}
@@ -48,7 +57,9 @@ export function PendingChangesBar({
               className="grid grid-rows-[0fr] opacity-0 transition-[grid-template-rows,opacity] duration-200 ease-out data-[active=true]:grid-rows-[1fr] data-[active=true]:opacity-100 motion-reduce:transition-none"
             >
               <div className="min-h-0 overflow-hidden">
-                <div className="pt-3">{feedback || retainedFeedback}</div>
+                <div className={hasHeader ? "pt-3" : undefined}>
+                  {feedback || retainedFeedback}
+                </div>
               </div>
             </div>
           </div>
