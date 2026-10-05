@@ -26,6 +26,7 @@ import {
   type OrganizationChangeOptions,
 } from "@/lib/organization-change";
 import { Button } from "./ui/button";
+import { SaveChangesControl } from "./patterns/save-changes-control";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
 import {
@@ -229,7 +230,7 @@ export function LearningAssignmentPicker({
     }
   }
   async function save() {
-    if (running.current || refreshing.current) return;
+    if (!dirty || running.current || refreshing.current) return;
     if (data.governanceRevision !== revision.current) {
       setStale(true);
       setError(
@@ -621,10 +622,14 @@ export function LearningAssignmentPicker({
                     Cancel
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  loading={busy}
-                  disabled={!dirty || stale || (target && !selected.length)}
+                <SaveChangesControl
+                  dirty={dirty}
+                  busy={busy}
+                  blockedReason={stale
+                    ? "Refresh to review current consequences."
+                    : target && !selected.length
+                      ? "Select at least one item to continue."
+                      : undefined}
                   onClick={() => {
                     if (step === "review") {
                       running.current = true;
@@ -638,7 +643,7 @@ export function LearningAssignmentPicker({
                     : step === "review"
                       ? "Save assignments"
                       : "Review changes"}
-                </Button>
+                </SaveChangesControl>
               </>
             )}
           </DialogFooter>

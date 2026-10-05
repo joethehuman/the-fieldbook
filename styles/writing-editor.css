@@ -39,6 +39,13 @@
   flex-direction: column;
   overflow: clip;
 }
+/* The privacy draft stays a readable width while its editor can grow vertically. */
+.privacy-policy-editor .writing-surface {
+  height: 30rem;
+  min-height: 18rem;
+  resize: vertical;
+  overflow: auto;
+}
 .writing-editor .mdxeditor {
   display: flex;
   flex-direction: column;

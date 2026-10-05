@@ -818,7 +818,7 @@ test("shared settings library and connection states work in the server app", asy
   await expect(
     page.getByRole("spinbutton", { name: "New user onboarding window (days)" }),
   ).toHaveAccessibleDescription(
-    /Defaults apply to future onboarding clocks.*Existing onboarding windows and saved course deadlines stay fixed.*review recalculation/,
+    /These defaults apply to future onboarding and course assignments.*Existing dates stay fixed until you review and recalculate them/,
   );
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({

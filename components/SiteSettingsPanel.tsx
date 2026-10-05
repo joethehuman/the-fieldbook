@@ -6,6 +6,8 @@ import { DeadlineReview } from "./DeadlineReview";
 import { FormField } from "@/components/patterns/form-field";
 import { TextField } from "./patterns/text-field";
 import { SettingsSection as SettingsGroup } from "./patterns/settings-section";
+import { SettingsPageActions } from "./patterns/settings-page-actions";
+import { SaveChangesControl } from "./patterns/save-changes-control";
 import { Alert } from "./ui/alert";
 import { useToast } from "./ui/toast";
 import { useInteractionDialog } from "./ui/interaction-dialog";
@@ -129,19 +131,35 @@ export default function SiteSettingsPanel({
     setSettings(latest);
   }
   const discard = () => { setSettings(savedSettings.current); setDocMoves([]); setNotice(""); setDocsIssue(null); };
+  const discardAction = dirty ? (
+    <Button
+      type="button"
+      variant="link"
+      disabled={busy}
+      data-slot="discard-changes"
+      className="text-caption text-muted-foreground hover:text-foreground"
+      onClick={discard}
+    >
+      Discard changes
+    </Button>
+  ) : null;
   const saveAction = (
-    <ActionGroup>
-      {dirty && <span role="status" className="text-caption text-muted-foreground">Unsaved changes</span>}
-      {dirty && <Button type="button" variant="outline" disabled={busy} onClick={discard}>Discard changes</Button>}
-      <Button type="submit" loading={busy} disabled={section === "ai" && !!settings.askAi?.enabled && !settings.askAi.model}>{busy ? "Saving…" : "Save settings"}</Button>
-    </ActionGroup>
+    <SaveChangesControl
+      dirty={dirty}
+      busy={busy}
+      blockedReason={section === "ai" && !!settings.askAi?.enabled && !settings.askAi.model
+        ? "Choose a primary model to save."
+        : undefined}
+    >
+      {busy ? "Saving…" : "Save settings"}
+    </SaveChangesControl>
   );
   return (
     <form
       className="settings-panel"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (busy) return;
+        if (busy || !dirty) return;
         if (section === "ai" && settings.askAi?.enabled && !settings.askAi.model) {
           setNotice("Choose a primary model before enabling Ask AI.");
           return;
@@ -201,112 +219,136 @@ export default function SiteSettingsPanel({
       }}
     >
       {section === "identity" && (
-        <SettingsGroup
-          tabIndex={-1}
-          disabled={busy}
-          id="settings-identity"
-          actions={saveAction}
-          title={<h3>Installation branding</h3>}
-          guidance="The same identity appears in your workspace and on account pages. The saved name, welcome description and published privacy link are visible before sign-in, including on private installations."
-        >
-          <TextField
-            id="installation-name"
-            label="Installation name"
-            description="Up to 60 characters."
-            required
-            maxLength={60}
-            value={settings.name}
-            error={nameError}
-            onBlur={(e) =>
-              setNameError(
-                e.target.validity.valueMissing
-                  ? "Installation name is required."
-                  : "",
-              )
-            }
-            onInvalid={() => setNameError("Installation name is required.")}
-            onChange={(e) => {
-              setSettings({ ...settings, name: e.target.value });
-              if (nameError)
-                setNameError(
-                  e.target.value ? "" : "Installation name is required.",
-                );
-            }}
-          />
-          <TextField
-            id="welcome-description"
-            label="Welcome description (optional)"
-            maxLength={180}
-            value={settings.welcomeDescription || ""}
-            description="A short welcome on the sign-in page. Authentication instructions are provided by Fieldbook."
-            onChange={(e) =>
-              setSettings({ ...settings, welcomeDescription: e.target.value })
-            }
-          />
-          <FormField
-            label="Home page"
-            description="The page people open from your installation address. Docs opens the first published article in your Docs order."
+        <>
+          <SettingsGroup
+            tabIndex={-1}
+            disabled={busy}
+            id="settings-identity"
+            title={<h3>Installation details</h3>}
+            description="The name and welcome people see across your installation."
           >
-            <SelectField
-              value={settings.homePage || "courses"}
-              onValueChange={(value) =>
-                setSettings({
-                  ...settings,
-                  homePage: value as "updates" | "courses" | "docs",
-                })
+            <TextField
+              id="installation-name"
+              label="Installation name"
+              description="Up to 60 characters."
+              required
+              maxLength={60}
+              value={settings.name}
+              error={nameError}
+              onBlur={(e) =>
+                setNameError(
+                  e.target.validity.valueMissing
+                    ? "Installation name is required."
+                    : "",
+                )
               }
-              disabled={busy}
-              aria-label="Home page"
+              onInvalid={() => setNameError("Installation name is required.")}
+              onChange={(e) => {
+                setSettings({ ...settings, name: e.target.value });
+                if (nameError)
+                  setNameError(
+                    e.target.value ? "" : "Installation name is required.",
+                  );
+              }}
+            />
+            <TextField
+              id="welcome-description"
+              label="Welcome description (optional)"
+              maxLength={180}
+              value={settings.welcomeDescription || ""}
+              description="A short welcome on the sign-in page. Authentication instructions are provided by Fieldbook."
+              onChange={(e) =>
+                setSettings({ ...settings, welcomeDescription: e.target.value })
+              }
+            />
+            <FormField
+              label="Home page"
+              description="The page people open from your installation address. Docs opens the first published article in your Docs order."
             >
-              <option value="updates">Updates</option>
-              <option value="courses">Courses</option>
-              <option value="docs">Docs</option>
-            </SelectField>
-          </FormField>
-          <TextField
-            id="privacy-policy-link"
-            label="Privacy-policy link"
-            readOnly
-            value={privacyHref(settings) || ""}
-            placeholder="No published policy"
-            description="Set or publish this link in Organization Settings → Privacy policy. Hosted and external policies use the same published setting across the application."
-          />
-          <FieldGroup className="brand-control">
-            <legend>Accent color</legend>
+              <SelectField
+                value={settings.homePage || "courses"}
+                onValueChange={(value) =>
+                  setSettings({
+                    ...settings,
+                    homePage: value as "updates" | "courses" | "docs",
+                  })
+                }
+                disabled={busy}
+                aria-label="Home page"
+              >
+                <option value="updates">Updates</option>
+                <option value="courses">Courses</option>
+                <option value="docs">Docs</option>
+              </SelectField>
+            </FormField>
+            <TextField
+              id="privacy-policy-link"
+              label="Privacy-policy link"
+              readOnly
+              value={privacyHref(settings) || ""}
+              placeholder="No published policy"
+              description="Set or publish this link in Organization Settings → Privacy policy. Hosted and external policies use the same published setting across the application."
+            />
             <FieldDescription>
-              Used for links and highlights across your organization. Link text
-              darkens when needed for readability.
+              The same identity appears in your workspace and on account pages.
+              The saved name, welcome description and published privacy link are
+              visible before sign-in, including on private installations.
             </FieldDescription>
-            <div className="color-control">
-              <Input
-                aria-label="Choose accent color"
-                type="color"
-                value={
-                  /^#[0-9a-f]{6}$/i.test(settings.accent)
-                    ? settings.accent
-                    : "#0069ff"
-                }
-                onChange={(e) =>
-                  setSettings({ ...settings, accent: e.target.value })
-                }
-              />
-              <Input
-                aria-label="Accent color hex value"
-                type="text"
-                required
-                pattern="#[0-9a-fA-F]{6}"
-                maxLength={7}
-                spellCheck={false}
-                placeholder="#0069ff"
-                value={settings.accent}
-                onChange={(e) =>
-                  setSettings({ ...settings, accent: e.target.value })
-                }
-              />
-            </div>
-          </FieldGroup>
-          <CardPaletteSettings settings={settings} onChange={(cardPalette) => setSettings({ ...settings, cardPalette })} />
-        </SettingsGroup>
+          </SettingsGroup>
+          <SettingsGroup
+            disabled={busy}
+            id="settings-appearance"
+            title={<h3>Appearance</h3>}
+            description="Choose the accent and generated artwork colors used across your installation."
+          >
+            <FieldGroup className="brand-control">
+              <legend>Accent color</legend>
+              <FieldDescription>
+                Used for links and highlights across your organization. Link
+                text darkens when needed for readability.
+              </FieldDescription>
+              <div className="color-control">
+                <Input
+                  aria-label="Choose accent color"
+                  type="color"
+                  value={
+                    /^#[0-9a-f]{6}$/i.test(settings.accent)
+                      ? settings.accent
+                      : "#0069ff"
+                  }
+                  onChange={(e) =>
+                    setSettings({ ...settings, accent: e.target.value })
+                  }
+                />
+                <Input
+                  aria-label="Accent color hex value"
+                  type="text"
+                  required
+                  pattern="#[0-9a-fA-F]{6}"
+                  maxLength={7}
+                  spellCheck={false}
+                  placeholder="#0069ff"
+                  value={settings.accent}
+                  onChange={(e) =>
+                    setSettings({ ...settings, accent: e.target.value })
+                  }
+                />
+              </div>
+            </FieldGroup>
+            <CardPaletteSettings
+              settings={settings}
+              onChange={(cardPalette) =>
+                setSettings({ ...settings, cardPalette })
+              }
+            />
+          </SettingsGroup>
+          <SettingsPageActions
+            guidance="Changes to installation details and appearance save together."
+            actions={saveAction}
+            belowActions={discardAction}
+            sticky={dirty || busy}
+          />
+        </>
       )}
       {section === "links" && (
         <SettingsGroup
@@ -316,6 +358,7 @@ export default function SiteSettingsPanel({
           title={<h3>Account menu links</h3>}
           guidance="The same links are visible to everyone in your workspace, including guests when browsing is public. Save settings to apply changes."
           actions={saveAction}
+          belowActions={discardAction}
         >
           <ExternalLinksSettings
             links={settings.externalLinks || []}
@@ -393,21 +436,17 @@ export default function SiteSettingsPanel({
         <SettingsGroup
           id="settings-courses"
           actions={saveAction}
+          belowActions={discardAction}
           tabIndex={-1}
           disabled={busy}
           title={<h3>Timing windows</h3>}
           description="Set the number of days for new users and ongoing catch-up."
-          guidance={
-            <div id="due-dates-help">
-              Due dates add an overdue flag; completion always includes all assigned courses.
-              Turning dates off hides deadlines without resetting them or changing New/Existing stage.
-              Defaults apply to future onboarding clocks and assignment episodes. Existing onboarding
-              windows and saved course deadlines stay fixed; save the defaults, then review recalculation
-              to change existing dates.
-            </div>
-          }
+          guidance="Save to apply due date settings."
         >
-          <FormField label="Use due dates">
+          <FormField
+            label="Use due dates"
+            description="Turning dates off hides due and overdue labels without erasing saved deadlines or changing New/Existing stage. Assigned courses still count toward completion."
+          >
             <Switch
               checked={settings.dueDatesEnabled !== false}
               disabled={busy}
@@ -416,6 +455,10 @@ export default function SiteSettingsPanel({
               }
             />
           </FormField>
+          <FieldDescription id="due-dates-help">
+            These defaults apply to future onboarding and course assignments.
+            Existing dates stay fixed until you review and recalculate them.
+          </FieldDescription>
           <FormField label="New user onboarding window (days)">
             <Input
               aria-describedby="due-dates-help"
@@ -450,13 +493,14 @@ export default function SiteSettingsPanel({
               }
             />
           </FormField>
-          {onReviewDeadlines && <><FieldDescription>Save any changed defaults before reviewing existing deadlines.</FieldDescription><DeadlineReview onReview={onReviewDeadlines} disabled={busy || dirty} /></>}
+          {onReviewDeadlines && <><FieldDescription>Save changes before reviewing existing deadlines.</FieldDescription><DeadlineReview onReview={onReviewDeadlines} disabled={busy || dirty} /></>}
         </SettingsGroup>
       )}
       {section === "access" && (
         <SettingsGroup
           id="settings-access"
           actions={saveAction}
+          belowActions={discardAction}
           tabIndex={-1}
           disabled={busy}
           title={<h3>Access and accounts</h3>}
@@ -610,6 +654,8 @@ export default function SiteSettingsPanel({
           {" "}
           <PrivacySettingsPanel
             actions={saveAction}
+            belowActions={discardAction}
+            sticky={dirty || busy}
             settings={settings}
             onChange={setSettings}
             busy={busy}
@@ -631,7 +677,7 @@ export default function SiteSettingsPanel({
       )}
       {section === "mcp" && <McpSettings production={production} contributor={contributor} />}
       {section === "ai" && !contributor && <AskAiSettingsPanel
-        production={production} busy={busy} actions={saveAction}
+        production={production} busy={busy} actions={saveAction} belowActions={discardAction} sticky={dirty || busy}
         value={settings.askAi ?? defaultAskAiSettings}
         onChange={(askAi) => setSettings({ ...settings, askAi })}
       />}

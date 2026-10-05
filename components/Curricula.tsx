@@ -48,6 +48,7 @@ import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
 import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
 import { assignmentAudiences } from "@/lib/assignment-audiences";
 import { useNestedNavigationGuard } from "./patterns/use-nested-navigation-guard";
+import { SaveChangesControl } from "./patterns/save-changes-control";
 import {
   isOrganizationChangeCanceled,
   type OrganizationChangeOptions,
@@ -172,7 +173,7 @@ export default function Curricula({
     }
   }
   async function save() {
-    if (!editing) return;
+    if (!editing || !dirty || busy) return;
     const name = editing.name.trim();
     if (!name) {
       setNotice("Give the curriculum a name.");
@@ -367,9 +368,12 @@ export default function Curricula({
               <Button type="button" variant="outline" onClick={closeEditor}>
                 Cancel
               </Button>
-              <Button type="submit" loading={busy}>
+              <SaveChangesControl
+                dirty={dirty}
+                busy={busy}
+              >
                 {busy ? "Saving…" : "Save curriculum"}
-              </Button>
+              </SaveChangesControl>
             </SectionHeader>
             <FormField label="Name">
               <Input

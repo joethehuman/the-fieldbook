@@ -22,6 +22,7 @@ Use existing primitives and patterns before creating a new one. Put reusable beh
 - Use DataTable with a declared column schema for application records. Keep horizontal overflow inside TableContainer. Plain tables remain appropriate for authored content.
 - Use shared dialog and picker patterns. Keep search and actions reachable while result lists scroll. Preserve keyboard selection, dismissal, and focus return.
 - Use the shared publication, progress, empty, error, loading, and pending-save states. A published item with newer draft edits must show both facts.
+- For explicit manual saves, compare the draft with its saved baseline in the owning form and use SaveChangesControl. Keep Save visible but disabled when nothing changed. In settings footers, keep the gray save area compact and place a quiet Discard action just below it when editing begins. Announce unsaved and saving states to assistive technology without adding visible status text; explain any other reason that blocks saving. Guard form submission as well, so pressing Enter cannot save an unchanged draft. Automatic draft saves and publication actions have their own states.
 
 A parent layout owns the space between sections. A field group owns the space between fields. Individual controls should not add compensating margins. Use semantic theme tokens rather than literal interface colors; decorative artwork and validated runtime branding are separate cases. Text must remain readable when it wraps or grows.
 

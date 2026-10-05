@@ -8,6 +8,7 @@ import {
 } from "@/lib/ai";
 import { FormField } from "./patterns/form-field";
 import { SettingsSection } from "./patterns/settings-section";
+import { SettingsPageActions } from "./patterns/settings-page-actions";
 import { Button } from "./ui/button";
 import { ActionGroup } from "./ui/action-group";
 import { Switch } from "./ui/switch";
@@ -47,12 +48,16 @@ export function AskAiSettingsPanel({
   production,
   busy,
   actions,
+  belowActions,
+  sticky = false,
 }: {
   value: AskAiSettings;
   onChange: (next: AskAiSettings) => void;
   production: boolean;
   busy: boolean;
   actions: ReactNode;
+  belowActions?: ReactNode;
+  sticky?: boolean;
 }) {
   const [setup, setSetup] = useState<AiSetup | null>(
     production ? null : demoSetup,
@@ -193,35 +198,29 @@ export function AskAiSettingsPanel({
   };
 
   return (
-    <SettingsSection
-      id="settings-ai"
-      title={<h3>Configuration</h3>}
-      disabled={busy}
-      actions={actions}
-      description="Concise answers from your published Fieldbook content."
-      guidance={
-        production
-          ? "Save settings to apply changes."
-          : "Demo settings affect this browser only. AI answers are unavailable."
-      }
-    >
-      <FieldGroup className="gap-2">
-        <Field orientation="horizontal">
-          <Switch
-            checked={value.enabled}
-            disabled={busy}
-            onCheckedChange={(enabled) => onChange({ ...value, enabled })}
-          />
-          Enable Ask AI
-        </Field>
-        <FieldDescription>
-          Visitors with access to this Fieldbook can ask questions from Search,
-          including guests on public sites. Off restores basic search.
-        </FieldDescription>
-      </FieldGroup>
-      {value.enabled && (
-        <>
-          <FieldGroup className="gap-3">
+    <>
+      <SettingsSection
+        id="settings-ai"
+        title={<h3>Availability</h3>}
+        disabled={busy}
+        description="Concise answers from your published Fieldbook content."
+      >
+        <FieldGroup className="gap-2">
+          <Field orientation="horizontal">
+            <Switch
+              checked={value.enabled}
+              disabled={busy}
+              onCheckedChange={(enabled) => onChange({ ...value, enabled })}
+            />
+            Enable Ask AI
+          </Field>
+          <FieldDescription>
+            Visitors with access to this Fieldbook can ask questions from
+            Search, including guests on public sites. Off restores basic search.
+          </FieldDescription>
+        </FieldGroup>
+        {value.enabled && (
+          <FieldGroup className="gap-3 border-t border-border pt-5">
             <div
               className="flex flex-wrap items-center justify-between gap-2 text-copy"
               aria-label="Model router"
@@ -260,103 +259,130 @@ export function AskAiSettingsPanel({
               </Alert>
             )}
           </FieldGroup>
-          <FieldGroup>
-            <legend>Models</legend>
-            <div className="grid items-start gap-4 md:grid-cols-2">
-              {picker(false)}
-              {picker(true)}
-            </div>
-            {!routerChanged &&
-              setup?.catalog.ready &&
-              value.model &&
-              !model && (
-                <Alert>
-                  The saved primary is unavailable. Choose a replacement
-                  {fallback
-                    ? "; the saved fallback can still serve questions."
-                    : " before enabling Ask AI."}
-                </Alert>
-              )}
-            {!routerChanged &&
-              setup?.catalog.ready &&
-              value.fallbackModel &&
-              !fallback && (
-                <Alert>
-                  The saved fallback is unavailable. Choose a replacement or
-                  select None.
-                </Alert>
-              )}
-          </FieldGroup>
-          <FieldGroup
-            className="gap-3"
-            aria-describedby="ai-sources-description"
+        )}
+      </SettingsSection>
+      {value.enabled && (
+        <>
+          <SettingsSection
+            id="settings-ai-models"
+            title={<h3>Models</h3>}
+            description="Choose the primary model and an optional backup."
+            disabled={busy}
           >
-            <legend>Published sources</legend>
-            <FieldDescription id="ai-sources-description">
-              Choose at least one. Drafts, quizzes, media and account data are
-              excluded.
-            </FieldDescription>
-            <div className="flex flex-wrap gap-4">
-              {sourceChoices.map((source) => (
-                <Field key={source.value} orientation="horizontal">
-                  <Checkbox
-                    checked={value.sources.includes(source.value)}
-                    disabled={
-                      busy ||
-                      (value.sources.length === 1 &&
-                        value.sources.includes(source.value))
-                    }
-                    onCheckedChange={(checked) =>
-                      onChange({
-                        ...value,
-                        sources: checked
-                          ? [...value.sources, source.value]
-                          : value.sources.filter(
-                              (item) => item !== source.value,
-                            ),
-                      })
-                    }
-                  />
-                  {source.label}
-                </Field>
-              ))}
-            </div>
-          </FieldGroup>
-          <FieldGroup className="gap-3">
-            <FormField
-              label="Answer guidance"
-              description={`${value.guidance.length.toLocaleString()} / 2,000 characters. Adds to the fixed access, evidence and citation rules.`}
+            <FieldGroup>
+              <div className="grid items-start gap-4 md:grid-cols-2">
+                {picker(false)}
+                {picker(true)}
+              </div>
+              {!routerChanged &&
+                setup?.catalog.ready &&
+                value.model &&
+                !model && (
+                  <Alert>
+                    The saved primary is unavailable. Choose a replacement
+                    {fallback
+                      ? "; the saved fallback can still serve questions."
+                      : " before enabling Ask AI."}
+                  </Alert>
+                )}
+              {!routerChanged &&
+                setup?.catalog.ready &&
+                value.fallbackModel &&
+                !fallback && (
+                  <Alert>
+                    The saved fallback is unavailable. Choose a replacement or
+                    select None.
+                  </Alert>
+                )}
+            </FieldGroup>
+          </SettingsSection>
+          <SettingsSection
+            id="settings-ai-content"
+            title={<h3>Answer content</h3>}
+            description="Choose the published material Ask AI can use and guide its response style."
+            disabled={busy}
+          >
+            <FieldGroup
+              className="gap-3"
+              aria-describedby="ai-sources-description"
             >
-              <Textarea
-                value={value.guidance}
-                disabled={busy}
-                maxLength={2_000}
-                rows={4}
-                onChange={(event) =>
-                  onChange({ ...value, guidance: event.target.value })
-                }
-              />
-            </FormField>
-            <ActionGroup>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={
-                  busy || value.guidance === defaultAskAiSettings.guidance
-                }
-                onClick={() =>
-                  onChange({
-                    ...value,
-                    guidance: defaultAskAiSettings.guidance,
-                  })
-                }
+              <legend>Published sources</legend>
+              <FieldDescription id="ai-sources-description">
+                Choose at least one. Drafts, quizzes, media and account data are
+                excluded.
+              </FieldDescription>
+              <div className="flex flex-wrap gap-4">
+                {sourceChoices.map((source) => (
+                  <Field key={source.value} orientation="horizontal">
+                    <Checkbox
+                      checked={value.sources.includes(source.value)}
+                      disabled={
+                        busy ||
+                        (value.sources.length === 1 &&
+                          value.sources.includes(source.value))
+                      }
+                      onCheckedChange={(checked) =>
+                        onChange({
+                          ...value,
+                          sources: checked
+                            ? [...value.sources, source.value]
+                            : value.sources.filter(
+                                (item) => item !== source.value,
+                              ),
+                        })
+                      }
+                    />
+                    {source.label}
+                  </Field>
+                ))}
+              </div>
+            </FieldGroup>
+            <FieldGroup className="gap-3">
+              <FormField
+                label="Answer guidance"
+                description={`${value.guidance.length.toLocaleString()} / 2,000 characters. Adds to the fixed access, evidence and citation rules.`}
               >
-                Reset to default
-              </Button>
-            </ActionGroup>
-          </FieldGroup>
+                <Textarea
+                  value={value.guidance}
+                  disabled={busy}
+                  maxLength={2_000}
+                  rows={4}
+                  onChange={(event) =>
+                    onChange({ ...value, guidance: event.target.value })
+                  }
+                />
+              </FormField>
+              <ActionGroup>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={
+                    busy || value.guidance === defaultAskAiSettings.guidance
+                  }
+                  onClick={() =>
+                    onChange({
+                      ...value,
+                      guidance: defaultAskAiSettings.guidance,
+                    })
+                  }
+                >
+                  Reset to default
+                </Button>
+              </ActionGroup>
+            </FieldGroup>
+          </SettingsSection>
         </>
       )}
-    </SettingsSection>
+      <SettingsPageActions
+        guidance={
+          production
+            ? "Save settings to apply changes across this page."
+            : "Demo settings affect this browser only. AI answers are unavailable."
+        }
+        actions={actions}
+        belowActions={belowActions}
+        sticky={sticky}
+      />
+    </>
   );
 }
