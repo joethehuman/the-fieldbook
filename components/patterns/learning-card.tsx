@@ -45,35 +45,39 @@ export function LearningCard({
   const content = (
     <>
       {artwork}
-      <div className="flex flex-1 flex-col gap-4 p-5">
-        <h3 className="min-h-12 text-lg font-semibold leading-6 tracking-tight [overflow-wrap:anywhere]">
+      <div className="flex min-h-64 flex-1 flex-col p-5">
+        <h3 className="text-lg font-semibold leading-6 tracking-tight [overflow-wrap:anywhere]">
           {title}
         </h3>
-        <p className="line-clamp-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
-          {description}
-        </p>
+        {detail && <div className="mt-2">{detail}</div>}
+        <div className="flex flex-1 items-center py-3">
+          <p className="line-clamp-3 text-sm text-muted-foreground [overflow-wrap:anywhere]">
+            {description}
+          </p>
+        </div>
         <div
           data-slot="learning-card-metadata"
-          className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground"
+          className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground"
         >
           {metadata}
         </div>
-        {detail}
-        <ContentCardFooter
-          action={
-            <>
-              {action}
-              <ArrowRight size={17} aria-hidden="true" />
-            </>
-          }
-        >
-          <ProgressStatus
-            value={status.percent}
-            complete={status.complete}
-            started={status.started}
-            size="compact"
-          />
-        </ContentCardFooter>
+        <div className="mt-4">
+          <ContentCardFooter
+            action={
+              <>
+                {action}
+                <ArrowRight size={17} aria-hidden="true" />
+              </>
+            }
+          >
+            <ProgressStatus
+              value={status.percent}
+              complete={status.complete}
+              started={status.started}
+              size="compact"
+            />
+          </ContentCardFooter>
+        </div>
       </div>
     </>
   );

@@ -30,6 +30,42 @@ async function expectImmediateHighlight(page: Page, target: Locator) {
   expect(first).toBe(resting);
 }
 
+test("course rows fade only where more cards are hidden", async ({ page }, info) => {
+  await seed(page);
+  const row = page.locator(".library .course-row").first();
+  await row.evaluate((element) => {
+    (element as HTMLElement).style.width = "420px";
+    element.scrollLeft = 0;
+  });
+
+  await expect(row).toHaveAttribute("data-scroll-before", "false");
+  await expect(row).toHaveAttribute("data-scroll-after", "true");
+  await expect(row).toHaveAttribute("tabindex", "0");
+  expect(await row.evaluate((element) => getComputedStyle(element).maskImage)).not.toBe("none");
+  await row.screenshot({ path: info.outputPath("course-row-start.png") });
+
+  await row.evaluate((element) => {
+    element.scrollLeft = (element.scrollWidth - element.clientWidth) / 2;
+  });
+  await expect(row).toHaveAttribute("data-scroll-before", "true");
+  await expect(row).toHaveAttribute("data-scroll-after", "true");
+  await row.screenshot({ path: info.outputPath("course-row-middle.png") });
+
+  await row.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await expect(row).toHaveAttribute("data-scroll-before", "true");
+  await expect(row).toHaveAttribute("data-scroll-after", "false");
+
+  await row.evaluate((element) => {
+    (element as HTMLElement).style.width = `${element.scrollWidth + 20}px`;
+  });
+  await expect(row).toHaveAttribute("data-scroll-before", "false");
+  await expect(row).toHaveAttribute("data-scroll-after", "false");
+  await expect(row).not.toHaveAttribute("tabindex");
+  expect(await row.evaluate((element) => getComputedStyle(element).maskImage)).toBe("none");
+});
+
 test("course counts center beside labels and cards lift within their scrolling strip", async ({ page }, info) => {
   await seed(page);
   const title = page.getByRole("heading", { name: /^For you/ });

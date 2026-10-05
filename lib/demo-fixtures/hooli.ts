@@ -6,8 +6,8 @@ import type {
   Progress,
   Team,
   User,
-} from "../../lib/types";
-import type { SiteSettings } from "../../lib/settings";
+} from "../types";
+import type { SiteSettings } from "../settings";
 
 /** Fixed fictional sample data. Creation and Reset demo load the same records. */
 export const hooliDemoData: {

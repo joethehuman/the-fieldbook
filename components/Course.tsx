@@ -186,7 +186,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
           <section ref={activeCard} className="course-lesson grid gap-6">
             <span className="eyebrow">Lesson {step + 1} of {course.lessons.length}</span>
             <h2 ref={heading} tabIndex={-1}>{lesson.title}</h2>
-            {lesson.videoUrl && <CourseVideo key={lesson.videoUrl} url={lesson.videoUrl} title={`${lesson.title} video`} posterUrl={course.coverImageUrl} />}
+            {lesson.videoUrl && <CourseVideo key={lesson.videoUrl} url={lesson.videoUrl} title={`${lesson.title} video`} posterUrl={course.coverImageUrl} eager />}
             <div className="markdown">{lessonContent}</div>
             {p?.lessons.includes(lesson.id) && <Badge variant="success"><CheckCircle2 size={16} /> Lesson completed</Badge>}
           </section>

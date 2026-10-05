@@ -1,18 +1,23 @@
 # Fieldbook design system
 
-Fieldbook uses one owned interface library across the installed app and demo. Its foundations are shadcn/ui source composition, Radix interaction primitives, Tailwind CSS 4, Geist, Lucide, and semantic theme variables. This guide is for contributors changing the interface; the current components and demo-only /ui catalog show the implementation.
+Fieldbook's design system is the shared interface code in `components/` and `styles/`, together with the usage rules in this guide. The installed app and separate interactive demo use that code. The demo-only `/ui` catalog shows representative examples, not a complete component inventory or the source of the components.
 
-## Where decisions belong
+Its foundations are shadcn/ui source composition, Radix interaction primitives, Tailwind CSS 4, Geist, Lucide, and semantic theme variables. This guide is for contributors changing the interface.
+
+## Where the interface lives
 
 | Layer | Location | Owns |
 | --- | --- | --- |
 | Theme | styles/tokens.css | Colors, type, spacing, radii, and page measures |
 | Primitives | components/ui/ | Controls, fields, dialogs, menus, cards, tables, and feedback |
 | Patterns | components/patterns/ | Repeated page composition and navigation |
+| Product components | components/ | Reusable feature UI, such as `CourseCard` and `CurriculumCard` |
 | Application layout | styles/layout.css | Shell and feature geometry |
 | Reading and artwork | styles/content.css and styles/artwork.css | Authored content and decorative media |
 
-Use existing primitives and patterns before creating a new one. Put reusable behavior and styling in the shared layer; keep data fetching, permissions, and mutations in the owning feature. Avoid a second feature-specific control system or broad overrides. The design system is a small set of reliable defaults, not a reason to turn every layout into a configurable component.
+Before building a control, card, or page pattern, check the shared components and the `/ui` examples. Reuse or extend an existing component when it already owns the behavior. For example, `CourseCard` and `CurriculumCard` compose the shared `LearningCard`; the demo and installed Updates pages both use `UpdateCard`.
+
+Put new reusable controls in `components/ui/`, repeated composition in `components/patterns/`, and reusable product UI in `components/`. Keep route-specific data fetching, permissions, mutations, and route destinations in the owning app or demo feature. A one-off layout can stay local; move it into the shared library when reuse warrants it. Do not copy a reusable interface between the installed app and demo or build a second feature-specific control system. Avoid broad overrides and components with options for every possible layout.
 
 ## Compose a page
 
@@ -35,7 +40,7 @@ Use semantic elements, accessible names, visible focus, and keyboard-operable co
 
 ## Verify interface work
 
-The demo-only /ui route shows shared components with synthetic content. Extend it when adding a reusable pattern. Run checks appropriate to the change:
+When adding or changing a shared component, show representative states in the demo's `/ui` catalog using the actual component, and document any non-obvious usage or accessibility rules. The catalog uses synthetic content; it does not supply runtime components to the installed interface. Run checks appropriate to the change:
 
 ~~~sh
 pnpm check:ui

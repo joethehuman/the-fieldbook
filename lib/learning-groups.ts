@@ -53,7 +53,9 @@ export function expandLearning(
     ),
   ];
 }
-export function updateFeedTimestamp(item: Content): number | undefined {
+export function updateFeedTimestamp(
+  item: Pick<Content, "feedAt" | "updatedAt" | "createdAt">,
+): number | undefined {
   const parse = (value?: string) => {
     if (!value) return undefined;
     const time = Date.parse(value);

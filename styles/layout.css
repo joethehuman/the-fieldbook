@@ -702,6 +702,25 @@
     padding: var(--space-3) var(--space-2);
     margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-2));
   }
+  .course-row[data-scroll-before="true"][data-scroll-after="true"] {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--space-12),
+      black calc(100% - var(--space-12)),
+      transparent
+    );
+  }
+  .course-row[data-scroll-before="true"][data-scroll-after="false"] {
+    mask-image: linear-gradient(to right, transparent, black var(--space-12));
+  }
+  .course-row[data-scroll-before="false"][data-scroll-after="true"] {
+    mask-image: linear-gradient(
+      to right,
+      black calc(100% - var(--space-12)),
+      transparent
+    );
+  }
   .course-row > [data-slot="content-action"] {
     flex: 0 0 min(18rem, 85vw, 100%);
     scroll-snap-align: start;
@@ -1019,8 +1038,12 @@
     .course-continue-title { display: none; }
   }
   .course-video { display: grid; gap: var(--space-3); min-width: 0; position: relative; }
-  .course-video-loading { position: absolute; z-index: 1; top: var(--space-4); left: var(--space-4); padding: var(--space-2) var(--space-3); border-radius: var(--radius); background: var(--background); color: var(--foreground); font-size: .875rem; pointer-events: none; }
   .course-video video, .course-video iframe { display: block; width: 100%; max-height: 70dvh; aspect-ratio: 16 / 9; border: 0; border-radius: var(--radius); background: var(--foreground); }
+  .course-video-embed { display: block; width: 100%; max-height: 70dvh; aspect-ratio: 16 / 9; position: relative; overflow: hidden; border-radius: var(--radius); background: var(--muted); }
+  .course-video-embed iframe { position: absolute; inset: 0; height: 100%; max-height: none; border-radius: 0; }
+  .course-video-embed iframe[aria-hidden="true"] { opacity: 0; pointer-events: none; }
+  .course-video-poster { position: absolute; inset: 0; display: block; background: var(--muted); }
+  .course-video-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .course-video-actions { justify-content: flex-end; }
   .course-video-speed { display: flex; align-items: center; gap: var(--space-2); font-size: .875rem; }
   .course-video-speed [data-slot="select-trigger"] { min-width: 5rem; }
