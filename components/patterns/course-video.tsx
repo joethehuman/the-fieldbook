@@ -7,7 +7,35 @@ import { ActionGroup } from "../ui/action-group";
 import { Note } from "../ui/note";
 import { Field } from "../ui/field";
 
-export function CourseVideo({ url, title, posterUrl }: { url: string; title: string; posterUrl?: string }) {
+function EmbeddedVideo({ url, title, posterUrl, eager }: { url: string; title: string; posterUrl?: string; eager: boolean }) {
+  const [ready, setReady] = useState(false);
+  const [posterIndex, setPosterIndex] = useState(0);
+  const youtubeId = url.match(/^https:\/\/www\.youtube-nocookie\.com\/embed\/([\w-]{11})$/)?.[1];
+  const posters = youtubeId
+    ? [
+        `https://i.ytimg.com/vi/${youtubeId}/maxresdefault.jpg`,
+        `https://i.ytimg.com/vi/${youtubeId}/hqdefault.jpg`,
+        posterUrl,
+      ]
+    : [posterUrl];
+  const poster = posters[posterIndex];
+
+  return <span className="course-video-embed">
+    {!ready && <span className="course-video-poster" role="status">
+      {poster && <img src={poster} alt="" loading={eager ? "eager" : "lazy"} fetchPriority={eager ? "high" : "auto"} onError={() => setPosterIndex((index) => index + 1)} />}
+      <span className="course-video-poster-label">Loading video…</span>
+    </span>}
+    <iframe
+      src={url} title={title} loading={eager ? "eager" : "lazy"} allowFullScreen
+      allow="accelerometer; autoplay; encrypted-media; fullscreen; picture-in-picture"
+      referrerPolicy="strict-origin-when-cross-origin"
+      aria-hidden={!ready} tabIndex={ready ? undefined : -1}
+      onLoad={() => setReady(true)}
+    />
+  </span>;
+}
+
+export function CourseVideo({ url, title, posterUrl, eager = false }: { url: string; title: string; posterUrl?: string; eager?: boolean }) {
   const source = videoSource(url);
   const ref = useRef<HTMLVideoElement>(null);
   const [speed, setSpeed] = useState("1.2");
@@ -18,11 +46,7 @@ export function CourseVideo({ url, title, posterUrl }: { url: string; title: str
   if (!source) return <Note>This video URL is not supported. Ask an editor to update it.</Note>;
   return <span className="course-video">
     {source.type === "file" && !ready && !failed && <span className="course-video-loading" role="status">Loading video…</span>}
-    {source.type === "embed" ? <iframe
-      src={source.url} title={title} loading="lazy" allowFullScreen
-      allow="accelerometer; autoplay; encrypted-media; fullscreen; picture-in-picture"
-      referrerPolicy="strict-origin-when-cross-origin"
-    /> : <video
+    {source.type === "embed" ? <EmbeddedVideo key={source.url} url={source.url} title={title} posterUrl={posterUrl} eager={eager} /> : <video
       key={retry} ref={ref} src={retry && source.url.startsWith("/api/media/") ? `${source.url}?renew=${retry}` : source.url} controls preload="metadata" playsInline poster={posterUrl}
       aria-label={title}
       onTimeUpdate={(event) => { position.current = event.currentTarget.currentTime; }}
