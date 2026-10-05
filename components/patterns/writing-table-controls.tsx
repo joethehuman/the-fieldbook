@@ -37,7 +37,27 @@ function position(element: HTMLElement | null, box: Partial<Box>) {
     for (const [property, value] of Object.entries(box))
       element.style.setProperty(property, `${value}px`);
 }
-type Drag = { axis: Axis; from: number; boundary: number };
+type Drag = {
+  axis: Axis;
+  from: number;
+  boundary: number;
+  preview: string;
+  left: number;
+  top: number;
+};
+
+function previewText(host: HTMLElement, axis: Axis, index: number) {
+  const rows = Array.from(host.querySelector("table")?.tBodies[0]?.rows || []);
+  const cells = rows.map((row) =>
+    Array.from(row.cells).filter((cell) => !cell.hasAttribute("data-tool-cell")),
+  );
+  const selected = axis === "row" ? cells[index] || [] : cells.map((row) => row[index]);
+  return selected
+    .map((cell) => cell?.textContent?.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" · ");
+}
 
 function TableControls({
   editor,
@@ -54,9 +74,10 @@ function TableControls({
   const [geometry, setGeometry] = useState<Geometry | null>(null);
   const [menu, setMenu] = useState<{ axis: Axis; index: number } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
+  const [pressed, setPressed] = useState<{ axis: Axis; index: number } | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const gesture = useRef<(() => void) | null>(null);
-  useWritingInteraction(!!menu || !!drag);
+  useWritingInteraction(!!menu || !!pressed);
   useEffect(() => () => gesture.current?.(), []);
   useEffect(() => {
     const close = () => setMenu(null);
@@ -154,12 +175,17 @@ function TableControls({
     if (disabled || event.button !== 0 || !geometry) return;
     event.preventDefault();
     gesture.current?.();
+    setPressed({ axis, index });
+    const pointerId = event.pointerId;
     const startX = event.clientX,
       startY = event.clientY;
     let dragging = false,
       boundary = index;
     const boxes = geometry[axis === "row" ? "rows" : "columns"];
+    const preview = previewText(host, axis, index);
     const update = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      if (!(e.buttons & 1)) return cancel();
       if (!dragging && Math.hypot(e.clientX - startX, e.clientY - startY) < 6)
         return;
       dragging = true;
@@ -176,7 +202,14 @@ function TableControls({
           (axis === "row" ? b.top + b.height / 2 : b.left + b.width / 2),
       );
       if (boundary < 0) boundary = boxes.length;
-      setDrag({ axis, from: index, boundary });
+      setDrag({
+        axis,
+        from: index,
+        boundary,
+        preview,
+        left: Math.max(8, Math.min(e.clientX + 16, window.innerWidth - 288)),
+        top: Math.max(8, Math.min(e.clientY + 16, window.innerHeight - 52)),
+      });
       setAnnouncement(
         `Moving ${axis} ${index + 1} to position ${(boundary > index ? boundary - 1 : boundary) + 1}. Escape cancels.`,
       );
@@ -186,6 +219,7 @@ function TableControls({
       }
     };
     const finish = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
       cleanup();
       setDrag(null);
       if (dragging) {
@@ -207,11 +241,13 @@ function TableControls({
             : { axis, index },
         );
     };
-    const cancel = () => {
+    const cancel = (e?: PointerEvent) => {
+      if (e && e.pointerId !== pointerId) return;
       cleanup();
       setDrag(null);
       setAnnouncement("Move cancelled.");
     };
+    const blur = () => cancel();
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
@@ -223,6 +259,8 @@ function TableControls({
       document.removeEventListener("pointerup", finish);
       document.removeEventListener("pointercancel", cancel);
       document.removeEventListener("keydown", key);
+      window.removeEventListener("blur", blur);
+      setPressed(null);
       gesture.current = null;
     };
     gesture.current = cleanup;
@@ -230,6 +268,7 @@ function TableControls({
     document.addEventListener("pointerup", finish);
     document.addEventListener("pointercancel", cancel);
     document.addEventListener("keydown", key);
+    window.addEventListener("blur", blur);
   }
   if (!geometry || disabled) return null;
   const { grid } = geometry;
@@ -275,6 +314,7 @@ function TableControls({
                     variant="ghost"
                     size="icon"
                     className="writing-table-grip"
+                    data-pressed={pressed?.axis === axis && pressed.index === index}
                     aria-label={`${axis === "row" ? "Row" : "Column"} ${index + 1} actions and drag handle`}
                     onPointerDown={(event) => start(event, axis, index)}
                   >
@@ -385,6 +425,23 @@ function TableControls({
           contentEditable={false}
         />
       )}
+      {pressed &&
+        createPortal(
+          <span className="writing-table-drag-shield" aria-hidden="true" />,
+          document.body,
+        )}
+      {drag &&
+        createPortal(
+          <span
+            className="writing-table-drag-preview"
+            ref={(element) => position(element, { left: drag.left, top: drag.top })}
+            aria-hidden="true"
+          >
+            <strong>{drag.axis === "row" ? "Row" : "Column"} {drag.from + 1}</strong>
+            {drag.preview && <span>{drag.preview}</span>}
+          </span>,
+          document.body,
+        )}
       <span
         className="sr-only"
         role="status"
