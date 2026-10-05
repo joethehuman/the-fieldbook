@@ -22,6 +22,16 @@ export function Table({
     />
   );
 }
+/** Authored columns use validated pixel measures and still fill their reading region. */
+export function AuthoredTable({ children, widths }: { children: React.ReactNode; widths?: number[] }) {
+  return <Table
+    className={widths ? "authored-table-sized" : undefined}
+    style={widths ? { width: `max(100%, ${widths.reduce((sum, width) => sum + width, 0)}px)` } : undefined}
+  >
+    {widths && <colgroup>{widths.map((width, index) => <col key={index} style={{ width }} />)}</colgroup>}
+    {children}
+  </Table>;
+}
 export function TableHeader({ className, ...props }: ComponentProps<"thead">) {
   return (
     <thead

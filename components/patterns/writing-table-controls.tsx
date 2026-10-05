@@ -15,10 +15,11 @@ import {
 import {
   $getNodeByKey,
   $getRoot,
+  HISTORY_MERGE_TAG,
   HISTORY_PUSH_TAG,
   type LexicalEditor,
 } from "lexical";
-import { moveTablePart } from "@/lib/writing-table";
+import { MAX_TABLE_COLUMN_WIDTH, MIN_TABLE_COLUMN_WIDTH, moveTablePart, setTableColumnWidths, tableColumnWidths } from "@/lib/writing-table";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -75,9 +76,12 @@ function TableControls({
   const [menu, setMenu] = useState<{ axis: Axis; index: number } | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [pressed, setPressed] = useState<{ axis: Axis; index: number } | null>(null);
+  const [resizing, setResizing] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const gesture = useRef<(() => void) | null>(null);
-  useWritingInteraction(!!menu || !!pressed);
+  const resizePreview = useRef(false);
+  const refresh = useRef<() => void>(() => {});
+  useWritingInteraction(!!menu || !!pressed || resizing !== null);
   useEffect(() => () => gesture.current?.(), []);
   useEffect(() => {
     const close = () => setMenu(null);
@@ -90,6 +94,19 @@ function TableControls({
     if (!table) return;
     host.classList.add("writing-table-block");
     const measure = () => {
+      if (!resizePreview.current) editor.getEditorState().read(() => {
+        const widths = getTable()?.getMdastNode();
+        const sized = widths && tableColumnWidths(widths);
+        const columns = Array.from(table.querySelectorAll<HTMLTableColElement>("colgroup col")).slice(1, -1);
+        const total = sized?.reduce((sum, width) => sum + width, 0);
+        const tableWidth = total ? `max(100%, ${total}px)` : "";
+        if (table.style.width !== tableWidth) table.style.width = tableWidth;
+        table.style.tableLayout = sized ? "fixed" : "";
+        columns.forEach((column, index) => {
+          const width = sized?.[index] ? `${sized[index]}px` : "";
+          if (column.style.width !== width) column.style.width = width;
+        });
+      });
       const rows = Array.from(table.tBodies[0]?.rows || []);
       const cells = rows.map((row) =>
         Array.from(row.cells).filter(
@@ -127,6 +144,7 @@ function TableControls({
         JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
       );
     };
+    refresh.current = measure;
     measure();
     const resize = new ResizeObserver(measure);
     resize.observe(table);
@@ -136,7 +154,10 @@ function TableControls({
       subtree: true,
       characterData: true,
     });
+    const unregister = editor.registerUpdateListener(measure);
     return () => {
+      unregister();
+      refresh.current = () => {};
       resize.disconnect();
       mutation.disconnect();
       host.classList.remove("writing-table-block");
@@ -166,6 +187,73 @@ function TableControls({
       moveTablePart(node.getWritable().getMdastNode(), axis, from, to);
     });
     setAnnouncement(`Moved ${axis} ${from + 1} to position ${to + 1}.`);
+  }
+  function commitWidth(index: number, width: number, baseline?: number[]) {
+    change((node) => {
+      const table = node.getWritable().getMdastNode();
+      const widths = tableColumnWidths(table)?.slice() || baseline || geometry?.columns.map((column) => Math.round(column.width)) || [];
+      widths[index] = Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, Math.round(width)));
+      setTableColumnWidths(table, widths.map((value) => Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, value))));
+    });
+    setAnnouncement(`Column ${index + 1} width ${Math.round(width)} pixels.`);
+  }
+  function startResize(event: React.PointerEvent<HTMLButtonElement>, index: number) {
+    if (disabled || event.button !== 0 || !geometry) return;
+    event.preventDefault();
+    event.stopPropagation();
+    gesture.current?.();
+    const pointerId = event.pointerId;
+    const startX = event.clientX;
+    const baseline = geometry.columns.map((column) => Math.round(column.width));
+    const initial = baseline[index];
+    let width = initial;
+    resizePreview.current = true;
+    setResizing(index);
+    const preview = (next: number) => {
+      const table = host.querySelector("table");
+      const column = table?.querySelectorAll<HTMLTableColElement>("colgroup col")[index + 1];
+      if (!table || !column) return;
+      column.style.width = `${next}px`;
+      table.style.tableLayout = "fixed";
+      table.style.width = `max(100%, ${baseline.reduce((sum, value) => sum + value, 0) - initial + next}px)`;
+    };
+    const update = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      e.preventDefault();
+      width = Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, Math.round(initial + e.clientX - startX)));
+      preview(width);
+      setAnnouncement(`Column ${index + 1} width ${width} pixels. Escape cancels.`);
+    };
+    const finish = (e: PointerEvent) => {
+      if (e.pointerId !== pointerId) return;
+      cleanup();
+      if (width !== initial) commitWidth(index, width, baseline);
+    };
+    const cancel = (e?: PointerEvent) => {
+      if (e && e.pointerId !== pointerId) return;
+      cleanup();
+      preview(initial);
+      setAnnouncement("Resize cancelled.");
+    };
+    const blur = () => cancel();
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); cancel(); } };
+    const cleanup = () => {
+      document.removeEventListener("pointermove", update);
+      document.removeEventListener("pointerup", finish);
+      document.removeEventListener("pointercancel", cancel);
+      document.removeEventListener("keydown", key);
+      window.removeEventListener("blur", blur);
+      setResizing(null);
+      resizePreview.current = false;
+      requestAnimationFrame(() => refresh.current());
+      gesture.current = null;
+    };
+    gesture.current = cleanup;
+    document.addEventListener("pointermove", update, { passive: false });
+    document.addEventListener("pointerup", finish);
+    document.addEventListener("pointercancel", cancel);
+    document.addEventListener("keydown", key);
+    window.addEventListener("blur", blur);
   }
   function start(
     event: React.PointerEvent<HTMLButtonElement>,
@@ -336,22 +424,28 @@ function TableControls({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() =>
-                      change((node) =>
-                        axis === "row"
-                          ? node.insertRowAt(index)
-                          : node.insertColumnAt(index),
-                      )
+                      change((node) => {
+                        if (axis === "row") node.insertRowAt(index);
+                        else {
+                          const widths = tableColumnWidths(node.getMdastNode())?.slice();
+                          node.insertColumnAt(index);
+                          if (widths) { widths.splice(index, 0, MIN_TABLE_COLUMN_WIDTH); setTableColumnWidths(node.getWritable().getMdastNode(), widths); }
+                        }
+                      })
                     }
                   >
                     Insert {axis} before
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() =>
-                      change((node) =>
-                        axis === "row"
-                          ? node.insertRowAt(index + 1)
-                          : node.insertColumnAt(index + 1),
-                      )
+                      change((node) => {
+                        if (axis === "row") node.insertRowAt(index + 1);
+                        else {
+                          const widths = tableColumnWidths(node.getMdastNode())?.slice();
+                          node.insertColumnAt(index + 1);
+                          if (widths) { widths.splice(index + 1, 0, MIN_TABLE_COLUMN_WIDTH); setTableColumnWidths(node.getWritable().getMdastNode(), widths); }
+                        }
+                      })
                     }
                   >
                     Insert {axis} after
@@ -375,7 +469,9 @@ function TableControls({
                           node.selectPrevious();
                           node.remove();
                         } else {
+                          const widths = tableColumnWidths(node.getMdastNode())?.slice();
                           node.deleteColumnAt(index);
+                          if (widths) { widths.splice(index, 1); setTableColumnWidths(node.getWritable().getMdastNode(), widths); }
                           node
                             .getWritable()
                             .getMdastNode()
@@ -392,6 +488,31 @@ function TableControls({
           ),
         ),
       )}
+      {geometry.columns.map((box, index) => (
+        <Button
+          key={`resize-${index}`}
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="writing-table-resizer"
+          contentEditable={false}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`Resize column ${index + 1}`}
+          aria-valuemin={MIN_TABLE_COLUMN_WIDTH}
+          aria-valuemax={MAX_TABLE_COLUMN_WIDTH}
+          aria-valuenow={Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, Math.round(box.width)))}
+          title={`Resize column ${index + 1}; use arrow keys for 16 pixel steps`}
+          ref={(element) => position(element, { left: box.left + box.width, top: grid.top + box.height / 2 })}
+          onPointerDown={(event) => startResize(event, index)}
+          onKeyDown={(event) => {
+            const direction = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
+            if (!direction && event.key !== "Home" && event.key !== "End") return;
+            event.preventDefault();
+            commitWidth(index, event.key === "Home" ? MIN_TABLE_COLUMN_WIDTH : event.key === "End" ? MAX_TABLE_COLUMN_WIDTH : box.width + direction * 16);
+          }}
+        ><span aria-hidden="true" /></Button>
+      ))}
       {source && (
         <span
           className="writing-table-drag-source"
@@ -504,11 +625,13 @@ function DividerControls({
   );
 }
 
-function WritingTableControls() {
+function WritingTableControls({ initialWidths, onRootEditor, onWidthsChange }: { initialWidths: (number[] | null)[]; onRootEditor: (editor: LexicalEditor | null) => void; onWidthsChange: (widths: (number[] | null)[]) => void }) {
   const editor = useCellValue(rootEditor$);
+  const initialized = useRef(false);
   const [tables, setTables] = useState<
     { key: string; host: HTMLElement; divider: boolean }[]
   >([]);
+  useEffect(() => { onRootEditor(editor); return () => onRootEditor(null); }, [editor, onRootEditor]);
   useEffect(() => {
     if (!editor) return;
     let frame = 0;
@@ -516,6 +639,21 @@ function WritingTableControls() {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(() =>
         editor.getEditorState().read(() => {
+          if (!initialized.current && initialWidths.length) {
+            const nodes = $getRoot().getChildren().filter($isTableNode);
+            if (nodes.length) {
+              initialized.current = true;
+              editor.update(() => {
+                $getRoot().getChildren().filter($isTableNode).forEach((node, index) => {
+                  const widths = initialWidths[index];
+                  if (widths?.length === node.getColCount()) setTableColumnWidths(node.getWritable().getMdastNode(), widths);
+                });
+              }, { tag: HISTORY_MERGE_TAG });
+              return;
+            }
+          }
+          const tableNodes = $getRoot().getChildren().filter($isTableNode);
+          onWidthsChange(tableNodes.map((node) => tableColumnWidths(node.getMdastNode())?.slice() || null));
           const next = $getRoot()
             .getChildren()
             .filter(
@@ -552,7 +690,7 @@ function WritingTableControls() {
       unregister();
       cancelAnimationFrame(frame);
     };
-  }, [editor]);
+  }, [editor, initialWidths, onWidthsChange]);
   return editor
     ? tables.map(({ key, host, divider }) =>
         createPortal(
@@ -567,8 +705,8 @@ function WritingTableControls() {
       )
     : null;
 }
-export const writingTableControlsPlugin = realmPlugin({
+export const writingTableControlsPlugin = (initialWidths: (number[] | null)[], onRootEditor: (editor: LexicalEditor | null) => void, onWidthsChange: (widths: (number[] | null)[]) => void) => realmPlugin({
   init(realm) {
-    realm.pub(addComposerChild$, WritingTableControls);
+    realm.pub(addComposerChild$, () => <WritingTableControls initialWidths={initialWidths} onRootEditor={onRootEditor} onWidthsChange={onWidthsChange} />);
   },
 });

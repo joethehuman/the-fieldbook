@@ -330,6 +330,15 @@
   min-width: 100%;
   height: auto;
 }
+.writing-editor .writing-content [data-lexical-decorator="true"] table:has(col[style*="width"]) {
+  table-layout: fixed;
+}
+.writing-editor .writing-content [data-lexical-decorator="true"] table:has(col[style*="width"]) tbody > tr > :is(td, th):not([data-tool-cell="true"]):not(:first-child) {
+  min-width: 0;
+}
+.writing-editor .writing-content table :is(td, th) {
+  overflow-wrap: anywhere;
+}
 .writing-editor
   .writing-content
   [data-lexical-decorator="true"]
@@ -516,6 +525,10 @@
 .writing-editor .writing-table-block table col:first-child,
 .writing-editor .writing-table-block table col:last-child { display: none; }
 .writing-table-handle { position: absolute; z-index: 2; transform: translate(-50%, -50%); }
+.writing-table-resizer { position: absolute; z-index: 2; width: 16px; height: 28px; transform: translate(-50%, -50%); cursor: col-resize; touch-action: none; border: 0; background: transparent; display: grid; place-items: center; }
+.writing-table-resizer > span { display: block; width: 3px; height: 16px; border-radius: 2px; background: var(--muted-foreground); opacity: .65; }
+.writing-table-resizer:is(:hover, :focus-visible) > span { background: var(--ring); opacity: 1; }
+.writing-table-resizer:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .writing-table-handle .writing-table-grip { background: transparent; touch-action: none; cursor: grab; }
 .writing-table-handle .writing-table-grip:is(:active, [data-pressed="true"]) { cursor: grabbing; }
 .writing-table-grip-mark { display: block; width: var(--space-4); height: var(--space-1); border-radius: var(--radius); background: var(--muted-foreground); box-shadow: 0 0 0 3px var(--background); }

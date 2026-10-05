@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Table } from "../ui/table";
+import { AuthoredTable } from "../ui/table";
 
 /** Keeps wide reading tables scrollable without moving the surrounding prose. */
-export function ScrollableMarkdownTable({ children }: { children: ReactNode }) {
+export function ScrollableMarkdownTable({ children, widths }: { children: ReactNode; widths?: number[] }) {
   const region = useRef<HTMLDivElement>(null);
   const [moreRight, setMoreRight] = useState(false);
 
@@ -26,7 +26,7 @@ export function ScrollableMarkdownTable({ children }: { children: ReactNode }) {
 
   return <div className="markdown-table-wrap" data-more-right={moreRight}>
     <div ref={region} className="markdown-table" role="region" aria-label="Scrollable table" tabIndex={0}>
-      <Table>{children}</Table>
+      <AuthoredTable widths={widths}>{children}</AuthoredTable>
     </div>
   </div>;
 }

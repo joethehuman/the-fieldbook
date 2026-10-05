@@ -4,6 +4,7 @@ import { freshWorkspace, type Workspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { equivalentMarkdown } from "../../lib/markdown-compatibility";
+import { writeTableWidths } from "../../lib/writing-table";
 import {
   authoringUser,
   setupAuthoringProvider,
@@ -167,6 +168,7 @@ async function setup(
   production: boolean,
   body = original,
   kind: "doc" | "brief" = "doc",
+  itemId = "writing-fixture",
 ) {
   let state = withPublishedSnapshots(freshWorkspace());
   if (kind === "doc") {
@@ -187,7 +189,7 @@ async function setup(
   const source = state.content.find((item) => item.kind === kind)!;
   const item = {
     ...source,
-    id: "writing-fixture",
+    id: itemId,
     ...(kind === "doc"
       ? {
           category: "Start here",
@@ -269,8 +271,8 @@ async function setup(
   await page.route("**/api/media/example.mp4", (route) =>
     route.fulfill({ status: 204 }),
   );
-  await page.goto(production ? "/admin" : "/#admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.goto(production ? `/admin/content/${itemId}/edit` : "/#admin");
+  if (!production) await page.getByRole("button", { name: "Edit", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Back to content", exact: true }),
   ).toBeVisible();
@@ -357,6 +359,58 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
   expect((await read()).publishedContent).toEqual([]);
   expect((await read()).content[0].body).toContain("A private addition.");
   expect(errors).toEqual([]);
+});
+
+test("resized Doc tables persist through save, reopen, publish, and reading", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Reader persistence is checked with the installed app fixture.");
+  const body = "| Short | Detailed paragraph |\n| --- | --- |\n| A | This is a longer sentence that should wrap when the column is narrow. |";
+  const itemId = "00000000-0000-4000-8000-000000000099";
+  const { read } = await setup(page, true, body, "doc", itemId);
+  const resize = page.getByRole("separator", { name: "Resize column 2" });
+  await resize.focus();
+  await resize.press("ArrowRight");
+  await waitForDraftSaved(page);
+  const saved = (await read()).content[0].body;
+  expect(saved).toContain("fieldbook-table-widths:v1");
+  await page.getByRole("button", { name: "Back to content", exact: true }).click();
+  await page.goto(`/admin/content/${itemId}/edit`);
+  expect((await downloadMarkdown(page)).body).toBe(saved);
+  await page.getByRole("button", { name: "Publish", exact: true }).click();
+  await expect(page.locator('[data-slot="toast"]')).toContainText("published");
+  expect((await read()).publishedContent![0].body).toBe(saved);
+  await page.goto(`/docs/${itemId}`);
+  const table = page.locator(".markdown-table table");
+  await expect(table.locator("colgroup col")).toHaveCount(2);
+  await expect(table.getByRole("cell", { name: /longer sentence/ })).toBeVisible();
+  expect(await table.evaluate((node) => getComputedStyle(node).tableLayout)).toBe("fixed");
+});
+
+test("short tables fill the reader and many columns scroll without widening the page", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Reader layout uses the installed app fixture.");
+  const many = Array.from({ length: 8 }, (_, index) => `Column ${index + 1}`);
+  const longToken = "averylongunbrokentokenthatneedstowrapinsidethenarrowcolumn";
+  const body = writeTableWidths(
+    `| Label | Detail |\n| --- | --- |\n| Short | A longer paragraph of prose that wraps as the reading width changes. ${longToken} |\n\n` +
+    `| ${many.join(" | ")} |\n| ${many.map(() => "---").join(" | ")} |\n| ${many.join(" | ")} |`,
+    [[160, 240], many.map(() => 160)],
+  );
+  const itemId = "00000000-0000-4000-8000-000000000098";
+  await setup(page, true, body, "doc", itemId);
+  await page.goto(`/docs/${itemId}`);
+  const regions = page.locator(".markdown-table");
+  await expect(regions).toHaveCount(2);
+  const short = await regions.nth(0).evaluate((node) => ({
+    area: node.clientWidth,
+    table: node.querySelector("table")!.getBoundingClientRect().width,
+    token: getComputedStyle(node.querySelector("td:last-child")!).overflowWrap,
+  }));
+  expect(short.table).toBeGreaterThanOrEqual(short.area - 2);
+  expect(short.table).toBeGreaterThanOrEqual(400 - 2);
+  expect(short.table).toBeLessThanOrEqual(Math.max(short.area, 400) + 2);
+  expect(short.token).toBe("anywhere");
+  const wide = await regions.nth(1).evaluate((node) => ({ area: node.clientWidth, content: node.scrollWidth }));
+  expect(wide.content).toBeGreaterThan(wide.area);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(info.project.name.endsWith("phone") ? 375 : 1440);
 });
 
 test("formatting controls, keyboard save and responsive settings", async ({

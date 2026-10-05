@@ -173,9 +173,15 @@
   .markdown-table :is(th, td) {
     min-width: 11rem;
   }
+  .markdown-table .authored-table-sized {
+    table-layout: fixed;
+  }
+  .markdown-table .authored-table-sized :is(th, td) {
+    min-width: 0;
+  }
   .markdown th,
   .markdown td {
-    overflow-wrap: normal;
+    overflow-wrap: anywhere;
     vertical-align: top;
     border: 1px solid var(--authored-table-border);
     padding: var(--space-3);

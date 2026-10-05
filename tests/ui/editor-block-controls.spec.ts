@@ -107,6 +107,53 @@ test("column move saves current cell edits and carries alignment; Escape cancels
   expect((await downloadMarkdown(page)).body).toBe(before);
 });
 
+test("column resize is keyboard operable, survives a column move, and participates in undo", async ({ page }) => {
+  await open(page);
+  const resize = page.getByRole("separator", { name: "Resize column 2" });
+  await expect(resize).toBeVisible();
+  const before = Number(await resize.getAttribute("aria-valuenow"));
+  await resize.focus();
+  await resize.press("ArrowRight");
+  await expect.poll(async () => (await downloadMarkdown(page)).body).toContain("fieldbook-table-widths:v1");
+  const sized = (await downloadMarkdown(page)).body;
+  const widths = JSON.parse(sized.match(/fieldbook-table-widths:v1 (\[[^\n]*\])/ )![1])[0] as number[];
+  expect(widths[1]).toBeGreaterThanOrEqual(before + 15);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(async () => (await downloadMarkdown(page)).body).not.toContain("fieldbook-table-widths:v1");
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect.poll(async () => (await downloadMarkdown(page)).body).toBe(sized);
+  const grip = page.getByRole("button", { name: "Column 2 actions and drag handle" });
+  await grip.click();
+  await page.getByRole("menuitem", { name: "Move column right" }).click();
+  const moved = (await downloadMarkdown(page)).body;
+  const movedWidths = JSON.parse(moved.match(/fieldbook-table-widths:v1 (\[[^\n]*\])/ )![1])[0] as number[];
+  expect(movedWidths[2]).toBe(widths[1]);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(async () => (await downloadMarkdown(page)).body).toBe(sized);
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await expect.poll(async () => (await downloadMarkdown(page)).body).toBe(moved);
+});
+
+test("dragging a column edge previews width and Escape cancels without saving", async ({ page }) => {
+  await open(page);
+  const resize = page.getByRole("separator", { name: "Resize column 2" });
+  const box = await resize.boundingBox();
+  const start = Number(await resize.getAttribute("aria-valuenow"));
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box!.x + box!.width / 2 + 48, box!.y + box!.height / 2, { steps: 6 });
+  await expect.poll(async () => Number(await resize.getAttribute("aria-valuenow"))).toBeGreaterThan(start);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  expect((await downloadMarkdown(page)).body).not.toContain("fieldbook-table-widths:v1");
+  const next = await resize.boundingBox();
+  await page.mouse.move(next!.x + next!.width / 2, next!.y + next!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(next!.x + next!.width / 2 + 48, next!.y + next!.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(async () => (await downloadMarkdown(page)).body).toContain("fieldbook-table-widths:v1");
+});
+
 test("image settings use the shared dialog and preserve Cancel versus Save", async ({
   page,
 }, info) => {

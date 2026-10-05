@@ -6,6 +6,7 @@ import { writingTableControlsPlugin } from "./writing-table-controls";
 import { writingVideoPlugin } from "./writing-video";
 import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
+import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
 import { createWritingBlock, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu } from "./writing-selection-menu";
 import { usePhoneLayout } from "./use-phone-layout";
@@ -36,6 +37,7 @@ import {
   rootEditor$,
   readOnly$,
   $createTableNode,
+  $isTableNode,
   insertCodeBlock$,
   insertThematicBreak$,
   useCodeBlockEditorContext,
@@ -62,6 +64,7 @@ import {
   CAN_UNDO_COMMAND,
   CAN_REDO_COMMAND,
   COMMAND_PRIORITY_EDITOR,
+  HISTORY_MERGE_TAG,
   SKIP_DOM_SELECTION_TAG,
   SKIP_SCROLL_INTO_VIEW_TAG,
 } from "lexical";
@@ -270,14 +273,18 @@ export default function WritingEditorEngine({
   viewControls,
 }: WritingEditorProps & { onUnsupported: () => void; viewControls: ReactNode }) {
   const editor = useRef<MDXEditorMethods>(null);
-  const initial = useRef(value);
+  const initial = useRef(readTableWidths(value));
   const current = useRef(value);
+  const loadingWidths = useRef(false);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
   const failed = useRef(false);
   const file = useRef<HTMLInputElement>(null);
   const root = useRef<HTMLDivElement>(null);
   const slashMenu = useRef<HTMLDivElement>(null);
   const mediaMenu = useRef<HTMLDivElement>(null);
   const lexicalEditor = useRef<LexicalEditor | null>(null);
+  const tableEditor = useRef<LexicalEditor | null>(null);
   const writingActions = useRef<WritingActions | null>(null);
   const selectionTools = useRef<((keyboard: boolean) => boolean) | null>(null);
   const pendingList = useRef<"bullet" | "number" | null>(null);
@@ -366,7 +373,20 @@ export default function WritingEditorEngine({
   useEffect(() => {
     if (current.current !== value) {
       current.current = value;
-      editor.current?.setMarkdown(value);
+      const parsed = readTableWidths(value);
+      loadingWidths.current = true;
+      editor.current?.setMarkdown(parsed.markdown);
+      const frame = requestAnimationFrame(() => {
+        tableEditor.current?.update(() => {
+          $getRoot().getChildren().filter($isTableNode).forEach((node, index) => {
+            const widths = parsed.widths[index];
+            if (widths?.length === node.getColCount())
+              setTableColumnWidths(node.getWritable().getMdastNode(), widths);
+          });
+        }, { tag: HISTORY_MERGE_TAG });
+        loadingWidths.current = false;
+      });
+      return () => { cancelAnimationFrame(frame); loadingWidths.current = false; };
     }
   }, [value]);
   async function upload(file: File) {
@@ -683,7 +703,23 @@ export default function WritingEditorEngine({
       imageUploadHandler: onUpload ? upload : undefined,
     }),
     tablePlugin(),
-    writingTableControlsPlugin(),
+    writingTableControlsPlugin(
+      initial.current.widths,
+      (root) => { tableEditor.current = root; },
+      (widths) => {
+        if (loadingWidths.current) return;
+        const saved = readTableWidths(current.current).widths;
+        const previous = saved.some(Boolean) ? saved : [];
+        const nextWidths = widths.some(Boolean) ? widths : [];
+        if (JSON.stringify(previous) === JSON.stringify(nextWidths)) return;
+        const markdown = editor.current?.getMarkdown() || readTableWidths(current.current).markdown;
+        const next = writeTableWidths(markdown, widths);
+        if (next !== current.current) {
+          current.current = next;
+          onChangeRef.current(next);
+        }
+      },
+    )(),
     codeBlockPlugin({
       codeBlockEditorDescriptors: [
         { priority: 0, match: () => true, Editor: PlainCodeEditor },
@@ -874,7 +910,7 @@ export default function WritingEditorEngine({
       {uploadProgress && <div className="px-3 py-2"><MediaUploadStatus progress={uploadProgress} /></div>}
       <MDXEditor
         ref={editor}
-        markdown={initial.current}
+        markdown={initial.current.markdown}
         trim={false}
         readOnly={disabled || busy}
         suppressHtmlProcessing
@@ -896,14 +932,21 @@ export default function WritingEditorEngine({
         onChange={(markdown, normalized) => {
           if (failed.current) return;
           if (normalized) {
-            if (!equivalentMarkdown(current.current, markdown)) {
+            if (!equivalentMarkdown(readTableWidths(current.current).markdown, markdown)) {
               failed.current = true;
               onUnsupported();
             }
             return;
           }
-          current.current = markdown;
-          onChange(markdown);
+          const widths: (number[] | null)[] = [];
+          tableEditor.current?.getEditorState().read(() => {
+            $getRoot().getChildren().filter($isTableNode).forEach((node) => {
+              widths.push(tableColumnWidths(node.getMdastNode())?.slice() || null);
+            });
+          });
+          const next = writeTableWidths(markdown, widths);
+          current.current = next;
+          onChange(next);
         }}
         plugins={plugins}
       />
