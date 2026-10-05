@@ -124,7 +124,12 @@ export function ContentFeedback({
       id={`${id}-panel`}
       aria-label={expanded ? "Course feedback" : "Did you find this useful?"}
       aria-busy={pending}
-      className="min-w-0"
+      className={cn(
+        "flex min-w-0 flex-col",
+        desktop &&
+          !expanded &&
+          "max-h-[min(calc(100dvh-1.5rem),var(--radix-popover-content-available-height))]",
+      )}
       onKeyDown={(event) => {
         if (event.key === "Escape" && !desktop && !expanded) {
           event.preventDefault();
@@ -136,45 +141,50 @@ export function ContentFeedback({
         if (rating) void persist(rating, comment, true);
       }}
     >
-      <div className="flex flex-wrap items-center gap-2 px-3 py-2">
-        <span className="min-w-0 flex-1 text-copy leading-snug text-muted-foreground">
-          Did you find this useful?
-        </span>
-        <div
-          className="flex shrink-0 items-center gap-1"
-          role="group"
-          aria-label="Rate this content"
-        >
-          {choices(true)}
+      <div
+        data-slot="feedback-fields"
+        className="min-h-0 overflow-y-auto overscroll-y-contain"
+      >
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2">
+          <span className="min-w-0 flex-1 text-copy leading-snug text-muted-foreground">
+            Did you find this useful?
+          </span>
+          <div
+            className="flex shrink-0 items-center gap-1"
+            role="group"
+            aria-label="Rate this content"
+          >
+            {choices(true)}
+          </div>
+        </div>
+        <div className="grid gap-3 px-3 pb-3">
+          <Field className="sr-only" htmlFor={`${id}-comment`}>
+            Your feedback (optional)
+          </Field>
+          <Textarea
+            ref={textarea}
+            id={`${id}-comment`}
+            rows={4}
+            maxLength={2000}
+            value={comment}
+            onChange={(event) => setComment(event.target.value)}
+            placeholder="Your feedback…"
+            aria-describedby={`${id}-help`}
+          />
+          <p
+            id={`${id}-help`}
+            className="text-right text-xs text-muted-foreground"
+          >
+            Optional · up to 2,000 characters
+          </p>
+          {error && (
+            <Alert variant="destructive" role="alert">
+              {error}
+            </Alert>
+          )}
         </div>
       </div>
-      <div className="grid gap-3 px-3 pb-3">
-        <Field className="sr-only" htmlFor={`${id}-comment`}>
-          Your feedback (optional)
-        </Field>
-        <Textarea
-          ref={textarea}
-          id={`${id}-comment`}
-          rows={4}
-          maxLength={2000}
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          placeholder="Your feedback…"
-          aria-describedby={`${id}-help`}
-        />
-        <p
-          id={`${id}-help`}
-          className="text-right text-xs text-muted-foreground"
-        >
-          Optional · up to 2,000 characters
-        </p>
-        {error && (
-          <Alert variant="destructive" role="alert">
-            {error}
-          </Alert>
-        )}
-      </div>
-      <CardFooter className="sticky bottom-0 justify-end px-3">
+      <CardFooter className="shrink-0 justify-end px-3">
         {!desktop && !expanded && (
           <Button
             type="button"
@@ -197,14 +207,22 @@ export function ContentFeedback({
       </CardFooter>
     </form>
   );
-  if (expanded) return (
-    <section aria-label="Content feedback" className="w-full min-w-0">
-      <div className="rounded-lg border border-border bg-background">{panel}</div>
-      <p role="status" className="mt-2 text-copy text-muted-foreground">{status}</p>
-    </section>
-  );
+  if (expanded)
+    return (
+      <section aria-label="Content feedback" className="w-full min-w-0">
+        <div className="rounded-lg border border-border bg-background">
+          {panel}
+        </div>
+        <p role="status" className="mt-2 text-copy text-muted-foreground">
+          {status}
+        </p>
+      </section>
+    );
   return (
-    <section aria-label="Content feedback" className="flex min-w-0 flex-col items-center">
+    <section
+      aria-label="Content feedback"
+      className="flex min-w-0 flex-col items-center"
+    >
       <Popover open={desktop && open} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
           <div
@@ -239,6 +257,7 @@ export function ContentFeedback({
         {desktop && (
           <PopoverContent
             side="top"
+            className="overflow-hidden p-0 pe-0 [scrollbar-gutter:auto]"
             aria-label="Did you find this useful?"
             onOpenAutoFocus={(event) => {
               event.preventDefault();
