@@ -702,6 +702,25 @@
     padding: var(--space-3) var(--space-2);
     margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-2));
   }
+  .course-row[data-scroll-before="true"][data-scroll-after="true"] {
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      black var(--space-12),
+      black calc(100% - var(--space-12)),
+      transparent
+    );
+  }
+  .course-row[data-scroll-before="true"][data-scroll-after="false"] {
+    mask-image: linear-gradient(to right, transparent, black var(--space-12));
+  }
+  .course-row[data-scroll-before="false"][data-scroll-after="true"] {
+    mask-image: linear-gradient(
+      to right,
+      black calc(100% - var(--space-12)),
+      transparent
+    );
+  }
   .course-row > [data-slot="content-action"] {
     flex: 0 0 min(18rem, 85vw, 100%);
     scroll-snap-align: start;
