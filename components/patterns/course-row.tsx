@@ -1,5 +1,5 @@
 "use client";
-import { Children, useEffect, useRef, useState, type ReactNode } from "react";
+import { Children, useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { SectionHeader, SplitPanel } from "./layout";
 
 /** Keep overflowing course strips keyboard-scrollable as their contents resize. */
@@ -19,14 +19,30 @@ export function CourseRow({
   splitAt?: "tablet" | "xl";
 }) {
   const row = useRef<HTMLDivElement>(null);
-  const [scrollable, setScrollable] = useState(false);
-  useEffect(() => {
+  const [edges, setEdges] = useState({
+    before: false,
+    after: false,
+    scrollable: false,
+  });
+  const measure = useCallback(() => {
     const element = row.current;
     if (!element) return;
-    const measure = () => {
-      const overflow = element.scrollWidth - element.clientWidth > 1;
-      setScrollable((previous) => previous === overflow ? previous : overflow);
-    };
+    const scrollable = element.scrollWidth - element.clientWidth > 1;
+    const before = scrollable && element.scrollLeft > 2;
+    const after =
+      scrollable &&
+      element.scrollWidth - element.clientWidth - element.scrollLeft > 2;
+    setEdges((previous) =>
+      previous.before === before &&
+      previous.after === after &&
+      previous.scrollable === scrollable
+        ? previous
+        : { before, after, scrollable },
+    );
+  }, []);
+  useLayoutEffect(() => {
+    const element = row.current;
+    if (!element) return;
     const resize = new ResizeObserver(measure);
     const observe = () => {
       resize.disconnect();
@@ -41,7 +57,7 @@ export function CourseRow({
       resize.disconnect();
       mutation.disconnect();
     };
-  }, []);
+  }, [measure]);
   return (
     <div className="course-row-wrap">
       <SectionHeader
@@ -59,7 +75,10 @@ export function CourseRow({
           className="course-row"
           role="region"
           aria-label={title}
-          tabIndex={scrollable ? 0 : undefined}
+          tabIndex={edges.scrollable ? 0 : undefined}
+          data-scroll-before={edges.before}
+          data-scroll-after={edges.after}
+          onScroll={measure}
         >
           {children}
         </div>
