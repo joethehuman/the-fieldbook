@@ -2,6 +2,8 @@
 import { useRef, useState, type DragEvent } from "react";
 import {
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   FileText,
   Folder,
   FolderOpen,
@@ -26,6 +28,7 @@ import {
 } from "@/lib/docs-navigation";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { Button } from "./ui/button";
+import { Tooltip } from "./ui/tooltip";
 import { SelectField } from "./ui/select";
 import { ReorderRow } from "./patterns/reorder-row";
 import { PublicationStatus } from "./patterns/publication-status";
@@ -629,30 +632,45 @@ export function DocSectionsSettings({
           <Plus aria-hidden="true" />
           New section
         </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={blocked || !expandableRoots.length}
-          aria-expanded={allRootsExpanded}
-          onClick={() =>
-            setExpanded((current) =>
-              allRootsExpanded
-                ? new Set()
-                : new Set([
-                    ...current,
-                    ...expandableRoots.map((root) => root.id),
-                  ]),
-            )
-          }
-        >
-          {allRootsExpanded ? "Collapse sections" : "Expand sections"}
-        </Button>
       </div>
       <BulkActions
         collectionSize={selection.collectionSize}
         selected={selection.actionIds}
         onSelectionChange={selection.setSelected}
         noun="items"
+        summaryControl={
+          <Tooltip
+            content={allRootsExpanded ? "Collapse sections" : "Expand sections"}
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground"
+              disabled={blocked || !expandableRoots.length}
+              aria-label={
+                allRootsExpanded ? "Collapse sections" : "Expand sections"
+              }
+              aria-expanded={allRootsExpanded}
+              onClick={() =>
+                setExpanded((current) =>
+                  allRootsExpanded
+                    ? new Set()
+                    : new Set([
+                        ...current,
+                        ...expandableRoots.map((root) => root.id),
+                      ]),
+                )
+              }
+            >
+              {allRootsExpanded ? (
+                <ChevronsDownUp aria-hidden="true" />
+              ) : (
+                <ChevronsUpDown aria-hidden="true" />
+              )}
+            </Button>
+          </Tooltip>
+        }
         commands={[
           {
             id: "move",
@@ -735,7 +753,7 @@ export function DocSectionsSettings({
         ]}
       />
       {sections.length ? (
-        <ol className="doc-order-list">
+        <ol className="doc-order-list mt-3">
           {roots.map((root) => sectionBranch(root, roots))}
         </ol>
       ) : (

@@ -254,22 +254,35 @@ test("document move actions stage, discard and save the reader order without cha
   page,
 }, info) => {
   const fixture = await openOrderingFixture(page);
-  const first = page.getByRole("button", { name: "New section", exact: true });
   const toggle = page.getByRole("button", {
     name: "Expand sections",
     exact: true,
   });
-  const firstBox = await first.boundingBox(),
-    toggleBox = await toggle.boundingBox();
-  expect(Math.abs(firstBox!.y - toggleBox!.y)).toBeLessThan(1);
+  const toolbar = page.getByRole("region", { name: "Selected items", exact: true });
+  const toggleBox = await toggle.boundingBox(),
+    summaryBox = await toolbar.getByRole("status").first().boundingBox(),
+    toolbarBox = await toolbar.boundingBox();
+  expect(toggleBox!.x + toggleBox!.width).toBeLessThan(summaryBox!.x);
+  expect(
+    Math.abs(
+      toggleBox!.y + toggleBox!.height / 2 - summaryBox!.y - summaryBox!.height / 2,
+    ),
+  ).toBeLessThan(1);
   const header = page
     .locator('[data-slot="reorder-row"]')
     .filter({ has: page.getByText("Start", { exact: true }) });
+  const headerBox = await header.boundingBox();
+  expect(
+    headerBox!.y - toolbarBox!.y - toolbarBox!.height,
+  ).toBeGreaterThanOrEqual(12);
   const title = await header.locator("strong").boundingBox(),
     count = await header.locator("small").boundingBox();
   expect(count!.x).toBeGreaterThan(title!.x + title!.width);
   expect(Math.abs(title!.y + title!.height / 2 - count!.y - count!.height / 2)).toBeLessThan(1);
+  await page.screenshot({ path: info.outputPath("docs-navigation-toolbar.png") });
+  await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await toggle.click();
+  await expect(page.getByRole("button", { name: "Collapse sections", exact: true })).toHaveAttribute("aria-expanded", "true");
   const documents = page.getByRole("list", {
     name: "Documents in Start",
     exact: true,
