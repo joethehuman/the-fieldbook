@@ -510,7 +510,7 @@
 .writing-editor .writing-table-block table col:last-child { display: none; }
 .writing-table-handle { position: absolute; z-index: 2; transform: translate(-50%, -50%); }
 .writing-table-handle .writing-table-grip { background: transparent; touch-action: none; cursor: grab; }
-.writing-table-handle .writing-table-grip:active { cursor: grabbing; }
+.writing-table-handle .writing-table-grip:is(:active, [data-pressed="true"]) { cursor: grabbing; }
 .writing-table-grip-mark { display: block; width: var(--space-4); height: var(--space-1); border-radius: var(--radius); background: var(--muted-foreground); box-shadow: 0 0 0 3px var(--background); }
 .writing-table-row .writing-table-grip-mark { width: var(--space-1); height: var(--space-4); }
 .writing-table-grip:is(:hover, :focus-visible, [data-state="open"]) .writing-table-grip-mark { background: var(--ring); }
@@ -518,6 +518,9 @@
 .writing-table-drop { position: absolute; z-index: 3; pointer-events: none; background: var(--ring); }
 .writing-table-drop-row { height: 3px; transform: translateY(-50%); }
 .writing-table-drop-column { width: 3px; transform: translateX(-50%); }
+.writing-table-drag-shield { position: fixed; inset: 0; z-index: 1000; cursor: grabbing; }
+.writing-table-drag-preview { position: fixed; z-index: 1001; display: flex; align-items: baseline; gap: var(--space-2); max-width: min(17.5rem, calc(100vw - 16px)); padding: var(--space-2) var(--space-3); overflow: hidden; pointer-events: none; white-space: nowrap; border: 1px solid var(--control-border); border-radius: var(--radius); background: var(--card); color: var(--foreground); box-shadow: var(--elevation-floating); }
+.writing-table-drag-preview span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted-foreground); }
 @media (hover: none) { .writing-block-actions { opacity: 1; } }
 .writing-editor .mdxeditor-contenteditable-wrapper { position: relative; }
 .writing-divider-tools { position: absolute; transform: translate(-100%, -50%); z-index: 2; }
