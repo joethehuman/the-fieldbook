@@ -5,6 +5,7 @@ import { saveSettings } from "../../server/save-settings";
 import { saveContent } from "../../server/content";
 import { defaultSettings } from "../../lib/settings";
 import { seedContent } from "../../lib/seed";
+import { availableDocSections } from "../../lib/docs-navigation";
 
 const admin = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -57,6 +58,114 @@ test("server schema rejects cycles, third levels, duplicate siblings and invalid
     ]),
     false,
   );
+});
+
+test("deleted Docs do not block section removal; restored drafts and live publications still do", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalEnv = { ...process.env };
+  Object.assign(process.env, {
+    NEXT_PUBLIC_SUPABASE_URL: "https://test.supabase.co",
+    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test",
+    SUPABASE_SECRET_KEY: "test",
+    FIELDBOOK_URL: "https://example.test",
+    FIELDBOOK_OWNER_EMAIL: "admin@example.test",
+  });
+  const systemSettings = {
+    ...defaultSettings,
+    organizationTeamId: "organization",
+  };
+  let settings: typeof defaultSettings = {
+    ...systemSettings,
+    docSections: [section],
+  };
+  let deletedAt: string | null = "2026-10-05T00:00:00Z";
+  let draft = { ...legacy, sectionId: section.id, status: "draft" as const };
+  let published: typeof legacy | null = null;
+  let writes = 0;
+  globalThis.fetch = async (input, init) => {
+    const url = new URL(String(input));
+    let body: unknown;
+    if (url.pathname.endsWith("fb_config")) {
+      if (init?.method === "PATCH") {
+        writes++;
+        settings = JSON.parse(String(init.body)).settings;
+        body = { revision: writes + 1 };
+      } else
+        body = {
+          settings,
+          groups: [],
+          governance_revision: 1,
+          teams: [
+            {
+              id: "organization",
+              name: "Organization",
+              system: "organization",
+            },
+          ],
+        };
+    } else if (url.pathname.endsWith("fb_documents")) {
+      body =
+        deletedAt && url.searchParams.get("deleted_at") === "is.null"
+          ? []
+          : [{ id, draft, published }];
+    } else throw new Error("Unexpected request " + url.pathname);
+    return new Response(JSON.stringify(body), {
+      headers: {
+        "Content-Type": "application/json",
+        ...(Array.isArray(body)
+          ? { "Content-Range": body.length ? "0-0/1" : "*/0" }
+          : {}),
+      },
+    });
+  };
+  try {
+    const removed = {
+      ...systemSettings,
+      docSections: [],
+      docCategoryOrder: [],
+    };
+    await saveSettings(admin, { settings: removed, expected: 1 });
+    assert.equal(writes, 1);
+    assert.deepEqual(settings.docSections, []);
+    // Restoration retains placement metadata; the existing resolver recovers it.
+    deletedAt = null;
+    const recovered = availableDocSections([draft], [], settings.docSections);
+    assert.equal(recovered[0].id, section.id);
+    await assert.rejects(
+      () =>
+        saveSettings(admin, {
+          settings: {
+            ...removed,
+            docSections: [{ id: "other", name: "Other" }],
+          },
+          expected: 2,
+        }),
+      /draft and published documents/,
+    );
+    await saveSettings(admin, {
+      settings: { ...removed, docSections: recovered },
+      expected: 2,
+    });
+    assert.equal(writes, 2);
+    // A draft moved elsewhere must not hide a publication in the original section.
+    published = { ...legacy, sectionId: section.id };
+    draft = { ...draft, category: "Other", sectionId: "other" };
+    await assert.rejects(
+      () =>
+        saveSettings(admin, {
+          settings: {
+            ...removed,
+            docSections: [{ id: "other", name: "Other" }],
+          },
+          expected: 3,
+        }),
+      /draft and published documents/,
+    );
+    assert.equal(writes, 2);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env = originalEnv;
+  }
 });
 
 test("admin settings guard draft and published placement; content write validates section IDs", async () => {

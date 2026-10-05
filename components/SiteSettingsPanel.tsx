@@ -59,7 +59,7 @@ export default function SiteSettingsPanel({
 }) {
   const notify = useToast();
   const { confirm, prompt } = useInteractionDialog();
-  const saveError = useRevealTarget();
+  const saveError = useRevealTarget({ block: section === "docs" ? "nearest" : "start" });
   const loadedSettings = (workspace: Workspace) => {
     const saved = (workspace.settings || {}) as Partial<typeof defaultSettings> & {
       logoUrl?: string;
@@ -80,6 +80,7 @@ export default function SiteSettingsPanel({
   const savedSettings = useRef(settings);
   const [docMoves, setDocMoves] = useState<DocNavigationMove[]>([]);
   const dirty = docMoves.length > 0 || !equalJson(settings, savedSettings.current);
+  const docsSaveActive = dirty || busy || !!notice;
   const visibleDocs = [...data.content, ...(data.publishedContent || [])].filter((item) => item.kind === "doc").map((doc) => {
     const move = docMoves.find((item) => item.id === doc.id);
     return move ? { ...doc, sectionId: move.sectionId } : doc;
@@ -321,15 +322,19 @@ export default function SiteSettingsPanel({
         </SettingsGroup>
       )}
       {section === "docs" && (
-        <div className="min-w-0">
-          <PendingChangesBar active={dirty || busy} actions={<>
+        <div className="min-w-0 [overflow-anchor:none]">
+          <PendingChangesBar active={docsSaveActive} feedback={notice ? (
+            <Alert variant="destructive" role="alert" {...saveError.targetProps}>
+              {notice}
+            </Alert>
+          ) : undefined} actions={<>
             <Button type="button" variant="outline" disabled={busy} onClick={discard}>Discard changes</Button>
             <Button type="submit" loading={busy}>{busy ? "Saving…" : "Save settings"}</Button>
           </>}>{busy ? "Saving changes…" : "Unsaved changes"}</PendingChangesBar>
           <SettingsGroup
             measure="full"
             id="settings-docs"
-            className={dirty || busy ? "rounded-t-none border-t-0" : undefined}
+            className={docsSaveActive ? "rounded-t-none border-t-0" : undefined}
             title={<h3>Document sections</h3>}
             description="Organize top-level sections and their subsections. Documents can sit at either level."
             guidance="Drag to reorder or move items between sections, or use Move to… in the menus."
@@ -606,7 +611,7 @@ export default function SiteSettingsPanel({
         value={settings.askAi ?? defaultAskAiSettings}
         onChange={(askAi) => setSettings({ ...settings, askAi })}
       />}
-      {section !== "mcp" && notice && (
+      {section !== "mcp" && section !== "docs" && notice && (
         <div className="settings-save-bar" {...saveError.targetProps}>
           <Alert variant="destructive" role="alert">
             {notice}

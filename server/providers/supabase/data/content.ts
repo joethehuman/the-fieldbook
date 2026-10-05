@@ -104,6 +104,7 @@ export const contentData: Pick<
         db()
           .from("fb_documents")
           .select("id,draft,published", { count: "exact" })
+          .is("deleted_at", null)
           .order("id")
           .range(from, to),
     );

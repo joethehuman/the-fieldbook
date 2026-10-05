@@ -1,5 +1,5 @@
 "use client";
-import { useState, type DragEvent } from "react";
+import { useRef, useState, type DragEvent } from "react";
 import { ChevronRight, GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import {
   availableDocSections,
@@ -61,15 +61,37 @@ export function DocSectionsSettings({
   const { confirm, prompt } = useInteractionDialog();
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [creatingUnder, setCreatingUnder] = useState("");
-  const [creatingRoot, setCreatingRoot] = useState(false);
-  const [showDocs, setShowDocs] = useState(false);
+  const [creating, setCreating] = useState<{ parentId: string } | null>(null);
+  const createTrigger = useRef<HTMLElement | null>(null);
+  const sectionTriggers = useRef(new Map<string, HTMLButtonElement>());
+  const createCompleted = useRef(false);
+  const createdRow = useRef<HTMLLIElement | null>(null);
+  const [createdId, setCreatedId] = useState("");
   const [moving, setMoving] = useState("");
   const [moveTarget, setMoveTarget] = useState("");
   const conflict = legacySectionConflict(docs);
   const blocked = disabled || !!conflict;
   const uniqueDocs = [...new Map(docs.map((doc) => [doc.id, doc])).values()];
   const roots = sections.filter((section) => !section.parentId);
+  const expandableRoots = roots.filter(
+    (root) =>
+      sections.some((section) => section.parentId === root.id) ||
+      uniqueDocs.some((doc) => sectionForDoc(doc, sections)?.id === root.id),
+  );
+  const allRootsExpanded =
+    expandableRoots.length > 0 &&
+    expandableRoots.every((root) => expanded.has(root.id));
+  const sectionVisible = (section: DocSection) =>
+    !section.parentId || expanded.has(section.parentId);
+  const visibleIds = [
+    ...sections.filter(sectionVisible).map((section) => sectionKey(section.id)),
+    ...uniqueDocs
+      .filter((doc) => {
+        const section = sectionForDoc(doc, sections);
+        return section && sectionVisible(section) && expanded.has(section.id);
+      })
+      .map((doc) => docKey(doc.id)),
+  ];
   const allItems = [
     ...sections.map((section) => ({
       id: sectionKey(section.id),
@@ -81,10 +103,9 @@ export function DocSectionsSettings({
     })),
   ];
   const selection = useBulkSelection(
-    `docs-navigation-${showDocs}`,
-    allItems
-      .filter((item) => showDocs || !isDoc(item.id))
-      .map((item) => item.id),
+    "docs-navigation",
+    allItems.map((item) => item.id),
+    visibleIds,
   );
   function act(change: () => { sections: DocSection[]; moves?: Placement[] }) {
     setError("");
@@ -128,9 +149,11 @@ export function DocSectionsSettings({
   function revealDestination(id: string) {
     const destination = sections.find((section) => section.id === id);
     if (destination)
-      setExpanded((current) =>
-        new Set(current).add(destination.parentId || destination.id),
-      );
+      setExpanded((current) => {
+        const next = new Set(current).add(destination.id);
+        if (destination.parentId) next.add(destination.parentId);
+        return next;
+      });
   }
   function stageMove(keys: string[], target: string) {
     const success = act(() => prepareMove(keys, target));
@@ -319,7 +342,7 @@ export function DocSectionsSettings({
       : undefined;
   function documentRows(section: DocSection) {
     const items = orderedSectionDocs(uniqueDocs, sections, section.id);
-    if (!showDocs || !items.length) return null;
+    if (!expanded.has(section.id) || !items.length) return null;
     return (
       <li className="list-none">
         <ol
@@ -405,6 +428,8 @@ export function DocSectionsSettings({
       >
         <ol className="doc-order-list">
           <ReorderRow
+            ref={createdId === section.id ? createdRow : undefined}
+            tabIndex={createdId === section.id ? -1 : undefined}
             handle={handle(key, sectionPath(section, sections))}
             selection={select(key, sectionPath(section, sections))}
             compactActions
@@ -425,7 +450,7 @@ export function DocSectionsSettings({
             }
             actions={
               <>
-                {children.length > 0 && (
+                {(children.length > 0 || count > 0) && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -456,6 +481,11 @@ export function DocSectionsSettings({
                       size="icon"
                       disabled={blocked}
                       aria-label={`Actions for ${sectionPath(section, sections)}`}
+                      ref={(button) => {
+                        if (button)
+                          sectionTriggers.current.set(section.id, button);
+                        else sectionTriggers.current.delete(section.id);
+                      }}
                     >
                       <MoreHorizontal size={18} aria-hidden="true" />
                     </Button>
@@ -479,10 +509,11 @@ export function DocSectionsSettings({
                     {!section.parentId && (
                       <DropdownMenuItem
                         onSelect={() => {
-                          setCreatingUnder(section.id);
-                          setExpanded((current) =>
-                            new Set(current).add(section.id),
-                          );
+                          createTrigger.current =
+                            sectionTriggers.current.get(section.id) || null;
+                          createCompleted.current = false;
+                          setCreatedId("");
+                          setCreating({ parentId: section.id });
                         }}
                       >
                         Add subsection
@@ -542,24 +573,6 @@ export function DocSectionsSettings({
               </ol>
             </li>
           )}
-          {creatingUnder === section.id && (
-            <li className="ms-6 border-s border-border ps-3">
-              <DocSectionCreate
-                sections={sections}
-                initialParentId={section.id}
-                disabled={blocked}
-                onCreate={(created) => {
-                  if (
-                    changeSections(() =>
-                      availableDocSections(docs, [], [...sections, created]),
-                    )
-                  )
-                    setCreatingUnder("");
-                }}
-                onCancel={() => setCreatingUnder("")}
-              />
-            </li>
-          )}
         </ol>
       </li>
     );
@@ -571,21 +584,34 @@ export function DocSectionsSettings({
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button
           type="button"
-          variant={creatingRoot ? "outline" : "default"}
           disabled={blocked}
-          onClick={() => setCreatingRoot((current) => !current)}
+          onClick={(event) => {
+            createTrigger.current = event.currentTarget;
+            createCompleted.current = false;
+            setCreatedId("");
+            setCreating({ parentId: "" });
+          }}
         >
-          {!creatingRoot && <Plus aria-hidden="true" />}
-          {creatingRoot ? "Cancel new section" : "New section"}
+          <Plus aria-hidden="true" />
+          New section
         </Button>
         <Button
           type="button"
           variant="outline"
-          disabled={blocked}
-          aria-pressed={showDocs}
-          onClick={() => setShowDocs((current) => !current)}
+          disabled={blocked || !expandableRoots.length}
+          aria-expanded={allRootsExpanded}
+          onClick={() =>
+            setExpanded((current) =>
+              allRootsExpanded
+                ? new Set()
+                : new Set([
+                    ...current,
+                    ...expandableRoots.map((root) => root.id),
+                  ]),
+            )
+          }
         >
-          {showDocs ? "Hide documents" : "Show documents"}
+          {allRootsExpanded ? "Collapse sections" : "Expand sections"}
         </Button>
       </div>
       <BulkActions
@@ -679,23 +705,68 @@ export function DocSectionsSettings({
           {roots.map((root) => sectionBranch(root, roots))}
         </ol>
       ) : (
-        <p>No sections yet. Create one below.</p>
+        <p>No sections yet. Create a section to get started.</p>
       )}
-      {creatingRoot && (
-        <DocSectionCreate
-          sections={sections}
-          disabled={blocked}
-          onCreate={(created) => {
-            if (
-              changeSections(() =>
-                availableDocSections(docs, [], [...sections, created]),
-              )
-            )
-              setCreatingRoot(false);
-          }}
-          onCancel={() => setCreatingRoot(false)}
-        />
-      )}
+      <Dialog
+        open={!!creating}
+        onOpenChange={(open) => {
+          if (!open) setCreating(null);
+        }}
+      >
+        {creating && (
+          <DialogContent
+            onCloseAutoFocus={(event) => {
+              event.preventDefault();
+              if (!createCompleted.current) {
+                createTrigger.current?.focus({ preventScroll: true });
+                return;
+              }
+              // Reveal only after the modal releases focus and the new row mounts.
+              requestAnimationFrame(() => {
+                const row = createdRow.current;
+                if (!row?.isConnected) return;
+                row.focus({ preventScroll: true });
+                row.scrollIntoView({
+                  block: "center",
+                  behavior: window.matchMedia(
+                    "(prefers-reduced-motion: reduce)",
+                  ).matches
+                    ? "instant"
+                    : "smooth",
+                });
+              });
+            }}
+          >
+            <DialogTitle>
+              {creating.parentId ? "New subsection" : "New section"}
+            </DialogTitle>
+            <DialogDescription>
+              Create a section, then save settings to apply your navigation
+              changes.
+            </DialogDescription>
+            <DocSectionCreate
+              sections={sections}
+              initialParentId={creating.parentId}
+              disabled={blocked}
+              onCreate={(created) => {
+                if (blocked)
+                  throw new Error(conflict || "Finish the current save first.");
+                onChange(
+                  availableDocSections(docs, [], [...sections, created]),
+                );
+                if (created.parentId)
+                  setExpanded((current) =>
+                    new Set(current).add(created.parentId!),
+                  );
+                createCompleted.current = true;
+                setCreatedId(created.id);
+                setCreating(null);
+              }}
+              onCancel={() => setCreating(null)}
+            />
+          </DialogContent>
+        )}
+      </Dialog>
       <Dialog
         open={!!moving}
         onOpenChange={(open) => {
