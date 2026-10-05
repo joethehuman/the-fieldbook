@@ -380,8 +380,10 @@ export default function WritingEditorEngine({
         tableEditor.current?.update(() => {
           $getRoot().getChildren().filter($isTableNode).forEach((node, index) => {
             const widths = parsed.widths[index];
-            if (widths?.length === node.getColCount())
-              setTableColumnWidths(node.getWritable().getMdastNode(), widths);
+            setTableColumnWidths(
+              node.getWritable().getMdastNode(),
+              widths?.length === node.getColCount() ? widths : undefined,
+            );
           });
         }, { tag: HISTORY_MERGE_TAG });
         loadingWidths.current = false;

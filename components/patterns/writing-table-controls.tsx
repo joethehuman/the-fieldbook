@@ -19,7 +19,7 @@ import {
   HISTORY_PUSH_TAG,
   type LexicalEditor,
 } from "lexical";
-import { MAX_TABLE_COLUMN_WIDTH, MIN_TABLE_COLUMN_WIDTH, moveTablePart, setTableColumnWidths, tableColumnWidths } from "@/lib/writing-table";
+import { MAX_SAVED_TABLE_COLUMN_WIDTH, MAX_TABLE_COLUMN_WIDTH, MIN_TABLE_COLUMN_WIDTH, moveTablePart, setTableColumnWidths, tableColumnWidths } from "@/lib/writing-table";
 import { Button } from "../ui/button";
 import {
   DropdownMenu,
@@ -214,8 +214,9 @@ function TableControls({
     change((node) => {
       const table = node.getWritable().getMdastNode();
       const widths = tableColumnWidths(table)?.slice() || baseline || geometry?.columns.map((column) => Math.ceil(column.width)) || [];
-      widths[index] = Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, Math.round(width)));
-      setTableColumnWidths(table, widths.map((value) => Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, value))));
+      const maximum = Math.max(MAX_TABLE_COLUMN_WIDTH, Math.ceil(baseline?.[index] ?? geometry?.columns[index]?.width ?? MAX_TABLE_COLUMN_WIDTH));
+      widths[index] = Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(maximum, Math.round(width)));
+      setTableColumnWidths(table, widths.map((value) => Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_SAVED_TABLE_COLUMN_WIDTH, value))));
     });
     setAnnouncement(`Column ${index + 1} width ${Math.round(width)} pixels.`);
   }
@@ -229,6 +230,7 @@ function TableControls({
     // Auto-sized cells can be fractionally wide; rounding down rewraps untouched columns.
     const baseline = geometry.columns.map((column) => Math.ceil(column.width));
     const initial = baseline[index];
+    const maximum = Math.max(MAX_TABLE_COLUMN_WIDTH, initial);
     let width = initial;
     resizePreview.current = true;
     setResizing(index);
@@ -246,7 +248,7 @@ function TableControls({
     const update = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return;
       e.preventDefault();
-      width = Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, Math.round(initial + e.clientX - startX)));
+      width = Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(maximum, Math.round(initial + e.clientX - startX)));
       preview(width);
       setAnnouncement(`Column ${index + 1} width ${width} pixels. Escape cancels.`);
     };
@@ -534,8 +536,8 @@ function TableControls({
           aria-orientation="vertical"
           aria-label={`Resize column ${index + 1}`}
           aria-valuemin={MIN_TABLE_COLUMN_WIDTH}
-          aria-valuemax={MAX_TABLE_COLUMN_WIDTH}
-          aria-valuenow={Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, Math.round(box.width)))}
+          aria-valuemax={Math.max(MAX_TABLE_COLUMN_WIDTH, Math.ceil(box.width))}
+          aria-valuenow={Math.max(MIN_TABLE_COLUMN_WIDTH, Math.ceil(box.width))}
           title={`Resize column ${index + 1}; use arrow keys for 16 pixel steps`}
           ref={(element) => position(element, { left: box.left + box.width, top: grid.top + box.height / 2 })}
           onPointerDown={(event) => startResize(event, index)}
@@ -543,7 +545,10 @@ function TableControls({
             const direction = event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0;
             if (!direction && event.key !== "Home" && event.key !== "End") return;
             event.preventDefault();
-            commitWidth(index, event.key === "Home" ? MIN_TABLE_COLUMN_WIDTH : event.key === "End" ? MAX_TABLE_COLUMN_WIDTH : box.width + direction * 16);
+            const current = Math.ceil(box.width);
+            const next = Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(Math.max(MAX_TABLE_COLUMN_WIDTH, current),
+              event.key === "Home" ? MIN_TABLE_COLUMN_WIDTH : event.key === "End" ? MAX_TABLE_COLUMN_WIDTH : current + direction * 16));
+            if (next !== current) commitWidth(index, next);
           }}
         ><span aria-hidden="true" /></Button>
       ))}

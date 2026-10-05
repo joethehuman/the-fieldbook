@@ -433,6 +433,23 @@ test("resizing the last column keeps earlier columns and their text layout", asy
   }
 });
 
+test("resizing beside a naturally wide column preserves that column", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Editor geometry uses the installed app fixture.");
+  const longWord = "W".repeat(240);
+  const { read } = await setup(page, true,
+    `| Label | Reference |\n| --- | --- |\n| A | ${longWord} |`);
+  const table = page.locator(".writing-content table");
+  const secondWidth = () => table.evaluate((node) =>
+    (node as HTMLTableElement).tBodies[0].rows[1].cells[2].getBoundingClientRect().width);
+  const before = await secondWidth();
+  expect(before).toBeGreaterThan(640);
+  const resize = page.getByRole("separator", { name: "Resize column 1" });
+  await resize.focus();
+  await resize.press("ArrowRight");
+  await expect.poll(async () => (await read()).content[0].body).toContain("fieldbook-table-widths:v1");
+  expect(await secondWidth()).toBeGreaterThanOrEqual(before - 1);
+});
+
 test("short tables keep their authored width and many columns scroll without widening the page", async ({ page }, info) => {
   test.skip(!info.project.name.startsWith("production"), "Reader layout uses the installed app fixture.");
   const many = Array.from({ length: 8 }, (_, index) => `Column ${index + 1}`);

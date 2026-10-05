@@ -68,6 +68,7 @@ test("table width metadata survives a Markdown round trip and leaves old tables 
   assert.equal(writeTableWidths(sized, [[224, 336]]), sized);
   assert.equal(writeTableWidths(sized, [null]), markdown);
   assert.equal(readTableWidths("<!-- fieldbook-table-widths:v1 [[20]] -->\n\n" + markdown).markdown.startsWith("<!--"), true);
+  assert.deepEqual(readTableWidths(writeTableWidths(markdown, [[2423, 194]])).widths, [[2423, 194]]);
 });
 
 test("column movement carries width with cells and undo restores it", () => {

@@ -7,7 +7,7 @@ import { contentLinkTarget, normalizeContentLink, type ContentLinkContext } from
 import { isInlineVideo } from "@/lib/inline-video";
 import { CourseVideo } from "./patterns/course-video";
 import { Button } from "./ui/button";
-import { readTableWidths } from "@/lib/writing-table";
+import { readTableWidths, remarkTopLevelTableIndices } from "@/lib/writing-table";
 
 export default function Markdown({
   children,
@@ -23,13 +23,12 @@ export default function Markdown({
   onImageOpen?: (src: string, alt: string) => void;
 }) {
   const { markdown, widths } = readTableWidths(children);
-  let tableIndex = 0;
   return (
     <ReactMarkdown
       remarkPlugins={
         headingPrefix === undefined
-          ? [remarkGfm]
-          : [remarkGfm, remarkHeadingAnchors]
+          ? [remarkGfm, remarkTopLevelTableIndices]
+          : [remarkGfm, remarkTopLevelTableIndices, remarkHeadingAnchors]
       }
       components={{
         ...(headingPrefix !== undefined
@@ -79,7 +78,10 @@ export default function Markdown({
               <img src={src} alt={alt || ""} loading="lazy" />
             </Button>
           ) : <img src={src} alt={alt || ""} loading="lazy" /> : null,
-        table: ({ children }) => <ScrollableMarkdownTable widths={widths[tableIndex++] || undefined}>{children}</ScrollableMarkdownTable>,
+        table: ({ children, node }) => {
+          const index = node?.properties?.["data-fieldbook-table-index"];
+          return <ScrollableMarkdownTable widths={typeof index === "number" ? widths[index] || undefined : undefined}>{children}</ScrollableMarkdownTable>;
+        },
       }}
     >
       {markdown}
