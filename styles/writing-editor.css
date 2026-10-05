@@ -524,7 +524,8 @@
 .writing-editor .writing-table-block table col:first-child,
 .writing-editor .writing-table-block table col:last-child { display: none; }
 .writing-table-handle { position: absolute; z-index: 2; transform: translate(-50%, -50%); }
-.writing-table-resizer { position: absolute; z-index: 2; width: 16px; height: 28px; transform: translate(-50%, -50%); cursor: col-resize; touch-action: none; border: 0; background: transparent; display: grid; place-items: center; }
+.writing-table-resizer { position: absolute; z-index: 2; width: 16px; height: 28px; transform: translate(-50%, -50%); cursor: grab; touch-action: none; border: 0; background: transparent; display: grid; place-items: center; }
+.writing-table-resizer:is(:active, [data-resizing="true"]) { cursor: grabbing; }
 .writing-table-resizer > span { display: block; width: 3px; height: 16px; border-radius: 2px; background: var(--muted-foreground); opacity: .65; }
 .writing-table-resizer:is(:hover, :focus-visible) > span { background: var(--ring); opacity: 1; }
 .writing-table-resizer:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }

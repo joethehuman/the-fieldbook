@@ -387,6 +387,52 @@ test("resized Doc tables persist through save, reopen, publish, and reading", as
   expect(await table.evaluate((node) => getComputedStyle(node).tableLayout)).toBe("fixed");
 });
 
+test("resizing the last column keeps earlier columns and their text layout", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Editor geometry uses the installed app fixture.");
+  const body = "A manager’s credibility comes from closing the loop.\n\n" +
+    "| Question | Owner | Next update |\n| --- | --- | --- |\n" +
+    "| Which team owns the account? | Sales leadership | Thursday |\n" +
+    "| Does approval routing change? | Finance operations | Friday |";
+  const { read } = await setup(page, true, body);
+  const table = page.locator(".writing-content table");
+  const snapshot = () => table.evaluate((node) => {
+    const element = node as HTMLTableElement;
+    const cells = Array.from(element.tBodies[0].rows[1].cells).filter((cell) => !cell.hasAttribute("data-tool-cell"));
+    return {
+      layout: getComputedStyle(element).tableLayout,
+      widths: cells.map((cell) => cell.getBoundingClientRect().width),
+      heights: cells.map((cell) => cell.getBoundingClientRect().height),
+    };
+  });
+  const lastEdge = page.getByRole("separator", { name: "Resize column 3" });
+  await lastEdge.scrollIntoViewIfNeeded();
+  expect(await lastEdge.evaluate((node) => getComputedStyle(node).cursor)).toBe("grab");
+  const before = await snapshot();
+  const edge = await lastEdge.boundingBox();
+  await page.mouse.move(edge!.x + edge!.width / 2, edge!.y + edge!.height / 2);
+  await page.mouse.down();
+  await expect(lastEdge).toHaveAttribute("data-resizing", "true");
+  const shield = page.locator(".writing-table-drag-shield");
+  await expect(shield).toBeVisible();
+  expect(await shield.evaluate((node) => getComputedStyle(node).cursor)).toBe("grabbing");
+  await page.mouse.move(edge!.x + edge!.width / 2 + 160, edge!.y + edge!.height / 2, { steps: 8 });
+  await expect(shield).toBeVisible();
+  expect(await shield.evaluate((node) => getComputedStyle(node).cursor)).toBe("grabbing");
+  const during = await snapshot();
+  await page.screenshot({ path: info.outputPath("table-resize-preview.png") });
+  await page.mouse.up();
+  await expect(shield).toHaveCount(0);
+  expect(await lastEdge.evaluate((node) => getComputedStyle(node).cursor)).toBe("grab");
+  await expect.poll(async () => (await read()).content[0].body).toContain("fieldbook-table-widths:v1");
+  const after = await snapshot();
+  for (const index of [0, 1]) {
+    expect(during.widths[index]).toBeGreaterThanOrEqual(before.widths[index] - 1);
+    expect(during.heights[index]).toBeLessThanOrEqual(before.heights[index] + 1);
+    expect(after.widths[index]).toBeGreaterThanOrEqual(before.widths[index] - 1);
+    expect(after.heights[index]).toBeLessThanOrEqual(before.heights[index] + 1);
+  }
+});
+
 test("short tables keep their authored width and many columns scroll without widening the page", async ({ page }, info) => {
   test.skip(!info.project.name.startsWith("production"), "Reader layout uses the installed app fixture.");
   const many = Array.from({ length: 8 }, (_, index) => `Column ${index + 1}`);

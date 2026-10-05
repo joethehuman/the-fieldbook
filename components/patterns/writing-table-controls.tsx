@@ -213,7 +213,7 @@ function TableControls({
   function commitWidth(index: number, width: number, baseline?: number[]) {
     change((node) => {
       const table = node.getWritable().getMdastNode();
-      const widths = tableColumnWidths(table)?.slice() || baseline || geometry?.columns.map((column) => Math.round(column.width)) || [];
+      const widths = tableColumnWidths(table)?.slice() || baseline || geometry?.columns.map((column) => Math.ceil(column.width)) || [];
       widths[index] = Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, Math.round(width)));
       setTableColumnWidths(table, widths.map((value) => Math.max(MIN_TABLE_COLUMN_WIDTH, Math.min(MAX_TABLE_COLUMN_WIDTH, value))));
     });
@@ -226,7 +226,8 @@ function TableControls({
     gesture.current?.();
     const pointerId = event.pointerId;
     const startX = event.clientX;
-    const baseline = geometry.columns.map((column) => Math.round(column.width));
+    // Auto-sized cells can be fractionally wide; rounding down rewraps untouched columns.
+    const baseline = geometry.columns.map((column) => Math.ceil(column.width));
     const initial = baseline[index];
     let width = initial;
     resizePreview.current = true;
@@ -527,6 +528,7 @@ function TableControls({
           variant="ghost"
           size="icon"
           className="writing-table-resizer"
+          data-resizing={resizing === index}
           contentEditable={false}
           role="separator"
           aria-orientation="vertical"
@@ -578,7 +580,7 @@ function TableControls({
           contentEditable={false}
         />
       )}
-      {pressed &&
+      {(pressed || resizing !== null) &&
         createPortal(
           <span className="writing-table-drag-shield" aria-hidden="true" />,
           document.body,
