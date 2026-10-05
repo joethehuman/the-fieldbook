@@ -3,7 +3,7 @@ import { SortPicker } from "./patterns/sort-picker";
 import { useState } from "react";
 import type { Content, Curriculum, Progress, User, Group } from "@/lib/types";
 import type { SiteSettings } from "@/lib/settings";
-import { learningState } from "@/lib/learning";
+import { learningState, learningTarget } from "@/lib/learning";
 import { curriculumCourses } from "@/lib/learning-cards";
 import { courseProgress } from "@/lib/course-progress";
 import { PageHeader, EmptyState } from "./patterns/layout";
@@ -80,6 +80,11 @@ export function CurriculumPage({
             course={course}
             settings={settings}
             status={courseProgress(course, progress)}
+            dueDate={
+              user && assignedIds.has(course.id)
+                ? learningTarget(course, user, groups, settings)
+                : undefined
+            }
             assignmentLabel={
               assignedIds.has(course.id)
                 ? user?.id === "guest" || settings?.dueDatesEnabled === false

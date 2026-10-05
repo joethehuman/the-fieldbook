@@ -286,6 +286,7 @@ export default function Learning({
       course={c}
       settings={settings}
       status={courseProgress(c, progress)}
+      dueDate={sortRecord(c).dueDate}
       assignmentLabel={
         assignedIds.has(c.id)
           ? useDueDates

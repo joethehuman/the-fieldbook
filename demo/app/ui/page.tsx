@@ -30,7 +30,7 @@ import {
 } from "@/components/patterns/search-result";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
-import { Clock3, BookOpen, ListChecks } from "lucide-react";
+import { Clock3, BookOpen, CalendarDays, ListChecks } from "lucide-react";
 import { LearningCardFact, LearningCard } from "@/components/patterns/learning-card";
 import { CardArtwork } from "@/components/patterns/card-artwork";
 import { CARD_ART_VERSION } from "@/lib/card-art";
@@ -140,6 +140,7 @@ export default function ComponentCatalog() {
         </p>
         <a href="/">Back to Fieldbook</a>
         <a href="/ui/workspace">Workspace frame example</a>
+        <a href="/ui/course-cards">Learning card examples</a>
         <a href="/ui/quiz-review">Quiz results: 1, 2 and 10 questions</a>
       </PageHeader>
       <ControlExamples />
@@ -433,6 +434,12 @@ export default function ComponentCatalog() {
                   : "Example course"
               }
               description="Shared spacing, readable descriptions and aligned actions."
+              detail={value === 0 ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                  <CalendarDays size={14} strokeWidth={1.6} aria-hidden="true" />
+                  Due 2 days ago
+                </span>
+              ) : undefined}
               metadata={
                 value === 33 ? (
                   <LearningCardFact icon={BookOpen}>1 of 3 courses complete</LearningCardFact>
