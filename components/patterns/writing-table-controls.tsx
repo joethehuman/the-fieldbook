@@ -77,29 +77,31 @@ function TableControls({
   const [drag, setDrag] = useState<Drag | null>(null);
   const [pressed, setPressed] = useState<{ axis: Axis; index: number } | null>(null);
   const [resizing, setResizing] = useState<number | null>(null);
+  const [fade, setFade] = useState({ left: false, right: false });
   const [announcement, setAnnouncement] = useState("");
   const gesture = useRef<(() => void) | null>(null);
+  const fadeRef = useRef<HTMLSpanElement>(null);
   const resizePreview = useRef(false);
   const refresh = useRef<() => void>(() => {});
   useWritingInteraction(!!menu || !!pressed || resizing !== null);
   useEffect(() => () => gesture.current?.(), []);
-  useEffect(() => {
-    const close = () => setMenu(null);
-    host.addEventListener("scroll", close);
-    return () => host.removeEventListener("scroll", close);
-  }, [host]);
   useLayoutEffect(() => {
     if (disabled) return;
     const table = host.querySelector("table");
     if (!table) return;
     host.classList.add("writing-table-block");
+    const updateFade = () => {
+      const left = host.scrollLeft > 2;
+      const right = host.scrollWidth - host.scrollLeft - host.clientWidth > 2;
+      setFade((current) => current.left === left && current.right === right ? current : { left, right });
+    };
     const measure = () => {
       if (!resizePreview.current) editor.getEditorState().read(() => {
         const widths = getTable()?.getMdastNode();
         const sized = widths && tableColumnWidths(widths);
         const columns = Array.from(table.querySelectorAll<HTMLTableColElement>("colgroup col")).slice(1, -1);
         const total = sized?.reduce((sum, width) => sum + width, 0);
-        const tableWidth = total ? `max(100%, ${total}px)` : "";
+        const tableWidth = total ? `${total}px` : "";
         if (table.style.width !== tableWidth) table.style.width = tableWidth;
         table.style.tableLayout = sized ? "fixed" : "";
         columns.forEach((column, index) => {
@@ -124,8 +126,10 @@ function TableControls({
           height: b.height,
         };
       };
-      const first = box(cells[0][0]);
-      const last = box(cells.at(-1)!.at(-1)!);
+      const firstCell = cells[0][0];
+      const lastCell = cells.at(-1)!.at(-1)!;
+      const first = box(firstCell);
+      const last = box(lastCell);
       const grid = {
         left: first.left,
         top: first.top,
@@ -143,11 +147,26 @@ function TableControls({
       setGeometry((previous) =>
         JSON.stringify(previous) === JSON.stringify(next) ? previous : next,
       );
+      const frame = editor.getRootElement()?.parentElement;
+      if (frame) {
+        const origin = frame.getBoundingClientRect();
+        const bounds = host.getBoundingClientRect();
+        const top = firstCell.getBoundingClientRect().top;
+        const bottom = lastCell.getBoundingClientRect().bottom;
+        position(fadeRef.current, {
+          left: bounds.left - origin.left + frame.scrollLeft,
+          top: top - origin.top + frame.scrollTop,
+          width: bounds.width,
+          height: bottom - top,
+        });
+      }
+      updateFade();
     };
     refresh.current = measure;
     measure();
     const resize = new ResizeObserver(measure);
     resize.observe(table);
+    resize.observe(host);
     const mutation = new MutationObserver(measure);
     mutation.observe(table, {
       childList: true,
@@ -155,14 +174,17 @@ function TableControls({
       characterData: true,
     });
     const unregister = editor.registerUpdateListener(measure);
+    host.addEventListener("scroll", updateFade, { passive: true });
     return () => {
       unregister();
+      host.removeEventListener("scroll", updateFade);
       refresh.current = () => {};
       resize.disconnect();
       mutation.disconnect();
       host.classList.remove("writing-table-block");
     };
   }, [host, disabled]);
+  useLayoutEffect(() => { if (geometry) refresh.current(); }, [geometry]);
   function change(
     run: (node: NonNullable<ReturnType<typeof getTable>>) => void,
   ) {
@@ -211,11 +233,14 @@ function TableControls({
     setResizing(index);
     const preview = (next: number) => {
       const table = host.querySelector("table");
-      const column = table?.querySelectorAll<HTMLTableColElement>("colgroup col")[index + 1];
-      if (!table || !column) return;
-      column.style.width = `${next}px`;
+      const columns = Array.from(table?.querySelectorAll<HTMLTableColElement>("colgroup col") || []).slice(1, -1);
+      if (!table || !columns[index]) return;
+      columns.forEach((column, columnIndex) => {
+        column.style.width = `${columnIndex === index ? next : baseline[columnIndex]}px`;
+      });
       table.style.tableLayout = "fixed";
-      table.style.width = `max(100%, ${baseline.reduce((sum, value) => sum + value, 0) - initial + next}px)`;
+      table.style.width = `${baseline.reduce((sum, value) => sum + value, 0) - initial + next}px`;
+      refresh.current();
     };
     const update = (e: PointerEvent) => {
       if (e.pointerId !== pointerId) return;
@@ -359,6 +384,7 @@ function TableControls({
     window.addEventListener("blur", blur);
   }
   if (!geometry || disabled) return null;
+  const fadeFrame = editor.getRootElement()?.parentElement;
   const { grid } = geometry;
   const source = drag
     ? geometry[drag.axis === "row" ? "rows" : "columns"][drag.from]
@@ -367,6 +393,12 @@ function TableControls({
   const boundary = drag && (boxes[drag.boundary] || boxes.at(-1));
   return (
     <>
+      {fadeFrame && createPortal(
+        <span ref={fadeRef} className="table-edge-fade writing-table-edge-fade"
+          data-more-left={fade.left} data-more-right={fade.right}
+          contentEditable={false} aria-hidden="true" />,
+        fadeFrame,
+      )}
       <WritingBlockActions
         label="Table"
         {...blockActions(editor, nodeKey)}

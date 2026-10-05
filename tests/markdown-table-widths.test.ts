@@ -11,7 +11,7 @@ test("published Markdown uses saved column measures without showing metadata", (
     children: writeTableWidths(body, [[192, 288]]),
   }));
   assert.match(html, /<colgroup><col style="width:192px"\/><col style="width:288px"\/><\/colgroup>/);
-  assert.match(html, /width:max\(100%, 480px\)/);
+  assert.match(html, /style="width:480px"/);
   assert.doesNotMatch(html, /fieldbook-table-widths/);
   assert.match(html, /This paragraph can wrap inside its cell/);
 });
@@ -21,4 +21,5 @@ test("existing tables retain automatic layout", () => {
     children: "| One | Two |\n| --- | --- |\n| A | B |",
   }));
   assert.doesNotMatch(html, /authored-table-sized|<colgroup>/);
+  assert.match(html, /style="width:max-content"/);
 });

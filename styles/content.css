@@ -155,19 +155,27 @@
     position: relative;
     min-width: 0;
   }
-  .markdown-table-wrap[data-more-right="true"]::after {
-    content: "";
+  .table-edge-fade::before,
+  .table-edge-fade::after {
     position: absolute;
     top: 0;
     bottom: 0;
-    right: 0;
     width: 2.5rem;
     pointer-events: none;
+    z-index: 1;
+  }
+  .table-edge-fade[data-more-left="true"]::before {
+    content: "";
+    left: 0;
+    background: linear-gradient(to right, var(--background), transparent);
+  }
+  .table-edge-fade[data-more-right="true"]::after {
+    content: "";
+    right: 0;
     background: linear-gradient(to right, transparent, var(--background));
   }
   .markdown-table [data-slot="table"] {
     width: max-content;
-    min-width: 100%;
     table-layout: auto;
   }
   .markdown-table :is(th, td) {
