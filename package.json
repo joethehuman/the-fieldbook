@@ -25,7 +25,7 @@
     "dev:demo": "pnpm --dir demo dev",
     "build:demo": "pnpm --dir demo build",
     "start:demo": "pnpm --dir demo start",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p demo/tsconfig.json",
+    "typecheck": "node scripts/typecheck.mjs",
     "test:roster": "playwright test -c playwright.roster.config.ts"
   },
   "dependencies": {

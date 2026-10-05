@@ -10,8 +10,8 @@ import { expireDemoDeleted } from "./bulk-actions";
 import { contentSignature, withPublishedSnapshots } from "./demo-publication";
 import { defaultSettings } from "./settings";
 import { DOC_CATEGORY_ORDER, seedContent } from "./seed";
-import { hooliDemoData } from "../demo/data/hooli";
-import { withCourseOpeningVideo } from "../demo/data/course-opening-videos";
+import { hooliDemoData } from "./demo-fixtures/hooli";
+import { withCourseOpeningVideo } from "./demo-fixtures/course-opening-videos";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 import { gradeQuiz, quizUnlocked } from "./course-quiz";
 export type Workspace = {

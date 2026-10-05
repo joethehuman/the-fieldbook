@@ -1,4 +1,4 @@
-import type { Content } from "../../lib/types";
+import type { Content } from "../types";
 
 // Public trailers linked by the fictional demo only. Stable assignments keep
 // a course's opening video consistent across resets and browser sessions.
