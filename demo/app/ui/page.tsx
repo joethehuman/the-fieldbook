@@ -30,12 +30,11 @@ import {
 } from "@/components/patterns/search-result";
 import { InitialsAvatar } from "@/components/ui/initials-avatar";
 import { InstallationIdentity } from "@/components/patterns/installation-identity";
-import { Clock3, BookOpen, CalendarDays, ListChecks } from "lucide-react";
-import { LearningCardFact, LearningCard } from "@/components/patterns/learning-card";
 import { CardArtwork } from "@/components/patterns/card-artwork";
 import { CARD_ART_VERSION } from "@/lib/card-art";
 import { LaunchList } from "@/components/patterns/launch-list";
 import { CourseRow } from "@/components/patterns/course-row";
+import { LearningCardExamples } from "./learning-card-examples";
 
 import { RecordExamples } from "./record-examples";
 import { DataTable } from "@/components/patterns/data-table";
@@ -425,46 +424,7 @@ export default function ComponentCatalog() {
           heading={<h2>Learning cards and progress</h2>}
           description="Courses and curricula share their layout. Controls appear only when the row overflows."
         >
-          {[0, 33, 100].map((value) => (
-            <LearningCard
-              key={value}
-              title={
-                value === 33
-                  ? "A longer curriculum title that wraps naturally"
-                  : "Example course"
-              }
-              description="Shared spacing, readable descriptions and aligned actions."
-              detail={value === 0 ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-                  <CalendarDays size={14} strokeWidth={1.6} aria-hidden="true" />
-                  Due 2 days ago
-                </span>
-              ) : undefined}
-              metadata={
-                value === 33 ? (
-                  <LearningCardFact icon={BookOpen}>1 of 3 courses complete</LearningCardFact>
-                ) : (
-                  <><LearningCardFact icon={Clock3}>5 min</LearningCardFact><LearningCardFact icon={BookOpen}>2 lessons</LearningCardFact><LearningCardFact icon={ListChecks}>Quiz</LearningCardFact></>
-                )
-              }
-              status={{
-                percent: value,
-                complete: value === 100,
-                started: value > 0,
-              }}
-              artwork={
-                <CardArtwork
-                  id={`catalog-learning-${value}`}
-                  title="Example course"
-                  kind={value === 33 ? "curriculum" : "course"}
-                  category={value === 33 ? undefined : "Product"}
-                  relevance={value === 100 ? undefined : value === 0 ? "Past due" : "For you"}
-                />
-              }
-              action={value === 33 ? "View curriculum" : "Start course"}
-              onClick={() => {}}
-            />
-          ))}
+          <LearningCardExamples />
         </CourseRow>
         <CollectionControls
           search={

@@ -1,11 +1,7 @@
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
-import { IntentLink } from "@/components/patterns/intent-link";
-import { ArrowRight } from "lucide-react";
-import { CardArtwork } from "@/components/patterns/card-artwork";
+import { UpdateCard } from "@/components/patterns/update-card";
 import type { SiteSettings } from "@/lib/settings";
-import { ContentAction } from "@/components/patterns/content-action";
 import {
-  ContentCardFooter,
   EmptyState,
   PageHeader,
   SectionHeader,
@@ -31,46 +27,14 @@ function Cards({
   return (
     <div className="brief-list">
       {items.map((item, index) => (
-        <ContentAction
-          asChild
-          className={`brief-card ${index === 0 ? "featured" : ""}`}
+        <UpdateCard
           key={item.id}
-        >
-          <IntentLink
-            href={`/updates/${encodeURIComponent(item.id)}`}
-            eager={index === 0}
-          >
-            <CardArtwork
-              id={item.id}
-              title={item.title}
-              kind="brief"
-              category={item.category}
-              art={item.cardArt}
-              settings={settings}
-            />
-            <div className="brief-copy">
-              <span className="eyebrow">{item.category}</span>
-              <h3>{item.title}</h3>
-              <p>{item.summary}</p>
-              <ContentCardFooter
-                action={
-                  <>
-                    Read the update <ArrowRight size={16} />
-                  </>
-                }
-              >
-                {new Date(
-                  item.feedAt || item.updatedAt || item.createdAt || "",
-                ).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                  timeZone: "UTC",
-                })}
-              </ContentCardFooter>
-            </div>
-          </IntentLink>
-        </ContentAction>
+          item={item}
+          featured={index === 0}
+          href={`/updates/${encodeURIComponent(item.id)}`}
+          eager={index === 0}
+          settings={settings}
+        />
       ))}
     </div>
   );

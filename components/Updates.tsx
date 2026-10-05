@@ -1,15 +1,9 @@
 "use client";
 import { useLayoutEffect, useRef, useState } from "react";
-import { ContentAction } from "@/components/patterns/content-action";
-import {
-  SectionHeader,
-  EmptyState,
-  ContentCardFooter,
-} from "@/components/patterns/layout";
-import { ArrowRight } from "lucide-react";
-import { CardArtwork } from "./patterns/card-artwork";
+import { SectionHeader, EmptyState } from "@/components/patterns/layout";
+import { UpdateCard } from "@/components/patterns/update-card";
 import type { SiteSettings } from "@/lib/settings";
-import { updateFeedTimestamp, updatesForUser } from "@/lib/learning-groups";
+import { updatesForUser } from "@/lib/learning-groups";
 import {
   effectiveGroups,
   type Content,
@@ -133,48 +127,14 @@ function UpdateCards({
   return (
     <div className="brief-list">
       {items.map((b, i) => (
-        <ContentAction
-          interaction="lift"
-          className={"brief-card " + (i === 0 ? "featured" : "")}
+        <UpdateCard
           key={b.id}
+          item={b}
+          featured={i === 0}
           onClick={() => onOpen(b.id)}
-        >
-          <CardArtwork
-            id={b.id}
-            title={b.title}
-            kind="brief"
-            category={b.category}
-            art={b.cardArt}
-            settings={settings}
-          />
-          <div className="brief-copy">
-            <span className="eyebrow">{b.category}</span>
-            <h3>{b.title}</h3>
-            <p>{b.summary}</p>
-            <ContentCardFooter
-              action={
-                <>
-                  Read the update <ArrowRight size={16} />
-                </>
-              }
-            >
-              {formatUpdateDate(b)}
-            </ContentCardFooter>
-          </div>
-        </ContentAction>
+          settings={settings}
+        />
       ))}
     </div>
   );
-}
-
-function formatUpdateDate(item: Content) {
-  const timestamp = updateFeedTimestamp(item);
-  return timestamp === undefined
-    ? "Date unavailable"
-    : new Date(timestamp).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        timeZone: "UTC",
-      });
 }
