@@ -871,6 +871,54 @@ test("long feedback prompt wraps without crowding rating controls", async ({
   await snapshotReview(page, info, "feedback-narrow-long-prompt");
 });
 
+test("content feedback keeps fields clear of Send in a short window and on a phone", async ({
+  page,
+}) => {
+  for (const viewport of [
+    { width: 700, height: 320 },
+    { width: 375, height: 667 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/ui#catalog-content-feedback");
+    await page.waitForLoadState("networkidle");
+    const catalog = page.locator("#catalog-content-feedback");
+    await catalog
+      .getByRole("button", { name: "Did you find this useful?", exact: true })
+      .first()
+      .click();
+    const form = page.getByRole("form", {
+      name: "Did you find this useful?",
+      exact: true,
+    });
+    const fields = form.locator('[data-slot="feedback-fields"]');
+    const footer = form.locator('[data-slot="card-footer"]');
+    await expect(form).toBeVisible();
+    const fieldsBox = await fields.boundingBox();
+    const footerBox = await footer.boundingBox();
+    expect(fieldsBox!.y + fieldsBox!.height).toBeLessThanOrEqual(
+      footerBox!.y + 1,
+    );
+    if (viewport.width === 700) {
+      const scrollable = await fields.evaluate(
+        (element) => element.scrollHeight > element.clientHeight,
+      );
+      expect(scrollable).toBe(true);
+      await fields.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      const scrolled = await fields.evaluate((element) => element.scrollTop);
+      expect(scrolled).toBeGreaterThan(0);
+    }
+    await form.getByRole("textbox").fill("Feedback remains editable.");
+    await form.getByRole("button", { name: "Useful", exact: true }).click();
+    await expect(
+      form.getByRole("button", { name: "Send", exact: true }),
+    ).toBeEnabled();
+    await form.getByRole("button", { name: "Send", exact: true }).click();
+    await expect(form).toBeHidden();
+  }
+});
+
 test("hire-date guidance labels the date and stage is derived", async ({
   page,
 }, info) => {
