@@ -15,21 +15,35 @@ function trailerFor(courseId: string) {
   return trailers[(hash >>> 0) % trailers.length];
 }
 
-/** Add an opening video without removing the lesson's existing media or text. */
+const obsoleteVideoNote =
+  "Use this official HBO season 6 trailer as optional cultural context; it is not required course material.";
+
+function withoutOtherMedia(body: string) {
+  return body
+    .split("\n")
+    .filter((line) =>
+      !/^\s*(?:!\[[^\]]*\]\([^\n]+\)|\[(?:Video|Recording)\]\([^\n]+\))\s*$/i.test(line) &&
+      line.trim() !== obsoleteVideoNote,
+    )
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** Keep one opening video and the lesson's non-media content. */
 export function withCourseOpeningVideo(course: Content): Content {
   if (course.kind !== "course" || !course.lessons.length) return course;
   const [first, ...remaining] = course.lessons;
   const videoUrl = trailerFor(course.id);
-  if (first.videoUrl === videoUrl) return course;
+  const body = withoutOtherMedia(first.body);
+  if (first.videoUrl === videoUrl && first.body === body) return course;
   return {
     ...course,
     lessons: [
       {
         ...first,
         videoUrl,
-        body: first.videoUrl
-          ? `[Video](${first.videoUrl})\n\n${first.body}`
-          : first.body,
+        body,
       },
       ...remaining,
     ],

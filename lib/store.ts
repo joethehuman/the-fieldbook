@@ -71,17 +71,25 @@ function refreshDemoCourseOpeningVideos(data: Workspace): Workspace {
   const refresh = (items: Content[]) =>
     items.map((item) => {
       const first = item.lessons[0];
-      const original = originals.get(item.id)?.lessons[0];
+      const seed = originals.get(item.id);
+      const original = seed?.lessons[0];
       if (
         item.kind !== "course" ||
         !first ||
         !original ||
         first.id !== original.id ||
-        first.title !== original.title ||
-        first.body !== original.body ||
-        first.videoUrl !== original.videoUrl
+        first.title !== original.title
       )
         return item;
+      const previousBody = original.videoUrl
+        ? `[Video](${original.videoUrl})\n\n${original.body}`
+        : original.body;
+      const currentOpeningVideo = withCourseOpeningVideo(seed!).lessons[0].videoUrl;
+      const untouchedSeed =
+        first.body === original.body && first.videoUrl === original.videoUrl;
+      const previousOpening =
+        first.body === previousBody && first.videoUrl === currentOpeningVideo;
+      if (!untouchedSeed && !previousOpening) return item;
       const updated = withCourseOpeningVideo(item);
       if (updated === item) return item;
       changed = true;
