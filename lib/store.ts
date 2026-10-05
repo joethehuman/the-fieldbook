@@ -7,10 +7,11 @@ import {
   withOrganizationTeam,
 } from "./organization-team";
 import { expireDemoDeleted } from "./bulk-actions";
-import { withPublishedSnapshots } from "./demo-publication";
+import { contentSignature, withPublishedSnapshots } from "./demo-publication";
 import { defaultSettings } from "./settings";
 import { DOC_CATEGORY_ORDER, seedContent } from "./seed";
 import { hooliDemoData } from "../demo/data/hooli";
+import { withCourseOpeningVideo } from "../demo/data/course-opening-videos";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 import { gradeQuiz, quizUnlocked } from "./course-quiz";
 export type Workspace = {
@@ -58,11 +59,39 @@ export function freshWorkspace(): Workspace {
       name: "Hoolibook",
       docCategoryOrder: [...DOC_CATEGORY_ORDER],
     },
-    content: structuredClone(seedContent).map((item) => ({
-      ...item,
-      ...contentOverrides[item.id],
-    })),
+    content: structuredClone(seedContent).map((item) =>
+      withCourseOpeningVideo({ ...item, ...contentOverrides[item.id] }),
+    ),
   });
+}
+/** Refresh untouched sample lessons in existing browsers without replacing edits. */
+function refreshDemoCourseOpeningVideos(data: Workspace): Workspace {
+  const originals = new Map(seedContent.map((item) => [item.id, item]));
+  let changed = false;
+  const refresh = (items: Content[]) =>
+    items.map((item) => {
+      const first = item.lessons[0];
+      const original = originals.get(item.id)?.lessons[0];
+      if (
+        item.kind !== "course" ||
+        !first ||
+        !original ||
+        first.id !== original.id ||
+        first.title !== original.title ||
+        first.body !== original.body ||
+        first.videoUrl !== original.videoUrl
+      )
+        return item;
+      const updated = withCourseOpeningVideo(item);
+      if (updated === item) return item;
+      changed = true;
+      return item.publishedSignature === contentSignature(item)
+        ? { ...updated, publishedSignature: contentSignature(updated) }
+        : updated;
+    });
+  const content = refresh(data.content);
+  const publishedContent = data.publishedContent && refresh(data.publishedContent);
+  return changed ? { ...data, content, publishedContent } : data;
 }
 /** Repair only the original Hoolibook sample group's conflicting course selection. */
 function repairHooliSecurityAssignment(data: Workspace): Workspace {
@@ -201,7 +230,8 @@ export function loadWorkspace(): Workspace {
     if (renamed?.previous.includes(user.name)) user.name = renamed.name;
   }
   const upgraded = withPublishedSnapshots(data);
-  const repaired = expireDemoDeleted(repairHooliSecurityAssignment(upgraded));
+  const refreshed = refreshDemoCourseOpeningVideos(upgraded);
+  const repaired = expireDemoDeleted(repairHooliSecurityAssignment(refreshed));
   const legacy = repaired.users.some((p) => !p.learningAssignments)
     ? {
         ...repaired,
