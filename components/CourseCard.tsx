@@ -1,11 +1,24 @@
-import { Clock3, BookOpen, ListChecks } from "lucide-react";
+import { Clock3, BookOpen, CalendarDays, ListChecks } from "lucide-react";
 import { LearningCardFact, LearningCard } from "./patterns/learning-card";
 
 import type { courseProgress } from "@/lib/course-progress";
 
 import { CardArtwork } from "./patterns/card-artwork";
+import { todayUTC } from "@/lib/learning";
 import type { SiteSettings } from "@/lib/settings";
 import type { Content } from "@/lib/types";
+
+function dueLabel(dueDate: string) {
+  const target = Date.parse(`${dueDate}T00:00:00Z`);
+  if (!Number.isFinite(target)) return undefined;
+  const today = Date.parse(`${todayUTC()}T00:00:00Z`);
+  const days = Math.round((target - today) / 86_400_000);
+  if (days === 0) return "Due today";
+  if (days > 0) return `Due in ${days} ${days === 1 ? "day" : "days"}`;
+  const elapsed = -days;
+  return `Due ${elapsed} ${elapsed === 1 ? "day" : "days"} ago`;
+}
+
 export function CourseCard({
   course: c,
   status,
@@ -26,6 +39,13 @@ export function CourseCard({
   settings?: SiteSettings;
 }) {
   const { complete, started } = status;
+  const visibleDueDate =
+    !complete &&
+    assignmentLabel === "Assigned" &&
+    settings?.dueDatesEnabled !== false
+      ? dueDate
+      : undefined;
+  const dueText = visibleDueDate ? dueLabel(visibleDueDate) : undefined;
   return (
     <LearningCard
       onClick={onClick}
@@ -52,8 +72,14 @@ export function CourseCard({
             : "Start course"
       }
       detail={
-        dueDate && !complete ? (
-          <small className="text-muted-foreground">Due {dueDate}</small>
+        dueText ? (
+          <time
+            dateTime={visibleDueDate}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+          >
+            <CalendarDays size={14} strokeWidth={1.6} aria-hidden="true" />
+            {dueText}
+          </time>
         ) : undefined
       }
       artwork={
