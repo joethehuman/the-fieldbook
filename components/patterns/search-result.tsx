@@ -29,7 +29,7 @@ export function Highlight({ text, terms }: { text: string; terms: string[] }) {
         i % 2 ? (
           <mark
             key={i}
-            className="rounded-sm bg-accent text-accent-foreground font-semibold"
+            className="bg-accent px-0.5 text-accent-foreground font-semibold"
           >
             {part}
           </mark>
