@@ -320,7 +320,8 @@
 .writing-editor .writing-content [data-lexical-decorator="true"]:has(table) {
   display: block;
   width: 100%;
-  max-width: 100%;
+  max-width: var(--reading-width);
+  margin-inline: auto;
   overflow-x: auto;
   border-radius: var(--radius);
 }

@@ -109,6 +109,9 @@ test("column move saves current cell edits and carries alignment; Escape cancels
 
 test("column resize is keyboard operable, survives a column move, and participates in undo", async ({ page }) => {
   await open(page);
+  const canvasWidth = await page.locator('.writing-content [data-lexical-decorator="true"]:has(table)').first()
+    .evaluate((node) => node.getBoundingClientRect().width);
+  expect(canvasWidth).toBeLessThanOrEqual(704);
   const resize = page.getByRole("separator", { name: "Resize column 2" });
   await expect(resize).toBeVisible();
   const before = Number(await resize.getAttribute("aria-valuenow"));
