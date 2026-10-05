@@ -10,6 +10,8 @@ import { FieldGroup } from "@/components/ui/field";
 import { TextField } from "@/components/patterns/text-field";
 import { PendingChangesBar } from "@/components/patterns/pending-changes-bar";
 import { SettingsSection } from "@/components/patterns/settings-section";
+import { SettingsPageActions } from "@/components/patterns/settings-page-actions";
+import { SaveChangesControl } from "@/components/patterns/save-changes-control";
 import { SectionHeader } from "@/components/patterns/layout";
 
 const variants = [
@@ -26,6 +28,7 @@ export function ControlExamples() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [pendingExample, setPendingExample] = useState(true);
+  const [settingsExampleDirty, setSettingsExampleDirty] = useState(false);
   return (
     <section
       id="control-pilot"
@@ -174,6 +177,35 @@ export function ControlExamples() {
             <Button type="button" variant="outline" disabled={pendingExample} onClick={() => setPendingExample(true)}>Make example change</Button>
           </ActionGroup>
         </Card>
+      </div>
+      <div className="grid min-w-0 gap-4" aria-label="Settings page composition">
+        <SettingsSection
+          id="catalog-settings-details"
+          title={<h3>Installation details</h3>}
+          description="Related settings have one clear heading."
+        >
+          <p className="text-copy text-muted-foreground">Name and welcome description</p>
+          <Button type="button" variant="outline" onClick={() => setSettingsExampleDirty(true)}>
+            Make example change
+          </Button>
+        </SettingsSection>
+        <SettingsSection
+          id="catalog-settings-appearance"
+          title={<h3>Appearance</h3>}
+          description="A second group can stay on the same settings page."
+        >
+          <p className="text-copy text-muted-foreground">Accent and artwork colors</p>
+        </SettingsSection>
+        <SettingsPageActions
+          guidance="Changes in both sections save together."
+          belowActions={settingsExampleDirty ? (
+            <Button type="button" variant="link" className="text-caption text-muted-foreground hover:text-foreground" onClick={() => setSettingsExampleDirty(false)}>Discard changes</Button>
+          ) : null}
+          actions={<SaveChangesControl
+            dirty={settingsExampleDirty}
+            onClick={() => { setSettingsExampleDirty(false); setStatus("Settings layout example saved."); }}
+          >Save example</SaveChangesControl>}
+        />
       </div>
       <Card>
         <form

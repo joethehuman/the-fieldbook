@@ -39,7 +39,7 @@ export function PendingChangesBar({
         <div className="px-1 pt-2">
           <div
             data-slot="pending-changes-bar"
-            className={`rounded-t-xl border border-border bg-card p-3 shadow-surface transition-[opacity,visibility] duration-200 ease-out motion-reduce:transition-none ${active ? "visible opacity-100" : "invisible opacity-0"}`}
+            className={`rounded-t-xl border border-border bg-surface p-3 shadow-surface transition-[opacity,visibility] duration-200 ease-out motion-reduce:transition-none ${active ? "visible opacity-100" : "invisible opacity-0"}`}
           >
             {hasHeader && (
               <div className="flex flex-wrap items-center justify-between gap-3">

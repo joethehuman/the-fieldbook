@@ -76,6 +76,7 @@ import { SectionHeader, EmptyState } from "./patterns/layout";
 import { Pagination } from "./patterns/pagination";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
 import { useRevealTarget } from "./patterns/use-reveal-target";
+import { SaveChangesControl } from "./patterns/save-changes-control";
 import { groupPath } from "@/lib/group-hierarchy";
 import { organizationTeam } from "@/lib/organization-team";
 import { HierarchyPicker } from "./patterns/hierarchy-picker";
@@ -307,7 +308,7 @@ export function TeamsAdmin({
   }
   async function saveTeam(event: React.FormEvent) {
     event.preventDefault();
-    if (!editing || saving.current) return;
+    if (!editing || saving.current || !dirty) return;
     if (editSnapshot.current !== teamMutationSnapshot(data)) {
       setNotice(
         "Organization data changed while this editor was open. Close it and reopen the team before saving.",
@@ -1564,13 +1565,16 @@ export function TeamsAdmin({
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" loading={busy}>
+                  <SaveChangesControl
+                    dirty={dirty}
+                    busy={busy}
+                  >
                     {editingNeedsReview
                       ? "Review changes"
                       : editing.id === organization?.id
                         ? "Save manager"
                         : "Save team"}
-                  </Button>
+                  </SaveChangesControl>
                 </ActionGroup>
               </DialogFooter>
             </form>

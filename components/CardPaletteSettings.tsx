@@ -1,6 +1,5 @@
 "use client";
 import { Input } from "./ui/input";
-import { Card } from "./ui/card";
 import { SelectField } from "./ui/select";
 import { FormField } from "./patterns/form-field";
 import { CardArtwork } from "./patterns/card-artwork";
@@ -52,7 +51,7 @@ export function CardPaletteSettings({
         </p>
       </div>
       <div className="grid min-w-0 gap-4">
-        <Card className="grid gap-5">
+        <div className="grid gap-5">
           <div className="grid gap-4 sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)] sm:items-end">
             <FormField label="Palette mode">
               <SelectField
@@ -140,8 +139,8 @@ export function CardPaletteSettings({
               ))}
             </div>
           )}
-        </Card>
-        <Card className="grid min-w-0 content-start gap-4 bg-surface">
+        </div>
+        <div className="grid min-w-0 content-start gap-4 rounded-lg bg-surface p-4">
           <div className="grid gap-1">
             <h5>Live preview</h5>
             <p className="text-sm text-muted-foreground">
@@ -197,7 +196,7 @@ export function CardPaletteSettings({
               />
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </section>
   );

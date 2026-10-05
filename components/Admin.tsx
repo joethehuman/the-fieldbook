@@ -145,6 +145,7 @@ import { CourseBuilder } from "./CourseBuilder";
 import { requiresPassing, validQuestion } from "@/lib/course-quiz";
 import { canAdminister, canOpenAdminTab, roleLabel } from "@/lib/permissions";
 import SiteSettingsPanel from "./SiteSettingsPanel";
+import { SaveChangesControl } from "./patterns/save-changes-control";
 import { FeedbackAdmin } from "./Feedback";
 import { TeamsAdmin, TeamProgress } from "./Teams";
 import { videoSource } from "@/lib/video";
@@ -963,7 +964,7 @@ export default function Admin({
   }
   async function savePerson(e: React.FormEvent) {
     e.preventDefault();
-    if (!person || personSaving.current) return;
+    if (!person || personSaving.current || !personDirty) return;
     setPersonError("");
     if (
       data.users.some(
@@ -1988,11 +1989,6 @@ export default function Admin({
                     {personError && (
                       <Alert variant="destructive">{personError}</Alert>
                     )}
-                    {personDirty && (
-                      <p role="status" className="text-caption text-muted-foreground">
-                        Unsaved changes
-                      </p>
-                    )}
                     <PersonFields
                       person={person}
                       data={data}
@@ -2033,10 +2029,13 @@ export default function Admin({
                 <Button type="button" variant="outline" onClick={closePerson}>
                   Cancel
                 </Button>
-                <Button variant="default" loading={personBusy}>
+                <SaveChangesControl
+                  dirty={personDirty}
+                  busy={personBusy}
+                >
                   <Save size={16} />
                   Save profile
-                </Button>
+                </SaveChangesControl>
               </DialogFooter>
             </form>
           </DialogContent>

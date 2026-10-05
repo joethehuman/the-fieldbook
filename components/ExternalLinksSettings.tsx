@@ -12,7 +12,6 @@ import {
 } from "@/lib/external-links";
 import { TextField } from "./patterns/text-field";
 import { Button } from "./ui/button";
-import { Card } from "./ui/card";
 import { ActionGroup } from "./ui/action-group";
 import { FieldDescription, FieldGroup } from "./ui/field";
 
@@ -60,10 +59,10 @@ export function ExternalLinksSettings({
         const prefix = `external-link-${link.id}`;
         const name = link.label.trim() || `link ${index + 1}`;
         return (
-          <Card
+          <section
             key={link.id}
             aria-labelledby={`${prefix}-heading`}
-            className="grid gap-4"
+            className="grid gap-4 border-t border-border pt-5"
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h4 id={`${prefix}-heading`} className="text-sm font-semibold">
@@ -155,7 +154,7 @@ export function ExternalLinksSettings({
                 }
               />
             </FieldGroup>
-          </Card>
+          </section>
         );
       })}
       <ActionGroup>
