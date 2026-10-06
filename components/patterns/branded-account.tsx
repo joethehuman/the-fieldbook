@@ -17,16 +17,16 @@ export function BrandedAccount({
 }) {
   return (
     <AccountPage
-      viewportClassName={illustrated ? "access-card-viewport" : undefined}
+      centered={illustrated}
       className={
         illustrated
-          ? "access-card access-card-illustrated max-w-[51rem] gap-0 overflow-hidden border-l-[5px] [border-left-color:var(--brand)] p-0 sm:p-0 [overflow-wrap:anywhere] [&_h1]:text-[clamp(1.65rem,3vw,2.35rem)]"
+          ? "access-card access-card-illustrated max-w-[32rem] min-[801px]:max-w-[51rem] gap-0 overflow-hidden border-l-[5px] [border-left-color:var(--brand)] p-0 sm:p-0 [overflow-wrap:anywhere] [&_h1]:text-[clamp(1.65rem,3vw,2.35rem)]"
           : "access-card border-l-[5px] [border-left-color:var(--brand)] [overflow-wrap:anywhere]"
       }
       style={brandThemeStyle(branding.accent)}
     >
       <div className="access-card-content">
-        <InstallationIdentity name={branding.name} />
+        {!illustrated && <InstallationIdentity name={branding.name} />}
         <div className="access-card-body">{children}</div>
         {(footer || branding.privacyUrl) && (
           <div className="access-card-links">

@@ -997,13 +997,6 @@
 }
 
 @layer components {
-  .access-card-viewport {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding-block: var(--space-4);
-  }
-  .access-card-viewport > main { margin-block: auto; }
   .access-card-illustrated {
     grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.76fr);
     min-height: 30rem;
@@ -1028,7 +1021,6 @@
   .access-card-illustrated .access-card-body {
     flex: 1;
     align-content: center;
-    padding-top: var(--space-8);
   }
   .access-card-illustrated .access-card-body > [data-slot="button"] {
     min-height: 2.75rem;
@@ -1039,9 +1031,8 @@
     gap: var(--space-4);
     font-size: var(--type-label);
   }
-  @media (max-width: 700px) {
+  @media (max-width: 800px) {
     .access-card-illustrated { grid-template-columns: minmax(0, 1fr); }
-    .access-card-illustrated .access-card-content { min-height: 23rem; }
   }
 }
 

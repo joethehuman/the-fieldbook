@@ -47,15 +47,8 @@
   .access-artwork-paper-front span:first-child { margin-top: 1.6rem; }
   .access-artwork-paper-front span:nth-child(2) { width: 52%; }
   .access-artwork-paper-front span:nth-child(4) { width: 40%; }
-  @media (max-width: 700px) {
-    .access-artwork { grid-row: 1; min-height: 12rem; }
-    .access-artwork-label { top: 1.25rem; }
-    .access-artwork-pages {
-      top: 3.25rem;
-      left: calc(50% - 6.5rem);
-      transform: scale(0.45);
-      transform-origin: top center;
-    }
+  @media (max-width: 800px) {
+    .access-artwork { display: none; }
   }
 
   .card-artwork {

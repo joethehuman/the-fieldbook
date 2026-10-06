@@ -180,20 +180,21 @@ export function ReadingPage({ className, ...props }: ComponentProps<"main">) {
 }
 export function AccountPage({
   className,
-  viewportClassName,
+  centered = false,
   ...props
-}: ComponentProps<"main"> & { viewportClassName?: string }) {
+}: ComponentProps<"main"> & { centered?: boolean }) {
   return (
     <div
       data-slot="account-viewport"
       className={cn(
         "fixed inset-0 overflow-y-auto overscroll-none",
-        viewportClassName,
+        centered && "flex flex-col items-center py-4",
       )}
     >
       <main
         className={cn(
-          "mx-auto my-12 grid w-[calc(100%-2rem)] max-w-lg gap-6 rounded-xl border border-border bg-card p-4 shadow-sm sm:my-20 sm:p-8 [&_h1]:text-2xl [&_h1]:font-semibold [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-muted-foreground",
+          "mx-auto grid w-[calc(100%-2rem)] max-w-lg gap-6 rounded-xl border border-border bg-card p-4 shadow-sm sm:p-8 [&_h1]:text-2xl [&_h1]:font-semibold [&_p]:text-sm [&_p]:leading-relaxed [&_p]:text-muted-foreground",
+          centered ? "my-auto" : "my-12 sm:my-20",
           className,
         )}
         {...props}
