@@ -1,5 +1,14 @@
-.preview { min-height: 100vh; background: var(--background); }
-.preview :global([data-slot="account-viewport"]) { position: relative; overflow: visible; }
+.preview {
+  display: flex;
+  min-height: 100dvh;
+  flex-direction: column;
+  background: var(--background);
+}
+.preview :global([data-slot="account-viewport"]) {
+  position: relative;
+  flex: 1;
+  overflow: visible;
+}
 .reviewTools {
   position: relative;
   z-index: 1;
@@ -8,7 +17,12 @@
   gap: var(--space-3);
   padding: var(--space-4) var(--space-4) 0;
 }
-.tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); }
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
 .note {
   position: relative;
   z-index: 1;

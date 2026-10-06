@@ -1,5 +1,4 @@
 "use client";
-import ReadingError from "./ReaderError";
+import PageError from "./PageError";
 
-// Catch failures from reader and other server-rendered routes.
-export default ReadingError;
+export default PageError;

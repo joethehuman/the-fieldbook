@@ -4,11 +4,10 @@ import { useState } from "react";
 import { BrandedAccount } from "@/components/patterns/branded-account";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
-import type { Branding } from "@/lib/branding";
+import { brandingFromSettings, type Branding } from "@/lib/branding";
 import styles from "./preview.module.css";
 
-type Screen =
-  "public" | "private" | "missing" | "account-error" | "reader-error";
+type Screen = "public" | "private" | "missing" | "account-error" | "page-error";
 
 const exampleReference = "00000000-0000-4000-8000-000000000000";
 const screens: { id: Screen; label: string }[] = [
@@ -16,20 +15,23 @@ const screens: { id: Screen; label: string }[] = [
   { id: "private", label: "Sign in · private" },
   { id: "missing", label: "Unavailable page" },
   { id: "account-error", label: "Account error" },
-  { id: "reader-error", label: "Reader error" },
+  { id: "page-error", label: "Page error" },
 ];
 
 export default function AccessPreview() {
   const [screen, setScreen] = useState<Screen>("public");
   const signIn = screen === "public" || screen === "private";
-  const branding: Branding = {
-    name: "Fieldbook",
-    accent: "#17847f",
-    homePage: "courses",
-    welcomeDescription: "",
-    privacyUrl: screen === "account-error" ? null : "/privacy",
-    access: screen === "private" ? "private" : "public",
-  };
+  const branding: Branding =
+    screen === "account-error" || screen === "page-error"
+      ? brandingFromSettings({})
+      : {
+          name: "Fieldbook",
+          accent: "#17847f",
+          homePage: "courses",
+          welcomeDescription: "",
+          privacyUrl: "/privacy",
+          access: screen === "private" ? "private" : "public",
+        };
 
   return (
     <div className={styles.preview}>
@@ -75,7 +77,9 @@ export default function AccessPreview() {
         ) : screen === "missing" ? (
           <>
             <h1>This page isn’t available</h1>
-            <p>It may have been removed or is not published.</p>
+            <p>
+              The link may be incorrect, or the page may no longer be available.
+            </p>
             <Button type="button">Back to Fieldbook</Button>
           </>
         ) : screen === "account-error" ? (
@@ -91,7 +95,7 @@ export default function AccessPreview() {
           <>
             <h1>Unable to load this page</h1>
             <Alert variant="destructive" role="alert">
-              Reading services are unavailable. Please try again shortly.
+              Please try again. If this continues, contact your administrator.
             </Alert>
             <Button type="button">Try again</Button>
           </>
@@ -99,9 +103,10 @@ export default function AccessPreview() {
       </BrandedAccount>
       <p className={styles.note} id="preview">
         Layout preview using the shared Fieldbook card. Actions are inactive.
-        The name and teal accent are sample Identity settings; a live
-        installation uses its saved name and accent. The account-error reference
-        is an example; a live error supplies its own ID.
+        The sign-in and unavailable-page examples use sample Identity settings.
+        Error screens show the safe fallback used when settings cannot be read.
+        The account-error reference is an example; a live error supplies its own
+        ID.
       </p>
     </div>
   );

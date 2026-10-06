@@ -17,6 +17,7 @@ export function BrandedAccount({
 }) {
   return (
     <AccountPage
+      viewportClassName={illustrated ? "access-card-viewport" : undefined}
       className={
         illustrated
           ? "access-card access-card-illustrated max-w-[51rem] gap-0 overflow-hidden border-l-[5px] [border-left-color:var(--brand)] p-0 sm:p-0 [overflow-wrap:anywhere] [&_h1]:text-[clamp(1.65rem,3vw,2.35rem)]"

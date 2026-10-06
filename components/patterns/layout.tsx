@@ -178,11 +178,18 @@ export function ReadingPage({ className, ...props }: ComponentProps<"main">) {
     />
   );
 }
-export function AccountPage({ className, ...props }: ComponentProps<"main">) {
+export function AccountPage({
+  className,
+  viewportClassName,
+  ...props
+}: ComponentProps<"main"> & { viewportClassName?: string }) {
   return (
     <div
       data-slot="account-viewport"
-      className="fixed inset-0 overflow-y-auto overscroll-none"
+      className={cn(
+        "fixed inset-0 overflow-y-auto overscroll-none",
+        viewportClassName,
+      )}
     >
       <main
         className={cn(
