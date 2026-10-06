@@ -35,7 +35,17 @@ export default async function SignIn({
   const reference =
     q.reference && /^[a-f0-9-]{36}$/.test(q.reference) ? q.reference : null;
   return (
-    <BrandedAccount branding={branding}>
+    <BrandedAccount
+      branding={branding}
+      illustrated
+      footer={
+        branding.access === "public" ? (
+          <nav aria-label="Sign-in links">
+            <Link href={homePath(branding)}>Back to browsing</Link>
+          </nav>
+        ) : null
+      }
+    >
       <ReturnFragment
         destination={safeNext(
           (await cookies()).get(SIGN_IN_RETURN_COOKIE)?.value,
@@ -62,11 +72,6 @@ export default async function SignIn({
       <Button asChild variant="default" className="w-full">
         <a href="/auth/login">Continue with Google</a>
       </Button>
-      {branding.access === "public" && (
-        <nav className="sign-in-footer" aria-label="Sign-in links">
-          <Link href={homePath(branding)}>Back to browsing</Link>
-        </nav>
-      )}
     </BrandedAccount>
   );
 }

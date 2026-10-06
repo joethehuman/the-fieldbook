@@ -1,5 +1,5 @@
-import { AccountPage } from "@/components/patterns/layout";
-import { InstallationIdentity } from "@/components/patterns/installation-identity";
+import { BrandedAccount } from "@/components/patterns/branded-account";
+import { brandingFromSettings } from "@/lib/branding";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 export function AccountUnavailable({
@@ -10,8 +10,7 @@ export function AccountUnavailable({
   retry: string;
 }) {
   return (
-    <AccountPage>
-      <InstallationIdentity />
+    <BrandedAccount branding={brandingFromSettings({})} illustrated>
       <h1>Account services are unavailable</h1>
       <Alert role="alert" variant="destructive">
         Please try again shortly. If this continues, share this reference with
@@ -20,6 +19,6 @@ export function AccountUnavailable({
       <Button asChild>
         <a href={retry}>Try again</a>
       </Button>
-    </AccountPage>
+    </BrandedAccount>
   );
 }

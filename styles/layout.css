@@ -832,12 +832,6 @@
     display: grid;
     gap: var(--space-3);
   }
-  .sign-in-footer {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-4);
-    font-size: 0.8125rem;
-  }
   .guest-progress-note,
   .demo-note,
   .editor-help {
@@ -999,6 +993,48 @@
   @keyframes sidebar-content-appear {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+}
+
+@layer components {
+  .access-card-illustrated {
+    grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.76fr);
+    min-height: 30rem;
+    box-shadow: var(--elevation-floating);
+  }
+  .access-card-content {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    gap: var(--space-6);
+  }
+  .access-card-illustrated .access-card-content {
+    display: flex;
+    flex-direction: column;
+    padding: clamp(1.5rem, 4vw, 3rem);
+  }
+  .access-card-body {
+    display: grid;
+    min-width: 0;
+    gap: var(--space-6);
+  }
+  .access-card-illustrated .access-card-body {
+    flex: 1;
+    align-content: center;
+    padding-top: var(--space-8);
+  }
+  .access-card-illustrated .access-card-body > [data-slot="button"] {
+    min-height: 2.75rem;
+  }
+  .access-card-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    font-size: var(--type-label);
+  }
+  @media (max-width: 700px) {
+    .access-card-illustrated { grid-template-columns: minmax(0, 1fr); }
+    .access-card-illustrated .access-card-content { min-height: 23rem; }
   }
 }
 
