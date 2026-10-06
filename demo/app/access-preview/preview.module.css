@@ -92,8 +92,10 @@
 .artLabel {
   position: absolute;
   top: 2.75rem;
-  left: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 0.75rem;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -156,10 +158,10 @@
 
   .artwork {
     grid-row: 1;
-    min-height: 10rem;
+    min-height: 12rem;
   }
 
   .content { min-height: 23rem; }
-  .artLabel { top: 1.25rem; left: 1.5rem; }
-  .pages { top: -0.5rem; left: auto; right: 0.25rem; transform: scale(0.5); transform-origin: top right; }
+  .artLabel { top: 1.25rem; }
+  .pages { top: 3.25rem; left: calc(50% - 6.5rem); transform: scale(0.45); transform-origin: top center; }
 }

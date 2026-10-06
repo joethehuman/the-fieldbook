@@ -110,6 +110,7 @@ export default function AccessPreview() {
       </AccountPage>
       <p className={styles.note} id="preview">
         Layout preview using Fieldbook components and current screen copy. Actions are inactive.
+        The name and teal accent are sample Identity settings; a live installation uses its saved name and accent.
         The account-error reference is an example; a live error supplies its own ID.
       </p>
     </div>
