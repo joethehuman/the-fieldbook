@@ -202,8 +202,10 @@
   .writing-phone-format { flex-shrink: 0; }
 }
 .writing-editor .writing-content {
+  --writing-content-start: max(52px, var(--editor-content-padding, var(--space-6)));
   padding: var(--space-6);
   padding-inline: var(--editor-content-padding, var(--space-6));
+  padding-inline-start: var(--writing-content-start);
   outline: none;
 }
 .writing-editor .writing-content[contenteditable] {
@@ -468,6 +470,7 @@
   .writing-editor .writing-content {
     padding: var(--space-4);
     padding-inline: var(--editor-content-padding, var(--space-4));
+    padding-inline-start: var(--writing-content-start);
   }
 }
 
@@ -481,7 +484,9 @@
   gap: var(--space-6);
   padding-block-start: var(--space-6);
   padding-inline: var(--editor-content-padding, var(--space-6));
+  padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6)));
 }
+.writing-editor .writing-source { padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6))); }
 [data-slot="textarea"].document-title {
   min-height: 0;
   font-size: var(--type-page);
@@ -496,7 +501,7 @@
 .writing-editor [data-editor-block-type="image"] { max-width: 100%; }
 .writing-editor [data-editor-block-type="image"] img { display: block; max-width: 100%; height: auto; }
 @media (max-width: 600px) {
-  .writing-document-heading { padding-inline: var(--space-4); }
+  .writing-document-heading { padding-inline-end: var(--space-4); }
 }
 .writing-content .writing-code {
   background: var(--muted);
@@ -508,17 +513,19 @@
 }
 .course-builder-panel .writing-content h1 { font-size: 1.75rem; line-height: 1.3; letter-spacing: -0.035em; }
 
-/* Block actions share one inset surface, clear of selection outlines and prose. */
-.writing-block-actions { position: absolute; inset-block-start: var(--space-2); inset-inline-end: var(--space-2); z-index: 2; display: inline-flex; opacity: 0; }
+/* Block menus live in the writing gutter, outside media and table content. */
+.writing-block-actions { position: absolute; inset-block-start: 0; inset-inline-start: -44px; inset-inline-end: auto; z-index: 2; display: inline-flex; width: 44px; opacity: 0; }
+.writing-block-actions [data-slot="button"] { width: var(--control-height); height: var(--control-height); padding: var(--space-2); color: var(--muted-foreground); }
+.writing-block-actions [data-slot="button"]:is(:hover, :focus-visible, [data-state="open"]) { color: var(--foreground); }
 :is(.writing-media-block, .writing-code-block, .writing-table-block, [data-editor-block-type="image"]):is(:hover, :focus-within) > .writing-block-actions,
 .writing-block-actions:has([data-state="open"]) { opacity: 1; }
 .writing-code-block { position: relative; }
-.writing-code-block .writing-code { padding-inline-end: calc(var(--space-4) + var(--control-height)); }
 .writing-editor [data-editor-block-type="image"] { position: relative; padding: var(--space-2); border-radius: var(--radius); }
-.writing-editor [data-editor-block-type="image"] > .writing-block-actions { inset-block-start: var(--space-3); inset-inline-end: var(--space-3); }
-.writing-editor .writing-content .writing-table-block { position: relative; padding: var(--space-12) var(--space-4) var(--space-4); border-radius: 0; }
+.writing-editor .writing-content .writing-table-block { position: relative; padding: var(--space-6) var(--space-4) var(--space-4); border-radius: 0; }
 .writing-table-edge-fade { position: absolute; pointer-events: none; }
-.writing-table-block > .writing-block-actions { inset-block-start: 0; inset-inline-end: auto; }
+.writing-block-gutter-actions { position: absolute; z-index: 3; display: flex; width: 44px; height: var(--control-height); opacity: 0; }
+.writing-block-gutter-actions:is([data-hovered="true"], :hover, :focus-within, :has([data-state="open"])) { opacity: 1; }
+.writing-block-gutter-actions .writing-block-actions { position: static; opacity: 1; }
 .writing-editor .writing-table-block table :is(thead, tfoot),
 .writing-editor .writing-table-block table [data-tool-cell],
 .writing-editor .writing-table-block table col:first-child,
@@ -541,7 +548,5 @@
 .writing-table-drag-shield { position: fixed; inset: 0; z-index: 1000; cursor: grabbing; }
 .writing-table-drag-preview { position: fixed; z-index: 1001; display: flex; align-items: baseline; gap: var(--space-2); max-width: min(17.5rem, calc(100vw - 16px)); padding: var(--space-2) var(--space-3); overflow: hidden; pointer-events: none; white-space: nowrap; border: 1px solid var(--control-border); border-radius: var(--radius); background: var(--card); color: var(--foreground); box-shadow: var(--elevation-floating); }
 .writing-table-drag-preview span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted-foreground); }
-@media (hover: none) { .writing-block-actions { opacity: 1; } }
+@media (hover: none) { .writing-block-actions, .writing-block-gutter-actions { opacity: 1; } }
 .writing-editor .mdxeditor-contenteditable-wrapper { position: relative; }
-.writing-divider-tools { position: absolute; transform: translate(-100%, -50%); z-index: 2; }
-.writing-divider-tools .writing-block-actions { position: static; opacity: 1; }
