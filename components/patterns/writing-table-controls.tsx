@@ -95,6 +95,18 @@ function TableControls({
       const right = host.scrollWidth - host.scrollLeft - host.clientWidth > 2;
       setFade((current) => current.left === left && current.right === right ? current : { left, right });
     };
+    const positionActions = () => {
+      const actions = host.querySelector<HTMLElement>(".writing-block-actions");
+      if (!actions) return;
+      const tableBounds = table.getBoundingClientRect();
+      const hostBounds = host.getBoundingClientRect();
+      const visibleLeft = Math.max(tableBounds.left, hostBounds.left, 0);
+      const visibleRight = Math.min(tableBounds.right, hostBounds.right, window.innerWidth);
+      position(actions, {
+        left: Math.max(visibleLeft + 8, visibleRight - actions.offsetWidth - 8)
+          - hostBounds.left + host.scrollLeft,
+      });
+    };
     const measure = () => {
       if (!resizePreview.current) editor.getEditorState().read(() => {
         const widths = getTable()?.getMdastNode();
@@ -161,6 +173,7 @@ function TableControls({
         });
       }
       updateFade();
+      positionActions();
     };
     refresh.current = measure;
     measure();
@@ -174,10 +187,13 @@ function TableControls({
       characterData: true,
     });
     const unregister = editor.registerUpdateListener(measure);
-    host.addEventListener("scroll", updateFade, { passive: true });
+    const onScroll = () => { updateFade(); positionActions(); };
+    host.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", positionActions);
     return () => {
       unregister();
-      host.removeEventListener("scroll", updateFade);
+      host.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", positionActions);
       refresh.current = () => {};
       resize.disconnect();
       mutation.disconnect();

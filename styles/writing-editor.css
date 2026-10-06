@@ -518,7 +518,7 @@
 .writing-editor [data-editor-block-type="image"] > .writing-block-actions { inset-block-start: var(--space-3); inset-inline-end: var(--space-3); }
 .writing-editor .writing-content .writing-table-block { position: relative; padding: var(--space-12) var(--space-4) var(--space-4); border-radius: 0; }
 .writing-table-edge-fade { position: absolute; pointer-events: none; }
-.writing-table-block > .writing-block-actions { inset-block-start: 0; }
+.writing-table-block > .writing-block-actions { inset-block-start: 0; inset-inline-end: auto; }
 .writing-editor .writing-table-block table :is(thead, tfoot),
 .writing-editor .writing-table-block table [data-tool-cell],
 .writing-editor .writing-table-block table col:first-child,

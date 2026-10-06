@@ -1,9 +1,25 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { expectMarkdown, waitForDraftSaved, openContentSettings } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
+
+async function tableActionPlacement(table: Locator) {
+  return table.evaluate((node) => {
+    const host = node.closest<HTMLElement>('[data-lexical-decorator="true"]')!;
+    const button = host.querySelector<HTMLButtonElement>(".writing-block-actions button")!;
+    const tableBounds = node.getBoundingClientRect();
+    const hostBounds = host.getBoundingClientRect();
+    const buttonBounds = button.getBoundingClientRect();
+    return {
+      gap: Math.min(tableBounds.right, hostBounds.right, window.innerWidth) - buttonBounds.right,
+      withinVisibleTable: buttonBounds.left >= Math.max(tableBounds.left, hostBounds.left, 0) - 1,
+      tableRight: tableBounds.right,
+      hostRight: hostBounds.right,
+    };
+  });
+}
 
 async function setup(
   page: Page,
@@ -150,8 +166,8 @@ async function setup(
       sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     }, state);
   }
-  await page.goto(production ? "/admin" : "/#admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page.goto(production ? `/admin/content/${state.content[0].id}/edit` : "/#admin");
+  if (!production) await page.getByRole("link", { name: "Safety fixture" }).click();
   return { state, control };
 }
 async function failDraftWrites(page: Page, production: boolean, control: { failSave: boolean }) {
@@ -825,6 +841,10 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   expect(widths.table).toBeGreaterThan(widths.wrapper);
   expect(widths.wrapperScroll).toBeGreaterThan(widths.wrapper);
   expect(widths.editor).toBeLessThanOrEqual(widths.editorWidth + 2);
+  await expect.poll(async () => {
+    const placement = await tableActionPlacement(table);
+    return placement.gap >= -2 && placement.gap <= 16 && placement.withinVisibleTable;
+  }).toBe(true);
   const trailingControlWidth = await table
     .locator("tfoot th")
     .last()
@@ -834,10 +854,15 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   await expect(
     page.getByRole("menuitem", { name: "Insert column after" }),
   ).toBeVisible();
+  await page.keyboard.press("Escape");
   await table.evaluate((node) => {
     const scroller = node.closest('[data-lexical-decorator="true"]');
     if (scroller) scroller.scrollLeft = 180;
   });
+  await expect.poll(async () => {
+    const placement = await tableActionPlacement(table);
+    return placement.gap >= -2 && placement.gap <= 16 && placement.withinVisibleTable;
+  }).toBe(true);
   await expect(
     page.getByRole("menuitem", { name: "Insert column after" }),
   ).toHaveCount(0);
@@ -851,6 +876,20 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
     return owner.scrollWidth > owner.clientWidth;
   })).toBe(true);
 
+});
+
+test("table actions stay beside a table narrower than the editor", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true, false,
+    "| Symptom | Next check |\n| --- | --- |\n| No Ask AI option | Saved feature setting |");
+  const table = page.getByRole("textbox", { name: "Lesson content" }).locator("table");
+  await expect(table).toBeVisible();
+  await expect.poll(async () => {
+    const placement = await tableActionPlacement(table);
+    return placement.tableRight < placement.hostRight - 40
+      && placement.gap >= -2 && placement.gap <= 16 && placement.withinVisibleTable;
+  }).toBe(true);
+  await page.getByRole("button", { name: "Table actions" }).click();
+  await expect(page.getByRole("menuitem", { name: "Write after table" })).toBeVisible();
 });
 
 test("slash Table inserts at the selected line and unmatched searches can return to writing", async ({
