@@ -106,7 +106,7 @@ export async function exchangeSignInCode(code: string): Promise<boolean> {
 }
 
 export async function signOutIdentity(): Promise<void> {
-  await (await sessionClient()).auth.signOut();
+  await (await sessionClient()).auth.signOut({ scope: "local" });
 }
 
 export async function authorizationDetails(
