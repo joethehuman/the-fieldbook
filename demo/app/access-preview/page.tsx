@@ -7,13 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import styles from "./preview.module.css";
 
-type Screen = "public" | "private" | "missing" | "error";
+type Screen = "public" | "private" | "missing" | "account-error" | "reader-error";
+
+const exampleReference = "00000000-0000-4000-8000-000000000000";
 
 const screens: { id: Screen; label: string }[] = [
   { id: "public", label: "Sign in · public" },
   { id: "private", label: "Sign in · private" },
   { id: "missing", label: "Unavailable page" },
-  { id: "error", label: "Service error" },
+  { id: "account-error", label: "Account error" },
+  { id: "reader-error", label: "Reader error" },
 ];
 
 function PageArtwork() {
@@ -27,8 +30,6 @@ function PageArtwork() {
           <i /><i /><i /><i />
         </div>
       </div>
-      <div className={styles.artRule} />
-      <div className={styles.artFooter}>A place to keep learning.</div>
     </div>
   );
 }
@@ -57,20 +58,13 @@ export default function AccessPreview() {
       </div>
       <AccountPage className={styles.card}>
         <div className={styles.content}>
-          <div className={styles.identity}>
-            <InstallationIdentity name="Fieldbook" />
-            <span className={styles.context}>{signIn ? "YOUR LEARNING SPACE" : "FIELD GUIDE"}</span>
-          </div>
+          <InstallationIdentity name="Fieldbook" />
           <div className={styles.body}>
             {signIn ? (
               <>
                 <div className={styles.copy}>
-                  <h1>Welcome to Fieldbook.</h1>
-                  <p>
-                    {screen === "public"
-                      ? "Keep your course progress and pick up where you left off."
-                      : "Sign in with your approved Google account to continue."}
-                  </p>
+                  <h1>Sign in to Fieldbook</h1>
+                  {screen === "public" && <p>Sign in to save course progress across devices.</p>}
                 </div>
                 <Button className="w-full" type="button">
                   Continue with Google
@@ -83,19 +77,29 @@ export default function AccessPreview() {
             ) : screen === "missing" ? (
               <>
                 <div className={styles.copy}>
-                  <h1>This page isn’t available.</h1>
-                  <p>It may have moved, been removed, or is not published yet.</p>
+                  <h1>This page isn’t available</h1>
+                  <p>It may have been removed or is not published.</p>
                 </div>
                 <Button type="button">Back to Fieldbook</Button>
+              </>
+            ) : screen === "account-error" ? (
+              <>
+                <div className={styles.copy}>
+                  <h1>Account services are unavailable</h1>
+                </div>
+                <Alert variant="destructive" role="alert">
+                  Please try again shortly. If this continues, share this reference with
+                  your administrator: {exampleReference}
+                </Alert>
+                <Button type="button">Try again</Button>
               </>
             ) : (
               <>
                 <div className={styles.copy}>
-                  <h1>We couldn’t load this page.</h1>
-                  <p>Something interrupted the connection. Please try again shortly.</p>
+                  <h1>Unable to load this page</h1>
                 </div>
                 <Alert variant="destructive" role="alert">
-                  If this keeps happening, share the reference with your administrator.
+                  Reading services are unavailable. Please try again shortly.
                 </Alert>
                 <Button type="button">Try again</Button>
               </>
@@ -105,7 +109,8 @@ export default function AccessPreview() {
         <PageArtwork />
       </AccountPage>
       <p className={styles.note} id="preview">
-        Layout preview using Fieldbook components and styles. Actions on this page are inactive.
+        Layout preview using Fieldbook components and current screen copy. Actions are inactive.
+        The account-error reference is an example; a live error supplies its own ID.
       </p>
     </div>
   );

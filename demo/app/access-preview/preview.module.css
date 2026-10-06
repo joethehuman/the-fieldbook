@@ -46,17 +46,6 @@
   border-left: 5px solid var(--brand);
 }
 
-.identity {
-  display: grid;
-  gap: var(--space-2);
-}
-
-.context {
-  color: var(--muted-foreground);
-  font-size: 0.6875rem;
-  letter-spacing: 0.08em;
-}
-
 .body {
   display: grid;
   align-content: center;
@@ -148,25 +137,6 @@
 .paperFront i:nth-child(2) { width: 52%; }
 .paperFront i:nth-child(4) { width: 40%; }
 
-.artRule {
-  position: absolute;
-  right: 2rem;
-  bottom: 4.2rem;
-  left: 2rem;
-  height: 1px;
-  background: #171717;
-  opacity: 0.18;
-}
-
-.artFooter {
-  position: absolute;
-  right: 2rem;
-  bottom: 2.3rem;
-  left: 2rem;
-  font-size: 0.8rem;
-  color: #62615e;
-}
-
 .note {
   position: relative;
   z-index: 1;
@@ -192,5 +162,4 @@
   .content { min-height: 23rem; }
   .artLabel { top: 1.25rem; left: 1.5rem; }
   .pages { top: -0.5rem; left: auto; right: 0.25rem; transform: scale(0.5); transform-origin: top right; }
-  .artRule, .artFooter { display: none; }
 }
