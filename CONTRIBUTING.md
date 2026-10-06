@@ -67,7 +67,7 @@ Include verification evidence and remaining gaps in the pull request. Maintainer
 
 Enforce authorization on the server, including API and MCP operations. Hidden interface controls do not grant or restrict access. Preserve Fieldbook's distinctions: published content is available to everyone admitted to an installation; learning groups guide relevance and assignments; teams independently scope manager reporting. Preserve overlapping assignment sources and saved learner progress.
 
-Add new database migrations rather than editing migrations that may already have run. Keep [the single fresh-install command](docs/installation.md#set-up-the-database) working as migrations are added. Rehearse both a blank installation and an upgrade of existing data in isolated environments, and document application and database deployment order in the [upgrading guide](docs/upgrading.md). An application build does not apply migrations to an operator's database.
+Add new database migrations rather than editing migrations that may already have run. Keep [the single fresh-install command](docs/installation.md#3-set-up-the-database) working as migrations are added. Rehearse both a blank installation and an upgrade of existing data in isolated environments, and document application and database deployment order in the [upgrading guide](docs/upgrading.md). An application build does not apply migrations to an operator's database.
 
 ## Check the changed behavior
 
