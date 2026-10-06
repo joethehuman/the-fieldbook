@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
 import {
@@ -58,6 +58,82 @@ function previewText(host: HTMLElement, axis: Axis, index: number) {
     .filter(Boolean)
     .slice(0, 2)
     .join(" · ");
+}
+
+function GutterActions({
+  editor,
+  host,
+  align,
+  children,
+}: {
+  editor: LexicalEditor;
+  host: HTMLElement;
+  align: "table" | "divider";
+  children: ReactNode;
+}) {
+  const anchor = useRef<HTMLSpanElement>(null);
+  const [hovered, setHovered] = useState(false);
+  const frame = editor.getRootElement()?.parentElement;
+  useLayoutEffect(() => {
+    if (!frame) return;
+    const table = align === "table" ? host.querySelector("table") : null;
+    const measure = () => {
+      const origin = frame.getBoundingClientRect();
+      const bounds = host.getBoundingClientRect();
+      const tableBounds = table?.getBoundingClientRect();
+      position(anchor.current, {
+        left: (tableBounds ? Math.max(tableBounds.left, bounds.left + 16) : bounds.left)
+          - origin.left + frame.scrollLeft - 44,
+        top: (tableBounds ? tableBounds.top + 4 : bounds.top + bounds.height / 2 - 18)
+          - origin.top + frame.scrollTop,
+      });
+    };
+    const show = () => setHovered(true);
+    const hide = () => setHovered(false);
+    measure();
+    const resize = new ResizeObserver(measure);
+    resize.observe(frame);
+    resize.observe(host);
+    if (table) resize.observe(table);
+    let frameId = 0;
+    const unregister = editor.registerUpdateListener(() => {
+      cancelAnimationFrame(frameId);
+      frameId = requestAnimationFrame(measure);
+    });
+    host.addEventListener("pointerenter", show);
+    host.addEventListener("pointerleave", hide);
+    host.addEventListener("focusin", show);
+    host.addEventListener("focusout", hide);
+    host.addEventListener("scroll", measure, { passive: true });
+    document.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(frameId);
+      unregister();
+      resize.disconnect();
+      host.removeEventListener("pointerenter", show);
+      host.removeEventListener("pointerleave", hide);
+      host.removeEventListener("focusin", show);
+      host.removeEventListener("focusout", hide);
+      host.removeEventListener("scroll", measure);
+      document.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [editor, host, align, frame]);
+  if (!frame) return null;
+  return createPortal(
+    <span
+      ref={anchor}
+      className="writing-block-gutter-actions"
+      data-hovered={hovered}
+      contentEditable={false}
+      onPointerEnter={() => setHovered(true)}
+      onPointerLeave={() => setHovered(false)}
+    >
+      {children}
+    </span>,
+    frame,
+  );
 }
 
 function TableControls({
@@ -402,16 +478,18 @@ function TableControls({
           contentEditable={false} aria-hidden="true" />,
         fadeFrame,
       )}
-      <WritingBlockActions
-        label="Table"
-        {...blockActions(editor, nodeKey)}
-        onRemove={() =>
-          change((node) => {
-            node.selectPrevious();
-            node.remove();
-          })
-        }
-      />
+      <GutterActions editor={editor} host={host} align="table">
+        <WritingBlockActions
+          label="Table"
+          {...blockActions(editor, nodeKey)}
+          onRemove={() =>
+            change((node) => {
+              node.selectPrevious();
+              node.remove();
+            })
+          }
+        />
+      </GutterActions>
       {(["row", "column"] as const).flatMap((axis) =>
         geometry[axis === "row" ? "rows" : "columns"].map(
           (box, index, items) => (
@@ -624,43 +702,11 @@ function DividerControls({
   host: HTMLElement;
 }) {
   const disabled = useCellValue(readOnly$);
-  const anchor = useRef<HTMLSpanElement>(null);
-  useLayoutEffect(() => {
-    const parent = editor.getRootElement()?.parentElement;
-    if (!parent) return;
-    const measure = () => {
-      const origin = parent.getBoundingClientRect(),
-        bounds = host.getBoundingClientRect();
-      position(anchor.current, {
-        left: bounds.right - origin.left + parent.scrollLeft,
-        top: bounds.top - origin.top + parent.scrollTop,
-      });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(parent);
-    let frame = 0;
-    const unregister = editor.registerUpdateListener(() => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(measure);
-    });
-    document.addEventListener("scroll", measure, true);
-    return () => {
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      unregister();
-      document.removeEventListener("scroll", measure, true);
-    };
-  }, [editor, host]);
   if (disabled) return null;
   return (
-    <span
-      ref={anchor}
-      className="writing-divider-tools"
-      contentEditable={false}
-    >
+    <GutterActions editor={editor} host={host} align="divider">
       <WritingBlockActions label="Divider" {...blockActions(editor, nodeKey)} />
-    </span>
+    </GutterActions>
   );
 }
 

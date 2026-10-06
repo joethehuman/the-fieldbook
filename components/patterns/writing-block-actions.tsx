@@ -85,7 +85,7 @@ export function WritingBlockActions({
           <Button
             type="button"
             size="icon"
-            variant="outline"
+            variant="ghost"
             aria-label={`${label} actions`}
             disabled={disabled}
           >
@@ -93,7 +93,7 @@ export function WritingBlockActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
-          align="end"
+          align="start"
           onCloseAutoFocus={(event) => {
             if (acted.current) event.preventDefault();
           }}

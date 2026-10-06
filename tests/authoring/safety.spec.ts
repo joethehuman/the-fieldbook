@@ -1,9 +1,26 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { expectMarkdown, waitForDraftSaved, openContentSettings } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
+
+async function tableActionPlacement(table: Locator) {
+  return table.evaluate((node) => {
+    const host = node.closest<HTMLElement>('[data-lexical-decorator="true"]')!;
+    const button = document.querySelector<HTMLButtonElement>('button[aria-label="Table actions"]')!;
+    const tableBounds = node.getBoundingClientRect();
+    const hostBounds = host.getBoundingClientRect();
+    const buttonBounds = button.getBoundingClientRect();
+    const visibleLeft = Math.max(tableBounds.left, hostBounds.left + 16);
+    return {
+      gap: visibleLeft - buttonBounds.right,
+      withinViewport: buttonBounds.left >= 0 && buttonBounds.right <= window.innerWidth,
+      tableRight: tableBounds.right,
+      hostRight: hostBounds.right,
+    };
+  });
+}
 
 async function setup(
   page: Page,
@@ -150,8 +167,8 @@ async function setup(
       sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
     }, state);
   }
-  await page.goto(production ? "/admin" : "/#admin");
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page.goto(production ? `/admin/content/${state.content[0].id}/edit` : "/#admin");
+  if (!production) await page.getByRole("link", { name: "Safety fixture" }).click();
   return { state, control };
 }
 async function failDraftWrites(page: Page, production: boolean, control: { failSave: boolean }) {
@@ -825,6 +842,10 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   expect(widths.table).toBeGreaterThan(widths.wrapper);
   expect(widths.wrapperScroll).toBeGreaterThan(widths.wrapper);
   expect(widths.editor).toBeLessThanOrEqual(widths.editorWidth + 2);
+  await expect.poll(async () => {
+    const placement = await tableActionPlacement(table);
+    return placement.gap >= -2 && placement.gap <= 16 && placement.withinViewport;
+  }).toBe(true);
   const trailingControlWidth = await table
     .locator("tfoot th")
     .last()
@@ -834,10 +855,15 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
   await expect(
     page.getByRole("menuitem", { name: "Insert column after" }),
   ).toBeVisible();
+  await page.keyboard.press("Escape");
   await table.evaluate((node) => {
     const scroller = node.closest('[data-lexical-decorator="true"]');
     if (scroller) scroller.scrollLeft = 180;
   });
+  await expect.poll(async () => {
+    const placement = await tableActionPlacement(table);
+    return placement.gap >= -2 && placement.gap <= 16 && placement.withinViewport;
+  }).toBe(true);
   await expect(
     page.getByRole("menuitem", { name: "Insert column after" }),
   ).toHaveCount(0);
@@ -851,6 +877,63 @@ test("wide course tables scroll inside the editor and show a reading edge", asyn
     return owner.scrollWidth > owner.clientWidth;
   })).toBe(true);
 
+});
+
+test("table actions stay beside the table across editor widths", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true, false,
+    "| Symptom | Next check |\n| --- | --- |\n| No Ask AI option | Saved feature setting |");
+  const table = page.getByRole("textbox", { name: "Lesson content" }).locator("table");
+  await expect(table).toBeVisible();
+  await expect.poll(async () => {
+    const placement = await tableActionPlacement(table);
+    return (info.project.name.endsWith("phone") || placement.tableRight < placement.hostRight - 40)
+      && placement.gap >= -2 && placement.gap <= 16 && placement.withinViewport;
+  }).toBe(true);
+  const tableActions = page.getByRole("button", { name: "Table actions" });
+  await table.getByText("No Ask AI option").hover();
+  await expect.poll(() => tableActions.evaluate((node) => getComputedStyle(node.closest(".writing-block-gutter-actions")!).opacity)).toBe("1");
+  await tableActions.hover();
+  await expect.poll(() => tableActions.evaluate((node) => getComputedStyle(node.closest(".writing-block-gutter-actions")!).opacity)).toBe("1");
+  await tableActions.click();
+  await expect(page.getByRole("menuitem", { name: "Write after table" })).toBeVisible();
+  const menu = await page.getByRole("menu").boundingBox();
+  const canvas = await page.getByRole("textbox", { name: "Lesson content" }).boundingBox();
+  expect(menu!.x).toBeGreaterThanOrEqual(canvas!.x);
+  await page.screenshot({ path: info.outputPath("table-gutter-menu.png") });
+});
+
+test("non-text block menus sit in the left writing gutter", async ({ page }, info) => {
+  await page.route("https://example.com/fixture.png", (route) => route.fulfill({
+    contentType: "image/png",
+    body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=", "base64"),
+  }));
+  await setup(page, info.project.name.startsWith("production"), "course", true, false,
+    "Before\n\n[Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\n![Fixture](https://example.com/fixture.png)\n\n```js\nconst value = 1;\n```\n\n---\n\nAfter");
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  const blocks = [
+    { label: "Video actions", block: writing.locator(".writing-media-block") },
+    { label: "Image actions", block: writing.locator('[data-editor-block-type="image"]') },
+    { label: "Code block actions", block: writing.locator(".writing-code-block") },
+    { label: "Divider actions", block: writing.locator("hr") },
+  ];
+  for (const { label, block } of blocks) {
+    await expect(block).toBeVisible();
+    const action = page.getByRole("button", { name: label });
+    await expect(action).toHaveCount(1);
+    await expect.poll(async () => {
+      const button = await action.boundingBox();
+      const target = await block.boundingBox();
+      const canvas = await writing.boundingBox();
+      if (!button || !target || !canvas) return false;
+      const gap = target.x - (button.x + button.width);
+      return button.x >= canvas.x - 1 && gap >= -2 && gap <= 24;
+    }).toBe(true);
+    await action.click();
+    await expect(page.getByRole("menuitem", { name: new RegExp(`Write after ${label.split(" ")[0].toLowerCase()}`) })).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
+  await blocks[0].block.hover();
+  await page.screenshot({ path: info.outputPath("block-gutter.png") });
 });
 
 test("slash Table inserts at the selected line and unmatched searches can return to writing", async ({
