@@ -59,7 +59,7 @@ Sign in with FIELDBOOK_OWNER_EMAIL. The first verified sign-in at that address c
 
 In Admin, set the installation name, public or members-only access, registration choice, and an accurate privacy-policy link for **your** installation. Closed registration requires an administrator to preregister a person's Google email in People; no invitation email is sent. Create a draft, publish it, and check the result as a separate reader. A new Supabase project has no demo content.
 
-The database setup command connects scheduled cleanup to this deployed Fieldbook. It checks the worker route and the database schedule; after the first hourly run, confirm it succeeds in Supabase Cron History. Deleted content and accounts have a 30-day recovery window before permanent cleanup.
+The database setup command connects scheduled cleanup to this deployed Fieldbook. It checks that the worker route is reachable and the database schedule exists. After the first hourly run, confirm that the worker request received HTTP 200 and `fb_cleanup_config.last_run` updated. A Cron History entry alone does not prove the app accepted the request. Deleted content and accounts have a 30-day recovery window before permanent cleanup.
 
 ### Media and upload limits
 
