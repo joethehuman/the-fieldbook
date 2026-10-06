@@ -1,5 +1,56 @@
 /* Procedural card artwork; runtime palette values are validated in settings. */
 @layer components {
+  .access-artwork {
+    position: relative;
+    min-height: 30rem;
+    overflow: hidden;
+    background: #f8f7f3;
+    color: #171717;
+  }
+  .access-artwork-label {
+    position: absolute;
+    top: 2.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 0.75rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+  .access-artwork-label span { padding-inline: 0.35rem; color: #a3a19c; }
+  .access-artwork-pages {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 13rem;
+    height: 16.5rem;
+    transform: translate(-50%, -44%);
+  }
+  .access-artwork-paper {
+    position: absolute;
+    width: 9.5rem;
+    height: 13rem;
+    border: 2px solid var(--brand);
+    border-radius: 3px;
+    background: #f8f7f3;
+  }
+  .access-artwork-paper-back { top: 0; right: 0; opacity: 0.2; }
+  .access-artwork-paper-middle { top: 1.35rem; right: 1.35rem; opacity: 0.5; }
+  .access-artwork-paper-front { top: 2.7rem; right: 2.7rem; }
+  .access-artwork-paper-front span {
+    display: block;
+    width: 65%;
+    height: 2px;
+    margin: 1.1rem 0 0 1.2rem;
+    background: var(--brand);
+    opacity: 0.5;
+  }
+  .access-artwork-paper-front span:first-child { margin-top: 1.6rem; }
+  .access-artwork-paper-front span:nth-child(2) { width: 52%; }
+  .access-artwork-paper-front span:nth-child(4) { width: 40%; }
+  @media (max-width: 800px) {
+    .access-artwork { display: none; }
+  }
+
   .card-artwork {
     position: relative;
     isolation: isolate;

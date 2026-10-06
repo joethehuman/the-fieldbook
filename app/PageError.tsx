@@ -3,19 +3,22 @@ import { BrandedAccount } from "@/components/patterns/branded-account";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { brandingFromSettings } from "@/lib/branding";
-export default function ReadingError({
+
+export default function PageError({
   error,
+  retry,
 }: {
   error: Error & { digest?: string };
+  retry: () => void;
 }) {
   return (
-    <BrandedAccount branding={brandingFromSettings({})}>
+    <BrandedAccount branding={brandingFromSettings({})} illustrated>
       <h1>Unable to load this page</h1>
-      <Alert variant="destructive">
-        Reading services are unavailable. Please try again shortly.
-        {error.digest && <span>Reference: {error.digest}</span>}
+      <Alert role="alert" variant="destructive">
+        Please try again. If this continues, contact your administrator.
+        {error.digest && <> Reference: {error.digest}.</>}
       </Alert>
-      <Button onClick={() => window.location.reload()}>Try again</Button>
+      <Button onClick={retry}>Try again</Button>
     </BrandedAccount>
   );
 }
