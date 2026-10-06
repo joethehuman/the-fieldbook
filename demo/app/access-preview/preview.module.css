@@ -1,0 +1,196 @@
+.preview {
+  --brand: #17847f;
+  --link: #146b66;
+  --ring: var(--link);
+  min-height: 100vh;
+  background: var(--background);
+}
+
+.preview :global([data-slot="account-viewport"]) {
+  position: relative;
+  overflow: visible;
+}
+
+.reviewTools {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4) 0;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+}
+
+.card {
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 0.76fr);
+  gap: 0;
+  max-width: 51rem;
+  min-height: 30rem;
+  padding: 0;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--foreground) 13%, var(--background));
+  box-shadow: var(--elevation-floating);
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: clamp(1.5rem, 4vw, 3rem);
+  border-left: 5px solid var(--brand);
+}
+
+.identity {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.context {
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+}
+
+.body {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: var(--space-6);
+  flex: 1;
+  padding-top: var(--space-8);
+}
+
+.body > button {
+  min-height: 2.75rem;
+}
+
+.copy {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.copy h1 {
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  line-height: 1.1;
+  letter-spacing: -0.045em;
+}
+
+.copy p {
+  max-width: 30ch;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  font-size: var(--type-label);
+}
+
+.artwork {
+  position: relative;
+  min-height: 30rem;
+  overflow: hidden;
+  background: #f8f7f3;
+  color: #171717;
+}
+
+.artLabel {
+  position: absolute;
+  top: 2.75rem;
+  left: 2rem;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.artLabel span {
+  padding-inline: 0.35rem;
+  color: #a3a19c;
+}
+
+.pages {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 13rem;
+  height: 16.5rem;
+  transform: translate(-50%, -44%);
+}
+
+.paper {
+  position: absolute;
+  width: 9.5rem;
+  height: 13rem;
+  border: 2px solid var(--brand);
+  border-radius: 3px;
+  background: #f8f7f3;
+}
+
+.paperBack { top: 0; right: 0; opacity: 0.2; }
+.paperMiddle { top: 1.35rem; right: 1.35rem; opacity: 0.5; }
+.paperFront { top: 2.7rem; right: 2.7rem; }
+
+.paperFront i {
+  display: block;
+  height: 2px;
+  width: 65%;
+  margin: 1.1rem 0 0 1.2rem;
+  background: var(--brand);
+  opacity: 0.5;
+}
+
+.paperFront i:first-child { margin-top: 1.6rem; }
+.paperFront i:nth-child(2) { width: 52%; }
+.paperFront i:nth-child(4) { width: 40%; }
+
+.artRule {
+  position: absolute;
+  right: 2rem;
+  bottom: 4.2rem;
+  left: 2rem;
+  height: 1px;
+  background: #171717;
+  opacity: 0.18;
+}
+
+.artFooter {
+  position: absolute;
+  right: 2rem;
+  bottom: 2.3rem;
+  left: 2rem;
+  font-size: 0.8rem;
+  color: #62615e;
+}
+
+.note {
+  position: relative;
+  z-index: 1;
+  margin: 0 auto;
+  padding: 0 var(--space-4) var(--space-6);
+  max-width: 51rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .card {
+    grid-template-columns: 1fr;
+    max-width: 31rem;
+  }
+
+  .artwork {
+    grid-row: 1;
+    min-height: 10rem;
+  }
+
+  .content { min-height: 23rem; }
+  .artLabel { top: 1.25rem; left: 1.5rem; }
+  .pages { top: -0.5rem; left: auto; right: 0.25rem; transform: scale(0.5); transform-origin: top right; }
+  .artRule, .artFooter { display: none; }
+}
