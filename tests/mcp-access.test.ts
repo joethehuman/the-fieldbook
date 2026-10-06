@@ -130,7 +130,7 @@ test("capability migration preserves old admin consent and rejects unapproved da
     await pg.exec(
       await readFile(
         new URL(
-          "../supabase/migrations/20261002222344_mcp_connection_capabilities.sql",
+          "../supabase/history/initial-development/20261002222344_mcp_connection_capabilities.sql",
           import.meta.url,
         ),
         "utf8",

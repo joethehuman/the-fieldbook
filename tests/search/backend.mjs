@@ -8,7 +8,7 @@ await pg.exec(`create role anon;create role authenticated;create role service_ro
 create table fb_documents(id uuid primary key, draft jsonb,published jsonb,published_revision integer,revision integer default 1,updated_at text default '2026-01-01');`);
 await pg.exec(
   await readFile(
-    "supabase/migrations/20260921205449_published_search.sql",
+    "supabase/history/initial-development/20260921205449_published_search.sql",
     "utf8",
   ),
 );

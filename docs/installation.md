@@ -4,78 +4,62 @@ This guide installs the server application from the repository root. The optiona
 
 Use an available release tag or an exact reviewed commit. Keep a record of that commit and your applied migrations. Do not connect a live installation directly to an upstream development branch if you want to control upgrades.
 
-## 1. Prepare Supabase
+## 1. Create a Supabase project
 
-Create a dedicated hosted Supabase project. Save its database password and project credentials securely. Apply **every SQL file** in supabase/migrations/ from your selected commit, one file at a time in filename order. The first migration creates the private fieldbook-media bucket; later files add search, administration, recovery, and the scheduled deletion job. Do not stop at a migration named for the feature you intend to use. For an existing installation, follow [upgrading](upgrading.md) instead of replaying the initial schema.
-
-Record successful SQL-editor runs yourself. They are not automatically registered as CLI migrations. Do not rerun them through another method without reconciling that record.
+Create a dedicated, empty hosted Supabase project. Keep its database password and project credentials secure. Note the 20-letter project reference in its dashboard URL. Do not use an existing installation's database for first-time setup; use [upgrading](upgrading.md) for that database.
 
 ## 2. Configure Vercel
 
 Import **your own repository and chosen production branch** into Vercel. Use the Next.js preset, Node.js 22.x, the repository root as Root Directory (leave that field empty), the default Next.js output directory, and pnpm build. Set these environment variables for the installed app:
 
-| Variable | Value |
-| --- | --- |
-| NEXT_PUBLIC_SUPABASE_URL | Your Supabase project URL |
-| NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY | Its publishable key |
-| SUPABASE_SECRET_KEY | Its server-only secret key |
-| FIELDBOOK_URL | The canonical HTTPS origin of this installation, with no path |
-| FIELDBOOK_OWNER_EMAIL | The exact Google email that will bootstrap the first administrator |
-| FIELDBOOK_APP_KIND | installed |
+| Variable                             | Value                                                              |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| NEXT_PUBLIC_SUPABASE_URL             | Your Supabase project URL                                          |
+| NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY | Its publishable key                                                |
+| SUPABASE_SECRET_KEY                  | Its server-only secret key                                         |
+| FIELDBOOK_URL                        | The canonical HTTPS origin of this installation, with no path      |
+| FIELDBOOK_OWNER_EMAIL                | The exact Google email that will bootstrap the first administrator |
+| FIELDBOOK_APP_KIND                   | installed                                                          |
 
 The root [.env.example](../.env.example) lists optional settings. Never put SUPABASE_SECRET_KEY in a NEXT_PUBLIC_ variable or commit deployment secrets. On Vercel, the included Analytics and Speed Insights integrations default on; set FIELDBOOK_VERCEL_ANALYTICS_ENABLED=false or FIELDBOOK_VERCEL_SPEED_INSIGHTS_ENABLED=false before deployment if you do not want them. Match your privacy policy to the services you enable. A second Vercel project rooted at demo/ is optional; set its FIELDBOOK_APP_KIND to demo and enable files outside that root. Demo data does not migrate to Supabase.
 
 For a preview that needs real writes, use a **separate** Supabase project and Google OAuth configuration. Set FIELDBOOK_ENVIRONMENT=preview and FIELDBOOK_PREVIEW_SUPABASE_REF to that project's reference. Never connect a preview to the production backend.
 
-## 3. Configure Google sign-in
+## 3. Set up the database
+
+After the app is deployed, run this once from a local copy of the same repository commit with Node.js 22:
+
+```sh
+node scripts/setup-database.mjs
+```
+
+The guided command asks for the Supabase project reference and the deployed Fieldbook HTTPS address. Sign in to Supabase when prompted, and confirm the project shown before setup begins. It checks that the database is empty, installs Fieldbook's schema, connects the hourly deletion cleanup, and checks its settings, private media bucket, and cleanup schedule. The same command includes later database changes when setting up a new project. It does not reset an existing database.
+
+The command downloads a specific Supabase CLI version as needed; no separate CLI installation is required. Keep Supabase credentials out of repository files. If setup stops, read the error before retrying; a partially installed project should be reviewed rather than treated as empty. The deployed address must accept requests directly, without a sign-in screen or deployment protection in front of the cleanup route.
+
+## 4. Configure Google sign-in
 
 Create a Google OAuth **web client**. Give Google this authorized redirect URI, replacing PROJECT_REF with your Supabase project reference:
 
-~~~text
+```text
 https://PROJECT_REF.supabase.co/auth/v1/callback
-~~~
+```
 
 In Supabase Auth, enable the Google provider with that client's ID and secret. Set the Supabase **Site URL** to your FIELDBOOK_URL and allow this exact application callback:
 
-~~~text
+```text
 https://YOUR-FIELDBOOK-HOST/auth/callback
-~~~
+```
 
 These are different callbacks: Google returns to Supabase; Supabase returns to Fieldbook. Avoid wildcard production callback domains. Google's Testing audience permits only configured test users; configure its public audience and branding when you open sign-in more widely. See [Supabase's Google setup](https://supabase.com/docs/guides/auth/social-login/auth-google) and [redirect URL guidance](https://supabase.com/docs/guides/auth/redirect-urls).
 
-Deploy, then sign in with FIELDBOOK_OWNER_EMAIL. The first verified sign-in at that address creates the administrator profile. Other accounts do not choose their own role. The owner variable does not transfer or demote an existing administrator if changed later.
+Sign in with FIELDBOOK_OWNER_EMAIL. The first verified sign-in at that address creates the administrator profile. Other accounts do not choose their own role. The owner variable does not transfer or demote an existing administrator if changed later.
 
-## 4. Finish the installation
+## 5. Finish the installation
 
 In Admin, set the installation name, public or members-only access, registration choice, and an accurate privacy-policy link for **your** installation. Closed registration requires an administrator to preregister a person's Google email in People; no invitation email is sent. Create a draft, publish it, and check the result as a separate reader. A new Supabase project has no demo content.
 
-### Configure the deletion worker
-
-The migrations install an hourly schedule but leave its destination empty. Before using Delete, set the endpoint in **this installation's** Supabase SQL editor after the app is deployed. Use the direct canonical HTTPS host; a redirect may drop the Authorization header.
-
-~~~sql
-update public.fb_cleanup_config
-set endpoint = 'https://YOUR-DIRECT-HOST/api/internal/purge-deleted'
-where id = true;
-~~~
-
-A private database-generated credential authenticates the scheduled call. Do not display or copy it. Keep each preview database pointed only at its matching preview app. For a fresh, empty installation, send a test request from the same project's SQL editor:
-
-~~~sql
-select net.http_post(
-  url := endpoint,
-  headers := jsonb_build_object(
-    'Content-Type', 'application/json',
-    'Authorization', 'Bearer ' || secret
-  ),
-  body := '{}'::jsonb,
-  timeout_milliseconds := 60000
-) as request_id
-from public.fb_cleanup_config
-where id = true and endpoint is not null;
-~~~
-
-After the transaction commits, look up the returned request ID in net._http_response, confirm HTTP 200, and check that last_run advanced in public.fb_cleanup_config. Then check the first timed run in cron.job_run_details for the fieldbook-purge-deleted job. A successful queued SQL request alone does not prove the app accepted it. On an existing installation, a manual request may process due deletions; review the queue before testing. Deleted content and accounts have a 30-day recovery window before permanent cleanup.
+The database setup command connects scheduled cleanup to this deployed Fieldbook. It checks the worker route and the database schedule; after the first hourly run, confirm it succeeds in Supabase Cron History. Deleted content and accounts have a 30-day recovery window before permanent cleanup.
 
 ### Media and upload limits
 

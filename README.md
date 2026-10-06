@@ -6,7 +6,7 @@ The documented installation uses **Vercel, hosted Supabase, and Google sign-in**
 
 ## Start here
 
-- [Install Fieldbook](docs/installation.md) from your own accounts. The guide covers database migrations, hosting, sign-in, media, and first-use checks.
+- [Install Fieldbook](docs/installation.md) from your own accounts. The guide covers the single database setup command, hosting, sign-in, media, and first-use checks.
 - [Upgrade an installation](docs/upgrading.md) with separate database and media backups, a migration record, and an isolated rehearsal.
 - [Contribute](CONTRIBUTING.md) or read the [agent instructions](AGENTS.md) and [design system](docs/design-system.md) before changing the software.
 - Read the [license](LICENSE), [third-party notices](docs/third-party-notices.md), and [security reporting instructions](SECURITY.md).

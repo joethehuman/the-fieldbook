@@ -34,7 +34,7 @@ const migrations = [
 const migration = () =>
   readFile(
     new URL(
-      "../supabase/migrations/20261001222227_roster_people.sql",
+      "../supabase/history/initial-development/20261001222227_roster_people.sql",
       import.meta.url,
     ),
     "utf8",
@@ -51,7 +51,7 @@ async function database() {
   for (const name of migrations)
     await pg.exec(
       await readFile(
-        new URL(`../supabase/migrations/${name}`, import.meta.url),
+        new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
         "utf8",
       ),
     );

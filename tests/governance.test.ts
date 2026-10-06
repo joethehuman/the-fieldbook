@@ -112,7 +112,7 @@ test("governance database enforces permissions, revision, hierarchy, registratio
     ])
       await pg.exec(
         await readFile(
-          new URL(`../supabase/migrations/${name}`, import.meta.url),
+          new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
           "utf8",
         ),
       );

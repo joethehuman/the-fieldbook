@@ -48,6 +48,7 @@ Run `pnpm check:providers` after changes to provider integrations or boundaries.
 - Keep operator accounts, branding, content, and deployment secrets outside reusable source. For vulnerabilities, follow [SECURITY.md](SECURITY.md).
 
 Add a new migration for schema changes; never rewrite a migration that may already have run. Rehearse changes outside production and document compatibility and deployment order. Treat application deployment and database migration as separate operations.
+Keep `node scripts/setup-database.mjs` working for a fresh project when adding migrations. Test both a fresh install from the baseline plus later migrations and an upgrade from the preceding schema. The pre-release files in `supabase/history/initial-development/` are retained for older installations, not applied during a fresh install.
 
 ## Verify and explain the change
 

@@ -18,7 +18,7 @@ const admin: User = {
 };
 const migration = readFileSync(
   new URL(
-    `../../supabase/migrations/${readdirSync(new URL("../../supabase/migrations/", import.meta.url)).find((name) => name.endsWith("_admin_people_reads.sql"))}`,
+    `../../supabase/history/initial-development/${readdirSync(new URL("../../supabase/history/initial-development/", import.meta.url)).find((name) => name.endsWith("_admin_people_reads.sql"))}`,
     import.meta.url,
   ),
   "utf8",

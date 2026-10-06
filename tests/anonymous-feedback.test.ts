@@ -54,7 +54,7 @@ test("general feedback migration preserves content rows and requires matched con
     ]) {
       await pg.exec(
         await readFile(
-          new URL(`../supabase/migrations/${file}`, import.meta.url),
+          new URL(`../supabase/history/initial-development/${file}`, import.meta.url),
           "utf8",
         ),
       );
@@ -118,7 +118,7 @@ test("anonymous feedback migration preserves account rows and isolates guest ide
     await pg.exec(
       await readFile(
         new URL(
-          "../supabase/migrations/202609190001_fieldbook.sql",
+          "../supabase/history/initial-development/202609190001_fieldbook.sql",
           import.meta.url,
         ),
         "utf8",
@@ -138,7 +138,7 @@ test("anonymous feedback migration preserves account rows and isolates guest ide
     await pg.exec(
       await readFile(
         new URL(
-          "../supabase/migrations/20260924150351_anonymous_feedback.sql",
+          "../supabase/history/initial-development/20260924150351_anonymous_feedback.sql",
           import.meta.url,
         ),
         "utf8",

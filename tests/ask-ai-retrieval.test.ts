@@ -14,7 +14,7 @@ test("Ask AI additive migration preserves search/data, retrieves published windo
     await pg.exec(
       await readFile(
         new URL(
-          "../supabase/migrations/20260921205449_published_search.sql",
+          "../supabase/history/initial-development/20260921205449_published_search.sql",
           import.meta.url,
         ),
         "utf8",
@@ -72,7 +72,7 @@ test("Ask AI additive migration preserves search/data, retrieves published windo
     await pg.exec(
       await readFile(
         new URL(
-          "../supabase/migrations/20261002011512_ask_ai_passages.sql",
+          "../supabase/history/initial-development/20261002011512_ask_ai_passages.sql",
           import.meta.url,
         ),
         "utf8",

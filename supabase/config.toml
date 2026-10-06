@@ -1,0 +1,5 @@
+# Local CLI identity. Hosted project settings are supplied by the installer.
+project_id = "fieldbook"
+
+[db]
+major_version = 17

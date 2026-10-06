@@ -119,7 +119,7 @@ test("guarded deletion migration: stored references, revision, authorization and
     ])
       await pg.exec(
         await readFile(
-          new URL(`../supabase/migrations/${name}`, import.meta.url),
+          new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
           "utf8",
         ),
       );

@@ -5,7 +5,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { demoSearch, makeResult, sourcePassages } from "../lib/search";
 const migration = new URL(
-  "../supabase/migrations/20260921205449_published_search.sql",
+  "../supabase/history/initial-development/20260921205449_published_search.sql",
   import.meta.url,
 );
 export const queries = [
@@ -33,7 +33,7 @@ test("indexed published retrieval: benchmark, publication lifecycle, source iden
     ]) {
       await pg.exec(
         await readFile(
-          new URL("../supabase/migrations/" + name, import.meta.url),
+          new URL("../supabase/history/initial-development/" + name, import.meta.url),
           "utf8",
         ),
       );

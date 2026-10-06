@@ -398,7 +398,7 @@ test("actual Production missing migrations commit atomically without losing type
       [flatGroupMigration, rootMigration, fallback, combined, safeguards].map(
         async (name) => {
           const sql = await readFile(
-            new URL(`../supabase/migrations/${name}`, import.meta.url),
+            new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
             "utf8",
           );
           assert.match(sql, /^begin;$/m);

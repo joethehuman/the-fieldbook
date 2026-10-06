@@ -25,7 +25,7 @@ export const flatGroupMigration = "20261002022921_flat_learning_groups.sql";
 export async function migrate(pg: PGlite, name: string) {
   await pg.exec(
     await readFile(
-      new URL(`../../supabase/migrations/${name}`, import.meta.url),
+      new URL(`../../supabase/history/initial-development/${name}`, import.meta.url),
       "utf8",
     ),
   );

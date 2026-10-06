@@ -29,7 +29,7 @@ test("group requirements and person progress administration are atomic, versione
     ])
       await pg.exec(
         await readFile(
-          new URL("../supabase/migrations/" + name, import.meta.url),
+          new URL("../supabase/history/initial-development/" + name, import.meta.url),
           "utf8",
         ),
       );

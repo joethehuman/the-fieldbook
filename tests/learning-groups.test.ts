@@ -301,7 +301,7 @@ test("learning-groups migration preserves history and enforces atomic, scoped te
     ])
       await pg.exec(
         await readFile(
-          new URL("../supabase/migrations/" + name, import.meta.url),
+          new URL("../supabase/history/initial-development/" + name, import.meta.url),
           "utf8",
         ),
       );
@@ -410,7 +410,7 @@ test("learning-groups migration preserves history and enforces atomic, scoped te
     await pg.exec(
       await readFile(
         new URL(
-          "../supabase/migrations/202609200004_learning_groups.sql",
+          "../supabase/history/initial-development/202609200004_learning_groups.sql",
           import.meta.url,
         ),
         "utf8",

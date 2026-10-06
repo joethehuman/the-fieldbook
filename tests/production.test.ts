@@ -74,7 +74,7 @@ test("database migrations preserve drafts, enforce revisions, isolate browser ac
     ])
       await pg.exec(
         await readFile(
-          new URL(`../supabase/migrations/${name}`, import.meta.url),
+          new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
           "utf8",
         ),
       );
