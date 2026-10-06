@@ -31,7 +31,7 @@ export function DetailNavigation({
               type="button"
               variant="ghost"
               size="sm"
-              className={`min-w-0 max-w-full text-left${flush && index === 0 ? " px-0" : ""}`}
+              className={`min-w-0 text-left${flush && index === 0 ? " -ms-2.5" : " max-w-full"}`}
               disabled={disabled}
               aria-label={compact && index === 0 ? item.label : undefined}
               onClick={item.onSelect}
