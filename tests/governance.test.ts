@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { governanceSchema } from "../server/governance-schema";
 import { learningTarget } from "../lib/learning";
@@ -110,12 +110,7 @@ test("governance database enforces permissions, revision, hierarchy, registratio
       "202609190002_mcp_audience.sql",
       "202609200001_governance.sql",
     ])
-      await pg.exec(
-        await readFile(
-          new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
-          "utf8",
-        ),
-      );
+      await pg.exec(migrationSql(name));
     for (const u of users) {
       await pg.query("insert into auth.users values($1)", [u.id]);
       await pg.query(

@@ -1,6 +1,6 @@
+import { migrationSql } from "../helpers/migration-sql.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, readdirSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { adminSnapshot } from "../../server/admin-snapshot";
 import { defaultSettings } from "../../lib/settings";
@@ -16,13 +16,7 @@ const admin: User = {
   active: true,
   groups: [],
 };
-const migration = readFileSync(
-  new URL(
-    `../../supabase/history/initial-development/${readdirSync(new URL("../../supabase/history/initial-development/", import.meta.url)).find((name) => name.endsWith("_admin_people_reads.sql"))}`,
-    import.meta.url,
-  ),
-  "utf8",
-);
+const migration = migrationSql("20261001202740_admin_people_reads.sql");
 
 test("People migration preserves data, returns all 600 accounts, scopes complete history and rejects unauthorized callers", async () => {
   const pg = new PGlite();
@@ -55,8 +49,14 @@ test("People migration preserves data, returns all 600 accounts, scopes complete
       await tx.exec(migration);
     });
     assert.deepEqual(await fingerprint(), before);
-    const plan = await pg.query<{ "QUERY PLAN": string }>("explain select user_id from fb_progress where content_id = (select id from fb_documents order by id limit 1)");
-    assert.ok(plan.rows.some((row) => row["QUERY PLAN"].includes("fb_progress_content_id_idx")));
+    const plan = await pg.query<{ "QUERY PLAN": string }>(
+      "explain select user_id from fb_progress where content_id = (select id from fb_documents order by id limit 1)",
+    );
+    assert.ok(
+      plan.rows.some((row) =>
+        row["QUERY PLAN"].includes("fb_progress_content_id_idx"),
+      ),
+    );
 
     await pg.exec("set role service_role");
     const read = async (person: string | null = null) =>

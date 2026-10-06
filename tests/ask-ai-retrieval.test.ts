@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 
@@ -11,15 +11,7 @@ test("Ask AI additive migration preserves search/data, retrieves published windo
       create table fb_documents(id uuid primary key, draft jsonb, published jsonb, published_revision integer, deleted_at timestamptz);
       grant all on fb_documents to service_role;
       create table fb_config(settings jsonb); insert into fb_config values ('{"name":"Synthetic"}');`);
-    await pg.exec(
-      await readFile(
-        new URL(
-          "../supabase/history/initial-development/20260921205449_published_search.sql",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    );
+    await pg.exec(migrationSql("20260921205449_published_search.sql"));
     const ids = Array.from(
       { length: 6 },
       (_, i) => `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
@@ -69,15 +61,7 @@ test("Ask AI additive migration preserves search/data, retrieves published windo
     const beforeSearch = (
       await pg.query("select fb_search('quorum','all',30) as results")
     ).rows;
-    await pg.exec(
-      await readFile(
-        new URL(
-          "../supabase/history/initial-development/20261002011512_ask_ai_passages.sql",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    );
+    await pg.exec(migrationSql("20261002011512_ask_ai_passages.sql"));
     assert.deepEqual(
       (await pg.query("select * from fb_documents order by id")).rows,
       beforeDocs,

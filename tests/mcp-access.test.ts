@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import {
   availableMcpCapabilities,
@@ -128,13 +128,7 @@ test("capability migration preserves old admin consent and rejects unapproved da
       grant all on public.fb_profiles,public.fb_config,public.fb_mcp_grants to service_role;
     `);
     await pg.exec(
-      await readFile(
-        new URL(
-          "../supabase/history/initial-development/20261002222344_mcp_connection_capabilities.sql",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
+      migrationSql("20261002222344_mcp_connection_capabilities.sql"),
     );
     const preserved = (
       await pg.query<{ capabilities: string[]; enabled: boolean }>(

@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import {
   learningStage,
@@ -31,14 +31,7 @@ const migrations = [
   "20260927153217_media_cleanup_lock.sql",
   "20261001202740_admin_people_reads.sql",
 ];
-const migration = () =>
-  readFile(
-    new URL(
-      "../supabase/history/initial-development/20261001222227_roster_people.sql",
-      import.meta.url,
-    ),
-    "utf8",
-  );
+const migration = () => migrationSql("20261001222227_roster_people.sql");
 async function database() {
   const pg = new PGlite();
   await pg.exec(`create role anon; create role authenticated; create role service_role bypassrls;
@@ -48,13 +41,7 @@ async function database() {
     create function extensions.gen_random_bytes(integer) returns bytea language sql as 'select decode(repeat(''ab'',$1),''hex'')';`);
   // Search and scheduler extensions are exercised by their own suites. This fixture
   // applies the complete roster/governance/recovery chain using synthetic identities.
-  for (const name of migrations)
-    await pg.exec(
-      await readFile(
-        new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
-        "utf8",
-      ),
-    );
+  for (const name of migrations) await pg.exec(migrationSql(name));
   await pg.exec(`insert into auth.users values('${admin}'),('${learner}'),('${login}');
     insert into public.fb_profiles(id,name,email,role,onboarding_start) values
       ('${admin}','Admin','admin@example.test','admin',null),

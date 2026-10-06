@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { canPublish, canAdminister, canOpenAdminTab } from "../lib/permissions";
 import { reportTeamIds, type User } from "../lib/types";
@@ -68,10 +68,7 @@ const chain = [
   "20261001222227_roster_people.sql",
 ];
 async function migration(pg: PGlite, name: string) {
-  const sql = await readFile(
-    new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
-    "utf8",
-  );
+  const sql = migrationSql(name);
   try {
     await pg.exec(sql);
   } catch (error: any) {
@@ -108,12 +105,32 @@ test("contributor migration preserves records and enforces publishing, recovery,
     await migration(pg, "20261001234401_contributor_permissions.sql");
     assert.deepEqual(await fingerprint(), before);
     const cfg = await query("select to_jsonb(c) value from fb_config c");
-    const roster = (await pg.query<any>("select * from fb_profiles order by id")).rows;
-    const payload = { groups: cfg.groups, teams: cfg.teams, curricula: cfg.curricula,
-      users: roster.map((p) => ({ id: p.id, name: p.name, email: p.email,
-        role: p.id === id(2) ? "contributor" : p.role, active: p.active, groups: p.groups, teamId: p.team_id || undefined })) };
-    await query("select fb_save_governance($1,$2,'save',$3) value", [id(1), cfg.governance_revision, payload]);
-    assert.deepEqual((await query("select to_jsonb(c) value from fb_config c")).teams, cfg.teams);
+    const roster = (
+      await pg.query<any>("select * from fb_profiles order by id")
+    ).rows;
+    const payload = {
+      groups: cfg.groups,
+      teams: cfg.teams,
+      curricula: cfg.curricula,
+      users: roster.map((p) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        role: p.id === id(2) ? "contributor" : p.role,
+        active: p.active,
+        groups: p.groups,
+        teamId: p.team_id || undefined,
+      })),
+    };
+    await query("select fb_save_governance($1,$2,'save',$3) value", [
+      id(1),
+      cfg.governance_revision,
+      payload,
+    ]);
+    assert.deepEqual(
+      (await query("select to_jsonb(c) value from fb_config c")).teams,
+      cfg.teams,
+    );
     await pg.exec("set role service_role");
     const save = (doc: any, expected = 0, publish = false) =>
       query(
@@ -189,7 +206,9 @@ test("contributor migration preserves records and enforces publishing, recovery,
       /Revision conflict/,
     );
     // Removing an empty section must not destroy a deleted Doc's recovery path.
-    await pg.exec(`reset role; update fb_config set settings=jsonb_set(settings,'{docSections}','[]'); set role service_role;`);
+    await pg.exec(
+      `reset role; update fb_config set settings=jsonb_set(settings,'{docSections}','[]'); set role service_role;`,
+    );
     assert.equal(
       await query("select fb_restore_deleted($1,'content',$2,3) value", [
         id(2),
@@ -206,8 +225,17 @@ test("contributor migration preserves records and enforces publishing, recovery,
     assert.equal(restored.deleted_at, null);
     assert.equal(restored.draft.sectionId, "guide");
     const recoveredSections = availableDocSections([restored.draft], [], []);
-    assert.equal(sectionForDoc(restored.draft, recoveredSections)?.name, "Guides");
-    assert.equal(await query("select count(*)::int value from fb_deleted_items where entity='content' and id=$1", [id(11)]), 0);
+    assert.equal(
+      sectionForDoc(restored.draft, recoveredSections)?.name,
+      "Guides",
+    );
+    assert.equal(
+      await query(
+        "select count(*)::int value from fb_deleted_items where entity='content' and id=$1",
+        [id(11)],
+      ),
+      0,
+    );
     const scoped = await query("select fb_governance_snapshot($1) value", [
       id(2),
     ]);
@@ -230,18 +258,49 @@ test("contributor migration preserves records and enforces publishing, recovery,
       [id(2)],
     );
     assert.deepEqual(alone.progress, []);
-    const currentRevision = await query("select governance_revision value from fb_config");
-    await query("select fb_save_governance($1,$2,'pending',$3) value", [id(1), currentRevision,
-      { name: "Preregistered Publisher", email: "pending@example.test", role: "contributor", groups: [], hireDate: "2025-03-01" }]);
-    const pending = await query("select to_jsonb(p) value from fb_profiles p where email='pending@example.test'");
-    assert.equal(pending.role, "contributor"); assert.equal(pending.auth_user_id, null);
-    assert.deepEqual((await query("select fb_governance_snapshot($1) value", [pending.id])).users, []);
-    await assert.rejects(query("select fb_require_publisher($1) value", [pending.id]), /publishing access/);
-    await pg.exec(`reset role; insert into auth.users values('${id(5)}'); set role service_role;`);
-    const activated = await query("select to_jsonb(fb_register_profile($1,'pending@example.test','Verified Publisher',false)) value", [id(5)]);
-    assert.equal(activated.id, pending.id); assert.equal(activated.role, "contributor");
-    assert.equal(activated.hire_date, "2025-03-01"); assert.equal(activated.auth_user_id, id(5));
-    assert.equal(await query("select fb_require_publisher($1) value", [pending.id]), "contributor");
+    const currentRevision = await query(
+      "select governance_revision value from fb_config",
+    );
+    await query("select fb_save_governance($1,$2,'pending',$3) value", [
+      id(1),
+      currentRevision,
+      {
+        name: "Preregistered Publisher",
+        email: "pending@example.test",
+        role: "contributor",
+        groups: [],
+        hireDate: "2025-03-01",
+      },
+    ]);
+    const pending = await query(
+      "select to_jsonb(p) value from fb_profiles p where email='pending@example.test'",
+    );
+    assert.equal(pending.role, "contributor");
+    assert.equal(pending.auth_user_id, null);
+    assert.deepEqual(
+      (await query("select fb_governance_snapshot($1) value", [pending.id]))
+        .users,
+      [],
+    );
+    await assert.rejects(
+      query("select fb_require_publisher($1) value", [pending.id]),
+      /publishing access/,
+    );
+    await pg.exec(
+      `reset role; insert into auth.users values('${id(5)}'); set role service_role;`,
+    );
+    const activated = await query(
+      "select to_jsonb(fb_register_profile($1,'pending@example.test','Verified Publisher',false)) value",
+      [id(5)],
+    );
+    assert.equal(activated.id, pending.id);
+    assert.equal(activated.role, "contributor");
+    assert.equal(activated.hire_date, "2025-03-01");
+    assert.equal(activated.auth_user_id, id(5));
+    assert.equal(
+      await query("select fb_require_publisher($1) value", [pending.id]),
+      "contributor",
+    );
     for (const clause of [
       "active=false",
       "active=true,auth_user_id=null",

@@ -1,6 +1,5 @@
 -- Fieldbook fresh-install baseline.
--- Generated from the ordered pre-release migrations in supabase/history/initial-development.
--- Keep those files for the existing installation; add future changes as new migrations.
+-- The starting schema for a new installation. Add future changes as new migrations.
 
 -- Begin 202609190001_fieldbook.sql
 -- Fieldbook's server is the authorization boundary. Browser and OAuth clients

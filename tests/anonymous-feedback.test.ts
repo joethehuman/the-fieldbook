@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { feedbackRows } from "../lib/reporting";
 import { freshWorkspace } from "../lib/store";
@@ -52,12 +52,7 @@ test("general feedback migration preserves content rows and requires matched con
       "20260924150351_anonymous_feedback.sql",
       "20260926182840_general_feedback.sql",
     ]) {
-      await pg.exec(
-        await readFile(
-          new URL(`../supabase/history/initial-development/${file}`, import.meta.url),
-          "utf8",
-        ),
-      );
+      await pg.exec(migrationSql(file));
     }
     const userId = crypto.randomUUID();
     const contentId = crypto.randomUUID();
@@ -115,15 +110,7 @@ test("anonymous feedback migration preserves account rows and isolates guest ide
     await pg.exec(
       "create role anon;create role authenticated;create role service_role;create role supabase_auth_admin;create schema auth;create table auth.users(id uuid primary key);create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);",
     );
-    await pg.exec(
-      await readFile(
-        new URL(
-          "../supabase/history/initial-development/202609190001_fieldbook.sql",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    );
+    await pg.exec(migrationSql("202609190001_fieldbook.sql"));
     const userId = crypto.randomUUID();
     const contentId = crypto.randomUUID();
     await pg.query("insert into auth.users(id) values($1)", [userId]);
@@ -135,15 +122,7 @@ test("anonymous feedback migration preserves account rows and isolates guest ide
       "insert into public.fb_feedback(id,user_id,content_id,version,rating,comment) values($1,$2,$3,1,'up','Account response')",
       [crypto.randomUUID(), userId, contentId],
     );
-    await pg.exec(
-      await readFile(
-        new URL(
-          "../supabase/history/initial-development/20260924150351_anonymous_feedback.sql",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    );
+    await pg.exec(migrationSql("20260924150351_anonymous_feedback.sql"));
     const guestKey = "a".repeat(64);
     await pg.query(
       "insert into public.fb_feedback(id,guest_key,content_id,version,rating,comment) values($1,$2,$3,1,'down','Guest response')",

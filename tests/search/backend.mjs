@@ -1,3 +1,4 @@
+import { migrationSql } from "../helpers/migration-sql.mjs";
 // Local protocol fixture + real embedded PostgreSQL search. No hosted service.
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
@@ -6,12 +7,7 @@ import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 const pg = new PGlite({ extensions: { pg_trgm } });
 await pg.exec(`create role anon;create role authenticated;create role service_role;
 create table fb_documents(id uuid primary key, draft jsonb,published jsonb,published_revision integer,revision integer default 1,updated_at text default '2026-01-01');`);
-await pg.exec(
-  await readFile(
-    "supabase/history/initial-development/20260921205449_published_search.sql",
-    "utf8",
-  ),
-);
+await pg.exec(migrationSql("20260921205449_published_search.sql"));
 const id = "00000000-0000-4000-8000-000000000001";
 const content = {
   id,

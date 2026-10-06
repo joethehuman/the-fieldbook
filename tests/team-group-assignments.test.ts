@@ -1,3 +1,4 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
@@ -28,12 +29,7 @@ const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 async function migrate(pg: PGlite, name: string) {
   try {
-    await pg.exec(
-      await readFile(
-        new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
-        "utf8",
-      ),
-    );
+    await pg.exec(migrationSql(name));
   } catch (e: any) {
     throw new Error(`${name}: ${e.message}; ${e.where}; ${e.internalQuery}`);
   }

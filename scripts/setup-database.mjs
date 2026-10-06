@@ -49,11 +49,19 @@ function sqlString(value) {
 
 async function run(...args) {
   await new Promise((resolveRun, rejectRun) => {
-    const child = spawn(cli, ["--yes", cliVersion, ...args], {
-      cwd: root,
-      env: process.env,
-      stdio: "inherit",
-    });
+    const child = spawn(
+      cli,
+      [
+        "--yes",
+        cliVersion,
+        "--agent",
+        "no",
+        "--output-format",
+        "text",
+        ...args,
+      ],
+      { cwd: root, env: process.env, stdio: "inherit" },
+    );
     child.on("error", rejectRun);
     child.on("exit", (code) =>
       code === 0
@@ -120,7 +128,7 @@ async function main() {
   console.log("Checking the deployed worker...");
   await checkWorker(origin);
   console.log("Connecting to Supabase...");
-  if (!process.env.SUPABASE_ACCESS_TOKEN) await run("login");
+  if (!process.env.SUPABASE_ACCESS_TOKEN) await run("login", "--no-browser");
   await run("link", "--project-ref", projectRef);
   await run(
     "db",

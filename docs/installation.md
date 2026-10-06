@@ -10,7 +10,7 @@ Create a dedicated, empty hosted Supabase project. Keep its database password an
 
 ## 2. Configure Vercel
 
-Import **your own repository and chosen production branch** into Vercel. Use the Next.js preset, Node.js 22.x, the repository root as Root Directory (leave that field empty), the default Next.js output directory, and pnpm build. Set these environment variables for the installed app:
+Import **your own repository and chosen production branch** into Vercel. Use the Next.js preset, Node.js 22.x, the repository root as Root Directory (leave that field empty), the default Next.js output directory, `pnpm install --frozen-lockfile` as the install command, and `pnpm build` as the build command. Set these environment variables for the installed app:
 
 | Variable                             | Value                                                              |
 | ------------------------------------ | ------------------------------------------------------------------ |
@@ -21,7 +21,7 @@ Import **your own repository and chosen production branch** into Vercel. Use the
 | FIELDBOOK_OWNER_EMAIL                | The exact Google email that will bootstrap the first administrator |
 | FIELDBOOK_APP_KIND                   | installed                                                          |
 
-The root [.env.example](../.env.example) lists optional settings. Never put SUPABASE_SECRET_KEY in a NEXT_PUBLIC_ variable or commit deployment secrets. On Vercel, the included Analytics and Speed Insights integrations default on; set FIELDBOOK_VERCEL_ANALYTICS_ENABLED=false or FIELDBOOK_VERCEL_SPEED_INSIGHTS_ENABLED=false before deployment if you do not want them. Match your privacy policy to the services you enable. A second Vercel project rooted at demo/ is optional; set its FIELDBOOK_APP_KIND to demo and enable files outside that root. Demo data does not migrate to Supabase.
+The root [.env.example](../.env.example) lists optional settings. Copy the complete Supabase secret key, not an abbreviated value shown in a dashboard preview. Never put SUPABASE_SECRET_KEY in a NEXT_PUBLIC_ variable or commit deployment secrets. On Vercel, the included Analytics and Speed Insights integrations default on; set FIELDBOOK_VERCEL_ANALYTICS_ENABLED=false or FIELDBOOK_VERCEL_SPEED_INSIGHTS_ENABLED=false before deployment if you do not want them. Match your privacy policy to the services you enable. A second Vercel project rooted at demo/ is optional; set its FIELDBOOK_APP_KIND to demo and enable files outside that root. Demo data does not migrate to Supabase.
 
 For a preview that needs real writes, use a **separate** Supabase project and Google OAuth configuration. Set FIELDBOOK_ENVIRONMENT=preview and FIELDBOOK_PREVIEW_SUPABASE_REF to that project's reference. Never connect a preview to the production backend.
 
@@ -37,9 +37,11 @@ The guided command asks for the Supabase project reference and the deployed Fiel
 
 The command downloads a specific Supabase CLI version as needed; no separate CLI installation is required. Keep Supabase credentials out of repository files. If setup stops, read the error before retrying; a partially installed project should be reviewed rather than treated as empty. The deployed address must accept requests directly, without a sign-in screen or deployment protection in front of the cleanup route.
 
+The guided command keeps the CLI in interactive text mode, including when launched by a coding agent. Open the Supabase login link it prints in your browser and complete the requested verification. The command does not open a browser automatically.
+
 ## 4. Configure Google sign-in
 
-Create a Google OAuth **web client**. Give Google this authorized redirect URI, replacing PROJECT_REF with your Supabase project reference:
+In Google Cloud, create or select a project and configure its OAuth branding and audience. For a first private test, select **External** and **Testing**, add the administrator's Google address as a test user, and use the basic `openid`, `email`, and `profile` scopes. Then create a Google OAuth **web client**. Give Google this authorized redirect URI, replacing PROJECT_REF with your Supabase project reference:
 
 ```text
 https://PROJECT_REF.supabase.co/auth/v1/callback
@@ -67,9 +69,9 @@ The fieldbook-media bucket must remain private. The initial migration may set a 
 
 ## Optional AI connections
 
-The installed app exposes an authenticated MCP endpoint at FIELDBOOK_URL/api/mcp. To use it, enable Supabase Auth's OAuth 2.1 Server, set its consent path to /oauth/consent, enable the Custom Access Token Hook public.fb_access_token_hook, and use asymmetric JWT signing keys so Fieldbook can verify tokens through the project's JWKS. Register an AI client with its exact callback, connect to the HTTPS MCP endpoint, approve its requested capabilities, and call get_capabilities. Test a disposable draft, separate publication, and revocation from /connections. Access depends on both the user's current Fieldbook role and that connection's approved capabilities. Keep temporary media transfer URLs out of published content.
+The installed app exposes an authenticated MCP endpoint at FIELDBOOK_URL/api/mcp. To use it, enable Supabase Auth's OAuth 2.1 Server, set its consent path to /oauth/consent, enable the Custom Access Token Hook public.fb_access_token_hook, and use asymmetric JWT signing keys so Fieldbook can verify tokens through the project's JWKS. Register an AI client with its exact callback, connect to the HTTPS MCP endpoint, approve its requested capabilities, and call get_capabilities. Some clients request `offline_access` to refresh their sign-in; this does not grant Fieldbook tool permissions. Test a disposable draft, separate publication, and revocation from /connections. Access depends on both the user's current Fieldbook role and that connection's approved capabilities. Keep temporary media transfer URLs out of published content. See the [MCP setup guide](https://www.thefieldbook.org/docs/76be7ee8-371d-4ed0-b57f-1277460df3fe) for client-specific steps.
 
-Learner Ask AI is separate and off by default. Its implemented router is Vercel AI Gateway; configure a model and the installation setting only if you intend to use it. The optional AI_GATEWAY_API_KEY supports local or alternative credentials. Basic reading and admin work do not require either AI feature.
+Learner Ask AI is separate and off by default. Its implemented router is Vercel AI Gateway; configure a model and the installation setting only if you intend to use it. The optional AI_GATEWAY_API_KEY supports local or alternative credentials. Basic reading and admin work do not require either AI feature. See the [Ask AI setup guide](https://www.thefieldbook.org/docs/02dbd607-82c5-46ed-9877-debc2c24538a) for provider and model checks.
 
 ## Verify before use
 

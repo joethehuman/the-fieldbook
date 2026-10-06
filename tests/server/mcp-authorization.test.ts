@@ -127,6 +127,11 @@ test("consent rejects another identity, mismatched authorization and custom OAut
   };
   try {
     await validateMcpAuthorization(user, details, "authorization");
+    await validateMcpAuthorization(
+      user,
+      { ...details, scope: "openid email offline_access profile" },
+      "authorization",
+    );
     linked = false;
     await assert.rejects(
       validateMcpAuthorization(user, details, "authorization"),
@@ -140,7 +145,7 @@ test("consent rejects another identity, mismatched authorization and custom OAut
     await assert.rejects(
       validateMcpAuthorization(
         user,
-        { ...details, scope: "email content:write" },
+        { ...details, scope: "email offline_access content:write" },
         "authorization",
       ),
       /unsupported identity scopes/,

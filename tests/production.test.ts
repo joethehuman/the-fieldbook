@@ -1,10 +1,13 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { contentSchema, settingsSchema } from "../server/schemas";
 import { videoSource } from "../lib/video";
-import { guestAnswersForImport, guestSelectionsForImport } from "../lib/guest-progress";
+import {
+  guestAnswersForImport,
+  guestSelectionsForImport,
+} from "../lib/guest-progress";
 
 test("guest import preserves a passing answer set after a failed retake", () => {
   const old = {
@@ -18,7 +21,10 @@ test("guest import preserves a passing answer set after a failed retake", () => 
   assert.deepEqual(guestAnswersForImport(old, [0, 0], false), [1, 0]);
   assert.deepEqual(guestAnswersForImport(old, undefined, undefined), [1, 0]);
   assert.deepEqual(guestAnswersForImport(old, [1, 1], true), [1, 1]);
-  assert.deepEqual(guestSelectionsForImport(old, [[0], [0]], false), [[1], [0]]);
+  assert.deepEqual(guestSelectionsForImport(old, [[0], [0]], false), [
+    [1],
+    [0],
+  ]);
   assert.deepEqual(guestSelectionsForImport(old, [[1], [1]], true), [[1], [1]]);
 });
 
@@ -72,12 +78,7 @@ test("database migrations preserve drafts, enforce revisions, isolate browser ac
       "202609190001_fieldbook.sql",
       "202609190002_mcp_audience.sql",
     ])
-      await pg.exec(
-        await readFile(
-          new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
-          "utf8",
-        ),
-      );
+      await pg.exec(migrationSql(name));
     const id = crypto.randomUUID(),
       user = crypto.randomUUID(),
       other = crypto.randomUUID();

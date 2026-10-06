@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import {
   rosterDatabase,
   migrate,
@@ -397,10 +397,7 @@ test("actual Production missing migrations commit atomically without losing type
     const sources = await Promise.all(
       [flatGroupMigration, rootMigration, fallback, combined, safeguards].map(
         async (name) => {
-          const sql = await readFile(
-            new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
-            "utf8",
-          );
+          const sql = migrationSql(name);
           assert.match(sql, /^begin;$/m);
           assert.match(sql, /commit;\s*$/);
           return sql.replace(/^begin;\s*\n/m, "").replace(/commit;\s*$/, "");

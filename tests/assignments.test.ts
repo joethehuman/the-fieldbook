@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { assignedCourses } from "../lib/types";
 import {
@@ -27,12 +27,7 @@ test("group requirements and person progress administration are atomic, versione
       "202609200002_assignments.sql",
       "202609200003_required_learning.sql",
     ])
-      await pg.exec(
-        await readFile(
-          new URL("../supabase/history/initial-development/" + name, import.meta.url),
-          "utf8",
-        ),
-      );
+      await pg.exec(migrationSql(name));
     for (const id of [admin, learner]) {
       await pg.query("insert into auth.users values($1)", [id]);
       await pg.query(

@@ -1,9 +1,9 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import { teamProgressRows, teamProgressCsv } from "../lib/reporting";
 import { serializeCsv } from "../lib/csv";
 import type { Workspace } from "../lib/store";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { legacyWorkspace as freshWorkspace } from "./fixtures/legacy-workspace";
 import { assignedCourses, effectiveGroups, isComplete } from "../lib/types";
@@ -299,12 +299,7 @@ test("learning-groups migration preserves history and enforces atomic, scoped te
       "202609200002_assignments.sql",
       "202609200003_required_learning.sql",
     ])
-      await pg.exec(
-        await readFile(
-          new URL("../supabase/history/initial-development/" + name, import.meta.url),
-          "utf8",
-        ),
-      );
+      await pg.exec(migrationSql(name));
     const users = [
       {
         id: admin,
@@ -407,15 +402,7 @@ test("learning-groups migration preserves history and enforces atomic, scoped te
     const before = await row(a);
     const progressBefore = (await pg.query("select * from public.fb_progress"))
       .rows;
-    await pg.exec(
-      await readFile(
-        new URL(
-          "../supabase/history/initial-development/202609200004_learning_groups.sql",
-          import.meta.url,
-        ),
-        "utf8",
-      ),
-    );
+    await pg.exec(migrationSql("202609200004_learning_groups.sql"));
     const migrated = await config();
     assert.deepEqual(migrated.groups[0].learningItems, [
       { kind: "course", id: a },

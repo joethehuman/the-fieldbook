@@ -1,13 +1,11 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 import { demoSearch, makeResult, sourcePassages } from "../lib/search";
-const migration = new URL(
-  "../supabase/history/initial-development/20260921205449_published_search.sql",
-  import.meta.url,
-);
+const migration = "20260921205449_published_search.sql";
 export const queries = [
   ["Disaster recovery", "Disaster recovery"],
   ["wal archive", "Disaster recovery"],
@@ -31,21 +29,11 @@ test("indexed published retrieval: benchmark, publication lifecycle, source iden
       "202609200003_required_learning.sql",
       "202609200004_learning_groups.sql",
     ]) {
-      await pg.exec(
-        await readFile(
-          new URL("../supabase/history/initial-development/" + name, import.meta.url),
-          "utf8",
-        ),
-      );
+      await pg.exec(migrationSql(name));
     }
+    await pg.exec(migrationSql(migration));
     await pg.exec(` insert into fb_documents(id,draft,published,published_revision) values('00000000-0000-4000-8000-000000000001','{"title":"draftsecret"}',
  '{"kind":"doc","title":"Disaster recovery","summary":"Restore a service safely","body":"Use a wal archive to restore your database.","updatedAt":"2020-01-01T00:00:00Z","questions":[{"answer":"answersecret"}]}',4);`);
-    const beforeBackfill = (await pg.query("select * from fb_documents")).rows;
-    await pg.exec(await readFile(migration, "utf8"));
-    assert.deepEqual(
-      (await pg.query("select * from fb_documents")).rows,
-      beforeBackfill,
-    );
     await pg.exec(`insert into fb_documents(id,draft,published,published_revision) values('00000000-0000-4000-8000-000000000002','{}',
  '{"kind":"course","title":"Distributed systems","lessons":[{"id":"consensus","title":"Consensus","body":"A quorum election selects the leader."}]}',7);
  insert into fb_documents(id,draft,published,published_revision) values('00000000-0000-4000-8000-000000000003','{}',

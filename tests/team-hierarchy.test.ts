@@ -1,6 +1,6 @@
+import { migrationSql } from "./helpers/migration-sql.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import { PGlite } from "@electric-sql/pglite";
 import { freshWorkspace } from "../lib/store";
 import {
@@ -117,12 +117,7 @@ test("guarded deletion migration: stored references, revision, authorization and
       "20260923180607_guarded_team_deletion.sql",
       "20260923230000_scope_pending_group_cleanup.sql",
     ])
-      await pg.exec(
-        await readFile(
-          new URL(`../supabase/history/initial-development/${name}`, import.meta.url),
-          "utf8",
-        ),
-      );
+      await pg.exec(migrationSql(name));
     const users = [
       {
         id: admin,

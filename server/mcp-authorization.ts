@@ -24,7 +24,10 @@ export async function validateMcpAuthorization(
   const scopes = details.scope.trim().split(/\s+/).filter(Boolean);
   if (
     scopes.some(
-      (scope) => !["openid", "email", "profile", "phone"].includes(scope),
+      (scope) =>
+        !["openid", "email", "profile", "phone", "offline_access"].includes(
+          scope,
+        ),
     )
   )
     throw new HttpError(

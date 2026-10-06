@@ -13,9 +13,7 @@ An installation runs a specific Git commit and its matching database schema. Ups
 
 For an installation created with the fresh-install baseline, link the Supabase CLI to the correct project, review `supabase db push --dry-run`, and apply only the pending migrations with `supabase db push` at the stage required by the release. Never run `supabase db reset --linked` on an installation with data. A Vercel build does not update its database.
 
-If your installation predates the single-command setup, its database needs a one-time migration-record check before CLI upgrades. Do **not** run the fresh-install command or apply the baseline to that database. Compare the installed schema with the historical SQL in `supabase/history/initial-development/` using an isolated restore, then record baseline version `20261006061752` as already applied with `supabase migration repair --status applied 20261006061752 --linked`. Check `supabase migration list` and a dry run before applying later migrations. Only mark the baseline applied after verifying the schema; SQL Editor runs did not record CLI migrations.
-
-If a migration changes tables or functions used by the running app, stop writes or use a maintenance window until compatible code is deployed. The roster and assignment migrations in this repository are examples that require coordinated code and database changes; read their SQL and target release notes before applying them. Deploy the reviewed code to your production branch after the required schema is ready.
+If a migration changes tables or functions used by the running app, stop writes or use a maintenance window until compatible code is deployed. Read the migration and release notes for its required deployment order. Deploy the reviewed code to your production branch after the required schema is ready.
 
 Check the exact deployed commit and test owner and learner sign-in, draft/publication access, learner progress, uploads, and the admin tasks your installation uses. Verify the deletion worker's endpoint and first scheduled run if that feature changed. Record the new commit and applied migrations privately.
 

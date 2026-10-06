@@ -1,5 +1,5 @@
+import { migrationSql } from "./migration-sql.mjs";
 import { PGlite } from "@electric-sql/pglite";
-import { readFile } from "node:fs/promises";
 export const rosterMigrations = [
   "202609190001_fieldbook.sql",
   "202609190002_mcp_audience.sql",
@@ -23,12 +23,7 @@ export const contributorMigration =
   "20261001234401_contributor_permissions.sql";
 export const flatGroupMigration = "20261002022921_flat_learning_groups.sql";
 export async function migrate(pg: PGlite, name: string) {
-  await pg.exec(
-    await readFile(
-      new URL(`../../supabase/history/initial-development/${name}`, import.meta.url),
-      "utf8",
-    ),
-  );
+  await pg.exec(migrationSql(name));
 }
 export async function rosterDatabase() {
   const pg = new PGlite();
