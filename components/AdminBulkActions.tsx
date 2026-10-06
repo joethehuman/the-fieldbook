@@ -43,7 +43,7 @@ export function adminCommands({
   function command(
     operation: BulkOperation,
     label: string,
-    description: string,
+    description: BulkCommand["description"],
     other: Partial<BulkCommand> = {},
   ): BulkCommand {
     return {
@@ -126,7 +126,15 @@ export function adminCommands({
         command(
           "delete",
           "Delete selected",
-          `You are deleting ${entity === "user" ? "users. Access ends immediately" : "content. Selected content is unpublished immediately"}. Restore is available in Organization Settings → Recently deleted for 30 days. After 30 days, these records and associated learning history, quiz attempts and feedback are permanently erased.`,
+          ({ itemLabel, count }) => {
+            if (entity === "user")
+              return itemLabel
+                ? `${itemLabel} loses access now and can be restored for 30 days. After that, the account and related learning records are permanently erased.`
+                : `${count} users lose access now and can be restored for 30 days. After that, the accounts and related learning records are permanently erased.`;
+            return itemLabel
+              ? `${itemLabel} can be restored for 30 days. After that, it and its related learning records are permanently erased.`
+              : `${count} items can be restored for 30 days. After that, the items and their related learning records are permanently erased.`;
+          },
           {
             destructive: true,
             review:
@@ -150,8 +158,7 @@ export function adminCommands({
                     </div>
                   )
                 : undefined,
-            acknowledgment:
-              "I understand that deletion becomes permanent after 30 days and erases associated learning history.",
+            acknowledgment: "I understand this will be permanent.",
           },
         ),
       ];

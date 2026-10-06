@@ -34,7 +34,9 @@ export type BulkCommand = {
   id: string;
   label: string;
   itemLabel?: string;
-  description: string;
+  description:
+    | string
+    | ((context: { itemLabel?: string; count: number }) => string);
   successMessage?: string;
   applyLabel?: string;
   disabledReason?: string;
@@ -247,8 +249,17 @@ export function BulkActions({
           >
             <DialogTitle>{command.label}</DialogTitle>
             <DialogDescription>
-              {item ? item.label : `${active.ids.length} ${noun} selected`}.{" "}
-              {command.description}
+              {typeof command.description === "function" ? (
+                command.description({
+                  itemLabel: item?.label,
+                  count: active.ids.length,
+                })
+              ) : (
+                <>
+                  {item ? item.label : `${active.ids.length} ${noun} selected`}.{" "}
+                  {command.description}
+                </>
+              )}
             </DialogDescription>
             {error && <Alert variant="destructive">{error}</Alert>}
             {command.options &&

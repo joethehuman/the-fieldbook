@@ -142,13 +142,14 @@ test("manager user deletion warns and leaves its team and members intact without
   await expect(query).toHaveAttribute("autocomplete", "off");
   await expect(query).toHaveAttribute("name", "admin-people-search");
   await page
-    .getByRole("checkbox", { name: `Select ${manager.name}`, exact: true })
-    .check();
-  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
+    .getByRole("button", { name: `Actions for ${manager.name}`, exact: true })
+    .click();
   await page
-    .getByRole("menuitem", { name: "Delete selected", exact: true })
+    .getByRole("menuitem", { name: "Delete", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("loses access now");
+  await expect(dialog).toContainText("related learning records");
   await expect(dialog).toContainText("without a manager");
   await expect(dialog).toContainText("Surviving subteam");
   await expect(dialog).toContainText("Delete teams separately");
@@ -175,7 +176,7 @@ test("manager user deletion warns and leaves its team and members intact without
   await page.screenshot({ path: info.outputPath("manager-delete-review.png") });
   await dialog.getByRole("checkbox").check();
   await dialog
-    .getByRole("button", { name: "Delete selected", exact: true })
+    .getByRole("button", { name: "Delete", exact: true })
     .click();
   await expect(dialog).toHaveCount(0);
   const after = await saved(page);
