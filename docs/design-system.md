@@ -17,6 +17,8 @@ Its foundations are shadcn/ui source composition, Radix interaction primitives, 
 
 Before building a control, card, or page pattern, check the shared components and the `/ui` examples. Reuse or extend an existing component when it already owns the behavior. For example, `CourseCard` and `CurriculumCard` compose the shared `LearningCard`; the demo and installed Updates pages both use `UpdateCard`.
 
+CourseCard owns the deadline cue in both apps. Overdue assigned courses show “N days past due” in the semantic destructive color; upcoming deadlines and “Due today” use muted text. Completed courses, guests and disabled due dates omit the cue.
+
 Put new reusable controls in `components/ui/`, repeated composition in `components/patterns/`, and reusable product UI in `components/`. Keep route-specific data fetching, permissions, mutations, and route destinations in the owning app or demo feature. A one-off layout can stay local; move it into the shared library when reuse warrants it. Do not copy a reusable interface between the installed app and demo or build a second feature-specific control system. Avoid broad overrides and components with options for every possible layout.
 
 ## Compose a page

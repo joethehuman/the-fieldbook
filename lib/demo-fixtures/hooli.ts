@@ -9,7 +9,7 @@ import type {
 } from "../types";
 import type { SiteSettings } from "../settings";
 
-/** Fixed fictional sample data. Creation and Reset demo load the same records. */
+/** Fictional sample records; original learning dates move relative to each visit. */
 export const hooliDemoData: {
   settings: Partial<SiteSettings>;
   teams: Team[];
