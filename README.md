@@ -26,4 +26,6 @@ pnpm dev
 
 Run the browser-local demo with pnpm dev:demo. The shared interface catalog is at /ui in the demo. The installed app lives at the repository root; demo/ is a separate optional app. Shared components and models live in components/ and lib/, server behavior in app/ and server/, and database migrations in supabase/migrations/.
 
+Each visit refreshes original sample learning dates relative to today, keeping upcoming and overdue examples available. Edited schedules and visitor progress stay saved in the browser. Course cards and deadline rules use the same shared code as the installed app.
+
 Fieldbook is available under the [Elastic License 2.0](LICENSE), which allows many internal uses but restricts offering the software's substantial functionality as a hosted or managed service. Review the license itself before relying on a particular use. There is no support SLA or promised release schedule.
