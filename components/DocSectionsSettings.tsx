@@ -34,6 +34,7 @@ import { ReorderRow } from "./patterns/reorder-row";
 import { PublicationStatus } from "./patterns/publication-status";
 import { useRowReorder } from "./patterns/use-row-reorder";
 import { FormField } from "./patterns/form-field";
+import { EmptyState } from "./patterns/layout";
 import DocSectionCreate from "./DocSectionCreate";
 import { BulkActions } from "./patterns/bulk-actions";
 import { useBulkSelection } from "./patterns/bulk-selection";
@@ -633,131 +634,133 @@ export function DocSectionsSettings({
           New section
         </Button>
       </div>
-      <BulkActions
-        collectionSize={selection.collectionSize}
-        selected={selection.actionIds}
-        onSelectionChange={selection.setSelected}
-        noun="items"
-        summaryControl={
-          <Tooltip
-            content={allRootsExpanded ? "Collapse sections" : "Expand sections"}
-          >
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground"
-              disabled={blocked || !expandableRoots.length}
-              aria-label={
-                allRootsExpanded ? "Collapse sections" : "Expand sections"
-              }
-              aria-expanded={allRootsExpanded}
-              onClick={() =>
-                setExpanded((current) =>
-                  allRootsExpanded
-                    ? new Set()
-                    : new Set([
-                        ...current,
-                        ...expandableRoots.map((root) => root.id),
-                      ]),
-                )
-              }
+      {sections.length > 0 && (
+        <BulkActions
+          collectionSize={selection.collectionSize}
+          selected={selection.actionIds}
+          onSelectionChange={selection.setSelected}
+          noun="items"
+          summaryControl={
+            <Tooltip
+              content={allRootsExpanded ? "Collapse sections" : "Expand sections"}
             >
-              {allRootsExpanded ? (
-                <ChevronsDownUp aria-hidden="true" />
-              ) : (
-                <ChevronsUpDown aria-hidden="true" />
-              )}
-            </Button>
-          </Tooltip>
-        }
-        commands={[
-          {
-            id: "move",
-            label: "Move to…",
-            description:
-              "Move selected documents and sections to one destination. Section documents stay attached. Review the paths, then save settings.",
-            successMessage:
-              "Navigation changes staged. Save settings to apply them.",
-            disabledReason: blocked
-              ? conflict || "Finish the current save first."
-              : undefined,
-            options: moveOptions(selection.actionIds),
-            selectionMode: "single",
-            review: (values, keys) => {
-              try {
-                const next = prepareMove(keys, values[0]);
-                return (
-                  <ul className="text-copy">
-                    {keys.map((key) => (
-                      <li key={key}>
-                        {allItems.find((item) => item.id === key)?.label} →{" "}
-                        {isDoc(key)
-                          ? sectionPath(
-                              next.sections.find(
-                                (section) => section.id === values[0],
-                              )!,
-                              next.sections,
-                            )
-                          : sectionPath(
-                              next.sections.find(
-                                (section) => section.id === itemId(key),
-                              )!,
-                              next.sections,
-                            )}
-                      </li>
-                    ))}
-                  </ul>
-                );
-              } catch (error) {
-                return <p role="alert">{(error as Error).message}</p>;
-              }
-            },
-            apply: (values, keys = []) => {
-              const next = prepareMove(keys, values[0]);
-              if (blocked) throw new Error("Finish the current save first.");
-              onChange(next.sections, next.moves);
-              revealDestination(values[0]);
-            },
-          },
-          {
-            id: "delete",
-            label: "Delete selected sections",
-            destructive: true,
-            description:
-              "Delete selected empty sections. Save settings to apply the changes.",
-            disabledReason: blocked
-              ? conflict || "Finish the current save first."
-              : selection.actionIds.some(isDoc)
-                ? "Select only sections to delete them here."
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground"
+                disabled={blocked || !expandableRoots.length}
+                aria-label={
+                  allRootsExpanded ? "Collapse sections" : "Expand sections"
+                }
+                aria-expanded={allRootsExpanded}
+                onClick={() =>
+                  setExpanded((current) =>
+                    allRootsExpanded
+                      ? new Set()
+                      : new Set([
+                          ...current,
+                          ...expandableRoots.map((root) => root.id),
+                        ]),
+                  )
+                }
+              >
+                {allRootsExpanded ? (
+                  <ChevronsDownUp aria-hidden="true" />
+                ) : (
+                  <ChevronsUpDown aria-hidden="true" />
+                )}
+              </Button>
+            </Tooltip>
+          }
+          commands={[
+            {
+              id: "move",
+              label: "Move to…",
+              description:
+                "Move selected documents and sections to one destination. Section documents stay attached. Review the paths, then save settings.",
+              successMessage:
+                "Navigation changes staged. Save settings to apply them.",
+              disabledReason: blocked
+                ? conflict || "Finish the current save first."
                 : undefined,
-            apply: (_, keys = []) => {
-              if (blocked || keys.some(isDoc))
-                throw new Error("Select only empty sections to delete them.");
-              let next = sections;
-              const ids = keys
-                .map(itemId)
-                .sort(
-                  (a, b) =>
-                    Number(
-                      !!sections.find((section) => section.id === b)?.parentId,
-                    ) -
-                    Number(
-                      !!sections.find((section) => section.id === a)?.parentId,
-                    ),
-                );
-              for (const id of ids) next = deleteDocSection(next, id, docs);
-              onChange(next);
+              options: moveOptions(selection.actionIds),
+              selectionMode: "single",
+              review: (values, keys) => {
+                try {
+                  const next = prepareMove(keys, values[0]);
+                  return (
+                    <ul className="text-copy">
+                      {keys.map((key) => (
+                        <li key={key}>
+                          {allItems.find((item) => item.id === key)?.label} →{" "}
+                          {isDoc(key)
+                            ? sectionPath(
+                                next.sections.find(
+                                  (section) => section.id === values[0],
+                                )!,
+                                next.sections,
+                              )
+                            : sectionPath(
+                                next.sections.find(
+                                  (section) => section.id === itemId(key),
+                                )!,
+                                next.sections,
+                              )}
+                        </li>
+                      ))}
+                    </ul>
+                  );
+                } catch (error) {
+                  return <p role="alert">{(error as Error).message}</p>;
+                }
+              },
+              apply: (values, keys = []) => {
+                const next = prepareMove(keys, values[0]);
+                if (blocked) throw new Error("Finish the current save first.");
+                onChange(next.sections, next.moves);
+                revealDestination(values[0]);
+              },
             },
-          },
-        ]}
-      />
+            {
+              id: "delete",
+              label: "Delete selected sections",
+              destructive: true,
+              description:
+                "Delete selected empty sections. Save settings to apply the changes.",
+              disabledReason: blocked
+                ? conflict || "Finish the current save first."
+                : selection.actionIds.some(isDoc)
+                  ? "Select only sections to delete them here."
+                  : undefined,
+              apply: (_, keys = []) => {
+                if (blocked || keys.some(isDoc))
+                  throw new Error("Select only empty sections to delete them.");
+                let next = sections;
+                const ids = keys
+                  .map(itemId)
+                  .sort(
+                    (a, b) =>
+                      Number(
+                        !!sections.find((section) => section.id === b)?.parentId,
+                      ) -
+                      Number(
+                        !!sections.find((section) => section.id === a)?.parentId,
+                      ),
+                  );
+                for (const id of ids) next = deleteDocSection(next, id, docs);
+                onChange(next);
+              },
+            },
+          ]}
+        />
+      )}
       {sections.length ? (
         <ol className="doc-order-list mt-3">
           {roots.map((root) => sectionBranch(root, roots))}
         </ol>
       ) : (
-        <p>No sections yet. Create a section to get started.</p>
+        <EmptyState>No sections yet. Create a section to get started.</EmptyState>
       )}
       <Dialog
         open={!!creating}
