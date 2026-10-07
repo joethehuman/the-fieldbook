@@ -8,16 +8,18 @@ export function BrandedAccount({
   branding,
   children,
   illustrated = false,
+  centered = illustrated,
   footer,
 }: {
   branding: Branding;
   children: ReactNode;
   illustrated?: boolean;
+  centered?: boolean;
   footer?: ReactNode;
 }) {
   return (
     <AccountPage
-      centered={illustrated}
+      centered={centered}
       className={
         illustrated
           ? "access-card access-card-illustrated max-w-[32rem] min-[801px]:max-w-[51rem] gap-0 overflow-hidden border-l-[5px] [border-left-color:var(--brand)] p-0 sm:p-0 [overflow-wrap:anywhere] [&_h1]:text-[clamp(1.65rem,3vw,2.35rem)]"
