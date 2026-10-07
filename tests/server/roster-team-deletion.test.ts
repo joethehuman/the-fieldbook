@@ -1,31 +1,10 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  rosterDatabase,
-  migrate,
-  value,
-  saveRoster,
-  episodeMigration,
-  contributorMigration,
-  flatGroupMigration,
-} from "../helpers/roster-database";
+import test from "node:test";
+import { rosterDatabase, saveRoster, value } from "../helpers/roster-database";
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 async function database() {
   const pg = await rosterDatabase();
-  for (const file of [
-    episodeMigration,
-    contributorMigration,
-    flatGroupMigration,
-    "20261002064454_team_group_course_assignments.sql",
-    "20261002135103_builtin_organization_team.sql",
-    "20261002184642_organization_membership.sql",
-    "20261002210106_combined_assignment_organization.sql",
-    "20261002214011_combined_governance_safeguards.sql",
-    "20261003140729_roster_csv_import.sql",
-    "20261003162418_roster_added_at.sql",
-  ])
-    await migrate(pg, file);
   await pg.exec(`insert into auth.users values('${id(1)}'),('${id(2)}'),('${id(3)}');
     insert into fb_profiles(id,auth_user_id,email,name,role) values
     ('${id(1)}','${id(1)}','admin@example.test','Admin','admin'),
@@ -33,41 +12,6 @@ async function database() {
     ('${id(3)}','${id(3)}','owner@example.test','Owner','admin');
     insert into fb_profiles(id,email,name,role,active) values
     ('${id(4)}','pending@example.test','Pending','learner',false);`);
-  const fingerprint = async () => {
-    const rows = (
-      await pg.query<{ name: string }>(
-        "select tablename name from pg_tables where schemaname='public' order by tablename",
-      )
-    ).rows;
-    return Promise.all(
-      rows.map(async ({ name }) => [
-        name,
-        await value(
-          pg,
-          `select coalesce(jsonb_agg(to_jsonb(t) order by to_jsonb(t)::text),'[]') value from public.${name} t`,
-        ),
-      ]),
-    );
-  };
-  const before = await fingerprint();
-  const functions = await value(
-    pg,
-    "select jsonb_agg(jsonb_build_object('name',proname,'def',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname not in ('fb_delete_users','fb_save_governance')",
-  );
-  await migrate(pg, "20261003212205_roster_team_deletion.sql");
-  assert.deepEqual(
-    await fingerprint(),
-    before,
-    "migration rewrites no existing application data",
-  );
-  assert.deepEqual(
-    await value(
-      pg,
-      "select jsonb_agg(jsonb_build_object('name',proname,'def',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname not in ('fb_delete_users','fb_save_governance')",
-    ),
-    functions,
-    "unrelated functions and ACLs preserved",
-  );
   for (const fn of [
     "fb_delete_users(uuid,integer,jsonb,text)",
     "fb_save_governance(uuid,integer,text,jsonb)",

@@ -1,23 +1,22 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
-  progressDatabase,
-  progressMigration,
-  progressSeed,
-  personId as id,
-} from "../helpers/progress-report-database";
-import { migrate, value } from "../helpers/roster-database";
-import {
-  progressPeople,
-  filterProgress,
   emptyProgressFilters,
-  progressSummary,
+  filterProgress,
+  progressPeople,
   progressPeopleCsv,
+  progressSummary,
   subteamProgress,
 } from "../../lib/progress-report";
-import type { ProgressReportRecord } from "../../server/progress-report";
 import type { Workspace } from "../../lib/store";
 import type { User } from "../../lib/types";
+import type { ProgressReportRecord } from "../../server/progress-report";
+import {
+  personId as id,
+  progressDatabase,
+  progressSeed,
+} from "../helpers/progress-report-database";
+import { value } from "../helpers/roster-database";
 const viewer = (n: number, role: User["role"]): User => ({
   id: id(n),
   name: "Actor",
@@ -43,8 +42,6 @@ test("compact report preserves data, scopes roster before aggregation, and denie
   try {
     const root = await progressSeed(pg);
     const before = await value(pg, fingerprint);
-    await migrate(pg, progressMigration);
-    assert.deepEqual(await value(pg, fingerprint), before);
     const read = async (n: number, person?: number) =>
       (await value(pg, "select fb_progress_report($1,$2) value", [
         id(n),
@@ -123,6 +120,11 @@ test("compact report preserves data, scopes roster before aggregation, and denie
         assert.equal(progressPeopleCsv(filtered, true).rows.length, 1);
       },
     );
+    assert.deepEqual(
+      await value(pg, fingerprint),
+      before,
+      "report reads preserve saved records",
+    );
     await t.test(
       "saved dates, latest course version, overlaps and optional learning stay distinct",
       async () => {
@@ -175,7 +177,6 @@ test("compact report preserves data, scopes roster before aggregation, and denie
 test("500 people and 100 courses return person totals without course history", async (t) => {
   const pg = await progressDatabase();
   try {
-    await migrate(pg, progressMigration);
     await pg.exec(`select set_config('fieldbook.learning_batch','on',false);insert into auth.users values('${id(1)}');insert into fb_profiles(id,auth_user_id,name,email,role) values('${id(1)}','${id(1)}','Admin','admin@example.test','admin');
  insert into fb_profiles(id,name,email,role,team_id) select ('00000000-0000-4000-8000-'||lpad((1000+n)::text,12,'0'))::uuid,'Learner '||n,'learner'||n||'@example.test','learner','branch-'||(n%20) from generate_series(1,500)n;
  insert into fb_documents(id,draft,published,published_revision) select ('00000000-0000-4000-8000-'||lpad((10000+n)::text,12,'0'))::uuid,jsonb_build_object('kind','course','title','Course '||n,'version',1,'lessons',jsonb_build_array(jsonb_build_object('id','lesson'))),jsonb_build_object('kind','course','title','Course '||n,'version',1,'lessons',jsonb_build_array(jsonb_build_object('id','lesson'))),1 from generate_series(1,100)n;

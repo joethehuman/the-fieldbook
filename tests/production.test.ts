@@ -1,13 +1,12 @@
-import { migrationSql } from "./helpers/migration-sql.mjs";
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
-import { contentSchema, settingsSchema } from "../server/schemas";
-import { videoSource } from "../lib/video";
+import { test } from "node:test";
 import {
   guestAnswersForImport,
   guestSelectionsForImport,
 } from "../lib/guest-progress";
+import { videoSource } from "../lib/video";
+import { contentSchema, settingsSchema } from "../server/schemas";
+import { database } from "./helpers/database.mjs";
 
 test("guest import preserves a passing answer set after a failed retake", () => {
   const old = {
@@ -68,18 +67,13 @@ test("production content rejects duplicate lesson ids and unsafe branding", () =
   );
 });
 
-test("database migrations preserve drafts, enforce revisions, isolate browser access, and merge progress", async () => {
-  const pg = new PGlite();
+test("database preserves drafts, enforces revisions, isolates browser access, and merges progress", async () => {
+  const pg = await database();
   try {
-    await pg.exec(
-      "create role anon;create role authenticated;create role service_role;create role supabase_auth_admin;create schema auth;create table auth.users(id uuid primary key);create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);",
-    );
-    for (const name of [
-      "202609190001_fieldbook.sql",
-      "202609190002_mcp_audience.sql",
-    ])
-      await pg.exec(migrationSql(name));
-    const bucket = await pg.query<{ public: boolean; file_size_limit: number | null }>(
+    const bucket = await pg.query<{
+      public: boolean;
+      file_size_limit: number | null;
+    }>(
       "select public,file_size_limit from storage.buckets where id='fieldbook-media'",
     );
     assert.deepEqual(bucket.rows, [{ public: false, file_size_limit: null }]);
@@ -87,13 +81,24 @@ test("database migrations preserve drafts, enforce revisions, isolate browser ac
       user = crypto.randomUUID(),
       other = crypto.randomUUID();
     await pg.query("insert into auth.users(id) values($1),($2)", [user, other]);
+    await pg.query(
+      "insert into fb_profiles(id,auth_user_id,name,email,role) values($1,$1,'Admin','admin@example.test','admin'),($2,$2,'Learner','learner@example.test','learner')",
+      [user, other],
+    );
     const save = async (expected: number, title: string, publish: boolean) =>
       pg.query<any>(
         "select * from public.fb_save_document($1,$2,$3::jsonb,$4,false,$5,'test')",
         [
           id,
           expected,
-          JSON.stringify({ id, title, version: 1 }),
+          JSON.stringify({
+            id,
+            kind: "course",
+            title,
+            version: 1,
+            lessons: [{ id: "one" }, { id: "two" }],
+            assignments: [],
+          }),
           publish,
           user,
         ],

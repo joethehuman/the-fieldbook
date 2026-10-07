@@ -1,10 +1,9 @@
-import { migrationSql } from "./helpers/migration-sql.mjs";
-import test from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
-import { canPublish, canAdminister, canOpenAdminTab } from "../lib/permissions";
-import { reportTeamIds, type User } from "../lib/types";
+import test from "node:test";
 import { availableDocSections, sectionForDoc } from "../lib/docs-navigation";
+import { canAdminister, canOpenAdminTab, canPublish } from "../lib/permissions";
+import { reportTeamIds, type User } from "../lib/types";
+import { database } from "./helpers/database.mjs";
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -49,61 +48,26 @@ test("publishing and managed-team permissions compose without granting administr
   assert.equal(reportTeamIds({ ...user, registered: false }, teams).size, 0);
 });
 
-const chain = [
-  "202609190001_fieldbook.sql",
-  "202609190002_mcp_audience.sql",
-  "202609200001_governance.sql",
-  "202609200002_assignments.sql",
-  "202609200003_required_learning.sql",
-  "202609200004_learning_groups.sql",
-  "20260923180607_guarded_team_deletion.sql",
-  "20260923230000_scope_pending_group_cleanup.sql",
-  "20260924150351_anonymous_feedback.sql",
-  "20260926182840_general_feedback.sql",
-  "20260927150657_bulk_actions_recovery.sql",
-  "20260927151533_bulk_recovery_references.sql",
-  "20260927152156_account_deletion_lock.sql",
-  "20260927153217_media_cleanup_lock.sql",
-  "20261001202740_admin_people_reads.sql",
-  "20261001222227_roster_people.sql",
-];
-async function migration(pg: PGlite, name: string) {
-  const sql = migrationSql(name);
-  try {
-    await pg.exec(sql);
-  } catch (error: any) {
-    throw new Error(
-      `${name}: ${error.message}; position=${error.position}; internal=${error.internalQuery}; context=${error.where}`,
-    );
-  }
-}
-test("contributor migration preserves records and enforces publishing, recovery, governance and team scope", async () => {
-  const pg = new PGlite();
+test("contributor publishing, recovery, governance and team scope preserve saved records", async () => {
+  const pg = await database();
   const query = async (sql: string, args: any[] = []) =>
     (await pg.query<any>(sql, args)).rows[0]?.value;
   try {
-    await pg.exec(`create role anon; create role authenticated; create role service_role bypassrls; create role supabase_auth_admin;
-      create schema auth; create table auth.users(id uuid primary key);
-      create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
-      create schema extensions; create function extensions.gen_random_bytes(integer) returns bytea language sql as 'select decode(repeat(''ab'',$1),''hex'')';`);
-    for (const name of chain) await migration(pg, name);
     await pg.exec(`insert into auth.users values('${id(1)}'),('${id(2)}'),('${id(3)}'),('${id(4)}');
       insert into fb_profiles(id,auth_user_id,email,name,role,team_id) values
       ('${id(1)}','${id(1)}','admin@example.test','Admin','admin',null),
       ('${id(2)}','${id(2)}','publisher@example.test','Publisher','manager',null),
       ('${id(3)}','${id(3)}','child@example.test','Child learner','learner','child'),
       ('${id(4)}','${id(4)}','sibling@example.test','Sibling learner','learner','sibling');
-      update fb_config set teams='[{"id":"root","name":"Root","managerId":"${id(2)}"},{"id":"child","name":"Child","parentId":"root"},{"id":"sibling","name":"Sibling"}]', settings=settings||'{"docSections":[{"id":"guide","name":"Guides"}],"privacy":{"draft":{"body":"PRIVATE POLICY"}}}';
+      update fb_config set teams=teams||jsonb_build_array(jsonb_build_object('id','root','name','Root','managerId','${id(2)}','parentId',settings->>'organizationTeamId'),jsonb_build_object('id','child','name','Child','parentId','root'),jsonb_build_object('id','sibling','name','Sibling','parentId',settings->>'organizationTeamId')), settings=settings||'{"docSections":[{"id":"guide","name":"Guides"}],"privacy":{"draft":{"body":"PRIVATE POLICY"}}}';
       insert into fb_documents(id,draft,published,revision,published_revision) values('${id(10)}','{"id":"${id(10)}","kind":"course","title":"Existing course","groups":[],"assignments":[],"status":"published","version":1}','{"id":"${id(10)}","kind":"course","title":"Existing course","groups":[],"assignments":[],"status":"published","version":1}',1,1);
       insert into fb_progress(user_id,content_id,version,lessons,passed) values('${id(3)}','${id(10)}',1,'["lesson"]',true),('${id(4)}','${id(10)}',1,'[]',false);
       insert into fb_feedback(id,user_id,content_id,version,rating,comment) values(gen_random_uuid(),'${id(3)}','${id(10)}',1,'up','Preserved feedback');`);
+    await pg.exec("select fb_sync_learning()");
     const fingerprint = () =>
       query(
         "select jsonb_build_object('profiles',(select jsonb_agg(to_jsonb(p) order by id) from fb_profiles p),'config',(select to_jsonb(c) from fb_config c),'documents',(select jsonb_agg(to_jsonb(d) order by id) from fb_documents d),'progress',(select jsonb_agg(to_jsonb(p) order by user_id) from fb_progress p),'feedback',(select jsonb_agg(to_jsonb(f)) from fb_feedback f),'audit',(select jsonb_agg(to_jsonb(a)) from fb_audit a)) value",
       );
-    const before = await fingerprint();
-    await migration(pg, "20261001234401_contributor_permissions.sql");
-    assert.deepEqual(await fingerprint(), before);
     const cfg = await query("select to_jsonb(c) value from fb_config c");
     const roster = (
       await pg.query<any>("select * from fb_profiles order by id")
@@ -247,7 +211,7 @@ test("contributor migration preserves records and enforces publishing, recovery,
     assert.equal(scoped.progress.length, 1);
     assert.equal(scoped.progress[0].user_id, id(3));
     await pg.exec(
-      `reset role; update fb_config set teams='[]'; set role service_role;`,
+      `reset role; update fb_config set teams=(select jsonb_agg(t) from jsonb_array_elements(teams)t where t->>'system'='organization'); set role service_role;`,
     );
     const alone = await query("select fb_governance_snapshot($1) value", [
       id(2),

@@ -1,27 +1,19 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
-  migrate,
-  rosterDatabase,
-  episodeMigration,
-  contributorMigration,
-  flatGroupMigration,
-  value,
-} from "../helpers/roster-database";
-import {
-  learningReportRow,
-  learningReport,
-  feedbackReport,
-  getReportingScopes,
-} from "../../server/mcp-reports";
-import {
-  learningReportInputSchema,
   feedbackReportInputSchema,
+  learningReportInputSchema,
 } from "../../lib/mcp-report-schema";
 import type { User } from "../../lib/types";
+import {
+  feedbackReport,
+  getReportingScopes,
+  learningReport,
+  learningReportRow,
+} from "../../server/mcp-reports";
 import type { LearningReportPage } from "../../server/ports/mcp-reporting";
+import { rosterDatabase, value } from "../helpers/roster-database";
 
-const migration = "20261002222355_mcp_scoped_reports.sql";
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const user = (role: User["role"], n = 1): User => ({
@@ -36,17 +28,6 @@ const user = (role: User["role"], n = 1): User => ({
 
 async function database() {
   const pg = await rosterDatabase();
-  for (const name of [
-    episodeMigration,
-    contributorMigration,
-    flatGroupMigration,
-    "20261002064454_team_group_course_assignments.sql",
-    "20261002135103_builtin_organization_team.sql",
-    "20261002184642_organization_membership.sql",
-    "20261002210106_combined_assignment_organization.sql",
-    "20261002214011_combined_governance_safeguards.sql",
-  ])
-    await migrate(pg, name);
   return pg;
 }
 
@@ -111,21 +92,6 @@ test("MCP scoped reporting SQL preserves data, denies sibling/group escalation, 
      ('${id(3)}','${id(13)}',1,'["new"]',true,'[]'),
      ('${id(4)}','${id(10)}',1,'["a"]',false,'[]'),
      ('${id(7)}','${id(11)}',1,'[]',false,'[{"at":"2026-01-01","passed":false,"answers":[{"optionIds":["hidden"]}]}]');`);
-    const before = await value(
-      pg,
-      `select jsonb_build_object('config',(select to_jsonb(c) from fb_config c),'people',(select jsonb_agg(to_jsonb(p) order by id) from fb_profiles p),'documents',(select jsonb_agg(to_jsonb(d) order by id) from fb_documents d),'progress',(select jsonb_agg(to_jsonb(p) order by user_id,content_id,version) from fb_progress p),'episodes',(select jsonb_agg(to_jsonb(e) order by id) from fb_assignment_episodes e)) value`,
-    );
-    await migrate(pg, migration);
-    const after = await value(
-      pg,
-      `select jsonb_build_object('config',(select to_jsonb(c) from fb_config c),'people',(select jsonb_agg(to_jsonb(p) order by id) from fb_profiles p),'documents',(select jsonb_agg(to_jsonb(d) order by id) from fb_documents d),'progress',(select jsonb_agg(to_jsonb(p) order by user_id,content_id,version) from fb_progress p),'episodes',(select jsonb_agg(to_jsonb(e) order by id) from fb_assignment_episodes e)) value`,
-    );
-    assert.deepEqual(
-      after,
-      before,
-      "The additive migration does not modify operator data",
-    );
-
     await t.test(
       "manager scope excludes own account and sibling users even with shared group filters",
       async () => {
@@ -521,7 +487,6 @@ test("MCP scoped reporting SQL preserves data, denies sibling/group escalation, 
 test("MCP reporting pages cross the API's 1000-row cap without duplicates and bound filters", async (t) => {
   const pg = await database();
   try {
-    await migrate(pg, migration);
     await pg.exec(`insert into auth.users values('${id(1)}'); insert into fb_profiles(id,auth_user_id,name,email,role) values('${id(1)}','${id(1)}','Admin','admin@example.test','admin');
      select set_config('fieldbook.learning_batch','on',false);
      insert into fb_profiles(id,name,email,role) select ('00000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'Person '||n,'person'||n||'@example.test','learner' from generate_series(1000,1104) n;

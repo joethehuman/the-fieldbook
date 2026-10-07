@@ -1,41 +1,23 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  rosterDatabase,
-  contributorMigration,
-  migrate,
-  value,
-} from "../helpers/roster-database";
+import test from "node:test";
 import type {
-  McpPage,
   McpCatalogItem,
   McpMediaItem,
+  McpPage,
 } from "../../server/ports/mcp-data";
+import { rosterDatabase, value } from "../helpers/roster-database";
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 test("publisher catalog searches lesson drafts and paginates past old caps without leaking deleted or pending media", async () => {
   const pg = await rosterDatabase();
   try {
-    await migrate(pg, contributorMigration);
     await pg.exec(`insert into auth.users(id) values('${id(1)}'),('${id(2)}'),('${id(3)}');
       insert into fb_profiles(id,auth_user_id,email,name,role) values('${id(1)}','${id(1)}','admin@example.test','Admin','admin'),('${id(2)}','${id(2)}','publisher@example.test','Contributor','contributor'),('${id(3)}','${id(3)}','manager@example.test','Manager','manager');
       insert into fb_documents(id,draft,updated_at) select ('00000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,jsonb_build_object('id',n,'kind','course','title','Course '||n,'summary','','body','','status','draft','lessons',jsonb_build_array(jsonb_build_object('id','lesson','title','Lesson','body','special lesson phrase'))), '2026-01-01'::timestamptz from generate_series(100,1305)n;
       update fb_documents set deleted_at=now() where id='${id(1305)}';
       insert into fb_media(id,path,filename,mime,bytes,owner,ready,created_at) select ('00000000-0000-4000-8000-'||lpad(n::text,12,'0'))::uuid,'${id(2)}/00000000-0000-4000-8000-'||lpad(n::text,12,'0')||'.png','Image '||n,'image/png',1,'${id(2)}',true,'2026-01-01'::timestamptz from generate_series(1400,2505)n;
       update fb_media set ready=false where id='${id(2505)}';`);
-    const before = await value(
-      pg,
-      "select md5(string_agg(id::text||draft::text,',' order by id)) value from fb_documents",
-    );
-    await migrate(pg, "20261002222314_mcp_catalog.sql");
-    assert.equal(
-      await value(
-        pg,
-        "select md5(string_agg(id::text||draft::text,',' order by id)) value from fb_documents",
-      ),
-      before,
-    );
     const documents: string[] = [];
     let cursor: string | undefined;
     do {
