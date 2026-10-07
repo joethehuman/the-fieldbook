@@ -120,8 +120,8 @@ end $$;
 revoke all on function public.fb_allow_request from public,anon,authenticated;
 grant execute on function public.fb_allow_request to service_role;
 
-insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
-values('fieldbook-media','fieldbook-media',false,52428800,array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm'])
+insert into storage.buckets(id,name,public,allowed_mime_types)
+values('fieldbook-media','fieldbook-media',false,array['image/jpeg','image/png','image/webp','image/gif','video/mp4','video/webm'])
 on conflict(id) do nothing;
 -- No storage policies: only server-issued, path-specific signed upload/read URLs.
 -- End 202609190001_fieldbook.sql

@@ -36,17 +36,14 @@ A parent layout owns the space between sections. A field group owns the space be
 
 The workspace owns normal page scrolling. Nested lists may scroll when bounded, but short screens and enlarged text must still reach every control. Do not solve a sizing problem with a global overflow lock. Tables and horizontal strips scroll within their own containers without trapping vertical page scroll.
 
-Use semantic elements, accessible names, visible focus, and keyboard-operable controls. Check empty, loading, error, disabled, selected, and long-content states. Review desktop, tablet, phone, and enlarged-text layouts. An attractive initial screenshot does not establish that a control works after filtering, opening a menu, or saving.
+Use semantic elements, accessible names, visible focus, and keyboard-operable controls. Check the states and layouts affected by the change, including empty, loading, error, disabled, selected, long-content, and enlarged-text states where relevant. Review desktop, tablet, and phone layouts when the change can affect them. Exercise affected interactions such as filtering, opening menus, and saving.
 
 ## Verify interface work
 
-When adding or changing a shared component, show representative states in the demo's `/ui` catalog using the actual component, and document any non-obvious usage or accessibility rules. The catalog uses synthetic content; it does not supply runtime components to the installed interface. Run checks appropriate to the change:
+When adding or changing a shared component, show representative states in the demo's `/ui` catalog using the actual component, and document any non-obvious usage or accessibility rules. The catalog uses synthetic content; it does not supply runtime components to the installed interface.
 
-~~~sh
-pnpm check:ui
-pnpm test:ui
-~~~
+Run `pnpm check:ui` and relevant browser tests for the changed behavior. Review both apps when shared behavior changes.
 
-Build the demo and install the browser required by Playwright before its browser tests, as described by the scripts in package.json. Review the resulting screenshots as well as test output. Check both apps for shared changes. A local browser check does not prove a hosted installation's authentication or data behavior.
+Before running demo browser tests, build the demo and install the Playwright browser if needed. Available test commands are in `package.json`. Review the resulting screenshots as well as test output. A local browser check does not prove a hosted installation's authentication or data behavior.
 
 Adapted component-source attribution is in [third-party notices](third-party-notices.md).

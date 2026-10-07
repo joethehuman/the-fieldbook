@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createInterface } from "node:readline/promises";
@@ -45,6 +46,46 @@ function validateOrigin(value) {
 
 function sqlString(value) {
   return `'${value.replaceAll("'", "''")}'`;
+}
+
+/** Resume only a fully migrated, unused installation whose final connection is missing. */
+export function setupGuardSql(versions) {
+  if (!versions.length || versions.some((version) => !/^\d+$/.test(version))) {
+    throw new Error("Fieldbook migration versions are missing or invalid.");
+  }
+  const expected = versions.toSorted().map(sqlString).join(",");
+  return `DO $$ BEGIN
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_class
+      WHERE relnamespace = 'public'::regnamespace
+        AND relkind IN ('r', 'p', 'v', 'm') AND relname <> 'spatial_ref_sys'
+    ) THEN RETURN; END IF;
+    IF to_regclass('public.fb_config') IS NULL
+      OR to_regclass('public.fb_profiles') IS NULL
+      OR to_regclass('public.fb_documents') IS NULL
+      OR to_regclass('public.fb_media') IS NULL
+      OR to_regclass('public.fb_cleanup_config') IS NULL
+      OR to_regclass('supabase_migrations.schema_migrations') IS NULL
+    THEN RAISE EXCEPTION 'This project is not an empty or unfinished Fieldbook installation'; END IF;
+    IF EXISTS (
+      SELECT 1 FROM pg_class
+      WHERE relnamespace = 'public'::regnamespace
+        AND relkind IN ('r', 'p', 'v', 'm') AND relname <> 'spatial_ref_sys'
+        AND left(relname, 3) <> 'fb_'
+    ) THEN RAISE EXCEPTION 'This project contains another application'; END IF;
+    IF (SELECT array_agg(version::text ORDER BY version::text)
+        FROM supabase_migrations.schema_migrations)
+      IS DISTINCT FROM ARRAY[${expected}]::text[]
+    THEN RAISE EXCEPTION 'Migration history differs from this source; review the earlier setup error or use the upgrade guide'; END IF;
+    IF EXISTS (SELECT 1 FROM public.fb_profiles)
+      OR EXISTS (SELECT 1 FROM public.fb_documents)
+      OR EXISTS (SELECT 1 FROM public.fb_media)
+      OR (SELECT count(*) FROM public.fb_config) <> 1
+      OR (SELECT count(*) FROM public.fb_cleanup_config) <> 1
+      OR EXISTS (SELECT 1 FROM public.fb_cleanup_config WHERE endpoint IS NOT NULL)
+    THEN RAISE EXCEPTION 'Fieldbook is already configured or contains records; use the upgrade guide'; END IF;
+    RAISE NOTICE 'Finishing the interrupted Fieldbook installation';
+  END $$;`;
 }
 
 async function run(...args) {
@@ -118,7 +159,7 @@ async function main() {
     );
     console.log(`\nTarget: Supabase ${projectRef} → ${origin}`);
     const answer = (
-      await prompt.question("Set up this empty project? Type SETUP: ")
+      await prompt.question("Set up this new project? Type SETUP: ")
     ).trim();
     if (answer !== "SETUP") throw new Error("Setup cancelled.");
   } finally {
@@ -130,19 +171,10 @@ async function main() {
   console.log("Connecting to Supabase...");
   if (!process.env.SUPABASE_ACCESS_TOKEN) await run("login", "--no-browser");
   await run("link", "--project-ref", projectRef);
-  await run(
-    "db",
-    "query",
-    "--linked",
-    `DO $$ BEGIN
-      IF EXISTS (
-        SELECT 1 FROM pg_class
-        WHERE relnamespace = 'public'::regnamespace
-          AND relkind IN ('r', 'p', 'v', 'm')
-          AND relname <> 'spatial_ref_sys'
-      ) THEN RAISE EXCEPTION 'This project already has application data'; END IF;
-    END $$;`,
-  );
+  const versions = readdirSync(resolve(root, "supabase/migrations"))
+    .filter((name) => /^\d+_.+\.sql$/.test(name))
+    .map((name) => name.split("_")[0]);
+  await run("db", "query", "--linked", setupGuardSql(versions));
   console.log("Installing Fieldbook's database...");
   await run("db", "push", "--linked", "--yes");
 
@@ -172,7 +204,12 @@ async function main() {
   );
 }
 
-main().catch((error) => {
-  console.error(`Database setup: ${error.message}`);
-  process.exitCode = 1;
-});
+if (
+  process.argv[1] &&
+  resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  main().catch((error) => {
+    console.error(`Database setup: ${error.message}`);
+    process.exitCode = 1;
+  });
+}

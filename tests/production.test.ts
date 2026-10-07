@@ -79,6 +79,10 @@ test("database migrations preserve drafts, enforce revisions, isolate browser ac
       "202609190002_mcp_audience.sql",
     ])
       await pg.exec(migrationSql(name));
+    const bucket = await pg.query<{ public: boolean; file_size_limit: number | null }>(
+      "select public,file_size_limit from storage.buckets where id='fieldbook-media'",
+    );
+    assert.deepEqual(bucket.rows, [{ public: false, file_size_limit: null }]);
     const id = crypto.randomUUID(),
       user = crypto.randomUUID(),
       other = crypto.randomUUID();
