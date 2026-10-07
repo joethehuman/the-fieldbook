@@ -12,6 +12,8 @@ export async function recordProgress(user: User | null, input: unknown) {
   const parsed = progressSchema.safeParse(input);
   if (!parsed.success) throw new HttpError(400, "Invalid progress request.");
   const a = parsed.data;
+  if (a.guestImport && !user)
+    throw new HttpError(401, "Sign in to save browser progress.");
   const c = await dataStore().readPublishedCourse(a.contentId);
   if (!c || c.kind !== "course") throw new HttpError(404, "Course not found.");
   if (c.version !== a.version)
