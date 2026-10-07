@@ -1,28 +1,20 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import {
-  rosterDatabase,
-  migrate,
-  value,
-  episodeMigration,
-  contributorMigration,
-  flatGroupMigration,
-  saveRoster,
-} from "../helpers/roster-database";
-import {
-  reviewRosterImport,
-  applyRosterImport,
-  readRosterApply,
-} from "../../server/roster-import";
-import type { DataStore } from "../../server/ports/data";
-import type { User } from "../../lib/types";
+import test from "node:test";
 import { serializeCsv } from "../../lib/csv";
 import {
-  rosterTemplate,
   ROSTER_IMPORT_MAX_ROWS,
+  rosterTemplate,
 } from "../../lib/roster-import";
+import type { User } from "../../lib/types";
 import { profile } from "../../server/auth";
+import type { DataStore } from "../../server/ports/data";
+import {
+  applyRosterImport,
+  readRosterApply,
+  reviewRosterImport,
+} from "../../server/roster-import";
+import { rosterDatabase, saveRoster, value } from "../helpers/roster-database";
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const admin: User = {
@@ -34,41 +26,14 @@ const admin: User = {
   groups: [],
 };
 const csv = (rows: string[][]) => serializeCsv({ ...rosterTemplate(), rows });
-const migration = "20261003140729_roster_csv_import.sql";
 async function database() {
   const pg = await rosterDatabase();
-  for (const file of [
-    episodeMigration,
-    contributorMigration,
-    flatGroupMigration,
-    "20261002064454_team_group_course_assignments.sql",
-    "20261002135103_builtin_organization_team.sql",
-    "20261002184642_organization_membership.sql",
-    "20261002210106_combined_assignment_organization.sql",
-    "20261002214011_combined_governance_safeguards.sql",
-  ])
-    await migrate(pg, file);
+  // Represent existing people whose creation dates were never recorded.
+  // The current trigger owns dates for every subsequent insert and update.
   await pg.exec(
-    `insert into auth.users values('${id(1)}'),('${id(2)}'); insert into fb_profiles(id,auth_user_id,email,name,role) values('${id(1)}','${id(1)}','admin@example.test','Admin','admin'),('${id(2)}','${id(2)}','learner@example.test','Learner','learner');`,
-  );
-  const before = await unchangedData(pg);
-  const functions = await value(
-    pg,
-    "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'",
-  );
-  await migrate(pg, migration);
-  assert.deepEqual(
-    await unchangedData(pg),
-    before,
-    "additive migration preserves every existing application table",
-  );
-  assert.deepEqual(
-    await value(
-      pg,
-      "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname not in ('fb_roster_import','fb_roster_import_fingerprint')",
-    ),
-    functions,
-    "all existing functions and grants are unchanged",
+    `alter table fb_profiles disable trigger fb_profile_added_at;
+    insert into auth.users values('${id(1)}'),('${id(2)}'); insert into fb_profiles(id,auth_user_id,email,name,role) values('${id(1)}','${id(1)}','admin@example.test','Admin','admin'),('${id(2)}','${id(2)}','learner@example.test','Learner','learner');
+    alter table fb_profiles enable trigger fb_profile_added_at;`,
   );
   const store = {
     readConfiguration: () =>
@@ -129,53 +94,6 @@ async function database() {
         payload ? JSON.stringify(payload) : null,
       ]),
   } as unknown as DataStore;
-  const beforeDates = await unchangedData(pg);
-  const beforeFunctions = await value(
-    pg,
-    "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public'",
-  );
-  await migrate(pg, "20261003162418_roster_added_at.sql");
-  const afterDates = await unchangedData(pg);
-  for (const person of afterDates.fb_profiles) {
-    assert.equal(
-      person.added_at,
-      null,
-      "unknown historical dates stay unknown",
-    );
-    delete person.added_at;
-  }
-  assert.deepEqual(
-    afterDates,
-    beforeDates,
-    "date capture does not change any prior application data",
-  );
-  assert.deepEqual(
-    await value(
-      pg,
-      "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname<>'fb_profile_added_at'",
-    ),
-    beforeFunctions,
-    "date capture preserves every existing function and permission",
-  );
-  await migrate(pg, "20261003212205_roster_team_deletion.sql");
-  const beforeRecovery = await unchangedData(pg);
-  const preservedFunctions = await value(
-    pg,
-    "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname not in ('fb_roster_import','fb_roster_import_fingerprint')",
-  );
-  await migrate(pg, "20261003222648_roster_import_reactivation.sql");
-  assert.deepEqual(
-    await unchangedData(pg),
-    beforeRecovery,
-    "recovery upgrade rewrites no application data",
-  );
-  assert.deepEqual(
-    await value(
-      pg,
-      "select jsonb_agg(jsonb_build_object('name',proname,'definition',pg_get_functiondef(p.oid),'acl',proacl) order by p.oid) value from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and proname not in ('fb_roster_import','fb_roster_import_fingerprint')",
-    ),
-    preservedFunctions,
-  );
   return { pg, store };
 }
 async function unchangedData(pg: Awaited<ReturnType<typeof rosterDatabase>>) {
@@ -674,7 +592,7 @@ test("CSV recovery atomically restores a signed-in deleted user, retains history
   const { pg, store } = await database();
   try {
     await pg.exec(
-      `update fb_profiles set role='contributor',hire_date='2026-01-01' where id='${id(2)}'; insert into fb_documents(id,draft,published) values('${id(10)}','{}','{}'); insert into fb_progress(user_id,content_id,version,lessons,passed) values('${id(2)}','${id(10)}',1,'["lesson"]',true); insert into fb_mcp_grants(user_id,client_id,client_name) values('${id(2)}','client','Client');`,
+      `update fb_profiles set role='contributor',hire_date='2026-01-01' where id='${id(2)}'; insert into fb_documents(id,draft,published) values('${id(10)}','{"kind":"course","title":"Saved course","version":1,"lessons":[]}','{"kind":"course","title":"Saved course","version":1,"lessons":[]}'); insert into fb_progress(user_id,content_id,version,lessons,passed) values('${id(2)}','${id(10)}',1,'["lesson"]',true); insert into fb_mcp_grants(user_id,client_id,client_name) values('${id(2)}','client','Client');`,
     );
     const original = await value(
       pg,

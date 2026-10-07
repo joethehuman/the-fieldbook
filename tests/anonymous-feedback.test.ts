@@ -1,28 +1,10 @@
-import { migrationSql } from "./helpers/migration-sql.mjs";
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
+import { test } from "node:test";
 import { feedbackRows } from "../lib/reporting";
 import { freshWorkspace } from "../lib/store";
+import { database, seedProfile } from "./helpers/database.mjs";
 
-test("administrator feedback labels anonymous submissions as guest visitors", () => {
-  const workspace = freshWorkspace();
-  const content = workspace.content[0];
-  workspace.feedback = [
-    {
-      id: crypto.randomUUID(),
-      userId: "guest",
-      contentId: content.id,
-      version: content.version,
-      rating: "up",
-      comment: "Helpful",
-      updatedAt: "2026-09-24T00:00:00.000Z",
-    },
-  ];
-  assert.equal(feedbackRows(workspace)[0].person, "Guest visitor");
-});
-
-test("general feedback appears in administrator reports without a content item", () => {
+test("feedback reports label guests and general submissions without a content item", () => {
   const workspace = freshWorkspace();
   workspace.feedback = [
     {
@@ -30,7 +12,7 @@ test("general feedback appears in administrator reports without a content item",
       userId: "guest",
       rating: "down",
       comment: "Navigation was confusing",
-      updatedAt: "2026-09-26T00:00:00.000Z",
+      updatedAt: "2026-09-26T00:00:00Z",
     },
   ];
   const row = feedbackRows(workspace)[0];
@@ -41,126 +23,94 @@ test("general feedback appears in administrator reports without a content item",
   assert.equal(feedbackRows(workspace, "doc").length, 0);
 });
 
-test("general feedback migration preserves content rows and requires matched content fields", async () => {
-  const pg = new PGlite();
+test("feedback keeps separate account/guest submissions, enforces authorship and paired content fields, and denies direct browser access", async () => {
+  const pg = await database();
   try {
-    await pg.exec(
-      "create role anon;create role authenticated;create role service_role;create role supabase_auth_admin;create schema auth;create table auth.users(id uuid primary key);create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);",
+    const user = crypto.randomUUID(),
+      content = crypto.randomUUID();
+    await seedProfile(pg, user);
+    await pg.query(
+      "insert into fb_documents(id,draft,published) values($1,$2,$2)",
+      [content, { kind: "doc", title: "Document", body: "Useful", version: 1 }],
     );
-    for (const file of [
-      "202609190001_fieldbook.sql",
-      "20260924150351_anonymous_feedback.sql",
-      "20260926182840_general_feedback.sql",
+    const first = crypto.randomUUID(),
+      second = crypto.randomUUID();
+    await pg.query(
+      "insert into fb_feedback(id,user_id,content_id,version,rating,comment) values($1,$3,$4,1,'up','First'),($2,$3,$4,1,'down','Second')",
+      [first, second, user, content],
+    );
+    await pg.query(
+      "insert into fb_feedback(id,guest_key,content_id,version,rating,comment) values($1,$3,$4,1,'up','Guest one'),($2,$3,$4,1,'down','Guest two')",
+      [crypto.randomUUID(), crypto.randomUUID(), "a".repeat(64), content],
+    );
+    await pg.query(
+      "insert into fb_feedback(id,user_id,rating,comment) values($1,$2,'up','General')",
+      [crypto.randomUUID(), user],
+    );
+    assert.equal((await pg.query("select * from fb_feedback")).rows.length, 5);
+    await pg.query(
+      "update fb_feedback set comment='Comment on first entry' where id=$1",
+      [first],
+    );
+    assert.equal(
+      (
+        await pg.query<{ comment: string }>(
+          "select comment from fb_feedback where id=$1",
+          [second],
+        )
+      ).rows[0].comment,
+      "Second",
+    );
+    for (const entry of [
+      { id: crypto.randomUUID(), rating: "up", comment: "Missing author" },
+      {
+        id: crypto.randomUUID(),
+        user_id: user,
+        guest_key: "a".repeat(64),
+        rating: "up",
+        comment: "Two authors",
+      },
+      {
+        id: crypto.randomUUID(),
+        guest_key: "invalid",
+        rating: "up",
+        comment: "Bad guest key",
+      },
+      {
+        id: crypto.randomUUID(),
+        user_id: user,
+        content_id: content,
+        rating: "up",
+        comment: "Missing version",
+      },
+      {
+        id: crypto.randomUUID(),
+        user_id: user,
+        version: 1,
+        rating: "up",
+        comment: "Missing content",
+      },
     ]) {
-      await pg.exec(migrationSql(file));
+      const keys = Object.keys(entry);
+      await assert.rejects(
+        pg.query(
+          `insert into fb_feedback(${keys.join(",")}) values(${keys.map((_, i) => "$" + (i + 1)).join(",")})`,
+          Object.values(entry),
+        ),
+      );
     }
-    const userId = crypto.randomUUID();
-    const contentId = crypto.randomUUID();
-    await pg.query("insert into auth.users(id) values($1)", [userId]);
-    await pg.query(
-      "insert into public.fb_documents(id,draft,published) values($1,'{}','{}')",
-      [contentId],
-    );
-    await pg.query(
-      "insert into public.fb_feedback(id,user_id,content_id,version,rating,comment) values($1,$2,$3,1,'up','Item')",
-      [crypto.randomUUID(), userId, contentId],
-    );
-    await pg.query(
-      "insert into public.fb_feedback(id,user_id,rating,comment) values($1,$2,'down','General')",
-      [crypto.randomUUID(), userId],
-    );
-    await pg.query(
-      "insert into public.fb_feedback(id,guest_key,rating,comment) values($1,$2,'up','Guest general')",
-      [crypto.randomUUID(), "a".repeat(64)],
-    );
-    const rows = await pg.query<{
-      content_id: string | null;
-      version: number | null;
-    }>("select content_id,version from public.fb_feedback order by comment");
-    assert.deepEqual(
-      rows.rows.map((row) => [row.content_id, row.version]),
-      [
-        [null, null],
-        [null, null],
-        [contentId, 1],
-      ],
-    );
-    await assert.rejects(
-      pg.query(
-        "insert into public.fb_feedback(id,user_id,content_id,rating,comment) values($1,$2,$3,'up','Invalid')",
-        [crypto.randomUUID(), userId, contentId],
-      ),
-    );
-    await assert.rejects(
-      pg.query(
-        "insert into public.fb_feedback(id,user_id,version,rating,comment) values($1,$2,1,'up','Invalid')",
-        [crypto.randomUUID(), userId],
-      ),
-    );
-    await pg.exec("set role anon");
-    await assert.rejects(pg.query("select * from public.fb_feedback"));
-  } finally {
-    await pg.close();
-  }
-});
-
-test("anonymous feedback migration preserves account rows and isolates guest identity", async () => {
-  const pg = new PGlite();
-  try {
-    await pg.exec(
-      "create role anon;create role authenticated;create role service_role;create role supabase_auth_admin;create schema auth;create table auth.users(id uuid primary key);create schema storage;create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);",
-    );
-    await pg.exec(migrationSql("202609190001_fieldbook.sql"));
-    const userId = crypto.randomUUID();
-    const contentId = crypto.randomUUID();
-    await pg.query("insert into auth.users(id) values($1)", [userId]);
-    await pg.query(
-      "insert into public.fb_documents(id,draft,published) values($1,'{}','{}')",
-      [contentId],
-    );
-    await pg.query(
-      "insert into public.fb_feedback(id,user_id,content_id,version,rating,comment) values($1,$2,$3,1,'up','Account response')",
-      [crypto.randomUUID(), userId, contentId],
-    );
-    await pg.exec(migrationSql("20260924150351_anonymous_feedback.sql"));
-    const guestKey = "a".repeat(64);
-    await pg.query(
-      "insert into public.fb_feedback(id,guest_key,content_id,version,rating,comment) values($1,$2,$3,1,'down','Guest response')",
-      [crypto.randomUUID(), guestKey, contentId],
-    );
-    await pg.query(
-      "insert into public.fb_feedback(id,guest_key,content_id,version,rating,comment) values($1,$2,$3,1,'up','Updated') on conflict(guest_key,content_id) do update set rating=excluded.rating,comment=excluded.comment",
-      [crypto.randomUUID(), guestKey, contentId],
-    );
-    const result = await pg.query<{
-      user_id: string | null;
-      guest_key: string | null;
-      comment: string;
-    }>(
-      "select user_id,guest_key,comment from public.fb_feedback order by comment",
-    );
-    assert.deepEqual(
-      result.rows.map((row) => [row.user_id, row.guest_key, row.comment]),
-      [
-        [userId, null, "Account response"],
-        [null, guestKey, "Updated"],
-      ],
-    );
-    await assert.rejects(
-      pg.query(
-        "insert into public.fb_feedback(id,content_id,version,rating,comment) values($1,$2,1,'up','Invalid')",
-        [crypto.randomUUID(), contentId],
-      ),
-    );
-    await assert.rejects(
-      pg.query(
-        "insert into public.fb_feedback(id,user_id,guest_key,content_id,version,rating,comment) values($1,$2,$3,$4,1,'up','Invalid')",
-        [crypto.randomUUID(), userId, "b".repeat(64), contentId],
-      ),
-    );
-    await pg.exec("set role anon");
-    await assert.rejects(pg.query("select * from public.fb_feedback"));
-    await pg.exec("reset role");
+    await pg.query("delete from fb_feedback where id=any($1::uuid[])", [
+      [first, second],
+    ]);
+    assert.equal((await pg.query("select * from fb_feedback")).rows.length, 3);
+    for (const role of ["anon", "authenticated"]) {
+      await pg.exec("set role " + role);
+      await assert.rejects(
+        pg.query("select * from fb_feedback"),
+        /permission denied/,
+      );
+      await pg.exec("reset role");
+    }
   } finally {
     await pg.close();
   }

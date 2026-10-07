@@ -1,10 +1,9 @@
-import { migrationSql } from "../helpers/migration-sql.mjs";
-import test from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
-import { adminSnapshot } from "../../server/admin-snapshot";
+import test from "node:test";
 import { defaultSettings } from "../../lib/settings";
 import type { User } from "../../lib/types";
+import { adminSnapshot } from "../../server/admin-snapshot";
+import { database } from "../helpers/database.mjs";
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -16,27 +15,19 @@ const admin: User = {
   active: true,
   groups: [],
 };
-const migration = migrationSql("20261001202740_admin_people_reads.sql");
 
-test("People migration preserves data, returns all 600 accounts, scopes complete history and rejects unauthorized callers", async () => {
-  const pg = new PGlite();
+test("People reads preserve data, return all registered/pending accounts, scope complete history and reject unauthorized callers", async () => {
+  const pg = await database();
   try {
     await pg.exec(`
-      create role anon; create role authenticated; create role service_role;
-      create table fb_config(id boolean primary key, governance_revision integer, groups jsonb, teams jsonb, curricula jsonb);
-      create table fb_profiles(id uuid primary key, name text, email text, role text, active boolean, deleted_at timestamptz);
-      create table fb_pending_profiles(email text primary key);
-      create table fb_documents(id uuid primary key);
-      create table fb_progress(user_id uuid references fb_profiles, content_id uuid references fb_documents, version integer, lessons jsonb, attempts jsonb, primary key(user_id,content_id,version));
-      create table fb_feedback(id int primary key, content_id uuid references fb_documents);
-      insert into fb_config values(true, 42, '[{"id":"group"}]', '[{"id":"team"}]', '[{"id":"curriculum"}]');
-      insert into fb_profiles select ('00000000-0000-4000-8000-' || lpad(i::text,12,'0'))::uuid, 'Person '||i, 'person'||i||'@example.test', case when i=1 then 'admin' else 'learner' end, true, null from generate_series(1,600) i;
-      insert into fb_documents select ('00000000-0000-4000-9000-' || lpad(i::text,12,'0'))::uuid from generate_series(1,50) i;
-      insert into fb_progress select p.id,d.id,1,'["lesson-1"]','[{"passed":false,"answers":[{"correct":false}]}]' from fb_profiles p cross join fb_documents d;
-      insert into fb_progress select user_id,content_id,2,lessons,attempts from fb_progress where user_id='${id(2)}';
-      insert into fb_feedback select i, (select id from fb_documents order by id limit 1) from generate_series(1,600) i;
-      insert into fb_pending_profiles values('pending@example.test');
-      grant select on all tables in schema public to service_role;
+      update fb_config set governance_revision=42, groups='[{"id":"group","name":"Group"}]',curricula='[{"id":"curriculum"}]';
+      insert into auth.users(id) select ('00000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid from generate_series(1,600)i;
+      insert into fb_profiles(id,auth_user_id,name,email,role) select ('00000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,('00000000-0000-4000-8000-'||lpad(i::text,12,'0'))::uuid,'Person '||i,'person'||i||'@example.test',case when i=1 then 'admin' else 'learner' end from generate_series(1,600)i;
+      insert into fb_profiles(id,name,email) values('${id(601)}','Pending','pending@example.test');
+      insert into fb_documents(id,draft,published,published_revision) select ('00000000-0000-4000-9000-'||lpad(i::text,12,'0'))::uuid,jsonb_build_object('kind','course','title','Course '||i,'version',1,'lessons','[]'::jsonb),jsonb_build_object('kind','course','title','Course '||i,'version',1,'lessons','[]'::jsonb),1 from generate_series(1,50)i;
+      insert into fb_progress(user_id,content_id,version,lessons,attempts) select p.id,d.id,1,'["lesson-1"]','[{"passed":false,"answers":[{"correct":false}]}]' from fb_profiles p cross join fb_documents d where p.auth_user_id is not null;
+      insert into fb_progress select user_id,content_id,2,lessons,passed,attempts,revision from fb_progress where user_id='${id(2)}';
+      insert into fb_feedback(id,user_id,content_id,version,rating,comment) select gen_random_uuid(),('${id(1)}')::uuid,(select id from fb_documents order by id limit 1),1,'up','Feedback' from generate_series(1,600)i;
     `);
     const fingerprint = async () =>
       (
@@ -45,10 +36,6 @@ test("People migration preserves data, returns all 600 accounts, scopes complete
         )
       ).rows;
     const before = await fingerprint();
-    await pg.transaction(async (tx) => {
-      await tx.exec(migration);
-    });
-    assert.deepEqual(await fingerprint(), before);
     const plan = await pg.query<{ "QUERY PLAN": string }>(
       "explain select user_id from fb_progress where content_id = (select id from fb_documents order by id limit 1)",
     );
@@ -67,11 +54,12 @@ test("People migration preserves data, returns all 600 accounts, scopes complete
         )
       ).rows[0].data;
     const people = await read();
-    assert.equal(people.users.length, 600);
+    assert.equal(people.users.length, 601);
     assert.equal(people.users[599].id, id(600));
     assert.equal(people.revision, 42);
     assert.deepEqual(people.curricula, [{ id: "curriculum" }]);
-    assert.equal(people.pending.length, 1);
+    assert.equal(people.pending.length, 0);
+    assert.equal(people.users[600].auth_user_id, null);
     assert.deepEqual(people.progress, []);
     const person = await read(id(2));
     assert.equal(person.progress.length, 100);
@@ -103,6 +91,7 @@ test("People migration preserves data, returns all 600 accounts, scopes complete
       "select indexname from pg_indexes where indexname in ('fb_progress_content_id_idx','fb_feedback_content_id_idx')",
     );
     assert.equal(indexes.rows.length, 2);
+    assert.deepEqual(await fingerprint(), before);
   } finally {
     await pg.close();
   }

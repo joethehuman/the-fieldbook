@@ -1,30 +1,7 @@
-import {
-  rosterDatabase,
-  migrate,
-  episodeMigration,
-  contributorMigration,
-  flatGroupMigration,
-  value,
-} from "./roster-database";
-export const progressMigration = "20261002232135_progress_report.sql";
+import { rosterDatabase, value } from "./roster-database";
 export const personId = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
-export async function progressDatabase() {
-  const pg = await rosterDatabase();
-  for (const n of [
-    episodeMigration,
-    contributorMigration,
-    flatGroupMigration,
-    "20261002064454_team_group_course_assignments.sql",
-    "20261002135103_builtin_organization_team.sql",
-    "20261002184642_organization_membership.sql",
-    "20261002210106_combined_assignment_organization.sql",
-    "20261002214011_combined_governance_safeguards.sql",
-    "20261002222355_mcp_scoped_reports.sql",
-  ])
-    await migrate(pg, n);
-  return pg;
-}
+export const progressDatabase = rosterDatabase;
 export async function progressSeed(
   pg: Awaited<ReturnType<typeof progressDatabase>>,
 ) {

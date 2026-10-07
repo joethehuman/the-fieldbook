@@ -1,11 +1,8 @@
-import { migrationSql } from "./helpers/migration-sql.mjs";
-import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { PGlite } from "@electric-sql/pglite";
-import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
+import { test } from "node:test";
 import { demoSearch, makeResult, sourcePassages } from "../lib/search";
-const migration = "20260921205449_published_search.sql";
+import { database } from "./helpers/database.mjs";
 export const queries = [
   ["Disaster recovery", "Disaster recovery"],
   ["wal archive", "Disaster recovery"],
@@ -16,22 +13,8 @@ export const queries = [
   ["zzqxvnothing", ""],
 ] as const;
 test("indexed published retrieval: benchmark, publication lifecycle, source identity and grants", async () => {
-  const pg = new PGlite({ extensions: { pg_trgm } });
+  const pg = await database();
   try {
-    await pg.exec(
-      "create role anon; create role authenticated; create role service_role bypassrls; create role supabase_auth_admin; create schema auth; create table auth.users(id uuid primary key); create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);",
-    );
-    for (const name of [
-      "202609190001_fieldbook.sql",
-      "202609190002_mcp_audience.sql",
-      "202609200001_governance.sql",
-      "202609200002_assignments.sql",
-      "202609200003_required_learning.sql",
-      "202609200004_learning_groups.sql",
-    ]) {
-      await pg.exec(migrationSql(name));
-    }
-    await pg.exec(migrationSql(migration));
     await pg.exec(` insert into fb_documents(id,draft,published,published_revision) values('00000000-0000-4000-8000-000000000001','{"title":"draftsecret"}',
  '{"kind":"doc","title":"Disaster recovery","summary":"Restore a service safely","body":"Use a wal archive to restore your database.","updatedAt":"2020-01-01T00:00:00Z","questions":[{"answer":"answersecret"}]}',4);`);
     await pg.exec(`insert into fb_documents(id,draft,published,published_revision) values('00000000-0000-4000-8000-000000000002','{}',

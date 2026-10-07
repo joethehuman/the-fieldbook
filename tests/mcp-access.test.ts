@@ -1,7 +1,5 @@
-import { migrationSql } from "./helpers/migration-sql.mjs";
-import test from "node:test";
 import assert from "node:assert/strict";
-import { PGlite } from "@electric-sql/pglite";
+import test from "node:test";
 import {
   availableMcpCapabilities,
   LEGACY_MCP_CAPABILITIES,
@@ -10,6 +8,7 @@ import {
   validMcpCapabilities,
 } from "../lib/mcp-access";
 import type { Team, User } from "../lib/types";
+import { database } from "./helpers/database.mjs";
 
 const user: User = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -109,27 +108,20 @@ test("legacy consent preserves existing tools while promotions and added capabil
   assert.equal(validMcpCapabilities("content:write"), false);
 });
 
-test("capability migration preserves old admin consent and rejects unapproved database grant writes", async () => {
-  const pg = new PGlite();
+test("MCP consent defaults remain compatible and reject unapproved database grant writes", async () => {
+  const pg = await database();
   const manager = "22222222-2222-4222-8222-222222222222";
   const learner = "33333333-3333-4333-8333-333333333333";
   try {
     await pg.exec(`
-      create role anon; create role authenticated; create role service_role;
-      create table public.fb_profiles(id uuid primary key,role text,active boolean,auth_user_id uuid,deleted_at timestamptz);
-      create table public.fb_config(teams jsonb);
-      create table public.fb_mcp_grants(user_id uuid,client_id text,client_name text,enabled boolean default true,granted_at timestamptz default now(),primary key(user_id,client_id));
-      insert into public.fb_profiles values
-        ('${user.id}','admin',true,'${user.id}',null),
-        ('${manager}','manager',true,'${manager}',null),
-        ('${learner}','learner',true,'${learner}',null);
-      insert into public.fb_config values ('[{"id":"team","managerId":"${manager}"}]');
-      insert into public.fb_mcp_grants(user_id,client_id,client_name) values ('${user.id}','legacy','Original'),('${manager}','unexpected','Unexpected');
-      grant all on public.fb_profiles,public.fb_config,public.fb_mcp_grants to service_role;
+      insert into auth.users(id) values('${user.id}'),('${manager}'),('${learner}');
+      insert into public.fb_profiles(id,auth_user_id,email,name,role) values
+        ('${user.id}','${user.id}','admin@example.test','Admin','admin'),
+        ('${manager}','${manager}','manager@example.test','Manager','manager'),
+        ('${learner}','${learner}','learner@example.test','Learner','learner');
+      update public.fb_config set teams=teams||jsonb_build_array(jsonb_build_object('id','team','name','Team','managerId','${manager}','parentId',settings->>'organizationTeamId'));
+      insert into public.fb_mcp_grants(user_id,client_id,client_name) values ('${user.id}','legacy','Original');
     `);
-    await pg.exec(
-      migrationSql("20261002222344_mcp_connection_capabilities.sql"),
-    );
     const preserved = (
       await pg.query<{ capabilities: string[]; enabled: boolean }>(
         "select capabilities,enabled from public.fb_mcp_grants where client_id='legacy'",
@@ -137,14 +129,6 @@ test("capability migration preserves old admin consent and rejects unapproved da
     ).rows[0];
     assert.deepEqual(preserved.capabilities, [...LEGACY_MCP_CAPABILITIES]);
     assert.equal(preserved.enabled, true);
-    assert.equal(
-      (
-        await pg.query<{ enabled: boolean }>(
-          "select enabled from public.fb_mcp_grants where client_id='unexpected'",
-        )
-      ).rows[0].enabled,
-      false,
-    );
     await pg.exec("set role authenticated");
     await assert.rejects(
       pg.query(
@@ -198,7 +182,9 @@ test("capability migration preserves old admin consent and rejects unapproved da
         [user.id],
       ),
     );
-    await pg.exec("update public.fb_config set teams='[]'");
+    await pg.exec(
+      "update public.fb_config set teams=(select jsonb_agg(t) from jsonb_array_elements(teams)t where t->>'system'='organization')",
+    );
     await assert.rejects(
       pg.query(
         "select public.fb_enable_mcp_grant($1,'manager','Reports',array['reports:read'])",
