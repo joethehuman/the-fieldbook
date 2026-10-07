@@ -40,7 +40,7 @@ create table public.fb_feedback (
   id uuid primary key, user_id uuid not null references auth.users(id) on delete cascade,
   content_id uuid not null references public.fb_documents(id), version integer not null,
   rating text not null check(rating in ('up','down')), comment text not null,
-  updated_at timestamptz not null default now(), unique(user_id,content_id)
+  updated_at timestamptz not null default now()
 );
 create table public.fb_media (
   id uuid primary key, path text unique not null, filename text not null,
@@ -1131,7 +1131,7 @@ end $$;
 -- End 20260923230000_scope_pending_group_cleanup.sql
 
 -- Begin 20260924150351_anonymous_feedback.sql
--- Allow one feedback record per browser/content without creating an account.
+-- Allow guest feedback without creating an account.
 -- The server stores only a hash of its random, HttpOnly browser token.
 alter table public.fb_feedback alter column user_id drop not null;
 alter table public.fb_feedback add column guest_key text;
@@ -1141,14 +1141,13 @@ alter table public.fb_feedback add constraint fb_feedback_one_author check (
 alter table public.fb_feedback add constraint fb_feedback_guest_key_format check (
   guest_key is null or guest_key ~ '^[0-9a-f]{64}$'
 );
-alter table public.fb_feedback add constraint fb_feedback_guest_content_unique
-  unique (guest_key, content_id);
+
 revoke all on public.fb_feedback from anon, authenticated;
 -- End 20260924150351_anonymous_feedback.sql
 
 -- Begin 20260926182840_general_feedback.sql
 -- General account-menu feedback has no content item or version.
--- Existing item feedback and its per-author uniqueness remain unchanged.
+-- Each submission has its own ID, including content and general feedback.
 alter table public.fb_feedback alter column content_id drop not null;
 alter table public.fb_feedback alter column version drop not null;
 alter table public.fb_feedback add constraint fb_feedback_content_pair check (
@@ -1678,6 +1677,8 @@ grant execute on function public.fb_admin_people_snapshot(uuid,uuid) to service_
 -- Content deletion and content-scoped reads need the reverse lookup too.
 create index fb_progress_content_id_idx on public.fb_progress(content_id);
 create index fb_feedback_content_id_idx on public.fb_feedback(content_id);
+create index fb_feedback_user_content_idx on public.fb_feedback(user_id,content_id,updated_at desc);
+create index fb_feedback_guest_content_idx on public.fb_feedback(guest_key,content_id,updated_at desc);
 -- End 20261001202740_admin_people_reads.sql
 
 -- Begin 20261001222227_roster_people.sql

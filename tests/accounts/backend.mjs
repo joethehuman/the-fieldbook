@@ -676,32 +676,36 @@ createServer(async (req, res) => {
       revision: fixtureGeneration,
     });
   if (url.pathname === "/rest/v1/fb_feedback") {
+    const matches = (row) => ["id", "content_id", "guest_key", "user_id"].every((field) => {
+      const value = url.searchParams.get(field);
+      if (!value) return true;
+      if (value === "is.null") return row[field] == null;
+      if (value.startsWith("in.(")) return value.slice(4, -1).split(",").includes(row[field]);
+      return row[field] === value.slice(3);
+    });
     if (req.method === "POST") {
       const row = JSON.parse(body || "{}");
-      if (row.content_id === null) {
-        configuredFeedback.push(row);
-        return send(res, []);
-      }
-      const index = configuredFeedback.findIndex(
-        (entry) =>
-          entry.content_id === row.content_id &&
-          (row.guest_key
-            ? entry.guest_key === row.guest_key
-            : entry.user_id === row.user_id),
-      );
-      if (index < 0) configuredFeedback.push(row);
-      else configuredFeedback[index] = row;
+      if (configuredFeedback.some((entry) => entry.id === row.id))
+        return send(res, { code: "23505", message: 'duplicate key violates unique constraint "fb_feedback_pkey"' }, 409);
+      configuredFeedback.push(row);
       return send(res, []);
     }
-    const rows = configuredFeedback.filter((row) =>
-      ["content_id", "guest_key", "user_id"].every((field) => {
-        const value = url.searchParams.get(field);
-        return !value || row[field] === value.slice(3);
-      }),
-    );
-    return send(res, rows, 200, {
-      "Content-Range": `0-${Math.max(0, rows.length - 1)}/${rows.length}`,
-    });
+    if (req.method === "PATCH") {
+      const changes = JSON.parse(body || "{}");
+      const rows = configuredFeedback.filter(matches);
+      for (const row of rows) Object.assign(row, changes);
+      return send(res, rows);
+    }
+    if (req.method === "DELETE") {
+      const rows = configuredFeedback.filter(matches);
+      configuredFeedback = configuredFeedback.filter((row) => !matches(row));
+      return send(res, rows);
+    }
+    let rows = configuredFeedback.filter(matches);
+    if (url.searchParams.has("order")) rows = rows.toSorted((a, b) => b.updated_at.localeCompare(a.updated_at) || b.id.localeCompare(a.id));
+    const total = rows.length;
+    if (url.searchParams.has("limit")) rows = rows.slice(0, Number(url.searchParams.get("limit")));
+    return send(res, rows, 200, { "Content-Range": `0-${Math.max(0, rows.length - 1)}/${total}` });
   }
   if (
     ["/rest/v1/fb_documents", "/rest/v1/fb_mcp_grants"].includes(url.pathname)

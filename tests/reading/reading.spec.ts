@@ -1649,7 +1649,7 @@ test("content feedback saves ratings and comments with retry and focus return", 
     },
   ]);
   let fail = false;
-  const writes: Array<{ rating: string; comment: string }> = [];
+  const writes: Array<{ rating: string; comment: string; submissionId: string }> = [];
   await page.route("**/api/feedback**", async (route) => {
     if (route.request().method() === "GET")
       return route.fulfill({ json: { saved: null } });
@@ -1660,7 +1660,7 @@ test("content feedback saves ratings and comments with retry and focus return", 
         status: 503,
         json: { error: "Feedback temporarily unavailable. Try again." },
       });
-    await route.fulfill({ json: { saved: true } });
+    await route.fulfill({ json: { saved: true, id: entry.submissionId } });
   });
   await page.goto(`/updates/${ids[1]}`);
   const region = page.getByRole("region", { name: "Content feedback" });
@@ -1705,18 +1705,15 @@ test("content feedback saves ratings and comments with retry and focus return", 
   await region
     .getByRole("button", { name: "Did you find this useful?", exact: true })
     .click();
-  await expect(form.getByRole("textbox")).toHaveValue(
-    "Clear and useful. Keep this draft.",
-  );
-  await form.getByRole("textbox").fill("Unsent draft");
+  const firstId = writes[0].submissionId;
+  expect(writes.slice(0, 3).every((write) => write.submissionId === firstId)).toBe(true);
+  await expect(form.getByRole("textbox")).toHaveValue("");
+  await expect(form.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
+  await form.getByRole("textbox").fill("Another observation");
   await form.getByRole("button", { name: "Not useful", exact: true }).click();
-  await expect(
-    form.getByRole("button", { name: "Send", exact: true }),
-  ).toBeEnabled();
-  expect(writes.at(-1)).toMatchObject({
-    rating: "down",
-    comment: "Clear and useful. Keep this draft.",
-  });
+  await expect(form.getByRole("button", { name: "Send", exact: true })).toBeEnabled();
+  expect(writes.at(-1)).toMatchObject({ rating: "down", comment: "Another observation" });
+  expect(writes.at(-1)!.submissionId).not.toBe(firstId);
   await form.getByRole("textbox").press("Escape");
   await expect(form).toBeHidden();
   await page.screenshot({

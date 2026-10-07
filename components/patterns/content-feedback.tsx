@@ -32,7 +32,11 @@ export function ContentFeedback({
   expanded = false,
 }: {
   saved?: { rating: Rating; comment?: string };
-  onSave: (rating: Rating, comment: string) => void | Promise<void>;
+  onSave: (
+    rating: Rating,
+    comment: string,
+    submissionId: string,
+  ) => void | string | Promise<void | string>;
   disabled?: boolean;
   expanded?: boolean;
 }) {
@@ -48,6 +52,7 @@ export function ContentFeedback({
   const [error, setError] = useState("");
   const [status, setStatus] = useState("");
   const busy = useRef(false);
+  const submissionId = useRef<string | null>(null);
   const trigger = useRef<HTMLButtonElement | null>(null);
   const textarea = useRef<HTMLTextAreaElement | null>(null);
   const id = useId();
@@ -59,8 +64,15 @@ export function ContentFeedback({
     wasOpen.current = open;
   }, [open, desktop]);
 
+  function reset() {
+    submissionId.current = null;
+    setRating(undefined);
+    setComment("");
+    setError("");
+  }
   function close() {
     setOpen(false);
+    reset();
   }
   async function persist(next: Rating, text: string, finish: boolean) {
     if (busy.current || disabled) return;
@@ -69,13 +81,18 @@ export function ContentFeedback({
     setError("");
     setStatus("");
     try {
-      await onSave(next, text.trim());
+      submissionId.current ||= crypto.randomUUID();
+      const savedId = await onSave(next, text.trim(), submissionId.current);
+      if (savedId) submissionId.current = savedId;
       setStatus(
         finish
           ? "Feedback saved."
           : "Rating saved. You can add an optional comment.",
       );
-      if (finish && !expanded) close();
+      if (finish) {
+        if (expanded) reset();
+        else close();
+      }
     } catch (cause) {
       setError(
         cause instanceof Error
@@ -108,7 +125,7 @@ export function ContentFeedback({
           if (!inPanel) trigger.current = event.currentTarget;
           setRating(value);
           setOpen(true);
-          void persist(value, saved?.comment || "", false);
+          void persist(value, comment, false);
         }}
       >
         {value === "up" ? (
@@ -133,7 +150,7 @@ export function ContentFeedback({
       onKeyDown={(event) => {
         if (event.key === "Escape" && !desktop && !expanded) {
           event.preventDefault();
-          close();
+          if (!busy.current) close();
         }
       }}
       onSubmit={(event) => {
@@ -190,6 +207,7 @@ export function ContentFeedback({
             type="button"
             variant="ghost"
             size="sm"
+            disabled={pending}
             className="mr-auto"
             onClick={close}
           >
@@ -223,7 +241,14 @@ export function ContentFeedback({
       aria-label="Content feedback"
       className="flex min-w-0 flex-col items-center"
     >
-      <Popover open={desktop && open} onOpenChange={setOpen}>
+      <Popover
+        open={desktop && open}
+        onOpenChange={(next) => {
+          if (busy.current) return;
+          if (next) setOpen(true);
+          else close();
+        }}
+      >
         <PopoverAnchor asChild>
           <div
             className={cn(
