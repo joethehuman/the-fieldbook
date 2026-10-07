@@ -354,7 +354,7 @@ export default function Fieldbook() {
   const policyHref = privacyHref(branding);
   if (!restored || !data || !user) {
     const picker = (
-      <BrandedAccount branding={brandingFromSettings(branding)}>
+      <BrandedAccount branding={brandingFromSettings(branding)} centered>
         <Badge variant="default">INTERACTIVE DEMO</Badge>
         <h1>Choose a demo profile</h1>
         {!data && error && (
