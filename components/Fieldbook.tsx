@@ -785,6 +785,13 @@ export default function Fieldbook() {
                     );
               }
             }}
+            onDeleteFeedback={async (ids) => {
+              if (!user.active || user.role !== "admin") throw new Error("Administrator access is required.");
+              const latest = loadWorkspace();
+              const next = { ...latest, feedback: (latest.feedback || []).filter((entry) => !ids.includes(entry.id)) };
+              saveWorkspace(next);
+              setData(next);
+            }}
             onBulk={async (action) => {
               const result = applyDemoBulk(data, user, action);
               saveWorkspace(result.data);

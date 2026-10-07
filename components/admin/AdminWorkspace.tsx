@@ -135,6 +135,19 @@ export function AdminWorkspace({
           }}
           user={user}
           onChange={persist}
+          onDeleteFeedback={async (ids) => {
+            setReportIssue("Updating report…");
+            try {
+              setData(await runtime.deleteFeedback(ids));
+              setReportIssue(undefined);
+            } catch (failure) {
+              if (failure instanceof SaveRecoveryError && failure.snapshot) {
+                setData(failure.snapshot);
+                setReportIssue(undefined);
+              } else setReportIssue("Reload the report before exporting after a failed change.");
+              throw failure;
+            }
+          }}
           onImported={async () => {
             setData(await runtime.refresh());
             setError("");

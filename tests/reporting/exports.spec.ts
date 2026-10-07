@@ -133,7 +133,7 @@ export function fixture(): Workspace {
   });
   data.feedback = [
     {
-      id: "f1",
+      id: "00000000-0000-4000-8000-000000000101",
       contentId: "course-1",
       userId: data.users[0].id,
       version: 1,
@@ -142,7 +142,7 @@ export function fixture(): Workspace {
       updatedAt: "2026-09-21T17:30:00Z",
     },
     {
-      id: "f2",
+      id: "00000000-0000-4000-8000-000000000102",
       contentId: "course-1",
       userId: data.users[0].id,
       version: 1,
@@ -151,7 +151,7 @@ export function fixture(): Workspace {
       updatedAt: "2026-09-20T17:30:00Z",
     },
     {
-      id: "f3",
+      id: "00000000-0000-4000-8000-000000000103",
       contentId: "removed",
       userId: "removed",
       version: 1,
@@ -1312,3 +1312,44 @@ for (const scope of ["multiple roots", "Organization"]) {
     await screenshot(page, info, `manager-highest-${scope.replace(" ", "-")}`);
   });
 }
+
+
+test("administrator can cancel, individually delete and bulk-delete filtered feedback", async ({ page }, info) => {
+  const data = fixture();
+  data.feedback!.push({ ...data.feedback![1], id: "00000000-0000-4000-8000-000000000104", updatedAt: "2026-09-19T12:00:00Z" }, {
+    id: "00000000-0000-4000-8000-000000000105", userId: data.users[0].id,
+    rating: "up", comment: "Keep this general feedback", updatedAt: "2026-09-18T12:00:00Z",
+  });
+  await setup(page, info, "admin", data);
+  await section(page, "Feedback");
+  const cards = page.locator('article[data-slot="card"]');
+  await expect(cards).toHaveCount(5);
+  await cards.first().getByRole("button", { name: /^Actions for feedback/ }).click();
+  await page.getByRole("menuitem", { name: "Delete feedback", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("cannot be undone");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(cards).toHaveCount(5);
+  await cards.first().getByRole("button", { name: /^Actions for feedback/ }).click();
+  await page.getByRole("menuitem", { name: "Delete feedback", exact: true }).click();
+  await dialog.getByRole("button", { name: "Delete feedback", exact: true }).click();
+  await expect(cards).toHaveCount(4);
+  await page.getByRole("searchbox", { name: "Search feedback" }).fill("=1+2");
+  await expect(cards).toHaveCount(2);
+  await page.getByRole("checkbox", { name: "Select all filtered feedback", exact: true }).click();
+  await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete selected feedback", exact: true }).click();
+  await expect(dialog).toContainText("2 feedback entries");
+  await screenshot(page, info, "feedback-delete-confirmation");
+  await dialog.getByRole("button", { name: "Delete selected feedback", exact: true }).click();
+  await expect(cards).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Search feedback" }).fill("");
+  await expect(cards).toHaveCount(2);
+  await expect(page.locator(".report-summary")).toContainText("2 ratings");
+  const remaining = await download(page, page.getByRole("button", { name: "Export CSV", exact: true }), info, "feedback-deleted");
+  expect(remaining.rows).toHaveLength(3);
+  expect(remaining.rows.flat()).toContain("Keep this general feedback");
+  expect(remaining.rows.flat()).not.toContain("'=1+2");
+  await page.reload();
+  await expect(cards).toHaveCount(2);
+});

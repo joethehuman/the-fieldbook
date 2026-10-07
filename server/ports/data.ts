@@ -263,11 +263,12 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
   readSavedFeedback(
     contentId: string,
     identity: SavedFeedbackIdentity,
-  ): Promise<Pick<FeedbackRecord, "rating" | "comment"> | null>;
+  ): Promise<Pick<FeedbackRecord, "id" | "rating" | "comment"> | null>;
   saveFeedback(
     record: Omit<FeedbackRecord, "user_id" | "guest_key">,
     identity: SavedFeedbackIdentity,
-  ): Promise<void>;
+  ): Promise<string>;
+  deleteFeedback(ids: string[]): Promise<string[]>;
   consumeRateLimit(
     key: string,
     limit: number,

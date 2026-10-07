@@ -280,6 +280,7 @@ type Props = {
   data: Workspace;
   user: User;
   onImported?: () => Promise<void>;
+  onDeleteFeedback?: (ids: string[]) => Promise<void>;
   onOpenTab?: (tab: string) => Promise<void>;
   onPrepareAssignments?: () => Promise<Workspace>;
   onOpenPersonProgress?: (id: string) => Promise<void>;
@@ -374,6 +375,7 @@ export default function Admin({
   data,
   user,
   onImported,
+  onDeleteFeedback,
   onOpenTab,
   onPrepareAssignments,
   onOpenPersonProgress,
@@ -1326,7 +1328,7 @@ export default function Admin({
                 onSaveDocsNavigation={onSaveDocsNavigation}
               />
             ) : tab === "feedback" ? (
-              <FeedbackAdmin data={data} />
+              <FeedbackAdmin data={data} onDeleteFeedback={admin ? onDeleteFeedback : undefined} />
             ) : tab === "teams" ? (
               <TeamsAdmin
                 key={adminHref(destination)}

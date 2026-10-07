@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     const a = z
       .object({
         contentId: z.uuid().optional(),
+        submissionId: z.uuid().optional(),
         rating: z.enum(["up", "down"]),
         comment: z.string().max(5000),
       })
@@ -59,20 +60,24 @@ export async function POST(req: NextRequest) {
     }
     const c = a.contentId ? await getContent(a.contentId, user) : null;
     if (!c) await canRead(user);
+    const identity = user ? { userId: user.id } : { guestKey: hash(token!) };
+    // Older open readers omit a submission ID. Keep their rating/comment pair
+    // together while new readers explicitly identify each new interaction.
+    const legacy =
+      c && !a.submissionId
+        ? await dataStore().readSavedFeedback(c.id, identity)
+        : null;
     const record = {
-      id: crypto.randomUUID(),
+      id: a.submissionId || legacy?.id || crypto.randomUUID(),
       content_id: c?.id ?? null,
       version: c?.version ?? null,
       rating: a.rating,
       comment: a.comment,
       updated_at: new Date().toISOString(),
     };
-    await dataStore().saveFeedback(
-      record,
-      user ? { userId: user.id } : { guestKey: hash(token!) },
-    );
+    const id = await dataStore().saveFeedback(record, identity);
     const response = NextResponse.json(
-      { saved: true },
+      { saved: true, id },
       { headers: { "Cache-Control": "no-store" } },
     );
     if (token && !existingToken)

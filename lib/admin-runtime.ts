@@ -32,6 +32,7 @@ export type AdminRuntime = {
   ) => Promise<Content>;
   publishedContent: (id: string) => Promise<Content>;
   refresh: () => Promise<Workspace>;
+  deleteFeedback: (ids: string[]) => Promise<Workspace>;
   reviewDeadlines: (
     token?: string,
   ) => Promise<import("./assignment-episodes").DeadlineReview>;
@@ -140,6 +141,22 @@ export function createAdminRuntime(initial: {
   const settingsSaver = createSettingsSaver(request, fresh);
   const docsNavigationSaver = createDocsNavigationSaver(request, fresh);
   return {
+    deleteFeedback: (ids) =>
+      mutate(async () => {
+        try {
+          for (let offset = 0; offset < ids.length; offset += 200) {
+            await request("/api/admin/feedback", {
+              ids: ids.slice(offset, offset + 200),
+            });
+          }
+          clearCached();
+          return await fresh("feedback");
+        } catch (error) {
+          clearCached();
+          const snapshot = await fresh("feedback").catch(() => undefined);
+          throw new SaveRecoveryError((error as Error).message, snapshot);
+        }
+      }),
     upload: uploadMediaFile,
     saveSettings: (before, settings) =>
       mutate(async () => {
