@@ -9,7 +9,6 @@ import { AskAiConversation } from "./AskAiConversation";
 import { ContentSearch } from "./ContentSearch";
 import { SearchPanel } from "./patterns/search-panel";
 import { SearchField } from "./patterns/search-field";
-import { usePhoneLayout } from "./patterns/use-phone-layout";
 import { Toolbar } from "./patterns/layout";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -32,7 +31,6 @@ export function SearchExperience({
   onOpen: (result: SearchResult) => void | Promise<boolean | void>;
 }) {
   const [query, setQuery] = useState("");
-  const phone = usePhoneLayout();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState("search");
   const [draft, setDraft] = useState("");
@@ -90,9 +88,7 @@ export function SearchExperience({
               aria-controls={visible ? id : undefined}
               maxLength={enabled ? 2000 : 160}
               placeholder={
-                enabled
-                  ? (phone ? "Search or Ask AI" : "Search Fieldbook or Ask AI")
-                  : "Search Fieldbook"
+                enabled ? "Search or Ask AI" : "Search Fieldbook"
               }
               value={query}
               onFocus={() => setOpen(!!query.trim())}

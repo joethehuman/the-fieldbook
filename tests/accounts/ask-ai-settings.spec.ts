@@ -160,7 +160,7 @@ test("Admin configures and saves AI without generation; toggles restore search a
   );
   expect(await setupCalls(request)).toBe(0); // Opening Admin and saving never generate
   await expect(
-    page.getByPlaceholder("Search Fieldbook or Ask AI", { exact: true }),
+    page.getByPlaceholder("Search or Ask AI", { exact: true }),
   ).toBeVisible();
   await section(page, "Identity");
   await expect(page.getByRole("alertdialog")).toHaveCount(0);
@@ -210,7 +210,7 @@ test("Admin configures and saves AI without generation; toggles restore search a
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
   await expect(
-    page.getByPlaceholder("Search Fieldbook or Ask AI", { exact: true }),
+    page.getByPlaceholder("Search or Ask AI", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("combobox", { name: "Primary model", exact: true }),
@@ -300,7 +300,7 @@ test("Admin configures and saves AI without generation; toggles restore search a
   );
   await page.goto("/courses");
   await expect(
-    page.getByPlaceholder("Search Fieldbook or Ask AI", { exact: true }),
+    page.getByPlaceholder("Search or Ask AI", { exact: true }),
   ).toBeVisible();
 });
 

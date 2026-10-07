@@ -147,7 +147,7 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
   const input = page.getByRole("textbox", { name: "Search all content" });
   await expect(input).toHaveAttribute(
     "placeholder",
-    "Search Fieldbook or Ask AI",
+    "Search or Ask AI",
   );
   await input.fill("ordinary search");
   await input.press("Enter");
