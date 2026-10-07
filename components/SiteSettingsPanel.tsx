@@ -398,7 +398,7 @@ export default function SiteSettingsPanel({
             className={docsSaveActive ? "rounded-t-none border-t-0" : undefined}
             title={<h3>Document sections</h3>}
             description="Organize top-level sections and their subsections. Documents can sit at either level."
-            guidance="Drag to reorder or move items between sections, or use Move to… in the menus."
+            guidance={docSections.length > 0 ? "Drag to reorder or move items between sections, or use Move to… in the menus." : undefined}
           >
             <DocSectionsSettings
               sections={docSections}
