@@ -20,9 +20,10 @@ test("a built demo keeps its deadline mix on fresh and returning visits months a
     });
   await expect(future).toContainText("Due in 5 days");
   await expect(future).not.toContainText("Past due");
+  await expect(future.locator("time")).toHaveCSS("color", "rgb(102, 102, 102)");
   // Use any overdue original course rather than depending on editorial titles.
   await expect(
-    page.locator(".course-card").filter({ hasText: "Due 28 days ago" }),
+    page.locator(".course-card").filter({ hasText: "28 days past due" }),
   ).toHaveCount(3);
   const progress = await page.evaluate(
     () => JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!).progress,
@@ -33,10 +34,13 @@ test("a built demo keeps its deadline mix on fresh and returning visits months a
   await expect(future).toContainText("Due in 5 days");
   const pastCards = page
     .locator(".course-card")
-    .filter({ hasText: "Due 28 days ago" });
+    .filter({ hasText: "28 days past due" });
   await expect(pastCards).toHaveCount(3);
-  for (const past of await pastCards.all())
+  for (const past of await pastCards.all()) {
     await expect(past).toContainText("Past due");
+    await expect(past.locator("time")).toContainText("28 days past due");
+    await expect(past.locator("time")).toHaveCSS("color", "rgb(180, 35, 24)");
+  }
   const saved = await page.evaluate(() =>
     JSON.parse(localStorage.getItem("fieldbook.workspace.v1")!),
   );

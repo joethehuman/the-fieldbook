@@ -7,16 +7,24 @@ import { CardArtwork } from "./patterns/card-artwork";
 import { todayUTC } from "@/lib/learning";
 import type { SiteSettings } from "@/lib/settings";
 import type { Content } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 function dueLabel(dueDate: string) {
   const target = Date.parse(`${dueDate}T00:00:00Z`);
   if (!Number.isFinite(target)) return undefined;
   const today = Date.parse(`${todayUTC()}T00:00:00Z`);
   const days = Math.round((target - today) / 86_400_000);
-  if (days === 0) return "Due today";
-  if (days > 0) return `Due in ${days} ${days === 1 ? "day" : "days"}`;
-  const elapsed = -days;
-  return `Due ${elapsed} ${elapsed === 1 ? "day" : "days"} ago`;
+  const count = Math.abs(days);
+  const unit = count === 1 ? "day" : "days";
+  return {
+    text:
+      days === 0
+        ? "Due today"
+        : days > 0
+          ? `Due in ${count} ${unit}`
+          : `${count} ${unit} past due`,
+    pastDue: days < 0,
+  };
 }
 
 export function CourseCard({
@@ -75,10 +83,13 @@ export function CourseCard({
         dueText ? (
           <time
             dateTime={visibleDueDate}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"
+            className={cn(
+              "inline-flex items-center gap-1.5 text-xs font-medium",
+              dueText.pastDue ? "text-destructive" : "text-muted-foreground",
+            )}
           >
             <CalendarDays size={14} strokeWidth={1.6} aria-hidden="true" />
-            {dueText}
+            {dueText.text}
           </time>
         ) : undefined
       }

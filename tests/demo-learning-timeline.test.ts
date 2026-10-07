@@ -80,7 +80,7 @@ test("fresh and reset samples keep real upcoming/overdue card and report states 
     assert.doesNotMatch(future, />Past due</);
     const past = card(data, "course-6");
     assert.match(past, />Past due</);
-    assert.match(past, /Due 28 days ago/);
+    assert.match(past, /28 days past due/);
     const detail = localProgressDetail(data, admin(data));
     assert.equal(
       detail.courses.find((course) => course.id === "course-7")!.dueDate,
@@ -117,7 +117,7 @@ test("an existing browser refreshes and persists dates six months later without 
   t.mock.timers.setTime(Date.parse("2027-04-07T12:00:00Z"));
   const after = loadWorkspace();
   assert.match(card(after, "course-7"), /Due in 5 days/);
-  assert.match(card(after, "course-6"), /Due 28 days ago/);
+  assert.match(card(after, "course-6"), /28 days past due/);
   assert.deepEqual(after.progress, before.progress);
   assert.equal(
     JSON.parse(values.get("fieldbook.workspace.v1")!).demoLearningDay,
@@ -141,7 +141,7 @@ test("original fixed-date browsers upgrade automatically while older unrelated f
   saveWorkspace(legacy);
   const upgraded = loadWorkspace();
   assert.match(card(upgraded, "course-7"), /Due in 5 days/);
-  assert.match(card(upgraded, "course-6"), /Due 28 days ago/);
+  assert.match(card(upgraded, "course-6"), /28 days past due/);
   assert.equal(
     upgraded.users.find((person) => person.id === "demo-contributor")!
       .learningAssignments![0].dueDate,
