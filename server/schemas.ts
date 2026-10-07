@@ -282,6 +282,7 @@ export const settingsSchema = z
     }
   });
 export const progressSchema = z.object({
+  guestImport: z.boolean().optional(),
   contentId: z.uuid(),
   version: z.number().int().positive(),
   lessonId: text(100).optional(),
