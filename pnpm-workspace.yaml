@@ -1,5 +1,10 @@
 packages:
   - demo
+# Patched transitive dependencies.
+overrides:
+  sharp: 0.35.5
+  source-map-js: 1.2.2
+  compression: 1.8.2
 allowBuilds:
   esbuild: true
 onlyBuiltDependencies:

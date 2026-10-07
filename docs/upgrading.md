@@ -1,24 +1,43 @@
 # Upgrade a Fieldbook installation
 
-An installation runs a specific Git commit and its matching database schema. Upstream changes do not update your deployment or Supabase project automatically. Choose an available release tag or an exact reviewed commit, and record what you deploy. Keep a production branch under your control so you can review an update before Vercel deploys it.
+Choose the release you want to run. Read its release information for configuration changes, database migrations and any required deployment order. Preserve your installation's environment settings and custom source changes.
 
-## Before changing production
+## Application updates
 
-1. Read the target release notes and the changes since your installed commit. Identify new migrations in supabase/migrations/ and any configuration or provider changes. Do not infer required steps from a version number alone.
-2. Back up the **database and private Storage files separately**. Record the current deployment commit, environment configuration, and migrations already applied. Test a restore in an isolated project before depending on those backups.
-3. Bring the selected target commit into a separate update branch. Resolve conflicts with your custom changes and review the resulting diff. Install locked dependencies and run checks relevant to the changed behavior.
-4. Rehearse the upgrade with a separate Supabase project and deployment. Never give a preview the production backend secrets or point its deletion worker at the production app. Verify sign-in, content, progress, media, and any optional MCP or AI features you use.
+Bring the selected release into the branch Vercel deploys from your own repository. From your local copy, replace the placeholders with the release tag and your deployment branch:
 
-## Apply and verify
+```sh
+git fetch https://github.com/joethehuman/the-fieldbook.git tag RELEASE_TAG
+git switch YOUR_DEPLOYMENT_BRANCH
+git merge RELEASE_TAG
+git push origin YOUR_DEPLOYMENT_BRANCH
+```
 
-For an installation created with the fresh-install baseline, link the Supabase CLI to the correct project, review `supabase db push --dry-run`, and apply only the pending migrations with `supabase db push` at the stage required by the release. Never run `supabase db reset --linked` on an installation with data. A Vercel build does not update its database.
+Resolve any conflicts with your custom changes before pushing.
 
-If a migration changes tables or functions used by the running app, stop writes or use a maintenance window until compatible code is deployed. Read the migration and release notes for its required deployment order. Deploy the reviewed code to your production branch after the required schema is ready.
+A push to the configured production branch starts Vercel's deployment. Afterward, check the changed behavior in your installation and note the deployed release or commit. A separate preview is available if you want to try the update first.
 
-Check the exact deployed commit and test owner and learner sign-in, draft/publication access, learner progress, uploads, and the admin tasks your installation uses. Verify the deletion worker's endpoint and first scheduled run if that feature changed. Record the new commit and applied migrations privately.
+If the release has no new database migrations, no database command is needed. Release 1 starts with the single `20261006061752_initial_install.sql` baseline.
+
+## Releases with database changes
+
+New SQL files in `supabase/migrations/` are applied separately from application deployment. Follow the release's compatibility and deployment order. Use a maintenance window only if the change requires one. Choose backups or a rehearsal according to the change and the data you need to protect.
+
+From a local copy of the target release, use the pinned CLI without installing it globally:
+
+```sh
+npx --yes supabase@2.119.0 --agent no --output-format text login --no-browser
+npx --yes supabase@2.119.0 --agent no --output-format text link --project-ref YOUR_PROJECT_REF
+npx --yes supabase@2.119.0 --agent no --output-format text db push --linked --dry-run
+npx --yes supabase@2.119.0 --agent no --output-format text db push --linked
+```
+
+Confirm the project reference and pending migrations before applying them. An application build does not migrate the database. Never run `supabase db reset --linked` or the fresh-install setup command against an installation with data. Stop and read the error if a migration fails.
+
+After the update, check the affected features and existing records. Keep the deployed version and migration record available for the next update.
 
 ## Rollback
 
-Keep the prior deployment available. Rolling back code does **not** reverse SQL migrations, provider settings, or content written after the change. Use the old code only if it remains compatible with the new schema. Otherwise stop writes and use a tested restore or forward fix. Restoring an older backup can lose later data, including Auth and media changes.
+The prior application deployment can be restored if it remains compatible with the current database. Rolling back code does not reverse migrations, provider settings or later data writes. An incompatible database change may need a forward fix or a chosen recovery point; restoring older data can lose newer records and uploads.
 
-For first-time setup, follow [installation](installation.md). Storage file-size limits are operator settings and may need adjustment after an upgrade; see [upload limits](installation.md#media-and-upload-limits).
+For first-time setup, follow [installation](installation.md).

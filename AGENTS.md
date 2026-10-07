@@ -47,8 +47,8 @@ Run `pnpm check:providers` after changes to provider integrations or boundaries.
 - Keep private media private and server credentials out of browser code. Use synthetic records in tests, examples, logs, and screenshots.
 - Keep operator accounts, branding, content, and deployment secrets outside reusable source. For vulnerabilities, follow [SECURITY.md](SECURITY.md).
 
-Add a new migration for schema changes; never rewrite a migration that may already have run. Rehearse changes outside production and document compatibility and deployment order. Treat application deployment and database migration as separate operations.
-Keep `node scripts/setup-database.mjs` working for a fresh project when adding migrations. Test both a fresh install from the baseline plus later migrations and an upgrade from the preceding schema.
+Add a new migration for schema changes; do not rewrite migrations shipped in a release. Document compatibility and deployment order. Treat application deployment and database migration as separate operations.
+Keep `node scripts/setup-database.mjs` working when adding migrations. Verify fresh setup and upgrades of existing data with checks that match the change's risk, using local or available non-production environments. A new hosted project is not a default requirement.
 
 ## Verify and explain the change
 

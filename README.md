@@ -7,15 +7,15 @@ The documented installation uses **Vercel, hosted Supabase, and Google sign-in**
 ## Start here
 
 - [Install Fieldbook](docs/installation.md) from your own accounts. The guide covers the single database setup command, hosting, sign-in, media, and first-use checks.
-- [Upgrade an installation](docs/upgrading.md) with separate database and media backups, a migration record, and an isolated rehearsal.
+- [Upgrade an installation](docs/upgrading.md), including any database changes required by the release.
 - [Contribute](CONTRIBUTING.md) or read the [agent instructions](AGENTS.md) and [design system](docs/design-system.md) before changing the software.
 - Read the [license](LICENSE), [third-party notices](docs/third-party-notices.md), and [security reporting instructions](SECURITY.md).
 
-The installation is a Next.js application backed by Supabase Database, Auth, and private Storage. Google accounts sign in through Supabase Auth. Administrators can create and publish content, manage people and assignments, and review feedback and progress. Published content is available to everyone admitted to an installation; learning groups guide relevance and assignments rather than content access. Teams separately scope manager reporting.
+The installation is a Next.js application backed by Supabase Database, Auth, and private Storage. Google accounts sign in through Supabase Auth. Administrators can create and publish content, manage people and assignments, and review feedback and progress. Published content is available to everyone admitted to an installation; learning groups guide relevance and assignments rather than content access. Teams separately scope manager reporting. Fieldbook is developed with AI-assisted coding.
 
-Search is built in. Learner Ask AI and the authenticated administrator MCP endpoint are optional; each requires its own configuration. The demo can illustrate the interface, but its simulated identities and data must not be used to judge production permissions or persistence.
+Search is built in. Ask AI and the authenticated MCP endpoint are optional. MCP access follows the account's publishing or reporting permissions and the connection's approved capabilities. The demo can illustrate the interface, but its simulated identities and data do not establish installed permissions or persistence.
 
-## Run locally
+## Local development (optional)
 
 Use Node.js 22.x and pnpm 10.17.1. Configure a separate development Supabase project in a root .env.local file before starting the installed application. Never use production credentials for local development.
 

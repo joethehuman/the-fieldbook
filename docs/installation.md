@@ -1,87 +1,94 @@
 # Install The Fieldbook
 
-This guide installs the server application from the repository root. The optional demo/ app uses fictional browser-local data and is not an installation. The supported setup is **Vercel, hosted Supabase, and Google sign-in**. You need your own GitHub, Vercel, Supabase, and Google Cloud accounts. A custom domain and AI client are optional.
+The supported setup is Next.js on Vercel, hosted Supabase for database, authentication and private media, and Google sign-in. You need your own GitHub, Vercel, Supabase and Google Cloud accounts, plus Node.js 22 on your computer to run database setup. A custom domain is optional.
 
-Use an available release tag or an exact reviewed commit. Keep a record of that commit and your applied migrations. Do not connect a live installation directly to an upstream development branch if you want to control upgrades.
+## 1. Get the source and create a Supabase project
 
-## 1. Create a Supabase project
+Copy or fork [the Fieldbook repository](https://github.com/joethehuman/the-fieldbook) into your own GitHub account. Choose a release tag or commit and keep a local copy of that same source version. Your repository and deployment branch control when you take updates. Preserve the ELv2 license and third-party notices.
 
-Create a dedicated, empty hosted Supabase project. Keep its database password and project credentials secure. Note the 20-letter project reference in its dashboard URL. Do not use an existing installation's database for first-time setup; use [upgrading](upgrading.md) for that database.
+Create a dedicated, empty hosted Supabase project. Note its project reference, project URL, publishable key and server-only secret key. Keep its database password and credentials secure. For an existing Fieldbook database, follow [upgrading](upgrading.md).
 
 ## 2. Configure Vercel
 
-Import **your own repository and chosen production branch** into Vercel. Use the Next.js preset, Node.js 22.x, the repository root as Root Directory (leave that field empty), the default Next.js output directory, `pnpm install --frozen-lockfile` as the install command, and `pnpm build` as the build command. Set these environment variables for the installed app:
+Import your repository into Vercel and choose its production branch. Use:
 
-| Variable                             | Value                                                              |
-| ------------------------------------ | ------------------------------------------------------------------ |
-| NEXT_PUBLIC_SUPABASE_URL             | Your Supabase project URL                                          |
-| NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY | Its publishable key                                                |
-| SUPABASE_SECRET_KEY                  | Its server-only secret key                                         |
-| FIELDBOOK_URL                        | The canonical HTTPS origin of this installation, with no path      |
-| FIELDBOOK_OWNER_EMAIL                | The exact Google email that will bootstrap the first administrator |
-| FIELDBOOK_APP_KIND                   | installed                                                          |
+| Setting          | Value                            |
+| ---------------- | -------------------------------- |
+| Framework        | Next.js                          |
+| Root Directory   | Repository root; leave empty     |
+| Node.js          | 22.x                             |
+| Install Command  | `pnpm install --frozen-lockfile` |
+| Build Command    | `pnpm build`                     |
+| Output Directory | Next.js default                  |
 
-The root [.env.example](../.env.example) lists optional settings. Copy the complete Supabase secret key, not an abbreviated value shown in a dashboard preview. Never put SUPABASE_SECRET_KEY in a NEXT_PUBLIC_ variable or commit deployment secrets. On Vercel, the included Analytics and Speed Insights integrations default on; set FIELDBOOK_VERCEL_ANALYTICS_ENABLED=false or FIELDBOOK_VERCEL_SPEED_INSIGHTS_ENABLED=false before deployment if you do not want them. Match your privacy policy to the services you enable. A second Vercel project rooted at demo/ is optional; set its FIELDBOOK_APP_KIND to demo and enable files outside that root. Demo data does not migrate to Supabase.
+Add these variables to Vercel's **Production** environment:
 
-For a preview that needs real writes, use a **separate** Supabase project and Google OAuth configuration. Set FIELDBOOK_ENVIRONMENT=preview and FIELDBOOK_PREVIEW_SUPABASE_REF to that project's reference. Never connect a preview to the production backend.
+| Variable                               | Value                                        |
+| -------------------------------------- | -------------------------------------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Your Supabase project URL                    |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Its publishable key                          |
+| `SUPABASE_SECRET_KEY`                  | Its complete server-only secret key          |
+| `FIELDBOOK_URL`                        | Your canonical HTTPS origin, with no path    |
+| `FIELDBOOK_OWNER_EMAIL`                | The Google email for the first administrator |
+| `FIELDBOOK_APP_KIND`                   | `installed`                                  |
+
+Never put the secret key in a `NEXT_PUBLIC_` variable or commit credentials. Copy the complete key rather than an abbreviated dashboard display.
+
+Deploy the app. You can use its assigned Vercel domain. If that address differs from `FIELDBOOK_URL`, correct the variable and redeploy. Environment changes take effect after redeployment.
+
+On Vercel, Analytics and Speed Insights default on. Set `FIELDBOOK_VERCEL_ANALYTICS_ENABLED=false` or `FIELDBOOK_VERCEL_SPEED_INSIGHTS_ENABLED=false` to disable either. Other optional settings are listed in [.env.example](../.env.example).
 
 ## 3. Set up the database
 
-After the app is deployed, run this once from a local copy of the same repository commit with Node.js 22:
+From the root of your local source copy, with Node.js 22, run:
 
 ```sh
 node scripts/setup-database.mjs
 ```
 
-The guided command asks for the Supabase project reference and the deployed Fieldbook HTTPS address. Sign in to Supabase when prompted, and confirm the project shown before setup begins. It checks that the database is empty, installs Fieldbook's schema, connects the hourly deletion cleanup, and checks its settings, private media bucket, and cleanup schedule. The same command includes later database changes when setting up a new project. It does not reset an existing database.
+Enter the Supabase project reference and deployed Fieldbook HTTPS address. Confirm the target by typing `SETUP`. Open the Supabase login link in your browser and complete verification when prompted.
 
-The command downloads a specific Supabase CLI version as needed; no separate CLI installation is required. Keep Supabase credentials out of repository files. If setup stops, read the error before retrying; a partially installed project should be reviewed rather than treated as empty. The deployed address must accept requests directly, without a sign-in screen or deployment protection in front of the cleanup route.
+The command downloads a pinned Supabase CLI, applies the database migrations, creates the private media bucket and connects hourly deletion cleanup. No separate CLI installation, Docker or individual SQL commands are needed.
 
-The guided command keeps the CLI in interactive text mode, including when launched by a coding agent. Open the Supabase login link it prints in your browser and complete the requested verification. The command does not open a browser automatically.
+The cleanup route must be reachable without Vercel deployment protection. Fieldbook's members-only browsing setting does not block this route.
+
+If the database migrations finished but the final cleanup connection failed, rerun the same command. It can finish an unused installation with matching migrations and no configured cleanup endpoint. It refuses configured installations, existing content, people or media, and unrelated application tables. If a migration itself failed, read the Supabase error before retrying; do not reset a database with data.
 
 ## 4. Configure Google sign-in
 
-In Google Cloud, create or select a project and configure its OAuth branding and audience. For a first private test, select **External** and **Testing**, add the administrator's Google address as a test user, and use the basic `openid`, `email`, and `profile` scopes. Then create a Google OAuth **web client**. Give Google this authorized redirect URI, replacing PROJECT_REF with your Supabase project reference:
+In Google Cloud, create or select a project. Configure its OAuth audience and branding for your intended users, using only the basic `openid`, email and profile identity scopes. Create an OAuth **Web application** client.
 
-```text
-https://PROJECT_REF.supabase.co/auth/v1/callback
-```
+- Authorized JavaScript origin: your `FIELDBOOK_URL`.
+- Authorized redirect URI: `https://PROJECT_REF.supabase.co/auth/v1/callback`.
 
-In Supabase Auth, enable the Google provider with that client's ID and secret. Set the Supabase **Site URL** to your FIELDBOOK_URL and allow this exact application callback:
+In Supabase Auth, enable the **Google** provider and enter the client ID and client secret. Under **URL Configuration**, set **Site URL** to `FIELDBOOK_URL` and allow:
 
 ```text
 https://YOUR-FIELDBOOK-HOST/auth/callback
 ```
 
-These are different callbacks: Google returns to Supabase; Supabase returns to Fieldbook. Avoid wildcard production callback domains. Google's Testing audience permits only configured test users; configure its public audience and branding when you open sign-in more widely. See [Supabase's Google setup](https://supabase.com/docs/guides/auth/social-login/auth-google) and [redirect URL guidance](https://supabase.com/docs/guides/auth/redirect-urls).
+Google returns to Supabase; Supabase returns to Fieldbook. Use the exact callback shown by your Supabase project. See [Supabase's Google setup](https://supabase.com/docs/guides/auth/social-login/auth-google).
 
-Sign in with FIELDBOOK_OWNER_EMAIL. The first verified sign-in at that address creates the administrator profile. Other accounts do not choose their own role. The owner variable does not transfer or demote an existing administrator if changed later.
+Google's Testing allowlist has an exception for apps using only these basic identity scopes. Use Fieldbook's registration setting to control admission. [Google's audience guidance](https://developers.google.com/identity/protocols/oauth2/production-readiness/overview) explains its account and publishing options.
 
-## 5. Finish the installation
+Sign in with `FIELDBOOK_OWNER_EMAIL`. The first verified registration at that address creates the administrator. Changing the variable later does not transfer an existing administrator or promote an already registered learner.
 
-In Admin, set the installation name, public or members-only access, registration choice, and an accurate privacy-policy link for **your** installation. Closed registration requires an administrator to preregister a person's Google email in People; no invitation email is sent. Create a draft, publish it, and check the result as a separate reader. A new Supabase project has no demo content.
+## 5. Start using Fieldbook
 
-The database setup command connects scheduled cleanup to this deployed Fieldbook. It checks that the worker route is reachable and the database schedule exists. After the first hourly run, confirm that the worker request received HTTP 200 and `fb_cleanup_config.last_run` updated. A Cron History entry alone does not prove the app accepted the request. Deleted content and accounts have a 30-day recovery window before permanent cleanup.
+Open **Manage organization → Access** and choose public or members-only browsing and open or closed registration. A new installation defaults to public browsing and open registration. Closed registration requires preregistering a person's Google email in **People**; no invitation email is sent.
 
-### Media and upload limits
+Create and publish your first content, then open it as a reader. A new database has no demo content. Installation name, home page, privacy notice, teams, learning audiences and due dates can be configured as needed.
 
-The fieldbook-media bucket must remain private. The initial migration may set a 50 MB bucket limit. In Supabase Storage settings, choose the global limit allowed by your plan and adjust the bucket limit deliberately; upgrading a plan does not change either setting automatically. Optional FIELDBOOK_UPLOAD_MAX_BYTES is a separate application limit. Fieldbook accepts JPG, PNG, WebP, GIF, MP4, and WebM; it does not transcode video. Larger files use signed chunked uploads directly to Supabase Storage. Test a representative upload and playback. Back up Storage files separately from the database.
+The media bucket stays private. Upload size depends on your storage provider and bucket settings; Fieldbook adds a size limit only if you set `FIELDBOOK_UPLOAD_MAX_BYTES`. Supported uploads are JPG, PNG, WebP, GIF, MP4 and WebM. Fieldbook does not transcode video.
 
-## Optional AI connections
+Deleted content and accounts have a 30-day recovery window, followed by hourly permanent cleanup. If cleanup needs attention, **Recently deleted** shows the operator warning.
 
-The installed app exposes an authenticated MCP endpoint at FIELDBOOK_URL/api/mcp. To use it, enable Supabase Auth's OAuth 2.1 Server, set its consent path to /oauth/consent, enable the Custom Access Token Hook public.fb_access_token_hook, and use asymmetric JWT signing keys so Fieldbook can verify tokens through the project's JWKS. Register an AI client with its exact callback, connect to the HTTPS MCP endpoint, approve its requested capabilities, and call get_capabilities. Some clients request `offline_access` to refresh their sign-in; this does not grant Fieldbook tool permissions. Test a disposable draft, separate publication, and revocation from /connections. Access depends on both the user's current Fieldbook role and that connection's approved capabilities. Keep temporary media transfer URLs out of published content. See the [MCP setup guide](https://www.thefieldbook.org/docs/76be7ee8-371d-4ed0-b57f-1277460df3fe) for client-specific steps.
+## Optional services and development
 
-Learner Ask AI is separate and off by default. Its implemented router is Vercel AI Gateway; configure a model and the installation setting only if you intend to use it. The optional AI_GATEWAY_API_KEY supports local or alternative credentials. Basic reading and admin work do not require either AI feature. See the [Ask AI setup guide](https://www.thefieldbook.org/docs/02dbd607-82c5-46ed-9877-debc2c24538a) for provider and model checks.
-
-## Verify before use
-
-- Owner sign-in works; a learner cannot see drafts, admin controls, or other learners' data.
-- Public or members-only browsing and registration follow the settings you chose.
-- Publication appears to an admitted reader; learner progress persists across devices.
-- Image and video upload/playback work, while draft media remains private.
-- The privacy link names your operator and policy.
-- The deletion worker endpoint responds and its scheduled run succeeds.
-- If enabled, MCP consent, permitted tools, and revocation work from a real client.
-- Database **and** media backups restore in an isolated environment.
-
-For local development, copy .env.example to a root .env.local and use a dedicated development Supabase project. Configure its application callback for http://127.0.0.1:3000 and use that origin as FIELDBOOK_URL. The Google callback still points to the development Supabase project. Run pnpm install --frozen-lockfile and pnpm dev; use pnpm dev:demo for the browser-local demo.
+- **Ask AI:** off by default; [configure it](https://www.thefieldbook.org/docs/02dbd607-82c5-46ed-9877-debc2c24538a) if you want generated answers from published content.
+- **MCP:** [configure authorization and an AI client](https://www.thefieldbook.org/docs/76be7ee8-371d-4ed0-b57f-1277460df3fe) if publishing or reporting accounts need external AI tools.
+- **Privacy notice:** host a notice in Fieldbook or link to an existing one if you choose to publish one.
+- **Backups:** choose your own recovery arrangements. Supabase's [database backup options](https://supabase.com/docs/guides/platform/backups) depend on the plan; database backups do not include uploaded Storage file bytes.
+- **Previews:** optional. Use a separate Supabase project and Google configuration. Vercel detects preview deployments automatically; set `FIELDBOOK_PREVIEW_SUPABASE_REF` to that backend's reference alongside its credentials. The app checks that its URL matches the declared reference. Keep production credentials out of previews.
+- **Local development:** copy `.env.example` to `.env.local` with a dedicated development backend. Set `FIELDBOOK_URL=http://127.0.0.1:3000` and allow that origin's `/auth/callback` in Supabase. Run `pnpm install --frozen-lockfile` and `pnpm dev`.
+- **Demo:** `pnpm dev:demo` runs fictional browser-local data without a backend. It is a separate optional app and does not provision an installation.

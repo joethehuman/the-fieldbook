@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -50,7 +50,13 @@ function inspect(directory) {
       violations.push(`${name}: bypasses the service composition boundary`);
   }
 }
-for (const directory of ["app", "demo/app", "server", "lib", "components"])
+for (const directory of [
+  "app",
+  "server",
+  "lib",
+  "components",
+  ...(existsSync(resolve(root, "demo/app")) ? ["demo/app"] : []),
+])
   inspect(resolve(root, directory));
 const proxy = readFileSync(resolve(root, "proxy.ts"), "utf8");
 if (/["']@supabase\//.test(proxy))
