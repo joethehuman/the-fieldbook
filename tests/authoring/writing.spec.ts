@@ -602,7 +602,7 @@ test("formatting controls, keyboard save and responsive settings", async ({
   expect((await read()).publishedContent![0].body).toBe("A short update");
   await openContentSettings(page);
   await expect(
-    page.getByRole("heading", { name: "Audience", exact: true }),
+    page.getByRole("heading", { name: "Assign", exact: true }),
   ).toBeVisible();
   await closeContentSettings(page);
   await page.evaluate(() => (document.documentElement.style.fontSize = "200%"));

@@ -1053,7 +1053,7 @@ for (const kind of ["doc", "brief", "course"] as const)
       await expect(panel.getByRole("heading", { name: "Before publishing", exact: true })).toHaveCount(0);
       const headings = ["Short description", kind === "doc" ? "Section" : "Category"];
       if (kind !== "doc") {
-        headings.push("Audience");
+        headings.push("Assign");
         if (kind === "course" && (await fixture.read()).content[0].questions.length > 0) headings.push("Quiz");
         headings.push("Card artwork");
       }
@@ -1465,7 +1465,7 @@ test("Quiz uses lesson title typography and stays pinned while the course title 
   }
 });
 
-test("course Quiz settings follow Audience, save the passing rule and hide without a quiz", async ({ page }, info) => {
+test("course Quiz settings follow Assign, save the passing rule and hide without a quiz", async ({ page }, info) => {
   const { read } = await open(page, info.project.name.startsWith("production"), "course", 2, (item) => { item.questions = []; item.requirePassing = false; });
   const details = page.getByRole("button", { name: "Details", exact: true });
   const outline = page.getByRole("button", { name: "Outline", exact: true });
@@ -1482,7 +1482,7 @@ test("course Quiz settings follow Audience, save the passing rule and hide witho
   await showDetails();
   panel = page.getByRole("complementary", { name: "Content details", exact: true });
   const headings = await panel.getByRole("heading").allTextContents();
-  expect(headings.indexOf("Quiz")).toBe(headings.indexOf("Audience") + 1);
+  expect(headings.indexOf("Quiz")).toBe(headings.indexOf("Assign") + 1);
   expect(headings.indexOf("Card artwork")).toBe(headings.indexOf("Quiz") + 1);
   const requirement = panel.getByRole("checkbox", { name: "Require all answers correct to complete", exact: true });
   await expect(requirement).not.toBeChecked();

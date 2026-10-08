@@ -2755,7 +2755,7 @@ export function Editor({
       {c.kind !== "doc" && (
         <EditorDetailsGroup
           id="content-assignments"
-          title="Audience"
+          title="Assign"
         >
           {c.kind === "brief" ? (
             <LearningAssignmentPicker
