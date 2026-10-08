@@ -5,7 +5,7 @@ import { expect, type Page } from "@playwright/test";
 export async function waitForDraftSaved(page: Page) {
   await expect(
     page.locator(".editor-save-status [role=status] > .sr-only"),
-  ).toHaveText(/^Saved(?:\. Unpublished edits)?$/);
+  ).toHaveText("Saved");
 }
 
 export async function openContentSettings(page: Page) {
@@ -74,4 +74,17 @@ export async function replaceWritingText(page: Page, text: string) {
     if (i) await page.keyboard.press("Enter");
     await page.keyboard.insertText(paragraphs[i]);
   }
+}
+
+
+/** Desktop has a canvas Back action; compact editors use the existing account menu. */
+export async function returnToContent(page: Page) {
+  const back = page.getByRole("button", { name: "Back to content", exact: true });
+  if (await back.isVisible()) { await back.click(); return; }
+  const account = page.getByRole("button", { name: "Account menu", exact: true });
+  if (!await account.isVisible()) await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+  await account.click();
+  const content = page.getByRole("menuitem", { name: "Manage content", exact: true });
+  if (await content.isVisible()) await content.click();
+  else await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
 }

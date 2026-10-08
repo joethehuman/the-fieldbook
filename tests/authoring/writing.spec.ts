@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { downloadMarkdown, expectMarkdown, replaceWritingText, waitForDraftSaved, openContentSettings, closeContentSettings } from "./editor-helpers";
+import { downloadMarkdown, expectMarkdown, replaceWritingText, waitForDraftSaved, openContentSettings, closeContentSettings, returnToContent } from "./editor-helpers";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -273,9 +273,7 @@ async function setup(
   );
   await page.goto(production ? `/admin/content/${itemId}/edit` : "/#admin");
   if (!production) await page.getByRole("link", { name: item.title, exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Back to content", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".editor")).toBeVisible();
   const read = async (): Promise<Workspace> =>
     production
       ? state
@@ -325,16 +323,12 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
     equivalentMarkdown(original, draft.replace(/A private addition\./, "")),
   ).toBe(true);
   expect((await read()).publishedContent![0].body).toBe(original);
-  await page
-    .getByRole("button", { name: "Back to content", exact: true })
-    .click();
+  await returnToContent(page);
   await expect(
     page.getByText("Unpublished edits", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Back to content", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".editor")).toBeVisible();
   await expect(editor).toContainText("A private addition.");
   await page
     .getByRole("button", { name: "Publish", exact: true })
@@ -345,9 +339,7 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
     path: info.outputPath("writing-editor.png"),
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "Back to content", exact: true })
-    .click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Unpublish", exact: true }).click();
   await page
     .getByRole("alertdialog")
@@ -373,7 +365,7 @@ test("resized Doc tables persist through save, reopen, publish, and reading", as
   await waitForDraftSaved(page);
   const saved = (await read()).content[0].body;
   expect(saved).toContain("fieldbook-table-widths:v1");
-  await page.getByRole("button", { name: "Back to content", exact: true }).click();
+  await returnToContent(page);
   await page.goto(`/admin/content/${itemId}/edit`);
   await expect(page.getByRole("separator", { name: "Resize column 2" })).toBeVisible();
   expect((await downloadMarkdown(page)).body).toBe(saved);
@@ -680,9 +672,7 @@ for (const kind of ["Doc", "Update"]) {
       ).not.toHaveValue("");
     }
     await closeContentSettings(page);
-    await page
-      .getByRole("button", { name: "Back to content", exact: true })
-      .click();
+    await returnToContent(page);
     await page.getByRole("button", { name: kind, exact: true }).click();
     await page.getByLabel("Title", { exact: true }).fill(`New ${kind}`);
     await openContentSettings(page);
@@ -754,9 +744,7 @@ for (const kind of ["Doc", "Update"]) {
       expect(saved?.folder).toBe("New organization name");
     }
     await closeContentSettings(page);
-    await page
-      .getByRole("button", { name: "Back to content", exact: true })
-      .click();
+    await returnToContent(page);
     await page
       .getByRole("row")
       .filter({ hasText: `New ${kind}` })

@@ -289,8 +289,8 @@ export function LibraryExamples() {
           <EditorSaveStatus status="Not saved" published={false} />
           <EditorSaveStatus status="Saved" published={false} />
           <EditorSaveStatus status="Saved" published />
-          <EditorSaveStatus status="Saved" published hasUnpublishedChanges />
-          <EditorSaveStatus status="Saving…" published hasUnpublishedChanges />
+          <EditorSaveStatus status="Uploading…" published />
+          <EditorSaveStatus status="Saving…" published />
           <EditorSaveStatus status="Changes not saved" published failed />
         </div>
         <p className="text-copy text-muted-foreground">

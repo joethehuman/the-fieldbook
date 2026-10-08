@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { expectMarkdown, waitForDraftSaved, openContentSettings } from "./editor-helpers";
+import { expectMarkdown, waitForDraftSaved, openContentSettings, returnToContent } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
@@ -242,7 +242,7 @@ test("failed autosave preserves edits through search, canceled navigation and re
   const { control } = await setup(page, production);
   await failDraftWrites(page, production, control);
   await page.getByLabel("Title", { exact: true }).fill("Keep these edits");
-  await page.getByRole("button", { name: "Back to content" }).click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep these edits",
@@ -293,7 +293,7 @@ test("failed autosave preserves edits through search, canceled navigation and re
     path: info.outputPath("dirty-editor.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Back to content" }).click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page.locator(".admin-layout")).toBeVisible();
 });
@@ -303,7 +303,7 @@ test("browser back preserves an unsaved failed draft when leaving is canceled", 
 }, info) => {
   const production = info.project.name.startsWith("production");
   const { control } = await setup(page, production);
-  await page.getByRole("button", { name: "Back to content" }).click();
+  await returnToContent(page);
   await openNav(page);
   // This fixture resets published Docs between cases; use a collection route.
   await page
@@ -446,9 +446,7 @@ for (const failure of [false, true])
     await expect(
       page.locator(".editor-heading").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
     ).toBeDisabled();
-    await expect(
-      page.getByRole("button", { name: "Back to content" }),
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
     // Exercise the handler directly too, bypassing the disabled submit button.
     await page
       .locator("form.editor")
@@ -1341,7 +1339,7 @@ test("large media resumes a lost chunk acknowledgement and inserts only verified
   await page.locator('.writing-editor input[type="file"]').setInputFiles(filePath);
   await expect.poll(() => !!release).toBe(true);
   await expect(page.getByRole("progressbar", { name: "File upload progress" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Back to content" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
   expect(completes).toBe(0);
   expect(state.content[0].body).toBe("Keep my original draft");
   await page.screenshot({ path: info.outputPath("large-upload-progress.png"), fullPage: true });
@@ -1353,7 +1351,7 @@ test("large media resumes a lost chunk acknowledgement and inserts only verified
   expect(state.content[0].body).toContain("Keep my original draft");
   expect(state.content[0].body).toContain("/api/media/verified-large.png");
   await expect(page.getByRole("progressbar", { name: "File upload progress" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Back to content" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Details", exact: true })).toBeEnabled();
 });
 
 for (const failure of ["storage limit", "expired permission", "verification"] as const) {

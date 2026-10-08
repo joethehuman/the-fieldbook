@@ -2940,7 +2940,6 @@ export function Editor({
           <EditorSaveStatus
             status={saveStatus}
             published={!!c.publishedRevision}
-            hasUnpublishedChanges={!!c.publishedRevision && publicationChanged}
             failed={needsRecovery}
           />
           <Button

@@ -260,13 +260,10 @@
   .editor-heading-actions { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: var(--space-3); margin-inline-start: auto; }
   .editor-save-status { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; gap: var(--space-3); color: var(--muted-foreground); }
   .editor-status-phrase, .editor-status-wide { display: inline-flex; align-items: center; gap: var(--space-2); white-space: nowrap; }
-  .editor-status-separator { color: var(--muted-foreground); }
   .editor-status-compact { display: none; }
   @container editor-shell (width < 40rem) {
     .editor-heading { gap: var(--space-2); }
     .editor-heading-actions, .editor-save-status { gap: var(--space-2); }
-    .editor-status-wide { display: none; }
-    .editor-status-compact { display: inline-flex; align-items: center; gap: var(--space-1); }
     [data-slot="detail-navigation"][data-compact] .detail-navigation-label { display: none; }
   }
   .editor-content { gap: var(--space-4); }
@@ -415,7 +412,7 @@
     align-items: center;
     gap: var(--space-3);
     height: 2.75rem;
-    margin-block-start: var(--space-3);
+    margin-block-start: 0;
     margin-inline: calc(-1 * var(--editor-text-inset));
     pointer-events: auto;
   }
@@ -457,8 +454,7 @@
     .topbar { gap: var(--space-2); padding-inline: var(--space-3); }
     .app-editor-header, .editor-app-actions { gap: var(--space-2); }
     .app-editor-header .editor-save-status { gap: var(--space-1); }
-    .app-editor-header .editor-status-wide, .app-editor-header .detail-navigation-label { display: none; }
-    .app-editor-header .editor-status-compact { display: inline-flex; }
+    .app-editor-header .detail-navigation-label { display: none; }
     .editor-frame { --editor-content-padding: var(--space-4); }
   }
   @media (prefers-reduced-motion: reduce) { .topbar::after, .editor-canvas-navigation::after, .editor-frame-panel { transition: none; } }
@@ -1030,8 +1026,9 @@
     .app .sidebar-account-trigger { transform: none; }
     .app .topbar { --search-panel-width: min(48rem, calc(100vw - 2rem)); flex-wrap: nowrap; gap: var(--space-2); padding-inline: var(--space-4); }
     .app .topbar [data-slot="search-panel"] [data-slot="search-field"] { width: 100%; }
-    .app .app-editor-header .editor-status-wide { display: none; }
-    .app .app-editor-header .editor-status-compact { display: inline-flex; }
+    .app .editor-save-status .editor-status-wide { display: none; }
+    .app .editor-save-status .editor-status-compact { display: inline-flex; }
+    .app .editor-save-status .editor-status-phrase[data-save-state="failed"] { display: none; }
     .app .sidebar.open.navigation-pending::after {
       content: ""; position: fixed; top: 0; left: 0; width: 34%; height: 2px;
       background: var(--primary);

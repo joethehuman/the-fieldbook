@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
-import { waitForDraftSaved, openContentSettings, closeContentSettings } from "./editor-helpers";
+import { waitForDraftSaved, openContentSettings, closeContentSettings, returnToContent } from "./editor-helpers";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
 async function openMenu(page: Page) {
@@ -97,7 +97,7 @@ test("contributors share publishing editors with four permitted destinations on 
   await waitForDraftSaved(page);
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByRole("button", { name: "Published", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Back to content", exact: true }).click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Course", exact: true }).click();
   await openContentSettings(page);
   await expect(page.getByRole("button", { name: "Manage assigned courses", exact: true })).toHaveCount(0);

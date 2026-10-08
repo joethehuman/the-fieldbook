@@ -7,7 +7,7 @@ import {
   setupAuthoringProvider,
   syncAuthoringProvider,
 } from "./provider-fixture";
-import { downloadMarkdown, waitForDraftSaved } from "./editor-helpers";
+import { downloadMarkdown, waitForDraftSaved, returnToContent } from "./editor-helpers";
 
 async function open(
   page: Page,
@@ -232,8 +232,9 @@ test("editor controls and app navigation retain the compact layout boundary", as
       const showControls = compact;
       if (showControls) await expect(command).toBeVisible(); else await expect(command).toBeHidden();
       const row = (await page.locator(".editor-frame-controls").boundingBox())!;
-      const back = (await page.getByRole("button", { name: "Back to content", exact: true }).boundingBox())!;
-      expect(back.y + back.height).toBeLessThanOrEqual(row.y);
+      await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeHidden();
+      const header = (await page.locator(".topbar").boundingBox())!;
+      expect(row.y - header.y - header.height).toBeLessThanOrEqual(24);
       expect(row.y).toBeLessThan(200);
       await page.screenshot({ path: info.outputPath(`mobile-canvas-${width}.png`) });
       if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
@@ -370,45 +371,38 @@ test("small-screen search opens a full field and restores its trigger on Escape"
 });
 
 for (const kind of ["doc", "brief", "course"] as const)
-  test(`${kind}: canvas back navigation remains above the pinned heading`, async ({ page }, info) => {
+  test(`${kind}: canvas navigation keeps desktop Back and compact toolbar-only pinning`, async ({ page }, info) => {
     await open(page, info.project.name.startsWith("production"), kind);
     const back = page.getByRole("button", { name: "Back to content", exact: true });
-    await expect(page.locator(".topbar").getByRole("button", { name: "Back to content", exact: true })).toHaveCount(0);
-    const start = (await back.boundingBox())!;
     const title = page.locator("#editor-title");
-    expect((await title.boundingBox())!.y).toBeGreaterThan(start.y + start.height);
-    if (await page.locator(".editor-frame").getAttribute("data-cards") !== "true")
+    const pinnedTitle = kind === "course" ? page.getByRole("textbox", { name: "Lesson title", exact: true }) : title;
+    const compact = await page.locator(".editor-frame").getAttribute("data-cards") === "true";
+    const nav = page.locator(".editor-canvas-navigation");
+    const start = (await nav.boundingBox())!;
+    if (compact) {
+      await expect(back).toHaveCount(0);
+      const row = (await page.locator('.editor-frame-controls[data-cards="true"]').boundingBox())!;
+      expect(row.y - start.y).toBeCloseTo(8, 0);
+      expect(start.height).toBeCloseTo(row.height + 12, 0);
+    } else {
+      await expect(back).toBeVisible();
       expect(Math.abs((await back.locator("svg").boundingBox())!.x - (await title.boundingBox())!.x)).toBeLessThanOrEqual(2);
-    if (await page.locator(".editor-frame").getAttribute("data-cards") !== "true") {
-      expect((await page.getByRole("button", { name: "Details", exact: true }).boundingBox())!.y).toBeCloseTo(start.y, 0);
-      if (kind === "course") expect((await page.getByRole("button", { name: "Outline", exact: true }).boundingBox())!.y).toBeCloseTo(start.y, 0);
     }
-    await page.locator(".editor").evaluate((el) => {
+    expect((await title.boundingBox())!.y).toBeGreaterThanOrEqual(start.y + start.height);
+    await page.locator(".editor").evaluate(el => {
       const owner = el.getAttribute("data-scroll-layout") === "workspace" ? el.querySelector(".writing-viewport")! : el.closest(".main-content")!;
       owner.scrollTop = 450;
     });
-    await expect.poll(async () => (await back.boundingBox())!.y).toBeCloseTo(start.y, 0);
-    const pinnedTitle = kind === "course" ? page.getByRole("textbox", { name: "Lesson title", exact: true }) : title;
     const pinned = (await pinnedTitle.boundingBox())!;
-    expect(pinned.y).toBeGreaterThanOrEqual(start.y + start.height);
+    expect(pinned.y).toBeGreaterThanOrEqual((await nav.boundingBox())!.y + start.height);
     if (kind === "course") await expect(title).not.toBeInViewport();
-    await page.locator(".editor").evaluate((el) => {
+    await page.locator(".editor").evaluate(el => {
       const owner = el.getAttribute("data-scroll-layout") === "workspace" ? el.querySelector(".writing-viewport")! : el.closest(".main-content")!;
       owner.scrollTop += 200;
     });
-    await expect.poll(async () => (await pinnedTitle.boundingBox())!.y).toBeCloseTo(pinned.y, 0);
-    await expect(back).toBeInViewport();
-    await page.screenshot({ path: info.outputPath(`${kind}-canvas-back.png`) });
-    if (kind === "course") {
-      const outline = page.getByRole("button", { name: "Outline", exact: true });
-      if (await outline.getAttribute("aria-expanded") === "false") await outline.click();
-      await page.getByRole("button", { name: /^Quiz/ }).click();
-      await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toBeVisible();
-      if (await page.locator(".editor-frame").getAttribute("data-cards") !== "true")
-      expect(Math.abs((await back.locator("svg").boundingBox())!.x - (await title.boundingBox())!.x)).toBeLessThanOrEqual(2);
-      await expect(back).toBeInViewport();
-    }
-    await back.click();
+    expect((await pinnedTitle.boundingBox())!.y).toBeCloseTo(pinned.y, 0);
+    await page.screenshot({ path: info.outputPath(`${kind}-canvas-navigation.png`) });
+    await returnToContent(page);
     await expect(page.locator(".editor")).toHaveCount(0);
   });
 
@@ -724,11 +718,11 @@ test("editor entry collapses navigation but authors can reopen it", async ({ pag
   await expect(app).not.toHaveClass(/sidebar-collapsed/);
   await page.locator("#editor-title").focus();
   await expect(app).not.toHaveClass(/sidebar-collapsed/);
-  await page.getByRole("button", { name: "Back to content", exact: true }).click();
+  await returnToContent(page);
   await page.getByRole("link", { name: "A clear place to write", exact: true }).click();
   await expect(app).toHaveClass(/sidebar-collapsed/);
   for (const kind of ["Doc", "Update", "Course"]) {
-    await page.getByRole("button", { name: "Back to content", exact: true }).click();
+    await returnToContent(page);
     await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
     await page.getByRole("button", { name: kind, exact: true }).click();
     await expect(page.locator(".editor")).toBeVisible();
@@ -881,7 +875,9 @@ for (const kind of ["doc", "brief", "course"] as const)
         if (info.project.use.hasTouch) await field.tap(); else await field.click();
         await expect(field).not.toHaveAttribute("data-reveal-focus", "true");
         expect(await field.locator("..").evaluate((el) => getComputedStyle(el, "::after").content)).toBe("none");
-        await page.getByRole("button", { name: "Back to content", exact: true }).focus();
+        const back = page.getByRole("button", { name: "Back to content", exact: true });
+        if (await back.isVisible()) await back.focus();
+        else await page.getByRole("button", { name: "Details", exact: true }).focus();
         for (let step = 0; step < 12; step++) {
           await page.keyboard.press("Tab");
           if (await field.evaluate((el) => document.activeElement === el)) break;
@@ -1246,7 +1242,7 @@ test("Details uses Edit Audience for existing Course and Update assignments", as
 
 test("a new Course shows only its current version before first publication", async ({ page }, info) => {
   await open(page, info.project.name.startsWith("production"), "course");
-  await page.getByRole("button", { name: "Back to content", exact: true }).click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Course", exact: true }).click();
   const toggle = page.getByRole("button", { name: "Details", exact: true });
   if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
@@ -1279,23 +1275,26 @@ for (const kind of ["doc", "brief", "course"] as const)
         await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       });
-      const start = (await back.boundingBox())!;
+      const start = stacked ? null : await back.boundingBox();
+      if (stacked) await expect(back).toBeHidden();
       if (!stacked) {
+        expect(start).not.toBeNull();
         await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
         const detail = (await page.getByRole("button", { name: "Details", exact: true }).boundingBox())!;
-        expect(detail.y + detail.height / 2).toBeCloseTo(start.y + start.height / 2, 0);
+        expect(detail.y + detail.height / 2).toBeCloseTo(start!.y + start!.height / 2, 0);
         if (width >= 1024) expect(Math.abs((await back.locator("svg").boundingBox())!.x - (await title.boundingBox())!.x)).toBeLessThanOrEqual(2);
         if (kind === "course") {
           const outline = (await page.getByRole("button", { name: "Outline", exact: true }).boundingBox())!;
-          expect(outline.y + outline.height / 2).toBeCloseTo(start.y + start.height / 2, 0);
-          expect(start.x).toBeGreaterThanOrEqual(outline.x + outline.width + 4);
+          expect(outline.y + outline.height / 2).toBeCloseTo(start!.y + start!.height / 2, 0);
+          expect(start!.x).toBeGreaterThanOrEqual(outline.x + outline.width + 4);
         }
       }
       await page.locator(".editor").evaluate((el) => {
         const owner = el.getAttribute("data-scroll-layout") === "workspace" ? el.querySelector(".writing-viewport")! : el.closest(".main-content")!;
         owner.scrollTop = 450;
       });
-      await expect(back).toBeInViewport({ ratio: 1 });
+      if (stacked) await expect(back).toBeHidden();
+      else await expect(back).toBeInViewport({ ratio: 1 });
       await expect(page.getByRole("button", { name: "Details", exact: true })).toBeInViewport({ ratio: 1 });
       if (kind === "course") await expect(page.getByRole("button", { name: "Outline", exact: true })).toBeInViewport({ ratio: 1 });
       await expect(pinned).toBeInViewport({ ratio: 1 });
@@ -1688,7 +1687,9 @@ for (const kind of ["doc", "brief", "course"] as const)
       expect(line.x - frame.x).toBeCloseTo(frame.x + frame.width - line.x - line.width, 0);
       expect((await page.locator("#editor-title").boundingBox())!.x).toBeCloseTo(line.x, 0);
       if (kind === "course") expect((await page.getByRole("textbox", { name: "Lesson title", exact: true }).boundingBox())!.x).toBeCloseTo(line.x, 0);
-      expect(Math.abs((await page.getByRole("button", { name: "Back to content", exact: true }).locator("svg").boundingBox())!.x - line.x)).toBeLessThanOrEqual(2);
+      const back = page.getByRole("button", { name: "Back to content", exact: true });
+      if (compact) await expect(back).toBeHidden();
+      else expect(Math.abs((await back.locator("svg").boundingBox())!.x - line.x)).toBeLessThanOrEqual(2);
       if (compact) {
         await expect(page.locator(".editor-frame")).toHaveAttribute("data-cards", "true");
         await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeVisible();
@@ -1813,4 +1814,97 @@ test("a final video block retains a writing line below its reserved gap", async 
   await waitForDraftSaved(page);
   const { body } = await downloadMarkdown(page);
   expect(body).toMatch(/Paragraph 1\.[\s\S]*\[Video\]\(https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ\)[\s\S]*After the final video\./);
+});
+
+
+test("mobile saving and saved use centered icons without unpublished-edit labels", async ({ page }, info) => {
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const header = page.locator(".topbar");
+  const status = header.locator('.editor-status-phrase');
+  const compact = status.locator('.editor-status-compact');
+  const wide = status.locator('.editor-status-wide');
+  for (const width of [1440, 375, 768, 600]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.locator("#editor-title").fill(`Saved title at ${width}`);
+    await expect(status).toHaveAttribute("data-save-state", "saving");
+    await expect(header).not.toContainText("Unpublished");
+    if (width < 768) {
+      await expect(wide).toBeHidden();
+      await expect(compact.locator('svg')).toBeVisible();
+      await expect(compact).toHaveText("");
+      const icon = (await compact.boundingBox())!;
+      const badge = (await header.locator('.editor-save-status [data-slot="badge"]').boundingBox())!;
+      const publish = (await header.getByRole("button", { name: "Publish", exact: true }).boundingBox())!;
+      expect(icon.y + icon.height / 2).toBeCloseTo(badge.y + badge.height / 2, 0);
+      expect(icon.y + icon.height / 2).toBeCloseTo(publish.y + publish.height / 2, 0);
+      const before = (await compact.boundingBox())!;
+      await waitForDraftSaved(page);
+      await expect(status).toHaveAttribute("data-save-state", "saved");
+      expect((await compact.boundingBox())!.width).toBeCloseTo(before.width, 0);
+      await expect(compact.locator('svg')).toBeVisible();
+      await expect(compact).toHaveText("");
+    } else {
+      await expect(compact).toBeHidden();
+      await expect(wide).toHaveText("Saving…");
+      await waitForDraftSaved(page);
+      await expect(wide).toHaveText("Saved");
+    }
+    await expect(header.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
+    await page.screenshot({ path: info.outputPath(`save-icons-${width}.png`), animations: "disabled" });
+  }
+});
+
+test("failed saves stay in the recovery alert and compact headers omit the failure", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Controlled writes use the isolated installed-app fixture.");
+  await open(page, true, "doc");
+  const header = page.locator(".topbar");
+  const status = header.locator('.editor-status-phrase');
+  let mode: "hold" | "fail" | "pass" = "pass";
+  let release: () => void = () => {};
+  let pending: Promise<void> = Promise.resolve();
+  let started = 0;
+  await page.route("**/api/content*", async route => {
+    if (route.request().method() !== "POST" || mode === "pass") return route.fallback();
+    started++;
+    if (mode === "hold") { await pending; return route.fallback(); }
+    return route.fulfill({ status: 503, json: { error: "Synthetic save failure. Try again." } });
+  });
+  for (const width of [1440, 375]) {
+    await page.setViewportSize({ width, height: 1000 });
+    mode = "hold";
+    pending = new Promise(resolve => { release = resolve; });
+    const previous = started;
+    await page.locator("#editor-title").fill(`Held draft at ${width}`);
+    await expect.poll(() => started).toBeGreaterThan(previous);
+    await expect(status).toHaveAttribute("data-save-state", "saving");
+    const indicator = status.locator('.editor-status-compact');
+    const before = width < 768 ? (await indicator.boundingBox())! : null;
+    if (width < 768) await expect(indicator.locator('svg')).toBeVisible();
+    mode = "pass";
+    release();
+    await waitForDraftSaved(page);
+    if (before) expect((await indicator.boundingBox())!.width).toBeCloseTo(before.width, 0);
+    mode = "fail";
+    await page.locator("#editor-title").fill(`Retain this failed draft at ${width}`);
+    const alert = page.locator('.editor').getByRole("alert");
+    await expect(alert).toContainText("We couldn’t confirm your latest changes were saved.");
+    await expect(alert).toContainText("Your work is still here. Keep this page open.");
+    await expect(alert.getByRole("button", { name: "Retry saving", exact: true })).toBeEnabled();
+    await expect(alert.getByRole("button", { name: "Download your changes", exact: true })).toBeEnabled();
+    await expect(header.getByRole("alert")).toHaveCount(0);
+    await expect(status).toHaveAttribute("data-save-state", "failed");
+    if (width < 768) {
+      await expect(status).toBeHidden();
+      await expect(header.getByRole("status")).toHaveCount(0);
+    } else await expect(status.locator('.editor-status-wide')).toHaveText("Changes not saved");
+    await expect(header).not.toContainText("Unpublished");
+    await expect(header.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+    await page.screenshot({ path: info.outputPath(`save-failure-${width}.png`), animations: "disabled" });
+    mode = "pass";
+    await alert.getByRole("button", { name: "Retry saving", exact: true }).click();
+    await waitForDraftSaved(page);
+    await expect(alert).toHaveCount(0);
+    await expect(status).toHaveAttribute("data-save-state", "saved");
+    await expect(header.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
+  }
 });
