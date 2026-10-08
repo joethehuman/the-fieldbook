@@ -7,6 +7,7 @@ import {
   useId,
   useEffect,
 } from "react";
+import { Alert } from "../ui/alert";
 import { Download } from "lucide-react";
 import { Button } from "../ui/button";
 import { downloadCsv, type CsvReport } from "@/lib/csv";
@@ -57,7 +58,7 @@ export function CsvExport({
         throw new Error("The report changed. Try exporting again.");
       downloadCsv(prepared, filename);
     } catch {
-      setError("CSV could not be prepared. Reload the report and try again.");
+      setError("The CSV couldn’t be prepared. Refresh the report and try again.");
     } finally {
       locked.current = false;
       setBusy(false);
@@ -77,9 +78,9 @@ export function CsvExport({
         {busy ? "Preparing CSV…" : "Export CSV"}
       </Button>
       {(unavailable || error) && (
-        <p id={id} role="alert" className="text-sm text-destructive">
+        <Alert id={id} variant="destructive" onDismiss={() => setError("")}>
           {unavailable || error}
-        </p>
+        </Alert>
       )}
     </div>
   );

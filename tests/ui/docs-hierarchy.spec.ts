@@ -599,7 +599,7 @@ test("Docs settings move and rename a subsection without losing published placem
     .click();
   await page.getByRole("menuitem", { name: "Delete section" }).click();
   await expect(
-    page.getByText("Move this section's documents before deleting it."),
+    page.getByText("Move this section’s items elsewhere before deleting it."),
   ).toBeVisible();
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByText("Settings saved.")).toBeVisible();

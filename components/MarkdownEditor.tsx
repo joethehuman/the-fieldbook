@@ -213,7 +213,7 @@ export default function MarkdownEditor({
           : "Markdown with formatting shortcuts. Preview before publishing."}
       </FieldDescription>
       {error && (
-        <Alert id={`${id}-error`} variant="destructive" role="alert">
+        <Alert id={`${id}-error`} variant="destructive" role="alert" onDismiss={() => setError("")}>
           {error}
         </Alert>
       )}

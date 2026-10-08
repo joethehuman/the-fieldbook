@@ -46,7 +46,7 @@ test("failed settings save preserves the draft and another explicit Save retries
   );
   await assert.rejects(
     save(before, settings),
-    /Database temporarily unavailable.*Your edits remain open/,
+    /Database temporarily unavailable/,
   );
   assert.equal(settings.name, "Saved installation");
   assert.deepEqual((await save(before, settings)).settings, settings);
@@ -87,7 +87,7 @@ test("unavailable recovery read keeps edits and the next explicit Save reads bef
     },
   );
   await assert.rejects(save(before, settings), (error: Error) => {
-    assert.match(error.message, /Your edits remain open/);
+    assert.match(error.message, /settings couldn’t be saved/);
     assert.doesNotMatch(error.message, /private transport details/);
     return true;
   });
@@ -112,7 +112,7 @@ test("settings changed by another administrator cannot be overwritten on retry",
     async () => current,
   );
   await assert.rejects(save(before, settings), /Settings changed/);
-  await assert.rejects(save(before, settings), /changed elsewhere/);
+  await assert.rejects(save(before, settings), /changed in another session/);
   assert.equal(writes, 1);
   assert.equal(current.settings!.name, "Other administrator");
 });

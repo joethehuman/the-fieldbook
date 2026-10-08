@@ -87,7 +87,7 @@ for (const failure of [
     try {
       await assert.rejects(uploadMediaFile(file), (error: Error) => {
         assert(!error.message.includes("private signed URL detail"));
-        return /Could not start|file-size limit|connection was interrupted|could not be verified/.test(
+        return /upload couldn’t be started|exceeds the upload size limit|upload was interrupted|upload couldn’t be verified/.test(
           error.message,
         );
       });
@@ -111,7 +111,7 @@ test("storage failures explain useful categories without reflecting provider mes
   }
   assert.match(
     uploadFailure(400, '{"error":"EntityTooLarge"}'),
-    /file-size limit/,
+    /exceeds the upload size limit/,
   );
   assert.match(uploadFailure(403), /permission expired or was denied/);
 });

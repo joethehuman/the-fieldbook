@@ -1,4 +1,5 @@
 import type { ComponentProps } from "react";
+import { Alert } from "./alert";
 import { cn } from "@/lib/utils";
 
 /** Implicit labels preserve native form semantics and label Radix's button triggers. */
@@ -50,12 +51,14 @@ export function FieldDescription({ className, ...props }: ComponentProps<"p">) {
   );
 }
 
-/** Persistent validation copy. The owning field connects it with aria-describedby. */
-export function FieldError({ className, ...props }: ComponentProps<"p">) {
+/** Dismissal hides validation copy; the owning control keeps its invalid state. */
+export function FieldError({ className, ...props }: ComponentProps<typeof Alert>) {
   return (
-    <p
+    <Alert
+      variant="destructive"
+      dismissible={!props["aria-hidden"]}
       data-slot="field-error"
-      className={cn("text-copy font-normal text-destructive", className)}
+      className={cn("min-h-control-sm border-0 bg-transparent px-0 py-0 text-copy font-normal [&>button]:end-0 [&>button]:top-0", className)}
       {...props}
     />
   );

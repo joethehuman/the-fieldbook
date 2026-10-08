@@ -13,8 +13,7 @@ export function AccountUnavailable({
     <BrandedAccount branding={brandingFromSettings({})} illustrated>
       <h1>Account services are unavailable</h1>
       <Alert role="alert" variant="destructive">
-        Please try again shortly. If this continues, share this reference with
-        your administrator: {reference}
+        Try again shortly or contact your administrator. Reference: {reference}
       </Alert>
       <Button asChild>
         <a href={retry}>Try again</a>

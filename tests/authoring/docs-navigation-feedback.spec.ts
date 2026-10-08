@@ -4,7 +4,7 @@ import { defaultSettings } from "../../lib/settings";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
 const failure =
-  "Move this section's draft and published documents before deleting it. Reference: 00000000-0000-4000-8000-000000000099.";
+  "Move this section’s items elsewhere before deleting it. Reference: 00000000-0000-4000-8000-000000000099.";
 
 async function setup(page: Page, production: boolean, withDocs = false) {
   const data = freshWorkspace();
@@ -227,10 +227,11 @@ test("Docs save errors expand smoothly beside sticky actions, preserve alignment
   );
   const alert = bar.getByRole("alert");
   await expect(alert).toContainText(
-    "Move this section's draft and published documents",
+    "Move this section’s items elsewhere before deleting it",
   );
   await expect(alert).toBeInViewport();
   await expect(alert).toBeFocused();
+  await expect(alert).toHaveCSS("outline-style", "none");
   await expect(page.locator(".settings-panel").getByRole("alert")).toHaveCount(
     1,
   );
@@ -284,10 +285,11 @@ test("blocked section deletion appears in the sticky callout without changing na
       .click();
     await expect(alert).toBeInViewport();
     await expect(alert).toBeFocused();
+  await expect(alert).toHaveCSS("outline-style", "none");
     await expect(bar.locator('[data-slot="pending-changes-feedback"]')).toHaveCSS("opacity", "1");
-    await expect(alert).toContainText("Can’t delete “Section 12”");
+    await expect(alert).toContainText("This section can’t be deleted yet.");
     await expect(alert).toContainText(
-      "Move this section's documents before deleting it.",
+      "Move this section’s items elsewhere before deleting it.",
     );
     expect(Math.abs((await scrollTop(page)) - before)).toBeLessThan(3);
     await expect(

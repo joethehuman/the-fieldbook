@@ -86,8 +86,7 @@ export default function AccessPreview() {
           <>
             <h1>Account services are unavailable</h1>
             <Alert variant="destructive" role="alert">
-              Please try again shortly. If this continues, share this reference
-              with your administrator: {exampleReference}
+              Try again shortly or contact your administrator. Reference: {exampleReference}
             </Alert>
             <Button type="button">Try again</Button>
           </>
@@ -95,7 +94,7 @@ export default function AccessPreview() {
           <>
             <h1>Unable to load this page</h1>
             <Alert variant="destructive" role="alert">
-              Please try again. If this continues, contact your administrator.
+              Try again. If the problem continues, contact your administrator.
             </Alert>
             <Button type="button">Try again</Button>
           </>

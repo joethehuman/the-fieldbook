@@ -104,15 +104,16 @@ export function ContentSearch({
           <SearchResultSkeleton />
         </div>
       ) : state === "error" ? (
-        <Alert variant="destructive">
-          <p>
-            Search could not load. Try again. If your access changed, sign in
-            again.
-          </p>
+        <div className="grid gap-3">
+          <Alert variant="destructive">
+            <p>
+              Search results couldn’t be loaded. Try again or sign in again if your access changed.
+            </p>
+          </Alert>
           <Button variant="outline" onClick={() => setRetry((x) => x + 1)}>
             Retry search
           </Button>
-        </Alert>
+        </div>
       ) : response.results.length ? (
         <div
           className="grid gap-3"

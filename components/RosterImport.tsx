@@ -769,7 +769,7 @@ export function RosterImport({
           </DialogDescription>
           <DialogSteps steps={["Upload", "Review"]} current={step} />
           {error && (
-            <Alert variant="destructive" role="alert">
+            <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
               {error}
             </Alert>
           )}

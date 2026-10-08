@@ -147,7 +147,7 @@ test("external links: empty state, limit, validation, reorder, recovery and save
     rejectSave = true;
     await settings.getByRole("button", { name: "Save settings" }).click();
     await expect(
-      page.getByText(/0 of 1 changes confirmed saved. Save unavailable/),
+      page.getByText(/0 of 1 changes were confirmed saved. Save unavailable/),
     ).toBeVisible();
     await expect(
       last.getByRole("textbox", { name: "Label", exact: true }),

@@ -270,7 +270,7 @@ export function LibraryExamples() {
           Changing a completion window recalculates targets for everyone.
         </Note>
         <Alert variant="destructive">
-          The example could not be saved. Review the fields and try again.
+          Navigation couldn’t be saved. Review the fields.
         </Alert>
         <Alert variant="success">Example changes saved.</Alert>
         <ActionGroup>

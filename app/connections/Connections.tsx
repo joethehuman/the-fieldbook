@@ -59,15 +59,17 @@ export default function Connections({ branding }: { branding: Branding }) {
         Revoke a connection to immediately stop its tools in {branding.name}.
       </p>
       {error && (
-        <Alert variant="destructive" role="alert">
-          {error}
+        <div className="grid gap-3">
+          <Alert variant="destructive" role="alert">
+            {error}
+          </Alert>
           <Button
             variant="outline"
             onClick={() => load().catch((e) => setError(e.message))}
           >
             Try again
           </Button>
-        </Alert>
+        </div>
       )}
       {loading && (
         <div

@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "../ui/alert";
 import { useEffect, useRef, useState } from "react";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
 import {
@@ -170,9 +171,7 @@ export function WritingImageDialog() {
           />
         </Field>
         {error && (
-          <p role="alert" className="text-copy text-destructive">
-            {error}
-          </p>
+          <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>
         )}
         <DialogFooter>
           <Button

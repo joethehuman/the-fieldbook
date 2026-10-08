@@ -393,7 +393,7 @@ export function LearningAssignmentPicker({
             {triggerLabel}
           </Button>
         ))}
-      {!open && error && <Alert variant="destructive">{error}</Alert>}
+      {!open && error && <Alert variant="destructive" onDismiss={() => { if (!stale) setError(""); }}>{error}</Alert>}
       {!compact && !target && (
         <p className="text-sm text-muted-foreground">
           {initialKeys.length || Object.keys(inherited).length
@@ -486,7 +486,7 @@ export function LearningAssignmentPicker({
           >
             {error && (
               <div className="mb-4 grid shrink-0 gap-3">
-                <Alert variant="destructive">{error}</Alert>
+                <Alert variant="destructive" onDismiss={() => { if (!stale) setError(""); }}>{error}</Alert>
                 {stale && (
                   <Button
                     type="button"

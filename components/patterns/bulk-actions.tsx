@@ -221,7 +221,7 @@ export function BulkActions({
         </div>
       )}
       {resultNotice && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" onDismiss={() => setResultNotice(null)}>
           <p>{resultNotice.message}</p>
           {resultNotice.details && (
             <ul className="max-h-48 overflow-y-auto overscroll-y-contain">
@@ -261,7 +261,7 @@ export function BulkActions({
                 </>
               )}
             </DialogDescription>
-            {error && <Alert variant="destructive">{error}</Alert>}
+            {error && <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>}
             {command.options &&
               (command.selectionMode === "single" ? (
                 <FormField label={command.fieldLabel || "Destination"}>

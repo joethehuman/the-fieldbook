@@ -293,6 +293,10 @@ export function saveWorkspace(data: Workspace) {
     );
   localStorage.setItem(KEY, JSON.stringify(data));
 }
+/** Only after confirming Reset demo: replace even a damaged sample snapshot. */
+export function resetWorkspace(data: Workspace) {
+  localStorage.setItem(KEY, JSON.stringify(data));
+}
 export function updateProgress(
   data: Workspace,
   userId: string,

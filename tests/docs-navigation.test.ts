@@ -165,15 +165,15 @@ test("deletion guards children, draft and published documents", () => {
     { id: "a", name: "A", legacyCategory: "Old A" },
     { id: "x", name: "X", parentId: "a" },
   ];
-  assert.throws(() => deleteDocSection(sections, "a", []), /subsections/);
+  assert.throws(() => deleteDocSection(sections, "a", []), /items/);
   assert.throws(
     () =>
       deleteDocSection(sections, "x", [doc("draft", "A", "", "x", "draft")]),
-    /documents/,
+    /items/,
   );
   assert.throws(
     () => deleteDocSection(sections, "a", [doc("legacy", "Old A")]),
-    /subsections/,
+    /items/,
   );
   assert.deepEqual(
     deleteDocSection(sections, "x", []).map((section) => section.id),

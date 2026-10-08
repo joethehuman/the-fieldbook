@@ -123,7 +123,7 @@ export function PendingPeople({
               <DialogBody>
                 <ScrollRegion className="h-full p-1">
                   <FieldGroup disabled={busy}>
-                    {error && <Alert variant="destructive">{error}</Alert>}
+                    {error && <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>}
                     <PersonFields
                       person={editing}
                       data={data}

@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "../ui/alert";
 import { useState } from "react";
 import { WritingBlockActions } from "./writing-block-actions";
 import { CourseVideo } from "./course-video";
@@ -56,9 +57,7 @@ export function WritingMediaVideo({
             />
           </Field>
           {error && (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
+            <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>
           )}
           <DialogFooter>
             <Button

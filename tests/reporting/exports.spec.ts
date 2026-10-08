@@ -562,10 +562,15 @@ test("download preparation failure is visible, retryable and creates no file", a
   });
   await page.getByRole("button", { name: "Export CSV", exact: true }).click();
   await expect(
-    page.getByRole("alert").filter({ hasText: "CSV could not be prepared" }),
-  ).toContainText("CSV could not be prepared");
+    page.getByRole("alert").filter({ hasText: "CSV couldn’t be prepared" }),
+  ).toContainText("CSV couldn’t be prepared");
   expect(downloads).toEqual([]);
   await screenshot(page, info, "export-error");
+  const failure = page.getByRole("alert").filter({ hasText: "CSV couldn’t be prepared" });
+  await failure.getByRole("button", { name: "Dismiss message", exact: true }).click();
+  await expect(failure).toHaveCount(0);
+  expect(downloads).toEqual([]);
+  await expect(page.getByRole("button", { name: "Export CSV", exact: true })).toBeEnabled();
   await page.evaluate(() => {
     URL.createObjectURL = (window as any).originalCreate;
   });
@@ -576,7 +581,7 @@ test("download preparation failure is visible, retryable and creates no file", a
     "retry",
   );
   await expect(
-    page.getByText("CSV could not be prepared", { exact: false }),
+    page.getByText("CSV couldn’t be prepared", { exact: false }),
   ).toHaveCount(0);
 });
 
@@ -730,7 +735,7 @@ test("preparation state prevents duplicate clicks and reports a changed filter w
   await page.clock.runFor(10);
   await expect(
     page.getByText(
-      "CSV could not be prepared. Reload the report and try again.",
+      "The CSV couldn’t be prepared. Refresh the report and try again.",
     ),
   ).toBeVisible();
   expect(downloads).toEqual([]);
@@ -977,7 +982,7 @@ test("changed saved report blocks CSV until refresh and revoked access blocks de
   await page.getByRole("button", { name: "Export CSV", exact: true }).click();
   await expect(
     page.getByText(
-      "CSV could not be prepared. Reload the report and try again.",
+      "The CSV couldn’t be prepared. Refresh the report and try again.",
     ),
   ).toBeVisible();
   expect(files).toEqual([]);

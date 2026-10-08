@@ -142,7 +142,7 @@ test("revision conflicts retain failed moves and source section; explicit retry 
     result.remaining.map((item) => item.id),
     ["second"],
   );
-  assert.match(result.error!, /1 document moves remain unsaved/);
+  assert.match(result.error!, /Review 1 unconfirmed item/);
   assert.ok(
     result.data.settings!.docSections!.some(
       (section) => section.id === "source",
@@ -177,7 +177,7 @@ test("failed initial settings save writes no document metadata", async () => {
   const h = harness({ failedSettings: true });
   await assert.rejects(
     h.save(h.before, desired(h.before), moves),
-    /edits remain open/,
+    /settings couldn’t be saved/,
   );
   assert.equal(
     h.requests.filter((request) => request.path === "/api/admin/bulk").length,
@@ -190,7 +190,7 @@ test("failed final section deletion reports saved document moves and retains the
   const h = harness({ failedFinal: true });
   const result = await h.save(h.before, desired(h.before), moves);
   assert.deepEqual(result.remaining, []);
-  assert.match(result.error!, /Document moves were saved/);
+  assert.match(result.error!, /documents were moved/);
   assert.ok(result.data.content.every((item) => item.sectionId === "target"));
   assert.ok(
     result.data.settings!.docSections!.some(
@@ -204,7 +204,7 @@ test("lost responses cannot be confirmed from the draft index when the actual pu
   const h = harness({ lostResponse: true, mismatchedPublished: true });
   const result = await h.save(h.before, desired(h.before), moves);
   assert.equal(result.remaining.length, 2);
-  assert.match(result.error!, /Could not confirm this move/);
+  assert.match(result.error!, /move couldn’t be confirmed/);
   assert.equal(h.requests.filter((request) => request.path.startsWith("/api/content?")).length, 2);
   assert.equal(h.requests.filter((request) => request.path === "/api/admin/bulk").length, 1);
 });
