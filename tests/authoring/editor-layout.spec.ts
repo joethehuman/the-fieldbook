@@ -943,8 +943,12 @@ for (const kind of ["doc", "brief", "course"] as const)
       const selection = window.getSelection();
       return !!selection?.isCollapsed && !!selection.anchorNode && el.contains(selection.anchorNode) && selection.anchorOffset === 0;
     })).toBe(true);
+    await page.keyboard.press("/");
+    const slashMenu = page.getByRole("menu", { name: /Insert content/ });
+    await expect(slashMenu).toBeVisible();
+    await page.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
     await page.keyboard.insertText("Start writing here");
-    await expect(writer.locator("p").first()).toHaveText("Start writing here");
+    await expect(writer.locator("h2").first()).toHaveText("Start writing here");
     await page.screenshot({ path: info.outputPath(`${kind}-requirement-caret.png`) });
     if (kind === "course") {
       const outline = page.getByRole("button", { name: "Outline", exact: true });
@@ -980,6 +984,8 @@ test("quiz publishing links smoothly reveal the question without focusing an inp
   const question = page.locator('[data-question-id="question-3"]');
   await expect(question.getByRole("heading", { name: "Question 4", exact: true })).toBeInViewport({ ratio: 1 });
   await expect(question.getByRole("textbox", { name: "Question", exact: true })).toBeInViewport({ ratio: 1 });
+  const quizHeader = page.locator(".course-quiz-canvas > .writing-document-heading");
+  expect((await question.getByRole("heading", { name: "Question 4", exact: true }).boundingBox())!.y).toBeGreaterThanOrEqual((await quizHeader.boundingBox())!.y + (await quizHeader.boundingBox())!.height);
   await expect.poll(() => question.evaluate((el) => !el.contains(document.activeElement))).toBe(true);
   const samples = await page.evaluate(() => (window as unknown as { revealScrollSamples: number[] }).revealScrollSamples);
   expect(new Set(samples.map(Math.round)).size).toBeGreaterThan(2);
@@ -1043,7 +1049,11 @@ for (const kind of ["doc", "brief", "course"] as const)
       const panel = page.getByRole("complementary", { name: "Content details", exact: true });
       await expect(panel.getByRole("heading", { name: "Before publishing", exact: true })).toHaveCount(0);
       const headings = ["Short description", kind === "doc" ? "Section" : "Category"];
-      if (kind !== "doc") headings.push("Audience", "Card artwork");
+      if (kind !== "doc") {
+        headings.push("Audience");
+        if (kind === "course" && (await fixture.read()).content[0].questions.length > 0) headings.push("Quiz");
+        headings.push("Card artwork");
+      }
       if (kind === "course") headings.push("Duration", "Version");
       if (kind === "brief" && status === "published") headings.push("Updates feed");
       headings.push("Recovery");
@@ -1376,3 +1386,163 @@ test("edge controls never cross the canvas and the desktop navigation stays cent
   expect(row.x + row.width + 7).toBeLessThanOrEqual(backBox.x);
   expect(row.y + row.height / 2).toBeCloseTo(backBox.y + backBox.height / 2, 0);
 });
+
+test("quiz outline actions and delete controls preserve question and answer minimums", async ({ page }, info) => {
+  const { read } = await open(page, info.project.name.startsWith("production"), "course", 2, (item) => {
+    item.questions = [{ id: "quiz-one", prompt: "Pick the right answer", options: ["Right", "Wrong"], optionIds: ["right", "wrong"], correctOptionIds: ["right"] }];
+  });
+  const outline = page.getByRole("button", { name: "Outline", exact: true });
+  if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
+  await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: "Quiz", exact: true }).click();
+  const first = page.locator('[data-question-id="quiz-one"]');
+  await expect(first.getByText("Mark every correct answer. Keep at least one correct and incorrect answer.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Remove question / })).toHaveCount(0);
+  await expect(first.getByRole("button", { name: /^Remove answer / })).toHaveCount(0);
+  await first.getByRole("button", { name: "Add answer", exact: true }).click();
+  await expect(first.getByRole("button", { name: /^Remove answer / })).toHaveCount(3);
+  await first.getByRole("button", { name: "Remove answer 3", exact: true }).click();
+  await expect(first.getByRole("textbox", { name: /^Answer / })).toHaveCount(2);
+  await expect(first.getByRole("button", { name: /^Remove answer / })).toHaveCount(0);
+  await page.getByRole("button", { name: "Add question", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Remove question / })).toHaveCount(2);
+  await page.getByRole("button", { name: "Remove question 2", exact: true }).click();
+  await expect(page.getByRole("button", { name: /^Remove question / })).toHaveCount(0);
+  if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
+  await page.getByRole("button", { name: "Quiz actions", exact: true }).click();
+  await expect(page.getByRole("menuitem")).toHaveCount(1);
+  await expect(page.getByRole("menuitem", { name: "Delete quiz", exact: true })).toBeVisible();
+  await page.getByRole("menuitem", { name: "Delete quiz", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Quiz", exact: true })).toHaveCount(0);
+  if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
+  await expect(page.getByRole("button", { name: "Add quiz", exact: true })).toBeVisible();
+  await expect.poll(async () => (await read()).content[0].questions.length).toBe(0);
+  await page.getByRole("button", { name: "Add quiz", exact: true }).click();
+  await expect(page.locator('[data-question-id]')).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /^Remove question / })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Remove answer / })).toHaveCount(0);
+});
+
+test("Quiz uses lesson title typography and stays pinned while the course title scrolls", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await open(page, info.project.name.startsWith("production"), "course", 2, (item) => {
+    item.questions = Array.from({ length: 8 }, (_, index) => ({ id: `pin-${index}`, prompt: `Question ${index + 1}`, options: ["Right", "Wrong"], optionIds: [`right-${index}`, `wrong-${index}`], correctOptionIds: [`right-${index}`] }));
+  });
+  const typography = await page.getByRole("textbox", { name: "Lesson title", exact: true }).evaluate((el) => {
+    const style = getComputedStyle(el);
+    return [style.fontSize, style.lineHeight, style.fontWeight, style.letterSpacing, style.color];
+  });
+  const outline = page.getByRole("button", { name: "Outline", exact: true });
+  if (await outline.getAttribute("aria-expanded") !== "true") await outline.click();
+  await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: "Quiz", exact: true }).click();
+  if (await outline.getAttribute("aria-expanded") === "true") await outline.click();
+  const heading = page.getByRole("heading", { name: "Quiz", exact: true });
+  await expect(heading).toBeVisible();
+  expect(await heading.evaluate((el) => { const style = getComputedStyle(el); return [style.fontSize, style.lineHeight, style.fontWeight, style.letterSpacing, style.color]; })).toEqual(typography);
+  for (const width of [1600, 900, 375, 1600]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.locator(".editor").evaluate((el) => {
+      const owner = el.getAttribute("data-scroll-layout") === "workspace" ? el.querySelector(".editor-frame-canvas")! : el.closest(".main-content")!;
+      owner.scrollTop = 500;
+    });
+    await expect(heading).toBeInViewport({ ratio: 1 });
+    await expect(page.locator("#editor-title")).not.toBeInViewport();
+    const nav = (await page.locator(".editor-canvas-navigation").boundingBox())!;
+    const pinned = (await page.locator(".course-quiz-canvas > .writing-document-heading").boundingBox())!;
+    expect(pinned.y).toBeCloseTo(nav.y + nav.height, 0);
+    await page.locator(".editor").evaluate((el) => {
+      const owner = el.getAttribute("data-scroll-layout") === "workspace" ? el.querySelector(".editor-frame-canvas")! : el.closest(".main-content")!;
+      owner.scrollTop += 150;
+    });
+    expect((await page.locator(".course-quiz-canvas > .writing-document-heading").boundingBox())!.y).toBeCloseTo(pinned.y, 0);
+    await page.screenshot({ path: info.outputPath(`quiz-pinned-${width}.png`), animations: "disabled" });
+  }
+});
+
+test("course Quiz settings follow Audience, save the passing rule and hide without a quiz", async ({ page }, info) => {
+  const { read } = await open(page, info.project.name.startsWith("production"), "course", 2, (item) => { item.questions = []; item.requirePassing = false; });
+  const details = page.getByRole("button", { name: "Details", exact: true });
+  const outline = page.getByRole("button", { name: "Outline", exact: true });
+  const showDetails = async () => { if (await details.getAttribute("aria-expanded") !== "true") await details.click(); };
+  const showOutline = async () => { if (await outline.getAttribute("aria-expanded") !== "true") await outline.click(); };
+  await showDetails();
+  let panel = page.getByRole("complementary", { name: "Content details", exact: true });
+  await expect(panel.locator("#course-quiz")).toHaveCount(0);
+  await showOutline();
+  await page.getByRole("button", { name: "Add quiz", exact: true }).click();
+  const canvas = page.locator(".course-quiz-canvas");
+  await expect(canvas).toContainText("The quiz always follows the lessons. Learners can retry; no passing score is required unless you enable it in the course details menu.");
+  await expect(canvas.getByRole("checkbox", { name: "Require all answers correct to complete", exact: true })).toHaveCount(0);
+  await showDetails();
+  panel = page.getByRole("complementary", { name: "Content details", exact: true });
+  const headings = await panel.getByRole("heading").allTextContents();
+  expect(headings.indexOf("Quiz")).toBe(headings.indexOf("Audience") + 1);
+  expect(headings.indexOf("Card artwork")).toBe(headings.indexOf("Quiz") + 1);
+  const requirement = panel.getByRole("checkbox", { name: "Require all answers correct to complete", exact: true });
+  await expect(requirement).not.toBeChecked();
+  await requirement.check();
+  await expect.poll(async () => (await read()).content[0].requirePassing).toBe(true);
+  await showOutline();
+  await page.getByRole("navigation", { name: "Edit course step", exact: true }).getByRole("button", { name: /Start with context/ }).click();
+  await showDetails();
+  await expect(requirement).toBeChecked();
+  if (info.project.name.startsWith("production")) {
+    await page.reload();
+    await showDetails();
+    await expect(requirement).toBeChecked();
+  } else {
+    // The fixture reseeds this page on reload; a fresh tab reads the saved browser data.
+    const restored = await page.context().newPage();
+    await restored.addInitScript(() => sessionStorage.setItem("fieldbook.profile.v1", "demo-admin"));
+    await restored.goto(page.url());
+    const toggle = restored.getByRole("button", { name: "Details", exact: true });
+    if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+    await expect(restored.getByRole("checkbox", { name: "Require all answers correct to complete", exact: true })).toBeChecked();
+    await restored.close();
+  }
+  await showOutline();
+  await page.getByRole("navigation", { name: "Edit course step", exact: true }).locator(".quiz-step").click();
+  await showOutline();
+  await page.getByRole("button", { name: "Quiz actions", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete quiz", exact: true }).click();
+  await showDetails();
+  await expect(page.locator("#course-quiz")).toHaveCount(0);
+});
+
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: Details typography stays at its smaller size through narrow breakpoints`, async ({ page }, info) => {
+    await open(page, info.project.name.startsWith("production"), kind, 2, (item) => {
+      item.summary = "";
+      if (kind === "doc") { item.sectionId = "section-1"; item.category = "Section one"; item.folder = ""; }
+    }, (state) => {
+      if (kind === "doc") state.settings = { ...state.settings!, docSections: [{ id: "section-1", name: "Section one" }, { id: "section-2", name: "Section two" }] };
+    });
+    const toggle = page.getByRole("button", { name: "Details", exact: true });
+    const showDetails = async () => { if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click(); };
+    let baseline: string[] | undefined;
+    for (const width of [1440, 900, 768, 641, 640, 639, 500, 375]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.locator(".main-shell").evaluate(async () => { await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
+      await showDetails();
+      const panel = page.getByRole("complementary", { name: "Content details", exact: true });
+      const fonts = await panel.evaluate((el) => Array.from(el.querySelectorAll<HTMLElement>("*"))
+        .filter(node => !node.closest(".card-artwork-preview") && node.getBoundingClientRect().width > 0 && (node.matches('input:not([type="hidden"]):not([type="checkbox"]), textarea') || Array.from(node.childNodes).some(child => child.nodeType === Node.TEXT_NODE && child.textContent?.trim())))
+        .map(node => `${node.tagName}:${node.getAttribute('data-slot') || ''}:${node.matches('input, textarea') ? node.getAttribute('placeholder') || node.getAttribute('type') || '' : node.textContent?.trim()}:${getComputedStyle(node).fontSize}`));
+      if (!baseline) baseline = fonts;
+      expect(fonts).toEqual(baseline);
+      await expect(panel.locator("#editor-summary")).toHaveCSS("font-size", "14px");
+      if (kind === "doc") {
+        await panel.getByRole("button", { name: "Section", exact: true }).click();
+        await expect(page.getByRole("combobox", { name: "Search sections", exact: true })).toHaveCSS("font-size", "14px");
+        await page.keyboard.press("Escape");
+        await panel.getByRole("button", { name: "Create section", exact: true }).click();
+        await expect(panel.getByRole("textbox", { name: "New section name", exact: true })).toHaveCSS("font-size", "14px");
+        await panel.getByRole("button", { name: "Cancel", exact: true }).click();
+      } else {
+        await expect(panel.getByRole("combobox", { name: "Category", exact: true })).toHaveCSS("font-size", "14px");
+        await expect(panel.locator("#content-artwork-title")).toHaveCSS("font-size", "14px");
+      }
+      if (kind === "course") await expect(panel.getByRole("spinbutton", { name: "Estimated minutes", exact: true })).toHaveCSS("font-size", "14px");
+      if (width === 640 || width === 639) await page.screenshot({ path: info.outputPath(`${kind}-details-type-${width}.png`), animations: "disabled" });
+    }
+  });
+}

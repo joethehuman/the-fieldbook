@@ -2615,6 +2615,7 @@ export function Editor({
       <EditorDetailsGroup id="writing-summary" title="Short description">
         <FormField label="Short description" visuallyHiddenLabel description={`${c.summary.length}/300`}>
           <Textarea
+            variant="metadata"
             id="editor-summary"
             size="compact"
             rows={3}
@@ -2632,6 +2633,7 @@ export function Editor({
         {c.kind === "doc" ? (
           <>
             <DocSectionPicker
+              inputVariant="metadata"
               sections={docSections}
               canCreate={!!onWorkspaceChange}
               value={sectionForDoc(c, docSections)?.id || ""}
@@ -2651,20 +2653,21 @@ export function Editor({
                 }));
               }}
             />
-            {onWorkspaceChange && (
+            {onWorkspaceChange && !creatingSection && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 disabled={busy}
-                onClick={() => setCreatingSection((open) => !open)}
+                onClick={() => setCreatingSection(true)}
               >
                 <Plus aria-hidden="true" />
-                {creatingSection ? "Close section form" : "Create section"}
+                Create section
               </Button>
             )}
             {creatingSection && (
               <DocSectionCreate
+                inputVariant="metadata"
                 sections={docSections}
                 disabled={busy || !onWorkspaceChange}
                 onCancel={() => setCreatingSection(false)}
@@ -2704,6 +2707,7 @@ export function Editor({
         ) : (
           <FormField label="Category" visuallyHiddenLabel>
             <CreatableCombobox
+              variant="metadata"
               value={c.category}
               onValueChange={(value) => set("category", value)}
               options={data.content
@@ -2782,9 +2786,22 @@ export function Editor({
           )}
         </EditorDetailsGroup>
       )}
+      {c.kind === "course" && c.questions.length > 0 && (
+        <EditorDetailsGroup id="course-quiz" title="Quiz">
+          <Field orientation="horizontal">
+            <Checkbox
+              checked={requiresPassing(c)}
+              disabled={busy}
+              onCheckedChange={(checked) => set("requirePassing", checked === true)}
+            />
+            Require all answers correct to complete
+          </Field>
+        </EditorDetailsGroup>
+      )}
       {c.kind !== "doc" && (
         <div id="content-artwork" className="editor-details-group">
           <CardArtEditor
+            inputVariant="metadata"
             id={c.id}
             title={c.title}
             kind={c.kind}
@@ -2815,6 +2832,7 @@ export function Editor({
           <EditorDetailsGroup id="course-duration" title="Duration">
             <FormField label="Estimated minutes">
               <Input
+                variant="metadata"
                 type="number"
                 min={1}
                 max={600}

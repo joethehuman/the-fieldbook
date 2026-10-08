@@ -36,6 +36,7 @@ export function HierarchyPicker({
   emptyMessage = "No matching teams.",
   visibleRows,
   showFullHierarchy = true,
+  inputVariant,
   className,
   disabled,
   ...props
@@ -52,6 +53,7 @@ export function HierarchyPicker({
   emptyMessage?: string;
   visibleRows?: number;
   showFullHierarchy?: boolean;
+  inputVariant?: ComponentProps<typeof Input>["variant"];
 }) {
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -125,6 +127,7 @@ export function HierarchyPicker({
           }}
         >
           <Input
+            variant={inputVariant}
             ref={input}
             type="search"
             role="combobox"

@@ -511,6 +511,12 @@ export default function ComponentCatalog() {
             />
           </SearchField>
           <FieldGroup>
+            <FormField label="Metadata input">
+              <Input variant="metadata" placeholder="Consistent metadata typography" />
+            </FormField>
+            <FormField label="Metadata textarea">
+              <Textarea variant="metadata" size="compact" placeholder="Consistent metadata typography" />
+            </FormField>
             <Field>
               Group name
               <Input defaultValue="Sales" />

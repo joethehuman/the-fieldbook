@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ComponentProps } from "react";
 import { X } from "lucide-react";
 import { Alert } from "../ui/alert";
 import type { UploadProgress } from "@/lib/upload-media";
@@ -36,6 +36,7 @@ export function CardArtEditor({
   onBusyChange,
   saveMode = "manual",
   shortTitleId,
+  inputVariant,
 }: {
   id: string;
   title: string;
@@ -50,6 +51,7 @@ export function CardArtEditor({
   onBusyChange?: (busy: boolean) => void;
   saveMode?: "manual" | "automatic";
   shortTitleId?: string;
+  inputVariant?: ComponentProps<typeof Input>["variant"];
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const shuffleHistory = useRef<{ id: string; seeds: number[] }>({
@@ -107,6 +109,7 @@ export function CardArtEditor({
         description={<><span className="block">Can differ from full title.</span><span className="block">Max 40 characters ({graphemeCount(current.shortTitle)}/40).</span></>}
       >
         <Input
+          variant={inputVariant}
           id={shortTitleId}
           value={current.shortTitle}
           disabled={disabled || uploading}

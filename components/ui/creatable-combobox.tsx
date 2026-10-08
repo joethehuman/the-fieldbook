@@ -12,7 +12,7 @@ import {
 } from "./popover";
 import { cn } from "@/lib/utils";
 
-type Props = Omit<ComponentProps<"input">, "value" | "onChange" | "list"> & {
+type Props = Omit<ComponentProps<typeof Input>, "value" | "onChange" | "list"> & {
   value: string;
   onValueChange: (value: string) => void;
   options: string[];

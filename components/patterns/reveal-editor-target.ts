@@ -22,8 +22,12 @@ export function revealEditorTarget(target: HTMLElement, {
   if (focus) {
     target.focus({ preventScroll: true });
     if (target.isContentEditable) {
+      // A caret at the editor root looks like the first line, but slash commands
+      // need a selection inside a writing block. Skip non-editable decorations.
+      const firstBlock = Array.from(target.querySelectorAll<HTMLElement>("p, h1, h2, h3, h4, h5, h6, blockquote, li"))
+        .find((block) => block.isContentEditable);
       const range = document.createRange();
-      range.selectNodeContents(target);
+      range.selectNodeContents(firstBlock || target);
       range.collapse(true);
       const selection = window.getSelection();
       selection?.removeAllRanges();
@@ -72,10 +76,10 @@ export function revealEditorTarget(target: HTMLElement, {
     const canvas = target.closest<HTMLElement>(".editor-frame-canvas");
     const surfaceTop = canvas ? parseFloat(getComputedStyle(canvas).top) : NaN;
     const navigation = parseFloat(style.getPropertyValue("--editor-navigation-height")) || 0;
-    const heading = target.closest(".writing-surface")?.querySelector<HTMLElement>(".writing-document-heading");
+    const heading = target.closest(".writing-surface, .course-quiz-canvas")?.querySelector<HTMLElement>(".writing-document-heading");
     const inHeading = !!heading?.contains(target);
     const pinnedHeading = heading && !inHeading && !target.closest(".writing-course-heading") ? heading.getBoundingClientRect().height : 0;
-    const inset = local ? canvasScroll ? navigation : inHeading ? toolbar : toolbar + pinnedHeading : wholeSurface && Number.isFinite(surfaceTop) ? surfaceTop
+    const inset = local ? canvasScroll ? navigation + pinnedHeading : inHeading ? toolbar : toolbar + pinnedHeading : wholeSurface && Number.isFinite(surfaceTop) ? surfaceTop
       : header + (inControls ? 0 : inCanvas || inPanel ? controls + navigation + (inToolbar ? 0 : toolbar + pinnedHeading) : 0);
     let top = viewport.top + container.clientTop + inset;
     let bottom = viewport.top + container.clientTop + container.clientHeight;

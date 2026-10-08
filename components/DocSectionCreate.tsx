@@ -4,7 +4,7 @@ import { ActionGroup } from "./ui/action-group";
 import { Input } from "./ui/input";
 import { SelectField } from "./ui/select";
 import { Button } from "./ui/button";
-import { useState } from "react";
+import { useState, type ComponentProps } from "react";
 import { Plus } from "lucide-react";
 import { createDocSection, type DocSection } from "@/lib/docs-navigation";
 
@@ -14,12 +14,14 @@ export default function DocSectionCreate({
   onCancel,
   initialParentId = "",
   disabled = false,
+  inputVariant,
 }: {
   sections: DocSection[];
   onCreate: (section: DocSection) => void | Promise<void>;
   onCancel?: () => void;
   initialParentId?: string;
   disabled?: boolean;
+  inputVariant?: ComponentProps<typeof Input>["variant"];
 }) {
   const [name, setName] = useState("");
   const [parentId, setParentId] = useState(initialParentId);
@@ -45,6 +47,7 @@ export default function DocSectionCreate({
     <div className="doc-section-create">
       <FormField label="New section name" error={error}>
         <Input
+          variant={inputVariant}
           value={name}
           maxLength={80}
           disabled={disabled || busy}

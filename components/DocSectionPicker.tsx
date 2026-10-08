@@ -1,18 +1,22 @@
 "use client";
+import type { ComponentProps } from "react";
+import type { Input } from "./ui/input";
 import { FormField } from "./patterns/form-field";
 import { HierarchyPicker } from "./patterns/hierarchy-picker";
 import type { DocSection } from "@/lib/docs-navigation";
 
-export function DocSectionPicker({ sections, value, onChange, disabled = false, canCreate = true }: {
+export function DocSectionPicker({ sections, value, onChange, disabled = false, canCreate = true, inputVariant }: {
   sections: DocSection[];
   value: string;
   onChange: (id: string) => void;
   disabled?: boolean;
   canCreate?: boolean;
+  inputVariant?: ComponentProps<typeof Input>["variant"];
 }) {
   return (
     <FormField label="Section" visuallyHiddenLabel>
       <HierarchyPicker
+        inputVariant={inputVariant}
         value={value}
         onValueChange={onChange}
         disabled={disabled}
