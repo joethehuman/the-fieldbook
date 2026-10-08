@@ -10,6 +10,7 @@ import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
 import { createWritingBlock, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu } from "./writing-selection-menu";
+import { normalizeWritingSelection, writingSelectionBoundariesPlugin } from "./writing-selection-boundaries";
 import { EditorWritingActionsContext } from "./editor-frame";
 import { useWritingControlsLayout } from "./use-editor-cards-layout";
 import { WritingLinkDialog } from "./writing-link-dialog";
@@ -193,6 +194,7 @@ function WritingToolbar({
       editor?.update(() => {
         const selection = $getSelection();
         if (!$isRangeSelection(selection)) return;
+        normalizeWritingSelection(selection);
         $setBlocksType(selection, () => createWritingBlock(kind));
       }, { discrete: true });
     onEditorReady(editor, {
@@ -535,7 +537,9 @@ export default function WritingEditorEngine({
   function rememberSelection() {
     mediaSelection.current = null;
     lexicalEditor.current?.getEditorState().read(() => {
-      mediaSelection.current = $getSelection()?.clone() || null;
+      const selection = $getSelection()?.clone() || null;
+      if ($isRangeSelection(selection)) normalizeWritingSelection(selection);
+      mediaSelection.current = selection;
     });
   }
   function insertAtMediaSelection(markdown: string) {
@@ -694,6 +698,7 @@ export default function WritingEditorEngine({
     writingViewPanelPlugin(),
     writingVideoPlugin(),
     writingUploadPlugin(),
+    writingSelectionBoundariesPlugin(),
     headingsPlugin(),
     listsPlugin(),
     quotePlugin(),

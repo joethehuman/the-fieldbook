@@ -25,7 +25,7 @@ async function tableActionPlacement(table: Locator) {
 async function setup(
   page: Page,
   production: boolean,
-  kind: "doc" | "course" = "doc",
+  kind: "doc" | "course" | "brief" = "doc",
   blankCourse = false,
   assignedCourse = false,
   lessonBody?: string,
@@ -40,7 +40,10 @@ async function setup(
     state.content[0].questions = [];
     state.content[0].requirePassing = false;
   }
-  if (lessonBody !== undefined) state.content[0].lessons[0].body = lessonBody;
+  if (lessonBody !== undefined) {
+    if (kind === "course") state.content[0].lessons[0].body = lessonBody;
+    else state.content[0].body = lessonBody;
+  }
   state.publishedContent = [];
   if (assignedCourse) {
     const course = state.content[0];
@@ -1502,4 +1505,297 @@ test("card artwork above 50 MB reaches storage and a rejection preserves existin
   await expect(artwork.getByRole("button", { name: "Upload image", exact: true })).toBeEnabled();
   await artwork.getByRole("alert").scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("large-artwork-recovery.png"), fullPage: true });
+});
+
+async function paragraphBoundary(page: Page, writing: Locator, backward = false, rootBoundary = false) {
+  await writing.click();
+  await writing.evaluate((surface, { backward, rootBoundary }) => {
+    const text = surface.querySelector("p span")!.firstChild!;
+    const end = rootBoundary ? surface : surface.querySelector("h2 span")!.firstChild!;
+    const offset = rootBoundary ? 1 : 0;
+    const selection = window.getSelection()!;
+    selection.setBaseAndExtent(backward ? end : text, backward ? offset : 0,
+      backward ? text : end, backward ? 0 : offset);
+  }, { backward, rootBoundary });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+}
+
+async function pasteText(writing: Locator, html = "", clipboard?: Record<string, string>) {
+  await writing.evaluate((surface, { html, clipboard }) => {
+    const data = new DataTransfer();
+    for (const [type, value] of Object.entries(clipboard || {
+      "text/plain": "Paste sentence", ...(html ? { "text/html": html } : {}),
+    })) data.setData(type, value);
+    surface.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, { html, clipboard });
+}
+
+for (const backward of [false, true]) for (const action of ["Backspace", "Delete", "cut", "typing", "paste"] as const) {
+  test(`paragraph boundary ${action} preserves the following heading; backward=${backward}`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "course", true, false,
+      "Paragraph one.\n\n## Heading below\n\nBody after.");
+    const writing = page.getByRole("textbox", { name: "Lesson content" });
+    await paragraphBoundary(page, writing, backward, !backward);
+    if (action === "cut") await writing.evaluate((surface) => {
+      surface.dispatchEvent(new ClipboardEvent("cut", { clipboardData: new DataTransfer(), bubbles: true, cancelable: true }));
+    });
+    else if (action === "typing") await page.keyboard.type("Replacement");
+    else if (action === "paste") await pasteText(writing);
+    else await page.keyboard.press(action);
+    await expect(writing.locator("h2")).toHaveText("Heading below");
+    await expect(writing).not.toContainText("Paragraph one.");
+    if (action === "typing") await expect(writing.locator("p").first()).toHaveText("Replacement");
+    if (action === "paste") await expect(writing.locator("p").first()).toHaveText("Paste sentence");
+    await expect(writing.locator("p").last()).toHaveText("Body after.");
+    await expectMarkdown(page, /## Heading below\n\nBody after\./);
+  });
+}
+
+for (const placement of ["middle", "blank"] as const) for (const payload of ["plain", "HTML", "ghost heading", "leading ghost", "Lexical ghost", "Lexical leading ghost"] as const) {
+  test(`text paste ${payload} at ${placement} keeps paragraph style and adds no heading`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "course", true, false,
+      "BeforeAfter\n\n## Heading below");
+    const writing = page.getByRole("textbox", { name: "Lesson content" });
+    await writing.click();
+    await writing.evaluate((surface, placement) => {
+      const text = surface.querySelector("p span")!.firstChild!;
+      window.getSelection()!.setBaseAndExtent(text, placement === "middle" ? 6 : 11, text, placement === "middle" ? 6 : 11);
+    }, placement);
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+    if (placement === "blank") await page.keyboard.press("Enter");
+    if (payload.startsWith("Lexical")) await pasteText(writing, "", {
+      "text/plain": "Paste sentence\n",
+      "application/x-lexical-editor": JSON.stringify({ namespace: "MDXEditor", nodes: (payload === "Lexical leading ghost" ? [
+        { type: "heading", version: 1, tag: "h2", children: [], direction: null, format: "", indent: 0 },
+        { type: "paragraph", version: 1, children: [{ type: "text", version: 1, text: "Paste sentence", format: 0, detail: 0, mode: "normal", style: "" }], direction: null, format: "", indent: 0 },
+      ] : [
+        { type: "paragraph", version: 1, children: [{ type: "text", version: 1, text: "Paste sentence", format: 0, detail: 0, mode: "normal", style: "" }], direction: null, format: "", indent: 0 },
+        { type: "heading", version: 1, tag: "h2", children: [], direction: null, format: "", indent: 0 },
+      ]) }),
+    });
+    else await pasteText(writing, payload === "plain" ? "" : `${payload === "leading ghost" ? "<h2></h2>" : ""}<p>Paste sentence</p>${payload === "ghost heading" ? "<h2><span></span></h2>" : ""}`);
+    await expect(writing.locator("h2")).toHaveText("Heading below");
+    if (placement === "middle") await expect(writing.locator("p").first()).toHaveText("BeforePaste sentenceAfter");
+    else {
+      await expect(writing.locator("p").nth(0)).toHaveText("BeforeAfter");
+      await expect(writing.locator("p").nth(1)).toHaveText("Paste sentence");
+      await expect(writing.locator("p")).toHaveCount(3); // Includes the editor's existing trailing writing line.
+    }
+    await expectMarkdown(page, placement === "middle"
+      ? "BeforePaste sentenceAfter\n\n## Heading below"
+      : "BeforeAfter\n\nPaste sentence\n\n## Heading below");
+  });
+}
+
+for (const operation of ["copy", "format"] as const) test(`paragraph boundary ${operation} excludes the next heading`, async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true, false,
+    "Paragraph one.\n\n## Heading below\n\nBody after.");
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await paragraphBoundary(page, writing);
+  if (operation === "copy") {
+    const clipboard = await writing.evaluate((surface) => {
+      const data = new DataTransfer();
+      surface.dispatchEvent(new ClipboardEvent("copy", { clipboardData: data, bubbles: true, cancelable: true }));
+      return Object.fromEntries(Array.from(data.types).map((type) => [type, data.getData(type)]));
+    });
+    expect(clipboard["text/html"]).not.toMatch(/<h[1-6]/);
+    expect(JSON.parse(clipboard["application/x-lexical-editor"]).nodes).toHaveLength(1);
+    expect(clipboard["text/plain"]).toBe("Paragraph one.");
+  } else {
+    const tools = page.getByRole("dialog", { name: "Format selected text", exact: true });
+    if (info.project.name.endsWith("phone")) {
+      await page.getByRole("button", { name: "Commands: insert blocks or format selected text" }).click();
+    }
+    await tools.getByRole("button", { name: "Normal Text", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Heading 3", exact: true }).click();
+    await expect(writing.locator("h3")).toHaveText("Paragraph one.");
+  }
+  await expect(writing.locator("h2")).toHaveText("Heading below");
+});
+
+test("rich paste preserves real headings and the untouched paragraph suffix", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true, false,
+    "BeforeAfter\n\n## Heading below");
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click();
+  await writing.evaluate((surface) => {
+    const text = surface.querySelector("p span")!.firstChild!;
+    window.getSelection()!.setBaseAndExtent(text, 6, text, 6);
+  });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await pasteText(writing, "<p>Paste sentence</p><h2>Real pasted heading</h2>");
+  await expect(writing.locator("p").first()).toHaveText("BeforePaste sentence");
+  await expect(writing.locator("h2").first()).toHaveText("Real pasted heading");
+  await expect(writing.locator("p").nth(1)).toHaveText("After");
+  await expect(writing.locator("h2").last()).toHaveText("Heading below");
+  await expectMarkdown(page, "BeforePaste sentence\n\n## Real pasted heading\n\nAfter\n\n## Heading below");
+  await writing.click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(writing.locator("p").first()).toHaveText("BeforeAfter");
+  await expect(writing.locator("h2")).toHaveText("Heading below");
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(writing.locator("h2").first()).toHaveText("Real pasted heading");
+});
+
+for (const next of ["# Heading below", "### Heading below", "#### Heading below", "##### Heading below", "###### Heading below", "> Callout below", "- List below", "1. List below"] as const) {
+  test(`paragraph boundary preserves the next ${next.split(" ")[0]} block`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "course", true, false, `Paragraph one.\n\n${next}\n\nBody after.`);
+    const writing = page.getByRole("textbox", { name: "Lesson content" });
+    await writing.click();
+    await writing.evaluate((surface) => {
+      const start = surface.querySelector("p span")!.firstChild!;
+      const nextBlock = surface.children[1];
+      const end = document.createTreeWalker(nextBlock, NodeFilter.SHOW_TEXT).nextNode()!;
+      window.getSelection()!.setBaseAndExtent(start, 0, end, 0);
+    });
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+    await page.keyboard.press("Backspace");
+    await expectMarkdown(page, `${next.replace(/^- /, "* ")}\n\nBody after.`);
+  });
+}
+
+test("explicit paragraph joining and selecting real heading text retain normal editing behavior", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true, false, "Paragraph one.\n\n## Heading below");
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click();
+  await writing.evaluate((surface) => {
+    const text = surface.querySelector("p span")!.firstChild!;
+    const heading = surface.querySelector("h2 span")!.firstChild!;
+    window.getSelection()!.setBaseAndExtent(text, text.textContent!.length, heading, 0);
+  });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await page.keyboard.press("Backspace");
+  await expect(writing.locator("p").first()).toHaveText("Paragraph one.Heading below");
+  await writing.click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(writing.locator("h2")).toHaveText("Heading below");
+  await writing.evaluate((surface) => {
+    const text = surface.querySelector("p span")!.firstChild!;
+    const heading = surface.querySelector("h2 span")!.firstChild!;
+    window.getSelection()!.setBaseAndExtent(text, 0, heading, 1);
+  });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await page.keyboard.press("Backspace");
+  await expect(writing).not.toContainText("Paragraph one.");
+  await expect(writing.locator("p").first()).toHaveText("eading below");
+});
+
+for (const block of ["code", "table", "divider", "image", "video"] as const) test(`paragraph boundary preserves the following ${block} element`, async ({ page }, info) => {
+  const content = {
+    code: "```\nKeep this code\n```",
+    table: "| Column |\n| --- |\n| Keep this cell |",
+    divider: "***",
+    image: "![Diagram](https://example.com/diagram.png)",
+    video: "[Video](https://example.com/clip.mp4)",
+  }[block];
+  await page.route("https://example.com/diagram.png", (route) => route.fulfill({ contentType: "image/png", body: Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=", "base64",
+  ) }));
+  await page.route("https://example.com/clip.mp4", (route) => route.fulfill({ contentType: "video/mp4", body: "synthetic" }));
+  await setup(page, info.project.name.startsWith("production"), "course", true, false, `Paragraph one.\n\n${content}\n\n## Heading below`);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await paragraphBoundary(page, writing, false, true);
+  await page.keyboard.press("Backspace");
+  await expect(writing.locator("h2")).toHaveText("Heading below");
+  await expectMarkdown(page, block === "table" ? /Keep this cell[\s\S]*## Heading below/ : `${content}\n\n## Heading below`);
+  if (block === "table") await expect(writing.locator("table")).toHaveCount(1);
+  if (block === "code") await expect(page.getByRole("textbox", { name: "Plain text code block" })).toHaveValue("Keep this code");
+  if (block === "divider") await expect(writing.locator("hr")).toHaveCount(1);
+  if (block === "image") await expect(writing.locator("img")).toHaveAttribute("src", "https://example.com/diagram.png");
+  if (block === "video") await expect(writing.locator("video")).toHaveAttribute("src", "https://example.com/clip.mp4");
+});
+
+for (const block of ["callout", "bullet", "numbered"] as const) test(`rich paste of a ${block} keeps the untouched paragraph suffix plain`, async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true, false, "BeforeAfter\n\n## Heading below");
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click();
+  await writing.evaluate((surface) => {
+    const text = surface.querySelector("p span")!.firstChild!;
+    window.getSelection()!.setBaseAndExtent(text, 6, text, 6);
+  });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  const element = { callout: "<blockquote>Real pasted callout</blockquote>", bullet: "<ul><li>Real pasted list</li></ul>", numbered: "<ol><li>Real pasted list</li></ol>" }[block];
+  await pasteText(writing, `<p>Paste sentence</p>${element}`);
+  await expect(writing.locator("p").first()).toHaveText("BeforePaste sentence");
+  await expect(writing.locator("p").nth(1)).toHaveText("After");
+  await expect(writing.locator("h2")).toHaveText("Heading below");
+  if (block === "callout") await expect(writing.locator("blockquote")).toHaveText("Real pasted callout");
+  else await expect(writing.locator("li")).toHaveText("Real pasted list");
+});
+
+for (const failure of [false, true]) test(`image paste at a paragraph boundary preserves the following heading; failure=${failure}`, async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+  const { control } = await setup(page, true, "course", true, false, "Paragraph one.\n\n## Heading below");
+  control.uploadFailure = failure;
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await paragraphBoundary(page, writing);
+  await writing.evaluate((surface) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["synthetic"], "boundary.png", { type: "image/png" }));
+    surface.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect.poll(() => control.uploaded).toBe(true);
+  await expect(writing.locator("h2")).toHaveText("Heading below");
+  control.releaseUpload();
+  if (failure) {
+    await expect(page.locator(".writing-editor").getByRole("alert")).toBeVisible();
+    await expect(writing.locator("p").first()).toHaveText("Paragraph one.");
+  } else await expect(writing.locator("img")).toHaveAttribute("src", /\/api\/media\//);
+  await expect(writing.locator("h2")).toHaveText("Heading below");
+});
+
+for (const backward of [false, true]) for (const action of ["copy", "typing", "paste", "Backspace", "format"] as const) {
+  test(`both paragraph boundaries ${action} exclude surrounding headings; backward=${backward}`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "course", true, false,
+      "## Heading above\n\nParagraph one.\n\n## Heading below");
+    const writing = page.getByRole("textbox", { name: "Lesson content" });
+    await writing.click();
+    await writing.evaluate((surface, backward) => {
+      const before = surface.querySelectorAll("h2 span")[0].firstChild!;
+      const after = surface.querySelectorAll("h2 span")[1].firstChild!;
+      window.getSelection()!.setBaseAndExtent(backward ? after : before, backward ? 0 : before.textContent!.length,
+        backward ? before : after, backward ? before.textContent!.length : 0);
+    }, backward);
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+    if (action === "copy") {
+      const data = await writing.evaluate((surface) => {
+        const clipboard = new DataTransfer();
+        surface.dispatchEvent(new ClipboardEvent("copy", { clipboardData: clipboard, bubbles: true, cancelable: true }));
+        return Object.fromEntries(Array.from(clipboard.types).map((type) => [type, clipboard.getData(type)]));
+      });
+      expect(data["text/plain"]).toBe("Paragraph one.");
+      expect(data["text/html"]).not.toMatch(/<h[1-6]/);
+      expect(JSON.parse(data["application/x-lexical-editor"]).nodes).toHaveLength(1);
+    } else if (action === "format") {
+      if (info.project.name.endsWith("phone")) await page.getByRole("button", { name: "Commands: insert blocks or format selected text" }).click();
+      const tools = page.getByRole("dialog", { name: "Format selected text", exact: true });
+      await tools.getByRole("button", { name: "Normal Text", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Heading 3", exact: true }).click();
+      await expect(writing.locator("h3")).toHaveText("Paragraph one.");
+    } else if (action === "typing") await page.keyboard.type("Replacement");
+    else if (action === "paste") await pasteText(writing);
+    else await page.keyboard.press("Backspace");
+    await expect(writing.locator("h2")).toHaveText(["Heading above", "Heading below"]);
+    if (action === "typing") await expect(writing.locator("p").first()).toHaveText("Replacement");
+    if (action === "paste") await expect(writing.locator("p").first()).toHaveText("Paste sentence");
+  });
+}
+
+for (const kind of ["doc", "brief"] as const) test(`${kind === "brief" ? "update" : kind} shares paragraph boundary deletion and paste protection`, async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), kind, false, false, "Paragraph one.\n\n## Heading below");
+  const writing = page.getByRole("textbox", { name: kind === "doc" ? "Doc content" : "Update content", exact: true });
+  await paragraphBoundary(page, writing);
+  await page.keyboard.press("Backspace");
+  await expect(writing.locator("h2")).toHaveText("Heading below");
+  await writing.click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(writing.locator("p").first()).toHaveText("Paragraph one.");
+  await writing.evaluate((surface) => {
+    const text = surface.querySelector("p span")!.firstChild!;
+    window.getSelection()!.setBaseAndExtent(text, 6, text, 6);
+  });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await pasteText(writing, "<p>Paste sentence</p><h2></h2>");
+  await expect(writing.locator("p").first()).toHaveText("ParagrPaste sentenceaph one.");
+  await expect(writing.locator("h2")).toHaveText("Heading below");
 });

@@ -48,6 +48,8 @@ Details orders publishing requirements, short description, organization, audienc
 
 Image insertion uses a quiet muted Loading… bar at the paste or upload location, then replaces it with the image. Keep upload feedback out of the space above the editor so navigation and pinned titles do not move. Loading blocks are temporary editor state and never saved in Markdown; an upload failure restores the original text and retains the existing error and retry behavior. The image-fetch placeholder uses the same bar instead of a dashed image icon.
 
+Text selections exclude adjoining blocks when their endpoints contain none of those blocks’ content, for deletion, replacement, copying, and formatting. Clipboard import drops empty trailing styled-block artifacts and preserves the original style of untouched text after a rich-text paste; meaningful pasted headings retain their formatting. Deliberate paragraph joins and selections that include actual text in the next block keep normal editing behavior.
+
 ## Verify interface work
 
 When adding or changing a shared component, show representative states in the demo's `/ui` catalog using the actual component, and document any non-obvious usage or accessibility rules. The catalog uses synthetic content; it does not supply runtime components to the installed interface.
