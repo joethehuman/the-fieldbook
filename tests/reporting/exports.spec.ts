@@ -763,6 +763,8 @@ test("app bar stays visible over long administration reports", async ({
       .evaluate((el) => el.getBoundingClientRect().top),
   ).toBe(0);
   await page.screenshot({ path: info.outputPath("bar-report-scrolled.png") });
+  const openSearch = page.getByRole("button", { name: "Open search", exact: true });
+  if (await openSearch.isVisible()) await openSearch.click();
   await page.getByRole("textbox", { name: "Search all content" }).fill("sales");
   await expect(page.locator('[data-slot="search-panel"]')).toBeVisible();
   await page.screenshot({ path: info.outputPath("bar-report-search.png") });

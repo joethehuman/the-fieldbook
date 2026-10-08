@@ -234,9 +234,20 @@ async function save(page: Page) {
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
-  await expect(
-    page.getByText("Settings saved.", { exact: true }),
-  ).toBeVisible();
+  const review = page.getByRole("dialog", { name: "Review changes", exact: true });
+  const saved = page.getByText("Settings saved.", { exact: true });
+  const saveButton = page.getByRole("button", { name: "Save settings", exact: true });
+  const saveStatus = page.locator('[data-slot="save-changes-control"] [role="status"]');
+  await expect.poll(async () =>
+    (await review.isVisible()) ||
+    ((await saveButton.count()) === 1 && (await saveButton.isDisabled()) &&
+      (await saveStatus.count()) === 0 && (await saved.isVisible())),
+  ).toBe(true);
+  if (await review.isVisible())
+    await review.getByRole("button", { name: "Apply changes", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Save settings", exact: true })).toBeDisabled();
+  await expect(page.locator('[data-slot="save-changes-control"] [role="status"]')).toHaveCount(0);
+  await expect(saved).toBeVisible();
 }
 async function nav(page: Page, name: string) {
   const open = page.getByRole("button", { name: "Open navigation" });
@@ -265,7 +276,7 @@ test("optional existing selection, explicit named creation, save flow and retain
   });
   await picker.focus();
   await page.keyboard.press("Enter");
-  await page.getByRole("option", { name: "Broader learning group / Visitors", exact: true }).click();
+  await page.getByRole("option", { name: "Visitors", exact: true }).click();
   expect((await f.getData()).settings.guestGroupId).toBeNull();
   await save(page);
   expect((await f.getData()).settings.guestGroupId).toBe("visitors");
@@ -365,14 +376,14 @@ test("guest Updates and curriculum learning, browser progress and account transi
     .getByRole(f.production ? "link" : "button", { name: /Guest introduction/ })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Guest introduction", exact: true }),
+    page.getByRole("heading", { name: "Guest introduction", exact: true, level: 1 }),
   ).toBeVisible();
   await shot(page, info, "guest-curriculum");
   await page
     .getByRole(f.production ? "link" : "button", { name: /Foundation course/ })
     .first()
     .click();
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await page.getByRole("radio", { name: "Correct", exact: true }).check();
   await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(
@@ -393,15 +404,29 @@ test("guest Updates and curriculum learning, browser progress and account transi
   );
   await shot(page, info, "guest-updates");
   await f.unchangedPeople();
+  const imported = f.production ? page.waitForResponse((response) => {
+    if (!response.url().endsWith("/api/progress") || response.request().method() !== "POST") return false;
+    const body = response.request().postDataJSON();
+    return body.guestImport === true && body.complete === true;
+  }) : null;
   await f.signIn();
   await expect(page.locator(".for-you")).toContainText("Optional course");
   await expect(page.locator(".for-you")).not.toContainText(
     "Guest introduction",
   );
-  if (f.production)
-    await expect(
-      page.getByRole("region", { name: "Import browser progress" }),
-    ).toBeVisible();
+  if (imported) {
+    const response = await imported;
+    expect(response.status()).toBe(200);
+    expect(response.request().postDataJSON()).toMatchObject({
+      contentId: "00000000-0000-4000-8000-000000000001",
+      lessons: ["lesson"],
+      complete: true,
+      guestImport: true,
+    });
+    expect(await response.json()).toMatchObject({ passed: true });
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("fieldbook.guest-progress.v1"))).toBeNull();
+    await expect(page.getByRole("region", { name: "Import browser progress" })).toHaveCount(0);
+  }
   await f.unchangedPeople();
 });
 
@@ -471,7 +496,7 @@ test("settings and group failures preserve edits, successful retry and pending d
     .fill("New guests");
   await page.getByRole("button", { name: "Create group", exact: true }).click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Synthetic save conflict" }),
+    page.getByRole("alert").filter({ hasText: "Synthetic save conflict" }),
   ).toBeVisible();
   await expect(
     page.getByRole("combobox", { name: "Learning group for guests" }),
@@ -480,12 +505,12 @@ test("settings and group failures preserve edits, successful retry and pending d
     (await f.getData()).groups.some((g: any) => g.name === "New guests"),
   ).toBe(false);
   f.fail("settings");
-  await select(page, "Learning group for guests", "Broader learning group / Visitors");
+  await select(page, "Learning group for guests", "Visitors");
   await page
     .getByRole("button", { name: "Save settings", exact: true })
     .click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Synthetic save conflict" }),
+    page.getByRole("alert").filter({ hasText: "Synthetic save conflict" }),
   ).toBeVisible();
   await expect(
     page.getByRole("combobox", { name: "Learning group for guests" }),
@@ -500,9 +525,9 @@ test("settings and group failures preserve edits, successful retry and pending d
     page.getByRole("button", { name: "Saving…", exact: true }),
   ).toBeDisabled();
   await shot(page, info, "saving");
-  await expect(
-    page.getByText("Settings saved.", { exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Save settings", exact: true })).toBeDisabled();
+  await expect(page.locator('[data-slot="save-changes-control"] [role="status"]')).toHaveCount(0);
+  await expect(page.getByText("Settings saved.", { exact: true })).toBeVisible();
   await f.unchangedPeople();
 });
 

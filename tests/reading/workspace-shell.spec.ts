@@ -435,7 +435,7 @@ test("demo initial entry and profile selection use the account page without a fu
     await staticPage.goto("http://127.0.0.1:3132");
     await staticPage.evaluate(() => document.fonts.ready);
     const profiles = staticPage.locator(".profile-list button");
-    await expect(profiles).toHaveCount(3);
+    await expect(profiles).toHaveCount(4);
     for (const profile of await profiles.all()) {
       await expect(profile).toBeVisible();
       await expect(profile).toHaveAttribute("aria-disabled", "true");
@@ -484,6 +484,7 @@ test("demo initial entry and profile selection use the account page without a fu
   expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
     false,
   );
+  expect(hydrationErrors).toEqual([]);
   await page.evaluate(() => {
     sessionStorage.removeItem("fieldbook.profile.v1");
     localStorage.setItem(
@@ -498,7 +499,7 @@ test("demo initial entry and profile selection use the account page without a fu
   await expect(
     page
       .getByRole("alert")
-      .filter({ hasText: "Saved demo data could not be opened" }),
+      .filter({ hasText: "Your saved demo data couldn’t be opened. Use Reset demo to start again." }),
   ).toBeVisible();
   const inactiveProfile = page.getByRole("button", { name: /Alex Edwards/ });
   await expect(inactiveProfile).toHaveAttribute("aria-disabled", "true");
@@ -516,7 +517,9 @@ test("demo initial entry and profile selection use the account page without a fu
   expect(await page.evaluate(() => (window as any).sawFullScreenLoader)).toBe(
     false,
   );
-  expect(hydrationErrors).toEqual([]);
+  expect(hydrationErrors).toEqual([
+    "Saved demo data could not be opened. Export or reset this browser’s demo.",
+  ]);
 });
 
 test("demo picker keeps its first painted layout through hydration and late font delivery", async ({
@@ -538,7 +541,7 @@ test("demo picker keeps its first painted layout through hydration and late font
             const { x, y, width, height } = node.getBoundingClientRect();
             return [x, y, width, height];
           },
-        );
+        ).filter(([, , width, height]) => width > 0 && height > 0);
         if (JSON.stringify(geometry) !== JSON.stringify(snapshots.at(-1)))
           snapshots.push(geometry);
       }
@@ -567,7 +570,7 @@ test("demo picker keeps its first painted layout through hydration and late font
   try {
     await page.goto("http://127.0.0.1:3132", { waitUntil: "commit" });
     await page.waitForFunction(() => (window as any).pickerPaints.length > 0);
-    await expect(page.locator(".profile-list button")).toHaveCount(3);
+    await expect(page.locator(".profile-list button")).toHaveCount(4);
     await expect(
       page.getByRole("button", { name: /Alex Edwards/ }),
     ).toHaveAttribute("aria-disabled", "true");
@@ -629,7 +632,7 @@ test("demo saved picker preserves custom branding, names and inactive profiles",
   await expect(
     page.getByText("Saved demo workspace", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".profile-list button")).toHaveCount(2);
+  await expect(page.locator(".profile-list button")).toHaveCount(3);
   await expect(
     page.getByRole("button", { name: /Oliver Anderson/ }),
   ).toHaveCount(0);
