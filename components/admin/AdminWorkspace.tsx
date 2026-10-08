@@ -208,14 +208,6 @@ export function AdminWorkspace({
                         : "governance";
             setData(await runtime.admin.prepare(scope));
           }}
-          onOpenPersonProgress={async (id) => {
-            setData(await runtime.admin.prepare("person", id));
-          }}
-          onEdit={async (id) => {
-            const result = await runtime.admin.edit(id);
-            setData(result.data);
-            return result.item;
-          }}
           onUnpublish={async (id) => {
             setData(await runtime.admin.unpublish(id));
           }}

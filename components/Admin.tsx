@@ -288,9 +288,7 @@ type Props = {
   onDeleteFeedback?: (ids: string[]) => Promise<void>;
   onOpenTab?: (tab: string) => Promise<void>;
   onPrepareAssignments?: () => Promise<Workspace>;
-  onOpenPersonProgress?: (id: string) => Promise<void>;
-  onEdit?: (id: string) => Promise<Content>;
-  onSaveContent?: (content: Content, intent: SaveIntent, options?: PublicationOptions) => Promise<Content>;
+  onSaveContent: (content: Content, intent: SaveIntent, options?: PublicationOptions) => Promise<Content>;
   onUnpublish?: (id: string) => Promise<void>;
   onChange: (
     d: Workspace,
@@ -383,8 +381,6 @@ export default function Admin({
   onDeleteFeedback,
   onOpenTab,
   onPrepareAssignments,
-  onOpenPersonProgress,
-  onEdit,
   onSaveContent,
   onUnpublish,
   onChange: persist,
@@ -966,34 +962,9 @@ export default function Admin({
     }
   }
   async function save(c: Content, intent: SaveIntent = "draft", options?: PublicationOptions) {
-    if (onSaveContent) {
-      const saved = await onSaveContent(c, intent, options);
-      await savedDestination(saved);
-      return saved;
-    }
-    const old = data.content.find((x) => x.id === c.id);
-    const updated = {
-      ...c,
-      createdAt:
-        old?.createdAt ||
-        old?.updatedAt ||
-        c.createdAt ||
-        new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    await onChange({
-      ...data,
-      content: old
-        ? data.content.map((x) => (x.id === c.id ? updated : x))
-        : [...data.content, updated],
-    });
-
-    await savedDestination(updated);
-    setNotice("");
-    // The server may normalize the draft while saving. Keep the editor's
-    // baseline on the persisted revision so a second publish is not treated
-    // as a concurrent edit.
-    return production && onEdit ? await onEdit(c.id) : updated;
+    const saved = await onSaveContent(c, intent, options);
+    await savedDestination(saved);
+    return saved;
   }
   async function savePerson(e: React.FormEvent) {
     e.preventDefault();
