@@ -86,7 +86,7 @@ function GutterActions({
       position(anchor.current, {
         left: Math.max(4, left),
         // With no outside gutter, use the table's top control space instead of its first cell.
-        top: (tableBounds ? left < 4 ? bounds.top + 4 : tableBounds.top + 4 : bounds.top + bounds.height / 2 - 18)
+        top: (tableBounds ? left < 4 ? bounds.top + 4 : tableBounds.top : bounds.top)
           - origin.top + frame.scrollTop,
       });
     };

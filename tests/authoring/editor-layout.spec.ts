@@ -121,7 +121,7 @@ for (const kind of ["doc", "brief", "course"] as const)
       await resize(width);
       const available = (await page.locator(".editor-frame").boundingBox())!.width;
       const compact = await page.locator(".editor-frame").getAttribute("data-cards") === "true";
-      await expect.poll(async () => (await firstLine.boundingBox())!.width).toBeCloseTo(Math.min(704, available - (compact ? 0 : 148)), 0);
+      await expect.poll(async () => (await firstLine.boundingBox())!.width).toBeCloseTo(Math.min(704, available - (compact ? 88 : 148)), 0);
       const column = (await firstLine.boundingBox())!;
       const frame = (await page.locator(".editor-frame").boundingBox())!;
       expect(Math.abs((column.x - frame.x) - (frame.x + frame.width - column.x - column.width))).toBeLessThanOrEqual(2);
@@ -146,7 +146,7 @@ for (const kind of ["doc", "brief", "course"] as const)
     await expect(preferred).toHaveAttribute("aria-expanded", "false");
   });
 
-test("balanced phone padding keeps table actions clear of authored cells", async ({ page }, info) => {
+test("balanced phone gutters keep table actions beside authored cells", async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, info.project.name.startsWith("production"), "doc", 2, (item) => {
     item.body = "| First column | Second column |\n| --- | --- |\n| Value | Another value |\n\n" + item.body;
@@ -158,7 +158,8 @@ test("balanced phone padding keeps table actions clear of authored cells", async
   await expect(actions).toBeInViewport({ ratio: 1 });
   const button = (await actions.boundingBox())!;
   const table = (await host.locator("table").boundingBox())!;
-  expect(button.y + button.height).toBeLessThanOrEqual(table.y + 1);
+  expect(button.x + button.width).toBeLessThanOrEqual(table.x - 4);
+  expect(button.y).toBeCloseTo(table.y, 0);
   await actions.click();
   await expect(page.getByRole("menuitem", { name: "Remove table", exact: true })).toBeVisible();
   await page.keyboard.press("Escape");
@@ -1661,4 +1662,155 @@ test("search clear stays inside a stable field and leaves room for long queries"
     expect((await field.boundingBox())!.width).toBeCloseTo(before.width, 0);
     if (await icon.isVisible()) await page.keyboard.press("Escape");
   }
+});
+
+
+for (const kind of ["doc", "brief", "course"] as const)
+  test(`${kind}: balanced block gutters retain aligned titles, reachable actions and compact cutoffs`, async ({ page }, info) => {
+    await page.route("https://example.test/image.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#e5e5e5"/></svg>' }));
+    await page.route("https://www.youtube-nocookie.com/**", route => route.fulfill({ contentType: "text/html", body: "<html><body>Video preview</body></html>" }));
+    await page.route("https://i.ytimg.com/**", route => route.fulfill({ status: 404, body: "" }));
+    const body = "Paragraph 1. Keep every block intact.\n\n```text\nA code example\nSecond line\n```\n\n![Example](https://example.test/image.svg)\n\n[Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\n| One | Two |\n| --- | --- |\n| First | Second |\n\n---\n\nFinal paragraph.";
+    await open(page, info.project.name.startsWith("production"), kind, 2, item => {
+      if (kind === "course") item.lessons[0].body = body;
+      else item.body = body;
+    });
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    for (const width of [1600, 768, 767, 600, 375, 320, 1600]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.locator(".main-shell").evaluate(async el => {
+        await Promise.all(el.getAnimations().map(a => a.finished.catch(() => {})));
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+      const compact = await page.evaluate(() => matchMedia("(width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait)").matches);
+      const frame = (await page.locator(".editor-frame").boundingBox())!;
+      const line = (await writer.locator("p").first().boundingBox())!;
+      expect(line.x - frame.x).toBeCloseTo(frame.x + frame.width - line.x - line.width, 0);
+      expect((await page.locator("#editor-title").boundingBox())!.x).toBeCloseTo(line.x, 0);
+      if (kind === "course") expect((await page.getByRole("textbox", { name: "Lesson title", exact: true }).boundingBox())!.x).toBeCloseTo(line.x, 0);
+      expect(Math.abs((await page.getByRole("button", { name: "Back to content", exact: true }).locator("svg").boundingBox())!.x - line.x)).toBeLessThanOrEqual(2);
+      if (compact) {
+        await expect(page.locator(".editor-frame")).toHaveAttribute("data-cards", "true");
+        await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeVisible();
+        const controls = (await page.locator('.editor-frame-controls[data-cards="true"]').boundingBox())!;
+        expect(controls.x).toBeCloseTo(frame.x, 0);
+        expect(controls.width).toBeCloseTo(frame.width, 0);
+      } else {
+        await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
+        await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
+      }
+      for (const [label, selector] of [["Code block", ".writing-code-block"], ["Image", '[data-editor-block-type="image"]'], ["Video", ".writing-media-block"], ["Table", ".writing-table-block"]]) {
+        const block = writer.locator(selector).first();
+        await block.scrollIntoViewIfNeeded();
+        if (!compact) await block.hover();
+        const actions = page.getByRole("button", { name: `${label} actions`, exact: true });
+        await expect(actions).toBeInViewport({ ratio: 1 });
+        const anchor = (await (label === "Table" ? block.locator("table") : block).boundingBox())!;
+        const button = (await actions.boundingBox())!;
+        expect(button.x + button.width).toBeLessThanOrEqual(anchor.x - 4);
+        expect(button.y).toBeCloseTo(anchor.y, 0);
+        await actions.click();
+        await expect(page.getByRole("menuitem", { name: `Remove ${label.toLowerCase()}`, exact: true })).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(actions).toBeFocused();
+      }
+      if (width === 375 || width === 1600) await page.screenshot({ path: info.outputPath(`${kind}-block-gutters-${width}.png`), animations: "disabled" });
+    }
+    await page.setViewportSize({ width: 375, height: 1000 });
+    await writer.locator(".writing-code-block").scrollIntoViewIfNeeded();
+    await page.getByRole("button", { name: "Code block actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Write after code block", exact: true }).click();
+    await page.keyboard.insertText("A paragraph after the code.");
+    await expect(writer).toContainText("A paragraph after the code.");
+    await expect(writer.locator(".writing-code-block")).toHaveCount(1);
+  });
+
+
+test("new list markers and their caret stay in place through the first typed character", async ({ page }, info) => {
+  await open(page, info.project.name.startsWith("production"), "doc", 2, item => { item.body = "Paragraph 1."; });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  for (const command of ["Bulleted list", "Numbered list"]) {
+    await writer.locator("p").last().click();
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Enter");
+    await expect(writer.locator("p").last()).toHaveText("");
+    const insertionLine = (await writer.locator("p").last().boundingBox())!;
+    await page.keyboard.press("/");
+    await page.getByRole("menuitem", { name: command, exact: true }).click();
+    const item = writer.locator(command === "Bulleted list" ? "ul > li" : "ol > li").last();
+    await expect(item).toBeVisible();
+    await waitForDraftSaved(page);
+    const snapshot = () => item.evaluate(el => {
+      const bounds = el.getBoundingClientRect();
+      const marker = getComputedStyle(el, "::marker");
+      const selection = getSelection();
+      return { x: bounds.x, y: bounds.y, font: marker.fontSize, color: marker.color, selected: el.contains(selection?.anchorNode || null) };
+    });
+    const before = await snapshot();
+    expect(before.selected).toBe(true);
+    expect(before.y).toBeCloseTo(insertionLine.y, 0);
+    await page.keyboard.type("A list item");
+    const after = await snapshot();
+    expect(after).toEqual(before);
+    await expect(item).toHaveText("A list item");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Enter");
+    await page.screenshot({ path: info.outputPath(`${command}-stable.png`), animations: "disabled" });
+  }
+});
+
+
+test("every inserted block leaves a consistent noneditable gap before writing resumes", async ({ page }, info) => {
+  await page.route("https://example.test/spacing.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#e5e5e5"/></svg>' }));
+  await page.route("https://www.youtube-nocookie.com/**", route => route.fulfill({ contentType: "text/html", body: "<html><body>Video preview</body></html>" }));
+  await page.route("https://i.ytimg.com/**", route => route.fulfill({ status: 404, body: "" }));
+  const body = "Paragraph 1.\n\n[Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)\n\nAfter video.\n\n```text\nCode example\n```\n\nAfter code.\n\n![Example](https://example.test/spacing.svg)\n\nAfter image.\n\n| One | Two |\n| --- | --- |\n| First | Second |\n\nAfter table.\n\n---\n\nAfter divider.";
+  await open(page, info.project.name.startsWith("production"), "doc", 2, item => { item.body = body; });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  for (const width of [1600, 375]) {
+    await page.setViewportSize({ width, height: 1000 });
+    for (const [selector, text] of [[".writing-media-block", "After video."], [".writing-code-block", "After code."], ['[data-editor-block-type="image"]', "After image."], [".writing-table-block", "After table."], ["hr", "After divider."]]) {
+      const paragraph = writer.locator("p").filter({ hasText: text });
+      await paragraph.scrollIntoViewIfNeeded();
+      const block = writer.locator(selector).first();
+      await expect(block).toBeVisible();
+      const bounds = (await block.boundingBox())!;
+      const line = (await paragraph.boundingBox())!;
+      expect(line.y - bounds.y - bounds.height).toBeGreaterThanOrEqual(24);
+      if (selector === ".writing-media-block") {
+        expect(line.y - bounds.y - bounds.height).toBeCloseTo(24, 0);
+        await page.screenshot({ path: info.outputPath(`video-writing-gap-${width}.png`), animations: "disabled" });
+      }
+    }
+    await page.screenshot({ path: info.outputPath(`block-spacing-${width}.png`), animations: "disabled" });
+  }
+});
+
+
+test("a final video block retains a writing line below its reserved gap", async ({ page }, info) => {
+  await page.route("https://www.youtube-nocookie.com/**", route => route.fulfill({ contentType: "text/html", body: "<html><body>Video preview</body></html>" }));
+  await page.route("https://i.ytimg.com/**", route => route.fulfill({ status: 404, body: "" }));
+  await open(page, info.project.name.startsWith("production"), "doc", 2, item => { item.body = "Paragraph 1."; });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  await writer.locator("p").first().click();
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await expect(writer.locator("p").last()).toHaveText("");
+  await page.keyboard.press("/");
+  await page.getByRole("menuitem", { name: "Embed video link", exact: true }).click();
+  const chooser = page.getByRole("dialog", { name: "Insert video", exact: true });
+  await chooser.getByRole("textbox", { name: "Video URL", exact: true }).fill("https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+  await chooser.getByRole("button", { name: "Insert video", exact: true }).click();
+  await expect(chooser).toBeHidden();
+  const block = writer.locator(".writing-media-block");
+  await expect(block).toBeVisible();
+  const line = writer.locator(":scope > p").last();
+  await expect(line).toHaveText("");
+  const bounds = (await block.boundingBox())!;
+  expect((await line.boundingBox())!.y - bounds.y - bounds.height).toBeCloseTo(24, 0);
+  await line.click();
+  await page.keyboard.type("After the final video.");
+  await waitForDraftSaved(page);
+  const { body } = await downloadMarkdown(page);
+  expect(body).toMatch(/Paragraph 1\.[\s\S]*\[Video\]\(https:\/\/www\.youtube\.com\/watch\?v=dQw4w9WgXcQ\)[\s\S]*After the final video\./);
 });

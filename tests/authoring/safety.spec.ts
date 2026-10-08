@@ -1130,14 +1130,9 @@ for (const { command, query, marker } of [
     await page.keyboard.press("/");
     await page.keyboard.type(query);
     await page.keyboard.press("Enter");
-    await expect(writing.locator(".writing-pending-list")).toBeVisible();
-    await expect
-      .poll(() =>
-        writing
-          .locator(".writing-pending-list")
-          .evaluate((node) => getComputedStyle(node, "::before").content),
-      )
-      .toBe(command === "Bulleted list" ? '"•"' : '"1."');
+    const item = writing.locator(command === "Bulleted list" ? "ul > li" : "ol > li").last();
+    await expect(item).toBeVisible();
+    await expect(item).toHaveText("");
     await page.keyboard.type("A list item");
     await expect
       .poll(() =>

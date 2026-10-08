@@ -232,7 +232,6 @@
 .writing-editor .writing-content:focus-within
   > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
-    .writing-pending-list,
     .writing-media-line
   ) {
   position: relative;
@@ -240,7 +239,6 @@
 .writing-editor .writing-content:focus-within
   > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
-    .writing-pending-list,
     .writing-media-line
   )::before {
   content: "Type / for commands…";
@@ -266,14 +264,6 @@
   border-radius: var(--radius);
   background: var(--muted);
   color: var(--muted-foreground);
-  pointer-events: none;
-}
-.writing-editor .writing-content:focus-within > p.writing-pending-list::before {
-  content: attr(data-list-marker);
-  display: inline-block;
-  min-width: 1.5rem;
-  color: var(--muted-foreground);
-  opacity: 1;
   pointer-events: none;
 }
 .writing-editor .writing-content .writing-media-line {
@@ -559,6 +549,12 @@
 .writing-table-drag-preview span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted-foreground); }
 @media (hover: none) { .writing-block-actions, .writing-block-gutter-actions { opacity: 1; } }
 .writing-editor .mdxeditor-contenteditable-wrapper { position: relative; }
+/* Block decorators must not leave anonymous inline line boxes around their content. */
+.writing-editor .writing-content > [data-lexical-decorator="true"],
+.writing-editor .writing-content > p > [data-lexical-decorator="true"]:has(.writing-media-block, [data-editor-block-type="image"]),
+.writing-editor .writing-content [data-editor-block-type="image"] { display: block; }
+.writing-editor .writing-content :is(.writing-code-block, .writing-media-block, [data-editor-block-type="image"], .writing-table-block),
+.writing-editor .writing-content > hr { margin-block-end: var(--space-6); }
 
 /* Content authoring is a blank canvas. Settings editors retain their framed surface. */
 .editor .writing-surface { border: 0; border-radius: 0; }
@@ -615,12 +611,9 @@
 .editor-frame .writing-viewport { scrollbar-gutter: stable both-edges; }
 .editor-frame[data-cards="true"] .writing-content { padding-block-end: var(--space-6); }
 .editor-frame[data-cards="true"] .writing-toolbar-controls { flex-wrap: nowrap; gap: var(--space-2); }
+.editor-frame[data-cards="true"] :is(.writing-block-actions, .writing-block-gutter-actions) { opacity: 1; }
 
 .writing-toolbar-controls[data-mobile="true"] .writing-command-label { display: none; }
 .editor .writing-toolbar-controls[data-canvas="true"]:not([data-mobile="true"]) { display: none; }
 .editor .writing-editor .mdxeditor-toolbar:has(.writing-toolbar-controls:not([data-mobile="true"])),
 .editor .writing-view-header:empty { display: none; }
-
-@container editor-shell (width < 48rem) {
-  .editor .writing-content .writing-table-block { padding-block-start: calc(var(--control-height) + var(--space-2)); }
-}

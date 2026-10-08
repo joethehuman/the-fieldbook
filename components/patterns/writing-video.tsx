@@ -24,6 +24,7 @@ type VideoData = SerializedLexicalNode & {
   url: string;
   label: string;
   title?: string | null;
+  inline?: boolean;
 };
 
 /** Stored as the same ordinary media link understood by Fieldbook's reader. */
@@ -33,6 +34,7 @@ class WritingVideoNode extends DecoratorNode<ReactNode> {
     public __label: string,
     public __title?: string | null,
     key?: NodeKey,
+    public __inline = true,
   ) {
     super(key);
   }
@@ -45,10 +47,11 @@ class WritingVideoNode extends DecoratorNode<ReactNode> {
       node.__label,
       node.__title,
       node.__key,
+      node.__inline,
     );
   }
   static importJSON(value: VideoData) {
-    return new WritingVideoNode(value.url, value.label, value.title);
+    return new WritingVideoNode(value.url, value.label, value.title, undefined, value.inline ?? true);
   }
   exportJSON(): VideoData {
     return {
@@ -58,16 +61,17 @@ class WritingVideoNode extends DecoratorNode<ReactNode> {
       url: this.__url,
       label: this.__label,
       title: this.__title,
+      inline: this.__inline,
     };
   }
   createDOM() {
-    return document.createElement("span");
+    return document.createElement(this.__inline ? "span" : "div");
   }
   updateDOM() {
     return false;
   }
   isInline() {
-    return true;
+    return this.__inline;
   }
   getTextContent() {
     return this.__label;
@@ -106,6 +110,29 @@ export const writingVideoPlugin = realmPlugin({
   init(realm) {
     realm.pub(addLexicalNode$, WritingVideoNode);
     realm.pub(addImportVisitor$, {
+      priority: 110,
+      testNode: (node) => {
+        if (node.type !== "paragraph" || node.children.length !== 1) return false;
+        const link = node.children[0];
+        return link.type === "link" && link.children.every((child) => child.type === "text") &&
+          isInlineVideo(link.url, link.children.map((child) => child.type === "text" ? child.value : "").join(""));
+      },
+      visitNode({ mdastNode, mdastParent, lexicalParent }) {
+        if (mdastNode.type !== "paragraph") return;
+        // insertMarkdown uses a lightweight append target instead of an ElementNode.
+        if (!("append" in lexicalParent) || typeof lexicalParent.append !== "function") return;
+        const link = mdastNode.children[0];
+        if (link.type !== "link") return;
+        lexicalParent.append(new WritingVideoNode(link.url,
+          link.children.map((child) => child.type === "text" ? child.value : "").join(""),
+          link.title, undefined, false));
+        // Match MDXEditor's trailing writing line for documents ending in other blocks.
+        if (mdastParent?.type === "root" && mdastParent.children.at(-1) === mdastNode) {
+          lexicalParent.append($createParagraphNode());
+        }
+      },
+    });
+    realm.pub(addImportVisitor$, {
       priority: 100,
       testNode: (node) =>
         node.type === "link" &&
@@ -128,12 +155,13 @@ export const writingVideoPlugin = realmPlugin({
       testLexicalNode: (node) => node instanceof WritingVideoNode,
       visitLexicalNode({ lexicalNode, mdastParent, actions }) {
         const video = lexicalNode as WritingVideoNode;
-        actions.appendToParent(mdastParent, {
-          type: "link",
+        const link = {
+          type: "link" as const,
           url: video.__url,
           title: video.__title,
-          children: [{ type: "text", value: video.__label }],
-        });
+          children: [{ type: "text" as const, value: video.__label }],
+        };
+        actions.appendToParent(mdastParent, video.isInline() ? link : { type: "paragraph", children: [link] });
       },
     });
   },
