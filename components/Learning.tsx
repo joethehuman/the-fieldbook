@@ -371,7 +371,7 @@ export default function Learning({
           (state.overdue.length > 0 || state.onboarding) && (
             <p className="text-xs text-muted-foreground">
               {state.overdue.length
-                ? `${state.overdue.length} courses past their target`
+                ? `${state.overdue.length} courses past their due date`
                 : `${Math.max(0, Math.ceil((Date.parse(state.target!) - Date.now()) / 86400000))} days left in onboarding`}
             </p>
           )}
