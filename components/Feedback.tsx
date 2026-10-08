@@ -37,7 +37,7 @@ import { SectionHeader } from "@/components/patterns/layout";
 import { Button } from "./ui/button";
 import { Tooltip } from "./ui/tooltip";
 import { SelectField } from "./ui/select";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Checkbox } from "./ui/choice";
 import {
   BulkActions,
@@ -393,18 +393,10 @@ export function FeedbackAdmin({
                     </TableCell>
                   )}
                   <TableCell>
-                    <Tooltip
-                      content={
-                        f.version ? `${f.title} · v${f.version}` : f.title
-                      }
-                    >
-                      <span
-                        tabIndex={0}
-                        className="block w-44 truncate rounded-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {f.title}
-                      </span>
-                    </Tooltip>
+                    <FeedbackTitle
+                      title={f.title}
+                      version={f.contentId ? f.version : undefined}
+                    />
                   </TableCell>
                   <TableCell>{f.kind}</TableCell>
                   <TableCell>
@@ -460,6 +452,49 @@ export function FeedbackAdmin({
         onClear={clearFilters}
       />
     </>
+  );
+}
+
+function FeedbackTitle({
+  title,
+  version,
+}: {
+  title: string;
+  version?: number;
+}) {
+  const displayTitle = version ? `${title} · v${version}` : title;
+  const container = useRef<HTMLDivElement>(null);
+  const [truncated, setTruncated] = useState(false);
+  useLayoutEffect(() => {
+    let active = true;
+    const measure = () => {
+      const label = container.current?.querySelector<HTMLElement>(
+        "[data-slot=feedback-title]",
+      );
+      if (active && label) setTruncated(label.scrollWidth > label.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (container.current) observer.observe(container.current);
+    void document.fonts.ready.then(measure);
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [displayTitle]);
+  const label = (
+    <span
+      data-slot="feedback-title"
+      tabIndex={truncated ? 0 : undefined}
+      className="block truncate rounded-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {displayTitle}
+    </span>
+  );
+  return (
+    <div ref={container} className="w-44">
+      {truncated ? <Tooltip content={displayTitle}>{label}</Tooltip> : label}
+    </div>
   );
 }
 
