@@ -88,7 +88,7 @@ test("due dates off keeps progress and uses recommended language", async ({
   await expect(summary).toContainText("recommended courses complete");
   await expect(summary.getByRole("progressbar")).toHaveCount(1);
   await expect(summary).not.toContainText(
-    /assigned|past their target|onboarding/i,
+    /assigned|past their due date|onboarding/i,
   );
   await summary.screenshot({
     path: info.outputPath("recommended-progress.png"),
