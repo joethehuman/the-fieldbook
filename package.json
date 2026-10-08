@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.129",
+    "@lexical/link": "0.48.0",
     "@lexical/list": "0.48.0",
     "@lexical/rich-text": "0.48.0",
     "@lexical/selection": "0.48.0",

@@ -34,6 +34,99 @@ const hello = "world";
 [Product walkthrough](/api/media/example.mp4)
 `;
 
+async function pasteWritingText(page: Page, value: string) {
+  await page.getByRole("textbox", { name: "Doc content", exact: true }).evaluate((node, text) => {
+    const data = new DataTransfer();
+    data.setData("text/plain", text);
+    const target = document.activeElement?.closest('[contenteditable="true"]');
+    (target && node.contains(target) ? target : node).dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  }, value);
+}
+
+test("pasting a URL links selected formatted text, supports undo and survives draft reload", async ({ page }, info) => {
+  const { read } = await setup(page, info.project.name.startsWith("production"), "Read **the guide** for context.");
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await editor.click();
+  await editor.locator("strong").selectText();
+  await pasteWritingText(page, "https://example.com/guide?from=editor#start");
+  const link = editor.getByRole("link", { name: "the guide", exact: true });
+  await expect(link).toHaveAttribute("href", "https://example.com/guide?from=editor#start");
+  await expect(link.locator("strong")).toHaveText("the guide");
+  await expect(editor).toHaveText("Read the guide for context.");
+  await editor.press("ControlOrMeta+z");
+  await expect(editor.getByRole("link")).toHaveCount(0);
+  await expect(editor.locator("strong")).toHaveText("the guide");
+  await editor.press("ControlOrMeta+Shift+z");
+  await expect(link).toHaveAttribute("href", "https://example.com/guide?from=editor#start");
+  await waitForDraftSaved(page);
+  expect((await read()).content[0].body).toContain("https://example.com/guide?from=editor#start");
+  expect((await downloadMarkdown(page)).body).toMatch(/\[.*the guide.*\]\(https:\/\/example.com\/guide\?from=editor#start\)/);
+  await page.reload();
+  await expect(link).toHaveAttribute("href", "https://example.com/guide?from=editor#start");
+  await expect(link.locator("strong")).toHaveText("the guide");
+});
+
+test("URL paste replaces an existing link destination and normalizes a bare domain", async ({ page }, info) => {
+  const { read } = await setup(page, info.project.name.startsWith("production"), "Read [the guide](https://example.com/old).");
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  const link = editor.getByRole("link", { name: "the guide", exact: true });
+  await editor.click();
+  await link.selectText();
+  await pasteWritingText(page, " example.org/new?next=yes#section ");
+  await expect(link).toHaveAttribute("href", "https://example.org/new?next=yes#section");
+  await expect(editor).toHaveText("Read the guide.");
+  await waitForDraftSaved(page);
+  expect((await read()).content[0].body).toContain("[the guide](https://example.org/new?next=yes#section)");
+});
+
+test("ordinary and unsafe text paste still replaces the selection", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "Replace me");
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  for (const value of ["Ordinary pasted words", "javascript:alert(1)", "https://example.com extra words"]) {
+    await editor.click();
+    await editor.press("ControlOrMeta+A");
+    await pasteWritingText(page, value);
+    await expect(editor).toHaveText(value);
+    await expect(editor.getByRole("link", { name: "Replace me", exact: true })).toHaveCount(0);
+  }
+});
+
+test("URL paste links table-cell selections and leaves code and caret paste alone", async ({ page }, info) => {
+  const { read } = await setup(page, info.project.name.startsWith("production"), "| Topic | Detail |\n| --- | --- |\n| Reference | A guide |\n\n`code example`\n\nCaret: ");
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  const cell = editor.getByRole("table").getByRole("textbox").last();
+  await cell.click();
+  await cell.press("ControlOrMeta+A");
+  await pasteWritingText(page, "https://example.com/table");
+  await expect(cell.getByRole("link", { name: "A guide", exact: true })).toHaveAttribute("href", "https://example.com/table");
+  await editor.locator("code").click();
+  await editor.locator("code").selectText();
+  await pasteWritingText(page, "https://example.com/code");
+  await expect(editor.locator("code")).toHaveText("https://example.com/code");
+  await expect(editor.locator("code a")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  const paragraph = editor.locator(":scope > p").last();
+  await paragraph.click();
+  await editor.press("ControlOrMeta+End");
+  await pasteWritingText(page, "https://example.com/caret");
+  await expect(paragraph).toContainText("Caret:");
+  await expect(paragraph).toContainText("https://example.com/caret");
+  await waitForDraftSaved(page);
+  expect((await read()).content[0].body).toContain("[A guide](https://example.com/table)");
+});
+
+test("native clipboard URL paste preserves a fully selected paragraph", async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "Read the guide");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => navigator.clipboard.writeText("https://example.com/native"));
+  const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await editor.click();
+  await editor.press("ControlOrMeta+A");
+  await editor.press("ControlOrMeta+V");
+  await expect(editor.getByRole("link", { name: "Read the guide", exact: true })).toHaveAttribute("href", "https://example.com/native");
+  await expect(editor).toHaveText("Read the guide");
+});
+
 test("link popups follow text through scrolling and panel changes, and bare domains save with HTTPS", async ({ page }, info) => {
   const { read } = await setup(page, info.project.name.startsWith("production"),
     "Before the link.\n\nRead [the guide](google.com) for context.\n\n[Local reference](guide.md), [heading](#next) and [older web link](example.org).\n\n" + Array.from({ length: 30 }, (_, index) => `Paragraph ${index}: More useful context.`).join("\n\n"));
