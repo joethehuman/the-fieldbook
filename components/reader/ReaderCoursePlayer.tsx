@@ -1,4 +1,5 @@
 "use client";
+import { contentPath, curriculumPath } from "@/lib/navigation";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -98,7 +99,7 @@ export function ReaderCoursePlayer({
   }
 
   const back = curriculum
-    ? `/curricula/${encodeURIComponent(curriculum)}?from=${encodeURIComponent(safeReturnPath(from))}`
+    ? `${curriculumPath(curriculum, curriculumTitle)}?from=${encodeURIComponent(safeReturnPath(from))}`
     : safeReturnPath(from);
   return (
     <Course
@@ -110,7 +111,7 @@ export function ReaderCoursePlayer({
       onProgress={record}
       onBack={() => router.push(back)}
       backHref={back}
-      lessonBaseHref={`/courses/${encodeURIComponent(course.id)}?from=${encodeURIComponent(safeReturnPath(from))}${curriculum ? `&curriculum=${encodeURIComponent(curriculum)}` : ""}`}
+      lessonBaseHref={`${contentPath("course", course.id, course.title)}?from=${encodeURIComponent(safeReturnPath(from))}${curriculum ? `&curriculum=${encodeURIComponent(curriculum)}` : ""}`}
       backLabel={curriculum ? "Back to curriculum" : "Back to courses"}
       guest={!signedIn}
       onSignIn={() =>

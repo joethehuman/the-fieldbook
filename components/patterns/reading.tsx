@@ -12,7 +12,8 @@ import type { ReactNode } from "react";
 import ReactMarkdown from "../Markdown";
 import { ChevronLeft, ChevronRight, Clock } from "lucide-react";
 import type { Content } from "@/lib/types";
-import { contentPath } from "@/lib/navigation";
+import { recordSegment } from "@/lib/record-url";
+import { curriculumPath, contentPath } from "@/lib/navigation";
 import { Button } from "../ui/button";
 import { ContentAction } from "./content-action";
 import { IntentLink } from "./intent-link";
@@ -42,7 +43,7 @@ export function Article({
 }) {
   const isDoc = item.kind === "doc";
   const headings = isDoc ? markdownHeadings(item.body) : [];
-  const prefix = demo ? `#docs/${encodeURIComponent(item.id)}?heading=` : "#";
+  const prefix = demo ? `#docs/${recordSegment(item.id, item.title)}?heading=` : "#";
   const ordered = orderedDocs(documents, sectionOrder, sections);
   const allSections = availableDocSections(documents, sectionOrder, sections);
   const placement = isDoc ? sectionForDoc(item, allSections) : undefined;
@@ -113,8 +114,8 @@ export function Article({
                           data-direction={direction === 0 ? "previous" : "next"}
                           href={
                             demo
-                              ? `#docs/${encodeURIComponent(doc.id)}`
-                              : contentPath("doc", doc.id)
+                              ? `#${contentPath("doc", doc.id, doc.title).slice(1)}`
+                              : contentPath("doc", doc.id, doc.title)
                           }
                           onClick={
                             onDocument
@@ -151,7 +152,7 @@ export function Article({
                       ) : (
                         <IntentLink
                           data-direction={direction === 0 ? "previous" : "next"}
-                          href={contentPath("doc", doc.id)}
+                          href={contentPath("doc", doc.id, doc.title)}
                           eager
                         >
                           {direction === 0 && (
@@ -192,8 +193,8 @@ export function CourseOverview({
   lessonBase?: string;
 }) {
   const path = lessonBase
-    ? `${lessonBase}/${encodeURIComponent(item.id)}`
-    : contentPath("course", item.id);
+    ? `${lessonBase}/${recordSegment(item.id, item.title)}`
+    : contentPath("course", item.id, item.title);
   return (
     <div className="course-detail">
       {back}
@@ -242,10 +243,12 @@ export function ReadingBack({
   kind,
   curriculum,
   clientNavigation = false,
+  curriculumTitle,
 }: {
   kind: Content["kind"];
   curriculum?: string;
   clientNavigation?: boolean;
+  curriculumTitle?: string;
 }) {
   const label =
     kind === "course" ? "courses" : kind === "doc" ? "docs" : "updates";
@@ -255,7 +258,7 @@ export function ReadingBack({
         <IntentLink
           href={
             curriculum
-              ? `/curricula/${encodeURIComponent(curriculum)}`
+              ? curriculumPath(curriculum, curriculumTitle)
               : `/${label}`
           }
           eager
@@ -266,7 +269,7 @@ export function ReadingBack({
         <a
           href={
             curriculum
-              ? `/curricula/${encodeURIComponent(curriculum)}`
+              ? curriculumPath(curriculum, curriculumTitle)
               : `/${label}`
           }
         >

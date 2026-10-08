@@ -29,6 +29,7 @@ export function RecordName({
           href={href}
           title={title}
           aria-disabled={props.disabled || undefined}
+          data-fieldbook-local-navigation={onNavigate ? "true" : undefined}
           onClick={(event) => {
             if (props.disabled) {
               event.preventDefault();

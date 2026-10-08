@@ -1,6 +1,7 @@
 import type { UIMessage } from "ai";
 import type { AiCitation } from "./ai";
 import { aiBounds } from "./ai";
+import { contentPath } from "./navigation";
 
 export type AskAiMessage = UIMessage<unknown, { sources: AiCitation[] }>;
 export const demoAiReply = "This feature is not available in the demo site.";
@@ -67,7 +68,9 @@ export function messageSources(message: AskAiMessage): AiCitation[] {
               : null;
       if (!section || typeof source.title !== "string") return false;
       const href = `/${section}/${encodeURIComponent(source.contentId)}${source.lessonId ? `?lesson=${encodeURIComponent(source.lessonId)}` : ""}`;
-      return source.href === href;
+      const readable = contentPath(source.kind, source.contentId, source.title) +
+        (source.lessonId ? `?lesson=${encodeURIComponent(source.lessonId)}` : "");
+      return source.href === href || source.href === readable;
     })
     .slice(0, aiBounds.sourceCount);
 }

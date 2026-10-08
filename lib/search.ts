@@ -1,3 +1,4 @@
+import { contentPath } from "./navigation";
 import type { Content } from "./types";
 export type SearchKind = Content["kind"];
 export type SearchFilter = "all" | SearchKind;
@@ -71,12 +72,9 @@ export function sourcePassages(c: Content): SourcePassage[] {
   ];
 }
 export function destination(
-  source: Pick<SourcePassage, "kind" | "contentId" | "lessonId">,
+  source: Pick<SourcePassage, "kind" | "contentId" | "lessonId"> & { title?: string },
 ) {
-  const section = { brief: "updates", doc: "docs", course: "courses" }[
-    source.kind
-  ];
-  return `/${section}/${encodeURIComponent(source.contentId)}${source.lessonId ? `?lesson=${encodeURIComponent(source.lessonId)}` : ""}`;
+  return `${contentPath(source.kind, source.contentId, source.title)}${source.lessonId ? `?lesson=${encodeURIComponent(source.lessonId)}` : ""}`;
 }
 function near(a: string, b: string) {
   if (a.length < 4 || Math.abs(a.length - b.length) > 1) return false;

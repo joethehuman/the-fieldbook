@@ -1,4 +1,5 @@
 "use client";
+import { contentPath, curriculumPath } from "@/lib/navigation";
 
 import { courseLibraryView, courseViewPaths, type LearningView } from "@/lib/course-destination";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,7 +29,7 @@ export function ReaderCourses({ data, initialView = "home" }: { data: CourseRead
     const suggested = assignedCourses(data.courses, data.user, data.groups)[0];
     const ids = new Set([suggested?.id, data.courses[0]?.id]);
     for (const id of ids)
-      if (id) router.prefetch(`/courses/${encodeURIComponent(id)}`);
+      if (id) router.prefetch(contentPath("course", id, data.courses.find((item) => item.id === id)?.title));
   }, [data.courses, data.groups, data.user, router]);
   return (
     <Learning
@@ -43,8 +44,8 @@ export function ReaderCourses({ data, initialView = "home" }: { data: CourseRead
       progress={data.user.id === "guest" ? guestProgress : data.progress}
       guest={data.user.id === "guest"}
       linkedNavigation
-      onOpen={(id) => router.push(`/courses/${encodeURIComponent(id)}?from=${encodeURIComponent(courseViewPaths[view])}`)}
-      onCurriculum={(id) => router.push(`/curricula/${encodeURIComponent(id)}?from=${encodeURIComponent(courseViewPaths[view])}`)}
+      onOpen={(id) => router.push(`${contentPath("course", id, data.courses.find((item) => item.id === id)?.title)}?from=${encodeURIComponent(courseViewPaths[view])}`)}
+      onCurriculum={(id) => router.push(`${curriculumPath(id, data.curricula.find((item) => item.id === id)?.name)}?from=${encodeURIComponent(courseViewPaths[view])}`)}
     />
   );
 }
