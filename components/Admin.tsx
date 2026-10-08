@@ -129,6 +129,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 
 import {
   Plus,
+  ChevronDown,
   X,
   Save,
   FileText,
@@ -1402,18 +1403,38 @@ export default function Admin({
                   }
                 >
                   <ActionGroup>
-                    <Button onClick={() => create("doc")}>
-                      <Plus size={15} />
-                      Doc
-                    </Button>
-                    <Button onClick={() => create("brief")}>
-                      <Plus size={15} />
-                      Update
-                    </Button>
-                    <Button variant="default" onClick={() => create("course")}>
-                      <Plus size={15} />
-                      Course
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button>
+                          <Plus aria-hidden="true" />
+                          Content
+                          <ChevronDown aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => create("doc")}
+                        >
+                          <Plus size={15} aria-hidden="true" />
+                          Doc
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => create("brief")}
+                        >
+                          <Plus size={15} aria-hidden="true" />
+                          Update
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => create("course")}
+                        >
+                          <Plus size={15} aria-hidden="true" />
+                          Course
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </ActionGroup>
                 </CollectionToolbar>
                 <CollectionControls
