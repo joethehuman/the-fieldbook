@@ -81,7 +81,7 @@ export function SearchableSelectionList({
       disabled={disabled}
       className={
         bounded
-          ? `flex flex-col [&>:not([data-slot=selection-results])]:shrink-0 ${bounded === "compact" ? "flex-1" : "h-full min-h-0"}`
+          ? `flex flex-col p-1 [&>:not([data-slot=selection-results])]:shrink-0 ${bounded === "compact" ? "flex-1" : "h-full min-h-0"}`
           : undefined
       }
     >

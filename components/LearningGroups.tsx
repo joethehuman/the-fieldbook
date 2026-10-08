@@ -23,9 +23,10 @@ import {
 } from "@/lib/types";
 import { learningSelectionOptions } from "@/lib/learning-assignment-selection";
 import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
+import { useUpdateAssignmentPicker } from "./use-update-assignment-picker";
+import { audienceAssignmentCommands } from "./audience-assignment-commands";
 import { useNestedNavigationGuard } from "./patterns/use-nested-navigation-guard";
 import { expandLearning, groupItems } from "@/lib/learning-groups";
-import { sourcePassages } from "@/lib/search";
 import { teamPath } from "@/lib/team-hierarchy";
 import {
   sortGroupBrowseItems,
@@ -70,7 +71,6 @@ import { CountMetric } from "./ui/count-metric";
 import { DataTable } from "./patterns/data-table";
 import { OrderedLearning } from "./patterns/ordered-learning";
 import { SearchableSelectionList } from "./patterns/searchable-selection-list";
-import { ContentSelectionList } from "./patterns/content-selection-list";
 import { FormField } from "./patterns/form-field";
 import { SectionHeader, EmptyState, Stack } from "./patterns/layout";
 import {
@@ -90,7 +90,6 @@ const byName = (
 const sorted = (ids: string[]) => [...ids].sort();
 type Editor =
   | { kind: "create" | "rename"; name: string; original: string }
-  | { kind: "updates"; ids: string[]; snapshot: string }
   | {
       kind: "membership";
       teams: string[];
@@ -169,24 +168,6 @@ export default function LearningGroups({
   const teams = data.teams || [];
   const content = data.publishedContent || data.content;
   const published = content.filter((item) => item.status === "published");
-  const searchableContent = useMemo(
-    () =>
-      new Map(
-        content
-          .filter((item) => item.status === "published")
-          .map((item) => [
-            item.id,
-            sourcePassages(item)
-              .map((passage) =>
-                [passage.title, passage.lessonTitle, passage.text]
-                  .filter(Boolean)
-                  .join(" "),
-              )
-              .join(" "),
-          ]),
-      ),
-    [content],
-  );
   const curricula = data.curricula || [];
   const items = group ? groupItems(group, content) : [];
   // The migration owns conversion. Never quietly remove inheritance in a screen render.
@@ -419,9 +400,7 @@ export default function LearningGroups({
       ? editor.name !== editor.original
       : editor.kind === "membership"
         ? membershipValue(editor) !== editor.original
-        : editor.kind === "updates"
-          ? editor.ids.length > 0
-          : false);
+        : false);
   guard.current = async () =>
     !saving.current &&
     (!dirty || (await confirm("Discard unsaved learning group changes?")));
@@ -436,6 +415,24 @@ export default function LearningGroups({
     onPrepare: onPrepareAssignments,
     registerNavigationGuard: registerAssignmentGuard,
   });
+  const updatePicker = useUpdateAssignmentPicker({
+    data,
+    onLearningMany: (actions) => learnMany(actions),
+    onPrepare: onPrepareAssignments,
+    registerNavigationGuard: registerAssignmentGuard,
+  });
+  async function editUpdates(mode: "add" | "remove", selected?: string[]) {
+    if (!group) return;
+    try {
+      await updatePicker.open(
+        { kind: "audiences", keys: [`group:${group.id}`], mode, selected },
+        group.name,
+      );
+    } catch (error) {
+      if (!isOrganizationChangeCanceled(error))
+        setNotice((error as Error).message);
+    }
+  }
   async function editAssignments(mode: "add" | "remove", selected?: string[]) {
     if (!group) return;
     setNotice("");
@@ -479,7 +476,6 @@ export default function LearningGroups({
   }, [group, returnToGroup, destination.targetProps.ref]);
   const organizationSnapshot = () =>
     JSON.stringify([data.groups, data.teams, data.users]);
-  const learningSnapshot = () => JSON.stringify([group, content, curricula]);
   const rosterSnapshot = organizationSnapshot();
   const currentOrganization = useRef(rosterSnapshot);
   currentOrganization.current = rosterSnapshot;
@@ -692,30 +688,6 @@ export default function LearningGroups({
         finishEditor();
       return;
     }
-    if (editor.kind !== "updates") return;
-    if (editor.snapshot !== learningSnapshot()) {
-      setNotice(
-        "This group's learning or content changed. Close this picker and review your selection again.",
-      );
-      return;
-    }
-    if (
-      await run(
-        () =>
-          learnMany(
-            editor.ids.map((contentId) => ({
-              operation: "target",
-              contentId,
-              groupId: group.id,
-              expected:
-                data.content.find((item) => item.id === contentId)?.revision ||
-                0,
-            })),
-          ),
-        "Updates added.",
-      )
-    )
-      finishEditor();
   }
   const learningOptions = group
     ? learningSelectionOptions(data, {
@@ -724,44 +696,25 @@ export default function LearningGroups({
         mode: "add",
       })
     : [];
-  const updateOptions = published
-    .filter(
-      (item) =>
-        item.kind === "brief" && group && !item.groups.includes(group.id),
-    )
-    .map((item) => ({
-      id: item.id,
-      label: item.title,
-      type: "update" as const,
-      description: item.summary,
-      category: item.category,
-      updatedAt: item.updatedAt,
-      searchText: searchableContent.get(item.id),
-    }));
+  const updateOptions = published.filter((item) => item.kind === "brief");
   const modalTitle = !editor
     ? ""
     : editor.kind === "create"
       ? "Create learning group"
       : editor.kind === "rename"
         ? "Rename learning group"
-        : editor.kind === "membership"
-          ? "Add Members"
-          : "Assign Updates";
+        : "Add Members";
   const modalDescription = !editor
     ? ""
     : editor.kind === "create" || editor.kind === "rename"
       ? "Use a unique name for this audience."
-      : editor.kind === "membership"
-        ? `Choose people or teams to include in ${group?.name}. Clear an existing selection to remove that membership source.`
-        : `Choose relevant Updates for ${group?.name}.`;
+      : `Choose people or teams to include in ${group?.name}. Clear an existing selection to remove that membership source.`;
   const modalAction =
     editor?.kind === "create"
       ? "Create group"
       : editor?.kind === "rename"
         ? "Save name"
-        : editor?.kind === "membership"
-          ? "Review changes"
-          : "Review changes";
+        : "Review changes";
 
   // Index shortcuts use the same editors, while keeping the index and its filters mounted.
   useEffect(() => {
@@ -769,7 +722,7 @@ export default function LearningGroups({
     startedIndexAction.current = indexAction;
     if (indexAction.kind === "people") openMembership();
     else if (indexAction.kind === "updates")
-      open({ kind: "updates", ids: [], snapshot: learningSnapshot() });
+      void editUpdates("add").finally(() => setIndexAction(null));
     else void editAssignments("add").finally(() => setIndexAction(null));
   }, [indexAction]);
 
@@ -958,19 +911,14 @@ export default function LearningGroups({
           busy || needsConversion
             ? "Finish the current change first."
             : undefined,
-        apply: async () => {
-          if (group)
-            await learnMany(
-              ids.map((contentId) => ({
-                operation: "untarget",
-                contentId,
-                groupId: group.id,
-                expected:
-                  data.content.find((item) => item.id === contentId)
-                    ?.revision || 0,
-              })),
-            );
-        },
+        externalReview: true,
+        apply: () => updatePicker.open(
+          {
+            kind: "audiences", keys: [`group:${group!.id}`],
+            mode: "remove", selected: ids,
+          },
+          group!.name,
+        ),
       },
     ];
   }
@@ -1041,48 +989,13 @@ export default function LearningGroups({
           });
         },
       })),
-      ...([true, false] as const).map((add): BulkCommand => ({
-        id: add ? "assign-courses" : "remove-courses",
-        label: add ? "Assign courses" : "Remove courses",
-        disabledReason,
-        description:
-          "Change direct course or curriculum assignments. Other audience sources and saved history remain.",
-        externalReview: true,
-        apply: async () => {
-          await assignmentPicker.open(
-            {
-              kind: "audiences",
-              keys: selectedIds.map((id) => `group:${id}`),
-              mode: add ? "add" : "remove",
-            },
-            `${selectedIds.length} ${selectedIds.length === 1 ? "group" : "groups"}`,
-          );
-        },
-      })),
-      ...([true, false] as const).map((add): BulkCommand => ({
-        id: add ? "assign-updates" : "remove-updates",
-        label: add ? "Assign updates" : "Remove updates",
-        disabledReason,
-        description:
-          "Change relevant Updates for these groups. Published Updates remain available throughout the installation.",
-        options: published
-          .filter((item) => item.kind === "brief")
-          .map((item) => ({ id: item.id, label: item.title })),
-        apply: async (values) => {
-          await learnMany(
-            values.flatMap((contentId) =>
-              selectedIds.map((groupId) => ({
-                operation: add ? "target" : "untarget",
-                contentId,
-                groupId,
-                expected:
-                  data.content.find((item) => item.id === contentId)
-                    ?.revision || 0,
-              })),
-            ),
-          );
-        },
-      })),
+      ...audienceAssignmentCommands(
+        selectedIds.map((id) => `group:${id}`),
+        selectedIds.length === 1
+          ? data.groups.find((g) => g.id === selectedIds[0])?.name || "Group"
+          : `${selectedIds.length} groups`,
+        assignmentPicker.open, updatePicker.open, disabledReason,
+      ),
     ];
   }
   return (
@@ -1092,6 +1005,7 @@ export default function LearningGroups({
       aria-label={(selected && group?.name) || "Groups"}
     >
       {assignmentPicker.picker}
+      {updatePicker.picker}
       {notice && !editor && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
       {needsConversion && (
         <Alert dismissible>
@@ -1788,13 +1702,7 @@ export default function LearningGroups({
                       disabled={
                         busy || needsConversion || !updateOptions.length
                       }
-                      onClick={() =>
-                        open({
-                          kind: "updates",
-                          ids: [],
-                          snapshot: learningSnapshot(),
-                        })
-                      }
+                      onClick={() => void editUpdates("add")}
                     >
                       <Plus aria-hidden="true" />
                       Assign Updates
@@ -1959,13 +1867,7 @@ export default function LearningGroups({
             // delayed restoration of focus to the Create group trigger.
             setReturnToGroup(id);
           }}
-          size={
-            editor?.kind === "updates"
-              ? "selection"
-              : editor?.kind === "membership"
-                ? "picker"
-                : "default"
-          }
+          size={editor?.kind === "membership" ? "picker" : "default"}
           onEscapeKeyDown={(event) => {
             if (busy) event.preventDefault();
           }}
@@ -2093,18 +1995,6 @@ export default function LearningGroups({
                   through another.
                 </p>
               </Tabs>
-            </DialogBody>
-          )}
-          {editor?.kind === "updates" && (
-            <DialogBody>
-              <ContentSelectionList
-                bounded
-                label="Find Updates"
-                disabled={busy}
-                options={updateOptions}
-                value={editor.ids}
-                onChange={(ids) => setEditor({ ...editor, ids })}
-              />
             </DialogBody>
           )}
           <DialogFooter className="justify-end">

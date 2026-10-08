@@ -80,6 +80,9 @@ import { SaveChangesControl } from "./patterns/save-changes-control";
 import { groupPath } from "@/lib/group-hierarchy";
 import { organizationTeam } from "@/lib/organization-team";
 import { HierarchyPicker } from "./patterns/hierarchy-picker";
+import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
+import { useNestedNavigationGuard } from "./patterns/use-nested-navigation-guard";
+import { audienceAssignmentCommands } from "./audience-assignment-commands";
 
 const PAGE_SIZE = 25;
 const byName = (
@@ -101,6 +104,7 @@ export function TeamsAdmin({
   onDestinationChange,
   data,
   onChange,
+  onPrepareAssignments,
   registerNavigationGuard,
 }: {
   initialTeam?: string;
@@ -114,6 +118,7 @@ export function TeamsAdmin({
     data: Workspace,
     options?: OrganizationChangeOptions,
   ) => void | Promise<void>;
+  onPrepareAssignments?: () => Promise<Workspace>;
   registerNavigationGuard?: RegisterNavigationGuard;
 }) {
   const teams = data.teams || [];
@@ -196,12 +201,21 @@ export function TeamsAdmin({
   guard.current = async () =>
     !saving.current &&
     (!dirty || (await confirm("Discard unsaved team changes?")));
-  useEffect(() => {
-    registerNavigationGuard?.(() => guard.current(), {
-      protected: dirty || busy,
-    });
-    return () => registerNavigationGuard?.(null);
-  }, [registerNavigationGuard, dirty, busy]);
+  const registerAssignmentGuard = useNestedNavigationGuard(
+    () => guard.current(), dirty || busy, registerNavigationGuard,
+  );
+  const assignmentPicker = useLearningAssignmentPicker({
+    data, onChange, onPrepare: onPrepareAssignments,
+    registerNavigationGuard: registerAssignmentGuard,
+  });
+  const assignmentCommands = (ids: string[]) => audienceAssignmentCommands(
+    ids.map(id => `team:${id}`),
+    ids.length === 1
+      ? teams.find(team => team.id === ids[0])?.name || "Team"
+      : `${ids.length} teams`,
+    assignmentPicker.open, undefined,
+    busy || dirty ? "Finish the current team change first." : undefined,
+  );
   useEffect(() => {
     function beforeUnload(event: BeforeUnloadEvent) {
       if (dirty || saving.current) {
@@ -486,6 +500,7 @@ export function TeamsAdmin({
 
   function teamCommands(selectedIds: string[]): BulkCommand[] {
     return [
+      ...assignmentCommands(selectedIds),
       ...([true, false] as const).map((add) => ({
         id: add ? "add-groups" : "remove-groups",
         label: add ? "Add to groups" : "Remove from groups",
@@ -796,6 +811,7 @@ export function TeamsAdmin({
       aria-label={team ? `${team.name} management` : "Teams"}
       className="grid min-w-0 gap-6"
     >
+      {assignmentPicker.picker}
       <div
         hidden={!!team}
         data-reveal-context
@@ -934,6 +950,12 @@ export function TeamsAdmin({
                 >
                   {managingOrganization ? "Edit manager" : "Edit team details"}
                 </Button>
+                {managingOrganization && (
+                  <ItemActions
+                    id={team.id} label={team.name} disabled={busy}
+                    noun="teams" commands={assignmentCommands([team.id])}
+                  />
+                )}
                 {!managingOrganization && (
                   <ItemActions
                     id={team.id}

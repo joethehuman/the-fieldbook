@@ -660,13 +660,13 @@ export function AudienceSelection({
           {rightLabel} ({rightCount})
         </Button>
       </div>
-      <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-2">
+      <div className="grid min-h-0 min-w-0 flex-1 gap-4 md:grid-cols-2">
         <section
           id={`${id}-available`}
           data-audience-pane="available"
           aria-label="Available audiences"
           className={cn(
-            "min-h-0 flex-col rounded-lg border border-border",
+            "min-h-0 min-w-0 flex-col rounded-lg border border-border",
             pane === "available" ? "flex" : "hidden md:flex",
           )}
         >
@@ -725,7 +725,7 @@ export function AudienceSelection({
           data-audience-pane="assigned"
           aria-label={`${rightLabel} audiences`}
           className={cn(
-            "min-h-0 flex-col rounded-lg border border-border",
+            "min-h-0 min-w-0 flex-col rounded-lg border border-border",
             pane === "assigned" ? "flex" : "hidden md:flex",
           )}
         >

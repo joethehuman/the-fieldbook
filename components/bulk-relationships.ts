@@ -8,6 +8,7 @@ import { groupItems } from "@/lib/learning-groups";
 import type { LearningAction } from "@/lib/learning";
 import type { BulkCommand } from "./patterns/bulk-actions";
 import type { OpenLearningAssignment } from "./use-learning-assignment-picker";
+import type { OpenUpdateAssignment } from "./use-update-assignment-picker";
 type Save = (data: Workspace) => void | Promise<void>;
 export type LearningMany = (actions: LearningAction[]) => Promise<void>;
 export function contentRelationshipCommands(
@@ -16,6 +17,7 @@ export function contentRelationshipCommands(
   save: Save,
   learn: LearningMany,
   openAssignments?: OpenLearningAssignment,
+  openUpdates?: OpenUpdateAssignment,
 ): BulkCommand[] {
   const records = data.content.filter((c) => selected.includes(c.id));
   const kind = records[0]?.kind;
@@ -36,19 +38,20 @@ export function contentRelationshipCommands(
     label:
       kind === "brief"
         ? add
-          ? "Add relevant groups"
-          : "Remove relevant groups"
+          ? "Edit group recommendations"
+          : "Remove group recommendations"
         : add
           ? "Assign to teams or groups"
           : "Remove team or group assignments",
     disabledReason: reason,
-    externalReview: kind === "course" && !!openAssignments,
+    externalReview: kind === "course" ? !!openAssignments : !!openUpdates,
     applyLabel: "Review changes",
     description: add
       ? "Add direct learning assignments or Update audiences. Overlapping courses count once. Existing history is preserved."
       : "Remove direct links only. Learning inherited through a curriculum or another team or group remains; saved history is preserved.",
     options:
-      kind === "course" && openAssignments
+      (kind === "course" && openAssignments) ||
+      (kind === "brief" && openUpdates)
         ? undefined
         : kind === "brief"
           ? data.groups.map((g) => ({ id: g.id, label: `Group: ${g.name}` }))
@@ -58,6 +61,19 @@ export function contentRelationshipCommands(
             })),
     apply: async (ids) => {
       if (kind === "brief") {
+        if (openUpdates) {
+          await openUpdates(
+            {
+              kind: "items",
+              ids: records.map((item) => item.id),
+              mode: add ? "add" : "remove",
+            },
+            records.length === 1
+              ? records[0].title
+              : `${records.length} selected Updates`,
+          );
+          return;
+        }
         await learn(
           records.flatMap((c) =>
             ids.map((groupId) => ({

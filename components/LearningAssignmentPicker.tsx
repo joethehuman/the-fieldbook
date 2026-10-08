@@ -2,8 +2,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Workspace } from "@/lib/store";
 import type { LearningItem } from "@/lib/types";
-import { ContentSelectionList } from "./patterns/content-selection-list";
-import { SearchableSelectionList } from "./patterns/searchable-selection-list";
+import { AssignmentTransfer } from "./patterns/assignment-transfer";
 import {
   applyLearningSelection,
   learningSelectionOptions,
@@ -36,7 +35,6 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
-  DialogSteps,
 } from "./ui/dialog";
 import { LearningAudienceReview } from "./LearningAudienceReview";
 import { X } from "lucide-react";
@@ -112,8 +110,6 @@ export function LearningAssignmentPicker({
   const previousStep = useRef<"select" | "review">("select");
   const heading = useRef<HTMLHeadingElement>(null);
   const selecting = step === "select";
-  const selectingAudiences =
-    target?.kind !== "audiences" && target?.mode !== "remove";
   useEffect(() => {
     body.current?.scrollTo(0, 0);
     heading.current?.focus({ preventScroll: true });
@@ -445,13 +441,7 @@ export function LearningAssignmentPicker({
         }}
       >
         <DialogContent
-          size={
-            selectingAudiences
-              ? "assignment"
-              : target?.kind === "audiences"
-                ? "workflow-list"
-                : "workflow"
-          }
+          size="assignment"
           onCloseAutoFocus={(event) => {
             if (requestedTarget && returnFocus.current?.isConnected) {
               event.preventDefault();
@@ -476,7 +466,9 @@ export function LearningAssignmentPicker({
               <DialogTitle ref={heading} tabIndex={-1}>
                 {target
                   ? target.kind === "audiences"
-                    ? "Assign Courses"
+                    ? target.mode === "remove"
+                      ? "Remove courses"
+                      : "Assign courses"
                     : target.mode === "remove"
                       ? "Remove assignments"
                       : "Add assignments"
@@ -499,24 +491,11 @@ export function LearningAssignmentPicker({
               <X aria-hidden="true" />
             </Button>
           </div>
-          {item?.kind !== "brief" && !selectingAudiences && (
-            <DialogSteps
-              steps={[
-                target?.kind === "audiences"
-                  ? "Select learning"
-                  : "Select assignments",
-                "Review changes",
-              ]}
-              current={step === "review" ? 1 : 0}
-            />
-          )}
           <DialogBody
             ref={body}
             className={
               selecting
-                ? selectingAudiences
-                  ? "flex flex-col overflow-hidden"
-                  : "flex flex-col gap-4 overflow-y-auto"
+                ? "flex flex-col overflow-hidden"
                 : "overflow-y-auto [scrollbar-gutter:stable]"
             }
           >
@@ -561,26 +540,26 @@ export function LearningAssignmentPicker({
                       : "Choose who gets this learning in For you and assigned learning."}
                 </p>
               )}
-              {target?.kind === "audiences" ? (
-                <ContentSelectionList
-                  bounded
-                  label="Find courses or curricula"
-                  showTypeFilter
-                  disabled={busy || stale}
-                  options={selectionOptions.flatMap((option) =>
-                    option.type ? [{ ...option, type: option.type }] : [],
-                  )}
-                  value={selected}
-                  onChange={setSelected}
-                />
-              ) : target?.mode === "remove" ? (
-                <SearchableSelectionList
-                  bounded
-                  label="Find a team or group"
-                  options={selectionOptions}
+              {target?.kind === "audiences" || target?.mode === "remove" ? (
+                <AssignmentTransfer
+                  options={selectionOptions.map((option) => ({
+                    ...option,
+                    type:
+                      option.type ||
+                      (option.id.startsWith("team:")
+                        ? ("team" as const)
+                        : ("group" as const)),
+                  }))}
                   value={selected}
                   onChange={setSelected}
                   disabled={busy || stale}
+                  rightLabel={target.mode === "remove" ? "To remove" : "To add"}
+                  removing={target.mode === "remove"}
+                  searchPlaceholder={
+                    target.kind === "audiences"
+                      ? "Find content"
+                      : "Find audiences"
+                  }
                 />
               ) : (
                 <AudienceSelection
