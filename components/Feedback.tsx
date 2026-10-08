@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 import { Badge } from "./ui/badge";
+import { DistributionBar } from "./ui/distribution-bar";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
 import {
@@ -264,13 +265,43 @@ export function FeedbackAdmin({
         <strong>
           {records.length} {records.length === 1 ? "rating" : "ratings"}
         </strong>
-        <span>{positive} useful</span>
-        <span>{records.length - positive} not useful</span>
-        <span>
-          {records.length
-            ? Math.round((positive / records.length) * 100) + "% positive"
-            : "No ratings yet"}
-        </span>
+        <div className="flex items-center gap-2">
+          <Badge variant="success">{positive} useful</Badge>
+          <Badge>{records.length - positive} not useful</Badge>
+        </div>
+        <div className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
+          <div className="w-14 shrink-0 [&_[data-slot=distribution-bar]]:h-1.5">
+            <DistributionBar
+              label="Feedback ratings"
+              segments={[
+                {
+                  id: "useful",
+                  label: "Useful",
+                  count: positive,
+                  tone: "success",
+                },
+                {
+                  id: "not-useful",
+                  label: "Not useful",
+                  count: records.length - positive,
+                  tone: "muted",
+                },
+              ]}
+            />
+          </div>
+          <span>
+            {records.length ? (
+              <>
+                <span className="font-semibold text-foreground">
+                  {Math.round((positive / records.length) * 100)}%
+                </span>{" "}
+                positive
+              </>
+            ) : (
+              "No ratings yet"
+            )}
+          </span>
+        </div>
       </div>
       {onDeleteFeedback && (
         <BulkActions
