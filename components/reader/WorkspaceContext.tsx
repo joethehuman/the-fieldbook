@@ -8,7 +8,7 @@ import type {
 
 export const WorkspaceContext = createContext<{
   beforeLocalNavigation: () => Promise<boolean>;
-  finishLocalNavigation: () => void;
+  finishLocalNavigation: (options?: { preserveForm?: boolean }) => void;
   updateContext: (context: ReaderShellContext) => void;
   registerNavigationGuard: RegisterNavigationGuard;
   registerLandingNavigation: (

@@ -118,7 +118,9 @@ export function AdminWorkspace({
               "",
               adminHref(destination, name),
             );
-            finishLocalNavigation();
+            // Replacement writes canonicalize or restore the current Admin
+            // form's URL; only a pushed destination leaves that form behind.
+            finishLocalNavigation({ preserveForm: replace });
             return true;
           }}
           onLoadDestination={async (destination) => {
