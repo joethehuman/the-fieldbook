@@ -149,19 +149,21 @@ export const contentData: Pick<
         .range(from, to),
     );
   },
-  async listPublishedReaderIndex() {
-    return await readAll<ReaderIndexRecord>((from, to) =>
-      db()
+  async listPublishedReaderIndex(ids) {
+    if (ids?.length === 0) return [];
+    return await readAll<ReaderIndexRecord>((from, to) => {
+      let query = db()
         .from("fb_documents")
         .select(
           "id,title:published->>title,summary:published->>summary,category:published->>category,folder:published->>folder,sectionId:published->>sectionId,sectionOrder:published->sectionOrder,kind:published->>kind,status:published->>status,createdAt:published->>createdAt,updatedAt:published->>updatedAt,feedAt:published->>feedAt,cardArt:published->cardArt,groups:published->groups,updateTeams:published->updateTeams",
           { count: "exact" },
         )
-        .not("published", "is", null)
-        .order("id")
+        .not("published", "is", null);
+      if (ids) query = query.in("id", [...ids]);
+      return query.order("id")
         .range(from, to)
-        .returns<ReaderIndexRecord[]>(),
-    );
+        .returns<ReaderIndexRecord[]>();
+    });
   },
   async listPublishedCourseIndex() {
     return await readAll<CourseIndexRecord>((from, to) =>

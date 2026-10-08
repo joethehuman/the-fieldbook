@@ -181,7 +181,7 @@ test("safe excerpts and lesson links from synthetic published sources", () => {
     questions: [{ answer: "private" }],
   };
   const r = demoSearch([c], "quorum", "all").results[0];
-  assert.equal(r.href, "/courses/one?lesson=a%2Fb");
+  assert.equal(r.href, "/courses/distributed-systems--one?lesson=a%2Fb");
   assert.ok(r.highlights.includes("quorum"));
   assert.equal(r.contentDate, null);
   assert.equal(sourcePassages({ ...c, status: "draft" }).length, 0);

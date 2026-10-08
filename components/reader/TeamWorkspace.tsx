@@ -10,7 +10,7 @@ import { useWorkspaceShell } from "./WorkspaceContext";
 
 export function TeamWorkspace({ data, user, initialPerson }: { data: Workspace; user: User; initialPerson?: string }) {
   const pathname = usePathname();
-  const personId = pathname === "/team" ? undefined : teamPersonId(pathname) || initialPerson;
+  const personId = pathname === "/team" ? undefined : teamPersonId(pathname, data.progressReport?.people.map((person) => person.u)) || initialPerson;
   const { registerLandingNavigation } = useWorkspaceShell();
   const registerLanding = useCallback(
     (navigation: LandingNavigation | null) =>
@@ -20,7 +20,7 @@ export function TeamWorkspace({ data, user, initialPerson }: { data: Workspace; 
   return (
     <TeamProgress
       initialPerson={personId}
-      onDestinationChange={async (id) => { window.history.pushState(null, "", teamHref(id)); return true; }}
+      onDestinationChange={async (id) => { window.history.pushState(null, "", teamHref(id, data.progressReport?.people.find((person) => person.u.id === id)?.u.name)); return true; }}
       data={data}
       user={user}
       registerLandingNavigation={registerLanding}

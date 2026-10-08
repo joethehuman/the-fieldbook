@@ -31,12 +31,18 @@ export function RecentlyDeleted({
   data,
   onBulk,
   contentOnly = false,
+  filter: controlledFilter,
+  onFilterChange,
 }: {
   data: Workspace;
   onBulk: BulkHandler;
   contentOnly?: boolean;
+  filter?: string;
+  onFilterChange?: (filter: string) => void;
 }) {
-  const [filter, setFilter] = useState("all");
+  const [localFilter, setLocalFilter] = useState("all");
+  const filter = controlledFilter ?? localFilter;
+  const setFilter = (next: string) => { if (onFilterChange) onFilterChange(next); else setLocalFilter(next); };
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);

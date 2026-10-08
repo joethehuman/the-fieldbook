@@ -189,7 +189,7 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
   listDraftIndex(): Promise<DraftIndexRecord[]>;
   listDraftCourses(): Promise<DocumentRecord[]>;
   listPublishedAssignmentContent(): Promise<PublishedAssignmentRecord[]>;
-  listPublishedReaderIndex(): Promise<ReaderIndexRecord[]>;
+  listPublishedReaderIndex(ids?: readonly string[]): Promise<ReaderIndexRecord[]>;
   listPublishedCourseIndex(): Promise<CourseIndexRecord[]>;
   listRecentMcpDocuments(): Promise<DocumentRecord[]>;
   findReadyMedia(ids: string[]): Promise<{ id: string; mime: string }[]>;

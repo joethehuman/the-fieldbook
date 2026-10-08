@@ -1,4 +1,5 @@
 "use client";
+import { contentPath, curriculumPath } from "@/lib/navigation";
 import {
   learningSortOptions,
   compareLearningRecords,
@@ -180,7 +181,7 @@ export default function Learning({
         }
         href={
           linkedNavigation
-            ? `/curricula/${encodeURIComponent(item.curriculum.id)}?from=${encodeURIComponent(courseViewPaths[view])}`
+            ? `${curriculumPath(item.curriculum.id, item.curriculum.name)}?from=${encodeURIComponent(courseViewPaths[view])}`
             : undefined
         }
       />
@@ -298,7 +299,7 @@ export default function Learning({
       onClick={linkedNavigation ? undefined : () => onOpen(c.id)}
       href={
         linkedNavigation
-          ? `/courses/${encodeURIComponent(c.id)}?from=${encodeURIComponent(courseViewPaths[view])}`
+          ? `${contentPath("course", c.id, c.title)}?from=${encodeURIComponent(courseViewPaths[view])}`
           : undefined
       }
     />
