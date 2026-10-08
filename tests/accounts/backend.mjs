@@ -418,6 +418,7 @@ createServer(async (req, res) => {
             "status",
             "createdAt",
             "updatedAt",
+            "feedAt",
             "groups",
             "updateTeams",
             "assignments",

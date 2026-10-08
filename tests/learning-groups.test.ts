@@ -219,6 +219,98 @@ test("Update feed handles zero, one, two, draft-only edits, duplicate IDs and in
   );
 });
 
+test("narrow reader rows and full demo content share Update fallback dates, ties, deduplication and audiences", () => {
+  const data = freshWorkspace();
+  const base = data.content.find((c) => c.kind === "brief")!;
+  const groups = [{ id: "sales", name: "Sales" }];
+  const teams = [{ id: "west", name: "West" }];
+  const make = (id: string, patch: Partial<typeof base> = {}) => ({
+    ...base,
+    id,
+    groups: ["sales"],
+    updateTeams: [],
+    feedAt: undefined,
+    updatedAt: "2026-10-02T00:00:00Z",
+    createdAt: undefined,
+    ...patch,
+  });
+  const content = [
+    make("fallback", { feedAt: "invalid", updatedAt: "2026-10-03T00:00:00Z" }),
+    make("team", {
+      groups: [],
+      updateTeams: ["west"],
+      feedAt: "2026-10-04T00:00:00Z",
+    }),
+    make("all", { groups: [], updatedAt: "2026-10-05T00:00:00Z" }),
+    make("tie-b"),
+    make("tie-a", { updatedAt: "invalid", createdAt: "2026-10-02T00:00:00Z" }),
+    make("undated-b", { updatedAt: "invalid" }),
+    make("undated-a", { updatedAt: "" }),
+    make("fallback", { updatedAt: "2026-10-09T00:00:00Z" }),
+    make("draft", { status: "draft" }),
+    make("doc", { kind: "doc" }),
+  ];
+  const narrow = content.map(
+    ({
+      id,
+      kind,
+      status,
+      groups,
+      updateTeams,
+      feedAt,
+      updatedAt,
+      createdAt,
+    }) => ({
+      id,
+      kind,
+      status,
+      groups,
+      updateTeams,
+      feedAt,
+      updatedAt,
+      createdAt,
+      marker: `preserved-${id}`,
+    }),
+  );
+  const before = structuredClone(narrow);
+  for (const guest of [false, true]) {
+    const user = {
+      ...data.users[0],
+      id: guest ? "guest" : "member",
+      groups: ["sales"],
+      teamId: "west",
+    };
+    const fullResult = updatesForUser(content, user, groups, teams);
+    const narrowResult = updatesForUser(narrow, user, groups, teams);
+    const ids = (result: typeof fullResult | typeof narrowResult) => ({
+      forYou: result.forYou.map((item) => item.id),
+      other: result.other.map((item) => item.id),
+    });
+    assert.deepEqual(ids(narrowResult), ids(fullResult));
+    assert.deepEqual(
+      ids(narrowResult),
+      guest
+        ? {
+            forYou: ["fallback", "tie-a"],
+            other: ["all", "team", "tie-b", "undated-a", "undated-b"],
+          }
+        : {
+            forYou: ["team", "fallback"],
+            other: ["all", "tie-a", "tie-b", "undated-a", "undated-b"],
+          },
+    );
+    for (const item of [...narrowResult.forYou, ...narrowResult.other]) {
+      assert.equal(item.marker, `preserved-${item.id}`);
+      assert.equal("body" in item, false);
+    }
+  }
+  assert.deepEqual(
+    narrow,
+    before,
+    "Selection must not mutate the reader index",
+  );
+});
+
 test("learning governance rejects bad team links, duplicate items and unpublished curricula", () => {
   const cid = "00000000-0000-4000-8000-000000000010";
   const input = {

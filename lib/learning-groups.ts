@@ -65,13 +65,24 @@ export function updateFeedTimestamp(
   // first-publication timestamp is not part of the current content model.
   return parse(item.feedAt) ?? parse(item.updatedAt) ?? parse(item.createdAt);
 }
-export function updatesForUser(
-  content: Content[],
+type UpdateFeedItem = Pick<
+  Content,
+  | "id"
+  | "kind"
+  | "status"
+  | "groups"
+  | "updateTeams"
+  | "feedAt"
+  | "updatedAt"
+  | "createdAt"
+>;
+export function updatesForUser<T extends UpdateFeedItem>(
+  content: readonly T[],
   user: Workspace["users"][number],
   groups: Group[],
   teams: Team[] = [],
 ) {
-  const updatesById = new Map<string, Content>();
+  const updatesById = new Map<string, T>();
   for (const item of content) {
     if (
       item.kind === "brief" &&
@@ -89,7 +100,13 @@ export function updatesForUser(
     if (bTime !== undefined) return 1;
     return a.id.localeCompare(b.id);
   });
-  const matches = (c: Content) => updateMatchesAudience(c, user, groups, teams);
+  const matches = (c: T) =>
+    updateMatchesAudience(
+      { groups: c.groups || [], updateTeams: c.updateTeams },
+      user,
+      groups,
+      teams,
+    );
   const featured = updates.filter(matches).slice(0, 2);
   const featuredIds = new Set(featured.map((item) => item.id));
   return {
