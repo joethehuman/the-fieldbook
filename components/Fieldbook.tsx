@@ -392,7 +392,7 @@ export default function Fieldbook() {
       <BrandedAccount branding={brandingFromSettings(branding)} centered>
         <Badge variant="default">INTERACTIVE DEMO</Badge>
         <h1>Choose a demo profile</h1>
-        {!data && (
+        {restored && !data && (
           <>
             {error && <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
               {error}
