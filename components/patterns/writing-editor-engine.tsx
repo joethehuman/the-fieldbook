@@ -12,6 +12,7 @@ import { WritingSelectionMenu } from "./writing-selection-menu";
 import { EditorWritingActionsContext } from "./editor-frame";
 import { useWritingControlsLayout } from "./use-editor-cards-layout";
 import { WritingLinkDialog } from "./writing-link-dialog";
+import { writingLinkPastePlugin } from "./writing-link-paste";
 import { WritingTitleContext, WritingIntroductionContext, WritingTitleEnterContext } from "./writing-title";
 import { WritingInteractionContext } from "./writing-interaction";
 import { Fragment, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -663,6 +664,7 @@ export default function WritingEditorEngine({
     quotePlugin(),
     thematicBreakPlugin(),
     linkPlugin(),
+    writingLinkPastePlugin(),
     linkDialogPlugin({ LinkDialog: WritingLinkDialog }),
     imagePlugin({
       disableImageResize: true,
