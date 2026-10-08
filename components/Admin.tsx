@@ -1868,12 +1868,14 @@ export default function Admin({
                                     onSelect: async () => {
                                       setOpeningItem(u.id);
                                       try {
-                                        await navigateDestination({
+                                        const opened = await navigateDestination({
                                           tab: "people",
                                           id: u.id,
                                         });
-                                        setNotice("");
-                                        adminPanel.reveal();
+                                        if (opened) {
+                                          setNotice("");
+                                          adminPanel.reveal();
+                                        }
                                       } catch (error) {
                                         setNotice((error as Error).message);
                                       } finally {
