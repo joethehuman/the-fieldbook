@@ -289,3 +289,24 @@ test("reader highlights fenced code, copies exactly, leaves inline code alone, a
     animations: "disabled",
   });
 });
+
+test("pasting an image in code leaves the code editor in control and does not upload into prose", async ({ page }, info) => {
+  await open(page, info.project.name.startsWith("production"), "doc", `Before the code.\n\n${fence(code)}\n\nAfter the code.`);
+  let uploads = 0;
+  await page.route("**/api/upload", (route) => {
+    uploads++;
+    return route.fulfill({ status: 500, json: { error: "Unexpected prose upload" } });
+  });
+  const input = page.locator(".writing-code-block .cm-content");
+  await input.click();
+  await input.evaluate((node) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["synthetic"], "code-paste.png", { type: "image/png" }));
+    node.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect(input).toHaveText(code);
+  await expect(page.locator(".writing-editor").getByRole("alert")).toHaveCount(0);
+  await expect(page.locator(".writing-content img, .writing-content .writing-image-loading")).toHaveCount(0);
+  expect(uploads).toBe(0);
+  expect((await downloadMarkdown(page)).body).toContain(fence(code));
+});

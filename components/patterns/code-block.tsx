@@ -7,7 +7,6 @@ import { Tooltip } from "../ui/tooltip";
 import { Alert } from "../ui/alert";
 import { codeLanguageLabel } from "@/lib/code-languages";
 import { useCodeHighlight } from "./use-code-highlight";
-import "../../styles/code-block.css";
 
 export function CodeBlockHeader({
   code,

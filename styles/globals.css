@@ -5,6 +5,7 @@
 @import "./layout.css";
 @import "./dialog.css";
 @import "./content.css";
+@import "./code-block.css";
 @import "./artwork.css";
 
 /* Explicit sources keep demo and production builds identical. */

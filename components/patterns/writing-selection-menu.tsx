@@ -11,6 +11,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { createWritingBlock, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
 import { useWritingInteraction } from "./writing-interaction";
 import { useWritingControlsLayout } from "./use-editor-cards-layout";
+import { normalizeWritingSelection } from "./writing-selection-boundaries";
+import { $isHeadingNode } from "@lexical/rich-text";
+import { $isListNode } from "@lexical/list";
 
 type SelectionMenuController = (keyboard: boolean) => boolean;
 
@@ -24,6 +27,7 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
   const phone = useWritingControlsLayout();
   const phoneTrigger = useRef<HTMLButtonElement>(null);
   const [hasSelection, setHasSelection] = useState(false);
+  const [selectionStyle, setSelectionStyle] = useState<string | null>(null);
   const format = useCellValue(currentFormat$);
   const blockType = useCellValue(currentBlockType$);
   const listType = useCellValue(currentListType$);
@@ -59,7 +63,20 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
       const existing = $getSelection();
       const current = $isRangeSelection(existing) ? existing.clone() : $createRangeSelection();
       current.applyDOMRange(selected);
-      if (!current.isCollapsed() && current.getTextContent().trim()) selection = current;
+      normalizeWritingSelection(current);
+      if (!current.isCollapsed() && current.getTextContent().trim()) {
+        selection = current;
+        const point = current.isBackward() ? current.focus : current.anchor;
+        const block = point.getNode().getTopLevelElement();
+        let kind = block?.getType() || "paragraph";
+        if ($isHeadingNode(block)) kind = block.getTag();
+        if ($isListNode(block)) {
+          let nearest = point.getNode();
+          while (!$isListNode(nearest) && nearest.getParent()) nearest = nearest.getParent()!;
+          kind = $isListNode(nearest) ? nearest.getListType() : block.getListType();
+        }
+        setSelectionStyle(kind);
+      }
     });
     if (!selection) return false;
     range.current = selected;
@@ -172,7 +189,7 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
     dismissed.current = stamp();
     setOpen(false);
   }
-  const currentStyle = writingBlockStyles.find(({ kind }) => kind === (listType || blockType)) || writingBlockStyles[0];
+  const currentStyle = writingBlockStyles.find(({ kind }) => kind === (selectionStyle || listType || blockType)) || writingBlockStyles[0];
 
   return <>
     {phone && showPhoneTrigger && <Button ref={phoneTrigger} type="button" variant="ghost" size="icon" className="writing-phone-format"
