@@ -8,6 +8,7 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
+import { blurWritingInput, captureWritingCursor, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout } from "./use-editor-cards-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
@@ -66,16 +67,51 @@ export function EditorFrame({
   const [overlayHost, setOverlayHost] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => { setOverlayHost(frame.current?.closest<HTMLElement>(".app") || null); }, []);
   const hasNavigation = !!navigation;
+  const [panels, setPanels] = useState({ outline: false, details: false });
+  const panelState = useRef(panels);
+  panelState.current = panels;
+  const measureDock = useRef<(() => void) | null>(null);
+  const lastWritingCursor = useRef<WritingCursor | null>(null);
+  const panelReturn = useRef<WritingCursor | null>(null);
+  const preparedPanel = useRef<"outline" | "details" | null>(null);
+  function preparePanel(side: "outline" | "details") {
+    if (!phone) return;
+    if (!panelState.current.outline && !panelState.current.details) {
+      const active = document.activeElement;
+      const chooser = active instanceof Element && !!active.closest(".writing-slash-menu, .writing-media-chooser, .editor-frame-controls");
+      panelReturn.current = captureWritingCursor(canvas.current) || (chooser ? lastWritingCursor.current : null);
+    }
+    preparedPanel.current = side;
+  }
+  function returnToWriting(toggle: HTMLButtonElement | null) {
+    const cursor = panelReturn.current;
+    panelReturn.current = null;
+    if (!phone) toggle?.focus();
+    else if (!restoreWritingCursor(cursor)) toggle?.focus({ preventScroll: true });
+  }
+  function togglePanel(side: "outline" | "details") {
+    defaultsApplied.current = true;
+    const closing = panelState.current[side];
+    if (!closing && preparedPanel.current !== side) preparePanel(side);
+    preparedPanel.current = null;
+    if (!closing && phone) blurWritingInput();
+    setPanels((current) => side === "outline"
+      ? { outline: !current.outline, details: wide.current ? current.details : false }
+      : { outline: wide.current ? current.outline : false, details: !current.details });
+    if (closing && phone) returnToWriting(side === "outline" ? outlineToggle.current : detailsToggle.current);
+  }
   useLayoutEffect(() => {
     const element = phone ? controls.current : canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
     if (!element) return;
     const owner = frame.current?.closest<HTMLElement>(".main-content");
     const header = frame.current?.closest(".app")?.querySelector<HTMLElement>(".topbar");
     let request = 0;
+    let releaseRequest = 0;
     let followUntil = 0;
     let layoutWidth = document.documentElement.clientWidth;
     let layoutHeight = document.documentElement.clientHeight;
     let keyboard = false;
+    let writingPoint: Range | null = null;
     // Apple can overlay an address pill and an input accessory row above the
     // keyboard without subtracting both from the reported visual viewport.
     const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent)
@@ -87,6 +123,7 @@ export function EditorFrame({
       const height = viewport?.height || (phone ? document.documentElement.clientHeight : window.innerHeight);
       const bottom = phone && appBounds ? Math.min(rawTop + height, appBounds.bottom) : rawTop + height;
       const visibleTop = phone ? Math.max(0, bottom - height) : rawTop;
+      let safeBottom = bottom;
       if (phone) {
         const width = document.documentElement.clientWidth;
         if (width !== layoutWidth) { layoutWidth = width; layoutHeight = document.documentElement.clientHeight; }
@@ -103,12 +140,41 @@ export function EditorFrame({
         element.style.setProperty("--editor-dock-center", center);
         overlayLayer.current?.style.setProperty("--editor-panel-center", center);
         element.style.setProperty("--editor-dock-gap", keyboard ? `max(${appleTouch ? 8 : 3}rem, env(safe-area-inset-bottom))` : "max(var(--space-3), env(safe-area-inset-bottom))");
+        // Resolve the CSS safe-area gap before following a line. This bottom
+        // lane also bounds popups and trailing scroll space independently.
+        element.style.setProperty("--editor-dock-anchor", "calc(var(--editor-dock-bottom) - var(--editor-dock-gap))");
+        const lane = element.getBoundingClientRect();
+        safeBottom = lane.bottom;
+        element.style.setProperty("--editor-usable-bottom", `${safeBottom}px`);
+        const prose = canvas.current?.querySelector<HTMLElement>('.writing-content[contenteditable="true"]');
+        const selection = window.getSelection();
+        const ownTools = active instanceof Element && !!active.closest('.writing-toolbar-controls, .writing-slash-menu, .writing-media-chooser');
+        const proseFocus = active instanceof HTMLElement && !!prose?.contains(active) && active.isContentEditable && !active.closest('.writing-code-block');
+        const nativeRange = active === document.body && !!selection && !selection.isCollapsed;
+        const holding = preparedPanel.current !== null;
+        if (!holding && !panelState.current.outline && !panelState.current.details && prose && (proseFocus || nativeRange) && selection?.focusNode && prose.contains(selection.focusNode)) {
+          writingPoint = document.createRange();
+          writingPoint.setStart(selection.focusNode, selection.focusOffset);
+          writingPoint.collapse(true);
+        } else if ((!ownTools && !holding) || panelState.current.outline || panelState.current.details) writingPoint = null;
+        let line = writingPoint?.startContainer.isConnected ? writingPoint.getClientRects()[0] : undefined;
+        if (!line?.height && writingPoint) {
+          const node = writingPoint.startContainer;
+          const block = (node instanceof Element ? node : node.parentElement)?.closest('p, li, h1, h2, h3, h4, h5, h6, blockquote');
+          if (block && !block.textContent?.trim()) line = block.getBoundingClientRect();
+        }
+        const minimum = Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0, canvas.current?.querySelector(".writing-document-heading")?.getBoundingClientRect().bottom || 0) + 8;
+        if (line?.height && line.bottom + 8 >= minimum && minimum + lane.height <= safeBottom) {
+          const top = Math.max(minimum, Math.min(line.bottom + 8, safeBottom - lane.height));
+          element.style.setProperty("--editor-dock-anchor", `${top + lane.height - (appBounds?.top || 0)}px`);
+          element.dataset.followsLine = "true";
+        } else delete element.dataset.followsLine;
       }
       const rect = element.getBoundingClientRect();
       const bounds = phone ? frame.current?.getBoundingClientRect() || rect : rect;
       const panelTop = phone ? Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0, bounds.top - 8) + 8 : rect.bottom + 8;
       const panelBottom = phone ? rect.top - 8 : bottom - 16;
-      if (phone) owner?.style.setProperty("--editor-dock-clearance", `${Math.max(80, bottom - rect.top + 12)}px`);
+      if (phone) owner?.style.setProperty("--editor-dock-clearance", `${Math.max(80, bottom - safeBottom + rect.height + 12)}px`);
       frame.current?.style.setProperty("--editor-navigation-height", `${phone ? 0 : rect.height}px`);
       overlayLayer.current?.style.setProperty("--editor-panel-top", `${panelTop - (phone ? appBounds?.top || 0 : 0)}px`);
       overlayLayer.current?.style.setProperty("--editor-panel-left", `${bounds.left - (phone ? appBounds?.left || 0 : 0)}px`);
@@ -126,6 +192,17 @@ export function EditorFrame({
       if (!request) request = requestAnimationFrame(tick);
     };
     const settle = () => { followUntil = performance.now() + 700; schedule(); };
+    const remember = () => {
+      const cursor = captureWritingCursor(canvas.current);
+      const active = document.activeElement;
+      if (cursor) lastWritingCursor.current = cursor;
+      else if (active instanceof HTMLElement && (active.isContentEditable || active.matches("input, textarea")) && !active.closest(".writing-media-chooser, .writing-slash-menu")) lastWritingCursor.current = null;
+    };
+    const released = () => {
+      cancelAnimationFrame(releaseRequest);
+      releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; schedule(); });
+    };
+    measureDock.current = measure;
     measure();
     const observer = new ResizeObserver(schedule);
     observer.observe(element);
@@ -141,9 +218,17 @@ export function EditorFrame({
       document.addEventListener("focusin", settle);
       document.addEventListener("focusout", settle);
       document.addEventListener("touchend", settle, { passive: true });
+      document.addEventListener("selectionchange", schedule);
+      document.addEventListener("input", schedule);
+      element.addEventListener("pointerdown", remember, true);
+      document.addEventListener("selectionchange", remember);
+      document.addEventListener("focusin", remember);
+      document.addEventListener("pointerup", released);
     }
     return () => {
       cancelAnimationFrame(request);
+      cancelAnimationFrame(releaseRequest);
+      if (measureDock.current === measure) measureDock.current = null;
       observer.disconnect();
       if (phone) owner?.style.removeProperty("--editor-dock-clearance");
       owner?.removeEventListener("scroll", schedule);
@@ -155,16 +240,22 @@ export function EditorFrame({
         document.removeEventListener("focusin", settle);
         document.removeEventListener("focusout", settle);
         document.removeEventListener("touchend", settle);
+        document.removeEventListener("selectionchange", schedule);
+        document.removeEventListener("input", schedule);
+        element.removeEventListener("pointerdown", remember, true);
+        document.removeEventListener("selectionchange", remember);
+        document.removeEventListener("focusin", remember);
+        document.removeEventListener("pointerup", released);
       }
     };
   }, [hasNavigation, phone, overlayHost]);
+  useLayoutEffect(() => { measureDock.current?.(); }, [panels.outline, panels.details]);
   const wide = useRef(false);
   const narrow = useRef(false);
   const outlineToggle = useRef<HTMLButtonElement>(null);
   const detailsToggle = useRef<HTMLButtonElement>(null);
   const outlineId = useId();
   const detailsId = useId();
-  const [panels, setPanels] = useState({ outline: false, details: false });
   const dismissPanels = useCallback(() => setPanels({ outline: false, details: false }), []);
   const compactControls = useMemo(() => phone ? { panelsOpen: panels.outline || panels.details, dismissPanels } : null, [phone, panels.outline, panels.details, dismissPanels]);
   const defaultsApplied = useRef(false);
@@ -309,7 +400,10 @@ export function EditorFrame({
           <Button ref={outlineToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle size-11 ${phone ? "relative appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute rounded-full"}`} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
-            onClick={() => { defaultsApplied.current = true; setPanels((current) => ({ outline: !current.outline, details: wide.current ? current.details : false })); }}>
+            onPointerDown={() => { if (phone) preparePanel("outline"); }}
+            onPointerCancel={() => { preparedPanel.current = null; measureDock.current?.(); }}
+            onMouseDown={(event) => { if (phone) event.preventDefault(); }}
+            onClick={() => togglePanel("outline")}>
             {panels.outline ? <X aria-hidden="true" /> : <ListTree aria-hidden="true" />}
           </Button>
         )}
@@ -318,10 +412,10 @@ export function EditorFrame({
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
-          onClick={() => {
-            defaultsApplied.current = true;
-            setPanels((current) => ({ outline: wide.current ? current.outline : false, details: !current.details }));
-          }}>
+          onPointerDown={() => { if (phone) preparePanel("details"); }}
+          onPointerCancel={() => { preparedPanel.current = null; measureDock.current?.(); }}
+          onMouseDown={(event) => { if (phone) event.preventDefault(); }}
+          onClick={() => togglePanel("details")}>
           {panels.details ? <X aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}
           {requirementsCount > 0 && <span className="editor-requirements-badge" aria-hidden="true">{requirementsCount}</span>}
         </Button>
@@ -335,7 +429,7 @@ export function EditorFrame({
               if (disabled || event.key !== "Escape" || event.defaultPrevented) return;
               event.preventDefault();
               setPanels((current) => ({ ...current, outline: false }));
-              outlineToggle.current?.focus();
+              returnToWriting(outlineToggle.current);
             }}>
             <h2 className="editor-floating-heading">Outline</h2>
             <ScrollRegion id={outlineId} className="editor-floating-body">{outline}</ScrollRegion>
@@ -348,7 +442,7 @@ export function EditorFrame({
               if (disabled || event.key !== "Escape" || event.defaultPrevented) return;
               event.preventDefault();
               setPanels((current) => ({ ...current, details: false }));
-              detailsToggle.current?.focus();
+              returnToWriting(detailsToggle.current);
             }}>
             <h2 className="editor-floating-heading">Details</h2>
             <ScrollRegion id={detailsId} className="editor-floating-body">{details}{recoverySection}{deleteAction}</ScrollRegion>

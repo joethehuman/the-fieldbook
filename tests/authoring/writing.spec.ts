@@ -1084,7 +1084,7 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await expect(menu.getByRole("menuitem", { name: "Heading 1", exact: true })).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
-  await expect(commands).toBeFocused();
+  await expect(editor).toBeFocused();
 });
 
 test("Heading 1–4 commands and selected-text Normal Text preserve authored content", async ({ page }, info) => {

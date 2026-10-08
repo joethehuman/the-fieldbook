@@ -10,7 +10,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { createWritingBlock, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
 import { useWritingInteraction } from "./writing-interaction";
-import { useWritingControlsLayout } from "./use-editor-cards-layout";
+import { useNativeWritingSelection, useWritingControlsLayout } from "./use-editor-cards-layout";
 import { normalizeWritingSelection } from "./writing-selection-boundaries";
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $isListNode } from "@lexical/list";
@@ -18,13 +18,15 @@ import { $isListNode } from "@lexical/list";
 export type SelectionMenuController = { show: (keyboard: boolean, trigger?: HTMLButtonElement) => boolean; dismiss: () => void };
 
 /** Non-modal formatting tools keep the real editor selection as their target. */
-export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = true }: {
+export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhoneTrigger = true }: {
   showPhoneTrigger?: boolean;
   disabled: boolean;
   onReady: (controller: SelectionMenuController | null) => void;
 }) {
   const editor = useCellValue(activeEditor$);
   const phone = useWritingControlsLayout();
+  const nativeSelection = useNativeWritingSelection();
+  const disabled = unavailable || nativeSelection;
   const phoneTrigger = useRef<HTMLButtonElement>(null);
   const dockTrigger = useRef<HTMLButtonElement | null>(null);
   const compact = phone && !showPhoneTrigger;
@@ -109,6 +111,14 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
     return () => onReady(null);
   }, [onReady, show]);
   useEffect(() => {
+    if (nativeSelection) {
+      saved.current = null;
+      savedEditor.current = null;
+      range.current = null;
+      setOpen(false);
+      setHasSelection(false);
+      return;
+    }
     let pending = 0;
     const update = () => {
       cancelAnimationFrame(pending);
@@ -149,7 +159,7 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
       document.removeEventListener("pointerup", update);
       unregister?.();
     };
-  }, [editor, snapshot, phone]);
+  }, [editor, snapshot, phone, nativeSelection]);
   useEffect(() => { setOpen(false); }, [phone]);
   useEffect(() => { if (disabled) setOpen(false); }, [disabled]);
 
@@ -195,6 +205,8 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
     setOpen(false);
   }
   const currentStyle = writingBlockStyles.find(({ kind }) => kind === (selectionStyle || listType || blockType)) || writingBlockStyles[0];
+
+  if (nativeSelection) return null;
 
   return <>
     {phone && showPhoneTrigger && <Button ref={phoneTrigger} type="button" variant="ghost" size="icon" className="writing-phone-format"

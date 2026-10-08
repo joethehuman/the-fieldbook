@@ -13,6 +13,7 @@ import { WritingSelectionMenu, type SelectionMenuController } from "./writing-se
 import { normalizeWritingSelection, writingSelectionBoundariesPlugin } from "./writing-selection-boundaries";
 import { EditorCompactControlsContext, EditorWritingActionsContext } from "./editor-frame";
 import { useWritingControlsLayout } from "./use-editor-cards-layout";
+import { blurWritingInput } from "./writing-cursor";
 import { hasWritingTarget, useWritingTarget } from "./use-writing-target";
 import { WritingLinkDialog } from "./writing-link-dialog";
 import { writingLinkPastePlugin } from "./writing-link-paste";
@@ -232,7 +233,7 @@ function WritingToolbar({
         </div>
         <Button type="button" size={phone ? "icon" : "sm"} variant={canvas && phone ? "ghost" : "outline"} disabled={disabled || canvas && phone && (!writingTarget || !!compactControls?.panelsOpen)}
           className={canvas && phone ? "size-11 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : undefined}
-          aria-label="Commands: insert blocks or format selected text"
+          aria-label={phone ? "Commands: insert blocks" : "Commands: insert blocks or format selected text"}
           onPointerDown={(event) => {
             if (!canvas || !phone || event.button !== 0 || !event.isPrimary) return;
             event.preventDefault();
@@ -286,6 +287,7 @@ export default function WritingEditorEngine({
   const pendingMedia = useRef(false);
   const slashSelection = useRef<BaseSelection | null>(null);
   const toolbarSelection = useRef<BaseSelection | null>(null);
+  const openingPointerClick = useRef(false);
   const activeLine = useRef<HTMLElement | null>(null);
   const [media, setMedia] = useState<"image" | "video">("image");
   const [busy, setBusy] = useState(false),
@@ -354,7 +356,10 @@ export default function WritingEditorEngine({
     slashMenu.current.style.left = `${slashPosition.left}px`;
     slashMenu.current.style.transform = slashPosition.above ? "translateY(-100%)" : "";
     slashMenu.current.style.maxHeight = `${slashPosition.maxHeight}px`;
-    if (slashFromToolbar && focusInsertItem.current) slashMenu.current.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+    if (slashFromToolbar && focusInsertItem.current) {
+      slashMenu.current.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+      if (canvas && compactRef.current) window.getSelection()?.removeAllRanges();
+    }
   }, [slashOpen, slashPosition, slashFromToolbar]);
   useLayoutEffect(() => {
     if (!slashOpen || slashFromToolbar || slashNavigation.current !== "keyboard") return;
@@ -376,9 +381,11 @@ export default function WritingEditorEngine({
     if (!mediaChooser || !mediaMenu.current) return;
     mediaMenu.current.style.top = `${mediaPosition.top}px`;
     mediaMenu.current.style.left = `${mediaPosition.left}px`;
-    const initial = mediaTab === "link"
-      ? mediaMenu.current.querySelector<HTMLInputElement>('input[type="url"]')
-      : mediaMenu.current.querySelector<HTMLInputElement>('input[aria-label="Alt text (optional)"]') || mediaMenu.current.querySelector<HTMLButtonElement>(".writing-media-fields button");
+    const initial = canvas && compactRef.current
+      ? mediaMenu.current.querySelector<HTMLButtonElement>(".writing-media-fields button, .writing-media-tabs button")
+      : mediaTab === "link"
+        ? mediaMenu.current.querySelector<HTMLInputElement>('input[type="url"]')
+        : mediaMenu.current.querySelector<HTMLInputElement>('input[aria-label="Alt text (optional)"]') || mediaMenu.current.querySelector<HTMLButtonElement>(".writing-media-fields button");
     initial?.focus({ preventScroll: true });
   }, [mediaChooser, mediaPosition, mediaTab]);
 
@@ -433,10 +440,19 @@ export default function WritingEditorEngine({
       const visibleWidth = viewport?.width || window.innerWidth;
       const width = Math.min(mediaChooser ? 324 : 288, visibleWidth - 16);
       menu.style.width = `${width}px`;
-      menu.style.top = `${anchor.top - 8}px`;
+      const safeBottom = parseFloat(dock.style.getPropertyValue("--editor-usable-bottom")) || bottom;
+      const aboveSpace = Math.max(0, anchor.top - top - 16);
+      const belowSpace = Math.max(0, safeBottom - anchor.bottom - 16);
+      const above = aboveSpace >= belowSpace;
+      // A tiny anchored palette can leave only its footer visible. Give the
+      // chooser the usable region and temporarily hide the toolbar instead.
+      const expanded = Math.max(aboveSpace, belowSpace) < 180;
+      if (expanded) dock.dataset.paletteOverlay = "true";
+      else delete dock.dataset.paletteOverlay;
+      menu.style.top = `${expanded ? top + 8 : above ? anchor.top - 8 : anchor.bottom + 8}px`;
       menu.style.left = `${Math.max(left + 8, Math.min(anchor.x + anchor.width / 2 - width / 2, left + visibleWidth - width - 8))}px`;
-      menu.style.transform = "translateY(-100%)";
-      menu.style.maxHeight = `${Math.max(80, Math.min(360, anchor.top - top - 16))}px`;
+      menu.style.transform = !expanded && above ? "translateY(-100%)" : "none";
+      menu.style.maxHeight = `${Math.min(360, expanded ? Math.max(0, safeBottom - top - 16) : above ? aboveSpace : belowSpace)}px`;
       if (mediaChooser) menu.style.overflowY = "auto";
     };
     const schedule = () => { if (!request) request = requestAnimationFrame(place); };
@@ -455,6 +471,7 @@ export default function WritingEditorEngine({
       cancelAnimationFrame(request);
       observer.disconnect();
       movement.disconnect();
+      delete dock.dataset.paletteOverlay;
       owner?.removeEventListener("scroll", schedule);
       window.removeEventListener("scroll", schedule);
       window.visualViewport?.removeEventListener("resize", schedule);
@@ -619,12 +636,15 @@ export default function WritingEditorEngine({
     if (!slashOpen) return;
     const viewport = root.current?.closest<HTMLElement>(".main-content");
     const close = () => {
+      // Keyboard dismissal can shrink spare scroll space and pan the owner.
+      // A compact tap-opened palette must survive that transition.
+      if (canvas && compactRef.current && slashFromToolbar) return;
       if (slashFromToolbar) setSlashOpen(false);
       else keepSlashAsText(slashQuery, false);
     };
     viewport?.addEventListener("scroll", close, { passive: true });
     return () => viewport?.removeEventListener("scroll", close);
-  }, [slashOpen, slashFromToolbar, slashQuery, keepSlashAsText]);
+  }, [canvas, slashOpen, slashFromToolbar, slashQuery, keepSlashAsText]);
 
   function rememberSelection() {
     mediaSelection.current = null;
@@ -652,14 +672,17 @@ export default function WritingEditorEngine({
     editor.current?.focus(() => editor.current?.insertMarkdown(markdown), { preventScroll: true });
     closeMedia();
   }
-  function closeMedia() {
+  function closeMedia(returnFocus = false) {
+    const selection = mediaSelection.current;
     activeLine.current?.classList.remove("writing-media-line");
     activeLine.current?.removeAttribute("data-media-placeholder");
     setMediaChooser(null);
     setVideoUrl("");
+    if (returnFocus && canvas && compactRef.current) restoreInsertTarget(selection);
   }
   function openMedia(type: "image" | "video", tab: "upload" | "link" = "upload") {
     rememberSelection();
+    if (canvas && compactRef.current) blurWritingInput();
     setSlashOpen(false);
     setMedia(type);
     setMediaTab(tab);
@@ -690,15 +713,35 @@ export default function WritingEditorEngine({
   ];
   const commandsFor = (query: string) => slashCommands.filter(({ name, terms }) => `${name} ${terms}`.toLowerCase().includes(query.trim().toLowerCase()));
   const matchingCommands = commandsFor(slashQuery);
+  function restoreInsertTarget(selection: BaseSelection | null) {
+    const lexical = lexicalEditor.current;
+    if (!lexical || !selection) return;
+    let attached = false;
+    lexical.read(() => {
+      try {
+        attached = $isRangeSelection(selection)
+          ? !!$getNodeByKey(selection.anchor.key)?.isAttached() && !!$getNodeByKey(selection.focus.key)?.isAttached()
+          : selection.getNodes().length > 0 && selection.getNodes().every((node) => node.isAttached());
+      } catch { /* The writing target changed while the chooser was open. */ }
+    });
+    if (!attached) return;
+    lexical.getRootElement()?.focus({ preventScroll: true });
+    lexical.update(() => {
+      $setSelection(selection.clone());
+      lexical.focus();
+    }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
+  }
   const closeInsertMenu = useCallback(() => {
     if (slashFromToolbar) {
       setSlashOpen(false);
-      insertTrigger.current?.focus({ preventScroll: true });
+      if (canvas && compactRef.current) {
+        restoreInsertTarget(slashSelection.current);
+      } else insertTrigger.current?.focus({ preventScroll: true });
     } else {
       keepSlashAsText();
       editor.current?.focus(undefined, { preventScroll: true });
     }
-  }, [slashFromToolbar, keepSlashAsText]);
+  }, [canvas, slashFromToolbar, keepSlashAsText]);
   useEffect(() => {
     if (!slashOpen) return;
     const dismiss = (event: KeyboardEvent) => {
@@ -779,6 +822,11 @@ export default function WritingEditorEngine({
       return;
     }
     openSlash(trigger, fromKeyboard);
+    if (canvas && compactRef.current) {
+      openingPointerClick.current = !fromKeyboard;
+      focusInsertItem.current = true;
+      blurWritingInput();
+    }
   }
   function runInsertCommand(run: () => void) {
     if (!slashFromToolbar) { run(); return; }
@@ -856,7 +904,15 @@ export default function WritingEditorEngine({
   ], [onUpload, disabled, busy, viewControls, canvas]);
   return (
     <WritingInteractionContext.Provider value={reportInteraction}>
-    <div ref={root} data-editor-interacting={popupActive || slashOpen || !!mediaChooser || undefined} className="writing-editor writing-surface rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {
+    <div ref={root} data-editor-interacting={popupActive || slashOpen || !!mediaChooser || undefined} className="writing-editor writing-surface rounded-lg border border-border bg-background" onClickCapture={(event) => {
+      const pointerClick = event.detail > 0 || ("pointerType" in event.nativeEvent && !!event.nativeEvent.pointerType);
+      const opening = openingPointerClick.current;
+      openingPointerClick.current = false;
+      // The opening touch can finish over a newly painted palette item.
+      // Consume only that gesture; a fresh pointerdown clears this guard.
+      if (canvas && compactRef.current && opening && pointerClick) { event.preventDefault(); event.stopPropagation(); }
+    }} onPointerDownCapture={(event) => {
+      openingPointerClick.current = false;
       if (event.target instanceof Element && event.target.closest(".writing-toolbar-controls")) {
         toolbarSelection.current = null;
         lexicalEditor.current?.getEditorState().read(() => {
@@ -975,10 +1031,10 @@ export default function WritingEditorEngine({
         </div>
         <div className="writing-slash-footer"><Button type="button" size="sm" variant="ghost" role="menuitem" onMouseDown={(event) => event.preventDefault()} onClick={closeInsertMenu}><span>Close menu</span><kbd>esc</kbd></Button></div>
       </div>, document.body)}
-      {mediaChooser && createPortal(<div ref={mediaMenu} className="writing-media-chooser" role="dialog" aria-label={`Insert ${mediaChooser}`} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeMedia(); editor.current?.focus(undefined, { preventScroll: true }); } }}>
+      {mediaChooser && createPortal(<div ref={mediaMenu} className="writing-media-chooser" role="dialog" aria-label={`Insert ${mediaChooser}`} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeMedia(true); if (!canvas || !compactRef.current) editor.current?.focus(undefined, { preventScroll: true }); } }}>
         <div className="writing-media-tabs"><Button type="button" variant="ghost" aria-pressed={mediaTab === "upload"} onClick={() => setMediaTab("upload")}>Upload</Button><Button type="button" variant="ghost" aria-pressed={mediaTab === "link"} onClick={() => setMediaTab("link")}>Link</Button></div>
         {mediaTab === "upload" ? <div className="writing-media-fields">{mediaChooser === "image" && <Input aria-label="Alt text (optional)" value={imageAlt} onChange={(event) => setImageAlt(event.target.value)} placeholder="Alt text (optional)" />}<Button type="button" disabled={!onUpload} onClick={() => file.current?.click()}>Choose {mediaChooser}</Button></div> : <div className="writing-media-fields"><Input aria-label={mediaChooser === "video" ? "Video URL" : "Image URL"} type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder={mediaChooser === "video" ? "YouTube, Vimeo or Loom URL" : "https://example.com/image.jpg"} /><Button type="button" onClick={mediaChooser === "video" ? insertVideo : () => { if (!/^https:\/\//i.test(videoUrl)) { setError("Use an HTTPS image URL."); return; } insertAtMediaSelection(`\n\n![${imageAlt.trim() || "Image"}](${videoUrl})\n\n`); }}>Insert {mediaChooser}</Button></div>}
-        <Button type="button" variant="ghost" size="sm" onClick={closeMedia}>Cancel</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => closeMedia(true)}>Cancel</Button>
       </div>, document.body)}
       <Input
         ref={file}

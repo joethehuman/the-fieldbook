@@ -1015,21 +1015,16 @@ test("selected text keeps contextual formatting without a desktop toolbar", asyn
   const writer = page.locator('.writing-content[contenteditable="true"]');
   await writer.fill("Keep this selection");
   await writer.press("ControlOrMeta+A");
-  if (
-    await page.evaluate(() => matchMedia("(width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait)").matches)
-  )
-    await page
-      .getByRole("button", {
-        name: "Commands: insert blocks or format selected text",
-        exact: true,
-      })
-      .click();
-  const tools = page.getByRole("dialog", {
-    name: "Format selected text",
-    exact: true,
-  });
-  await expect(tools).toBeVisible();
-  await tools.getByRole("button", { name: "Normal Text", exact: true }).click();
+  const native = await page.evaluate(() => matchMedia("(width < 768px), (pointer: coarse)").matches);
+  const tools = page.getByRole("dialog", { name: "Format selected text", exact: true });
+  if (native) {
+    await expect(tools).toHaveCount(0);
+    await page.getByRole("button", { name: /^Commands:/ }).click();
+    await expect(tools).toHaveCount(0);
+  } else {
+    await expect(tools).toBeVisible();
+    await tools.getByRole("button", { name: "Normal Text", exact: true }).click();
+  }
   await page.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
   await expect(writer.locator("h2")).toHaveText("Keep this selection");
   expect((await downloadMarkdown(page)).body).toBe("## Keep this selection");
@@ -2061,7 +2056,7 @@ test("editor delete failure retains the draft and uses the latest saved revision
 });
 
 for (const kind of ["doc", "brief", "course"] as const) {
-  test(`${kind}: bottom dock preserves editing and follows the visible keyboard area`, async ({ page }, info) => {
+  test(`${kind}: thin line toolbar preserves editing and stays inside the visible keyboard area`, async ({ page }, info) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const { read } = await open(page, info.project.name.startsWith("production"), kind);
     const writing = page.getByRole("textbox", { name: kind === "course" ? "Lesson content" : kind === "doc" ? "Doc content" : "Update content", exact: true });
@@ -2097,12 +2092,13 @@ for (const kind of ["doc", "brief", "course"] as const) {
       selection.removeAllRanges(); selection.addRange(range);
     });
     await dock.getByRole("button", { name: /^Commands:/ }).click();
-    await page.getByRole("button", { name: "Bold", exact: true }).click();
-    await expect(writing.locator("strong")).toHaveText("Keep");
+    await expect(page.locator('[data-writing-selection-menu]')).toHaveCount(0);
+    await expect(page.getByRole("menu", { name: "Insert content", exact: true })).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(writing).toBeFocused();
     await waitForDraftSaved(page);
     const saved = (await read()).content[0];
-    expect(kind === "course" ? saved.lessons[0].body : saved.body).toContain("**Keep**");
+    expect(kind === "course" ? saved.lessons[0].body : saved.body).toContain("Keep this paragraph");
     await page.screenshot({ path: info.outputPath(`${kind}-bottom-dock.png`) });
 
     await writing.locator("p").first().click();
@@ -2119,7 +2115,7 @@ for (const kind of ["doc", "brief", "course"] as const) {
         window.visualViewport!.dispatchEvent(new Event("resize"));
         window.visualViewport!.dispatchEvent(new Event("scroll"));
       }, { height, offsetTop });
-      await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(height + offsetTop - 48, 0);
+      await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeLessThanOrEqual(height + offsetTop - 48 + 1);
       const detailsToggle = dock.getByRole("button", { name: "Details", exact: true });
       await detailsToggle.click();
       const details = page.getByRole("complementary", { name: "Content details", exact: true });
@@ -2129,7 +2125,7 @@ for (const kind of ["doc", "brief", "course"] as const) {
       expect(pane.y + pane.height).toBeLessThanOrEqual(controls.y - 7);
       expect(pane.x + pane.width / 2).toBeCloseTo(375 / 2, 0);
       await details.press("Escape");
-      await expect(detailsToggle).toBeFocused();
+      await expect(writing).toBeFocused();
     }
     await page.screenshot({ path: info.outputPath(`${kind}-dock-keyboard-viewport.png`) });
   });
@@ -2167,6 +2163,14 @@ test("portrait touch tablets keep the existing dock cutoff and desktop returns w
     await expect(page.getByRole("group", { name: "Editor controls", exact: true })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeVisible();
     expect(await writer!.evaluate((node) => node.isConnected)).toBe(true);
+    await page.getByRole("textbox", { name: "Lesson content", exact: true }).evaluate((element) => {
+      element.focus();
+      const text = document.createTreeWalker(element.querySelector("p")!, NodeFilter.SHOW_TEXT).nextNode()!;
+      const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 5);
+      const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+      element.dispatchEvent(new Event("pointerup", { bubbles: true }));
+    });
+    await expect(page.locator('[data-writing-selection-menu], .writing-phone-format')).toHaveCount(0);
   } finally { await context.close(); }
 });
 
@@ -2238,7 +2242,7 @@ for (const kind of ["doc", "brief", "course"] as const) {
   });
 }
 
-test("compact native selection stays native until explicit dock formatting hands off focus", async ({ page }, info) => {
+test("compact selection stays native and Commands only opens insertion tools", async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, info.project.name.startsWith("production"), "course");
   const writing = page.getByRole("textbox", { name: "Lesson content", exact: true });
@@ -2249,30 +2253,28 @@ test("compact native selection stays native until explicit dock formatting hands
     const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
     element.dispatchEvent(new Event("pointerup", { bubbles: true }));
   });
-  await expect(page.locator('[data-writing-selection-menu="true"]')).toHaveCount(0);
+  await expect(page.locator('[data-writing-selection-menu]')).toHaveCount(0);
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("Format");
   const commands = page.getByRole("button", { name: /^Commands:/ });
   await expect(commands).toBeEnabled();
   if (info.project.use.hasTouch) await commands.tap(); else await commands.click();
-  const popup = page.locator('[data-writing-selection-menu="true"]').first();
-  await expect(popup).toBeVisible();
-  await expect(page.getByRole("menu", { name: "Insert content", exact: true })).toHaveCount(0);
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu).toBeVisible();
+  await expect(page.locator('[data-writing-selection-menu]')).toHaveCount(0);
   expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("");
-  await expect(popup.getByRole("button").first()).toBeFocused();
-  const box = (await popup.boundingBox())!, dock = (await page.getByRole("group", { name: "Editor controls", exact: true }).boundingBox())!;
-  expect(box.y + box.height).toBeLessThanOrEqual(dock.y - 3);
-  await popup.getByRole("button", { name: "Bold", exact: true }).click();
-  await expect(popup).toHaveCount(0);
-  await expect(writing.locator("strong")).toHaveText("Format");
-  await page.keyboard.type("Updated");
-  await expect(writing).toContainText("Updated this sentence");
-  await waitForDraftSaved(page);
+  await menu.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
+  await expect(writing.locator("h2")).toHaveText("Format this sentence");
+  await expect(page.locator('[data-writing-selection-menu]')).toHaveCount(0);
   await writing.press("ControlOrMeta+End");
   await page.keyboard.press("Enter");
   await page.keyboard.type("/hea");
   await expect(page.locator(".writing-slash-menu")).toBeVisible();
   await page.setViewportSize({ width: 900, height: 812 });
-  await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
-  await expect(writing).toContainText("/hea");
+  // A touch-first tablet stays compact in portrait; a mouse viewport leaves it.
+  if (!info.project.use.hasTouch) {
+    await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+    await expect(writing).toContainText("/hea");
+  }
 });
 
 test("compact dock follows independent viewport sizes, native app panning and dismissal", async ({ page }, info) => {
@@ -2299,17 +2301,18 @@ test("compact dock follows independent viewport sizes, native app panning and di
       window.visualViewport!.dispatchEvent(new Event("scroll"));
       window.dispatchEvent(new Event("scroll"));
     }, state);
-    await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(state.height + state.offsetTop - 48, 0);
+    await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeLessThanOrEqual(state.height + state.offsetTop - 48 + 1);
   }
   // WebKit can pan the app's client rectangle independently of its scrollTop.
   await page.locator(".app").evaluate((app) => { (app as HTMLElement).style.transform = "translateY(-84px)"; window.dispatchEvent(new Event("scroll")); });
-  await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(502, 0);
+  await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeLessThanOrEqual(503);
   await page.getByRole("button", { name: /^Commands:/ }).click();
   const menu = page.locator(".writing-slash-menu");
   await expect(menu).toBeVisible();
   const popup = (await menu.boundingBox())!, controls = (await dock.boundingBox())!;
-  expect(popup.y + popup.height).toBeLessThanOrEqual(controls.y - 7);
+  expect(popup.y + popup.height <= controls.y - 7 || popup.y >= controls.y + controls.height + 7).toBe(true);
   await page.keyboard.press("Escape");
+  await page.locator("#editor-title").click();
   await page.locator(".app").evaluate((app) => { (app as HTMLElement).style.removeProperty("transform"); });
   await page.evaluate(() => {
     Object.assign((window as unknown as { dockViewport: { height: number; offsetTop: number; innerHeight: number } }).dockViewport, { height: 812, offsetTop: 90, innerHeight: 490 });
@@ -2345,7 +2348,7 @@ for (const device of ["iPhone", "iPad", "Android"] as const) {
         window.visualViewport!.dispatchEvent(new Event("scroll"));
       }, state);
       const visibleBottom = state.height + state.offsetTop;
-      await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(visibleBottom - (device === "Android" ? 48 : 128), 0);
+      await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeLessThanOrEqual(visibleBottom - (device === "Android" ? 48 : 128) + 1);
       if (device !== "Android") {
         const box = (await dock.boundingBox())!;
         // Model the two native rows seen in Safari, which may remain inside
@@ -2367,11 +2370,147 @@ for (const device of ["iPhone", "iPad", "Android"] as const) {
       expect(box.y + box.height).toBeLessThanOrEqual((await dock.boundingBox())!.y - 7);
       await dock.getByRole("button", { name, exact: true }).click();
     }
+    await page.locator("#editor-title").click();
     await page.evaluate(() => {
       Object.assign((window as unknown as { dockViewport: { height: number; offsetTop: number } }).dockViewport, { height: 812, offsetTop: 0 });
       window.visualViewport!.dispatchEvent(new Event("resize"));
     });
     await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(800, 0);
     await page.screenshot({ path: info.outputPath(`${device}-centered-card-keyboard-clearance.png`) });
+  });
+}
+
+test("thin compact toolbar follows the actual wrapped line without moving the canvas", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writing = page.getByRole("textbox", { name: "Doc content", exact: true });
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  await writing.fill("A long paragraph that wraps across several lines so the controls follow the cursor rather than the bottom of this whole paragraph.");
+  const canvasLeft = (await writing.boundingBox())!.x;
+  const position = async (offset: number) => {
+    await writing.evaluate((element, offset) => {
+      element.focus();
+      const text = document.createTreeWalker(element.querySelector("p")!, NodeFilter.SHOW_TEXT).nextNode()!;
+      const range = document.createRange(); range.setStart(text, offset); range.collapse(true);
+      const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    }, offset);
+    await expect(dock).toHaveAttribute("data-follows-line", "true");
+    await expect.poll(async () => {
+      const line = await writing.evaluate(() => window.getSelection()!.getRangeAt(0).getClientRects()[0].bottom);
+      return (await dock.boundingBox())!.y - line;
+    }).toBeCloseTo(8, 0);
+  };
+  await position(5);
+  const first = (await dock.boundingBox())!;
+  expect(first.height).toBe(46);
+  expect(first.width).toBeLessThan(260);
+  await position(55);
+  expect((await dock.boundingBox())!.y).toBeGreaterThan(first.y);
+  await position((await writing.locator("p").first().textContent())!.length);
+  await page.keyboard.press("Enter");
+  await expect(writing.locator("p").last()).toHaveText("");
+  await expect(dock).toHaveAttribute("data-follows-line", "true");
+  await expect.poll(async () => (await dock.boundingBox())!.y - (await writing.locator("p").last().boundingBox())!.y - (await writing.locator("p").last().boundingBox())!.height).toBeCloseTo(8, 0);
+  await position(55);
+  expect((await writing.boundingBox())!.x).toBe(canvasLeft);
+  await page.screenshot({ path: info.outputPath("thin-line-toolbar-active.png") });
+  await dock.getByRole("button", { name: /^Commands:/ }).click();
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu).toBeVisible();
+  const box = (await menu.boundingBox())!, controls = (await dock.boundingBox())!;
+  expect(box.y + box.height <= controls.y - 7 || box.y >= controls.y + controls.height + 7).toBe(true);
+  expect(box.y).toBeGreaterThanOrEqual((await page.locator(".topbar").boundingBox())!.height);
+  await page.keyboard.press("Escape");
+  await expect(writing).toBeFocused();
+  await page.locator("#editor-title").click();
+  await expect(dock).not.toHaveAttribute("data-follows-line", "true");
+  await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(800, 0);
+  await page.screenshot({ path: info.outputPath("thin-line-toolbar.png") });
+});
+
+test("compact insertion palette exposes commands in a short keyboard viewport", async ({ page }, info) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" });
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "course");
+  const writing = page.getByRole("textbox", { name: "Lesson content", exact: true });
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  await writing.locator("p").first().click();
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport, "height", { configurable: true, get: () => 390 });
+    Object.defineProperty(window.visualViewport, "offsetTop", { configurable: true, get: () => 0 });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeLessThanOrEqual(263);
+  if (info.project.use.hasTouch) await dock.getByRole("button", { name: /^Commands:/ }).tap();
+  else await dock.getByRole("button", { name: /^Commands:/ }).click();
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu).toBeVisible();
+  await expect(dock).toBeHidden();
+  await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeInViewport();
+  const options = menu.locator(".writing-slash-options");
+  expect(await options.evaluate((element) => element.clientHeight)).toBeGreaterThanOrEqual(72);
+  const box = (await menu.boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(262);
+  await menu.getByRole("menuitem", { name: "Embed video link", exact: true }).scrollIntoViewIfNeeded();
+  await expect(menu.getByRole("menuitem", { name: "Embed video link", exact: true })).toBeInViewport();
+  await menu.getByRole("menuitem", { name: "Close menu esc", exact: true }).click();
+  await expect(menu).toHaveCount(0);
+  await expect(dock).toBeVisible();
+  await expect(writing).toBeFocused();
+  if (info.project.use.hasTouch) await dock.getByRole("button", { name: /^Commands:/ }).tap();
+  else await dock.getByRole("button", { name: /^Commands:/ }).click();
+  await menu.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
+  await expect(writing.locator("h2").first()).toContainText("Paragraph 1");
+  await expect(dock).toBeVisible();
+});
+
+for (const kind of ["doc", "course"] as const) {
+  test(`${kind}: compact menu gestures blur input and restore the saved cursor`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await open(page, info.project.name.startsWith("production"), kind);
+    const writer = page.getByRole("textbox", { name: kind === "doc" ? "Doc content" : "Lesson content", exact: true });
+    await writer.fill("Keep this cursor");
+    await writer.evaluate((element) => {
+      element.focus();
+      const text = document.createTreeWalker(element.querySelector("p")!, NodeFilter.SHOW_TEXT).nextNode()!;
+      const range = document.createRange(); range.setStart(text, 5); range.collapse(true);
+      const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+      document.dispatchEvent(new Event("selectionchange"));
+    });
+    const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+    const details = dock.getByRole("button", { name: "Details", exact: true });
+    const activate = (button: typeof details) => info.project.use.hasTouch ? button.tap() : button.click();
+    if (kind === "course") {
+      await activate(dock.getByRole("button", { name: "Outline", exact: true }));
+      await expect(writer).not.toBeFocused();
+    }
+    await activate(details);
+    await expect(writer).not.toBeFocused();
+    await page.locator("#editor-summary").fill("Metadata does not alter the saved canvas cursor.");
+    await activate(details);
+    await expect(writer).toBeFocused();
+    expect(await writer.evaluate(() => window.getSelection()!.focusOffset)).toBe(5);
+    await page.keyboard.type("returned ");
+    await expect(writer).toHaveText("Keep returned this cursor");
+    await dock.getByRole("button", { name: /^Commands:/ }).click();
+    await expect(writer).not.toBeFocused();
+    await page.getByRole("menuitem", { name: "Image", exact: true }).click();
+    const image = page.getByRole("dialog", { name: "Insert image", exact: true });
+    await expect(image).toBeVisible();
+    await expect(image.getByRole("textbox", { name: "Alt text (optional)", exact: true })).not.toBeFocused();
+    await activate(image.getByRole("button", { name: "Cancel", exact: true }));
+    await expect(writer).toBeFocused();
+    await page.keyboard.type("again ");
+    await expect(writer).toHaveText("Keep returned again this cursor");
+    await page.locator("#editor-title").click();
+    const title = page.locator("#editor-title");
+    await title.evaluate((input) => { (input as HTMLInputElement).setSelectionRange(2, 2); });
+    await activate(details);
+    await activate(details);
+    await expect(title).toBeFocused();
+    expect(await title.evaluate((input) => (input as HTMLInputElement).selectionStart)).toBe(2);
   });
 }
