@@ -4,6 +4,7 @@ import { WritingImageDialog, WritingImageToolbar } from "./writing-image";
 import { WritingBlockActions, blockActions } from "./writing-block-actions";
 import { writingTableControlsPlugin } from "./writing-table-controls";
 import { writingVideoPlugin } from "./writing-video";
+import { WritingImageLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
 import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
@@ -38,6 +39,7 @@ import {
   rootEditor$,
   readOnly$,
   $createTableNode,
+  $createImageNode,
   $isTableNode,
   insertCodeBlock$,
   insertThematicBreak$,
@@ -66,6 +68,7 @@ import {
   CAN_REDO_COMMAND,
   COMMAND_PRIORITY_EDITOR,
   HISTORY_MERGE_TAG,
+  HISTORY_PUSH_TAG,
   SKIP_DOM_SELECTION_TAG,
   SKIP_SCROLL_INTO_VIEW_TAG,
 } from "lexical";
@@ -297,6 +300,7 @@ export default function WritingEditorEngine({
   const writingActions = useRef<WritingActions | null>(null);
   const selectionTools = useRef<((keyboard: boolean) => boolean) | null>(null);
   const mediaSelection = useRef<BaseSelection | null>(null);
+  const pendingImage = useRef(false);
   const slashSelection = useRef<BaseSelection | null>(null);
   const toolbarSelection = useRef<BaseSelection | null>(null);
   const activeLine = useRef<HTMLElement | null>(null);
@@ -397,13 +401,44 @@ export default function WritingEditorEngine({
     setBusy(true);
     setError("");
     try {
-      return await onUpload(file, setUploadProgress);
+      return await onUpload(file, file.type.startsWith("image/") ? undefined : setUploadProgress);
     } catch (error) {
       setError((error as Error).message);
       throw error;
     } finally {
       setBusy(false);
       setUploadProgress(null);
+    }
+  }
+  async function insertUploadedImage(file: File, alt: string) {
+    const lexical = lexicalEditor.current;
+    if (!lexical || pendingImage.current) return;
+    const beforeUpload = lexical.getEditorState();
+    let key = "";
+    const selection = mediaSelection.current;
+    pendingImage.current = true;
+    lexical.update(() => {
+      if (selection) $setSelection(selection.clone());
+      const loading = new WritingUploadNode();
+      $insertNodes([loading]);
+      key = loading.getKey();
+    }, { discrete: true, tag: HISTORY_PUSH_TAG });
+    closeMedia();
+    try {
+      const url = await upload(file);
+      pendingImage.current = false;
+      lexical.update(() => {
+        const loading = $getNodeByKey(key);
+        if (!loading?.isAttached()) return;
+        const paragraph = $createParagraphNode().append($createImageNode({ src: url, altText: alt }));
+        loading.replace(paragraph);
+        if (!paragraph.getNextSibling()) paragraph.insertAfter($createParagraphNode());
+        paragraph.selectNext();
+      }, { discrete: true, tag: HISTORY_MERGE_TAG });
+    } catch {
+      pendingImage.current = false;
+      // A rejected upload must also restore any text selected before pasting.
+      lexical.setEditorState(beforeUpload, { tag: HISTORY_MERGE_TAG });
     }
   }
   function chooseBlock(kind: WritingBlockStyle) {
@@ -658,6 +693,7 @@ export default function WritingEditorEngine({
   const plugins = useMemo(() => [
     writingViewPanelPlugin(),
     writingVideoPlugin(),
+    writingUploadPlugin(),
     headingsPlugin(),
     listsPlugin(),
     quotePlugin(),
@@ -668,6 +704,7 @@ export default function WritingEditorEngine({
       disableImageResize: true,
       ImageDialog: WritingImageDialog,
       EditImageToolbar: WritingImageToolbar,
+      imagePlaceholder: WritingImageLoading,
       imageUploadHandler: onUpload ? upload : undefined,
     }),
     tablePlugin(),
@@ -737,13 +774,8 @@ export default function WritingEditorEngine({
       event.stopPropagation();
       if (!onUpload) { setError("Uploads are unavailable in this view."); return; }
       rememberSelection();
-      void (async () => {
-        try {
-          const url = await upload(image);
-          const alt = image.name.replace(/\.[^.]+$/, "").replace(/[\[\]\\\n]/g, " ") || "Image";
-          insertAtMediaSelection(`\n\n![${alt}](${url})\n\n`);
-        } catch { /* upload() keeps the document and shows the error. */ }
-      })();
+      const alt = image.name.replace(/\.[^.]+$/, "").replace(/[\[\]\\\n]/g, " ") || "Image";
+      void insertUploadedImage(image, alt);
     }} onKeyDownCapture={(event) => {
       if (slashOpen && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
         // Lexical's Enter/arrow handlers still run on a default-prevented event.
@@ -837,6 +869,12 @@ export default function WritingEditorEngine({
           const selected = event.target.files?.[0];
           if (!selected) return;
           try {
+            if (selected.type.startsWith("image/")) {
+              const alt = (imageAlt.trim() || selected.name).replace(/[\[\]\\\n]/g, " ");
+              await insertUploadedImage(selected, alt);
+              setImageAlt("");
+              return;
+            }
             const url = await upload(selected);
             const alt = (imageAlt.trim() || selected.name).replace(/[\[\]\\\n]/g, " ");
             const markdown = selected.type.startsWith("video/") ? `\n\n[Video](${url})\n\n` : `\n\n![${alt}](${url})\n\n`;
@@ -872,7 +910,7 @@ export default function WritingEditorEngine({
           onUnsupported();
         }}
         onChange={(markdown, normalized) => {
-          if (failed.current) return;
+          if (failed.current || pendingImage.current) return;
           if (normalized) {
             if (!equivalentMarkdown(readTableWidths(current.current).markdown, markdown)) {
               failed.current = true;

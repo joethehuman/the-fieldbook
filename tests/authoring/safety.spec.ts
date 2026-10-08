@@ -475,7 +475,8 @@ for (const failure of [false, true])
     if (await closeNav.isVisible()) await closeNav.click();
     await expect(
       page.getByRole("textbox", { name: "Doc content", exact: true }),
-    ).toHaveText("Keep the original body");
+    ).toHaveText("Keep the original bodyLoading…");
+    expect(state.content[0].body).toBe("Keep the original body");
     control.releaseUpload();
     await expect(
       page.locator(".topbar").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
@@ -1066,6 +1067,17 @@ test("pasted image uploads at the editor caret", async ({ page }, info) => {
   await page.keyboard.press("Enter");
   await page.keyboard.type("After the image");
   await writing.locator("p").nth(1).click();
+  await waitForDraftSaved(page);
+  const beforeTitle = await page.getByRole("textbox", { name: "Lesson title", exact: true }).boundingBox();
+  let releaseImage!: () => void;
+  let imageRequested = false;
+  await page.route("**/api/media/**", async (route) => {
+    imageRequested = true;
+    await new Promise<void>((resolve) => { releaseImage = resolve; });
+    await route.fulfill({ contentType: "image/png", body: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=", "base64",
+    ) });
+  });
   await writing.evaluate((node) => {
     const data = new DataTransfer();
     data.items.add(
@@ -1080,11 +1092,77 @@ test("pasted image uploads at the editor caret", async ({ page }, info) => {
     );
   });
   await expect.poll(() => control.uploaded).toBe(true);
+  await expect(writing.getByRole("status")).toHaveText("Loading…");
+  await expect(page.getByText("Uploading media. Keep this page open until the draft is saved.", { exact: true })).toHaveCount(0);
+  const uploadingTitle = await page.getByRole("textbox", { name: "Lesson title", exact: true }).boundingBox();
+  expect(uploadingTitle?.y).toBe(beforeTitle?.y);
+  await expect(writing.locator("p").first()).toHaveText("Before the image");
+  await expect(writing.locator("p").last()).toHaveText("After the image");
+  await page.screenshot({ path: info.outputPath("quiet-image-upload.png") });
   control.releaseUpload();
+  await expect.poll(() => imageRequested).toBe(true);
+  await expect(writing.getByRole("status")).toHaveText("Loading…");
+  await expect(writing.locator("img")).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath("quiet-image-fetch.png") });
+  releaseImage();
   await expect(writing.locator("img")).toHaveAttribute("src", /\/api\/media\//);
+  await expect(writing.getByRole("status")).toHaveCount(0);
   await expectMarkdown(page,
     /Before the image[\s\S]*!\[pasted\]\(\/api\/media\/[\s\S]*After the image/,
   );
+  await writing.click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(writing.locator("img")).toHaveCount(0);
+  await expect(writing).toHaveText(/Before the image[\s\S]*After the image/);
+  await expect(writing.getByRole("status")).toHaveCount(0);
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(writing.locator("img")).toHaveCount(1);
+  await expect(writing.getByRole("status")).toHaveCount(0);
+});
+
+test("image paste splits a paragraph at the caret without dropping text", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+  const { control } = await setup(page, true, "course", true);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.fill("BeforeAfter");
+  await waitForDraftSaved(page);
+  for (let index = 0; index < 5; index++) await writing.press("ArrowLeft");
+  expect(await writing.evaluate(() => window.getSelection()?.anchorOffset)).toBe(6);
+  await writing.evaluate((node) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["synthetic"], "middle.png", { type: "image/png" }));
+    node.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect.poll(() => control.uploaded).toBe(true);
+  await expect(writing).toHaveText("BeforeLoading…After");
+  control.releaseUpload();
+  await expect(writing.locator("img")).toHaveAttribute("src", /\/api\/media\//);
+  await expectMarkdown(page, /Before[\s\S]*!\[middle\]\(\/api\/media\/[\s\S]*After/);
+});
+
+test("failed image paste restores selected text without saving a loading block", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+  const { state, control } = await setup(page, true, "course", true);
+  control.uploadFailure = true;
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.fill("Keep the selected text");
+  await waitForDraftSaved(page);
+  const before = state.content[0].lessons[0].body;
+  await writing.press("ControlOrMeta+a");
+  await writing.evaluate((node) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["synthetic"], "failed.png", { type: "image/png" }));
+    node.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect.poll(() => control.uploaded).toBe(true);
+  await expect(writing.getByRole("status")).toHaveText("Loading…");
+  expect(state.content[0].lessons[0].body).toBe(before);
+  control.releaseUpload();
+  await expect(page.locator(".writing-editor").getByRole("alert")).toBeVisible();
+  await expect(writing).toHaveText("Keep the selected text");
+  await expect(writing.getByRole("status")).toHaveCount(0);
+  await expectMarkdown(page, before);
+  expect(state.content[0].lessons[0].body).toBe(before);
 });
 
 test("image chooser uploads into the selected lesson line", async ({
@@ -1345,7 +1423,7 @@ test("large media resumes a lost chunk acknowledgement and inserts only verified
   await writeFile(filePath, file);
   await page.locator('.writing-editor input[type="file"]').setInputFiles(filePath);
   await expect.poll(() => !!release).toBe(true);
-  await expect(page.getByRole("progressbar", { name: "File upload progress" })).toBeVisible();
+  await expect(editor.getByRole("status")).toHaveText("Loading…");
   await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
   expect(completes).toBe(0);
   expect(state.content[0].body).toBe("Keep my original draft");

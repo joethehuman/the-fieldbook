@@ -3017,11 +3017,9 @@ export function Editor({
           )}
         </ActionGroup>
       )}
-      {busy && (
+      {recovering && (
         <p role="status">
-          {uploadCount
-            ? "Uploading media. Keep this page open until the draft is saved."
-            : "Saving or refreshing. Keep this page open."}
+          Saving or refreshing. Keep this page open.
         </p>
       )}
       <FieldGroup disabled={busy} className="editor-content flex min-h-0 flex-col">
