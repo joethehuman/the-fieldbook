@@ -8,6 +8,7 @@ import { isInlineVideo } from "@/lib/inline-video";
 import { CourseVideo } from "./patterns/course-video";
 import { Button } from "./ui/button";
 import { readTableWidths, remarkTopLevelTableIndices } from "@/lib/writing-table";
+import { CodeBlock } from "./patterns/code-block";
 
 export default function Markdown({
   children,
@@ -31,6 +32,15 @@ export default function Markdown({
           : [remarkGfm, remarkTopLevelTableIndices, remarkHeadingAnchors]
       }
       components={{
+        pre: ({ node, children }) => {
+          const code = node?.children[0];
+          if (code?.type !== "element" || code.tagName !== "code") return <pre>{children}</pre>;
+          const classes = code.properties.className;
+          const languageClass = Array.isArray(classes) ? classes.find(value => String(value).startsWith("language-")) : undefined;
+          const value = code.children.map(child => child.type === "text" ? child.value : "").join("");
+          // Markdown adds one final line ending to <code>; the fence content excludes it.
+          return <CodeBlock code={value.replace(/\n$/, "")} language={languageClass ? String(languageClass).slice(9) : ""} />;
+        },
         ...(headingPrefix !== undefined
           ? Object.fromEntries(
               (["h1", "h2", "h3", "h4", "h5", "h6"] as const).map((tag) => [

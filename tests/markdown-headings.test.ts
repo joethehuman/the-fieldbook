@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import Markdown from "../components/Markdown";
+import { TooltipProvider } from "../components/ui/tooltip";
 import { markdownHeadings } from "../lib/markdown-headings";
 import { orderedDocs, type DocLink } from "../lib/docs-navigation";
 
@@ -21,7 +22,7 @@ test("outline and renderer agree for rich, repeated, Unicode and setext headings
     ],
   );
   const html = renderToStaticMarkup(
-    createElement(Markdown, { children: body, headingPrefix: "#" }),
+    createElement(TooltipProvider, null, createElement(Markdown, { children: body, headingPrefix: "#" })),
   );
   for (const h of headings) {
     assert.ok(html.includes(`id="${h.id}"`));

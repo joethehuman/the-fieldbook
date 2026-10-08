@@ -64,7 +64,7 @@ test("retrieval checks access before querying and exposes only published source 
         ...user,
         role,
       });
-      assert.equal(result.results[0].href, "/courses/one?lesson=a");
+      assert.equal(result.results[0].href, "/courses/systems--one?lesson=a");
       assert.equal(result.results[0].contentDate, null);
       assert.equal(result.results[0].publishedRevision, 4);
       assert.ok(!("text" in result.results[0]));

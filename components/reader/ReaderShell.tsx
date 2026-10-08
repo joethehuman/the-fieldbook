@@ -1,4 +1,6 @@
 "use client";
+import { decodedRecordId } from "@/lib/record-url";
+import { contentPath } from "@/lib/navigation";
 import { compactLayoutQuery } from "@/components/patterns/use-compact-layout";
 import {
   useEffect,
@@ -129,7 +131,7 @@ export function ReaderShell({
   const selected = section === "admin" || section === "team" || courseLibraryView(pathname) ? null :
     pathname === "/docs"
       ? orderedDocList[0]?.id || null
-      : pathname.split("/")[2] || null;
+      : decodedRecordId(pathname.split("/")[2] || "") || null;
   const { collapsed, setCollapsed } = useDesktopSidebar(
     section === "courses" && selected ? selected : undefined,
   );
@@ -141,7 +143,7 @@ export function ReaderShell({
       orderedDocList[index - 1],
       orderedDocList[index + 1],
     ])
-      if (neighbor) router.prefetch(`/docs/${encodeURIComponent(neighbor.id)}`);
+      if (neighbor) router.prefetch(contentPath("doc", neighbor.id, neighbor.title));
   }, [section, selected, orderedDocList, router]);
   useEffect(() => {
     if (!menu) return;
@@ -242,6 +244,7 @@ export function ReaderShell({
           );
           if (
             !anchor ||
+            anchor.dataset.fieldbookLocalNavigation === "true" ||
             event.defaultPrevented ||
             event.button ||
             event.metaKey ||
@@ -311,9 +314,9 @@ export function ReaderShell({
                 order={context.docCategoryOrder}
                 sections={context.docSections}
                 selected={selected}
-                href={(id) => `/docs/${encodeURIComponent(id)}`}
+                href={(id) => contentPath("doc", id, context.docs.find((doc) => doc.id === id)?.title)}
                 onNavigate={(id) => {
-                  void navigate(`/docs/${encodeURIComponent(id)}`);
+                  void navigate(contentPath("doc", id, context.docs.find((doc) => doc.id === id)?.title));
                 }}
                 storageKey="fieldbook.documents.production"
               />

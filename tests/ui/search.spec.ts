@@ -61,17 +61,19 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
   await expect(result).toBeVisible();
   await input.fill("a");
   await expect(panel.getByRole("status")).not.toContainText("Searching");
-  expect(await panel.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
+  const scroll = panel.locator('[data-slot="search-results-scroll"]');
+  expect(await scroll.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
     true,
   );
-  await panel.evaluate((el) => {
+  await scroll.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
   const filters = await panel
     .getByRole("group", { name: "Content type" })
     .boundingBox();
-  expect(filters!.y).toBeGreaterThanOrEqual(bounds.y);
-  expect(filters!.y).toBeLessThan(bounds.y + 50);
+  const scrollBounds = (await scroll.boundingBox())!;
+  expect(filters!.y).toBeGreaterThanOrEqual(scrollBounds.y);
+  expect(filters!.y).toBeLessThan(scrollBounds.y + 50);
   await input.fill("quorum");
   await expect(result).toBeVisible();
   await expect(result.locator("mark")).toContainText(["quorum"]);
@@ -189,6 +191,14 @@ test("Search returns to the first results and chat uses an embedded multiline co
     if (request.url().includes("/api/ask-ai")) aiRequests.push(request.url());
   });
   await page.goto("/#courses");
+  await expect(
+    page.getByRole("heading", { name: "Courses", exact: true }),
+  ).toBeVisible();
+  const openSearch = page.getByRole("button", {
+    name: "Open search",
+    exact: true,
+  });
+  if (await openSearch.isVisible()) await openSearch.click();
   const input = page.getByRole("textbox", { name: "Search all content" });
   await input.fill("Customer reference");
   const panel = page.locator('[data-slot="search-panel"]');
@@ -197,8 +207,15 @@ test("Search returns to the first results and chat uses an embedded multiline co
   const initialHeight = (await panel.boundingBox())!.height;
   expect(initialHeight).toBeGreaterThan(page.viewportSize()!.height * 0.6);
   const firstY = (await first.boundingBox())!.y;
-  await panel.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await expect(
+    panel.getByRole("button", { name: "Ask AI", exact: true }),
+  ).toHaveCount(0);
+  await panel.getByRole("tab", { name: "Ask AI", exact: true }).click();
   const chat = page.getByRole("region", { name: "Ask AI conversation" });
+  const initialQuestion = chat.getByRole("textbox", { name: "Your question" });
+  await initialQuestion.fill("Customer reference");
+  await initialQuestion.press("Enter");
+  await expect(chat.getByRole("status")).toContainText("Answer ready");
   const follow = chat.getByRole("textbox", { name: "Ask a follow-up" });
   await expect(follow).toBeVisible();
   await follow.fill("More detail about this customer reference. ".repeat(45));
@@ -303,10 +320,12 @@ test("Search returns to the first results and chat uses an embedded multiline co
   });
   await action.click();
   await expect(chat.getByRole("log")).toContainText("With more detail");
+  await expect(chat.getByRole("status")).toContainText("Answer ready");
   for (const question of ["How does that help?", "What should I try next?"]) {
     await follow.fill(question);
     await follow.press("Enter");
     await expect(chat.getByRole("log")).toContainText(question);
+    await expect(chat.getByRole("status")).toContainText("Answer ready");
     expect((await panel.boundingBox())!.height).toBe(initialHeight);
     const fieldBox = (await field.boundingBox())!;
     expect(fieldBox.y + fieldBox.height).toBe(emptyComposerBottom);
@@ -353,9 +372,13 @@ test("Search returns to the first results and chat uses an embedded multiline co
   expect(aiRequests).toEqual([]);
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(input).toHaveValue("");
-  await expect(
-    panel.getByRole("tab", { name: "Search", exact: true }),
-  ).toHaveAttribute("aria-selected", "true");
+  if (await openSearch.isVisible()) {
+    await expect(
+      panel.getByRole("tab", { name: "Search", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
+  } else {
+    await expect(panel).toHaveCount(0);
+  }
   await expect(chat).toHaveCount(0);
   expect(
     await page.evaluate(

@@ -1,7 +1,7 @@
 "use client";
 
 import { WritingImageDialog, WritingImageToolbar } from "./writing-image";
-import { WritingBlockActions, blockActions } from "./writing-block-actions";
+import { WritingCodeEditor } from "./writing-code";
 import { writingTableControlsPlugin } from "./writing-table-controls";
 import { writingVideoPlugin } from "./writing-video";
 import { WritingImageLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
@@ -14,6 +14,7 @@ import { normalizeWritingSelection, writingSelectionBoundariesPlugin } from "./w
 import { EditorWritingActionsContext } from "./editor-frame";
 import { useWritingControlsLayout } from "./use-editor-cards-layout";
 import { WritingLinkDialog } from "./writing-link-dialog";
+import { writingLinkPastePlugin } from "./writing-link-paste";
 import { WritingTitleContext, WritingIntroductionContext, WritingTitleEnterContext } from "./writing-title";
 import { WritingInteractionContext } from "./writing-interaction";
 import { Fragment, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -38,14 +39,11 @@ import {
   addEditorWrapper$,
   activeEditor$,
   rootEditor$,
-  readOnly$,
   $createTableNode,
   $createImageNode,
   $isTableNode,
   insertCodeBlock$,
   insertThematicBreak$,
-  useCodeBlockEditorContext,
-  type CodeBlockEditorProps,
 } from "@mdxeditor/editor";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
 import { $setBlocksType } from "@lexical/selection";
@@ -88,7 +86,6 @@ import {
 import { Button } from "../ui/button";
 import { Tooltip } from "../ui/tooltip";
 import { Input } from "../ui/input";
-import { Textarea } from "../ui/textarea";
 import { Alert } from "../ui/alert";
 import type { WritingEditorProps } from "./writing-editor";
 import { videoSource } from "@/lib/video";
@@ -132,35 +129,6 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
 const writingViewPanelPlugin = realmPlugin({
   init(realm) { realm.pub(addEditorWrapper$, WritingViewPanel); },
 });
-
-function PlainCodeEditor({
-  code,
-  language,
-  focusEmitter,
-}: CodeBlockEditorProps) {
-  const { setCode, parentEditor, lexicalNode } = useCodeBlockEditorContext();
-  const readOnly = useCellValue(readOnly$);
-  const input = useRef<HTMLTextAreaElement>(null);
-  useEffect(
-    () => focusEmitter.subscribe(() => input.current?.focus()),
-    [focusEmitter],
-  );
-  return (
-    <div className="writing-code-block" contentEditable={false}>
-    <WritingBlockActions label="Code block" disabled={readOnly} {...blockActions(parentEditor, lexicalNode.getKey())} />
-    <Textarea
-      ref={input}
-      aria-label={`${language || "Plain text"} code block`}
-      value={code}
-      readOnly={readOnly}
-      onChange={(event) => setCode(event.target.value)}
-      variant="embedded"
-      className="writing-code font-mono"
-      rows={Math.max(2, code.split("\n").length)}
-    />
-    </div>
-  );
-}
 
 type WritingActions = {
   block: (kind: WritingBlock) => void;
@@ -748,6 +716,7 @@ export default function WritingEditorEngine({
     quotePlugin(),
     thematicBreakPlugin(),
     linkPlugin(),
+    writingLinkPastePlugin(),
     linkDialogPlugin({ LinkDialog: WritingLinkDialog }),
     imagePlugin({
       disableImageResize: true,
@@ -776,7 +745,7 @@ export default function WritingEditorEngine({
     )(),
     codeBlockPlugin({
       codeBlockEditorDescriptors: [
-        { priority: 0, match: () => true, Editor: PlainCodeEditor },
+        { priority: 0, match: () => true, Editor: WritingCodeEditor },
       ],
     }),
     markdownShortcutPlugin(),
@@ -816,6 +785,7 @@ export default function WritingEditorEngine({
       // Dismiss an open menu as its anchor moves, so it cannot drift across the page.
       scroller.querySelectorAll<HTMLButtonElement>('table button[data-state="open"]').forEach((trigger) => trigger.click());
     }} onPasteCapture={(event) => {
+      if (event.target instanceof Element && event.target.closest(".writing-code-block")) return;
       if (!(event.target instanceof HTMLElement) || !event.target.closest("[contenteditable=true]")) return;
       const image = Array.from(event.clipboardData.items).find((item) => item.type.startsWith("image/"))?.getAsFile();
       if (!image) return;
@@ -826,6 +796,7 @@ export default function WritingEditorEngine({
       const alt = image.name.replace(/\.[^.]+$/, "").replace(/[\[\]\\\n]/g, " ") || "Image";
       void insertUploadedImage(image, alt);
     }} onKeyDownCapture={(event) => {
+      if (event.target instanceof Element && event.target.closest(".writing-code-block")) return;
       if (slashOpen && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
         // Lexical's Enter/arrow handlers still run on a default-prevented event.
         // A command keystroke belongs to the menu, not the document underneath it.

@@ -509,14 +509,7 @@
 @media (max-width: 600px) {
   .writing-document-heading { padding-inline-end: var(--space-4); }
 }
-.writing-content .writing-code {
-  background: var(--muted);
-  font-size: 0.8125rem;
-  line-height: 1.75;
-  padding: var(--space-4);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-}
+
 .course-builder-panel .writing-content h1 { font-size: 1.75rem; line-height: 1.3; letter-spacing: -0.035em; }
 
 /* Block menus live in the writing gutter, outside media and table content. */

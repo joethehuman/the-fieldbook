@@ -6,6 +6,9 @@ import { refreshIdentitySession } from "./server/identity";
 export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-fieldbook-reader-path", request.nextUrl.pathname);
+  // Next normalizes away flight headers before proxy. Browser fetch metadata
+  // distinguishes client navigation from a full document load for URL styling.
+  requestHeaders.set("x-fieldbook-reader-navigation", request.headers.get("sec-fetch-dest") === "empty" ? "client" : "document");
   requestHeaders.set(
     "x-fieldbook-reader-return",
     request.nextUrl.pathname + request.nextUrl.search,

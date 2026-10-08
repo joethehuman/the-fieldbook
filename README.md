@@ -13,6 +13,8 @@ The documented installation uses **Vercel, hosted Supabase, and Google sign-in**
 
 The installation is a Next.js application backed by Supabase Database, Auth, and private Storage. Google accounts sign in through Supabase Auth. Administrators can create and publish content, manage people and assignments, and review feedback and progress. Published content is available to everyone admitted to an installation; learning groups guide relevance and assignments rather than content access. Teams separately scope manager reporting. Fieldbook is developed with AI-assisted coding.
 
+Reader and named Admin record links include a readable title followed by the complete record ID. IDs remain stable, so existing links and links with older titles still work after a rename. Admin content types and page tabs have bookmarkable destinations that survive refresh and browser Back/Forward.
+
 Search is built in. Ask AI and the authenticated MCP endpoint are optional. MCP access follows the account's publishing or reporting permissions and the connection's approved capabilities. The demo can illustrate the interface, but its simulated identities and data do not establish installed permissions or persistence.
 
 On public installations, guest course progress stays in that browser. After sign-in, Fieldbook quietly saves compatible progress to the account and disregards invalid records, unavailable courses and older course versions. Temporary connection or service failures leave browser records available for a later attempt. This does not interrupt sign-in or show an import prompt.
@@ -29,6 +31,8 @@ pnpm dev
 Run the browser-local demo with pnpm dev:demo. The shared interface catalog is at /ui in the demo. The installed app lives at the repository root; demo/ is a separate optional app. Shared components and models live in components/ and lib/, server behavior in app/ and server/, and database migrations in supabase/migrations/.
 
 Each visit refreshes original sample learning dates relative to today, keeping upcoming and overdue examples available. Edited schedules and visitor progress stay saved in the browser. Course cards and deadline rules use the same shared code as the installed app.
+
+The demo searches published sample content and lesson text locally. Title and lesson-title matches take priority while typing, and search accepts basic typos.
 
 ## License
 

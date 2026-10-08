@@ -103,6 +103,8 @@ import { ScrollRegion } from "./patterns/scroll-region";
 import { RosterImport } from "./RosterImport";
 import {
   adminHref,
+  adminRecordName,
+  resolveAdminDestination,
   parseAdminDestination,
   type AdminDestination,
   type AdminTab,
@@ -275,6 +277,7 @@ type Props = {
   onWriteDestination?: (
     destination: AdminDestination,
     replace?: boolean,
+    name?: string,
   ) => Promise<boolean>;
   onLoadDestination?: (destination: AdminDestination) => Promise<Workspace>;
   onBulk: BulkHandler;
@@ -463,7 +466,7 @@ export default function Admin({
       initialPerson(initialDestination, data),
     ),
     [notice, setNotice] = useState(""),
-    [filter, setFilter] = useState("all"),
+    [filter, setFilter] = useState(initialDestination.contentKind || "all"),
     [query, setQuery] = useState(""),
     [category, setCategory] = useState("all"),
     [contentSort, setContentSort] = useState("created"),
@@ -534,6 +537,9 @@ export default function Admin({
     next: AdminDestination,
     options: { approved?: boolean; history?: boolean; replace?: boolean } = {},
   ) {
+    if (!options.history && next.tab === "content" && (next.id || next.create) && next.contentKind === undefined && filter !== "all")
+      next = { ...next, contentKind: filter as Content["kind"] };
+    next = resolveAdminDestination(next, data);
     if (!canOpenAdminTab(user, next.tab) || navigationBusy.current)
       return false;
     if (!options.approved && !options.history) {
@@ -550,6 +556,7 @@ export default function Admin({
     setOpeningItem(next.id || null);
     try {
       const loaded = onLoadDestination ? await onLoadDestination(next) : data;
+      next = resolveAdminDestination(next, loaded);
       if (next.id) {
         const collection =
           next.tab === "content"
@@ -570,7 +577,7 @@ export default function Admin({
       if (
         !options.history &&
         onWriteDestination &&
-        !(await onWriteDestination(next, options.replace))
+        !(await onWriteDestination(next, options.replace, adminRecordName(next, loaded)))
       ) {
         destinationRef.current = previous;
         return false;
@@ -578,6 +585,12 @@ export default function Admin({
       if (next.tab !== tab) { setQuery(""); setPage(1); }
       setDestination(next);
       setTab(next.tab);
+      if (next.tab === "content") {
+        setFilter(next.contentKind || "all");
+        setContentSection("all");
+        setCategory("all");
+        setPage(1);
+      }
       setEditing(initialContent(next, loaded));
       const profile = initialPerson(next, loaded);
       personBaseline.current = profile ? structuredClone(profile) : null;
@@ -611,9 +624,9 @@ export default function Admin({
   restoreDestination.current = () => {
     if (writingHistory.current) return;
     const path = production
-      ? window.location.pathname
-      : "/" + window.location.hash.slice(1).split("?")[0];
-    const next = parseAdminDestination(path);
+      ? window.location.pathname + window.location.search
+      : "/" + window.location.hash.slice(1);
+    const next = parseAdminDestination(path, data);
     if (next && adminHref(next) !== adminHref(destinationRef.current))
       void navigateDestination(next, { history: true });
   };
@@ -632,6 +645,19 @@ export default function Admin({
       );
     };
   }, [production]);
+  const canonicalDestination = adminHref(destination, adminRecordName(destination, data));
+  useEffect(() => {
+    if (!destination.id || !onWriteDestination || writingHistory.current) return;
+    const current = production ? window.location.pathname + window.location.search : "/" + window.location.hash.slice(1);
+    const currentDestination = parseAdminDestination(current, data);
+    if (!currentDestination || adminHref(currentDestination) !== adminHref(destination)) return;
+    if (current !== canonicalDestination) {
+      writingHistory.current = true;
+      void onWriteDestination(destination, true, adminRecordName(destination, data))
+        .catch(() => setNotice("Could not update this link. Refresh to try again."))
+        .finally(() => { writingHistory.current = false; });
+    }
+  }, [canonicalDestination, data, destination, onWriteDestination, production]);
   const contentRows = data.content
     .filter(
       (c) =>
@@ -733,7 +759,7 @@ export default function Admin({
     setCategory("all");
     setContentStatus("all");
     setContentSection("all");
-    setFilter("all");
+    void navigateDestination({ tab: "content" });
   };
   const clearPeopleFilters = () => {
     setQuery("");
@@ -917,18 +943,21 @@ export default function Admin({
   }
 
   function create(kind: Content["kind"]) {
-    void navigateDestination({ tab: "content", create: kind });
+    void navigateDestination({ tab: "content", create: kind, contentKind: filter === "all" ? undefined : filter as Content["kind"] });
   }
   async function savedDestination(content: Content) {
-    if (!destinationRef.current.create) return;
+    if (destinationRef.current.tab !== "content") return;
     const next: AdminDestination = {
       tab: "content",
+      contentKind: destinationRef.current.contentKind,
       id: content.id,
       view: "edit",
     };
+    const current = production ? window.location.pathname + window.location.search : "/" + window.location.hash.slice(1);
+    if (!destinationRef.current.create && current === adminHref(next, content.title)) return;
     writingHistory.current = true;
     try {
-      await onWriteDestination?.(next, true);
+      await onWriteDestination?.(next, true, content.title);
       destinationRef.current = next;
       setDestination(next);
     } finally {
@@ -1038,7 +1067,7 @@ export default function Admin({
           data={data}
           onSave={save}
           onCancel={() => {
-            void navigateDestination({ tab: "content" }, { approved: true });
+            void navigateDestination({ tab: "content", contentKind: destination.contentKind }, { approved: true });
           }}
           onUpload={onUpload}
           production={production}
@@ -1114,7 +1143,11 @@ export default function Admin({
     </div>
   );
 
-  const recordHref = (destination: AdminDestination) => production ? adminHref(destination) : `#${adminHref(destination).slice(1)}`;
+  const recordHref = (next: AdminDestination) => {
+    if (next.tab === "content" && next.id) next = { ...next, contentKind: filter === "all" ? undefined : filter as Content["kind"] };
+    const path = adminHref(next, adminRecordName(next, data));
+    return production ? path : `#${path.slice(1)}`;
+  };
   const contentEditHref = (id: string) => recordHref({ tab: "content", id, view: "edit" });
 
   function contentActions(
@@ -1312,6 +1345,8 @@ export default function Admin({
                 data={data}
                 onBulk={onBulk}
                 contentOnly={!admin}
+                filter={destination.deletedKind || "all"}
+                onFilterChange={(kind) => void navigateDestination({ tab: "deleted", ...(kind === "all" ? {} : { deletedKind: kind as "content" | "user" }) })}
               />
             ) : tab.startsWith("settings-") ? (
               <SiteSettingsPanel
@@ -1354,9 +1389,7 @@ export default function Admin({
                       variant="underline"
                       value={filter}
                       onValueChange={(value) => {
-                        setFilter(value);
-                        setContentSection("all");
-                        setCategory("all");
+                        void navigateDestination({ tab: "content", ...(value === "all" ? {} : { contentKind: value as Content["kind"] }) });
                       }}
                       options={[
                         { value: "all", label: "All content" },

@@ -26,6 +26,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+## Code highlighting
+
+Fieldbook uses [Highlight.js](https://github.com/highlightjs/highlight.js) for automatic language detection and reader syntax highlighting. It retains its BSD 3-Clause license; the complete [copyright notice and license](../public/licenses/highlightjs-bsd-3-clause.txt) ship with both apps at `/licenses/highlightjs-bsd-3-clause.txt`. CodeMirror and Lezer provide code editing and retain their MIT licenses and packaged notices. Preserve these dependency licenses when redistributing bundled software.
+
 ## Vercel AI SDK dependencies
 
 The `ai` package and its `@ai-sdk/gateway`, `@ai-sdk/provider` and `@ai-sdk/provider-utils` dependencies retain their Apache-2.0 licenses and packaged notices. Fieldbook imports these packages; it does not relicense them under ELv2. Preserve the dependencies' license files when distributing bundled software. See the [AI SDK source](https://github.com/vercel/ai) and its [license](https://github.com/vercel/ai/blob/main/LICENSE).

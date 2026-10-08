@@ -16,6 +16,24 @@ importers:
       '@ai-sdk/react':
         specifier: 4.0.129
         version: 4.0.129(react@19.3.0)(zod@4.6.5)
+      '@codemirror/commands':
+        specifier: 6.11.1
+        version: 6.11.1
+      '@codemirror/language':
+        specifier: 6.12.4
+        version: 6.12.4
+      '@codemirror/language-data':
+        specifier: 6.5.2
+        version: 6.5.2
+      '@codemirror/state':
+        specifier: 6.7.6
+        version: 6.7.6
+      '@codemirror/view':
+        specifier: 6.43.13
+        version: 6.43.13
+      '@lexical/link':
+        specifier: 0.48.0
+        version: 0.48.0(typescript@5.9.3)
       '@lexical/list':
         specifier: 0.48.0
         version: 0.48.0(typescript@5.9.3)
@@ -25,6 +43,9 @@ importers:
       '@lexical/selection':
         specifier: 0.48.0
         version: 0.48.0(typescript@5.9.3)
+      '@lezer/highlight':
+        specifier: 1.2.3
+        version: 1.2.3
       '@mdxeditor/editor':
         specifier: 4.2.5
         version: 4.2.5(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)
@@ -94,6 +115,9 @@ importers:
       geist:
         specifier: ^1.7.2
         version: 1.7.2(next@16.3.6(@playwright/test@1.63.0)(@types/node@22.20.3)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))
+      highlight.js:
+        specifier: 11.11.1
+        version: 11.11.1
       jose:
         specifier: ^6.2.12
         version: 6.2.12
@@ -182,6 +206,24 @@ importers:
       '@ai-sdk/react':
         specifier: 4.0.129
         version: 4.0.129(react@19.3.0)(zod@4.6.5)
+      '@codemirror/commands':
+        specifier: 6.11.1
+        version: 6.11.1
+      '@codemirror/language':
+        specifier: 6.12.4
+        version: 6.12.4
+      '@codemirror/language-data':
+        specifier: 6.5.2
+        version: 6.5.2
+      '@codemirror/state':
+        specifier: 6.7.6
+        version: 6.7.6
+      '@codemirror/view':
+        specifier: 6.43.13
+        version: 6.43.13
+      '@lezer/highlight':
+        specifier: 1.2.3
+        version: 1.2.3
       '@mdxeditor/editor':
         specifier: 4.2.5
         version: 4.2.5(@codemirror/language@6.12.4)(@lezer/highlight@1.2.3)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(typescript@5.9.3)(yjs@13.6.33)
@@ -251,6 +293,9 @@ importers:
       geist:
         specifier: ^1.7.2
         version: 1.7.2(next@16.3.6(@playwright/test@1.63.0)(@types/node@22.20.3)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))
+      highlight.js:
+        specifier: 11.11.1
+        version: 11.11.1
       jose:
         specifier: ^6.2.12
         version: 6.2.12
@@ -2334,6 +2379,10 @@ packages:
 
   hastscript@9.0.1:
     resolution: {integrity: sha512-g7df9rMFX/SPi34tyGCyUBREQoKkapwdY/T04Qn9TDWfHhAYt4/I0gMVirzK5wEzeUqIjEB+LXC/ypb7Aqno5w==}
+
+  highlight.js@11.11.1:
+    resolution: {integrity: sha512-Xwwo44whKBVCYoliBQwaPvtd/2tYFkRQtXDWj1nackaV2JPXx3L0+Jvd8/qCJ2p+ML0/XVkJ2q+Mr+UVdpJK5w==}
+    engines: {node: '>=12.0.0'}
 
   hono@4.13.13:
     resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
@@ -5601,6 +5650,8 @@ snapshots:
       hast-util-parse-selector: 4.0.0
       property-information: 7.2.0
       space-separated-tokens: 2.0.2
+
+  highlight.js@11.11.1: {}
 
   hono@4.13.13: {}
 

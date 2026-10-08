@@ -1699,7 +1699,7 @@ for (const block of ["code", "table", "divider", "image", "video"] as const) tes
   await expect(writing.locator("h2")).toHaveText("Heading below");
   await expectMarkdown(page, block === "table" ? /Keep this cell[\s\S]*## Heading below/ : `${content}\n\n## Heading below`);
   if (block === "table") await expect(writing.locator("table")).toHaveCount(1);
-  if (block === "code") await expect(page.getByRole("textbox", { name: "Plain text code block" })).toHaveValue("Keep this code");
+  if (block === "code") await expect(writing.locator(".writing-code-block .cm-content")).toHaveText("Keep this code");
   if (block === "divider") await expect(writing.locator("hr")).toHaveCount(1);
   if (block === "image") await expect(writing.locator("img")).toHaveAttribute("src", "https://example.com/diagram.png");
   if (block === "video") await expect(writing.locator("video")).toHaveAttribute("src", "https://example.com/clip.mp4");
@@ -1902,4 +1902,23 @@ for (const next of ["table", "image"] as const) test(`image paste leaves a writi
   await expect(writing.locator("p").first()).toHaveText("Before");
   if (next === "table") await expect(writing.locator("table")).toContainText("Keep this cell");
   else await expect(writing.locator('img[alt="Existing"]')).toHaveAttribute("src", "/api/media/existing.png");
+});
+
+for (const backward of [false, true]) test(`URL paste links only the selected paragraph across block boundaries; backward=${backward}`, async ({ page }, info) => {
+  await setup(page, info.project.name.startsWith("production"), "course", true, false,
+    "## Heading above\n\nParagraph one.\n\n## Heading below");
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.click();
+  await writing.evaluate((surface, backward) => {
+    const before = surface.querySelectorAll("h2 span")[0].firstChild!;
+    const after = surface.querySelectorAll("h2 span")[1].firstChild!;
+    window.getSelection()!.setBaseAndExtent(backward ? after : before, backward ? 0 : before.textContent!.length,
+      backward ? before : after, backward ? before.textContent!.length : 0);
+  }, backward);
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await pasteText(writing, "", { "text/plain": "https://example.com/guide" });
+  await expect(writing.locator("p").getByRole("link")).toHaveText("Paragraph one.");
+  await expect(writing.locator("p").getByRole("link")).toHaveAttribute("href", "https://example.com/guide");
+  await expect(writing.locator("h2")).toHaveText(["Heading above", "Heading below"]);
+  await expect(writing.locator("h2 a")).toHaveCount(0);
 });

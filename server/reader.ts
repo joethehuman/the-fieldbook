@@ -28,6 +28,7 @@ import { accountMenuLinks } from "@/lib/external-links";
 import type { Metadata } from "next";
 import { ogCardImages } from "@/lib/og-card";
 import { installation } from "./installation";
+import { recordId } from "@/lib/record-url";
 import { contentPath } from "@/lib/navigation";
 import { headers } from "next/headers";
 import { unstable_cache } from "next/cache";
@@ -358,6 +359,7 @@ export const readerCourses = cache(async () => {
 
 export const readerCurriculum = cache(async (id: string) => {
   const data = await readerCourses();
+  id = recordId(id, data.curricula) || "";
   const curriculum = data.curricula.find(
     (item: Curriculum) => item.id === id && item.status === "published",
   );
@@ -450,14 +452,14 @@ export function readerMetadata(
     metadataBase: new URL(installation().origin),
     title,
     description,
-    alternates: { canonical: contentPath(item.kind, item.id) },
+    alternates: { canonical: contentPath(item.kind, item.id, item.title) },
     openGraph: {
       ...card.openGraph,
       title,
       description,
       siteName: context.branding.name,
       type: item.kind === "course" ? "website" : "article",
-      url: contentPath(item.kind, item.id),
+      url: contentPath(item.kind, item.id, item.title),
     },
     twitter: {
       ...card.twitter,

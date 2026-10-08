@@ -1,3 +1,4 @@
+import { decodedRecordId, decodeRecordSegment } from "@/lib/record-url";
 import { courseLibraryView } from "@/lib/course-destination";
 import { teamPersonId } from "@/lib/team-destination";
 import { ReaderShell } from "@/components/reader/ReaderShell";
@@ -44,7 +45,7 @@ export default async function Layout({
     }
   }
   if (section !== "admin" && section !== "team" && !courseLibraryView(path) && parts[1] && requestHeaders.get("rsc") !== "1") {
-    const id = decodeURIComponent(parts[1]);
+    const id = (section === "curricula" ? decodeRecordSegment(parts[1]) : decodedRecordId(parts[1])) || "";
     if (section === "docs") await readerItem("doc", id);
     else if (section === "updates") await readerUpdateItem(id);
     else if (section === "courses") await readerCourseItem(id);

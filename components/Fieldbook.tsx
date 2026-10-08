@@ -1,4 +1,6 @@
 "use client";
+import { decodedRecordId, recordSegment } from "@/lib/record-url";
+import { contentPath, curriculumPath } from "@/lib/navigation";
 import { compactLayoutQuery } from "./patterns/use-compact-layout";
 import { teamHref, teamPersonId } from "@/lib/team-destination";
 import { courseLibraryView, courseViewPaths, type LearningView } from "@/lib/course-destination";
@@ -91,6 +93,8 @@ export default function Fieldbook() {
   const { confirm } = useInteractionDialog();
   const navigationGuard = useRef<NavigationGuard | null>(null);
   const acceptedUrl = useRef("");
+  const workspaceRef = useRef<Workspace | null>(null);
+  const [routeVersion, setRouteVersion] = useState(0);
   const menuTrigger = useRef<HTMLButtonElement>(null);
   const demoTrigger = useRef<HTMLButtonElement>(null);
   const menuClose = useRef<HTMLButtonElement>(null);
@@ -118,6 +122,7 @@ export default function Fieldbook() {
     [reportIssue, setReportIssue] = useState<string | undefined>(),
     [menu, setMenu] = useState(false),
     [showDemo, setShowDemo] = useState(false);
+  workspaceRef.current = data;
   const { collapsed, setCollapsed } = useDesktopSidebar(
     view === "learn" && selected && !selected.startsWith("curriculum:")
       ? selected
@@ -169,27 +174,31 @@ export default function Fieldbook() {
           return;
         }
         acceptedUrl.current = destination;
+        setRouteVersion((version) => version + 1);
         window.dispatchEvent(new Event("fieldbook:admin-history"));
-        const [v, id] = window.location.hash.slice(1).split("?")[0].split("/");
+        const [v, token] = window.location.hash.slice(1).split("?")[0].split("/");
+        const workspace = workspaceRef.current || loadWorkspace();
+        const records = v === "curricula" ? workspace.curricula : workspace.publishedContent || workspace.content;
+        const id = token ? decodedRecordId(token, records) : undefined;
         setTargetLesson(
-          new URLSearchParams(window.location.search).get("lesson") ||
+          new URLSearchParams(window.location.hash.split("?")[1] || window.location.search).get("lesson") ||
             undefined,
         );
-        setTeamPerson(teamPersonId("/" + window.location.hash.slice(1).split("?")[0]));
+        setTeamPerson(teamPersonId("/" + window.location.hash.slice(1).split("?")[0], workspace.users));
         const libraryView = courseLibraryView("/" + window.location.hash.slice(1).split("?")[0]);
         if (libraryView) setLearningView(libraryView);
-        setLearningReturn(courseLibraryView(new URLSearchParams(window.location.search).get("from") || "") || "home");
+        setLearningReturn(courseLibraryView(new URLSearchParams(window.location.hash.split("?")[1] || window.location.search).get("from") || "") || "home");
         const section = resolveSection(v);
         if (section) {
           setView(section);
           setSelected(
             !libraryView && v !== "admin" && id
               ? (v === "curricula" ? "curriculum:" : "") +
-                  decodeURIComponent(id)
+                  id
               : null,
           );
           setCourseOrigin(
-            new URLSearchParams(window.location.search).get("curriculum") ||
+            new URLSearchParams(window.location.hash.split("?")[1] || window.location.search).get("curriculum") ||
               undefined,
           );
         }
@@ -241,9 +250,9 @@ export default function Fieldbook() {
     const curriculum =
       v === "learn" && destinationId?.startsWith("curriculum:");
     const path = curriculum
-      ? `curricula/${encodeURIComponent(destinationId!.slice(11))}`
+      ? curriculumPath(destinationId!.slice(11), data?.curricula?.find((item) => item.id === destinationId!.slice(11))?.name).slice(1)
       : sectionPaths[v] +
-        (destinationId ? "/" + encodeURIComponent(destinationId) : "");
+        (destinationId ? "/" + recordSegment(destinationId, (data?.publishedContent || data?.content)?.find((item) => item.id === destinationId)?.title) : "");
     const params = new URLSearchParams();
     if (lesson) params.set("lesson", lesson);
     if (origin) params.set("curriculum", origin);
@@ -347,6 +356,32 @@ export default function Fieldbook() {
       : undefined;
   const user =
     demoGuest?.user || data?.users.find((u) => u.id === uid && u.active);
+  useEffect(() => {
+    if (!data || !user) return;
+    const [route, query] = window.location.hash.slice(1).split("?");
+    const [section, segment] = route.split("/");
+    if (!segment || !["docs", "updates", "courses", "curricula", "team"].includes(section)) return;
+    if (courseLibraryView("/" + route)) return;
+    let path: string | undefined;
+    if (section === "team") {
+      const id = teamPersonId("/" + route, data.users);
+      const person = data.users.find((entry) => entry.id === id);
+      if (person) path = teamHref(person.id, person.name);
+    } else if (section === "curricula") {
+      const id = decodedRecordId(segment, data.curricula);
+      const item = data.curricula?.find((entry) => entry.id === id && entry.status === "published");
+      if (item) path = curriculumPath(item.id, item.name);
+    } else {
+      const published = data.publishedContent || data.content.filter((item) => item.status === "published");
+      const id = decodedRecordId(segment, published);
+      const item = published.find((entry) => entry.id === id);
+      if (item) path = contentPath(item.kind, item.id, item.title);
+    }
+    if (path && path.slice(1) !== route) {
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${window.location.search}#${path.slice(1)}${query ? "?" + query : ""}`);
+      acceptedUrl.current = window.location.href;
+    }
+  }, [data, user, view, selected, routeVersion]);
   const branding = {
     ...defaultSettings,
     ...(data ? data.settings : demoPickerSettings),
@@ -357,7 +392,7 @@ export default function Fieldbook() {
       <BrandedAccount branding={brandingFromSettings(branding)} centered>
         <Badge variant="default">INTERACTIVE DEMO</Badge>
         <h1>Choose a demo profile</h1>
-        {!data && (
+        {restored && !data && (
           <>
             {error && <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
               {error}
@@ -485,7 +520,7 @@ export default function Fieldbook() {
               order={branding.docCategoryOrder}
               sections={branding.docSections}
               selected={selected || firstDoc?.id || null}
-              href={(id) => `#docs/${encodeURIComponent(id)}`}
+              href={(id) => `#${contentPath("doc", id, docs.find((doc) => doc.id === id)?.title).slice(1)}`}
               onOpen={(id) => navigate("docs", id)}
               storageKey="fieldbook.documents.demo"
             />
@@ -641,15 +676,15 @@ export default function Fieldbook() {
             data={data}
             user={user}
             initialDestination={
-              parseAdminDestination("/" + window.location.hash.slice(1)) || {
+              parseAdminDestination("/" + window.location.hash.slice(1), data) || {
                 tab: "content",
               }
             }
-            onWriteDestination={async (destination, replace) => {
+            onWriteDestination={async (destination, replace, name) => {
               window.history[replace ? "replaceState" : "pushState"](
                 null,
                 "",
-                `${window.location.pathname}#${adminHref(destination).slice(1)}`,
+                `${window.location.pathname}#${adminHref(destination, name).slice(1)}`,
               );
               acceptedUrl.current = window.location.href;
               return true;
@@ -777,7 +812,7 @@ export default function Fieldbook() {
               onDestinationChange={async (id) => {
                 if (!(await canLeave())) return false;
                 setTeamPerson(id);
-                window.history.pushState(null, "", `${window.location.pathname}#${teamHref(id).slice(1)}`);
+                window.history.pushState(null, "", `${window.location.pathname}#${teamHref(id, data.users.find((person) => person.id === id)?.name).slice(1)}`);
                 acceptedUrl.current = window.location.href;
                 return true;
               }}

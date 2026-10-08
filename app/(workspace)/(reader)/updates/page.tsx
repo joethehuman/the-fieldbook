@@ -1,3 +1,4 @@
+import { contentPath } from "@/lib/navigation";
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
 import { UpdateCard } from "@/components/patterns/update-card";
 import type { SiteSettings } from "@/lib/settings";
@@ -31,7 +32,7 @@ function Cards({
           key={item.id}
           item={item}
           featured={index === 0}
-          href={`/updates/${encodeURIComponent(item.id)}`}
+          href={contentPath("brief", item.id, item.title)}
           eager={index === 0}
           settings={settings}
         />
