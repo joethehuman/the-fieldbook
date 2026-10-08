@@ -40,6 +40,11 @@
   --destructive-foreground: #ffffff;
   --success: #16704a;
   --warning: #8b5908;
+  --code-keyword: #a83169;
+  --code-string: #216a43;
+  --code-number: #885416;
+  --code-title: #6439b5;
+  --code-attribute: #245b8b;
   --border: #e6e6e6;
   --input: #d4d4d4;
   --scrollbar-thumb: #c8c8c8;
