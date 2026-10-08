@@ -17,7 +17,7 @@ Its foundations are shadcn/ui source composition, Radix interaction primitives, 
 
 Before building a control, card, or page pattern, check the shared components and the `/ui` examples. Reuse or extend an existing component when it already owns the behavior. For example, `CourseCard` and `CurriculumCard` compose the shared `LearningCard`; the demo and installed Updates pages both use `UpdateCard`.
 
-Generated card artwork uses a consistent 1.5rem short title at every browser width. Horizontally scrolling CourseRow strips use a 1rem edge fade only where more content is hidden.
+Generated card artwork uses a consistent 1.5rem short title at every browser width. Horizontally scrolling CourseRow strips use a subtle 0.5rem edge fade only where more content is hidden, retaining 80% opacity at the edge so dark artwork stays visible.
 
 CourseCard owns the deadline cue in both apps. Overdue assigned courses show “N days past due” in the semantic destructive color; upcoming deadlines and “Due today” use muted text. Completed courses, guests and disabled due dates omit the cue.
 

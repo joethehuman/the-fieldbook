@@ -767,20 +767,20 @@
   .course-row[data-scroll-before="true"][data-scroll-after="true"] {
     mask-image: linear-gradient(
       to right,
-      transparent,
-      black var(--space-4),
-      black calc(100% - var(--space-4)),
-      transparent
+      rgb(0 0 0 / 80%),
+      black var(--space-2),
+      black calc(100% - var(--space-2)),
+      rgb(0 0 0 / 80%)
     );
   }
   .course-row[data-scroll-before="true"][data-scroll-after="false"] {
-    mask-image: linear-gradient(to right, transparent, black var(--space-4));
+    mask-image: linear-gradient(to right, rgb(0 0 0 / 80%), black var(--space-2));
   }
   .course-row[data-scroll-before="false"][data-scroll-after="true"] {
     mask-image: linear-gradient(
       to right,
-      black calc(100% - var(--space-4)),
-      transparent
+      black calc(100% - var(--space-2)),
+      rgb(0 0 0 / 80%)
     );
   }
   .course-row > [data-slot="content-action"] {
