@@ -497,6 +497,14 @@ for (const app of ["demo", "production"] as const) {
       animations: "disabled",
       path: info.outputPath(`${app}-heading-click.png`),
     });
+    await page.locator("#main-content").evaluate((el) => el.scrollTo(0, 0));
+    await expect(
+      outline.locator(
+        info.project.name === "phone"
+          ? '.reading-outline-disclosure a[aria-current="location"]'
+          : '.reading-outline-wide a[aria-current="location"]',
+      ),
+    ).toHaveAttribute("href", /heading-overview$/);
     await page.goBack();
     await page.goto(url(0));
     await expect(
