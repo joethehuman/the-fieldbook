@@ -34,7 +34,7 @@ export function MarkdownDownloadButton({
       type="button"
       variant="ghost"
       size="sm"
-      className="justify-start px-0 font-normal"
+      className="justify-start font-normal"
       disabled={disabled}
       onClick={download}
     >
