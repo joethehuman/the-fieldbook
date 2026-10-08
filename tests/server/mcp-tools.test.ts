@@ -551,3 +551,35 @@ test("SDK report tools validate real service outputs and keep report conflicts a
     Object.assign(store, saved);
   }
 });
+
+test("MCP reader links use published names and draft links open the named editor", async () => {
+  const store = data(), saved = { ...store };
+  const key = id(801);
+  const published = { id: key, kind: "doc", title: "Published guide", status: "published", questions: [], lessons: [] } as unknown as Content;
+  const draft = { ...published, title: "Unpublished title", status: "draft" } as Content;
+  Object.assign(store, {
+    readConfiguration: async () => ({ settings: { ...defaultSettings, access: "public" }, groups: [], teams: [], curricula: [] }),
+    findDocument: async () => ({ id: key, draft, published, revision: 2, published_revision: 1 }),
+    searchMcpCatalog: async () => ({ items: [{ id: key, title: draft.title, summary: "", kind: "doc", revision: 2, status: "draft", published: true }], nextCursor: null, complete: true }),
+    listPublishedReaderIndex: async (ids: string[]) => {
+      assert.deepEqual(ids, [key]);
+      return [{ id: key, title: published.title }];
+    },
+  });
+  const session = await connect();
+  try {
+    const search = await call(session.client, "search", { query: "guide" });
+    assert.equal(search.error, false);
+    assert.equal(search.value.results[0].url, "https://fieldbook.example/docs/published-guide-00000000000040008000000000000801");
+    const fetched = await call(session.client, "fetch", { id: key });
+    assert.equal(fetched.error, false);
+    assert.equal(fetched.value.url, search.value.results[0].url);
+    store.searchMcpCatalog = async () => ({ items: [{ id: key, title: draft.title, summary: "", kind: "doc", revision: 2, status: "draft", published: false }], nextCursor: null, complete: true });
+    const unpublished = await call(session.client, "search", { query: "guide" });
+    assert.equal(unpublished.error, false);
+    assert.equal(unpublished.value.results[0].url, "https://fieldbook.example/admin/content/unpublished-title-00000000000040008000000000000801/edit");
+  } finally {
+    Object.assign(store, saved);
+    await session.close();
+  }
+});

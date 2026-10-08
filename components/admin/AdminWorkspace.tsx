@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import {
   adminScope,
   adminHref,
+  resolveAdminDestination,
   type AdminDestination,
 } from "@/lib/admin-destination";
 import type { AdminRuntime } from "@/lib/admin-runtime";
@@ -110,12 +111,12 @@ export function AdminWorkspace({
         <Admin
           data={data}
           initialDestination={initial.destination}
-          onWriteDestination={async (destination, replace) => {
+          onWriteDestination={async (destination, replace, name) => {
             if (!(await beforeLocalNavigation())) return false;
             window.history[replace ? "replaceState" : "pushState"](
               null,
               "",
-              adminHref(destination),
+              adminHref(destination, name),
             );
             finishLocalNavigation();
             return true;
@@ -127,7 +128,8 @@ export function AdminWorkspace({
               scope === "person" ? destination.id : undefined,
             );
             if (destination.tab === "content" && destination.id) {
-              const result = await runtime.admin.edit(destination.id);
+              destination = resolveAdminDestination(destination, next);
+              const result = await runtime.admin.edit(destination.id!);
               next = result.data;
             }
             setData(next);

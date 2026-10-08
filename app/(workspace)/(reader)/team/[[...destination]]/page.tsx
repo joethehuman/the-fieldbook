@@ -1,3 +1,5 @@
+import { CanonicalRecordUrl } from "@/components/reader/CanonicalRecordUrl";
+import { normalizeReaderUrl } from "@server/reader-url";
 import { teamHref, teamPersonId } from "@/lib/team-destination";
 import { notFound } from "next/navigation";
 import { WorkspacePage } from "@/components/reader/WorkspacePage";
@@ -22,35 +24,49 @@ export default async function Page({
   const path =
     "/team" +
     (segments.length ? "/" + segments.map(encodeURIComponent).join("/") : "");
-  const personId = teamPersonId(path);
+  let personId = teamPersonId(path);
   if (segments.length && !personId) notFound();
   const { data, user } = await readerTeam();
+  const people = data.progressReport?.people.map((person) => person.u) || [];
+  personId = teamPersonId(path, people);
   if (
     personId &&
     !data.progressReport?.people.some((person) => person.u.id === personId)
   )
     notFound();
+  await normalizeReaderUrl(
+    teamHref(personId, people.find((person) => person.id === personId)?.name),
+  );
   return (
-    <WorkspacePage section="/team">
-      <>
-        <PageHeader>
-          <h1>Team progress</h1>
-        </PageHeader>
-        <TeamWorkspace
-          data={data}
-          initialPerson={personId}
-          user={
-            user || {
-              id: "guest",
-              name: "Guest",
-              email: "",
-              role: "learner",
-              groups: [],
-              active: false,
+    <>
+      <CanonicalRecordUrl
+        id={personId}
+        path={teamHref(
+          personId,
+          people.find((person) => person.id === personId)?.name,
+        )}
+      />
+      <WorkspacePage section="/team">
+        <>
+          <PageHeader>
+            <h1>Team progress</h1>
+          </PageHeader>
+          <TeamWorkspace
+            data={data}
+            initialPerson={personId}
+            user={
+              user || {
+                id: "guest",
+                name: "Guest",
+                email: "",
+                role: "learner",
+                groups: [],
+                active: false,
+              }
             }
-          }
-        />
-      </>
-    </WorkspacePage>
+          />
+        </>
+      </WorkspacePage>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import type { SiteSettings } from "./settings";
+import { recordSegment } from "./record-url";
 
 export const organizationHomePath = "/courses";
 
@@ -35,8 +36,12 @@ export function resolveSection(
   return Object.hasOwn(aliases, path) ? aliases[path] : undefined;
 }
 
-export function contentPath(kind: "course" | "doc" | "brief", id: string) {
+export function contentPath(kind: "course" | "doc" | "brief", id: string, title?: string) {
   const section =
     kind === "course" ? "learn" : kind === "doc" ? "docs" : "briefs";
-  return `/${sectionPaths[section]}/${encodeURIComponent(id)}`;
+  return `/${sectionPaths[section]}/${recordSegment(id, title)}`;
+}
+
+export function curriculumPath(id: string, title?: string) {
+  return `/curricula/${recordSegment(id, title)}`;
 }

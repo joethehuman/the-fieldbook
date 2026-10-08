@@ -1,6 +1,10 @@
+import { normalizeReaderUrl } from "@server/reader-url";
+import { withQuery } from "@/lib/record-url";
 import { canOpenAdminTab } from "@/lib/permissions";
 import {
   adminHref,
+  adminRecordName,
+  resolveAdminDestination,
   adminScope,
   parseAdminDestination,
 } from "@/lib/admin-destination";
@@ -15,13 +19,15 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Administration | Fieldbook" };
 export default async function Page({
   params,
+  searchParams,
 }: {
   params: Promise<{ destination?: string[] }>;
+  searchParams: Promise<{ from?: string }>;
 }) {
   const segments = (await params).destination || [];
-  const destination = parseAdminDestination(
-    "/admin" +
-      (segments.length ? "/" + segments.map(encodeURIComponent).join("/") : ""),
+  let destination = parseAdminDestination(
+    withQuery("/admin" +
+      (segments.length ? "/" + segments.map(encodeURIComponent).join("/") : ""), { from: (await searchParams).from }),
   );
   if (!destination) notFound();
   const path = adminHref(destination);
@@ -38,6 +44,7 @@ export default async function Page({
       scope,
       scope === "person" ? destination.id : undefined,
     );
+    destination = resolveAdminDestination(destination, data);
     if (destination.tab === "content" && destination.id) {
       const item = await getContent(destination.id, user, true);
       data.content = data.content.map((entry) =>
@@ -62,6 +69,7 @@ export default async function Page({
               : data.curricula;
     if (!collection?.some((item) => item.id === destination.id)) notFound();
   }
+  await normalizeReaderUrl(adminHref(destination, adminRecordName(destination, data)));
   return (
     <ProductionApp
       initialAdmin={{

@@ -17,6 +17,7 @@ import {
 } from "@/lib/mcp-contract";
 import { contentSignature } from "@/lib/demo-publication";
 import { availableDocSections } from "@/lib/docs-navigation";
+import { adminHref } from "@/lib/admin-destination";
 import { contentPath } from "@/lib/navigation";
 import { contentReport } from "./reports";
 import {
@@ -124,10 +125,12 @@ const handlers: Handlers = {
   },
   async search(ctx, input) {
     const page = await dataStore().searchMcpCatalog(ctx.user.id, input);
+    const published = page.items.some((item) => item.published) ? await dataStore().listPublishedReaderIndex(page.items.filter((item) => item.published).map((item) => item.id)) : [];
+    const titles = new Map(published.map((item) => [item.id, item.title]));
     return {
       results: page.items.map((item) => ({
         ...item,
-        url: `${installation().origin}${item.published ? contentPath(item.kind, item.id) : "/admin"}`,
+        url: `${installation().origin}${item.published ? contentPath(item.kind, item.id, titles.get(item.id)) : adminHref({ tab: "content", id: item.id, view: "edit" }, item.title)}`,
       })),
       nextCursor: page.nextCursor,
       complete: page.complete,
@@ -135,11 +138,12 @@ const handlers: Handlers = {
   },
   async fetch(ctx, { id }) {
     const c = await getContent(id, ctx.user, true);
+    const published = c.publishedRevision ? await getContent(id, ctx.user) : null;
     return {
       id,
       title: c.title,
       text: JSON.stringify(c),
-      url: `${installation().origin}${c.publishedRevision ? contentPath(c.kind, c.id) : "/admin"}`,
+      url: `${installation().origin}${published ? contentPath(published.kind, published.id, published.title) : adminHref({ tab: "content", id: c.id, view: "edit" }, c.title)}`,
       metadata: { revision: c.revision },
     };
   },
@@ -223,6 +227,7 @@ const handlers: Handlers = {
     { id, expected_revision, new_course_version, renew_update },
   ) {
     const c = await getContent(id, ctx.user, true);
+    const published = c.publishedRevision ? await getContent(id, ctx.user) : null;
     if (new_course_version) {
       if (c.kind !== "course")
         throw new HttpError(

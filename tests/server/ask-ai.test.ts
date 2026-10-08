@@ -77,7 +77,7 @@ function fixture() {
       calls.answer++;
       assert.equal(
         input.sources[0].href,
-        "/courses/" + passage.contentId + "?lesson=quorum",
+        "/courses/systems-" + passage.contentId.replaceAll("-", "") + "?lesson=quorum",
       );
       yield answer;
     },

@@ -1,4 +1,5 @@
 "use client";
+import { contentPath } from "@/lib/navigation";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -44,10 +45,10 @@ export function ReaderCurriculum({
       backLabel={back === "/courses" ? "Back to courses" : "Back"}
       onOpen={(id) =>
         router.push(
-          `/courses/${encodeURIComponent(id)}?curriculum=${encodeURIComponent(curriculum.id)}&from=${encodeURIComponent(back)}`,
+          `${contentPath("course", id, data.courses.find((item) => item.id === id)?.title)}?curriculum=${encodeURIComponent(curriculum.id)}&from=${encodeURIComponent(back)}`,
         )
       }
-      courseHref={(id) => `/courses/${encodeURIComponent(id)}?curriculum=${encodeURIComponent(curriculum.id)}&from=${encodeURIComponent(back)}`}
+      courseHref={(id) => `${contentPath("course", id, data.courses.find((item) => item.id === id)?.title)}?curriculum=${encodeURIComponent(curriculum.id)}&from=${encodeURIComponent(back)}`}
     />
   );
 }
