@@ -393,19 +393,12 @@ export function FeedbackAdmin({
                     </TableCell>
                   )}
                   <TableCell>
-                    <div className="flex w-44 items-center gap-2">
-                      <span
-                        className="min-w-0 truncate font-medium"
-                        title={f.title}
-                      >
-                        {f.title}
-                      </span>
-                      {!!f.version && (
-                        <span className="shrink-0 text-xs text-muted-foreground">
-                          v{f.version}
-                        </span>
-                      )}
-                    </div>
+                    <span
+                      className="block w-44 truncate font-medium"
+                      title={f.version ? `${f.title} · v${f.version}` : f.title}
+                    >
+                      {f.title}
+                    </span>
                   </TableCell>
                   <TableCell>{f.kind}</TableCell>
                   <TableCell>
