@@ -194,6 +194,9 @@ create table public."fb_search_words" (
     (coalesce((pg_catalog.ts_lexize('pg_catalog.english_stem'::regdictionary, word))[1], word)) stored
 );
 
+-- The Auth token hook may resolve its public-schema entry point.
+grant usage on schema public to supabase_auth_admin;
+
 -- Application functions
 
 CREATE FUNCTION public.fb_access_token_hook(event jsonb)
