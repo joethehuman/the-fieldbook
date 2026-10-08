@@ -49,7 +49,7 @@ export function Article({
   const index = ordered.findIndex((doc) => doc.id === item.id);
   const neighbors = index < 0 ? [] : [ordered[index - 1], ordered[index + 1]];
   return (
-    <div
+    <article
       className={
         isDoc
           ? `reading-layout${headings.length ? " has-outline" : ""}`
@@ -57,31 +57,34 @@ export function Article({
       }
     >
       <div className="reading-columns">
-        <article className="article">
-          <header className="article-header">
-            {back && <div className="article-navigation">{back}</div>}
-            <h1>{item.title}</h1>
-            <p className="article-lede">{item.summary}</p>
-            <div className="article-meta">
-              <span>
-                {placement
-                  ? sectionPath(placement, allSections, " / ")
-                  : item.category}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>
-                Updated{" "}
-                {new Date(item.updatedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                  timeZone: "UTC",
-                })}
-              </span>
-              <span aria-hidden="true">·</span>
-              <span>v{item.version}</span>
-            </div>
-          </header>
+        <header className="article-header">
+          {back && <div className="article-navigation">{back}</div>}
+          <h1>{item.title}</h1>
+          <p className="article-lede">{item.summary}</p>
+          <div className="article-meta">
+            <span>
+              {placement
+                ? sectionPath(placement, allSections, " / ")
+                : item.category}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              Updated{" "}
+              {new Date(item.updatedAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+                timeZone: "UTC",
+              })}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>v{item.version}</span>
+          </div>
+        </header>
+        {isDoc && (
+          <ReadingOutline key={item.id} headings={headings} prefix={prefix} />
+        )}
+        <div className="article">
           <div className="markdown">
             <ReactMarkdown
               headingPrefix={isDoc ? prefix : undefined}
@@ -172,12 +175,9 @@ export function Article({
               )}
             </nav>
           )}
-        </article>
-        {isDoc && (
-          <ReadingOutline key={item.id} headings={headings} prefix={prefix} />
-        )}
+        </div>
       </div>
-    </div>
+    </article>
   );
 }
 export function CourseOverview({

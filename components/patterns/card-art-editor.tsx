@@ -1,9 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ComponentProps } from "react";
+import { Alert } from "../ui/alert";
 import type { UploadProgress } from "@/lib/upload-media";
 import { MediaUploadStatus } from "./media-upload-status";
-import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FieldDescription } from "@/components/ui/field";
@@ -35,6 +35,7 @@ export function CardArtEditor({
   onBusyChange,
   saveMode = "manual",
   shortTitleId,
+  inputVariant,
 }: {
   id: string;
   title: string;
@@ -49,6 +50,7 @@ export function CardArtEditor({
   onBusyChange?: (busy: boolean) => void;
   saveMode?: "manual" | "automatic";
   shortTitleId?: string;
+  inputVariant?: ComponentProps<typeof Input>["variant"];
 }) {
   const fileInput = useRef<HTMLInputElement>(null);
   const shuffleHistory = useRef<{ id: string; seeds: number[] }>({
@@ -57,18 +59,16 @@ export function CardArtEditor({
   });
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
-  const [failed, setFailed] = useState(false);
   const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
   const current = resolvedCardArt(id, title, art, legacyCover);
   const generated = current.source === "generated";
   return (
     <section className="grid gap-3" aria-label="Card artwork editor">
       <h3 className={saveMode === "automatic" ? "text-sm font-semibold" : undefined}>Card artwork</h3>
-      <FieldDescription>
-        {saveMode === "automatic"
-          ? "Choose generated artwork or upload an image. Changes save as a draft."
-          : "Generated designs use your Identity artwork palette. Shuffle explores different designs and avoids recent repeats; save this item to keep the choice. A custom image replaces only the artwork above the card text."}
-      </FieldDescription>
+      {saveMode === "manual" && <FieldDescription>
+        Generated designs use your Identity artwork palette. Shuffle explores different designs and avoids recent repeats; save this item to keep the choice. A custom image replaces only the artwork above the card text.
+      </FieldDescription>}
       <div className="card-artwork-preview">
         <CardArtwork
           id={id}
@@ -88,6 +88,8 @@ export function CardArtEditor({
             (!onUpload && current.source === "generated")
           }
           onValueChange={(source) => {
+            setError("");
+            setNotice("");
             if (source === "generated")
               onChange({ ...current, source: "generated" });
             else if (current.imageUrl)
@@ -103,9 +105,10 @@ export function CardArtEditor({
       </FormField>
       <FormField
         label="Short title"
-        description={`Can differ from the full title. Up to 40 characters, shown within two lines on generated artwork (${graphemeCount(current.shortTitle)}/40).`}
+        description={<><span className="block">Can differ from full title.</span><span className="block">Max 40 characters ({graphemeCount(current.shortTitle)}/40).</span></>}
       >
         <Input
+          variant={inputVariant}
           id={shortTitleId}
           value={current.shortTitle}
           disabled={disabled || uploading}
@@ -118,7 +121,7 @@ export function CardArtEditor({
         />
       </FormField>
       <ActionGroup>
-        <Button
+        {generated && <Button
           type="button"
           variant="outline"
           size="sm"
@@ -139,27 +142,26 @@ export function CardArtEditor({
               version: CARD_ART_VERSION,
               seed,
             });
-            setNotice(saveMode === "automatic" ? "Design updated." : "New design previewed. Save to keep it.");
+            setError("");
+            setNotice(saveMode === "automatic" ? "" : "New design previewed. Save to keep it.");
           }}
         >
           Shuffle artwork
-        </Button>
-        {onUpload && (
+        </Button>}
+        {!generated && (
           <Button
             type="button"
             variant="outline"
             size="sm"
-            disabled={disabled || uploading}
+            disabled={disabled || uploading || !onUpload}
             onClick={() => fileInput.current?.click()}
           >
             {uploading
               ? "Uploading…"
-              : current.imageUrl
-                ? "Replace image"
-                : "Upload image"}
+              : "Replace image"}
           </Button>
         )}
-        {current.imageUrl && (
+        {!generated && current.imageUrl && (
           <Button
             type="button"
             variant="ghost"
@@ -171,7 +173,8 @@ export function CardArtEditor({
                 source: "generated",
                 imageUrl: undefined,
               });
-              setNotice(saveMode === "automatic" ? "Card image removed." : "Image removed from the card. Save to apply.");
+              setError("");
+              setNotice(saveMode === "automatic" ? "" : "Image removed from the card. Save to apply.");
             }}
           >
             Remove image
@@ -182,7 +185,7 @@ export function CardArtEditor({
         ref={fileInput}
         hidden
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif"
+        accept=".jpg,.jpeg,.png,.webp,.gif,image/jpeg,image/png,image/webp,image/gif"
         aria-label="Upload card artwork"
         disabled={disabled || uploading || !onUpload}
         onChange={async (event) => {
@@ -192,29 +195,26 @@ export function CardArtEditor({
           if (
             !["image/jpeg", "image/png", "image/webp", "image/gif"].includes(
               file.type,
-            ) ||
-            !file.size
+            )
           ) {
-            setNotice(
-              "Choose a non-empty JPG, PNG, WebP, or GIF image.",
-            );
+            setError("File type not supported. Choose JPG, PNG, WebP or GIF.");
+            return;
+          }
+          if (!file.size) {
+            setError("The image is empty. Choose a JPG, PNG, WebP or GIF image.");
             return;
           }
           setUploading(true);
           onBusyChange?.(true);
           setNotice("");
-          setFailed(false);
+          setError("");
           try {
             const imageUrl = await onUpload(file, setUploadProgress);
             onChange({ ...current, source: "upload", imageUrl });
-            setNotice(saveMode === "automatic" ? "Card image updated." : "Image uploaded. Save this item to apply it.");
+            setNotice(saveMode === "automatic" ? "" : "Image uploaded. Save this item to apply it.");
           } catch (error) {
-            setFailed(true);
-            setNotice(
-              error instanceof Error
-                ? error.message
-                : "Upload failed. Try again.",
-            );
+            const message = error instanceof Error ? error.message : "Upload failed. Try again.";
+            setError(/file type|mime/i.test(message) ? "File type not supported. Choose JPG, PNG, WebP or GIF." : message);
           } finally {
             setUploading(false);
             setUploadProgress(null);
@@ -222,14 +222,14 @@ export function CardArtEditor({
           }
         }}
       />
-      <FieldDescription>
-        {onUpload
-          ? "JPG, PNG, WebP or GIF. The installation's upload limits apply. Wide images crop to fill the card."
-          : "Custom image uploads are available in an installed Fieldbook. This demo saves generated artwork."}
-      </FieldDescription>
+      {!onUpload && <FieldDescription>Image uploads are available in an installed Fieldbook.</FieldDescription>}
       <MediaUploadStatus progress={uploadProgress} />
-      {failed && notice ? <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert> :
-        <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
+      {error && <Alert variant="destructive" dismissLabel="Dismiss artwork error" onDismiss={() => setError("")}>
+        {error}
+      </Alert>}
+      {notice && <p role="status" className="text-sm text-muted-foreground">
+        {notice}
+      </p>}
     </section>
   );
 }

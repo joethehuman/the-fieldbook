@@ -6,7 +6,7 @@ export function Input({
   variant = "default",
   ...props
 }: ComponentProps<"input"> & {
-  variant?: "default" | "title" | "lesson-title";
+  variant?: "default" | "metadata" | "title" | "lesson-title";
 }) {
   return (
     <input
@@ -14,7 +14,8 @@ export function Input({
       type={type}
       autoComplete="off"
       className={cn(
-        "flex min-h-control w-full min-w-0 rounded-control border border-control-border bg-background px-3 py-1.5 text-base sm:text-label font-normal text-foreground outline-none hover:enabled:border-control-hover placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border aria-invalid:border-destructive aria-invalid:hover:enabled:border-destructive file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+        "flex min-h-control w-full min-w-0 rounded-control border border-control-border bg-background px-3 py-1.5 font-normal text-foreground outline-none hover:enabled:border-control-hover placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:bg-disabled-background disabled:text-disabled-foreground disabled:border-border aria-invalid:border-destructive aria-invalid:hover:enabled:border-destructive file:mr-3 file:border-0 file:bg-transparent file:text-sm file:font-medium",
+        variant === "metadata" ? "text-label" : "text-base sm:text-label",
         (type === "hidden" || props.hidden) && "hidden",
         type === "color" && "size-10 shrink-0 cursor-pointer p-1",
         (variant === "title" || variant === "lesson-title") &&

@@ -197,7 +197,7 @@
   gap: var(--space-1);
 }
 @media (max-width: 767px) {
-  .writing-command-label, .writing-focus-label { display: none; }
+  .writing-command-label { display: none; }
   .writing-toolbar-controls { gap: var(--space-1); flex-wrap: nowrap; }
   .writing-phone-format { flex-shrink: 0; }
 }
@@ -232,7 +232,6 @@
 .writing-editor .writing-content:focus-within
   > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
-    .writing-pending-list,
     .writing-media-line
   ) {
   position: relative;
@@ -240,7 +239,6 @@
 .writing-editor .writing-content:focus-within
   > p.writing-active-line:is(:empty, :has(> br:only-child)):not(
     .writing-command-line,
-    .writing-pending-list,
     .writing-media-line
   )::before {
   content: "Type / for commands…";
@@ -266,14 +264,6 @@
   border-radius: var(--radius);
   background: var(--muted);
   color: var(--muted-foreground);
-  pointer-events: none;
-}
-.writing-editor .writing-content:focus-within > p.writing-pending-list::before {
-  content: attr(data-list-marker);
-  display: inline-block;
-  min-width: 1.5rem;
-  color: var(--muted-foreground);
-  opacity: 1;
   pointer-events: none;
 }
 .writing-editor .writing-content .writing-media-line {
@@ -487,7 +477,16 @@
   padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6)));
 }
 .writing-editor .writing-source { padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6))); }
-[data-slot="textarea"].document-title {
+.writing-title-field { position: relative; display: grid; min-width: 0; }
+.writing-title-field:has(.document-title[data-reveal-focus="true"]:focus)::after {
+  content: "";
+  position: absolute;
+  inset: -6px -8px;
+  border: 2px solid var(--ring);
+  border-radius: var(--radius);
+  pointer-events: none;
+}
+.document-title {
   min-height: 0;
   font-size: var(--type-page);
   line-height: var(--type-page-leading);
@@ -550,3 +549,72 @@
 .writing-table-drag-preview span { min-width: 0; overflow: hidden; text-overflow: ellipsis; color: var(--muted-foreground); }
 @media (hover: none) { .writing-block-actions, .writing-block-gutter-actions { opacity: 1; } }
 .writing-editor .mdxeditor-contenteditable-wrapper { position: relative; }
+/* Block decorators must not leave anonymous inline line boxes around their content. */
+.writing-editor .writing-content > [data-lexical-decorator="true"],
+.writing-editor .writing-content > p > [data-lexical-decorator="true"]:has(.writing-media-block, [data-editor-block-type="image"]),
+.writing-editor .writing-content [data-editor-block-type="image"] { display: block; }
+.writing-editor .writing-content :is(.writing-code-block, .writing-media-block, [data-editor-block-type="image"], .writing-table-block),
+.writing-editor .writing-content > hr { margin-block-end: var(--space-6); }
+
+/* Content authoring is a blank canvas. Settings editors retain their framed surface. */
+.editor .writing-surface { border: 0; border-radius: 0; }
+/* The title attention outline uses the existing page inset on narrow layouts. */
+.editor[data-scroll-layout="page"] .writing-surface { overflow: visible; }
+.editor .writing-surface:focus-within, .editor .writing-surface[data-editor-interacting="true"] { outline: none; }
+.editor .writing-editor .mdxeditor-toolbar, .editor .writing-view-header {
+  border: 0;
+  border-radius: 0;
+  background: var(--background);
+  padding: var(--space-1) var(--space-2);
+}
+.editor .writing-document-heading {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  gap: var(--space-1);
+  background: var(--background);
+  padding-block: var(--space-2) var(--space-3);
+}
+.editor .course-builder-panel .writing-document-heading .document-title {
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+}
+.editor[data-scroll-layout="page"] .writing-document-heading { top: var(--editor-navigation-height, 0px); }
+.editor .writing-document-heading::after {
+  content: "";
+  position: absolute;
+  inset: 100% 0 auto;
+  height: var(--scroll-fade-size);
+  pointer-events: none;
+  background: var(--scroll-fade-overlay);
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.editor .writing-viewport[data-scroll-fade-before="true"] .writing-document-heading::after,
+.app:has(.topbar[data-content-scrolled="true"]) .editor[data-scroll-layout="page"] .writing-document-heading::after { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .editor .writing-document-heading::after { transition: none; } }
+.editor .writing-course-heading {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--editor-content-padding, var(--space-6));
+  padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6)));
+}
+.editor .writing-viewport:has(.writing-document-heading) { mask-image: none; }
+.editor .writing-document-heading + .mdxeditor-root-contenteditable .writing-content { padding-block-start: var(--space-3); }
+.editor .writing-source-panel .writing-document-heading { position: relative; }
+.editor .course-quiz-content { padding: var(--space-3) var(--editor-content-padding); }
+.editor .course-quiz-canvas > .writing-document-heading { top: var(--editor-navigation-height, 0px); }
+.editor-frame-canvas[data-navigation-scrolled="true"] .course-quiz-canvas > .writing-document-heading::after { opacity: 1; }
+/* The mobile toolbar is portaled into the fixed canvas navigation row. */
+.editor .writing-editor .mdxeditor-toolbar { display: none; }
+.editor-frame :is(.writing-course-heading, .writing-document-heading, .writing-content, .writing-source, .course-quiz-content) { padding-inline: var(--editor-text-inset); }
+.editor-frame .writing-content { --writing-content-start: var(--editor-text-inset); }
+.editor-frame .writing-editor-notice { margin-inline: var(--editor-text-inset); }
+.editor-frame .writing-viewport { scrollbar-gutter: stable both-edges; }
+.editor-frame[data-cards="true"] .writing-content { padding-block-end: var(--space-6); }
+.editor-frame[data-cards="true"] .writing-toolbar-controls { flex-wrap: nowrap; gap: var(--space-2); }
+.editor-frame[data-cards="true"] :is(.writing-block-actions, .writing-block-gutter-actions) { opacity: 1; }
+
+.writing-toolbar-controls[data-mobile="true"] .writing-command-label { display: none; }
+.editor .writing-toolbar-controls[data-canvas="true"]:not([data-mobile="true"]) { display: none; }
+.editor .writing-editor .mdxeditor-toolbar:has(.writing-toolbar-controls:not([data-mobile="true"])),
+.editor .writing-view-header:empty { display: none; }

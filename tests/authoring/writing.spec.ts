@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { downloadMarkdown, expectMarkdown, replaceWritingText, waitForDraftSaved, openContentSettings, closeContentSettings } from "./editor-helpers";
+import { downloadMarkdown, expectMarkdown, replaceWritingText, waitForDraftSaved, openContentSettings, closeContentSettings, returnToContent } from "./editor-helpers";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { defaultSettings } from "../../lib/settings";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
@@ -272,10 +272,8 @@ async function setup(
     route.fulfill({ status: 204 }),
   );
   await page.goto(production ? `/admin/content/${itemId}/edit` : "/#admin");
-  if (!production) await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Back to content", exact: true }),
-  ).toBeVisible();
+  if (!production) await page.getByRole("link", { name: item.title, exact: true }).click();
+  await expect(page.locator(".editor")).toBeVisible();
   const read = async (): Promise<Workspace> =>
     production
       ? state
@@ -325,16 +323,12 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
     equivalentMarkdown(original, draft.replace(/A private addition\./, "")),
   ).toBe(true);
   expect((await read()).publishedContent![0].body).toBe(original);
-  await page
-    .getByRole("button", { name: "Back to content", exact: true })
-    .click();
+  await returnToContent(page);
   await expect(
     page.getByText("Unpublished edits", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Edit", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Back to content", exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".editor")).toBeVisible();
   await expect(editor).toContainText("A private addition.");
   await page
     .getByRole("button", { name: "Publish", exact: true })
@@ -345,9 +339,7 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
     path: info.outputPath("writing-editor.png"),
     fullPage: true,
   });
-  await page
-    .getByRole("button", { name: "Back to content", exact: true })
-    .click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Unpublish", exact: true }).click();
   await page
     .getByRole("alertdialog")
@@ -373,7 +365,7 @@ test("resized Doc tables persist through save, reopen, publish, and reading", as
   await waitForDraftSaved(page);
   const saved = (await read()).content[0].body;
   expect(saved).toContain("fieldbook-table-widths:v1");
-  await page.getByRole("button", { name: "Back to content", exact: true }).click();
+  await returnToContent(page);
   await page.goto(`/admin/content/${itemId}/edit`);
   await expect(page.getByRole("separator", { name: "Resize column 2" })).toBeVisible();
   expect((await downloadMarkdown(page)).body).toBe(saved);
@@ -680,9 +672,7 @@ for (const kind of ["Doc", "Update"]) {
       ).not.toHaveValue("");
     }
     await closeContentSettings(page);
-    await page
-      .getByRole("button", { name: "Back to content", exact: true })
-      .click();
+    await returnToContent(page);
     await page.getByRole("button", { name: kind, exact: true }).click();
     await page.getByLabel("Title", { exact: true }).fill(`New ${kind}`);
     await openContentSettings(page);
@@ -693,17 +683,18 @@ for (const kind of ["Doc", "Update"]) {
     expect((await read()).content.find((item) => item.title === `New ${kind}`)?.category).toBe("");
     await openContentSettings(page);
     if (kind === "Doc") {
-      const search = page.getByRole("searchbox", { name: "Search sections" });
+      await page.getByRole("button", { name: "Section", exact: true }).click();
+      const search = page.getByRole("combobox", { name: "Search sections", exact: true });
       await expect(search).toBeVisible();
       await search.fill("Start here");
       await expect(
-        page.getByRole("button", {
-          name: "Start here → Getting started",
+        page.getByRole("option", {
+          name: "Start here / Getting started",
           exact: true,
-          pressed: false,
         }),
       ).toBeVisible();
       await search.fill("");
+      await page.keyboard.press("Escape");
       await page
         .getByRole("button", { name: "Create section", exact: true })
         .first()
@@ -753,9 +744,7 @@ for (const kind of ["Doc", "Update"]) {
       expect(saved?.folder).toBe("New organization name");
     }
     await closeContentSettings(page);
-    await page
-      .getByRole("button", { name: "Back to content", exact: true })
-      .click();
+    await returnToContent(page);
     await page
       .getByRole("row")
       .filter({ hasText: `New ${kind}` })
@@ -932,7 +921,7 @@ test("inline Details closes with Escape and enlarged text leaves the canvas reac
       writing.evaluate((node) => {
         const canvas = node.querySelector("p")!.getBoundingClientRect();
         const header = document
-          .querySelector(".editor-heading")!
+          .querySelector(".topbar")!
           .getBoundingClientRect();
         const main = document
           .querySelector(".main-content")!
@@ -1083,9 +1072,10 @@ test("long writing uses a stationary desktop frame and reachable natural page fa
   const header = await page.locator(".editor-frame-controls").boundingBox();
   expect(after!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
   expect(after!.y + after!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeInViewport();
-  await expect(page.getByRole("button", { name: "More editor actions", exact: true })).toBeInViewport();
-  expect(await surface.evaluate((node) => getComputedStyle(node).borderBottomLeftRadius)).not.toBe("0px");
+  await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeInViewport();
+  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeHidden();
+  await expect(page.getByRole("button", { name: "More editor actions", exact: true })).toHaveCount(0);
+  expect(await surface.evaluate((node) => getComputedStyle(node).borderBottomLeftRadius)).toBe("0px");
   await editor.press("ControlOrMeta+End");
   await page.keyboard.type(" Final caret remains visible.");
   await expect(editor).toContainText("Final caret remains visible.");

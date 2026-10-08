@@ -1,9 +1,10 @@
+import { returnToContent } from "./editor-helpers";
 import { expect, test, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { courseViewPaths } from "../../lib/course-destination";
 import { setupAuthoringProvider, authoringUser } from "./provider-fixture";
 async function waitForDraftSaved(page: Page) {
-  await expect(page.locator(".editor-heading [role=status]")).toContainText(
+  await expect(page.locator(".editor-save-status [role=status]")).toContainText(
     "Saved",
   );
 }
@@ -174,9 +175,7 @@ test("content editors reopen the saved draft and preserve the dedicated workspac
   await expect(
     page.getByRole("tab", { name: "People", exact: true }),
   ).toHaveCount(0);
-  await page
-    .getByRole("button", { name: "Back to content", exact: true })
-    .click();
+  await returnToContent(page);
   await at(page, production, "/admin/content");
   await page.goBack();
   await at(page, production, path);

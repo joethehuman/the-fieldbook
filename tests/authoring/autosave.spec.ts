@@ -238,13 +238,13 @@ for (const lostResponse of [false, true])
       return route.fulfill({ status: 503, json: { error: "Temporary save failure" } });
     });
     await page.getByLabel("Title", { exact: true }).fill("First attempt");
-    await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Changes not saved");
+    await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Changes not saved");
     await page.getByLabel("Title", { exact: true }).fill("Newest open edits");
     await page.waitForTimeout(1000);
     expect(writes).toBe(1);
     await page.screenshot({ path: info.outputPath(`save-failure-${lostResponse}.png`) });
     await page.getByRole("button", { name: "Retry saving", exact: true }).click();
-    await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Saved. Unpublished edits");
+    await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Saved");
     expect((await read()).title).toBe("Newest open edits");
     expect((await read(true)).title).toBe("Autosave fixture");
     expect(writes).toBe(2);
@@ -261,7 +261,7 @@ test("conflicting retry keeps open edits and requires a confirmed saved-draft re
     return route.fulfill({ status: 409, json: { error: "Another author changed this draft" } });
   });
   await page.getByLabel("Title", { exact: true }).fill("Keep my open work");
-  await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Changes not saved");
+  await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Changes not saved");
   await page.route("**/api/content?*draft=true*", route => route.fulfill({ json: { ...before, title: "Other author's work", revision: 2 } }));
   await page.getByRole("button", { name: "Retry saving", exact: true }).click();
   await expect(page.locator("form.editor [role=alert]")).toContainText("Another session");
@@ -335,7 +335,7 @@ test("an assigned course stages a new version through autosaves and consumes it 
   const { read, before, data } = await setup(page, installed, "course");
   await page.getByRole("button", { name: /^Details/ }).click();
   const version = page.getByRole("checkbox", {
-    name: "Publish a new version and start a new completion window",
+    name: "Publish new version and reassign to audiences.",
   });
   await version.check();
   await page.getByRole("button", { name: /^Details/ }).click();

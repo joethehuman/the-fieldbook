@@ -8,17 +8,37 @@ export function revealEditorTarget(target: HTMLElement, {
     || target.closest<HTMLElement>(".main-content"),
   context = target.closest<HTMLElement>('[data-slot="field"]') || target,
   focus = true,
-}: { container?: HTMLElement | null; context?: HTMLElement; focus?: boolean } = {}) {
+  highlight = false,
+}: { container?: HTMLElement | null; context?: HTMLElement; focus?: boolean; highlight?: boolean } = {}) {
+  // Canvas title attention is explicit; ordinary clicks and keyboard focus stay quiet.
+  if (focus && highlight && target.matches(".document-title")) target.dataset.revealFocus = "true";
   const owner = target.closest<HTMLElement>(".main-content") || container;
-  const bounded = !!target.closest('.editor[data-scroll-layout="workspace"], [data-slot="dialog-content"]');
+  const bounded = !!target.closest('.editor[data-scroll-layout="workspace"], .editor-floating-body, [data-slot="dialog-content"]');
   // Stacked panels and the natural writing body belong to the page. A native
   // Markdown textarea can still own its text scrolling in the page layout.
   if (!bounded && !container?.matches("textarea")) container = owner;
   if (!container || !owner) { if (focus) target.focus({ preventScroll: true }); return () => {}; }
   activeReveals.get(container)?.();
-  if (focus) target.focus({ preventScroll: true });
+  if (focus) {
+    target.focus({ preventScroll: true });
+    if (target.isContentEditable) {
+      // A caret at the editor root looks like the first line, but slash commands
+      // need a selection inside a writing block. Skip non-editable decorations.
+      const firstBlock = Array.from(target.querySelectorAll<HTMLElement>("p, h1, h2, h3, h4, h5, h6, blockquote, li"))
+        .find((block) => block.isContentEditable);
+      const range = document.createRange();
+      range.selectNodeContents(firstBlock || target);
+      range.collapse(true);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    } else if (target.matches('textarea[aria-label$=" Markdown"]') && target instanceof HTMLTextAreaElement) {
+      target.setSelectionRange(0, 0);
+    }
+  }
   const writing = container.matches(".writing-scroll-area");
-  const local = writing || container.matches('.editor-frame-details, .editor-frame-outline, [data-slot="scroll-region"]');
+  const canvasScroll = container.matches(".editor-frame-canvas") && bounded;
+  const local = writing || canvasScroll || container.matches('.editor-frame-details, .editor-frame-outline, [data-slot="scroll-region"]');
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
   const gap = rem * 1.5;
   const start = container.scrollTop;
@@ -55,8 +75,12 @@ export function revealEditorTarget(target: HTMLElement, {
     const wholeSurface = target.matches(".writing-surface");
     const canvas = target.closest<HTMLElement>(".editor-frame-canvas");
     const surfaceTop = canvas ? parseFloat(getComputedStyle(canvas).top) : NaN;
-    const inset = local ? 0 : wholeSurface && Number.isFinite(surfaceTop) ? surfaceTop
-      : header + (inControls ? 0 : inCanvas || inPanel ? controls + (inToolbar ? 0 : toolbar) : 0);
+    const navigation = parseFloat(style.getPropertyValue("--editor-navigation-height")) || 0;
+    const heading = target.closest(".writing-surface, .course-quiz-canvas")?.querySelector<HTMLElement>(".writing-document-heading");
+    const inHeading = !!heading?.contains(target);
+    const pinnedHeading = heading && !inHeading && !target.closest(".writing-course-heading") ? heading.getBoundingClientRect().height : 0;
+    const inset = local ? canvasScroll ? navigation + pinnedHeading : inHeading ? toolbar : toolbar + pinnedHeading : wholeSurface && Number.isFinite(surfaceTop) ? surfaceTop
+      : header + (inControls ? 0 : inCanvas || inPanel ? controls + navigation + (inToolbar ? 0 : toolbar + pinnedHeading) : 0);
     let top = viewport.top + container.clientTop + inset;
     let bottom = viewport.top + container.clientTop + container.clientHeight;
     if (local && owner !== container) {
@@ -79,6 +103,9 @@ export function revealEditorTarget(target: HTMLElement, {
       // Long writing surfaces reveal their first line, not the middle of the whole body.
       fieldTop = control.top + (parseFloat(style.paddingTop) || 0);
       fieldBottom = fieldTop + Math.min(control.height, available * 0.65);
+    } else if (!focus && target === context && fieldBottom - fieldTop > available) {
+      // A multi-field section reveals its heading and first controls without selecting one.
+      fieldBottom = fieldTop + available;
     } else if (fieldBottom - fieldTop > available) {
       const label = target.closest<HTMLElement>('[data-slot="field"]')?.getBoundingClientRect();
       fieldTop = Math.max(Math.min(label?.top ?? control.top, control.top), control.bottom - available);
@@ -94,7 +121,7 @@ export function revealEditorTarget(target: HTMLElement, {
 
   const finish = () => {
     cancel();
-    if (!target.isConnected || !local || owner === container || (!writing && getComputedStyle(container).position !== "static")) return;
+    if (!target.isConnected || !local || canvasScroll || owner === container || (!writing && getComputedStyle(container).position !== "static")) return;
     const surface = writing ? container.closest<HTMLElement>(".writing-surface") : null;
     const parentTarget = surface && getComputedStyle(surface).maxHeight !== "none" ? surface : target;
     if (!parentTarget) return;

@@ -1,7 +1,7 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
-import { expectMarkdown, waitForDraftSaved, openContentSettings } from "./editor-helpers";
+import { expectMarkdown, waitForDraftSaved, openContentSettings, returnToContent } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
@@ -201,9 +201,8 @@ async function openNav(page: Page) {
   }
 }
 
-for (const entry of ["account menu", "breadcrumb"] as const) {
+for (const entry of ["account menu"]) {
   test(`Administration ${entry} preserves a failed draft on Cancel and returns to Content on Confirm`, async ({ page }, info) => {
-    test.skip(entry === "breadcrumb" && (page.viewportSize()?.width || 0) < 768, "Breadcrumbs are hidden on phone layouts");
     const production = info.project.name.startsWith("production");
     const { control } = await setup(page, production);
     await failDraftWrites(page, production, control);
@@ -211,13 +210,9 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
     await title.fill("Keep this exact editor");
     const original = await title.elementHandle();
     const select = async () => {
-      if (entry === "breadcrumb")
-        await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Administration", exact: true }).click();
-      else {
-        await openNav(page);
-        await page.getByRole("button", { name: "Account menu", exact: true }).click();
-        await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
-      }
+      await openNav(page);
+      await page.getByRole("button", { name: "Account menu", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
     };
     await select();
     await expect(page.getByRole("alertdialog")).toBeVisible();
@@ -247,7 +242,7 @@ test("failed autosave preserves edits through search, canceled navigation and re
   const { control } = await setup(page, production);
   await failDraftWrites(page, production, control);
   await page.getByLabel("Title", { exact: true }).fill("Keep these edits");
-  await page.getByRole("button", { name: "Back to content" }).click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Keep these edits",
@@ -298,7 +293,7 @@ test("failed autosave preserves edits through search, canceled navigation and re
     path: info.outputPath("dirty-editor.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Back to content" }).click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page.locator(".admin-layout")).toBeVisible();
 });
@@ -308,7 +303,7 @@ test("browser back preserves an unsaved failed draft when leaving is canceled", 
 }, info) => {
   const production = info.project.name.startsWith("production");
   const { control } = await setup(page, production);
-  await page.getByRole("button", { name: "Back to content" }).click();
+  await returnToContent(page);
   await openNav(page);
   // This fixture resets published Docs between cases; use a collection route.
   await page
@@ -356,13 +351,13 @@ test("failed save preserves downloadable text and does not show success", async 
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Recover my draft",
   );
-  await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Changes not saved");
+  await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Changes not saved");
   await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "page");
   await expect(page.locator('[data-slot="toast"]')).toHaveCount(0);
   await page.locator("form.editor").getByRole("button", { name: "Dismiss message", exact: true }).click();
   await expect(page.locator("form.editor").getByRole("alert")).toHaveCount(0);
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Recover my draft");
-  await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Changes not saved");
+  await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Changes not saved");
   await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
   if (production) await expect(page.getByRole("button", { name: "Retry saving", exact: true })).toBeVisible();
   const download = page.waitForEvent("download");
@@ -456,11 +451,9 @@ for (const failure of [false, true])
     });
     await expect.poll(() => control.uploaded).toBe(true);
     await expect(
-      page.locator(".editor-heading").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
+      page.locator(".topbar").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
     ).toBeDisabled();
-    await expect(
-      page.getByRole("button", { name: "Back to content" }),
-    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
     // Exercise the handler directly too, bypassing the disabled submit button.
     await page
       .locator("form.editor")
@@ -485,7 +478,7 @@ for (const failure of [false, true])
     ).toHaveText("Keep the original body");
     control.releaseUpload();
     await expect(
-      page.locator(".editor-heading").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
+      page.locator(".topbar").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
     ).toBeEnabled();
     if (failure)
       await expect(
@@ -579,7 +572,7 @@ for (const media of ["inline-video", "card-art"] as const)
     if (await actions.isVisible()) await expect(actions).toBeDisabled();
     else await expect(page.getByRole("button", { name: /^Outline/ })).toBeDisabled();
     await expect(
-      page.locator(".editor-heading").getByRole("button", { name: /Publish|Review requirements/, includeHidden: true }),
+      page.locator(".topbar").getByRole("button", { name: /Publish|Review requirements/, includeHidden: true }),
     ).toBeDisabled();
     await page
       .locator("form.editor")
@@ -1142,14 +1135,9 @@ for (const { command, query, marker } of [
     await page.keyboard.press("/");
     await page.keyboard.type(query);
     await page.keyboard.press("Enter");
-    await expect(writing.locator(".writing-pending-list")).toBeVisible();
-    await expect
-      .poll(() =>
-        writing
-          .locator(".writing-pending-list")
-          .evaluate((node) => getComputedStyle(node, "::before").content),
-      )
-      .toBe(command === "Bulleted list" ? '"•"' : '"1."');
+    const item = writing.locator(command === "Bulleted list" ? "ul > li" : "ol > li").last();
+    await expect(item).toBeVisible();
+    await expect(item).toHaveText("");
     await page.keyboard.type("A list item");
     await expect
       .poll(() =>
@@ -1358,7 +1346,7 @@ test("large media resumes a lost chunk acknowledgement and inserts only verified
   await page.locator('.writing-editor input[type="file"]').setInputFiles(filePath);
   await expect.poll(() => !!release).toBe(true);
   await expect(page.getByRole("progressbar", { name: "File upload progress" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Back to content" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
   expect(completes).toBe(0);
   expect(state.content[0].body).toBe("Keep my original draft");
   await page.screenshot({ path: info.outputPath("large-upload-progress.png"), fullPage: true });
@@ -1370,7 +1358,7 @@ test("large media resumes a lost chunk acknowledgement and inserts only verified
   expect(state.content[0].body).toContain("Keep my original draft");
   expect(state.content[0].body).toContain("/api/media/verified-large.png");
   await expect(page.getByRole("progressbar", { name: "File upload progress" })).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Back to content" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Details", exact: true })).toBeEnabled();
 });
 
 for (const failure of ["storage limit", "expired permission", "verification"] as const) {

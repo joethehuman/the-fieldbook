@@ -1,4 +1,5 @@
 "use client";
+import { compactLayoutQuery } from "./use-compact-layout";
 
 import {
   useRef,
@@ -300,7 +301,7 @@ export function AccountMenu({
           onFeedbackClose?.();
           if (
             !onFeedbackClose ||
-            !window.matchMedia("(max-width: 767px)").matches
+            !window.matchMedia(compactLayoutQuery).matches
           )
             trigger.current?.focus();
         }}

@@ -5,11 +5,9 @@ import { Component, createContext, useContext, useLayoutEffect, type ReactNode, 
 import { Textarea } from "../ui/textarea";
 import { Alert } from "../ui/alert";
 import { Button } from "../ui/button";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "../ui/dropdown-menu";
-import { Download, MoreHorizontal } from "lucide-react";
 import type { UploadMedia } from "../MarkdownEditor";
-import { EditorFocusControls } from "./editor-focus";
-import { WritingTitleContext } from "./writing-title";
+import { MarkdownDownloadButton } from "./markdown-download";
+import { WritingTitleContext, WritingIntroductionContext } from "./writing-title";
 import { useScrollFade } from "./use-scroll-fade";
 import { revealEditorTarget } from "./reveal-editor-target";
 import { usePhoneWritingViewport } from "./use-phone-writing-viewport";
@@ -19,27 +17,9 @@ import "../../styles/writing-editor.css";
 const EditorViewContext = createContext<ReactNode>(null);
 const MarkdownDownloadContext = createContext({ value: "", name: "Content" });
 
-function MarkdownDownloadMenu() {
+function StandaloneMarkdownDownload() {
   const { value, name } = useContext(MarkdownDownloadContext);
-  function download() {
-    const url = URL.createObjectURL(new Blob([value], { type: "text/markdown;charset=utf-8" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${name.trim().replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-").slice(0, 120) || "Content"}.md`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    // Allow the browser to consume the URL before releasing the download.
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-  return <DropdownMenu>
-    <DropdownMenuTrigger asChild>
-      <Button type="button" size="icon" variant="ghost" aria-label="More editor actions"><MoreHorizontal /></Button>
-    </DropdownMenuTrigger>
-    <DropdownMenuContent align="end">
-      <DropdownMenuItem onSelect={download}><Download aria-hidden="true" />Download Markdown</DropdownMenuItem>
-    </DropdownMenuContent>
-  </DropdownMenu>;
+  return <MarkdownDownloadButton value={value} name={name} />;
 }
 
 function EditorViewHeader({ children }: { children: ReactNode }) {
@@ -78,7 +58,9 @@ class EditorBoundary extends Component<
 }
 
 export type WritingEditorProps = {
+  canvas?: boolean;
   title?: ReactNode;
+  introduction?: ReactNode;
   downloadName?: string;
   value: string;
   onChange: (value: string) => void;
@@ -90,29 +72,48 @@ export type WritingEditorProps = {
 /** Visual authoring with a Markdown download and lossless recovery for unsupported content. */
 export function WritingEditor({
   label = "Content",
+  canvas = false,
   title,
+  introduction,
   downloadName = label,
   ...props
 }: WritingEditorProps) {
   const root = useRef<HTMLElement>(null);
   usePhoneWritingViewport(root);
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (!element) return;
+    let toolbar: HTMLElement | null = null;
+    const resize = new ResizeObserver(measure);
+    function measure() {
+      if (!element) return;
+      const next = element.querySelector<HTMLElement>(".mdxeditor-toolbar, .writing-view-header");
+      if (next !== toolbar) {
+        if (toolbar) resize.unobserve(toolbar);
+        toolbar = next;
+        if (toolbar) resize.observe(toolbar);
+      }
+      element.style.setProperty("--writing-toolbar-height", `${toolbar?.getBoundingClientRect().height || 0}px`);
+    }
+    const mutations = new MutationObserver(measure);
+    mutations.observe(element, { childList: true, subtree: true });
+    measure();
+    return () => { resize.disconnect(); mutations.disconnect(); };
+  }, []);
   const [mode, setMode] = useState("write");
   const [issue, setIssue] = useState("");
   const [failureDetail, setFailureDetail] = useState("");
   const sourceFade = useScrollFade<HTMLTextAreaElement>(mode === "source");
   useLayoutEffect(() => { sourceFade.measure(); }, [mode, props.value, sourceFade.measure]);
   // Keep the toolbar slot stable while typing so the engine's plugins stay stable.
-  const viewControls = useMemo(() => (
-    <div className="writing-view-controls ml-auto flex min-w-0 flex-wrap items-center gap-2">
-      <EditorFocusControls /><MarkdownDownloadMenu />
-    </div>
-  ), []);
+  const viewControls = useMemo(() => canvas ? null : <StandaloneMarkdownDownload />, [canvas]);
   return (
     <MarkdownDownloadContext.Provider value={{ value: props.value, name: downloadName }}>
     <WritingTitleContext.Provider value={title}>
+    <WritingIntroductionContext.Provider value={introduction}>
     <EditorViewContext.Provider value={viewControls}>
         <section ref={root} className="writing-root flex min-w-0 flex-col gap-3" aria-label={`${label} editor`} onFocusCapture={(event) => {
-          if (window.matchMedia("(max-width: 767px)").matches) return;
+          if (window.matchMedia("(max-width: 1279px)").matches) return;
           const target = event.target;
           if (!(target instanceof HTMLElement) || !target.matches('[contenteditable], textarea, [role="tabpanel"]')) return;
           const surface = target.closest<HTMLElement>(".writing-surface");
@@ -121,7 +122,7 @@ export function WritingEditor({
             revealEditorTarget(surface, { container: viewport, focus: false });
         }}>
           {issue && (
-            <div className="grid gap-3">
+            <div className="writing-editor-notice grid gap-3">
               <Alert role="alert">
                 {issue}
                 {process.env.NODE_ENV === "development" && failureDetail && <details className="mt-2">
@@ -137,6 +138,7 @@ export function WritingEditor({
             <div className="writing-surface min-w-0 rounded-lg border border-border bg-background">
               <EditorViewHeader>{viewControls}</EditorViewHeader>
                 <div className="writing-viewport writing-source-panel mt-0 focus-visible:ring-0">
+                  {introduction && <div className="writing-course-heading">{introduction}</div>}
                   {title && <div className="writing-document-heading">{title}</div>}
                   <Textarea
                     ref={sourceFade.ref}
@@ -162,6 +164,7 @@ export function WritingEditor({
             >
               <VisualEditor
                 {...props}
+                canvas={canvas}
                 label={label}
                 viewControls={viewControls}
                 onUnsupported={() => {
@@ -175,6 +178,7 @@ export function WritingEditor({
           )}
         </section>
     </EditorViewContext.Provider>
+    </WritingIntroductionContext.Provider>
     </WritingTitleContext.Provider>
     </MarkdownDownloadContext.Provider>
   );

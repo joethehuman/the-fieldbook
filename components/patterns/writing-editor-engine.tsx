@@ -9,9 +9,10 @@ import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
 import { createWritingBlock, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu } from "./writing-selection-menu";
-import { usePhoneLayout } from "./use-phone-layout";
+import { EditorWritingActionsContext } from "./editor-frame";
+import { useWritingControlsLayout } from "./use-editor-cards-layout";
 import { WritingLinkDialog } from "./writing-link-dialog";
-import { WritingTitleContext, WritingTitleEnterContext } from "./writing-title";
+import { WritingTitleContext, WritingIntroductionContext, WritingTitleEnterContext } from "./writing-title";
 import { WritingInteractionContext } from "./writing-interaction";
 import { Fragment, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -90,6 +91,7 @@ import "@mdxeditor/editor/style.css";
 
 function WritingViewPanel({ children }: { children: ReactNode }) {
   const title = useContext(WritingTitleContext);
+  const introduction = useContext(WritingIntroductionContext);
   const lexical = useCellValue(rootEditor$);
   useEffect(() => {
     if (!lexical) return;
@@ -119,7 +121,7 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
   }
   const fade = useScrollFade<HTMLDivElement>();
   return <div ref={fade.ref} data-state="active" className="writing-viewport writing-scroll-area scroll-fade mt-0 focus-visible:ring-0"
-    data-scroll-fade-before={fade.edges.before} data-scroll-fade-after={false} onScroll={fade.measure}><WritingTitleEnterContext.Provider value={enterBody}><div className="writing-document">{title && <div className="writing-document-heading">{title}</div>}{children}</div></WritingTitleEnterContext.Provider></div>;
+    data-scroll-fade-before={fade.edges.before} data-scroll-fade-after={false} onScroll={fade.measure}><WritingTitleEnterContext.Provider value={enterBody}><div className="writing-document">{introduction && <div className="writing-course-heading">{introduction}</div>}{title && <div className="writing-document-heading">{title}</div>}{children}</div></WritingTitleEnterContext.Provider></div>;
 }
 
 const writingViewPanelPlugin = realmPlugin({
@@ -167,14 +169,17 @@ function WritingToolbar({
   onSelectionReady,
   disabled,
   viewControls,
+  canvas,
 }: {
+  canvas: boolean;
   onInsert: (trigger: HTMLButtonElement, fromKeyboard: boolean) => void;
   onEditorReady: (editor: LexicalEditor | null, actions: WritingActions) => void;
   onSelectionReady: (controller: ((keyboard: boolean) => boolean) | null) => void;
   disabled: boolean;
   viewControls: ReactNode;
 }) {
-  const phone = usePhoneLayout();
+  const phone = useWritingControlsLayout();
+  const actionsHost = useContext(EditorWritingActionsContext);
   const editor = useCellValue(activeEditor$);
   const code = usePublisher(insertCodeBlock$);
   const divider = usePublisher(insertThematicBreak$);
@@ -230,9 +235,8 @@ function WritingToolbar({
       unavailable: !canRedo,
     },
   ];
-  return (
-    <div className="writing-toolbar">
-      <div className="writing-toolbar-controls" role="group" aria-label="Writing actions">
+  const controls = (
+      <div className="writing-toolbar-controls" data-canvas={canvas || undefined} data-mobile={phone || undefined} role="group" aria-label="Writing actions">
         <div className="writing-toolbar-group">
           {historyActions.map(({ label, icon: Icon, run, unavailable }) => (
             <Tooltip key={label} content={label}>
@@ -257,13 +261,18 @@ function WritingToolbar({
           <Plus /><span className="writing-command-label">Commands</span>
         </Button>
       </div>
-      <WritingSelectionMenu disabled={disabled} onReady={onSelectionReady} />
+  );
+  return (
+    <div className="writing-toolbar">
+      {canvas && phone && actionsHost ? createPortal(controls, actionsHost) : controls}
+      <WritingSelectionMenu showPhoneTrigger={!canvas} disabled={disabled} onReady={onSelectionReady} />
       {viewControls}
     </div>
   );
 }
 
 export default function WritingEditorEngine({
+  canvas = false,
   value,
   onChange,
   onUpload,
@@ -287,7 +296,6 @@ export default function WritingEditorEngine({
   const tableEditor = useRef<LexicalEditor | null>(null);
   const writingActions = useRef<WritingActions | null>(null);
   const selectionTools = useRef<((keyboard: boolean) => boolean) | null>(null);
-  const pendingList = useRef<"bullet" | "number" | null>(null);
   const mediaSelection = useRef<BaseSelection | null>(null);
   const slashSelection = useRef<BaseSelection | null>(null);
   const toolbarSelection = useRef<BaseSelection | null>(null);
@@ -364,13 +372,6 @@ export default function WritingEditorEngine({
     }
   }, [slashOpen, slashQuery, slashFromToolbar]);
   useEffect(() => {
-    const close = (event: PointerEvent) => {
-      if (pendingList.current && !root.current?.contains(event.target as Node)) clearPendingList();
-    };
-    document.addEventListener("pointerdown", close);
-    return () => document.removeEventListener("pointerdown", close);
-  }, []);
-  useEffect(() => {
     if (current.current !== value) {
       current.current = value;
       const parsed = readTableWidths(value);
@@ -405,28 +406,6 @@ export default function WritingEditorEngine({
       setUploadProgress(null);
     }
   }
-  function clearPendingList() {
-    pendingList.current = null;
-    activeLine.current?.classList.remove("writing-pending-list");
-    activeLine.current?.removeAttribute("data-list-marker");
-  }
-  function insertPendingList(kind: "bullet" | "number", text?: string) {
-    lexicalEditor.current?.update(() => {
-      const selection = $getSelection();
-      if (!$isRangeSelection(selection)) return;
-      const insertionLine = selection.anchor.getNode().getTopLevelElementOrThrow();
-      if (text) selection.insertText(text);
-      $insertList(kind);
-      const updated = $getSelection();
-      const list = $isRangeSelection(updated) ? updated.anchor.getNode().getTopLevelElementOrThrow() : null;
-      const beforeList = list?.getType() === "list" ? list.getPreviousSibling() : null;
-      // MDXEditor may retain the selected blank line immediately before the list.
-      if (beforeList?.getType() === "paragraph" && !beforeList.getTextContent()) beforeList.remove();
-      if (insertionLine.isAttached() && insertionLine.getType() === "paragraph" && !insertionLine.getTextContent() && insertionLine.getParent() === $getRoot()) {
-        insertionLine.remove();
-      }
-    });
-  }
   function chooseBlock(kind: WritingBlockStyle) {
     const lexical = lexicalEditor.current;
     let index = -1;
@@ -441,21 +420,8 @@ export default function WritingEditorEngine({
     });
     setSlashOpen(false);
     if (kind === "bullet" || kind === "number") {
-      if (slashFromToolbar && activeLine.current?.textContent?.trim()) {
-        lexical?.update(() => $insertList(kind));
-        return;
-      }
-      // Lexical drops an empty list, so keep its marker visible until the first character arrives.
-      pendingList.current = kind;
-      requestAnimationFrame(() => {
-        const anchor = window.getSelection()?.anchorNode;
-        const element = anchor instanceof Element ? anchor : anchor?.parentElement;
-        const line = element?.closest(".writing-content p");
-        if (!(line instanceof HTMLElement) || !pendingList.current) return;
-        activeLine.current = line;
-        line.classList.add("writing-pending-list");
-        line.dataset.listMarker = pendingList.current === "bullet" ? "•" : "1.";
-      });
+      lexical?.update(() => $insertList(kind), { discrete: true });
+      lexical?.focus();
       return;
     }
     writingActions.current?.block(kind);
@@ -731,6 +697,7 @@ export default function WritingEditorEngine({
     toolbarPlugin({
       toolbarContents: () => (
         <WritingToolbar
+          canvas={canvas}
           onInsert={openCommands}
           onSelectionReady={(controller) => { selectionTools.current = controller; }}
           onEditorReady={(active, actions) => { if (active) lexicalEditor.current = active; writingActions.current = actions; }}
@@ -739,7 +706,7 @@ export default function WritingEditorEngine({
         />
       ),
     }),
-  ], [onUpload, disabled, busy, viewControls]);
+  ], [onUpload, disabled, busy, viewControls, canvas]);
   return (
     <WritingInteractionContext.Provider value={reportInteraction}>
     <div ref={root} data-editor-interacting={popupActive || slashOpen || !!mediaChooser || undefined} className="writing-editor writing-surface rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {
@@ -750,7 +717,6 @@ export default function WritingEditorEngine({
         });
       }
       if (slashMenu.current?.contains(event.target as Node) || mediaMenu.current?.contains(event.target as Node)) return;
-      if (pendingList.current && activeLine.current && !activeLine.current.contains(event.target as Node)) clearPendingList();
       if (slashOpen && activeLine.current && !activeLine.current.contains(event.target as Node)) {
         if (slashFromToolbar) setSlashOpen(false);
         else keepSlashAsText(slashQuery, false);
@@ -763,28 +729,12 @@ export default function WritingEditorEngine({
       // MDXEditor's row/column menus are portaled outside the scrolling table.
       // Dismiss an open menu as its anchor moves, so it cannot drift across the page.
       scroller.querySelectorAll<HTMLButtonElement>('table button[data-state="open"]').forEach((trigger) => trigger.click());
-    }} onCompositionEndCapture={() => {
-      if (!pendingList.current) return;
-      const kind = pendingList.current;
-      clearPendingList();
-      requestAnimationFrame(() => insertPendingList(kind));
     }} onPasteCapture={(event) => {
       if (!(event.target instanceof HTMLElement) || !event.target.closest("[contenteditable=true]")) return;
       const image = Array.from(event.clipboardData.items).find((item) => item.type.startsWith("image/"))?.getAsFile();
-      if (!image && pendingList.current) {
-        const pasted = event.clipboardData.getData("text/plain");
-        if (!pasted) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const kind = pendingList.current;
-        clearPendingList();
-        insertPendingList(kind, pasted);
-        return;
-      }
       if (!image) return;
       event.preventDefault();
       event.stopPropagation();
-      clearPendingList();
       if (!onUpload) { setError("Uploads are unavailable in this view."); return; }
       rememberSelection();
       void (async () => {
@@ -795,16 +745,6 @@ export default function WritingEditorEngine({
         } catch { /* upload() keeps the document and shows the error. */ }
       })();
     }} onKeyDownCapture={(event) => {
-      if (pendingList.current && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
-        if (event.key === "Escape" || event.key === "Backspace") { clearPendingList(); if (event.key === "Escape") event.preventDefault(); return; }
-        if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-          event.preventDefault();
-          const kind = pendingList.current;
-          clearPendingList();
-          insertPendingList(kind, event.key);
-          return;
-        }
-      }
       if (slashOpen && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
         // Lexical's Enter/arrow handlers still run on a default-prevented event.
         // A command keystroke belongs to the menu, not the document underneath it.

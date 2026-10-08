@@ -101,7 +101,7 @@ test("installed course sidebar preserves header spacing across lessons and quiz"
   await expect(page.getByRole("heading", { name: "Second lesson", exact: true })).toBeFocused();
   await expect.poll(async () => Math.abs((await courseSidebarGap(page)) - gap)).toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("installed-lesson-2-spacing.png") });
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await expect(page.getByRole("heading", { name: "Check your knowledge" })).toBeFocused();
   await expect.poll(async () => Math.abs((await courseSidebarGap(page)) - gap)).toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("installed-quiz-spacing.png") });
@@ -784,7 +784,7 @@ test("Courses share reader navigation and show the signed-in account immediately
   expect(await page.content()).toContain("Synthetic Admin");
   expect(await page.content()).not.toContain("SECRET DRAFT BODY");
   await page.evaluate(() => ((window as any).__readerMarker = "kept"));
-  await page.locator(`a.course-card[href="/courses/${ids[2]}"]`).click();
+  await page.locator(`a.course-card[href^="/courses/${ids[2]}"]`).click();
   await expect(
     page.getByRole("heading", { name: items[2].title }),
   ).toBeVisible();
@@ -796,15 +796,10 @@ test("Courses share reader navigation and show the signed-in account immediately
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Updates" })
     .click();
-  if ((page.viewportSize()?.width || 0) < 768) {
+  if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
-    await page
-      .getByRole("navigation", { name: "Primary" })
-      .getByRole("link", { name: "Courses" })
-      .click();
-  } else {
-    await page.getByRole("link", { name: "Organization", exact: true }).click();
-  }
+  await page.getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Courses" }).click();
   await expect(page).toHaveURL(/\/courses$/);
   expect(await page.evaluate(() => (window as any).__readerMarker)).toBe(
     "kept",
@@ -1194,7 +1189,7 @@ test("publication and access changes are reflected on the next request", async (
   await fixture(request);
   expect((await request.get(path)).status()).toBe(200);
 });
-test("reading without JavaScript, responsive layout and native breadcrumbs", async ({
+test("reading without JavaScript, responsive layout and native sidebar links", async ({
   browser,
   baseURL,
 }, info) => {
@@ -1210,7 +1205,7 @@ test("reading without JavaScript, responsive layout and native breadcrumbs", asy
   ).toBeVisible();
   await expect(page.getByText(items[0].body, { exact: true })).toBeVisible();
   await expect(
-    page.locator('nav[aria-label="Breadcrumb"] a[href="/docs"]'),
+    page.locator('nav[aria-label="Primary"] a[href="/docs"]'),
   ).toHaveAttribute("href", "/docs");
   await expectReadingWidth(page);
   await page.screenshot({
@@ -1219,16 +1214,18 @@ test("reading without JavaScript, responsive layout and native breadcrumbs", asy
   });
   await page.goto(`/courses/${ids[2]}`);
   await expect(page.getByText(items[2].lessons[0].body, { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: /Second lesson/ }),
-  ).toHaveAttribute("href", `/courses/${ids[2]}?lesson=second`);
+  const lessonHref = await page.getByRole("link", { name: /Second lesson/ }).getAttribute("href");
+  const lessonDestination = new URL(lessonHref!, baseURL);
+  expect(lessonDestination.pathname).toBe(`/courses/${ids[2]}`);
+  expect(lessonDestination.searchParams.get("lesson")).toBe("second");
+  expect(lessonDestination.searchParams.get("from")).toBe("/courses");
   await page.screenshot({
     path: info.outputPath("course-no-js.png"),
     fullPage: true,
   });
   await context.close();
 });
-test("hydration keeps one article, breadcrumbs navigate, and lesson links open the player", async ({
+test("hydration keeps one article, sidebar navigation works, and lesson links open the player", async ({
   page,
 }, info) => {
   const errors: string[] = [];
@@ -1253,11 +1250,11 @@ test("hydration keeps one article, breadcrumbs navigate, and lesson links open t
     await expect(page.locator(".sidebar")).toHaveClass(/open/);
     await page.getByRole("button", { name: "Close navigation" }).click();
   } else {
-    const crumb = page
-      .getByRole("navigation", { name: "Breadcrumb" })
+    const destination = page
+      .getByRole("navigation", { name: "Primary" })
       .getByRole("link", { name: "Docs", exact: true });
-    await crumb.focus();
-    await crumb.press("Enter");
+    await destination.focus();
+    await destination.press("Enter");
   }
   await expect(page).toHaveURL(/\/docs$/);
   await page.goto(`/courses/${ids[2]}`);
@@ -1487,9 +1484,9 @@ test("long lesson transitions reveal next lesson tops and keep short quizzes in 
   await page.getByRole("button", { name: /^Next lesson/ }).click();
   await expect.poll(() => distanceFromScrollTop(".course-lesson")).toBeLessThan(70);
   await expect.poll(() => distanceFromScrollTop(".course-lesson")).toBeGreaterThanOrEqual(0);
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).scrollIntoViewIfNeeded();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("course-quiz-navigation.png") });
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await expect.poll(async () => {
     const card = (await page.locator(".course-quiz").boundingBox())!;
     const viewport = (await page.locator(".main-content").boundingBox())!;
@@ -1533,9 +1530,11 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
   });
   await page.goto(`/courses/${ids[2]}`);
   await page.getByRole("link", { name: /First lesson/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}\\?lesson=first`));
+  expect(new URL(page.url()).pathname).toBe(`/courses/${ids[2]}`);
+  expect(new URL(page.url()).searchParams.get("lesson")).toBe("first");
+  expect(new URL(page.url()).searchParams.get("from")).toBe("/courses");
   await page.getByRole("button", { name: "Next lesson" }).click();
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await page.getByRole("radio", { name: "First", exact: true }).check();
   await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(
@@ -1621,7 +1620,7 @@ test("reader does not load workspace and picks up republished content on reload"
 });
 
 async function expectReadingWidth(page: Page) {
-  const geometry = await page.locator("article.article").evaluate((article) => {
+  const geometry = await page.locator(".article").evaluate((article) => {
     const main = article.closest("main")!;
     const style = getComputedStyle(main);
     const available =

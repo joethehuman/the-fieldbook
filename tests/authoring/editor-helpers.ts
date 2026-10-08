@@ -3,30 +3,60 @@ import { expect, type Page } from "@playwright/test";
 
 /** Wait for the latest edit acknowledgement, without requesting publication. */
 export async function waitForDraftSaved(page: Page) {
-  await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText(/^Saved(?:\. Unpublished edits)?$/);
+  await expect(
+    page.locator(".editor-save-status [role=status] > .sr-only"),
+  ).toHaveText("Saved");
 }
 
 export async function openContentSettings(page: Page) {
-  const details = page.getByRole("complementary", { name: "Content details", exact: true });
+  const details = page.getByRole("complementary", {
+    name: "Content details",
+    exact: true,
+  });
   const toggle = page.getByRole("button", { name: /^Details/ });
-  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+  if ((await toggle.getAttribute("aria-expanded")) !== "true")
+    await toggle.click();
   await expect(details).toBeVisible();
   return details;
 }
 
 export async function closeContentSettings(page: Page) {
   const toggle = page.getByRole("button", { name: /^Details/ });
-  if (await toggle.getAttribute("aria-expanded") === "true") await toggle.click();
-  await expect(page.getByRole("complementary", { name: "Content details", exact: true })).toHaveCount(0);
+  if ((await toggle.getAttribute("aria-expanded")) === "true")
+    await toggle.click();
+  await expect(
+    page.getByRole("complementary", { name: "Content details", exact: true }),
+  ).toHaveCount(0);
 }
 
 /** Read the actual exported file, including edits not yet acknowledged by autosave. */
 export async function downloadMarkdown(page: Page) {
-  await page.getByRole("button", { name: "More editor actions", exact: true }).click();
+  const button = page.getByRole("button", {
+    name: "Download Markdown",
+    exact: true,
+  });
+  const toggle = page.getByRole("button", { name: "Details", exact: true });
+  let opened = false;
+  if (!(await button.isVisible()) && (await toggle.count())) {
+    await toggle.click();
+    opened = true;
+  }
   const pending = page.waitForEvent("download");
-  await page.getByRole("menuitem", { name: "Download Markdown", exact: true }).click();
+  await button.click();
   const download = await pending;
-  return { name: download.suggestedFilename(), body: await readFile((await download.path())!, "utf8") };
+  const result = {
+    name: download.suggestedFilename(),
+    body: await readFile((await download.path())!, "utf8"),
+  };
+  if (opened) {
+    const close = page.getByRole("button", {
+      name: "Close details",
+      exact: true,
+    });
+    if (await close.isVisible()) await close.click();
+    else await toggle.click();
+  }
+  return result;
 }
 
 export async function expectMarkdown(page: Page, expected: string | RegExp) {
@@ -44,4 +74,17 @@ export async function replaceWritingText(page: Page, text: string) {
     if (i) await page.keyboard.press("Enter");
     await page.keyboard.insertText(paragraphs[i]);
   }
+}
+
+
+/** Desktop has a canvas Back action; compact editors use the existing account menu. */
+export async function returnToContent(page: Page) {
+  const back = page.getByRole("button", { name: "Back to content", exact: true });
+  if (await back.isVisible()) { await back.click(); return; }
+  const account = page.getByRole("button", { name: "Account menu", exact: true });
+  if (!await account.isVisible()) await page.getByRole("button", { name: "Open navigation", exact: true }).click();
+  await account.click();
+  const content = page.getByRole("menuitem", { name: "Manage content", exact: true });
+  if (await content.isVisible()) await content.click();
+  else await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
 }

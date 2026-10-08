@@ -1,14 +1,16 @@
 "use client";
 
 import { useLayoutEffect, type RefObject } from "react";
+import { compactLayoutQuery } from "./use-compact-layout";
 
 /** CSS distributes the remaining space; measurement only chooses a usable layout. */
-export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMode = false) {
+export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
   useLayoutEffect(() => {
     const editor = ref.current;
     const viewport = editor?.closest<HTMLElement>(".main-content");
     if (!editor || !viewport) return;
     let request = 0;
+    let initialized = false;
     const observed = new Set<Element>();
     const observer = new ResizeObserver(schedule);
     function schedule() {
@@ -24,7 +26,7 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMod
         ...Array.from(editor.children).filter((child) => child !== content),
         ...Array.from(content.children).filter((child) => child !== frame),
         ...Array.from(frame.children).filter((child) => !child.matches(".editor-frame-body")),
-        ...editor.querySelectorAll(".mdxeditor-toolbar, .writing-view-header, .writing-root > [role=alert]"),
+        ...editor.querySelectorAll(".editor-canvas-navigation, .mdxeditor-toolbar, .writing-view-header, .writing-root > .writing-editor-notice"),
       ];
       const next = new Set<Element>([editor, viewport, ...chrome]);
       for (const element of observed) if (!next.has(element)) {
@@ -44,13 +46,23 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMod
         + (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
       // A phone document always flows through the page, including its blank
       // first paragraph. Keyboard changes must not swap or reset scroll owners.
-      const phone = window.matchMedia("(max-width: 767px)").matches;
+      const phone = window.matchMedia(compactLayoutQuery).matches;
       const layout = !phone && frame.getBoundingClientRect().width >= 48 * rem
         && viewport.clientHeight - reserved >= 12 * rem ? "workspace" : "page";
+      const writing = editor.querySelector<HTMLElement>(".writing-viewport") || editor.querySelector<HTMLElement>(".editor-frame-canvas");
+      if (!initialized) viewport.scrollTop = 0;
       if (editor.dataset.scrollLayout !== layout) {
+        const offset = initialized ? editor.dataset.scrollLayout === "workspace" ? writing?.scrollTop || 0 : viewport.scrollTop : 0;
         editor.dataset.scrollLayout = layout;
-        if (layout === "workspace") viewport.scrollTop = 0;
+        if (layout === "workspace") {
+          viewport.scrollTop = 0;
+          if (writing) writing.scrollTop = offset;
+        } else {
+          if (writing) writing.scrollTop = 0;
+          viewport.scrollTop = offset;
+        }
       }
+      initialized = true;
     }
     // Dynamic save notices and lazy/mode-specific toolbars also consume natural space.
     const mutations = new MutationObserver((records) => {
@@ -64,5 +76,5 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>, focusMod
       observer.disconnect();
       mutations.disconnect();
     };
-  }, [ref, focusMode]);
+  }, [ref]);
 }

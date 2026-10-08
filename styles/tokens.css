@@ -78,6 +78,13 @@
   --elevation-surface: 0 1px 2px rgb(0 0 0 / 3%);
   --elevation-card-hover: 0 2px 6px rgb(0 0 0 / 5%), 0 6px 16px rgb(0 0 0 / 7%);
   --elevation-floating: 0 4px 8px rgb(0 0 0 / 4%), 0 16px 40px rgb(0 0 0 / 8%);
+  --elevation-editor-panel: 0 2px 4px rgb(0 0 0 / 3%), 0 8px 20px rgb(0 0 0 / 5%);
+  --scroll-fade-size: 0.5rem;
+  --scroll-fade-overlay: linear-gradient(to bottom,
+    var(--background),
+    color-mix(in srgb, var(--background) 40%, transparent) 35%,
+    color-mix(in srgb, var(--background) 10%, transparent) 65%,
+    transparent);
   --dialog-workflow-width: 49rem;
   --dialog-workflow-height: 41rem;
   --dialog-workflow-list-height: 52rem;
@@ -91,8 +98,6 @@
   --reading-width: 44rem;
   --form-width: 48rem;
   --editor-title-width: 54rem;
-  --editor-writing-width: 64rem;
-  --editor-writing-focus-width: 56rem;
   --page-width: 90rem;
   --space-1: 0.25rem;
   --space-2: 0.5rem;

@@ -8,6 +8,8 @@ test("server search through SQL, stable lesson destination, publication and acce
   request,
 }, info) => {
   await page.goto("/courses");
+  const search = page.getByRole("button", { name: "Open search", exact: true });
+  if (await search.isVisible()) await search.click();
   const input = page.getByRole("textbox", { name: "Search all content" });
   await expect(input).toBeVisible();
   await page.evaluate(() => {
@@ -103,6 +105,8 @@ test("rapid queries, loading, failure recovery, keyboard and empty results", asy
   request,
 }, info) => {
   await page.goto("/courses");
+  const search = page.getByRole("button", { name: "Open search", exact: true });
+  if (await search.isVisible()) await search.click();
   const input = page.getByRole("textbox", { name: "Search all content" });
   // Delay an already completed older response, so it arrives after the new one.
   await page.route("**/api/search?**", async (route) => {

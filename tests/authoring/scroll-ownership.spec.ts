@@ -298,7 +298,7 @@ test("audience search and actions stay visible through long, one and zero choice
   await row.getByRole("button", { name: "Edit", exact: true }).click();
   const details = await openContentSettings(page);
   await details
-    .getByRole("button", { name: "Edit audience", exact: true })
+    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const dialog = page.getByRole("dialog", {
     name: "Course audience",

@@ -1,7 +1,8 @@
 "use client";
 
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import type { ComponentProps } from "react";
+import { useLayoutEffect, useState, type ComponentProps } from "react";
+import { useScrollFade } from "../patterns/use-scroll-fade";
 import { cn } from "@/lib/utils";
 
 // Owned shadcn composition: Radix owns dismissal, focus and collision handling.
@@ -37,15 +38,38 @@ export function PopoverContent({
 }
 
 /** A preferred list height that shrinks beneath stationary picker controls. */
-export function PopoverResults({ className, ...props }: ComponentProps<"div">) {
+export function PopoverResults({ className, children, visibleRows, onScroll, style, ...props }: ComponentProps<"div"> & { visibleRows?: number }) {
+  const fade = useScrollFade<HTMLDivElement>(visibleRows !== undefined);
+  const [height, setHeight] = useState<number>();
+  useLayoutEffect(() => {
+    const list = fade.ref.current;
+    if (!list || !visibleRows) return;
+    const rows = Array.from(list.children);
+    const measure = () => {
+      const first = rows[0]?.getBoundingClientRect();
+      const last = rows[Math.min(rows.length, visibleRows) - 1]?.getBoundingClientRect();
+      setHeight(first && last ? last.bottom - first.top : undefined);
+    };
+    measure();
+    const resize = new ResizeObserver(measure);
+    resize.observe(list);
+    rows.forEach((row) => resize.observe(row));
+    return () => resize.disconnect();
+  }, [children, visibleRows, fade.ref]);
   return (
     <div
+      {...props}
+      ref={fade.ref}
       data-slot="popover-results"
+      data-scroll-fade-before={fade.edges.before}
+      data-scroll-fade-after={fade.edges.after}
+      style={{ ...style, ...(visibleRows && height ? { maxHeight: height } : {}) }}
+      onScroll={(event) => { fade.measure(); onScroll?.(event); }}
       className={cn(
         "min-h-control max-h-60 flex-1 overflow-y-auto overscroll-y-contain pe-2 [scrollbar-gutter:stable]",
+        visibleRows && "scroll-fade",
         className,
       )}
-      {...props}
-    />
+    >{children}</div>
   );
 }

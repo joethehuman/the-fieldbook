@@ -28,7 +28,7 @@ export function SidebarHeading({
         type="button"
         variant="ghost"
         size="icon"
-        className="sidebar-toggle max-md:hidden transition-transform duration-[180ms]"
+        className="sidebar-toggle transition-transform duration-[180ms]"
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         aria-controls="main-sidebar"
         aria-expanded={!collapsed}
@@ -41,7 +41,7 @@ export function SidebarHeading({
         type="button"
         variant="ghost"
         size="icon"
-        className="md:hidden"
+        className="sidebar-mobile-close"
         aria-label="Close navigation"
         onClick={onClose}
       >

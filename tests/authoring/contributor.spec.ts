@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace, type Workspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
-import { waitForDraftSaved, openContentSettings, closeContentSettings } from "./editor-helpers";
+import { waitForDraftSaved, openContentSettings, closeContentSettings, returnToContent } from "./editor-helpers";
 import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
 
 async function openMenu(page: Page) {
@@ -85,7 +85,7 @@ test("contributors share publishing editors with four permitted destinations on 
   await waitForDraftSaved(page);
   await openContentSettings(page);
   await expect(page.getByRole("button", { name: "Create section", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Doc section choices" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Section", exact: true })).toBeVisible();
   await page.locator("main").evaluate((node) => Promise.all(
     node.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
   ));
@@ -97,7 +97,7 @@ test("contributors share publishing editors with four permitted destinations on 
   await waitForDraftSaved(page);
   await page.getByRole("button", { name: "Publish", exact: true }).click();
   await expect(page.getByRole("button", { name: "Published", exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Back to content", exact: true }).click();
+  await returnToContent(page);
   await page.getByRole("button", { name: "Course", exact: true }).click();
   await openContentSettings(page);
   await expect(page.getByRole("button", { name: "Manage assigned courses", exact: true })).toHaveCount(0);
@@ -121,10 +121,10 @@ test("contributor Update audience offers groups without team or Organization con
   await page
     .getByLabel("Title", { exact: true })
     .fill("Contributor audience draft");
-  await expect(page.locator(".editor-heading [role=status] .sr-only")).toHaveText("Saved");
+  await expect(page.locator(".editor-save-status [role=status] .sr-only")).toHaveText("Saved");
   await openContentSettings(page);
   await page
-    .getByRole("button", { name: "Edit audience", exact: true })
+    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const panel = page.getByRole("dialog", {
     name: "Update audience",

@@ -100,7 +100,7 @@ for (const app of ["demo", "production"] as const) {
     await expect(disclosure).not.toHaveAttribute("open");
   });
 
-  test(`${app}: saved accent colors breadcrumbs, authored links and selected Docs`, async ({
+  test(`${app}: saved accent colors authored links and selected Docs`, async ({
     page,
     request,
   }, info) => {
@@ -113,7 +113,7 @@ for (const app of ["demo", "production"] as const) {
       const data = freshWorkspace();
       data.content = arranged;
       data.publishedContent = arranged;
-      data.settings = { ...defaultSettings, accent: "#009908" };
+      data.settings = { ...defaultSettings, ...data.settings, accent: "#009908" };
       await page.addInitScript((workspace) => {
         localStorage.setItem(
           "fieldbook.workspace.v1",
@@ -131,9 +131,6 @@ for (const app of ["demo", "production"] as const) {
       });
       await page.goto("/docs");
     }
-    const breadcrumb = page
-      .getByRole("navigation", { name: "Breadcrumb" })
-      .getByRole("link", { name: "Organization" });
     const authored = page.locator("article").getByRole("link", {
       name: "the guide",
     });
@@ -153,8 +150,7 @@ for (const app of ["demo", "production"] as const) {
         ),
       )
       .toBe("#009908");
-    if (info.project.name === "desktop")
-      await expect(breadcrumb).toHaveCSS("color", linkColor);
+    await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveCount(0);
     if (info.project.name === "phone")
       await page.getByRole("button", { name: "Open navigation" }).click();
     const active = page
@@ -183,6 +179,7 @@ for (const app of ["demo", "production"] as const) {
       data.content = arranged;
       data.settings = {
         ...defaultSettings,
+        ...data.settings,
         docCategoryOrder: ["Reference", "Getting started"],
       };
       await page.addInitScript((workspace) => {
@@ -319,6 +316,7 @@ for (const app of ["demo", "production"] as const) {
       data.content = docs;
       data.settings = {
         ...defaultSettings,
+        ...data.settings,
         docCategoryOrder: ["Getting started", "Reference"],
       };
       await page.addInitScript((data) => {
@@ -403,11 +401,14 @@ for (const app of ["demo", "production"] as const) {
     await expect
       .poll(() => bar.evaluate((el) => el.getBoundingClientRect().top))
       .toBe(0);
+    const searchTrigger = page.getByRole("button", { name: "Open search", exact: true });
+    const compactSearch = await searchTrigger.isVisible();
+    if (compactSearch) await searchTrigger.click();
     const search = page.getByRole("textbox", { name: "Search all content" });
     await search.fill("readable");
     const panel = page.locator('[data-slot="search-panel"]');
     await expect(panel).toBeVisible();
-    expect(
+    if (!compactSearch) expect(
       await panel.evaluate((el) => el.getBoundingClientRect().top),
     ).toBeGreaterThanOrEqual(
       await search.evaluate((el) => el.getBoundingClientRect().bottom),
@@ -418,9 +419,9 @@ for (const app of ["demo", "production"] as const) {
     await page.screenshot({
       path: info.outputPath(`${app}-bar-scrolled-search.png`),
     });
-    await search.press("Escape");
-    await expect(search).toBeFocused();
     await search.fill("");
+    await search.press("Escape");
+    await expect(compactSearch ? searchTrigger : search).toBeFocused();
     const pagination = page.getByRole("navigation", {
       name: "Previous and next documents",
     });
@@ -564,6 +565,7 @@ for (const app of ["demo", "production"] as const) {
       data.content = hierarchy;
       data.settings = {
         ...defaultSettings,
+        ...data.settings,
         docCategoryOrder: ["Getting started"],
       };
       await page.addInitScript((workspace) => {

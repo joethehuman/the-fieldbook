@@ -12,11 +12,12 @@ import {
 } from "./popover";
 import { cn } from "@/lib/utils";
 
-type Props = Omit<ComponentProps<"input">, "value" | "onChange" | "list"> & {
+type Props = Omit<ComponentProps<typeof Input>, "value" | "onChange" | "list"> & {
   value: string;
   onValueChange: (value: string) => void;
   options: string[];
   listLabel: string;
+  visibleRows?: number;
 };
 
 /** Editable suggestions: free text is valid; selection also normalizes existing names. */
@@ -25,6 +26,7 @@ export function CreatableCombobox({
   onValueChange,
   options,
   listLabel,
+  visibleRows,
   disabled,
   ...props
 }: Props) {
@@ -155,7 +157,7 @@ export function CreatableCombobox({
             event.preventDefault();
         }}
       >
-        <PopoverResults id={listId} role="listbox" aria-label={listLabel}>
+        <PopoverResults id={listId} role="listbox" aria-label={listLabel} visibleRows={visibleRows}>
           {items.map((item, index) => (
             <div
               key={item.value}

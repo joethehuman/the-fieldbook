@@ -7,14 +7,15 @@ export function Textarea({
   ...props
 }: ComponentProps<"textarea"> & {
   size?: "default" | "compact";
-  variant?: "default" | "embedded" | "document-title";
+  variant?: "default" | "metadata" | "embedded" | "document-title";
 }) {
   return (
     <textarea
       data-slot="textarea"
       autoComplete="off"
       className={cn(
-        "w-full min-w-0 bg-background text-base sm:text-copy font-normal text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-disabled-background disabled:text-disabled-foreground",
+        "w-full min-w-0 bg-background font-normal text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:bg-disabled-background disabled:text-disabled-foreground",
+        variant === "metadata" ? "text-copy" : "text-base sm:text-copy",
         variant === "document-title"
           ? "document-title resize-none overflow-hidden rounded-none border-0 p-0 font-semibold tracking-tight"
           : variant === "embedded"
