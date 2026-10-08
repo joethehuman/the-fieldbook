@@ -767,7 +767,7 @@ test("leaf navigation refreshes added, renamed and removed Docs after direct Tea
   await expect(
     page.locator(`.sidebar a[href="/docs/${removedId}"]`),
   ).toHaveCount(0);
-  await expect(page.locator('.breadcrumb [aria-current="page"]')).toHaveText(
+  await expect(page.locator('main h1').first()).toHaveText(
     "Renamed second reference",
   );
 });
@@ -1236,7 +1236,7 @@ for (const section of ["updates", "courses", "curricula"] as const) {
       .getByRole("link", { name: "Open cold detail", exact: true })
       .click();
     await expect(page).toHaveURL(new RegExp(path + "$"));
-    await expect(page.locator('.breadcrumb [aria-current="page"]')).toHaveText(
+    await expect(page.locator('main h1').first()).toHaveText(
       section === "curricula" ? "Narrow curriculum" : item.title,
     );
     const { readQueries } = await (
@@ -1250,5 +1250,61 @@ for (const section of ["updates", "courses", "curricula"] as const) {
       ),
     ).toHaveLength(0);
     await expect(page.locator('.sidebar a[href^="/docs/"]')).toHaveCount(0);
+  });
+}
+
+for (const app of ["demo", "production"] as const) {
+  test(`${app}: shared header and page titles align without breadcrumbs`, async ({ page, request }, info) => {
+    const article = { ...doc, kind: "doc" as const, status: "published" as const, body: "## First section\n\nA readable reference.\n\n## Next section\n\nMore reference." };
+    if (app === "demo") {
+      const workspace = freshWorkspace();
+      workspace.content = [article];
+      workspace.publishedContent = [article];
+      await page.addInitScript((workspace) => {
+        localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
+        sessionStorage.setItem("fieldbook.profile.v1", "demo-admin");
+      }, workspace);
+    } else {
+      await request.post(`${backend}/fixture`, { data: { ...fixture, documents: [{ ...fixture.documents[0], published: article, draft: article }] } });
+    }
+    for (const width of [1600, 1180, 820, 375]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const section of ["updates", "courses", "docs"] as const) {
+        await page.goto(app === "demo" ? `http://localhost:3132/#${section === "docs" ? `docs/${docId}` : section}` : section === "docs" ? `/docs/${docId}` : `/${section}`);
+        const title = page.locator("main h1").first();
+        await expect(title).toHaveText(section === "docs" ? doc.title : section === "updates" ? "Updates" : "Courses");
+        await expect(page.getByRole("navigation", { name: "Breadcrumb" })).toHaveCount(0);
+        await openNavigation(page);
+        const compact = await page.getByRole("button", { name: "Open navigation", exact: true }).isVisible();
+        const search = compact ? page.getByRole("button", { name: "Open search", exact: true }) : page.getByRole("textbox", { name: "Search all content", exact: true });
+        const searchBox = (await search.boundingBox())!;
+        const heading = (await page.locator(".sidebar-heading").boundingBox())!;
+        expect(searchBox.y + searchBox.height / 2).toBeCloseTo(heading.y + heading.height / 2, 0);
+        const firstItem = (await page.locator(".sidebar-primary-link").first().boundingBox())!;
+        const firstLine = await title.evaluate((el) => { const box = el.getBoundingClientRect(); return { y: box.y, center: box.y + parseFloat(getComputedStyle(el).lineHeight) / 2 }; });
+        expect(Math.abs(firstLine.center - (firstItem.y + firstItem.height / 2))).toBeLessThanOrEqual(8);
+        expect(firstLine.y - (searchBox.y + searchBox.height)).toBeCloseTo(32, 0);
+        if (compact) await page.getByRole("button", { name: "Close navigation", exact: true }).click();
+        if (section === "docs") {
+          const disclosure = page.locator(".reading-outline-disclosure summary");
+          if (await disclosure.isVisible()) {
+            const header = (await page.locator(".article-header").boundingBox())!;
+            expect((await disclosure.boundingBox())!.y).toBeGreaterThanOrEqual(header.y + header.height);
+            await disclosure.click();
+            await page.getByRole("link", { name: "Next section", exact: true }).first().click();
+            await expect(page.locator('.markdown h2').last()).toBeInViewport();
+          }
+        }
+        if (width === 1600 || width === 820) await page.screenshot({ path: info.outputPath(`${app}-${section}-alignment-${width}.png`), animations: "disabled" });
+      }
+    }
+    // A collapsed rail uses the same two visual rows.
+    await page.setViewportSize({ width: 1180, height: 1000 });
+    await page.goto(app === "demo" ? "http://localhost:3132/#updates" : "/updates");
+    await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
+    const railToggle = (await page.getByRole("button", { name: "Expand sidebar", exact: true }).boundingBox())!;
+    const searchBox = (await page.getByRole("textbox", { name: "Search all content", exact: true }).boundingBox())!;
+    expect(railToggle.y + railToggle.height / 2).toBeCloseTo(searchBox.y + searchBox.height / 2, 0);
   });
 }

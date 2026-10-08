@@ -201,9 +201,8 @@ async function openNav(page: Page) {
   }
 }
 
-for (const entry of ["account menu", "breadcrumb"] as const) {
+for (const entry of ["account menu"]) {
   test(`Administration ${entry} preserves a failed draft on Cancel and returns to Content on Confirm`, async ({ page }, info) => {
-    test.skip(entry === "breadcrumb" && (page.viewportSize()?.width || 0) < 768, "Breadcrumbs are hidden on phone layouts");
     const production = info.project.name.startsWith("production");
     const { control } = await setup(page, production);
     await failDraftWrites(page, production, control);
@@ -211,13 +210,9 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
     await title.fill("Keep this exact editor");
     const original = await title.elementHandle();
     const select = async () => {
-      if (entry === "breadcrumb")
-        await page.getByRole("navigation", { name: "Breadcrumb" }).getByRole("link", { name: "Administration", exact: true }).click();
-      else {
-        await openNav(page);
-        await page.getByRole("button", { name: "Account menu", exact: true }).click();
-        await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
-      }
+      await openNav(page);
+      await page.getByRole("button", { name: "Account menu", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Manage organization", exact: true }).click();
     };
     await select();
     await expect(page.getByRole("alertdialog")).toBeVisible();

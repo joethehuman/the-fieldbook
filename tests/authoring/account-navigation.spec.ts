@@ -227,14 +227,10 @@ async function noNavigation(page: Page, select: () => Promise<void>) {
   await page.evaluate(() => (window as any).openingPageObserver.disconnect());
 }
 
-for (const entry of ["account menu", "breadcrumb"] as const) {
+for (const entry of ["account menu"]) {
   test(`Administration ${entry} returns sections to Content and landing selection does not navigate`, async ({
     page,
   }, info) => {
-    test.skip(
-      entry === "breadcrumb" && (page.viewportSize()?.width || 0) < 768,
-      "Breadcrumbs are hidden on phone layouts",
-    );
     await setup(page, info.project.name.startsWith("production"));
     await section(page, "Identity");
     const name = page.getByRole("textbox", {
@@ -242,13 +238,7 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
       exact: true,
     });
     await name.fill("Unsaved identity");
-    const select = () =>
-      entry === "account menu"
-        ? account(page, "Manage organization")
-        : page
-            .getByRole("navigation", { name: "Breadcrumb" })
-            .getByRole("link", { name: "Administration", exact: true })
-            .click();
+    const select = () => account(page, "Manage organization");
     await select();
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await expect(name).toHaveValue("Unsaved identity");
@@ -285,10 +275,6 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
   test(`Team progress ${entry} returns member details to the overview and landing selection does not navigate`, async ({
     page,
   }, info) => {
-    test.skip(
-      entry === "breadcrumb" && (page.viewportSize()?.width || 0) < 768,
-      "Breadcrumbs are hidden on phone layouts",
-    );
     await setup(page, info.project.name.startsWith("production"), true);
     await page
       .locator("button[data-person-id]")
@@ -299,13 +285,7 @@ for (const entry of ["account menu", "breadcrumb"] as const) {
       exact: true,
     });
     await expect(details).toBeVisible();
-    const select = () =>
-      entry === "account menu"
-        ? account(page, "My team’s progress")
-        : page
-            .getByRole("navigation", { name: "Breadcrumb" })
-            .getByRole("link", { name: "Team progress", exact: true })
-            .click();
+    const select = () => account(page, "My team’s progress");
     await select();
     await expect(details).toHaveCount(0);
     await expect(

@@ -61,7 +61,6 @@ export function DemoStartup({
               <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation">
                 <Menu />
               </Button>
-              <span className="breadcrumb">Organization</span>
             </>
           }
         >

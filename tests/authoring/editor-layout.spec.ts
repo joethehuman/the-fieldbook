@@ -120,7 +120,8 @@ for (const kind of ["doc", "brief", "course"] as const)
     for (const width of [1600, 1440, 1280, 1279, 1024, 768, 375]) {
       await resize(width);
       const available = (await page.locator(".editor-frame").boundingBox())!.width;
-      await expect.poll(async () => (await firstLine.boundingBox())!.width).toBeCloseTo(Math.min(704, available), 0);
+      const compact = await page.locator(".editor-frame").getAttribute("data-cards") === "true";
+      await expect.poll(async () => (await firstLine.boundingBox())!.width).toBeCloseTo(Math.min(704, available - (compact ? 0 : 148)), 0);
       const column = (await firstLine.boundingBox())!;
       const frame = (await page.locator(".editor-frame").boundingBox())!;
       expect(Math.abs((column.x - frame.x) - (frame.x + frame.width - column.x - column.width))).toBeLessThanOrEqual(2);
@@ -204,7 +205,7 @@ test("editor controls and app navigation share the compact layout boundary", asy
   const original = await writer.elementHandle();
   const outline = page.getByRole("button", { name: "Outline", exact: true });
   const details = page.getByRole("button", { name: "Details", exact: true });
-  for (const width of [375, 768, 1024, 1279, 1280]) {
+  for (const width of [375, 767, 768, 1024, 1279, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     await page.locator(".main-shell").evaluate(async (el) => {
       await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
@@ -1255,7 +1256,8 @@ for (const kind of ["doc", "brief", "course"] as const)
       await page.setViewportSize({ width, height: 900 });
       const compact = width <= 767 || (!!info.project.use.hasTouch && width <= 900);
       const frame = page.locator(".editor-frame");
-      if (compact) await expect(frame).toHaveAttribute("data-cards", "true");
+      const stacked = compact;
+      if (stacked) await expect(frame).toHaveAttribute("data-cards", "true");
       else await expect(frame).not.toHaveAttribute("data-cards", "true");
       await page.locator(".editor").evaluate((el) => {
         el.closest(".main-content")!.scrollTop = 0;
@@ -1267,14 +1269,14 @@ for (const kind of ["doc", "brief", "course"] as const)
         await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       });
       const start = (await back.boundingBox())!;
-      if (!compact) {
+      if (!stacked) {
         await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
         const detail = (await page.getByRole("button", { name: "Details", exact: true }).boundingBox())!;
-        expect(detail.y).toBeCloseTo(start.y, 0);
+        expect(detail.y + detail.height / 2).toBeCloseTo(start.y + start.height / 2, 0);
         if (width >= 1024) expect(Math.abs((await back.locator("svg").boundingBox())!.x - (await title.boundingBox())!.x)).toBeLessThanOrEqual(2);
         if (kind === "course") {
           const outline = (await page.getByRole("button", { name: "Outline", exact: true }).boundingBox())!;
-          expect(outline.y).toBeCloseTo(start.y, 0);
+          expect(outline.y + outline.height / 2).toBeCloseTo(start.y + start.height / 2, 0);
           expect(start.x).toBeGreaterThanOrEqual(outline.x + outline.width + 4);
         }
       }
@@ -1323,4 +1325,54 @@ test("resizing retains the writing position when the scroll owner changes", asyn
     })).toBeCloseTo(500, 0);
     await expect(page.getByRole("textbox", { name: "Lesson title", exact: true })).toBeInViewport();
   }
+});
+
+test("edge controls never cross the canvas and the desktop navigation stays centered", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await open(page, info.project.name.startsWith("production"), "course");
+  const original = await page.locator('.writing-content[contenteditable="true"]').elementHandle();
+  const frame = page.locator(".editor-frame");
+  const back = page.getByRole("button", { name: "Back to content", exact: true });
+  const outline = page.getByRole("button", { name: "Outline", exact: true });
+  const details = page.getByRole("button", { name: "Details", exact: true });
+  const title = page.locator("#editor-title");
+  const command = page.getByRole("button", { name: "Commands: insert blocks or format selected text", exact: true });
+  for (const expanded of [false, true]) {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    if (expanded) await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
+    else if (await page.getByRole("button", { name: "Collapse sidebar", exact: true }).isVisible())
+      await page.getByRole("button", { name: "Collapse sidebar", exact: true }).click();
+    for (const width of [1250, 1100, 1000, 980, 974, 972, 970, 968, 950, 900, 800, 768, 900, 972, 974, 1100, 1250]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.locator(".main-shell").evaluate(async (el) => {
+        await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+      const boxes = { back: (await back.boundingBox())!, outline: (await outline.boundingBox())!, details: (await details.boundingBox())!, title: (await title.boundingBox())! };
+      await expect(frame).not.toHaveAttribute("data-cards", "true");
+      // Include the padded Back button hit area, not just its arrow/text.
+      expect(boxes.outline.x + boxes.outline.width + 7).toBeLessThanOrEqual(boxes.back.x);
+      expect(Math.abs((await back.locator("svg").boundingBox())!.x - boxes.title.x)).toBeLessThanOrEqual(2);
+      expect(boxes.outline.y + boxes.outline.height / 2).toBeCloseTo(boxes.back.y + boxes.back.height / 2, 0);
+      expect(boxes.details.y + boxes.details.height / 2).toBeCloseTo(boxes.back.y + boxes.back.height / 2, 0);
+      await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
+      await expect(command).toBeHidden();
+      const modes = await frame.evaluate(async (el) => {
+        const values = new Set<string | undefined>();
+        for (let i = 0; i < 8; i++) { await new Promise(requestAnimationFrame); values.add((el as HTMLElement).dataset.cards); }
+        return values.size;
+      });
+      expect(modes).toBe(1);
+      expect(await original!.evaluate((node) => node.isConnected)).toBe(true);
+      if (width === 980 || width === 900 || width === 768) await page.screenshot({ path: info.outputPath(`controls-${expanded ? "expanded" : "rail"}-${width}.png`) });
+    }
+  }
+  // Enlarged type retains the desktop row and its clearance until compact mode.
+  await page.setViewportSize({ width: 1100, height: 1000 });
+  await page.evaluate(() => { document.documentElement.style.fontSize = "20px"; });
+  await expect(frame).not.toHaveAttribute("data-cards", "true");
+  const row = (await outline.boundingBox())!;
+  const backBox = (await back.boundingBox())!;
+  expect(row.x + row.width + 7).toBeLessThanOrEqual(backBox.x);
+  expect(row.y + row.height / 2).toBeCloseTo(backBox.y + backBox.height / 2, 0);
 });

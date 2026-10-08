@@ -1,6 +1,7 @@
 /* Application geometry only. Controls, fields, actions and surfaces live in components. */
 @layer components {
   .app {
+    --app-header-min-height: calc(2 * var(--space-6) + var(--control-height));
     --sidebar-rail-width: 4.25rem;
     --sidebar-inner-width: calc(var(--sidebar-width) - var(--space-4) - var(--space-4) - 1px);
     --active-sidebar-width: var(--sidebar-width);
@@ -28,6 +29,7 @@
     transition: none;
   }
   .sidebar-heading {
+    margin-block-end: var(--space-2);
     display: grid;
     min-width: 0;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -84,11 +86,11 @@
     display: flex;
     flex: none;
     flex-wrap: wrap;
-    min-height: 4rem;
+    min-height: var(--app-header-min-height);
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    padding: var(--space-3) var(--space-6);
+    padding: var(--space-6);
   }
   .topbar::after {
     content: "";
@@ -131,43 +133,15 @@
   .editor-app-actions { display: flex; align-items: center; min-width: 0; width: 100%; gap: var(--space-4); }
   .app-editor-header:empty { display: none; }
   .app-editor-header { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: flex-end; gap: var(--space-4); }
-  .topbar:has(.app-editor-header:not(:empty)) .breadcrumb { display: none; }
   .topbar > .app-navigation-toggle { order: -2; }
   .topbar [data-slot="search-panel"] [data-slot="search-field"] { width: 100%; }
   @media (min-width: 768px) { .topbar [data-slot="search-panel"] { left: 0; right: auto; } }
-  .breadcrumb {
-    flex: 1 1 12rem;
-    justify-content: flex-end;
-    overflow: hidden;
-    white-space: nowrap;
-  }
-  .breadcrumb,
-  .crumb-item {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: var(--space-2);
-    color: var(--muted-foreground);
-    font-size: 0.75rem;
-  }
-  .breadcrumb > a {
-    flex-shrink: 0;
-  }
-  .breadcrumb .crumb-item {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-  .breadcrumb strong {
-    color: var(--foreground);
-    overflow-wrap: anywhere;
-  }
   .topbar [data-slot="search-field"] {
     width: min(24rem, 40vw);
     max-width: 100%;
   }
   .main-content {
-    --workspace-inset-block: var(--space-5);
+    --workspace-inset-block: var(--space-2);
     --workspace-inset-inline: var(--space-6);
     container: workspace / inline-size;
     display: grid;
@@ -290,7 +264,11 @@
   .editor-frame {
     --scroll-fade-depth: var(--scroll-fade-size);
     --editor-panel-width: 320px;
-    --editor-text-inset: max(0px, calc((100% - var(--reading-width)) / 2));
+    /* Outline inset + button width + gap + Back button's padded outset. */
+    --editor-edge-clearance: calc(var(--space-3) + 2.75rem + var(--space-2) + 0.625rem);
+    --editor-column-width: min(var(--reading-width), max(0px, calc(100cqw - 2 * var(--editor-edge-clearance))));
+    --editor-text-inset: max(0px, calc((100% - var(--editor-column-width)) / 2));
+    container: editor-canvas / inline-size;
     --editor-content-padding: var(--space-6);
     position: relative;
     display: flex;
@@ -363,8 +341,10 @@
     opacity: 0;
     transition: opacity 160ms ease;
   }
-  .editor-frame[data-outline="true"]:not([data-cards="true"]) .editor-canvas-navigation {
-    padding-inline-start: max(var(--editor-text-inset), 4.5rem);
+  .editor-frame:not([data-cards="true"]) .editor-canvas-navigation > [data-slot="detail-navigation"] {
+    display: flex;
+    align-items: center;
+    min-height: 2.75rem;
   }
   .editor[data-scroll-layout="page"] .editor-canvas-navigation { top: 0; }
   .editor[data-scroll-layout="page"] .editor-canvas-navigation::before {
@@ -398,7 +378,7 @@
     flex-direction: column;
     min-width: 0;
     min-height: 0;
-    max-height: calc(100dvh - var(--app-bar-height, 4rem) - var(--space-8));
+    max-height: calc(100dvh - var(--app-bar-height, var(--app-header-min-height)) - var(--space-8));
     overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--border) 65%, var(--background));
     border-radius: var(--radius-xl);
@@ -453,7 +433,7 @@
   .editor-mobile-panels .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
   .editor-mobile-panels :is(.editor-frame-outline, .editor-frame-details) { max-height: inherit; }
   .editor-mobile-panels .editor-floating-heading { padding-inline: var(--space-4); min-height: 3.5rem; }
-  .editor-frame[data-cards="true"] { --editor-content-padding: var(--space-4); }
+  .editor-frame[data-cards="true"] { --editor-content-padding: var(--space-4); --editor-edge-clearance: 0px; }
   @media (max-width: 767px) {
     .topbar { gap: var(--space-2); padding-inline: var(--space-3); }
     .app-editor-header, .editor-app-actions { gap: var(--space-2); }
@@ -933,14 +913,11 @@
     .lesson-progress {
       grid-column: 1/-1;
     }
-    .breadcrumb {
-      display: none;
-    }
   }
   @media (width < 48rem) {
     .lesson-nav { grid-template-columns: minmax(0, 1fr); }
     .main-content {
-      --workspace-inset-block: var(--space-6);
+      --workspace-inset-block: var(--space-2);
       --workspace-inset-inline: var(--space-4);
     }
     .topbar {
@@ -1097,7 +1074,7 @@
   /* The main scroller's block padding already supplies the sticky top inset. */
   .course-sidebar { position: sticky; top: 0; min-width: 0; align-self: start; }
   /* Before measurement (including without JS), the card retains natural height. */
-  .course-sidebar-panel { display: flex; flex-direction: column; gap: var(--space-4); max-height: max(calc(var(--course-sidebar-chrome-height) + var(--course-outline-min-height)), calc(100dvh - var(--app-bar-height, 4rem) - 2 * var(--workspace-inset-block))); min-height: 0; overflow: hidden; }
+  .course-sidebar-panel { display: flex; flex-direction: column; gap: var(--space-4); max-height: max(calc(var(--course-sidebar-chrome-height) + var(--course-outline-min-height)), calc(100dvh - var(--app-bar-height, var(--app-header-min-height)) - 2 * var(--workspace-inset-block))); min-height: 0; overflow: hidden; }
   .course-sidebar .lesson-nav { position: static; flex: 0 1 auto; min-height: var(--course-outline-min-height); overflow-y: auto; overscroll-behavior: contain; align-content: start; border-top: 1px solid var(--border); padding-block: var(--space-4) var(--space-1); padding-right: var(--space-2); }
   .course-sidebar .lesson-nav h2 { font-size: 1rem; font-weight: var(--weight-heading); margin-block: var(--space-2); }
   .course-sidebar .lesson-nav [data-slot="navigation-button"] { text-align: left; align-items: center; }

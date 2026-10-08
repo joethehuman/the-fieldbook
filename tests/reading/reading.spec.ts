@@ -1177,7 +1177,7 @@ test("publication and access changes are reflected on the next request", async (
   await fixture(request);
   expect((await request.get(path)).status()).toBe(200);
 });
-test("reading without JavaScript, responsive layout and native breadcrumbs", async ({
+test("reading without JavaScript, responsive layout and native sidebar links", async ({
   browser,
   baseURL,
 }, info) => {
@@ -1193,7 +1193,7 @@ test("reading without JavaScript, responsive layout and native breadcrumbs", asy
   ).toBeVisible();
   await expect(page.getByText(items[0].body, { exact: true })).toBeVisible();
   await expect(
-    page.locator('nav[aria-label="Breadcrumb"] a[href="/docs"]'),
+    page.locator('nav[aria-label="Primary"] a[href="/docs"]'),
   ).toHaveAttribute("href", "/docs");
   await expectReadingWidth(page);
   await page.screenshot({
@@ -1202,16 +1202,18 @@ test("reading without JavaScript, responsive layout and native breadcrumbs", asy
   });
   await page.goto(`/courses/${ids[2]}`);
   await expect(page.getByText(items[2].lessons[0].body, { exact: true })).toBeVisible();
-  await expect(
-    page.getByRole("link", { name: /Second lesson/ }),
-  ).toHaveAttribute("href", `/courses/${ids[2]}?lesson=second`);
+  const lessonHref = await page.getByRole("link", { name: /Second lesson/ }).getAttribute("href");
+  const lessonDestination = new URL(lessonHref!, baseURL);
+  expect(lessonDestination.pathname).toBe(`/courses/${ids[2]}`);
+  expect(lessonDestination.searchParams.get("lesson")).toBe("second");
+  expect(lessonDestination.searchParams.get("from")).toBe("/courses");
   await page.screenshot({
     path: info.outputPath("course-no-js.png"),
     fullPage: true,
   });
   await context.close();
 });
-test("hydration keeps one article, breadcrumbs navigate, and lesson links open the player", async ({
+test("hydration keeps one article, sidebar navigation works, and lesson links open the player", async ({
   page,
 }, info) => {
   const errors: string[] = [];
@@ -1236,11 +1238,11 @@ test("hydration keeps one article, breadcrumbs navigate, and lesson links open t
     await expect(page.locator(".sidebar")).toHaveClass(/open/);
     await page.getByRole("button", { name: "Close navigation" }).click();
   } else {
-    const crumb = page
-      .getByRole("navigation", { name: "Breadcrumb" })
+    const destination = page
+      .getByRole("navigation", { name: "Primary" })
       .getByRole("link", { name: "Docs", exact: true });
-    await crumb.focus();
-    await crumb.press("Enter");
+    await destination.focus();
+    await destination.press("Enter");
   }
   await expect(page).toHaveURL(/\/docs$/);
   await page.goto(`/courses/${ids[2]}`);
@@ -1542,7 +1544,7 @@ test("reader does not load workspace and picks up republished content on reload"
 });
 
 async function expectReadingWidth(page: Page) {
-  const geometry = await page.locator("article.article").evaluate((article) => {
+  const geometry = await page.locator(".article").evaluate((article) => {
     const main = article.closest("main")!;
     const style = getComputedStyle(main);
     const available =

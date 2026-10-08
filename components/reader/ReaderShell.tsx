@@ -20,7 +20,6 @@ import { WorkspaceContext } from "./WorkspaceContext";
 import { usePathname, useRouter } from "next/navigation";
 import {
   BookOpen,
-  ChevronRight,
   GraduationCap,
   Menu,
   Newspaper,
@@ -40,7 +39,6 @@ import { Button } from "@/components/ui/button";
 import { ReaderSearch } from "./ReaderSearch";
 import { ReaderGuestImport } from "./ReaderGuestImport";
 import type { ReaderShellContext } from "@/lib/reader-types";
-import { homePath } from "@/lib/navigation";
 import { orderedDocs } from "@/lib/docs-navigation";
 
 export function ReaderShell({
@@ -145,15 +143,6 @@ export function ReaderShell({
     ])
       if (neighbor) router.prefetch(`/docs/${encodeURIComponent(neighbor.id)}`);
   }, [section, selected, orderedDocList, router]);
-  const articleTitle = selected
-    ? section === "docs"
-      ? context.docs.find((doc) => doc.id === selected)?.title
-      : section === "curricula"
-        ? context.curriculumTitles?.find((item) => item.id === selected)?.title
-        : section === "courses"
-          ? context.courseTitles?.find((item) => item.id === selected)?.title
-          : context.updateTitles?.find((item) => item.id === selected)?.title
-    : undefined;
   useEffect(() => {
     if (!menu) return;
     closeTrigger.current?.focus();
@@ -166,18 +155,6 @@ export function ReaderShell({
     document.addEventListener("keydown", escape);
     return () => document.removeEventListener("keydown", escape);
   }, [menu]);
-  const title =
-    section === "docs"
-      ? "Docs"
-      : section === "courses" || section === "curricula"
-        ? "Courses"
-        : section === "team"
-          ? "Team progress"
-          : section === "admin"
-            ? context.user?.role === "contributor" ? "Publishing" : "Administration"
-            : section === "privacy"
-              ? "Privacy policy"
-              : "Updates";
   const close = () => setMenu(false);
   const links = [
     { href: "/updates", title: "Updates", icon: Newspaper },
@@ -436,36 +413,6 @@ export function ReaderShell({
             >
               <Menu />
             </Button>
-            <nav className="breadcrumb" aria-label="Breadcrumb">
-              <Button asChild variant="link">
-                <Link href={homePath(context.branding)} prefetch>
-                  Organization
-                </Link>
-              </Button>
-              {section !== "courses" && (
-                <>
-                  <ChevronRight size={14} />
-                  <Button asChild variant="link">
-                    <Link
-                      href={
-                        section === "curricula" ? "/courses" : `/${section}`
-                      }
-                      prefetch
-                    >
-                      {title}
-                    </Link>
-                  </Button>
-                </>
-              )}
-              {selected && (
-                <>
-                  <ChevronRight size={14} />
-                  <span className="crumb-item" aria-current="page">
-                    {articleTitle || "Article"}
-                  </span>
-                </>
-              )}
-            </nav>
             <ReaderSearch
               enabled={context.branding.askAiEnabled === true}
               userId={context.user?.id || null}

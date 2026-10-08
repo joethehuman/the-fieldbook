@@ -50,7 +50,6 @@ import {
   GraduationCap,
   Newspaper,
   ArrowRight,
-  ChevronRight,
   X,
   Menu,
   Compass,
@@ -350,8 +349,6 @@ export default function Fieldbook() {
     ...defaultSettings,
     ...(data ? data.settings : demoPickerSettings),
   };
-  const landingPath = homePath(branding);
-  const landingView = resolveSection(landingPath.slice(1)) || "learn";
   const policyHref = privacyHref(branding);
   if (!restored || !data || !user) {
     const picker = (
@@ -434,16 +431,6 @@ export default function Fieldbook() {
   const item = visible.find(
     (c) => c.id === (selected || (view === "docs" ? firstDoc?.id : null)),
   );
-  const currentTitle =
-    view === "learn"
-      ? "Courses"
-      : view === "docs"
-        ? "Docs"
-        : view === "briefs"
-          ? "Updates"
-          : view === "team"
-            ? "Team progress"
-            : user.role === "contributor" ? "Publishing" : "Administration";
   return (
     <WorkspaceFrame
       accent={branding.accent}
@@ -582,57 +569,6 @@ export default function Fieldbook() {
           >
             <Menu />
           </Button>
-          <nav className="breadcrumb" aria-label="Breadcrumb">
-            <Button asChild variant="link">
-              <a
-                href={`#${landingPath.slice(1)}`}
-                onClick={(event) => {
-                  if (
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    event.shiftKey ||
-                    event.altKey
-                  )
-                    return;
-                  event.preventDefault();
-                  void navigate(landingView);
-                }}
-              >
-                Organization
-              </a>
-            </Button>
-            <ChevronRight size={14} />
-            <Button asChild variant="link">
-              <a
-                href={`#${sectionPaths[view]}`}
-                onClick={(event) => {
-                  if (
-                    event.metaKey ||
-                    event.ctrlKey ||
-                    event.shiftKey ||
-                    event.altKey
-                  )
-                    return;
-                  event.preventDefault();
-                  void navigate(view);
-                }}
-              >
-                {currentTitle}
-              </a>
-            </Button>
-            {item && (
-              <>
-                <ChevronRight size={14} />
-                <span
-                  className="crumb-item"
-                  aria-current="page"
-                  title={item.title}
-                >
-                  {item.title}
-                </span>
-              </>
-            )}
-          </nav>
           <SearchExperience
             key={`${user.id}:${data.settings?.askAi?.enabled ?? true}`}
             id="global-search-results"
