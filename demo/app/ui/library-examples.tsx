@@ -115,10 +115,7 @@ const exampleReportingTeams = [
   ...Array.from({ length: 12 }, (_, index) => ({
     id: `level-${index + 1}`,
     parentId: index ? `level-${index}` : "revenue",
-    label:
-      index === 0
-        ? "North America"
-        : `Level ${index + 1} regional team`,
+    label: index === 0 ? "North America" : `Level ${index + 1} regional team`,
     description: "Manager: Casey Rivera",
     managerName: "Casey Rivera",
     directMemberCount: index === 11 ? 6 : 68,
@@ -134,7 +131,10 @@ const exampleReportingTeams = [
 ];
 
 function AudienceSelectionExample() {
-  const [selected, setSelected] = useState<string[]>(["team:organization"]);
+  const [selected, setSelected] = useState<string[]>([
+    "team:sales",
+    "group:launch",
+  ]);
   const [data] = useState(() => ({
     ...freshWorkspace(),
     settings: {
@@ -145,6 +145,7 @@ function AudienceSelectionExample() {
     groups: [
       { id: "visitors", name: "Visitors" },
       { id: "sales", name: "Account executives" },
+      { id: "launch", name: "Launch readiness", teamIds: ["sales"] },
     ],
     teams: [
       {
@@ -153,6 +154,9 @@ function AudienceSelectionExample() {
         system: "organization" as const,
       },
       { id: "sales", name: "Sales", parentId: "organization" },
+      { id: "enterprise", name: "Enterprise Sales", parentId: "sales" },
+      { id: "midmarket", name: "Mid-market Sales", parentId: "sales" },
+      { id: "support", name: "Support", parentId: "organization" },
     ],
     users: freshWorkspace().users.map((user) => ({
       ...user,
@@ -162,11 +166,12 @@ function AudienceSelectionExample() {
   }));
   return (
     <section>
-      <h3>Content audiences</h3>
+      <h3>Assignment transfer: overlapping sources and inherited coverage</h3>
       <AudienceSelection
         data={data}
         selected={selected}
-        initialSelected={["team:sales"]}
+        initialSelected={["team:sales", "group:launch"]}
+        inherited={{ "team:support": ["Company foundations"] }}
         onChange={setSelected}
       />
     </section>
@@ -499,10 +504,16 @@ export function LibraryExamples() {
                   setBrowserSelection([]);
                 }}
               >
-                {selectBrowserTeams ? <X aria-hidden="true" /> : <ListChecks aria-hidden="true" />}
+                {selectBrowserTeams ? (
+                  <X aria-hidden="true" />
+                ) : (
+                  <ListChecks aria-hidden="true" />
+                )}
                 {selectBrowserTeams ? "Done selecting" : "Select multiple"}
               </Button>
-              <Button onClick={() => setMessage("Create a team in this example.")}>
+              <Button
+                onClick={() => setMessage("Create a team in this example.")}
+              >
                 <Plus aria-hidden="true" /> Add team
               </Button>
             </ActionGroup>
@@ -510,21 +521,26 @@ export function LibraryExamples() {
           selected={selectBrowserTeams ? browserSelection : undefined}
           onSelectionChange={setBrowserSelection}
           selectionActions={
-            selectBrowserTeams ? (range, total) => (
-              <BulkActions
-                collectionSize={total}
-                range={range}
-                selected={browserSelection}
-                onSelectionChange={setBrowserSelection}
-                noun="teams"
-                commands={[{
-                  id: "example-move",
-                  label: "Move selected teams",
-                  description: "This example reviews the selected teams without changing stored data.",
-                  apply: () => setMessage("Example team move reviewed."),
-                }]}
-              />
-            ) : undefined
+            selectBrowserTeams
+              ? (range, total) => (
+                  <BulkActions
+                    collectionSize={total}
+                    range={range}
+                    selected={browserSelection}
+                    onSelectionChange={setBrowserSelection}
+                    noun="teams"
+                    commands={[
+                      {
+                        id: "example-move",
+                        label: "Move selected teams",
+                        description:
+                          "This example reviews the selected teams without changing stored data.",
+                        apply: () => setMessage("Example team move reviewed."),
+                      },
+                    ]}
+                  />
+                )
+              : undefined
           }
           items={exampleReportingTeams}
         />
@@ -985,7 +1001,9 @@ function GroupIndexExample() {
     )
     .sort(
       (a, b) =>
-        (sort === "people" ? b.people - a.people : sort === "people-fewest"
+        (sort === "people"
+          ? b.people - a.people
+          : sort === "people-fewest"
             ? a.people - b.people
             : sort === "courses"
               ? b.courses - a.courses
@@ -1028,7 +1046,11 @@ function GroupIndexExample() {
           </FormField>
         }
         sort={
-          <SortPicker label="Sort example groups" value={sort} onValueChange={setSort}>
+          <SortPicker
+            label="Sort example groups"
+            value={sort}
+            onValueChange={setSort}
+          >
             <option value="name">{sortLabels.nameAsc}</option>
             <option value="reverse">{sortLabels.nameDesc}</option>
             <option value="people">{sortLabels.peopleMost}</option>

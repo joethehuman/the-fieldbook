@@ -44,7 +44,7 @@ import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 
 export function LearningAssignmentPicker({
   data,
-  item,
+  item: requestedItem,
   title,
   onChange,
   registerNavigationGuard,
@@ -55,7 +55,7 @@ export function LearningAssignmentPicker({
   draftAudiences,
   onDraftChange,
   showPeople = true,
-  target,
+  target: requestedTarget,
   onFinish,
 }: {
   onPrepare?: () => Promise<Workspace | null>;
@@ -80,6 +80,21 @@ export function LearningAssignmentPicker({
   | { item: LearningItem | { kind: "brief"; id: string }; target?: never }
   | { item?: never; target: LearningAssignmentTarget }
 )) {
+  // A single item's menu opens its complete source editor. Multi-item batches stay additive.
+  const editingSingle =
+    requestedTarget?.kind === "items" &&
+    requestedTarget.mode === "add" &&
+    requestedTarget.items.length === 1;
+  const item =
+    requestedItem || (editingSingle ? requestedTarget.items[0] : undefined);
+  const target = editingSingle ? undefined : requestedTarget;
+  const displayTitle =
+    editingSingle && item
+      ? item.kind === "curriculum"
+        ? data.curricula?.find((curriculum) => curriculum.id === item.id)
+            ?.name || title
+        : data.content.find((content) => content.id === item.id)?.title || title
+      : title;
   const [open, setOpen] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
@@ -97,6 +112,8 @@ export function LearningAssignmentPicker({
   const previousStep = useRef<"select" | "review">("select");
   const heading = useRef<HTMLHeadingElement>(null);
   const selecting = step === "select";
+  const selectingAudiences =
+    target?.kind !== "audiences" && target?.mode !== "remove";
   useEffect(() => {
     body.current?.scrollTo(0, 0);
     heading.current?.focus({ preventScroll: true });
@@ -375,11 +392,11 @@ export function LearningAssignmentPicker({
     }
   }
   useEffect(() => {
-    if (target) void begin();
-  }, [target]);
+    if (requestedTarget) void begin();
+  }, [requestedTarget]);
   return (
     <>
-      {!target &&
+      {!requestedTarget &&
         (renderTrigger ? (
           renderTrigger({ onClick: () => void begin(), loading: busy && !open })
         ) : (
@@ -393,8 +410,17 @@ export function LearningAssignmentPicker({
             {triggerLabel}
           </Button>
         ))}
-      {!open && error && <Alert variant="destructive" onDismiss={() => { if (!stale) setError(""); }}>{error}</Alert>}
-      {!compact && !target && (
+      {!open && error && (
+        <Alert
+          variant="destructive"
+          onDismiss={() => {
+            if (!stale) setError("");
+          }}
+        >
+          {error}
+        </Alert>
+      )}
+      {!compact && !requestedTarget && (
         <p className="text-sm text-muted-foreground">
           {initialKeys.length || Object.keys(inherited).length
             ? [...new Set([...initialKeys, ...Object.keys(inherited)])]
@@ -419,9 +445,15 @@ export function LearningAssignmentPicker({
         }}
       >
         <DialogContent
-          size={target?.kind === "audiences" ? "workflow-list" : "workflow"}
+          size={
+            selectingAudiences
+              ? "assignment"
+              : target?.kind === "audiences"
+                ? "workflow-list"
+                : "workflow"
+          }
           onCloseAutoFocus={(event) => {
-            if (target && returnFocus.current?.isConnected) {
+            if (requestedTarget && returnFocus.current?.isConnected) {
               event.preventDefault();
               returnFocus.current.focus();
             }
@@ -445,14 +477,16 @@ export function LearningAssignmentPicker({
                 {target
                   ? target.kind === "audiences"
                     ? "Assign Courses"
-                    : "Learning audience"
+                    : target.mode === "remove"
+                      ? "Remove assignments"
+                      : "Add assignments"
                   : item?.kind === "brief"
-                    ? "Update audience"
+                    ? "Update recommendations"
                     : item?.kind === "curriculum"
-                      ? "Curriculum audience"
-                      : "Course audience"}
+                      ? "Curriculum assignments"
+                      : "Course assignments"}
               </DialogTitle>
-              <DialogDescription>{title}</DialogDescription>
+              <DialogDescription>{displayTitle}</DialogDescription>
             </div>
             <Button
               type="button"
@@ -465,12 +499,12 @@ export function LearningAssignmentPicker({
               <X aria-hidden="true" />
             </Button>
           </div>
-          {item?.kind !== "brief" && (
+          {item?.kind !== "brief" && !selectingAudiences && (
             <DialogSteps
               steps={[
                 target?.kind === "audiences"
                   ? "Select learning"
-                  : "Select audience",
+                  : "Select assignments",
                 "Review changes",
               ]}
               current={step === "review" ? 1 : 0}
@@ -480,13 +514,22 @@ export function LearningAssignmentPicker({
             ref={body}
             className={
               selecting
-                ? "flex flex-col gap-4 overflow-y-auto"
+                ? selectingAudiences
+                  ? "flex flex-col overflow-hidden"
+                  : "flex flex-col gap-4 overflow-y-auto"
                 : "overflow-y-auto [scrollbar-gutter:stable]"
             }
           >
             {error && (
               <div className="mb-4 grid shrink-0 gap-3">
-                <Alert variant="destructive" onDismiss={() => { if (!stale) setError(""); }}>{error}</Alert>
+                <Alert
+                  variant="destructive"
+                  onDismiss={() => {
+                    if (!stale) setError("");
+                  }}
+                >
+                  {error}
+                </Alert>
                 {stale && (
                   <Button
                     type="button"
@@ -502,20 +545,22 @@ export function LearningAssignmentPicker({
             <div
               hidden={step !== "select"}
               className={
-                selecting ? "flex min-h-0 flex-1 flex-col gap-4" : "grid gap-4"
+                selecting ? "flex min-h-0 flex-1 flex-col gap-3" : "grid gap-4"
               }
             >
-              <p className="shrink-0 text-sm text-muted-foreground">
-                {target
-                  ? target.mode === "remove"
-                    ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."
-                    : target.kind === "audiences"
-                      ? "Choose courses or curricula for this audience. Other assignments stay in place."
-                      : "Add audiences for the selected learning. Other assignments stay in place."
-                  : item?.kind === "brief"
-                    ? "Choose who gets this Update in For you. No completion requirement."
-                    : "Choose who gets this learning in For you and assigned learning."}
-              </p>
+              {(target || item?.kind === "brief") && (
+                <p className="shrink-0 text-sm text-muted-foreground">
+                  {target
+                    ? target.mode === "remove"
+                      ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."
+                      : target.kind === "audiences"
+                        ? "Choose courses or curricula for this audience. Other assignments stay in place."
+                        : "Add audiences for the selected learning. Other assignments stay in place."
+                    : item?.kind === "brief"
+                      ? "Choose who gets this Update in For you. No completion requirement."
+                      : "Choose who gets this learning in For you and assigned learning."}
+                </p>
+              )}
               {target?.kind === "audiences" ? (
                 <ContentSelectionList
                   bounded
@@ -625,11 +670,13 @@ export function LearningAssignmentPicker({
                 <SaveChangesControl
                   dirty={dirty}
                   busy={busy}
-                  blockedReason={stale
-                    ? "Refresh to review current consequences."
-                    : target && !selected.length
-                      ? "Select at least one item to continue."
-                      : undefined}
+                  blockedReason={
+                    stale
+                      ? "Refresh to review current consequences."
+                      : target && !selected.length
+                        ? "Select at least one item to continue."
+                        : undefined
+                  }
                   onClick={() => {
                     if (step === "review") {
                       running.current = true;
