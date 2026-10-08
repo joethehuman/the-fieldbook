@@ -65,6 +65,17 @@ const layouts = {
   organizationReview: ["record", "text", "text", "text"],
   deadlineReview: ["record", "record", "date", "date"],
   courses: ["record", "text", "status", "actions"],
+  feedback: ["record", "status", "text", "status", "detail", "date", "actions"],
+  feedbackSelection: [
+    "select",
+    "record",
+    "status",
+    "text",
+    "status",
+    "detail",
+    "date",
+    "actions",
+  ],
 } as const satisfies Record<string, readonly Column[]>;
 
 // Only structural table primitives are transformed. Event handlers, refs, row keys

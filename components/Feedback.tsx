@@ -1,7 +1,24 @@
 "use client";
 import { SortPicker } from "./patterns/sort-picker";
 import { DetailNavigation } from "./patterns/detail-navigation";
-import { Card, CardContent, CardFooter } from "./ui/card";
+import { DataTable } from "./patterns/data-table";
+import { HierarchyPicker } from "./patterns/hierarchy-picker";
+import {
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "./ui/dialog";
 import { Badge } from "./ui/badge";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
@@ -104,6 +121,7 @@ export function FeedbackAdmin({
     JSON.stringify([kind, item, rating, query]),
     ids,
   );
+  const selectable = !!onDeleteFeedback && selection.canSelect;
   const commands: BulkCommand[] = onDeleteFeedback
     ? [
         {
@@ -218,20 +236,35 @@ export function FeedbackAdmin({
           </SelectField>
         </FormField>
         <FormField label="Content item">
-          <SelectField value={item} onValueChange={(value) => setItem(value)}>
-            <option value="all">All feedback</option>
-            {data.content
-              .filter((c) => kind === "all" || c.kind === kind)
-              .sort(
-                (a, b) =>
-                  a.title.localeCompare(b.title) || a.id.localeCompare(b.id),
-              )
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-          </SelectField>
+          <HierarchyPicker
+            value={item}
+            onValueChange={setItem}
+            searchLabel="Search content items"
+            searchPlaceholder="Search content titles"
+            emptyMessage="No matching content."
+            showFullHierarchy={false}
+            options={[
+              { id: "all", label: "All feedback", path: [] },
+              ...data.content
+                .filter((c) => kind === "all" || c.kind === kind)
+                .sort(
+                  (a, b) =>
+                    a.title.localeCompare(b.title) || a.id.localeCompare(b.id),
+                )
+                .map((c) => ({
+                  id: c.id,
+                  label: c.title,
+                  path: [
+                    c.kind === "doc"
+                      ? "Docs"
+                      : c.kind === "brief"
+                        ? "Updates"
+                        : "Courses",
+                    c.title,
+                  ],
+                })),
+            ]}
+          />
         </FormField>
       </CollectionControls>
       <div className="report-summary">
@@ -263,62 +296,107 @@ export function FeedbackAdmin({
           }
         />
       )}
-      <div className="grid gap-4">
-        {records.map((f) => (
-          <Card asChild className="p-0 sm:p-0" key={f.id}>
-            <article>
-              <CardContent className="grid gap-4">
-                <SectionHeader
-                  title={
-                    <div className="flex min-w-0 items-center gap-3">
-                      {onDeleteFeedback && selection.canSelect && (
-                        <Checkbox
-                          aria-label={`Select feedback from ${f.person} for ${f.title}`}
-                          checked={selection.selected.includes(f.id)}
-                          onCheckedChange={(checked) =>
-                            selection.toggle(f.id, checked === true)
-                          }
-                        />
+      {!!records.length && (
+        <TableContainer aria-label="Feedback table">
+          <DataTable
+            layout={selectable ? "feedbackSelection" : "feedback"}
+            density="compact"
+            className="[&_[data-slot=table-cell-content]]:whitespace-nowrap"
+          >
+            <TableHeader>
+              <TableRow>
+                {selectable && (
+                  <TableHead>
+                    <span className="sr-only">Select feedback</span>
+                  </TableHead>
+                )}
+                <TableHead>Content</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>From</TableHead>
+                <TableHead>Rating</TableHead>
+                <TableHead>Comment</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {records.map((f) => (
+                <TableRow key={f.id}>
+                  {selectable && (
+                    <TableCell>
+                      <Checkbox
+                        aria-label={`Select feedback from ${f.person} for ${f.title}`}
+                        checked={selection.selected.includes(f.id)}
+                        onCheckedChange={(checked) =>
+                          selection.toggle(f.id, checked === true)
+                        }
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <div className="flex w-44 items-center gap-2">
+                      <span
+                        className="min-w-0 truncate font-medium"
+                        title={f.title}
+                      >
+                        {f.title}
+                      </span>
+                      {!!f.version && (
+                        <span className="shrink-0 text-xs text-muted-foreground">
+                          v{f.version}
+                        </span>
                       )}
-                      <h3>{f.title}</h3>
                     </div>
-                  }
-                >
-                  <Badge variant={f.rating === "up" ? "success" : "default"}>
-                    {f.ratingLabel}
-                  </Badge>
-                  {onDeleteFeedback && (
+                  </TableCell>
+                  <TableCell>{f.kind}</TableCell>
+                  <TableCell>
+                    <span className="block w-28 truncate" title={f.person}>
+                      {f.person}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={f.rating === "up" ? "success" : "default"}>
+                      {f.ratingLabel}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <FeedbackComment entry={f} />
+                  </TableCell>
+                  <TableCell>
+                    <time dateTime={f.updatedAt}>
+                      {new Date(f.updatedAt).toLocaleDateString()}
+                    </time>
+                  </TableCell>
+                  <TableCell className="[&_button]:size-8">
                     <ItemActions
                       id={f.id}
                       label={`feedback from ${f.person} for ${f.title}`}
                       commands={commands}
+                      actions={
+                        f.contentId && item !== f.contentId
+                          ? [
+                              {
+                                label: "View all feedback for this item",
+                                onSelect: () => viewItem(f.contentId!),
+                              },
+                            ]
+                          : []
+                      }
+                      disabled={
+                        !onDeleteFeedback &&
+                        (!f.contentId || item === f.contentId)
+                      }
                       noun="feedback entries"
                     />
-                  )}
-                </SectionHeader>
-                <p className="whitespace-pre-wrap text-copy [overflow-wrap:anywhere]">
-                  {f.comment || "No written comment."}
-                </p>
-              </CardContent>
-              <CardFooter>
-                <p className="text-copy text-muted-foreground">
-                  {f.person} {f.version ? `· v${f.version} ` : ""}·{" "}
-                  {new Date(f.updatedAt).toLocaleDateString()}
-                </p>
-                {f.contentId && item !== f.contentId && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => viewItem(f.contentId!)}
-                  >
-                    View all feedback for this item
-                  </Button>
-                )}
-              </CardFooter>
-            </article>
-          </Card>
-        ))}
-      </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </DataTable>
+        </TableContainer>
+      )}
       <CollectionEmpty
         count={records.length}
         total={feedbackRows(data, "all", "all", "all", "", "newest").length}
@@ -326,5 +404,62 @@ export function FeedbackAdmin({
         onClear={clearFilters}
       />
     </>
+  );
+}
+
+function FeedbackComment({
+  entry,
+}: {
+  entry: ReturnType<typeof feedbackRows>[number];
+}) {
+  const [open, setOpen] = useState(false);
+  const comment = entry.comment?.trim();
+  const characters = Array.from(comment?.replace(/\s+/g, " ") || "");
+  const excerpt =
+    characters.slice(0, 80).join("") + (characters.length > 80 ? "…" : "");
+  return (
+    <div className="flex w-64 items-center gap-2">
+      {comment ? (
+        <>
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            {excerpt}
+          </span>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setOpen(true)}
+              aria-label={`View comment from ${entry.person} for ${entry.title}`}
+            >
+              View comment
+            </Button>
+            <DialogContent>
+              <DialogTitle>Feedback comment</DialogTitle>
+              <DialogDescription>
+                {entry.title} · {entry.person}
+                {entry.version ? ` · v${entry.version}` : ""} ·{" "}
+                {new Date(entry.updatedAt).toLocaleDateString()}
+              </DialogDescription>
+              <Badge variant={entry.rating === "up" ? "success" : "default"}>
+                {entry.ratingLabel}
+              </Badge>
+              <p className="whitespace-pre-wrap text-copy [overflow-wrap:anywhere]">
+                {entry.comment}
+              </p>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Close
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : (
+        <span className="text-muted-foreground">No comment</span>
+      )}
+    </div>
   );
 }
