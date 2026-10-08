@@ -684,12 +684,14 @@ export function TeamProgress({
             />
           </SectionHeader>
           {error ? (
-            <Alert variant="destructive" role="alert">
-              <p>{error}</p>
+            <div className="grid gap-3">
+              <Alert variant="destructive" role="alert">
+                <p>{error}</p>
+              </Alert>
               <Button variant="outline" onClick={() => void open(person)}>
                 Retry assignments
               </Button>
-            </Alert>
+            </div>
           ) : !detail ? (
             <p role="status" className="flex items-center gap-2">
               <Spinner />

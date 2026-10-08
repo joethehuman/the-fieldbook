@@ -403,7 +403,7 @@ test("minimal toolbar downloads the latest Markdown without remounting or changi
 test("unsupported Markdown remains downloadable and recoverable without normal source tabs", async ({ page }, info) => {
   const body = "Keep this footnote[^1].\n\n[^1]: An important detail.\n";
   const { writer } = await setup(page, info.project.name.startsWith("production"), body);
-  await expect(page.getByRole("alert").filter({ hasText: "original text is preserved" })).toBeVisible();
+  await expect(page.getByRole("alert").filter({ hasText: "Continue editing in Markdown below" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Markdown", exact: true })).toHaveCount(0);
   await expectMarkdown(page, body);
   const recovery = page.getByRole("textbox", { name: "Lesson content Markdown", exact: true });

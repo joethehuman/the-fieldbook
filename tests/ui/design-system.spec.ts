@@ -804,6 +804,11 @@ test("content feedback catalog preserves failed drafts, pending state and keyboa
     "Keep this draft while I retry.",
   );
   await snapshotReview(page, info, "feedback-error");
+  await form.getByRole("button", { name: "Dismiss message", exact: true }).click();
+  await expect(form.getByRole("alert")).toHaveCount(0);
+  await expect(form.getByRole("textbox")).toHaveValue("Keep this draft while I retry.");
+  await form.getByRole("button", { name: "Send", exact: true }).click();
+  await expect(form.getByRole("alert")).toContainText("Could not save feedback");
   await form.getByRole("textbox").press("Escape");
   await expect(form).toBeHidden();
   await expect(
@@ -814,9 +819,10 @@ test("content feedback catalog preserves failed drafts, pending state and keyboa
     .getByRole("button", { name: "Did you find this useful?", exact: true })
     .first()
     .click();
-  await expect(form.getByRole("textbox")).toHaveValue(
-    "Keep this draft while I retry.",
-  );
+  await expect(form.getByRole("textbox")).toHaveValue("");
+  await expect(form.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
+  await form.getByRole("button", { name: "Not useful", exact: true }).click();
+  await form.getByRole("textbox").fill("A fresh feedback entry.");
   await form.getByRole("button", { name: "Send", exact: true }).click();
   await expect(form).toBeHidden();
   await expect(catalog.getByRole("status").first()).toHaveText(

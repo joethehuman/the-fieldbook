@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import type { UploadProgress } from "@/lib/upload-media";
 import { MediaUploadStatus } from "./media-upload-status";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FieldDescription } from "@/components/ui/field";
@@ -56,6 +57,7 @@ export function CardArtEditor({
   });
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [failed, setFailed] = useState(false);
   const [notice, setNotice] = useState("");
   const current = resolvedCardArt(id, title, art, legacyCover);
   const generated = current.source === "generated";
@@ -201,11 +203,13 @@ export function CardArtEditor({
           setUploading(true);
           onBusyChange?.(true);
           setNotice("");
+          setFailed(false);
           try {
             const imageUrl = await onUpload(file, setUploadProgress);
             onChange({ ...current, source: "upload", imageUrl });
             setNotice(saveMode === "automatic" ? "Card image updated." : "Image uploaded. Save this item to apply it.");
           } catch (error) {
+            setFailed(true);
             setNotice(
               error instanceof Error
                 ? error.message
@@ -224,9 +228,8 @@ export function CardArtEditor({
           : "Custom image uploads are available in an installed Fieldbook. This demo saves generated artwork."}
       </FieldDescription>
       <MediaUploadStatus progress={uploadProgress} />
-      <p role="status" className="text-sm text-muted-foreground">
-        {notice}
-      </p>
+      {failed && notice ? <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert> :
+        <p role="status" className="text-sm text-muted-foreground">{notice}</p>}
     </section>
   );
 }

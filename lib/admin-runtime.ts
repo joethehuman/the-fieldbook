@@ -236,7 +236,7 @@ export function createAdminRuntime(initial: {
       mutate(async () => {
         if (contentRecoveryRequired)
           throw new SaveRecoveryError(
-            "Refresh and review the saved copy before applying more changes. Your edits remain open.",
+            "Refresh and review the saved copy before making more changes.",
           );
         const created = after.content.find(
           (item) => !before.content.some((previous) => previous.id === item.id),

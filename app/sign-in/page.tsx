@@ -62,10 +62,10 @@ export default async function SignIn({
       {q.error && (
         <Alert variant="destructive" role="alert">
           {q.error === "access"
-            ? "This account is not allowed to join. Use an approved Google account or contact your administrator."
+            ? "This account doesn’t have access. Use an approved Google account or contact an administrator."
             : q.error === "service"
-              ? "Sign-in services are unavailable. Try again shortly; contact your administrator if this continues."
-              : "Sign-in was cancelled or could not be completed. Please try again."}
+              ? "Sign-in is unavailable. Try again shortly or contact an administrator."
+              : "Sign-in was cancelled or could not be completed. Try again."}
           {reference && <> Reference: {reference}.</>}
         </Alert>
       )}

@@ -151,7 +151,7 @@ export function applyDemoBulk(
         if (!deleted || Date.parse(deleted.purgeAfter) <= now)
           throw new Error("The recovery window has ended.");
         if (deleted.revision !== target.expected)
-          throw new Error("This item changed. Reload before retrying.");
+          throw new Error("This item changed. Refresh and review the saved data before retrying.");
         if (deleted.content)
           data.content.push({
             ...deleted.content,
@@ -174,7 +174,7 @@ export function applyDemoBulk(
       } else if (request.entity === "content") {
         const item = data.content.find((c) => c.id === target.id);
         if (!item || (item.revision || 0) !== target.expected)
-          throw new Error("This item changed. Reload before retrying.");
+          throw new Error("This item changed. Refresh and review the saved data before retrying.");
         if (request.operation === "delete") {
           data.deletedItems.push({
             id: item.id,

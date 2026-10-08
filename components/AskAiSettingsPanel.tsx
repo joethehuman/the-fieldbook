@@ -88,7 +88,7 @@ export function AskAiSettingsPanel({
         if (!response.ok)
           throw new Error(
             data.error ||
-              "Ask AI configuration could not be checked. Reload to try again.",
+              "Ask AI settings couldn’t be checked. Reload this page to try again.",
           );
         if (!controller.signal.aborted) setSetup(data.setup);
       } catch (error) {
@@ -96,7 +96,7 @@ export function AskAiSettingsPanel({
           setNotice(
             error instanceof Error && error.name !== "TimeoutError"
               ? error.message
-              : "The model router check timed out. Reload to try again.",
+              : "The Ask AI settings check timed out. Reload this page to try again.",
           );
       }
     }
@@ -122,7 +122,7 @@ export function AskAiSettingsPanel({
       (!router
         ? setup.connection.message
         : !setup.connection.configured
-          ? "The model router needs credentials. Complete the installation configuration before enabling Ask AI."
+          ? "The model router needs credentials. Complete the installation configuration to enable Ask AI."
           : !setup.catalog.ready
             ? setup.catalog.message
             : !setup.retrieval.ready
@@ -251,11 +251,10 @@ export function AskAiSettingsPanel({
                 </Badge>
               )}
             </div>
-            {problem && <Alert role="status">{problem}</Alert>}
+            {problem && <Alert role="status" dismissible>{problem}</Alert>}
             {routerChanged && (
-              <Alert>
-                The model router changed. Choose a primary model and review the
-                fallback before saving.
+              <Alert dismissible>
+                The model router changed. Review the primary and fallback models before saving.
               </Alert>
             )}
           </FieldGroup>
@@ -278,20 +277,19 @@ export function AskAiSettingsPanel({
                 setup?.catalog.ready &&
                 value.model &&
                 !model && (
-                  <Alert>
-                    The saved primary is unavailable. Choose a replacement
+                  <Alert dismissible>
+                    The primary model is unavailable. Choose a replacement
                     {fallback
-                      ? "; the saved fallback can still serve questions."
-                      : " before enabling Ask AI."}
+                      ? ". The fallback model can still answer questions."
+                      : " to enable Ask AI."}
                   </Alert>
                 )}
               {!routerChanged &&
                 setup?.catalog.ready &&
                 value.fallbackModel &&
                 !fallback && (
-                  <Alert>
-                    The saved fallback is unavailable. Choose a replacement or
-                    select None.
+                  <Alert dismissible>
+                    The fallback model is unavailable. Choose a replacement or select None.
                   </Alert>
                 )}
             </FieldGroup>

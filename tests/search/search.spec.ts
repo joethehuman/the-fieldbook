@@ -143,11 +143,15 @@ test("rapid queries, loading, failure recovery, keyboard and empty results", asy
   await input.fill("quorum");
   await expect(
     page.getByRole("region", { name: "Search results" }).getByRole("alert"),
-  ).toContainText("Search could not load");
+  ).toContainText("Search results couldn’t be loaded");
   await page.screenshot({
     path: info.outputPath("search-error.png"),
     fullPage: true,
   });
+  const failure = page.getByRole("region", { name: "Search results" }).getByRole("alert");
+  await failure.getByRole("button", { name: "Dismiss message", exact: true }).click();
+  await expect(failure).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Retry search" })).toBeVisible();
   await request.post(fixture, { data: { fail: false } });
   await page.getByRole("button", { name: "Retry search" }).click();
   await expect(

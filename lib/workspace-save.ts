@@ -51,12 +51,12 @@ export function createWorkspaceSaver(
           snapshot = await load();
         } catch {
           throw new SaveRecoveryError(
-            "The latest saved state is still unavailable. Your edits remain open. Try refreshing again before saving.",
+            "The saved data couldn’t be loaded. Refresh before saving again.",
           );
         }
         recoveryRequired = false;
         throw new SaveRecoveryError(
-          "The latest saved state is available. Review it before saving again; no changes were resent.",
+          "The saved data was refreshed. Review it before saving again.",
           snapshot,
         );
       }
@@ -164,14 +164,13 @@ export function createWorkspaceSaver(
             ? error.message
             : "The connection failed.";
         throw new SaveRecoveryError(
-          `${completed} of ${operations.length} changes confirmed saved. ${detail} ` +
+          `${completed} of ${operations.length} changes were confirmed saved. ${detail} ` +
             (rejected
-              ? "The rejected change was not saved. "
+              ? "This change was rejected. "
               : "The last change may have been saved. ") +
             (snapshot
-              ? "Latest saved state refreshed. Review before retrying."
-              : "Latest saved state could not be refreshed. Refresh before retrying.") +
-            " Your edits remain open." +
+              ? "Review the saved data before trying again."
+              : "Refresh and review the saved data before retrying.") +
             refreshMessage,
           snapshot,
         );
@@ -181,7 +180,7 @@ export function createWorkspaceSaver(
       } catch (error) {
         recoveryRequired = true;
         throw new SaveRecoveryError(
-          "Changes saved, but the latest state could not be refreshed. Your edits remain open. Refresh before saving again." +
+          "Your changes were saved, but the latest data couldn’t be loaded. Refresh before making more changes." +
             (error instanceof RequestError ? ` ${error.message}` : ""),
         );
       }

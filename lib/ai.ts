@@ -1,5 +1,5 @@
 export const aiUnavailableMessage =
-  "Ask AI is temporarily unavailable. Try again later or use Search.";
+  "Ask AI is unavailable. Try again later or use Search.";
 
 import type { SearchKind } from "./search";
 

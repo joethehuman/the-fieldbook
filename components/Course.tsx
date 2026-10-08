@@ -181,7 +181,7 @@ export function Course({ course, progress, onBack, backLabel, onProgress, onDemo
         </Card>
       </aside>
       <div className="course-reader">
-        {saveError && <Alert variant="destructive" role="alert">{saveError}</Alert>}
+        {saveError && <Alert variant="destructive" role="alert" onDismiss={() => setSaveError("")}>{saveError}</Alert>}
         {lesson ? <>
           <section ref={activeCard} className="course-lesson grid gap-6">
             <span className="eyebrow">Lesson {step + 1} of {course.lessons.length}</span>

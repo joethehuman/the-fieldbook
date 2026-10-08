@@ -852,7 +852,7 @@ export default function WritingEditorEngine({
       if (event.key === "Escape") closeMedia();
     }}>
       {error && (
-        <Alert variant="destructive" role="alert">
+        <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
           {error}
         </Alert>
       )}

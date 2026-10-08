@@ -111,7 +111,7 @@ export async function bulkAction(
         if (row.revision !== target.expected)
           throw new HttpError(
             409,
-            "This item changed. Reload before retrying.",
+            "This item changed. Refresh and review the saved data before retrying.",
           );
         if (row.published_revision === row.revision) {
           results.push({ id: target.id, status: "unchanged" });

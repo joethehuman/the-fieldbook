@@ -122,8 +122,10 @@ export function AskAiConversation({
             )}
           </div>
           {chat.error && (
-            <Alert variant="destructive">
-              <p>{chat.error.message}</p>
+            <div className="grid gap-3">
+              <Alert variant="destructive">
+                <p>{chat.error.message}</p>
+              </Alert>
               <Button
                 type="button"
                 variant="outline"
@@ -133,7 +135,7 @@ export function AskAiConversation({
               >
                 Retry answer
               </Button>
-            </Alert>
+            </div>
           )}
           <p
             role="status"

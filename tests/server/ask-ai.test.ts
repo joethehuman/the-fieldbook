@@ -452,7 +452,7 @@ test("empty evidence cannot issue invented source links and still rechecks acces
           f.deps,
         ),
       ),
-      revoke ? /Ask AI is unavailable/ : /could not verify its source links/,
+      revoke ? /Ask AI is unavailable/ : /source links couldn’t be verified/,
     );
   }
 });

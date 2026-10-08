@@ -58,7 +58,7 @@ export function errorResponse(error: unknown, operation = "request") {
       error:
         error instanceof HttpError
           ? error.message
-          : "Unable to complete this request. Please try again.",
+          : "This action couldn’t be completed. Try again.",
       requestId,
     },
     {

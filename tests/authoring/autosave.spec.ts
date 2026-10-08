@@ -238,13 +238,13 @@ for (const lostResponse of [false, true])
       return route.fulfill({ status: 503, json: { error: "Temporary save failure" } });
     });
     await page.getByLabel("Title", { exact: true }).fill("First attempt");
-    await expect(page.locator(".editor-heading [role=status]")).toHaveText("Changes not saved");
+    await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Changes not saved");
     await page.getByLabel("Title", { exact: true }).fill("Newest open edits");
     await page.waitForTimeout(1000);
     expect(writes).toBe(1);
     await page.screenshot({ path: info.outputPath(`save-failure-${lostResponse}.png`) });
     await page.getByRole("button", { name: "Retry saving", exact: true }).click();
-    await expect(page.locator(".editor-heading [role=status]")).toHaveText("Saved");
+    await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Saved. Unpublished edits");
     expect((await read()).title).toBe("Newest open edits");
     expect((await read(true)).title).toBe("Autosave fixture");
     expect(writes).toBe(2);
@@ -261,10 +261,10 @@ test("conflicting retry keeps open edits and requires a confirmed saved-draft re
     return route.fulfill({ status: 409, json: { error: "Another author changed this draft" } });
   });
   await page.getByLabel("Title", { exact: true }).fill("Keep my open work");
-  await expect(page.locator(".editor-heading [role=status]")).toHaveText("Changes not saved");
+  await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Changes not saved");
   await page.route("**/api/content?*draft=true*", route => route.fulfill({ json: { ...before, title: "Other author's work", revision: 2 } }));
   await page.getByRole("button", { name: "Retry saving", exact: true }).click();
-  await expect(page.locator("form.editor [role=alert]")).toContainText("another session");
+  await expect(page.locator("form.editor [role=alert]")).toContainText("Another session");
   expect(writes).toBe(1);
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Keep my open work");
   await page.getByRole("button", { name: "Load saved draft", exact: true }).click();

@@ -185,7 +185,7 @@ export function BulkPicker({
         <DialogContent size="picker">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
-          {error && <Alert variant="destructive">{error}</Alert>}
+          {error && <Alert variant="destructive" onDismiss={() => setError("")}>{error}</Alert>}
           <DialogBody className="flex flex-col overflow-y-auto">
             <SearchableSelectionList
               bounded="compact"

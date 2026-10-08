@@ -85,7 +85,7 @@ export async function saveDocsNavigation(
         return {
           data: current,
           remaining,
-          error: `Section settings were saved. Remaining document moves are still unsaved. ${messages.join(" ")}`,
+          error: `The section settings were saved. Review ${remaining.length} unconfirmed ${remaining.length === 1 ? "item" : "items"} before retrying. ${[...new Set(messages)].join(" ")}`,
         };
       }
     }
@@ -94,7 +94,7 @@ export async function saveDocsNavigation(
     return {
       data: current,
       remaining,
-      error: `Some changes were saved. ${remaining.length} document moves remain unsaved. ${[...new Set(messages)].join(" ")}`,
+      error: `Review ${remaining.length} unconfirmed ${remaining.length === 1 ? "item" : "items"} before retrying. ${[...new Set(messages)].join(" ")}`,
     };
   try {
     current = await save(current, settings);
@@ -103,7 +103,7 @@ export async function saveDocsNavigation(
     return {
       data: current,
       remaining: [],
-      error: `Document moves were saved. Remaining section changes are still unsaved. ${(error as Error).message}`,
+      error: `The documents were moved, but the remaining section changes couldn’t be saved. ${(error as Error).message}`,
     };
   }
 }
@@ -145,7 +145,7 @@ export function createDocsNavigationSaver(
               : {
                   id,
                   status: "failed",
-                  message: `Could not confirm this move. Reload and review before retrying. ${(error as Error).message}`,
+                  message: `This move couldn’t be confirmed. Refresh and review the items before retrying. ${(error as Error).message}`,
                 };
           }),
         );

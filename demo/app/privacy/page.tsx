@@ -1,4 +1,5 @@
 "use client";
+import { Alert } from "@/components/ui/alert";
 import { ReadingPage } from "@/components/patterns/layout";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -25,7 +26,7 @@ export default function DemoPrivacyPage() {
         for another installation.
       </p>
       {error ? (
-        <p>Demo settings could not be loaded.</p>
+        <Alert variant="destructive">Demo settings could not be loaded.</Alert>
       ) : !settings ? (
         <p>Loading…</p>
       ) : policy?.mode === "external" ? (
