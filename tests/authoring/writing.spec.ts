@@ -766,7 +766,8 @@ for (const kind of ["Doc", "Update"]) {
     }
     await closeContentSettings(page);
     await returnToContent(page);
-    await page.getByRole("button", { name: kind, exact: true }).click();
+    await page.getByRole("button", { name: "Content", exact: true }).click();
+    await page.getByRole("menuitem", { name: kind, exact: true }).click();
     await page.getByLabel("Title", { exact: true }).fill(`New ${kind}`);
     await openContentSettings(page);
     await page

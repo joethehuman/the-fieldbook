@@ -129,6 +129,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 
 import {
   Plus,
+  ChevronDown,
   X,
   Save,
   FileText,
@@ -1066,6 +1067,7 @@ export default function Admin({
           content={editing}
           data={data}
           onSave={save}
+          onBulk={onBulk}
           onCancel={() => {
             void navigateDestination({ tab: "content", contentKind: destination.contentKind }, { approved: true });
           }}
@@ -1401,18 +1403,38 @@ export default function Admin({
                   }
                 >
                   <ActionGroup>
-                    <Button onClick={() => create("doc")}>
-                      <Plus size={15} />
-                      Doc
-                    </Button>
-                    <Button onClick={() => create("brief")}>
-                      <Plus size={15} />
-                      Update
-                    </Button>
-                    <Button variant="default" onClick={() => create("course")}>
-                      <Plus size={15} />
-                      Course
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button>
+                          <Plus aria-hidden="true" />
+                          Content
+                          <ChevronDown aria-hidden="true" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => create("doc")}
+                        >
+                          <Plus size={15} aria-hidden="true" />
+                          Doc
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => create("brief")}
+                        >
+                          <Plus size={15} aria-hidden="true" />
+                          Update
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="min-h-11"
+                          onSelect={() => create("course")}
+                        >
+                          <Plus size={15} aria-hidden="true" />
+                          Course
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </ActionGroup>
                 </CollectionToolbar>
                 <CollectionControls
@@ -2081,6 +2103,7 @@ export default function Admin({
   );
 }
 export function Editor({
+  onBulk,
   onLearningMany,
   onWorkspaceChange,
   onPrepareAssignments,
@@ -2094,6 +2117,7 @@ export function Editor({
   onReload,
   onLoadPublished,
 }: {
+  onBulk?: BulkHandler;
   onPrepareAssignments?: () => Promise<Workspace>;
   onUpload?: UploadMedia;
   registerNavigationGuard?: RegisterNavigationGuard;
@@ -2921,7 +2945,7 @@ export function Editor({
       type="button"
       variant="ghost"
       size="sm"
-      className="justify-start px-0 font-normal"
+      className="justify-start font-normal"
       disabled={
         busy ||
         saving ||
@@ -2949,6 +2973,18 @@ export function Editor({
             },
           ]}
         />
+  );
+  const deleteAction = onBulk && (
+    <ItemActions
+      id={c.id}
+      label={c.title || "Untitled"}
+      buttonLabel={`Delete ${c.kind === "doc" ? "Doc" : c.kind === "course" ? "Course" : "Update"}`}
+      disabled={busy || saving || publishing || dirty || needsRecovery || !data.content.some((item) => item.id === c.id)}
+      commands={adminCommands({ data, selected: [c.id], onBulk }).filter((command) => command.id === "delete")}
+      onSelectionChange={(failed) => {
+        if (!failed.length) onCancel();
+      }}
+    />
   );
   return (
     <form
@@ -3063,6 +3099,7 @@ export function Editor({
             introduction={<WritingTitle id="editor-title" aria-label="Title" maxLength={160} disabled={busy} value={c.title} onChange={(event) => set("title", event.target.value.replace(/\n/g, " "))} placeholder="Untitled course" />}
             details={details}
             recovery={recovery}
+            deleteAction={deleteAction}
             requirementsCount={requirements.length}
             revealDetails={detailsReveal}
             incompleteSteps={[
@@ -3082,6 +3119,7 @@ export function Editor({
               navigation={canvasNavigation}
               details={details}
               recovery={recovery}
+              deleteAction={deleteAction}
               download={{ value: c.body, name: c.title }}
               requirementsCount={requirements.length}
               revealDetails={detailsReveal}

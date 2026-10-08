@@ -3,6 +3,54 @@ const fixture = "http://127.0.0.1:3130/fixture";
 test.beforeEach(async ({ request }) => {
   await request.post(fixture, { data: { reset: true } });
 });
+test("production search handles swapped letters, word forms and mixed title/body queries", async ({
+  page,
+  request,
+}, info) => {
+  await request.post(fixture, { data: { searchExamples: true } });
+  await page.goto("/courses");
+  const trigger = page.getByRole("button", {
+    name: "Open search",
+    exact: true,
+  });
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  await expect(input.or(trigger).first()).toBeVisible();
+  if (!(await input.isVisible())) await trigger.click();
+  const region = page.getByRole("region", { name: "Search results" });
+  for (const [query, title] of [
+    ["coruse", "Course assignments"],
+    ["pepole", "People"],
+    ["reproting", "Progress and reporting"],
+    ["reports", "Progress and reporting"],
+    ["search filters", "Search"],
+    ["upload video", "Images and video"],
+    ["upolad video", "Images and video"],
+    ["course ass", "Course assignments"],
+  ]) {
+    await input.fill(query);
+    await expect(region.getByRole("status")).toContainText(`for “${query}”`);
+    await expect(
+      region.getByRole("link").first().getByRole("heading"),
+    ).toHaveText(title);
+  }
+  await input.fill("upload video");
+  await expect(region.getByRole("status")).toContainText("for “upload video”");
+  await region.getByRole("button", { name: "Docs", exact: true }).click();
+  await expect(
+    region.getByRole("link").first().getByRole("heading"),
+  ).toHaveText("Images and video");
+  await page.screenshot({
+    path: info.outputPath("search-refinements.png"),
+    fullPage: true,
+  });
+  await region.getByRole("link").first().click();
+  await expect(
+    page
+      .locator("main")
+      .getByRole("heading", { name: "Images and video", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/docs\/images-and-video-/);
+});
 test("server search through SQL, stable lesson destination, publication and access", async ({
   page,
   request,
@@ -152,10 +200,16 @@ test("rapid queries, loading, failure recovery, keyboard and empty results", asy
     path: info.outputPath("search-error.png"),
     fullPage: true,
   });
-  const failure = page.getByRole("region", { name: "Search results" }).getByRole("alert");
-  await failure.getByRole("button", { name: "Dismiss message", exact: true }).click();
+  const failure = page
+    .getByRole("region", { name: "Search results" })
+    .getByRole("alert");
+  await failure
+    .getByRole("button", { name: "Dismiss message", exact: true })
+    .click();
   await expect(failure).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Retry search" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Retry search" }),
+  ).toBeVisible();
   await request.post(fixture, { data: { fail: false } });
   await page.getByRole("button", { name: "Retry search" }).click();
   await expect(

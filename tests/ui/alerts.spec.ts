@@ -223,7 +223,8 @@ test("pasted-image failure dismisses without changing the draft and repeats", as
   await page.goto("/");
   await page.getByRole("button", { name: /Oliver Anderson/ }).click();
   await page.goto("/#admin/content");
-  await page.getByRole("button", { name: "Doc", exact: true }).click();
+  await page.getByRole("button", { name: "Content", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Doc", exact: true }).click();
   const writer = page
     .locator('.writing-content[contenteditable="true"]')
     .first();

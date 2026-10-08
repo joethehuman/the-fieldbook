@@ -148,7 +148,7 @@ test("core Admin pages keep clean destinations on refresh and browser history", 
   await page.goForward();
   await at(page, production, "/admin/content");
   await expect(
-    page.getByRole("button", { name: "Doc", exact: true }),
+    page.getByRole("button", { name: "Content", exact: true }),
   ).toBeVisible();
 });
 
@@ -215,7 +215,7 @@ test("dirty settings Cancel retains the form and Confirm completes native Back",
   await dialog.getByRole("button", { name: "Confirm", exact: true }).click();
   await at(page, production, "/admin/content");
   await expect(
-    page.getByRole("button", { name: "Doc", exact: true }),
+    page.getByRole("button", { name: "Content", exact: true }),
   ).toBeVisible();
 });
 
@@ -312,7 +312,8 @@ test("new content adopts its saved ID without losing the draft or history guard"
   const production = info.project.name.startsWith("production");
   await setup(page, production);
   await page.goto(destination(production, "/admin/content"));
-  await page.getByRole("button", { name: "Doc", exact: true }).click();
+  await page.getByRole("button", { name: "Content", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Doc", exact: true }).click();
   await at(page, production, "/admin/content/new/doc");
   const title = page.getByRole("textbox", { name: "Title", exact: true });
   await title.fill("A new stable draft");
@@ -409,7 +410,7 @@ test("a failed or slow destination read retains the current screen and allows re
   });
   await section(page, "Feedback");
   await expect(
-    page.getByRole("button", { name: "Doc", exact: true }),
+    page.getByRole("button", { name: "Content", exact: true }),
   ).toBeVisible();
   await expect(page).toHaveURL(/\/admin\/content$/);
   release();

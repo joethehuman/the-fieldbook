@@ -74,7 +74,7 @@ export function BulkActions({
   collectionSize: number;
   range?: string;
   /** Individual entry point using the same commands and consequence reviews. */
-  item?: { label: string; actions?: RowAction[]; disabled?: boolean };
+  item?: { label: string; actions?: RowAction[]; disabled?: boolean; buttonLabel?: string };
   onSelectionChange: (ids: string[]) => void;
   commands: BulkCommand[];
   noun?: string;
@@ -184,7 +184,18 @@ export function BulkActions({
   );
   return (
     <>
-      {item ? (
+      {item?.buttonLabel ? (
+        <Button
+          ref={menuTrigger}
+          type="button"
+          variant={commands[0]?.destructive ? "destructive" : "default"}
+          className="w-full justify-start"
+          disabled={busy || item.disabled || !commands[0] || !!commands[0].disabledReason}
+          onClick={() => choose(commands[0])}
+        >
+          {item.buttonLabel}
+        </Button>
+      ) : item ? (
         <RowActions
           label={item.label}
           disabled={busy || item.disabled}
@@ -381,6 +392,7 @@ export function ItemActions({
   commands,
   actions,
   disabled,
+  buttonLabel,
   noun = "items",
   onSelectionChange = () => {},
 }: {
@@ -389,6 +401,8 @@ export function ItemActions({
   commands: BulkCommand[];
   actions?: RowAction[];
   disabled?: boolean;
+  /** Direct button for a single command, using the same confirmation dialog. */
+  buttonLabel?: string;
   noun?: string;
   onSelectionChange?: (ids: string[]) => void;
 }) {
@@ -399,7 +413,7 @@ export function ItemActions({
       onSelectionChange={onSelectionChange}
       commands={commands}
       noun={noun}
-      item={{ label, actions, disabled }}
+      item={{ label, actions, disabled, buttonLabel }}
     />
   );
 }

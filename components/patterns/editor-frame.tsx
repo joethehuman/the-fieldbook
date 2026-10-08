@@ -34,6 +34,7 @@ export function EditorFrame({
   details,
   download,
   recovery,
+  deleteAction,
   requirementsCount = 0,
   revealDetails,
   revealCanvas,
@@ -47,6 +48,7 @@ export function EditorFrame({
   details: ReactNode;
   download?: { value: string; name: string };
   recovery?: ReactNode;
+  deleteAction?: ReactNode;
   requirementsCount?: number;
   revealDetails?: DetailsReveal;
   revealCanvas?: number;
@@ -285,7 +287,7 @@ export function EditorFrame({
               detailsToggle.current?.focus();
             }}>
             <h2 className="editor-floating-heading">Details</h2>
-            <ScrollRegion id={detailsId} className="editor-floating-body">{details}{recoverySection}</ScrollRegion>
+            <ScrollRegion id={detailsId} className="editor-floating-body">{details}{recoverySection}{deleteAction}</ScrollRegion>
           </aside>
         </div>}
   </>;
