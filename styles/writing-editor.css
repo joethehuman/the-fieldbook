@@ -609,7 +609,7 @@
 .editor .course-quiz-content { padding: var(--space-3) var(--editor-content-padding); }
 .editor .course-quiz-canvas > .writing-document-heading { top: var(--editor-navigation-height, 0px); }
 .editor-frame-canvas[data-navigation-scrolled="true"] .course-quiz-canvas > .writing-document-heading::after { opacity: 1; }
-/* The mobile toolbar is portaled into the fixed canvas navigation row. */
+/* Compact writing actions join Outline and Details in the floating bottom dock. */
 .editor .writing-editor .mdxeditor-toolbar { display: none; }
 .editor-frame :is(.writing-course-heading, .writing-document-heading, .writing-content, .writing-source, .course-quiz-content) { padding-inline: var(--editor-text-inset); }
 .editor-frame .writing-content { --writing-content-start: var(--editor-text-inset); }
@@ -623,3 +623,13 @@
 .editor .writing-toolbar-controls[data-canvas="true"]:not([data-mobile="true"]) { display: none; }
 .editor .writing-editor .mdxeditor-toolbar:has(.writing-toolbar-controls:not([data-mobile="true"])),
 .editor .writing-view-header:empty { display: none; }
+
+/* Cover the sticky inset after scrolling, without clipping the course-title attention ring. */
+.app:has(.topbar[data-content-scrolled="true"]) .editor-frame[data-cards="true"]:not(:has(.writing-course-heading [data-reveal-focus="true"]:focus)) .writing-document-heading::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 100%;
+  height: var(--space-2);
+  background: var(--background);
+  pointer-events: none;
+}

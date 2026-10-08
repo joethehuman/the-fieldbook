@@ -1226,15 +1226,11 @@ export default function Admin({
           onValueChange={async (next) => {
             await changeAdminTab(next);
           }}
-          options={visibleSections
-            .flatMap((section) => section.items)
-            .map((item) => ({
-              id: item.id,
-              name:
-                item.id === "people" && !production
-                  ? "Demo profiles"
-                  : item.name,
-            }))}
+          options={visibleSections.flatMap((section) => section.items.map((item) => ({
+            id: item.id,
+            group: section.label,
+            name: item.id === "people" && !production ? "Demo profiles" : item.name,
+          })))}
         >
           {visibleSections.map((section) => (
             <div className="admin-nav-group" key={section.label}>

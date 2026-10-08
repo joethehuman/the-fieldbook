@@ -216,6 +216,7 @@ function WritingToolbar({
                 type="button"
                 size="icon"
                 variant="ghost"
+                className={canvas && phone ? "size-11 rounded-xl border-transparent bg-transparent shadow-none disabled:bg-transparent disabled:border-transparent" : undefined}
                 aria-label={label}
                 disabled={disabled || unavailable}
                 onMouseDown={(event) => event.preventDefault()}
@@ -227,6 +228,7 @@ function WritingToolbar({
           ))}
         </div>
         <Button type="button" size={phone ? "icon" : "sm"} variant="outline" disabled={disabled}
+          className={canvas && phone ? "size-11 rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : undefined}
           aria-label="Commands: insert blocks or format selected text"
           onMouseDown={(event) => event.preventDefault()}
           onClick={(event) => onInsert(event.currentTarget, event.detail === 0)}>

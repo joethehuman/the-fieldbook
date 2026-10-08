@@ -2,7 +2,7 @@
 import type { ReactNode } from "react";
 import { Field } from "../ui/field";
 import { SelectField } from "../ui/select";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectLabel } from "../ui/select";
 import { PanelsTopLeft } from "lucide-react";
 import { usePhoneLayout } from "./use-phone-layout";
 import { TabsList } from "../ui/tabs";
@@ -20,12 +20,21 @@ export function ResponsiveTabsNavigation({
   label: string;
   value: string;
   onValueChange: (value: string) => void | Promise<void>;
-  options: { id: string; name: string }[];
+  options: { id: string; name: string; group?: string }[];
   pendingValue?: string | null;
   children: ReactNode;
 }) {
   const fade = useScrollFade<HTMLDivElement>();
   const phone = usePhoneLayout();
+  const groups = options.reduce<{ label?: string; items: typeof options }[]>((result, option) => {
+    let group = result.at(-1);
+    if (!group || group.label !== option.group) {
+      group = { label: option.group, items: [] };
+      result.push(group);
+    }
+    group.items.push(option);
+    return result;
+  }, []);
   return (
     <div data-slot="admin-navigation" className="min-w-0">
       {phone ? <div className="grid min-w-0 gap-2">
@@ -34,7 +43,10 @@ export function ResponsiveTabsNavigation({
             <PanelsTopLeft className="size-4" aria-hidden="true" />
             <span className="flex-1"><SelectValue /></span>
           </SelectTrigger>
-          <SelectContent>{options.map((option) => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}</SelectContent>
+          <SelectContent>{groups.map((group, index) => <SelectGroup key={group.label || index}>
+            {group.label && <SelectLabel>{group.label}</SelectLabel>}
+            {group.items.map((option) => <SelectItem key={option.id} value={option.id}>{option.name}</SelectItem>)}
+          </SelectGroup>)}</SelectContent>
         </Select>
         <span role="status" className={pendingValue ? "text-label text-muted-foreground" : "sr-only"}>
           {pendingValue ? `Opening ${options.find((option) => option.id === pendingValue)?.name || "section"}…` : ""}

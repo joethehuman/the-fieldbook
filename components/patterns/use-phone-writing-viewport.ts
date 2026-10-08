@@ -63,7 +63,8 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       const navigation = root!.closest(".editor-frame-canvas")?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().bottom || bounds.top;
       const heading = root!.querySelector(".writing-document-heading")?.getBoundingClientRect().bottom || bounds.top;
       const top = Math.max(bounds.top, viewport!.offsetTop, navigation, heading) + rem;
-      const bottom = Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height) - (keyboardOpen ? 3 : 1) * rem;
+      const dockClearance = parseFloat(getComputedStyle(owner!).getPropertyValue("--editor-dock-clearance")) || 0;
+      const bottom = Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height) - Math.max((keyboardOpen ? 3 : 1) * rem, dockClearance);
       if (bottom <= top) return;
       const delta = caret.bottom > bottom ? caret.bottom - bottom : caret.top < top ? caret.top - top : 0;
       if (Math.abs(delta) < 1) return;

@@ -66,32 +66,42 @@ export function EditorFrame({
   useLayoutEffect(() => { setOverlayHost(frame.current?.closest<HTMLElement>(".app") || null); }, []);
   const hasNavigation = !!navigation;
   useLayoutEffect(() => {
-    const element = canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
+    const element = phone ? controls.current : canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
     if (!element) return;
+    const owner = frame.current?.closest<HTMLElement>(".main-content");
+    const header = frame.current?.closest(".app")?.querySelector<HTMLElement>(".topbar");
     const measure = () => {
-      const rect = element.getBoundingClientRect();
-      frame.current?.style.setProperty("--editor-navigation-height", `${rect.height}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-top", `${rect.bottom + 8}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-left", `${rect.left}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-right", `${window.innerWidth - rect.right}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-max-width", `${rect.width}px`);
       const viewport = window.visualViewport;
       const bottom = (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
-      overlayLayer.current?.style.setProperty("--editor-panel-available-height", `${Math.max(80, bottom - rect.bottom - 24)}px`);
+      if (phone) element.style.setProperty("--editor-dock-offset", `${Math.max(0, window.innerHeight - bottom)}px`);
+      const rect = element.getBoundingClientRect();
+      const bounds = phone ? frame.current?.getBoundingClientRect() || rect : rect;
+      const panelTop = phone ? Math.max(viewport?.offsetTop || 0, header?.getBoundingClientRect().bottom || 0, bounds.top - 8) + 8 : rect.bottom + 8;
+      const panelBottom = phone ? rect.top - 8 : bottom - 16;
+      if (phone) owner?.style.setProperty("--editor-dock-clearance", `${Math.max(80, bottom - rect.top + 12)}px`);
+      frame.current?.style.setProperty("--editor-navigation-height", `${phone ? 0 : rect.height}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-top", `${panelTop}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-left", `${bounds.left}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-right", `${window.innerWidth - bounds.right}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-max-width", `${bounds.width}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-available-height", `${Math.max(80, panelBottom - panelTop)}px`);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
-    // Recovery notices move the toolbar as they expand/collapse above the canvas.
+    // Recovery notices and header changes affect the available panel space.
     const editor = frame.current?.closest(".editor");
     if (editor) observer.observe(editor);
-    const owner = frame.current?.closest(".main-content");
+    if (phone && header) observer.observe(header);
     owner?.addEventListener("scroll", measure, { passive: true });
+    window.addEventListener("resize", measure);
     window.visualViewport?.addEventListener("resize", measure);
     window.visualViewport?.addEventListener("scroll", measure);
     return () => {
       observer.disconnect();
+      if (phone) owner?.style.removeProperty("--editor-dock-clearance");
       owner?.removeEventListener("scroll", measure);
+      window.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("scroll", measure);
     };
@@ -240,9 +250,9 @@ export function EditorFrame({
     </div>
   </EditorDetailsGroup>;
   const panelControls = (
-      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined}>
+      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} role={phone ? "group" : undefined} aria-label={phone ? "Editor controls" : undefined}>
         {outline && (
-          <Button ref={outlineToggle} type="button" variant="outline" size="icon" className={`editor-panel-toggle ${phone ? "relative" : "absolute"} size-11 rounded-full`} data-side="outline"
+          <Button ref={outlineToggle} type="button" variant="outline" size="icon" className={`editor-panel-toggle size-11 ${phone ? "relative rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute rounded-full"}`} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
             onClick={() => { defaultsApplied.current = true; setPanels((current) => ({ outline: !current.outline, details: wide.current ? current.details : false })); }}>
@@ -250,7 +260,7 @@ export function EditorFrame({
           </Button>
         )}
         {phone && <div className="editor-writing-actions-host" ref={setWritingActionsHost} />}
-        <Button ref={detailsToggle} type="button" variant="outline" size="icon" className={`editor-panel-toggle ${phone ? "relative" : "absolute"} size-11 rounded-full`} data-side="details"
+        <Button ref={detailsToggle} type="button" variant="outline" size="icon" className={`editor-panel-toggle size-11 ${phone ? "relative rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute rounded-full"}`} data-side="details"
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
@@ -295,9 +305,10 @@ export function EditorFrame({
     <EditorWritingActionsContext.Provider value={writingActionsHost}>
     <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
       {!phone && panelControls}
+      {phone && overlayHost && createPortal(panelControls, overlayHost)}
       <div className="editor-frame-body">
         {!phone && panelSurfaces}
-        <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{(navigation || phone) && <div className="editor-canvas-navigation">{!phone && navigation}{phone && panelControls}</div>}{children}</div>
+        <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!phone && navigation && <div className="editor-canvas-navigation">{navigation}</div>}{children}</div>
       </div>
       {phone && overlayHost && createPortal(<div ref={overlayLayer} className="editor-mobile-panels">{panelSurfaces}</div>, overlayHost)}
     </section>
