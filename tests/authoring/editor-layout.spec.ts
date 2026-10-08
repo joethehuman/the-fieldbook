@@ -729,7 +729,8 @@ test("editor entry collapses navigation but authors can reopen it", async ({ pag
   for (const kind of ["Doc", "Update", "Course"]) {
     await returnToContent(page);
     await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
-    await page.getByRole("button", { name: kind, exact: true }).click();
+    await page.getByRole("button", { name: "Content", exact: true }).click();
+    await page.getByRole("menuitem", { name: kind, exact: true }).click();
     await expect(page.locator(".editor")).toBeVisible();
     await expect(app).toHaveClass(/sidebar-collapsed/);
   }
@@ -1248,7 +1249,8 @@ test("Details uses Edit Audience for existing Course and Update assignments", as
 test("a new Course shows only its current version before first publication", async ({ page }, info) => {
   await open(page, info.project.name.startsWith("production"), "course");
   await returnToContent(page);
-  await page.getByRole("button", { name: "Course", exact: true }).click();
+  await page.getByRole("button", { name: "Content", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Course", exact: true }).click();
   const toggle = page.getByRole("button", { name: "Details", exact: true });
   if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
   const version = page.locator("#course-version");
