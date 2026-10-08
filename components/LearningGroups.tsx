@@ -421,11 +421,16 @@ export default function LearningGroups({
     onPrepare: onPrepareAssignments,
     registerNavigationGuard: registerAssignmentGuard,
   });
-  async function editUpdates(mode: "add" | "remove", selected?: string[]) {
+  async function editUpdates(
+    mode: "add" | "remove" | "manage", selected?: string[],
+  ) {
     if (!group) return;
     try {
       await updatePicker.open(
-        { kind: "audiences", keys: [`group:${group.id}`], mode, selected },
+        {
+          kind: "audiences", keys: [`group:${group.id}`], mode,
+          ...(mode === "manage" ? { omit: selected } : { selected }),
+        },
         group.name,
       );
     } catch (error) {
@@ -433,12 +438,17 @@ export default function LearningGroups({
         setNotice((error as Error).message);
     }
   }
-  async function editAssignments(mode: "add" | "remove", selected?: string[]) {
+  async function editAssignments(
+    mode: "add" | "remove" | "manage", selected?: string[],
+  ) {
     if (!group) return;
     setNotice("");
     try {
       await assignmentPicker.open(
-        { kind: "audiences", keys: [`group:${group.id}`], mode, selected },
+        {
+          kind: "audiences", keys: [`group:${group.id}`], mode,
+          ...(mode === "manage" ? { omit: selected } : { selected }),
+        },
         group.name,
       );
     } catch (error) {
@@ -693,7 +703,7 @@ export default function LearningGroups({
     ? learningSelectionOptions(data, {
         kind: "audiences",
         keys: [`group:${group.id}`],
-        mode: "add",
+        mode: "manage",
       })
     : [];
   const updateOptions = published.filter((item) => item.kind === "brief");
@@ -722,8 +732,8 @@ export default function LearningGroups({
     startedIndexAction.current = indexAction;
     if (indexAction.kind === "people") openMembership();
     else if (indexAction.kind === "updates")
-      void editUpdates("add").finally(() => setIndexAction(null));
-    else void editAssignments("add").finally(() => setIndexAction(null));
+      void editUpdates("manage").finally(() => setIndexAction(null));
+    else void editAssignments("manage").finally(() => setIndexAction(null));
   }, [indexAction]);
 
   function groupCommands(selectedIds: string[]): BulkCommand[] {
@@ -878,7 +888,7 @@ export default function LearningGroups({
         label: "Remove courses",
         itemLabel: "Remove assignment",
         description:
-          "Remove these direct course or curriculum assignments. Other audience sources and saved history remain.",
+          "Manage direct courses and curricula for this group. Other sources and saved history remain.",
         externalReview: true,
         disabledReason:
           busy || needsConversion
@@ -890,8 +900,8 @@ export default function LearningGroups({
               {
                 kind: "audiences",
                 keys: [`group:${group.id}`],
-                mode: "remove",
-                selected: ids,
+                mode: "manage",
+                omit: ids,
               },
               group.name,
             );
@@ -906,7 +916,7 @@ export default function LearningGroups({
         label: "Remove updates",
         itemLabel: "Remove update",
         description:
-          "Remove these relevant Updates from the group. Published Updates remain available throughout the installation.",
+          "Manage this group’s Update recommendations.",
         disabledReason:
           busy || needsConversion
             ? "Finish the current change first."
@@ -915,7 +925,8 @@ export default function LearningGroups({
         apply: () => updatePicker.open(
           {
             kind: "audiences", keys: [`group:${group!.id}`],
-            mode: "remove", selected: ids,
+            mode: "manage",
+            omit: ids,
           },
           group!.name,
         ),
@@ -1352,10 +1363,9 @@ export default function LearningGroups({
                       disabled={
                         busy || needsConversion || !learningOptions.length
                       }
-                      onClick={() => void editAssignments("add")}
+                      onClick={() => void editAssignments("manage")}
                     >
-                      <Plus aria-hidden="true" />
-                      Assign Courses
+                      Manage Courses
                     </Button>
                   }
                 />
@@ -1433,7 +1443,7 @@ export default function LearningGroups({
                       "Learning order saved.",
                     )
                   }
-                  onRemove={(id) => void editAssignments("remove", [id])}
+                  onRemove={(id) => void editAssignments("manage", [id])}
                 />
                 {!filteredItems.length &&
                   (items.length ? (
@@ -1702,10 +1712,9 @@ export default function LearningGroups({
                       disabled={
                         busy || needsConversion || !updateOptions.length
                       }
-                      onClick={() => void editUpdates("add")}
+                      onClick={() => void editUpdates("manage")}
                     >
-                      <Plus aria-hidden="true" />
-                      Assign Updates
+                      Manage Updates
                     </Button>
                   }
                   search={

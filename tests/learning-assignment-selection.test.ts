@@ -1,8 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { audienceAssignmentCommands } from "../components/audience-assignment-commands";
 import { freshWorkspace } from "../lib/store";
 import {
   applyLearningSelection,
+  learningSelectionState,
+  rebaseAssignmentSelection,
   learningSelectionOptions,
 } from "../lib/learning-assignment-selection";
 import { learningAudienceReview } from "../lib/learning-audience-review";
@@ -184,5 +187,104 @@ test("course/curriculum bulk menus delegate to the shared workflow without gener
     { kind: "items", items, mode: "remove" },
     { kind: "items", items: [{ kind: "curriculum", id: "p" }], mode: "add" },
     { kind: "items", items: [{ kind: "curriculum", id: "p" }], mode: "remove" },
+  ]);
+});
+
+test("Manage Courses loads saved direct items and applies additions and removals together", () => {
+  const { data, items } = fixture();
+  data.groups[0].learningItems!.push({ kind: "curriculum", id: "p" });
+  const target = {
+    kind: "audiences" as const,
+    keys: ["group:a"],
+    mode: "manage" as const,
+  };
+  const initial = learningSelectionState(data, target);
+  assert.deepEqual(initial.selected, [`course:${items[0].id}`, "curriculum:p"]);
+  const next = applyLearningSelection(data, target, [
+    `course:${items[1].id}`,
+    "curriculum:p",
+  ]);
+  assert.deepEqual(next.groups[0].learningItems, [
+    { kind: "curriculum", id: "p" },
+    items[1],
+  ]);
+  assert.deepEqual(next.teams, data.teams);
+  assert.deepEqual(next.progress, data.progress);
+  assert.equal(
+    learningAudienceReview(data, next, items[0], "2026-10-08T00:00:00Z").lost,
+    0,
+  );
+  assert.deepEqual(
+    applyLearningSelection(data, target, []).groups[0].learningItems,
+    [],
+  );
+});
+test("bulk Manage Courses preserves partial links until explicitly added to all or removed", () => {
+  const { data, items } = fixture();
+  const target = {
+    kind: "audiences" as const,
+    keys: ["group:a", "group:b"],
+    mode: "manage" as const,
+  };
+  const initial = learningSelectionState(data, target);
+  assert.deepEqual(initial.partial, [`course:${items[0].id}`]);
+  const unchanged = applyLearningSelection(
+    data,
+    target,
+    initial.selected,
+    initial.partial,
+  );
+  assert.deepEqual(unchanged.groups, data.groups);
+  const all = applyLearningSelection(data, target, initial.selected);
+  assert.deepEqual(all.groups[1].learningItems, [items[0]]);
+  const removed = applyLearningSelection(data, target, []);
+  assert.deepEqual(removed.groups[0].learningItems, []);
+  assert.deepEqual(removed.teams, data.teams);
+  assert.throws(
+    () => applyLearningSelection(data, { ...target, keys: ["missing"] }, []),
+    /changed/,
+  );
+});
+test("management refresh preserves local removals and adds concurrent untouched assignments", () => {
+  assert.deepEqual(
+    rebaseAssignmentSelection(
+      { selected: ["a", "b"], partial: ["b"] },
+      { selected: ["a", "b", "c"], partial: ["b"] },
+      { selected: ["b", "d"], partial: [] },
+    ),
+    { selected: ["c", "b", "d"], partial: [] },
+  );
+});
+
+test("group and team menus use one management action per supported content kind", async () => {
+  const requests: unknown[] = [];
+  const learn = async (target: unknown) => {
+    requests.push(target);
+  };
+  const updates = async (target: unknown) => {
+    requests.push(target);
+  };
+  const group = audienceAssignmentCommands(
+    ["group:a"],
+    "Audience",
+    learn,
+    updates,
+  );
+  const team = audienceAssignmentCommands(["team:t"], "Team", learn);
+  assert.deepEqual(
+    group.map((c) => c.label),
+    ["Manage Courses", "Manage Updates"],
+  );
+  assert.deepEqual(
+    team.map((c) => c.label),
+    ["Manage Courses"],
+  );
+  await group[0].apply([]);
+  await group[1].apply([]);
+  await team[0].apply([]);
+  assert.deepEqual(requests, [
+    { kind: "audiences", keys: ["group:a"], mode: "manage" },
+    { kind: "audiences", keys: ["group:a"], mode: "manage" },
+    { kind: "audiences", keys: ["team:t"], mode: "manage" },
   ]);
 });

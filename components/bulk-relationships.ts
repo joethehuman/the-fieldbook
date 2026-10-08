@@ -33,6 +33,28 @@ export function contentRelationshipCommands(
   )
     ? "Publish every selected item before changing assignments or audiences."
     : undefined;
+  if (kind === "brief" && openUpdates)
+    return [
+      {
+        id: "manage-updates",
+        label: "Manage Updates",
+        disabledReason: reason,
+        externalReview: true,
+        description:
+          "Manage direct group recommendations. Team targeting stays in the Update editor.",
+        apply: () =>
+          openUpdates(
+            {
+              kind: "items",
+              ids: records.map((item) => item.id),
+              mode: "manage",
+            },
+            records.length === 1
+              ? records[0].title
+              : `${records.length} selected Updates`,
+          ),
+      },
+    ];
   const commands: BulkCommand[] = ([true, false] as const).map((add) => ({
     id: add ? "group-add" : "group-remove",
     label:

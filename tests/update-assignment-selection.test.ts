@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { freshWorkspace } from "../lib/store";
 import {
   initialUpdateSelection,
+  partialUpdateSelection,
   updateSelectionActions,
   updateSelectionOptions,
 } from "../lib/update-assignment-selection";
@@ -195,4 +196,90 @@ test("live recommendation pickers offer only groups; teams remain managed in the
     /changed/,
   );
   assert.deepEqual(data.publishedContent![0].updateTeams, ["sales"]);
+});
+
+test("Manage Updates combines group additions and removals while retaining team targets", () => {
+  const data = fixture();
+  const target = {
+    kind: "audiences" as const,
+    keys: ["group:sales"],
+    mode: "manage" as const,
+  };
+  assert.deepEqual(initialUpdateSelection(data, target), ["first"]);
+  assert.deepEqual(updateSelectionActions(data, target, ["second"]), [
+    {
+      operation: "untarget",
+      contentId: "first",
+      expected: 5,
+      groupId: "sales",
+    },
+    { operation: "target", contentId: "second", expected: 8, groupId: "sales" },
+  ]);
+  assert.deepEqual(data.publishedContent![0].updateTeams, ["sales"]);
+});
+test("bulk Manage Updates retains partial recommendations and only changes explicit choices", () => {
+  const data = fixture();
+  const target = {
+    kind: "audiences" as const,
+    keys: ["group:sales", "group:support"],
+    mode: "manage" as const,
+  };
+  const initial = initialUpdateSelection(data, target);
+  const partial = partialUpdateSelection(data, target);
+  assert.deepEqual(initial, ["first", "second"]);
+  assert.deepEqual(partial, initial);
+  assert.deepEqual(updateSelectionActions(data, target, initial, partial), []);
+  assert.deepEqual(updateSelectionActions(data, target, initial, ["second"]), [
+    {
+      operation: "target",
+      contentId: "first",
+      expected: 5,
+      groupId: "support",
+    },
+  ]);
+  assert.deepEqual(
+    updateSelectionActions(data, target, ["second"], ["second"]),
+    [
+      {
+        operation: "untarget",
+        contentId: "first",
+        expected: 5,
+        groupId: "sales",
+      },
+    ],
+  );
+});
+
+test("managing multiple Updates preserves partial group targets in the content orientation", () => {
+  const data = fixture();
+  const target = {
+    kind: "items" as const,
+    ids: ["first", "second"],
+    mode: "manage" as const,
+  };
+  const initial = initialUpdateSelection(data, target);
+  const partial = partialUpdateSelection(data, target);
+  assert.deepEqual(updateSelectionActions(data, target, initial, partial), []);
+  assert.deepEqual(
+    updateSelectionActions(data, target, ["group:support"], ["group:support"]),
+    [
+      {
+        operation: "untarget",
+        contentId: "first",
+        expected: 5,
+        groupId: "sales",
+      },
+    ],
+  );
+  assert.deepEqual(
+    updateSelectionActions(data, target, initial, ["group:support"]),
+    [
+      {
+        operation: "target",
+        contentId: "second",
+        expected: 8,
+        groupId: "sales",
+      },
+    ],
+  );
 });

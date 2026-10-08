@@ -8,11 +8,13 @@ import { isOrganizationChangeCanceled } from "@/lib/organization-change";
 import {
   editsCompleteUpdateSelection,
   initialUpdateSelection,
+  partialUpdateSelection,
   updateSelectionActions,
   updateSelectionOptions,
   updateSelectionSnapshot,
   type UpdateAssignmentTarget,
 } from "@/lib/update-assignment-selection";
+import { rebaseAssignmentSelection } from "@/lib/learning-assignment-selection";
 import { AssignmentTransfer } from "./patterns/assignment-transfer";
 import { SaveChangesControl } from "./patterns/save-changes-control";
 import {
@@ -46,6 +48,8 @@ export function UpdateAssignmentPicker({
 }) {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
+  const [partial, setPartial] = useState<string[]>([]);
+  const initialPartial = useRef<string[]>([]);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
   const [stale, setStale] = useState(false);
@@ -63,7 +67,9 @@ export function UpdateAssignmentPicker({
   const complete = editsCompleteUpdateSelection(target);
   const dirty =
     JSON.stringify([...selected].sort()) !==
-    JSON.stringify([...initial.current].sort());
+      JSON.stringify([...initial.current].sort()) ||
+    JSON.stringify([...partial].sort()) !==
+      JSON.stringify([...initialPartial.current].sort());
   const notify = useToast();
 
   async function prepare(refresh = false) {
@@ -84,28 +90,35 @@ export function UpdateAssignmentPicker({
       const available = new Set(
         updateSelectionOptions(prepared, target).map((option) => option.id),
       );
-      const added = selected.filter((key) => !initial.current.includes(key));
-      const removed = new Set(
-        initial.current.filter((key) => !selected.includes(key)),
-      );
-      const nextSelection = refresh
-        ? complete
-          ? [
-              ...new Set([
-                ...nextInitial.filter((key) => !removed.has(key)),
-                ...added,
-              ]),
-            ]
-          : selected
-        : complete
-          ? nextInitial
-          : target.kind === "audiences"
-            ? target.selected || []
-            : [];
+      const nextPartial = partialUpdateSelection(prepared, target);
+      const rebased =
+        refresh && complete
+          ? rebaseAssignmentSelection(
+              { selected: initial.current, partial: initialPartial.current },
+              { selected: nextInitial, partial: nextPartial },
+              { selected, partial },
+            )
+          : {
+              selected: refresh
+                ? selected
+                : complete
+                  ? nextInitial
+                  : target.kind === "audiences"
+                    ? target.selected || []
+                    : [],
+              partial: nextPartial,
+            };
       initial.current = nextInitial;
+      initialPartial.current = nextPartial;
+      const omit =
+        !refresh && target.kind === "audiences" ? target.omit || [] : [];
+      const nextSelection = rebased.selected.filter(
+        (key) => available.has(key) && !omit.includes(key),
+      );
+      setPartial(rebased.partial.filter((key) => nextSelection.includes(key)));
       snapshot.current = updateSelectionSnapshot(prepared);
       setWorkspace(prepared);
-      setSelected(nextSelection.filter((key) => available.has(key)));
+      setSelected(nextSelection);
       setStale(false);
       setGeneration((value) => value + 1);
     } catch (caught) {
@@ -172,7 +185,12 @@ export function UpdateAssignmentPicker({
           "Updates, audiences or membership changed. Refresh to review the current selection.",
         );
       }
-      const actions = updateSelectionActions(workspace, target, selected);
+      const actions = updateSelectionActions(
+        workspace,
+        target,
+        selected,
+        partial,
+      );
       if (actions.length) await latest.current.onLearningMany(actions);
       notify("Update recommendations saved.");
       latest.current.onFinish(true);
@@ -219,9 +237,7 @@ export function UpdateAssignmentPicker({
         <div className="flex shrink-0 items-start justify-between gap-4">
           <div className="grid gap-2">
             <DialogTitle ref={heading} tabIndex={-1}>
-              {discard
-                ? "Discard recommendation changes?"
-                : "Update recommendations"}
+              {discard ? "Discard recommendation changes?" : "Manage Updates"}
             </DialogTitle>
             <DialogDescription>{title}</DialogDescription>
           </div>
@@ -273,6 +289,11 @@ export function UpdateAssignmentPicker({
                   ? "Choose Updates to recommend in For you."
                   : "Choose groups that receive this Update in For you."}{" "}
                 No completion requirement.
+                {target.mode === "manage" &&
+                  (target.kind === "audiences"
+                    ? target.keys.length
+                    : target.ids.length) > 1 &&
+                  " Partial recommendations stay as they are; + All includes every selected audience or Update."}
               </p>
               {!workspace ? (
                 <p role="status">
@@ -285,7 +306,19 @@ export function UpdateAssignmentPicker({
                   key={generation}
                   options={options}
                   value={selected}
-                  onChange={setSelected}
+                  onChange={(value) => {
+                    setSelected(value);
+                    setPartial(partial.filter((id) => value.includes(id)));
+                  }}
+                  partial={partial}
+                  onAddToAll={(id) =>
+                    setPartial(partial.filter((key) => key !== id))
+                  }
+                  audienceCount={
+                    target.kind === "audiences"
+                      ? target.keys.length
+                      : target.ids.length
+                  }
                   disabled={busy || stale}
                   removing={target.mode === "remove"}
                   rightLabel={

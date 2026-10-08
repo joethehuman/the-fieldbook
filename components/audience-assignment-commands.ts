@@ -16,20 +16,18 @@ export function audienceAssignmentCommands(
   const kinds: ("learning" | "updates")[] = openUpdates
     ? ["learning", "updates"]
     : ["learning"];
-  return kinds.flatMap((kind) =>
-    (["add", "remove"] as const).map((mode) => ({
-      id: `${mode}-${kind}`,
-      label: `${mode === "add" ? "Assign" : "Remove"} ${kind === "learning" ? "courses" : "updates"}`,
-      description:
-        kind === "learning"
-          ? "Change direct course or curriculum assignments. Other assignment sources and saved history remain."
-          : "Change Update recommendations. Published Updates remain available throughout the installation.",
-      externalReview: true,
-      disabledReason,
-      apply: () =>
-        kind === "learning"
-          ? openLearning({ kind: "audiences", keys, mode }, title)
-          : openUpdates!({ kind: "audiences", keys, mode }, title),
-    })),
-  );
+  return kinds.map((kind) => ({
+    id: `manage-${kind}`,
+    label: kind === "learning" ? "Manage Courses" : "Manage Updates",
+    description:
+      kind === "learning"
+        ? "Manage direct course and curriculum assignments. Other sources and saved history remain."
+        : "Manage Update recommendations. Published Updates remain available throughout the installation.",
+    externalReview: true,
+    disabledReason,
+    apply: () =>
+      kind === "learning"
+        ? openLearning({ kind: "audiences", keys, mode: "manage" }, title)
+        : openUpdates!({ kind: "audiences", keys, mode: "manage" }, title),
+  }));
 }

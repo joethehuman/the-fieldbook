@@ -5,6 +5,8 @@ import type { LearningItem } from "@/lib/types";
 import { AssignmentTransfer } from "./patterns/assignment-transfer";
 import {
   applyLearningSelection,
+  learningSelectionState,
+  rebaseAssignmentSelection,
   learningSelectionOptions,
   selectedLearningItems,
   type LearningAssignmentTarget,
@@ -95,6 +97,7 @@ export function LearningAssignmentPicker({
       : title;
   const [open, setOpen] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
+    [partial, setPartial] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [stale, setStale] = useState(false),
@@ -125,6 +128,7 @@ export function LearningAssignmentPicker({
       discardDone.current?.(false);
     };
   }, []);
+  const initialPartial = useRef<string[]>([]);
   const initial = useRef<string[]>([]),
     revision = useRef<number | undefined>(undefined),
     snapshot = useRef(""),
@@ -132,9 +136,12 @@ export function LearningAssignmentPicker({
     refreshing = useRef(false);
   const notify = useToast();
   const dirty =
-    open &&
-    JSON.stringify([...selected].sort()) !==
-      JSON.stringify([...initial.current].sort());
+    (open &&
+      JSON.stringify([...selected].sort()) !==
+        JSON.stringify([...initial.current].sort())) ||
+    (open &&
+      JSON.stringify([...partial].sort()) !==
+        JSON.stringify([...initialPartial.current].sort()));
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (running.current || refreshing.current) return false;
@@ -172,7 +179,12 @@ export function LearningAssignmentPicker({
   const allAudiences = assignmentAudiences(data);
   const learningItem = item && item.kind !== "brief" ? item : undefined;
   const learningItems = target
-    ? selectedLearningItems(target, selected)
+    ? selectedLearningItems(
+        target,
+        target.mode === "manage"
+          ? [...new Set([...initial.current, ...selected])]
+          : selected,
+      )
     : learningItem
       ? [learningItem]
       : [];
@@ -264,7 +276,7 @@ export function LearningAssignmentPicker({
         if (!onChange) throw new Error("Assignment saving is unavailable.");
         await onChange(
           target
-            ? applyLearningSelection(dataRef.current, target, selected)
+            ? applyLearningSelection(dataRef.current, target, selected, partial)
             : assignLearningToAudiences(
                 dataRef.current,
                 learningItems,
@@ -332,17 +344,32 @@ export function LearningAssignmentPicker({
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
+      const managed = target
+        ? learningSelectionState(prepared, target)
+        : { selected: [], partial: [] };
       const ids = target
-        ? []
+        ? managed.selected
         : item?.kind === "brief"
           ? draftKeys || []
           : learningItem
             ? directlyAssignedAudiences(prepared, learningItem)
             : [];
       initial.current = ids;
+      initialPartial.current = managed.partial;
+      setPartial(
+        managed.partial.filter(
+          (id) => target?.kind !== "audiences" || !target.omit?.includes(id),
+        ),
+      );
       revision.current = prepared.governanceRevision;
       snapshot.current = assignmentSnapshot(prepared);
-      setSelected(target?.kind === "audiences" ? target.selected || [] : ids);
+      setSelected(
+        target?.kind === "audiences"
+          ? target.mode === "manage"
+            ? ids.filter((id) => !target.omit?.includes(id))
+            : target.selected || []
+          : ids,
+      );
       setStep("select");
       setReviewPlan(null);
       setOpen(true);
@@ -367,11 +394,26 @@ export function LearningAssignmentPicker({
       if (!latest || !mounted.current) return;
       revision.current = latest.governanceRevision;
       snapshot.current = assignmentSnapshot(latest);
+      if (target?.mode === "manage") {
+        const next = learningSelectionState(latest, target);
+        const rebased = rebaseAssignmentSelection(
+          { selected: initial.current, partial: initialPartial.current },
+          next,
+          { selected, partial },
+        );
+        initialPartial.current = next.partial;
+        const available = new Set(
+          learningSelectionOptions(latest, target).map((option) => option.id),
+        );
+        const valid = rebased.selected.filter((id) => available.has(id));
+        setSelected(valid);
+        setPartial(rebased.partial.filter((id) => valid.includes(id)));
+      }
       initial.current =
         item?.kind === "brief"
           ? draftKeys || []
           : target
-            ? []
+            ? learningSelectionState(latest, target).selected
             : learningItem
               ? directlyAssignedAudiences(latest, learningItem)
               : [];
@@ -466,9 +508,11 @@ export function LearningAssignmentPicker({
               <DialogTitle ref={heading} tabIndex={-1}>
                 {target
                   ? target.kind === "audiences"
-                    ? target.mode === "remove"
-                      ? "Remove courses"
-                      : "Assign courses"
+                    ? target.mode === "manage"
+                      ? "Manage Courses"
+                      : target.mode === "remove"
+                        ? "Remove courses"
+                        : "Assign courses"
                     : target.mode === "remove"
                       ? "Remove assignments"
                       : "Add assignments"
@@ -530,11 +574,15 @@ export function LearningAssignmentPicker({
               {(target || item?.kind === "brief") && (
                 <p className="shrink-0 text-sm text-muted-foreground">
                   {target
-                    ? target.mode === "remove"
-                      ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."
-                      : target.kind === "audiences"
-                        ? "Choose courses or curricula for this audience. Other assignments stay in place."
-                        : "Add audiences for the selected learning. Other assignments stay in place."
+                    ? target.mode === "manage"
+                      ? target.kind === "audiences" && target.keys.length > 1
+                        ? "Manage direct courses and curricula. Partial assignments stay as they are; + All assigns to every selected audience."
+                        : "Manage direct courses and curricula. Expand a curriculum to see its included courses."
+                      : target.mode === "remove"
+                        ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."
+                        : target.kind === "audiences"
+                          ? "Choose courses or curricula for this audience. Other assignments stay in place."
+                          : "Add audiences for the selected learning. Other assignments stay in place."
                     : item?.kind === "brief"
                       ? "Choose who gets this Update in For you. No completion requirement."
                       : "Choose who gets this learning in For you and assigned learning."}
@@ -551,9 +599,25 @@ export function LearningAssignmentPicker({
                         : ("group" as const)),
                   }))}
                   value={selected}
-                  onChange={setSelected}
+                  onChange={(value) => {
+                    setSelected(value);
+                    setPartial(partial.filter((id) => value.includes(id)));
+                  }}
+                  partial={partial}
+                  onAddToAll={(id) =>
+                    setPartial(partial.filter((key) => key !== id))
+                  }
+                  audienceCount={
+                    target.kind === "audiences" ? target.keys.length : 1
+                  }
                   disabled={busy || stale}
-                  rightLabel={target.mode === "remove" ? "To remove" : "To add"}
+                  rightLabel={
+                    target.mode === "manage"
+                      ? "Assigned"
+                      : target.mode === "remove"
+                        ? "To remove"
+                        : "To add"
+                  }
                   removing={target.mode === "remove"}
                   searchPlaceholder={
                     target.kind === "audiences"
@@ -652,7 +716,7 @@ export function LearningAssignmentPicker({
                   blockedReason={
                     stale
                       ? "Refresh to review current consequences."
-                      : target && !selected.length
+                      : target && target.mode !== "manage" && !selected.length
                         ? "Select at least one item to continue."
                         : undefined
                   }
