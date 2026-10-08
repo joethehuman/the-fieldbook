@@ -207,6 +207,7 @@ export const learningData: Pick<
         })
         .eq("user_id", userId)
         .order("content_id")
+        .order("version")
         .range(from, to),
     );
   },
