@@ -2945,7 +2945,7 @@ export function Editor({
       type="button"
       variant="ghost"
       size="sm"
-      className="justify-start px-0 font-normal"
+      className="justify-start font-normal"
       disabled={
         busy ||
         saving ||
