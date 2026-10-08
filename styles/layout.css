@@ -436,20 +436,20 @@
   .editor-frame-controls[data-cards="true"] .writing-toolbar-controls { flex-wrap: nowrap; gap: var(--space-2); }
   .main-content:has(.editor-frame[data-cards="true"]) {
     --editor-dock-clearance: 80px;
-    padding-block-end: calc(96px + var(--phone-keyboard-space, 0px));
+    padding-block-end: calc(max(96px, var(--editor-dock-clearance)) + var(--phone-keyboard-space, 0px));
   }
   .editor-mobile-panels { --scroll-fade-depth: var(--scroll-fade-size); }
   .editor-mobile-panels .editor-frame-panel {
     position: absolute;
     top: var(--editor-panel-top, 10rem);
+    inset-inline-start: var(--editor-panel-center, 50%);
+    transform: translateX(-50%);
     z-index: 14;
     width: min(320px, var(--editor-panel-max-width, calc(100vw - 2rem)));
     height: auto;
     max-height: var(--editor-panel-available-height, calc(100dvh - 11rem));
     padding: 0;
   }
-  .editor-mobile-panels .editor-frame-panel[data-side="outline"] { inset-inline-start: var(--editor-panel-left, var(--space-4)); }
-  .editor-mobile-panels .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
   .editor-mobile-panels :is(.editor-frame-outline, .editor-frame-details) { max-height: inherit; }
   .editor-mobile-panels .editor-floating-heading { padding-inline: var(--space-4); min-height: 3.5rem; }
   /* Equal block-action gutters keep Back, titles and writing on one centered column. */

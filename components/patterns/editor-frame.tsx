@@ -76,6 +76,10 @@ export function EditorFrame({
     let layoutWidth = document.documentElement.clientWidth;
     let layoutHeight = document.documentElement.clientHeight;
     let keyboard = false;
+    // Apple can overlay an address pill and an input accessory row above the
+    // keyboard without subtracting both from the reported visual viewport.
+    const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
     const measure = () => {
       const viewport = window.visualViewport;
       const appBounds = overlayHost?.getBoundingClientRect();
@@ -95,8 +99,10 @@ export function EditorFrame({
         // This also compensates for native viewport panning of the app itself.
         element.style.setProperty("--editor-dock-bottom", `${bottom - (appBounds?.top || 0)}px`);
         const centered = !viewport?.offsetLeft && Math.abs((viewport?.width || window.innerWidth) - (appBounds?.width || window.innerWidth)) < 1;
-        element.style.setProperty("--editor-dock-center", centered ? "50%" : `${(viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) / 2 - (appBounds?.left || 0)}px`);
-        element.style.setProperty("--editor-dock-gap", keyboard ? "max(3rem, env(safe-area-inset-bottom))" : "max(var(--space-3), env(safe-area-inset-bottom))");
+        const center = centered ? "50%" : `${(viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) / 2 - (appBounds?.left || 0)}px`;
+        element.style.setProperty("--editor-dock-center", center);
+        overlayLayer.current?.style.setProperty("--editor-panel-center", center);
+        element.style.setProperty("--editor-dock-gap", keyboard ? `max(${appleTouch ? 8 : 3}rem, env(safe-area-inset-bottom))` : "max(var(--space-3), env(safe-area-inset-bottom))");
       }
       const rect = element.getBoundingClientRect();
       const bounds = phone ? frame.current?.getBoundingClientRect() || rect : rect;
@@ -108,7 +114,7 @@ export function EditorFrame({
       overlayLayer.current?.style.setProperty("--editor-panel-left", `${bounds.left - (phone ? appBounds?.left || 0 : 0)}px`);
       overlayLayer.current?.style.setProperty("--editor-panel-right", `${phone && appBounds ? appBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
       overlayLayer.current?.style.setProperty("--editor-panel-max-width", `${bounds.width}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-available-height", `${Math.max(80, panelBottom - panelTop)}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-available-height", `${Math.max(phone ? 0 : 80, panelBottom - panelTop)}px`);
     };
     const tick = () => {
       request = 0;
@@ -188,7 +194,7 @@ export function EditorFrame({
         outline: column.left - bounds.left >= panelWidth + gap,
         details: bounds.right - column.right >= panelWidth + gap,
       };
-      wide.current = bounds.width >= 2 * panelWidth + 16;
+      wide.current = !phone && bounds.width >= 2 * panelWidth + 16;
       narrow.current = phone || !clearance.outline || !clearance.details;
       if (!defaultsApplied.current) {
         const app = target.closest(".app");

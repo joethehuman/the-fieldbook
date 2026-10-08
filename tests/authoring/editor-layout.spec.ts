@@ -2127,6 +2127,7 @@ for (const kind of ["doc", "brief", "course"] as const) {
       const pane = (await details.boundingBox())!, controls = (await dock.boundingBox())!;
       expect(pane.y).toBeGreaterThanOrEqual(offsetTop);
       expect(pane.y + pane.height).toBeLessThanOrEqual(controls.y - 7);
+      expect(pane.x + pane.width / 2).toBeCloseTo(375 / 2, 0);
       await details.press("Escape");
       await expect(detailsToggle).toBeFocused();
     }
@@ -2143,6 +2144,20 @@ test("portrait touch tablets keep the existing dock cutoff and desktop returns w
     const writer = await page.getByRole("textbox", { name: "Lesson content", exact: true }).elementHandle();
     await expect(page.locator(".editor-frame")).toHaveAttribute("data-cards", "true");
     await expect(page.getByRole("group", { name: "Editor controls", exact: true })).toBeVisible();
+    const outlineToggle = page.getByRole("button", { name: "Outline", exact: true });
+    const detailsToggle = page.getByRole("button", { name: "Details", exact: true });
+    await outlineToggle.click();
+    const outline = page.getByRole("complementary", { name: "Course outline", exact: true });
+    await expect(outline).toBeVisible();
+    const outlineBox = (await outline.boundingBox())!;
+    expect(outlineBox.x + outlineBox.width / 2).toBeCloseTo(512, 0);
+    await detailsToggle.click();
+    await expect(outline).toBeHidden();
+    const details = page.getByRole("complementary", { name: "Content details", exact: true });
+    await expect(details).toBeVisible();
+    const detailsBox = (await details.boundingBox())!;
+    expect(detailsBox.x + detailsBox.width / 2).toBeCloseTo(512, 0);
+    await detailsToggle.click();
     await page.getByRole("button", { name: "Open navigation", exact: true }).click();
     await expect(page.locator('.editor-frame-controls[data-cards="true"]')).toBeHidden();
     await page.getByRole("button", { name: "Close navigation", exact: true }).click();
@@ -2303,3 +2318,60 @@ test("compact dock follows independent viewport sizes, native app panning and di
   await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(800, 0);
   await page.screenshot({ path: info.outputPath("dock-after-viewport-dismissal.png") });
 });
+
+for (const device of ["iPhone", "iPad", "Android"] as const) {
+  test(`${device}: compact dock clears native keyboard controls and centers cards`, async ({ page }, info) => {
+    await page.addInitScript((device) => {
+      const apple = device !== "Android";
+      Object.defineProperty(navigator, "userAgent", { configurable: true, value: device === "iPhone" ? "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" : device === "iPad" ? "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15" : "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/130.0.0.0 Mobile Safari/537.36" });
+      Object.defineProperty(navigator, "platform", { configurable: true, value: device === "iPad" ? "MacIntel" : apple ? "iPhone" : "Linux armv8l" });
+      Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+    }, device);
+    await page.setViewportSize({ width: 375, height: 812 });
+    await open(page, info.project.name.startsWith("production"), "course");
+    const writing = page.getByRole("textbox", { name: "Lesson content", exact: true });
+    await writing.locator("p").first().click();
+    await page.evaluate(() => {
+      const state = { height: 490, offsetTop: 0 };
+      (window as unknown as { dockViewport: typeof state }).dockViewport = state;
+      Object.defineProperty(window.visualViewport, "height", { configurable: true, get: () => state.height });
+      Object.defineProperty(window.visualViewport, "offsetTop", { configurable: true, get: () => state.offsetTop });
+    });
+    const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+    for (const state of [{ height: 490, offsetTop: 0 }, { height: 430, offsetTop: 35 }, { height: 460, offsetTop: 60 }, { height: 320, offsetTop: 0 }]) {
+      await page.evaluate((next) => {
+        Object.assign((window as unknown as { dockViewport: typeof next }).dockViewport, next);
+        window.visualViewport!.dispatchEvent(new Event("resize"));
+        window.visualViewport!.dispatchEvent(new Event("scroll"));
+      }, state);
+      const visibleBottom = state.height + state.offsetTop;
+      await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(visibleBottom - (device === "Android" ? 48 : 128), 0);
+      if (device !== "Android") {
+        const box = (await dock.boundingBox())!;
+        // Model the two native rows seen in Safari, which may remain inside
+        // the reported viewport. The dock must clear their top plus a gap.
+        expect(box.y + box.height).toBeLessThanOrEqual(visibleBottom - 112 - 12);
+      }
+      const padding = await page.locator(".main-content").evaluate((owner) => {
+        const style = getComputedStyle(owner);
+        return { padding: parseFloat(style.paddingBottom), clearance: parseFloat(style.getPropertyValue("--editor-dock-clearance")) };
+      });
+      expect(padding.padding).toBeGreaterThanOrEqual(padding.clearance);
+    }
+    for (const name of ["Outline", "Details"] as const) {
+      await dock.getByRole("button", { name, exact: true }).click();
+      const card = page.getByRole("complementary", { name: name === "Outline" ? "Course outline" : "Content details", exact: true });
+      await expect(card).toBeVisible();
+      const box = (await card.boundingBox())!;
+      expect(box.x + box.width / 2).toBeCloseTo(187.5, 0);
+      expect(box.y + box.height).toBeLessThanOrEqual((await dock.boundingBox())!.y - 7);
+      await dock.getByRole("button", { name, exact: true }).click();
+    }
+    await page.evaluate(() => {
+      Object.assign((window as unknown as { dockViewport: { height: number; offsetTop: number } }).dockViewport, { height: 812, offsetTop: 0 });
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+    });
+    await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(800, 0);
+    await page.screenshot({ path: info.outputPath(`${device}-centered-card-keyboard-clearance.png`) });
+  });
+}
