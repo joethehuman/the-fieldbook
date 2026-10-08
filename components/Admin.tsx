@@ -1066,6 +1066,7 @@ export default function Admin({
           content={editing}
           data={data}
           onSave={save}
+          onBulk={onBulk}
           onCancel={() => {
             void navigateDestination({ tab: "content", contentKind: destination.contentKind }, { approved: true });
           }}
@@ -2081,6 +2082,7 @@ export default function Admin({
   );
 }
 export function Editor({
+  onBulk,
   onLearningMany,
   onWorkspaceChange,
   onPrepareAssignments,
@@ -2094,6 +2096,7 @@ export function Editor({
   onReload,
   onLoadPublished,
 }: {
+  onBulk?: BulkHandler;
   onPrepareAssignments?: () => Promise<Workspace>;
   onUpload?: UploadMedia;
   registerNavigationGuard?: RegisterNavigationGuard;
@@ -2950,6 +2953,18 @@ export function Editor({
           ]}
         />
   );
+  const deleteAction = onBulk && (
+    <ItemActions
+      id={c.id}
+      label={c.title || "Untitled"}
+      buttonLabel={`Delete ${c.kind === "doc" ? "Doc" : c.kind === "course" ? "Course" : "Update"}`}
+      disabled={busy || saving || publishing || dirty || needsRecovery || !data.content.some((item) => item.id === c.id)}
+      commands={adminCommands({ data, selected: [c.id], onBulk }).filter((command) => command.id === "delete")}
+      onSelectionChange={(failed) => {
+        if (!failed.length) onCancel();
+      }}
+    />
+  );
   return (
     <form
       ref={form}
@@ -3063,6 +3078,7 @@ export function Editor({
             introduction={<WritingTitle id="editor-title" aria-label="Title" maxLength={160} disabled={busy} value={c.title} onChange={(event) => set("title", event.target.value.replace(/\n/g, " "))} placeholder="Untitled course" />}
             details={details}
             recovery={recovery}
+            deleteAction={deleteAction}
             requirementsCount={requirements.length}
             revealDetails={detailsReveal}
             incompleteSteps={[
@@ -3082,6 +3098,7 @@ export function Editor({
               navigation={canvasNavigation}
               details={details}
               recovery={recovery}
+              deleteAction={deleteAction}
               download={{ value: c.body, name: c.title }}
               requirementsCount={requirements.length}
               revealDetails={detailsReveal}

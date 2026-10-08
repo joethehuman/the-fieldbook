@@ -26,13 +26,14 @@ const newQuestion = (): Question => {
 };
 
 /** Only the active lesson or final quiz is mounted, preserving a short edit surface. */
-export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep, details, recovery, introduction, navigation, requirementsCount, revealDetails, incompleteSteps = [] }: {
+export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep, details, recovery, deleteAction, introduction, navigation, requirementsCount, revealDetails, incompleteSteps = [] }: {
   course: Content;
   onChange: (updater: (current: Content) => Content) => void;
   onUpload?: UploadMedia;
   disabled: boolean;
   details: ReactNode;
   recovery?: ReactNode;
+  deleteAction?: ReactNode;
   introduction?: ReactNode;
   navigation?: ReactNode;
   requirementsCount?: number;
@@ -253,6 +254,7 @@ export function CourseBuilder({ course, onChange, onUpload, disabled, revealStep
     outlineContext={selectedLesson ? `Lesson ${course.lessons.indexOf(selectedLesson) + 1} of ${course.lessons.length}` : selected === "quiz" ? "Quiz" : undefined}
     details={details}
     recovery={recovery}
+    deleteAction={deleteAction}
     download={selectedLesson ? { value: selectedLesson.videoUrl ? `[Video](${selectedLesson.videoUrl})\n\n${selectedLesson.body}` : selectedLesson.body, name: selectedLesson.title } : undefined}
     requirementsCount={requirementsCount}
     revealDetails={revealDetails}
