@@ -340,7 +340,7 @@ export default function Curricula({
       className="learning-admin"
     >
       {assignmentPicker.picker}
-      {notice && <Alert variant="destructive">{notice}</Alert>}
+      {notice && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
       {editing ? (
         <form
           onSubmit={(e) => {

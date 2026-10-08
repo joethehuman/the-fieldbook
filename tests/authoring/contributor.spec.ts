@@ -121,7 +121,7 @@ test("contributor Update audience offers groups without team or Organization con
   await page
     .getByLabel("Title", { exact: true })
     .fill("Contributor audience draft");
-  await expect(page.locator(".editor-heading [role=status] .sr-only")).toHaveText("Saved");
+  await expect(page.locator(".editor-save-status [role=status] .sr-only")).toHaveText("Saved");
   await openContentSettings(page);
   await page
     .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })

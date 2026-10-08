@@ -70,6 +70,7 @@ import {
   freshWorkspace,
   loadWorkspace,
   saveWorkspace,
+  resetWorkspace,
   updateProgress,
   SESSION,
   DEMO_PROFILE_IDS,
@@ -138,7 +139,7 @@ export default function Fieldbook() {
           : null,
       );
     } catch (e) {
-      setError((e as Error).message);
+      setError("Your saved demo data couldn’t be opened. Use Reset demo to start again.");
     } finally {
       setRestored(true);
     }
@@ -271,7 +272,7 @@ export default function Fieldbook() {
   }
   async function persist(
     next: Workspace,
-    options?: { locallyHandled?: boolean },
+    options?: { locallyHandled?: boolean; reset?: boolean },
   ) {
     setError("");
     setReportIssue("Updating report…");
@@ -280,7 +281,8 @@ export default function Fieldbook() {
         data || next,
         reconcileDemoPublication(data || next, next),
       );
-      saveWorkspace(reconciled);
+      if (options?.reset) resetWorkspace(reconciled);
+      else saveWorkspace(reconciled);
       setData(reconciled);
       setReportIssue(undefined);
       setError("");
@@ -289,7 +291,7 @@ export default function Fieldbook() {
         "Reload the report before exporting after a failed change.",
       );
       const failure = new Error(
-        "Your browser could not save this change. Storage may be full or disabled. Your edits remain open.",
+        "Your browser couldn’t save this change. Check browser storage space and permissions.",
       );
       if (!options?.locallyHandled)
         setError(navigationGuard.current ? "" : failure.message);
@@ -317,7 +319,7 @@ export default function Fieldbook() {
       )
     ) {
       const next = freshWorkspace();
-      await persist(next);
+      await persist(next, { reset: true });
       logout();
       setShowDemo(false);
       navigate("learn");
@@ -352,14 +354,14 @@ export default function Fieldbook() {
   const policyHref = privacyHref(branding);
   if (!restored || !data || !user) {
     const picker = (
-      <BrandedAccount branding={brandingFromSettings(branding)}>
+      <BrandedAccount branding={brandingFromSettings(branding)} centered>
         <Badge variant="default">INTERACTIVE DEMO</Badge>
         <h1>Choose a demo profile</h1>
-        {!data && error && (
+        {!data && (
           <>
-            <Alert variant="destructive" role="alert">
+            {error && <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
               {error}
-            </Alert>
+            </Alert>}
             <Button variant="ghost" onClick={reset}>
               Reset demo
             </Button>
@@ -587,7 +589,7 @@ export default function Fieldbook() {
       }
       alert={
         error && (
-          <Alert variant="destructive" role="alert">
+          <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
             {error}
           </Alert>
         )
@@ -656,7 +658,7 @@ export default function Fieldbook() {
             onSaveDocsNavigation={async (before, settings, moves) => {
               let current = loadWorkspace();
               if (!equalJson(current.settings, before.settings))
-                throw new Error("Settings changed in another tab. Reload and review before saving. Your edits remain open.");
+                throw new Error("Settings changed in another session. Reload this page before saving.");
               const result = await saveDocsNavigation(before, settings, moves,
                 async (_, next) => { current = { ...current, settings: next }; return current; },
                 async (request) => {
@@ -683,7 +685,7 @@ export default function Fieldbook() {
                 );
                 if ((previous?.revision || 0) !== (content.revision || 0))
                   throw new Error(
-                    "This content changed in another tab. Reload and review the saved copy before saving again.",
+                    "Another session changed this content. Review the saved copy before saving again.",
                   );
                 const stamp = new Date().toISOString();
                 const next = reconcileLearning(
@@ -718,7 +720,7 @@ export default function Fieldbook() {
                 throw failure instanceof Error
                   ? failure
                   : new Error(
-                      "Your browser could not save this change. Your edits remain open.",
+                      "Your browser couldn’t save this change. Check your connection and try again.",
                     );
               }
             }}
@@ -756,7 +758,7 @@ export default function Fieldbook() {
               );
               if (!draft || !published)
                 throw new Error(
-                  "The published version is unavailable. Your changes remain open.",
+                  "The published version is unavailable. Continue with your current draft.",
                 );
               return {
                 ...published,

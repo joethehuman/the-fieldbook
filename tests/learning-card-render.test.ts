@@ -46,6 +46,7 @@ function library(
     optional?: boolean;
     curriculum?: boolean;
     dueDate?: string;
+    linkedNavigation?: boolean;
   } = {},
 ) {
   const { data, course, user } = fixture();
@@ -91,6 +92,7 @@ function library(
       assigned: assignedCourses([item], viewer, groups),
       onOpen() {},
       onCurriculum() {},
+      linkedNavigation: options.linkedNavigation,
       guest: options.guest,
     }),
   );
@@ -141,14 +143,28 @@ test("course cards inside curriculum pages use the same saved deadline", () => {
     }),
   );
   assert.match(html, />Past due</);
-  assert.match(html, /Due \d+ days ago/);
+  assert.match(html, /\d+ days past due/);
 });
 
 test("unfinished assigned course cards show the relative due date", () => {
   assert.match(library({ dueDate: addDays(todayUTC(), 6) }), /Due in 6 days/);
   assert.match(library({ dueDate: addDays(todayUTC(), 1) }), /Due in 1 day/);
   assert.match(library({ dueDate: todayUTC() }), /Due today/);
-  assert.match(library({ dueDate: addDays(todayUTC(), -2) }), /Due 2 days ago/);
+  assert.match(library({ dueDate: addDays(todayUTC(), -2) }), /2 days past due/);
+  assert.match(library({ dueDate: addDays(todayUTC(), -1) }), /1 day past due/);
+});
+
+test("demo and installed-app navigation share red past-due cues and muted upcoming cues", () => {
+  for (const linkedNavigation of [false, true]) {
+    const overdue = library({ linkedNavigation, dueDate: addDays(todayUTC(), -2) });
+    assert.match(overdue, /<time[^>]*class="[^"]*text-destructive[^"]*"[^>]*>[\s\S]*?2 days past due<\/time>/);
+    assert.doesNotMatch(overdue.match(/<time[^>]*>/)?.[0] || "", /text-muted-foreground/);
+    for (const dueDate of [todayUTC(), addDays(todayUTC(), 5)]) {
+      const upcoming = library({ linkedNavigation, dueDate });
+      assert.match(upcoming.match(/<time[^>]*>/)?.[0] || "", /text-muted-foreground/);
+      assert.doesNotMatch(upcoming.match(/<time[^>]*>/)?.[0] || "", /text-destructive/);
+    }
+  }
 });
 
 test("due cue is absent for completed, optional, guest, and deadlines-off cards", () => {
@@ -174,7 +190,7 @@ test("curriculum wrappers keep For you without a course due counter", () => {
     }),
   );
   assert.match(html, />For you</);
-  assert.doesNotMatch(html, /Due in|Due today|days ago/);
+  assert.doesNotMatch(html, /Due in|Due today|days past due/);
 });
 test("uploaded course covers retain type, category and relevance once", () => {
   const { course } = fixture();

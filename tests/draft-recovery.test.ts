@@ -129,11 +129,11 @@ test("retry refuses conflicting edits or a deleted draft, but allows a rejected 
         title: "Other author",
         revision: 5,
       }),
-    /another session/,
+    /Another session/,
   );
   assert.throws(
     () => resumeDraft(published, published, published, undefined),
-    /no longer available/,
+    /draft is no longer available/,
   );
   assert.equal(
     resumeDraft(

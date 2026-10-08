@@ -439,7 +439,7 @@ export function Assignments({
           </>
         )}
       </p>
-      {notice && <Alert variant="destructive">{notice}</Alert>}
+      {notice && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
       <CollectionControls
         search={
           <Input

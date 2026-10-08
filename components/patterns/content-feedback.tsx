@@ -195,7 +195,7 @@ export function ContentFeedback({
             Optional · up to 2,000 characters
           </p>
           {error && (
-            <Alert variant="destructive" role="alert">
+            <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
               {error}
             </Alert>
           )}

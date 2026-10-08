@@ -29,20 +29,20 @@ export function uploadFailure(status: number, body = "") {
     status === 413 ||
     /EntityTooLarge|PayloadTooLarge|InvalidUploadLength/.test(code)
   )
-    return "Storage rejected this file because it exceeds the installation's file-size limit. Ask an administrator to check the storage limits.";
+    return "This file exceeds the upload size limit. Use a smaller file or contact an administrator.";
   if (status === 401 || status === 403)
-    return "Upload permission expired or was denied. Choose the file again to retry.";
+    return "Your upload permission expired or was denied. Choose the file again to retry.";
   if (status === 404 || status === 410)
-    return "The upload expired or is unavailable. Choose the file again to retry.";
+    return "This upload expired. Choose the file again to start a new upload.";
   if (status === 409)
-    return "This upload conflicted with another transfer. Choose the file again to retry.";
+    return "This upload conflicts with another transfer. Choose the file again to retry.";
   if (status === 415 || /InvalidMimeType/.test(code))
-    return "Storage does not allow this file type. Choose a supported image, MP4 or WebM file.";
+    return "This file type isn’t supported. Choose an image, MP4 or WebM file.";
   if (status === 429 || status >= 500)
-    return "Storage is temporarily unavailable. Wait a moment, then choose the file again to retry.";
+    return "Storage is temporarily unavailable. Wait a moment, then choose the file again.";
   if (!status)
-    return "The upload connection was interrupted. Check your connection, then choose the file again to retry.";
-  return "Storage rejected the upload. Check the installation's storage limits and allowed file types, then try again.";
+    return "The upload was interrupted. Check your connection and choose the file again.";
+  return "The upload was rejected. Check the file type and size, then try again.";
 }
 
 export async function transferMedia(
@@ -126,8 +126,8 @@ export async function uploadMediaFile(
   } catch (error) {
     throw new Error(
       error instanceof RequestError
-        ? `Could not start the upload. ${error.message}`
-        : "Could not start the upload. Check your connection and try again.",
+        ? `The upload couldn’t be started. ${error.message}`
+        : "The upload couldn’t be started. Try again.",
     );
   }
   report("uploading");
@@ -139,10 +139,10 @@ export async function uploadMediaFile(
     return (await request("/api/upload", { complete: sign.id })).url as string;
   } catch (error) {
     throw new Error(
-      "The file transferred, but its upload could not be verified. No media was inserted. " +
+      "The upload couldn’t be verified. " +
         (error instanceof RequestError
           ? error.message
-          : "Check your connection and choose the file again to retry."),
+          : "Choose the file again to retry."),
     );
   }
 }

@@ -15,6 +15,8 @@ The installation is a Next.js application backed by Supabase Database, Auth, and
 
 Search is built in. Ask AI and the authenticated MCP endpoint are optional. MCP access follows the account's publishing or reporting permissions and the connection's approved capabilities. The demo can illustrate the interface, but its simulated identities and data do not establish installed permissions or persistence.
 
+On public installations, guest course progress stays in that browser. After sign-in, Fieldbook quietly saves compatible progress to the account and disregards invalid records, unavailable courses and older course versions. Temporary connection or service failures leave browser records available for a later attempt. This does not interrupt sign-in or show an import prompt.
+
 ## Local development (optional)
 
 Use Node.js 22.x and pnpm 10.17.1. Configure a separate development Supabase project in a root .env.local file before starting the installed application. Never use production credentials for local development.
@@ -25,5 +27,11 @@ pnpm dev
 ~~~
 
 Run the browser-local demo with pnpm dev:demo. The shared interface catalog is at /ui in the demo. The installed app lives at the repository root; demo/ is a separate optional app. Shared components and models live in components/ and lib/, server behavior in app/ and server/, and database migrations in supabase/migrations/.
+
+Each visit refreshes original sample learning dates relative to today, keeping upcoming and overdue examples available. Edited schedules and visitor progress stay saved in the browser. Course cards and deadline rules use the same shared code as the installed app.
+
+## License
+
+Copyright (c) 2026 Joseph DeSapio. All rights reserved.
 
 Fieldbook is available under the [Elastic License 2.0](LICENSE), which allows many internal uses but restricts offering the software's substantial functionality as a hosted or managed service. Review the license itself before relying on a particular use. There is no support SLA or promised release schedule.

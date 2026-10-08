@@ -107,7 +107,7 @@ export async function saveSettings(
       if (docs.some((doc) => sectionForDoc(doc, previous)?.id === section.id))
         throw new HttpError(
           400,
-          "Move this section's draft and published documents before deleting it.",
+          "Move this section’s items elsewhere before deleting it.",
         );
       if (
         previous.some(
@@ -118,7 +118,7 @@ export async function saveSettings(
       )
         throw new HttpError(
           400,
-          "Move subsections before deleting this section.",
+          "Move this section’s items elsewhere before deleting it.",
         );
     }
     for (const doc of docs) {

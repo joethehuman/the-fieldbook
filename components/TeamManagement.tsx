@@ -574,7 +574,7 @@ export function TeamsAdmin({
               </ul>
             );
           } catch (error) {
-            return <p role="alert">{(error as Error).message}</p>;
+            return <Alert variant="destructive">{(error as Error).message}</Alert>;
           }
         },
         apply: async (values: string[], ids: string[] = []) => {
@@ -970,7 +970,7 @@ export function TeamsAdmin({
             </p>
           </div>
           {notice && !editing && !moving && (
-            <Alert variant="destructive">{notice}</Alert>
+            <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>
           )}
           <Tabs
             value={
@@ -1329,7 +1329,7 @@ export function TeamsAdmin({
               Choose a new place for the whole branch. You’ll review any
               reporting or learning changes before saving.
             </DialogDescription>
-            {notice && <Alert variant="destructive">{notice}</Alert>}
+            {notice && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
             <DialogBody className="flex flex-col overflow-y-auto">
               <SearchableSelectionList
                 bounded="compact"
@@ -1449,7 +1449,7 @@ export function TeamsAdmin({
                 : "Set the name, parent and manager. You’ll review any reporting or learning changes before saving."}
             </DialogDescription>
             <form onSubmit={saveTeam} className="grid gap-4">
-              {notice && <Alert variant="destructive">{notice}</Alert>}
+              {notice && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
               <FieldGroup disabled={busy}>
                 {editing.id !== organization?.id && (
                   <>

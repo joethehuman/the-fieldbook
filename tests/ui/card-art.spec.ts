@@ -167,7 +167,7 @@ test("Shuffle opts into v6, avoids repeats and reloads the exact saved SVG witho
   const shuffled = await editor.locator(".card-artwork-geometry").innerHTML();
   expect(shuffled).not.toBe(first);
   await expect(
-    page.locator(".editor-heading [role=status] > .sr-only"),
+    page.locator(".editor-save-status [role=status] > .sr-only"),
   ).toHaveText(/^Saved(?:\. Unpublished edits)?$/);
   const saved = await storedArt(page, item.id);
   expect(saved.version).toBe(6);
@@ -235,7 +235,7 @@ for (const version of [2, 3, 4, 5, 6] as const) {
     // The demo has no upload handler; retaining that boundary is intentional.
     await expect(source).toBeDisabled();
     await expect(
-      page.locator(".editor-heading [role=status] > .sr-only"),
+      page.locator(".editor-save-status [role=status] > .sr-only"),
     ).toHaveText(/^Saved(?:\. Unpublished edits)?$/);
     await page.reload();
     const restored = await openArtwork(page, item.id);

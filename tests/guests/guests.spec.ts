@@ -368,7 +368,7 @@ test("guest Updates and curriculum learning, browser progress and account transi
     "0 of 2 recommended courses complete",
   );
   await expect(page.locator(".for-you")).not.toContainText(
-    /past their target|days left in onboarding/,
+    /past their due date|days left in onboarding/,
   );
   await shot(page, info, "guest-courses");
   await page.getByRole("button", { name: "View all for you" }).click();

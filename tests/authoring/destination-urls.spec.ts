@@ -4,7 +4,7 @@ import { freshWorkspace } from "../../lib/store";
 import { courseViewPaths } from "../../lib/course-destination";
 import { setupAuthoringProvider, authoringUser } from "./provider-fixture";
 async function waitForDraftSaved(page: Page) {
-  await expect(page.locator(".editor-heading [role=status]")).toContainText(
+  await expect(page.locator(".editor-save-status [role=status]")).toContainText(
     "Saved",
   );
 }

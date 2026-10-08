@@ -97,7 +97,7 @@ test("admin entry and section changes avoid the full workspace", async ({
     .getByRole("textbox", { name: "Title" })
     .fill("Revised administration article");
   await saved;
-  await expect(page.locator(".editor-heading [role=status]")).toHaveText(
+  await expect(page.locator(".editor-save-status [role=status]")).toHaveText(
     "Saved",
   );
   expect(workspaceReads).toBe(0);

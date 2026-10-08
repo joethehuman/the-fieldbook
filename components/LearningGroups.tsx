@@ -1092,11 +1092,10 @@ export default function LearningGroups({
       aria-label={(selected && group?.name) || "Groups"}
     >
       {assignmentPicker.picker}
-      {notice && !editor && <Alert variant="destructive">{notice}</Alert>}
+      {notice && !editor && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
       {needsConversion && (
-        <Alert>
-          These groups still use the previous hierarchy. Convert groups before
-          editing their audiences or learning.
+        <Alert dismissible>
+          These groups use an older hierarchy. Convert them before editing assignments.
         </Alert>
       )}
       {!selected || !group ? (
@@ -1978,7 +1977,7 @@ export default function LearningGroups({
           <DialogDescription className="shrink-0">
             {modalDescription}
           </DialogDescription>
-          {notice && <Alert variant="destructive">{notice}</Alert>}
+          {notice && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
           {(editor?.kind === "create" || editor?.kind === "rename") && (
             <form
               id="learning-group-name"

@@ -13,7 +13,7 @@ export function revertToPublished(
     !published.publishedRevision
   )
     throw new Error(
-      "The published version is unavailable. Your changes remain open.",
+      "The published version is unavailable. Continue with your current draft.",
     );
   return {
     ...structuredClone(published),
@@ -44,7 +44,7 @@ export function resumeDraft(
   if (!saved) {
     if (baseline.revision)
       throw new Error(
-        "This draft is no longer available. Your changes remain open.",
+        "This draft is no longer available. Download your changes before leaving.",
       );
     return { ...current, revision: 0 };
   }
@@ -56,7 +56,7 @@ export function resumeDraft(
       (!attempted || signature !== contentSignature(attempted)))
   )
     throw new Error(
-      "The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.",
+      "Another session changed this draft. Load the saved draft before continuing.",
     );
   return {
     ...current,

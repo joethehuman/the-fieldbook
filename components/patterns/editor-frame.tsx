@@ -80,6 +80,9 @@ export function EditorFrame({
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(element);
+    // Recovery notices move the toolbar as they expand/collapse above the canvas.
+    const editor = frame.current?.closest(".editor");
+    if (editor) observer.observe(editor);
     const owner = frame.current?.closest(".main-content");
     owner?.addEventListener("scroll", measure, { passive: true });
     window.visualViewport?.addEventListener("resize", measure);

@@ -99,11 +99,7 @@ export function SearchExperience({
         aria-controls={visible ? id : undefined}
         maxLength={enabled ? 2000 : 160}
         placeholder={
-          enabled
-            ? compact
-              ? "Search or Ask AI"
-              : "Search Fieldbook or Ask AI"
-            : "Search Fieldbook"
+          enabled ? "Search or Ask AI" : "Search Fieldbook"
         }
         value={query}
         onFocus={() => setOpen(compact || !!query.trim())}

@@ -56,12 +56,14 @@ export default function Consent({ branding }: { branding: Branding }) {
           : "Connecting your AI…"}
       </h1>
       {error && (
-        <Alert variant="destructive" role="alert">
-          {error}
+        <div className="grid gap-3">
+          <Alert variant="destructive" role="alert">
+            {error}
+          </Alert>
           <Button variant="outline" onClick={() => window.location.reload()}>
             Try again
           </Button>
-        </Alert>
+        </div>
       )}
       {details && (
         <>

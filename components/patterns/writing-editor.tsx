@@ -122,15 +122,17 @@ export function WritingEditor({
             revealEditorTarget(surface, { container: viewport, focus: false });
         }}>
           {issue && (
-            <Alert role="alert">
-              {issue} Your original text is preserved below.
-              <Button type="button" variant="outline" size="sm" className="ml-2" disabled={props.disabled}
+            <div className="writing-editor-notice grid gap-3">
+              <Alert role="alert">
+                {issue}
+                {process.env.NODE_ENV === "development" && failureDetail && <details className="mt-2">
+                  <summary>Editor error details</summary>
+                  <p className="mt-2 font-mono text-sm">{failureDetail}</p>
+                </details>}
+              </Alert>
+              <Button type="button" variant="outline" size="sm" disabled={props.disabled}
                 onClick={() => { setIssue(""); setFailureDetail(""); setMode("write"); }}>Retry visual editor</Button>
-              {process.env.NODE_ENV === "development" && failureDetail && <details className="mt-2">
-                <summary>Editor error details</summary>
-                <p className="mt-2 font-mono text-sm">{failureDetail}</p>
-              </details>}
-            </Alert>
+            </div>
           )}
           {mode !== "write" ? (
             <div className="writing-surface min-w-0 rounded-lg border border-border bg-background">
@@ -155,7 +157,7 @@ export function WritingEditor({
           ) : (
             <EditorBoundary
               onFailure={(error) => {
-                setIssue("The visual editor could not open this content.");
+                setIssue("The visual editor couldn’t open this content. Continue editing in Markdown below.");
                 setFailureDetail(`${error.name}: ${error.message}`);
                 setMode("source");
               }}
@@ -167,7 +169,7 @@ export function WritingEditor({
                 viewControls={viewControls}
                 onUnsupported={() => {
                   setIssue(
-                    "This content uses formatting the visual editor cannot safely edit.",
+                    "This formatting isn’t supported by the visual editor. Continue editing in Markdown below.",
                   );
                   setMode("source");
                 }}

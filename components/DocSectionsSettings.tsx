@@ -1,4 +1,5 @@
 "use client";
+import { Alert } from "./ui/alert";
 import { useRef, useState, type DragEvent } from "react";
 import {
   ChevronRight,
@@ -132,7 +133,7 @@ export function DocSectionsSettings({
       return true;
     } catch (error) {
       onError({
-        title: "Couldn’t update navigation",
+        title: "Navigation couldn’t be updated.",
         message: (error as Error).message,
       });
       return false;
@@ -592,7 +593,7 @@ export function DocSectionsSettings({
                             changeSections(() => next);
                         } catch (error) {
                           menuIssue.current = {
-                            title: `Can’t delete “${sectionPath(section, sections)}”`,
+                            title: "This section can’t be deleted yet.",
                             message: (error as Error).message,
                           };
                         }
@@ -712,7 +713,7 @@ export function DocSectionsSettings({
                     </ul>
                   );
                 } catch (error) {
-                  return <p role="alert">{(error as Error).message}</p>;
+                  return <Alert variant="destructive">{(error as Error).message}</Alert>;
                 }
               },
               apply: (values, keys = []) => {

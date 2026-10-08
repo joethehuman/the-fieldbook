@@ -102,9 +102,7 @@ export function RecentlyDeleted({
           Date.now() - Date.parse(data.cleanupStatus.lastRun) >
             2 * 60 * 60 * 1000) && (
           <Alert variant="destructive">
-            Automatic deletion needs operator attention. Check the cleanup
-            endpoint and scheduler. Overdue items stay inactive until cleanup
-            succeeds.
+            Automatic deletion is delayed. Check the cleanup endpoint and scheduler.
           </Alert>
         )}
       {!contentOnly && (
@@ -228,7 +226,7 @@ export function RecentlyDeleted({
                   {new Date(d.purgeAfter).toLocaleString()}
                   {d.error && (
                     <Alert variant="destructive">
-                      Deletion delayed. The worker will retry.
+                      Deletion is delayed. The cleanup worker will retry automatically.
                     </Alert>
                   )}
                   {!d.purging && Date.parse(d.purgeAfter) <= Date.now() && (

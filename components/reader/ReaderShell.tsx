@@ -230,7 +230,7 @@ export function ReaderShell({
         admin={section === "admin"}
         alert={
           accountError && (
-            <Alert variant="destructive" role="alert">
+            <Alert variant="destructive" role="alert" onDismiss={() => setAccountError("")}>
               {accountError}
             </Alert>
           )

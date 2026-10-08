@@ -177,7 +177,7 @@ export async function prepareAskAi(
     )
       throw new HttpError(
         502,
-        "Ask AI could not verify its source links. Try again or use Search.",
+        "The source links couldn’t be verified. Retry the answer or use Search.",
       );
     yield {
       type: "sources",

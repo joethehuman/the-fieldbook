@@ -140,7 +140,7 @@ test("deleted Docs do not block section removal; restored drafts and live public
           },
           expected: 2,
         }),
-      /draft and published documents/,
+      /Move this section’s items elsewhere before deleting it/,
     );
     await saveSettings(admin, {
       settings: { ...removed, docSections: recovered },
@@ -159,7 +159,7 @@ test("deleted Docs do not block section removal; restored drafts and live public
           },
           expected: 3,
         }),
-      /draft and published documents/,
+      /Move this section’s items elsewhere before deleting it/,
     );
     assert.equal(writes, 2);
   } finally {
@@ -228,7 +228,7 @@ test("admin settings guard draft and published placement; content write validate
           },
           expected: 1,
         }),
-      /draft and published documents/,
+      /Move this section’s items elsewhere before deleting it/,
     );
     assert.equal(writes, 0);
     await saveSettings(admin, {

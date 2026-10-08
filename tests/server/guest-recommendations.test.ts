@@ -89,6 +89,17 @@ test("real snapshot/progress/settings boundaries with synthetic PostgREST: no an
     assert.equal(requests.length, 2);
     assert.ok(requests.every((r) => r.method === "GET"));
     const course = guest.content[0];
+    const beforeImport = requests.length;
+    await assert.rejects(
+      recordProgress(null, {
+        contentId: course.id,
+        version: course.version,
+        lessons: ["lesson"],
+        guestImport: true,
+      }),
+      /Sign in to save browser progress/,
+    );
+    assert.ok(requests.slice(beforeImport).every((r) => r.method === "GET"));
     const result = await recordProgress(null, {
       contentId: course.id,
       version: course.version,

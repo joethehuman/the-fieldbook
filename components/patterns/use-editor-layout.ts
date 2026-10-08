@@ -26,7 +26,7 @@ export function useEditorLayout(ref: RefObject<HTMLFormElement | null>) {
         ...Array.from(editor.children).filter((child) => child !== content),
         ...Array.from(content.children).filter((child) => child !== frame),
         ...Array.from(frame.children).filter((child) => !child.matches(".editor-frame-body")),
-        ...editor.querySelectorAll(".editor-canvas-navigation, .mdxeditor-toolbar, .writing-view-header, .writing-root > [role=alert]"),
+        ...editor.querySelectorAll(".editor-canvas-navigation, .mdxeditor-toolbar, .writing-view-header, .writing-root > .writing-editor-notice"),
       ];
       const next = new Set<Element>([editor, viewport, ...chrome]);
       for (const element of observed) if (!next.has(element)) {

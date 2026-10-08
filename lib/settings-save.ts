@@ -17,7 +17,7 @@ export function createSettingsSaver(
     if (equalJson(current.settings, settings)) return current;
     if (!equalJson(current.settings, before.settings))
       throw new RequestError(
-        "Settings changed elsewhere. Reload this page before saving. Your edits remain open.",
+        "Settings changed in another session. Reload this page before saving.",
         409,
       );
     let saved: { revision: number; settings?: SiteSettings };
@@ -37,8 +37,7 @@ export function createSettingsSaver(
       throw new Error(
         (error instanceof RequestError
           ? error.message
-          : "Settings could not be saved. Check your connection and try again.") +
-          " Your edits remain open.",
+          : "Your settings couldn’t be saved. Check your connection and try again."),
       );
     }
     // The API acknowledges the canonical settings and revision. A failed follow-up

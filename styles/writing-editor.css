@@ -608,6 +608,7 @@
 .editor .writing-editor .mdxeditor-toolbar { display: none; }
 .editor-frame :is(.writing-course-heading, .writing-document-heading, .writing-content, .writing-source, .course-quiz-content) { padding-inline: var(--editor-text-inset); }
 .editor-frame .writing-content { --writing-content-start: var(--editor-text-inset); }
+.editor-frame .writing-editor-notice { margin-inline: var(--editor-text-inset); }
 .editor-frame .writing-viewport { scrollbar-gutter: stable both-edges; }
 .editor-frame[data-cards="true"] .writing-content { padding-block-end: var(--space-6); }
 .editor-frame[data-cards="true"] .writing-toolbar-controls { flex-wrap: nowrap; gap: var(--space-2); }

@@ -1031,7 +1031,7 @@ export default function Admin({
   if (editing)
     return (
       <>
-        {notice && <Alert variant="destructive">{notice}</Alert>}
+        {notice && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
         <Editor
           key={editing.id}
           content={editing}
@@ -1304,7 +1304,7 @@ export default function Admin({
                   )}
                 </SectionHeader>
               )}
-            {notice && <Alert variant="destructive">{notice}</Alert>}
+            {notice && <Alert variant="destructive" onDismiss={() => setNotice("")}>{notice}</Alert>}
             {detailView ? (
               detailView
             ) : tab === "deleted" ? (
@@ -1990,7 +1990,7 @@ export default function Admin({
                 <ScrollRegion className="h-full p-1">
                   <FieldGroup disabled={personBusy}>
                     {personError && (
-                      <Alert variant="destructive">{personError}</Alert>
+                      <Alert variant="destructive" onDismiss={() => setPersonError("")}>{personError}</Alert>
                     )}
                     <PersonFields
                       person={person}
@@ -2310,7 +2310,7 @@ export function Editor({
       );
       if (!latest) {
         throw new Error(
-          "No saved draft is available. Your changes remain open. Try saving again or download your changes.",
+          "No saved draft is available. Try saving again or download your changes.",
         );
       }
       if (
@@ -2392,7 +2392,7 @@ export function Editor({
       if (!latest || latest.revision !== baseline.current.revision) {
         queue.current!.block();
         throw new Error(
-          "The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.",
+          "Another session changed this draft. Load the saved draft before continuing.",
         );
       }
       const published = await onLoadPublished(latest.id);
@@ -2401,7 +2401,7 @@ export function Editor({
           published.publishedRevision !== latest.publishedRevision) {
         queue.current!.block();
         throw new Error(
-          "The saved draft changed in another session. Load the saved draft before continuing. Your changes remain open.",
+          "Another session changed this draft. Load the saved draft before continuing.",
         );
       }
       const next = revertToPublished(latest, published, !!onWorkspaceChange);
@@ -2964,14 +2964,12 @@ export function Editor({
           variant="destructive"
           role="alert"
           className={needsRecovery ? "text-foreground" : undefined}
+          onDismiss={() => setError("")}
         >
           {needsRecovery && (
             <>
               <p className="font-medium text-copy">
-                We couldn’t confirm your latest changes were saved.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Your work is still here. Keep this page open.
+                The save couldn’t be confirmed.
               </p>
             </>
           )}
@@ -2982,42 +2980,42 @@ export function Editor({
           >
             {error}
           </p>
-          {needsRecovery && (
-            <ActionGroup className="mt-1 gap-x-4 gap-y-2">
-              {onReload && (
-                <Button
-                  type="button"
-                  size="sm"
-                  disabled={busy || saving}
-                  onClick={() => void retrySaving()}
-                >
-                  Retry saving
-                </Button>
-              )}
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="text-xs text-muted-foreground underline"
-                onClick={downloadDraft}
-              >
-                Download your changes
-              </Button>
-              {onReload && (
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="text-xs text-muted-foreground underline"
-                  disabled={busy}
-                  onClick={reloadSaved}
-                >
-                  Load saved draft
-                </Button>
-              )}
-            </ActionGroup>
-          )}
         </Alert>
+      )}
+      {needsRecovery && (
+        <ActionGroup className="gap-x-4 gap-y-2">
+          {onReload && (
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy || saving}
+              onClick={() => void retrySaving()}
+            >
+              Retry saving
+            </Button>
+          )}
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="text-xs text-muted-foreground underline"
+            onClick={downloadDraft}
+          >
+            Download your changes
+          </Button>
+          {onReload && (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="text-xs text-muted-foreground underline"
+              disabled={busy}
+              onClick={reloadSaved}
+            >
+              Load saved draft
+            </Button>
+          )}
+        </ActionGroup>
       )}
       {busy && (
         <p role="status">

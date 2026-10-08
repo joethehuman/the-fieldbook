@@ -921,7 +921,7 @@ test("inline Details closes with Escape and enlarged text leaves the canvas reac
       writing.evaluate((node) => {
         const canvas = node.querySelector("p")!.getBoundingClientRect();
         const header = document
-          .querySelector(".editor-heading")!
+          .querySelector(".topbar")!
           .getBoundingClientRect();
         const main = document
           .querySelector(".main-content")!

@@ -186,7 +186,7 @@ export function moveDocSection(
     throw new Error("Section not found.");
   if (parentId && sections.some((section) => section.parentId === id))
     throw new Error(
-      "Move this section's subsections before making it a subsection.",
+      "Move this section’s subsections elsewhere before changing its level.",
     );
   const next = sections.map((section) =>
     section.id === id
@@ -307,9 +307,9 @@ export function deleteDocSection(
   docs: DocLink[],
 ) {
   if (sections.some((section) => section.parentId === id))
-    throw new Error("Move subsections before deleting this section.");
+    throw new Error("Move this section’s items elsewhere before deleting it.");
   if (docs.some((doc) => sectionForDoc(doc, sections)?.id === id))
-    throw new Error("Move this section's documents before deleting it.");
+    throw new Error("Move this section’s items elsewhere before deleting it.");
   return sections.filter((section) => section.id !== id);
 }
 export function sectionPath(

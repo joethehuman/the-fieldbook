@@ -15,7 +15,7 @@ export default function PageError({
     <BrandedAccount branding={brandingFromSettings({})} illustrated>
       <h1>Unable to load this page</h1>
       <Alert role="alert" variant="destructive">
-        Please try again. If this continues, contact your administrator.
+        Try again. If the problem continues, contact your administrator.
         {error.digest && <> Reference: {error.digest}.</>}
       </Alert>
       <Button onClick={retry}>Try again</Button>

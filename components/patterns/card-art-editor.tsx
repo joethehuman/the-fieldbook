@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, type ComponentProps } from "react";
-import { X } from "lucide-react";
 import { Alert } from "../ui/alert";
 import type { UploadProgress } from "@/lib/upload-media";
 import { MediaUploadStatus } from "./media-upload-status";
@@ -225,9 +224,8 @@ export function CardArtEditor({
       />
       {!onUpload && <FieldDescription>Image uploads are available in an installed Fieldbook.</FieldDescription>}
       <MediaUploadStatus progress={uploadProgress} />
-      {error && <Alert variant="destructive" className="relative pr-10">
+      {error && <Alert variant="destructive" dismissLabel="Dismiss artwork error" onDismiss={() => setError("")}>
         {error}
-        <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0" aria-label="Dismiss artwork error" onClick={() => setError("")}><X aria-hidden="true" /></Button>
       </Alert>}
       {notice && <p role="status" className="text-sm text-muted-foreground">
         {notice}

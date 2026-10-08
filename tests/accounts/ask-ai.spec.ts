@@ -40,7 +40,7 @@ function stream(
             {
               type: "error",
               errorText:
-                "Ask AI could not verify its source links. Try again or use Search.",
+                "The source links couldn’t be verified. Retry the answer or use Search.",
             },
           ]
         : [
@@ -147,7 +147,7 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
   const input = page.getByRole("textbox", { name: "Search all content" });
   await expect(input).toHaveAttribute(
     "placeholder",
-    "Search Fieldbook or Ask AI",
+    "Search or Ask AI",
   );
   await input.fill("ordinary search");
   await input.press("Enter");
@@ -466,10 +466,16 @@ test("Ask AI failure, explicit retry, stop and new conversation cancel pending w
     page
       .getByRole("region", { name: "Ask AI conversation" })
       .getByRole("alert"),
-  ).toContainText("could not verify");
+  ).toContainText("source links couldn’t be verified");
   await expect(page.getByText("Response incomplete.")).toBeVisible();
   await expect(page.getByRole("link", { name: /Source 1/ })).toHaveCount(0);
   await page.screenshot({ path: info.outputPath("ask-ai-error.png") });
+  const failure = page.getByRole("region", { name: "Ask AI conversation" }).getByRole("alert");
+  await failure.getByRole("button", { name: "Dismiss message", exact: true }).click();
+  await expect(failure).toHaveCount(0);
+  expect(calls).toBe(1);
+  await expect(page.getByText("Response incomplete.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Retry answer" })).toBeVisible();
   await page.getByRole("button", { name: "Retry answer" }).click();
   await expect(
     page

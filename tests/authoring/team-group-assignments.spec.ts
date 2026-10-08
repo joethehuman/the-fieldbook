@@ -240,6 +240,6 @@ test("installed editor saves after assignments change its document revision", as
   expect(persisted.lessons).toEqual(course.lessons);
   expect(persisted.questions).toEqual(course.questions);
   await expect(
-    page.locator(".editor-heading [role=status] .sr-only"),
-  ).toHaveText("Saved. Unpublished edits");
+    page.locator(".editor-save-status [role=status] .sr-only"),
+  ).toHaveText("Saved");
 });

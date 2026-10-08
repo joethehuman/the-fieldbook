@@ -491,7 +491,7 @@ export default function ComponentCatalog() {
           </ActionGroup>
           <Alert variant="success">Your changes have been saved.</Alert>
           <Alert variant="destructive">
-            We couldn’t save. Your changes are still here.
+            Your changes couldn’t be saved. Try again.
           </Alert>
           <Progress value={75} aria-label="Assigned learning complete" />
           <div className="flex flex-wrap gap-4">

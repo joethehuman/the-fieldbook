@@ -27,12 +27,12 @@ test("confirmed save followed by failed refresh does not repeat the write", asyn
       return after;
     },
   );
-  await assert.rejects(save(before, after), /Changes saved, but/);
-  await assert.rejects(save(before, after), /still unavailable/);
+  await assert.rejects(save(before, after), /Your changes were saved/);
+  await assert.rejects(save(before, after), /saved data couldn’t be loaded/);
   unavailable = false;
   await assert.rejects(save(before, after), (e: SaveRecoveryError) => {
     assert.equal(e.snapshot, after);
-    assert.match(e.message, /no changes were resent/);
+    assert.match(e.message, /Review it before saving again/);
     return true;
   });
   assert.equal(writes, 1);
@@ -52,8 +52,8 @@ test("partial failure stops subsequent writes and returns fresh revisions", asyn
   );
   await assert.rejects(save(before, after), (e: SaveRecoveryError) => {
     assert.equal(e.snapshot, current);
-    assert.match(e.message, /1 of 3 changes confirmed saved/);
-    assert.match(e.message, /rejected change was not saved/);
+    assert.match(e.message, /1 of 3 changes were confirmed saved/);
+    assert.match(e.message, /change was rejected/);
     return true;
   });
   assert.equal(writes, 2);
@@ -68,7 +68,7 @@ test("lost mutation response is uncertain even if the server saved it", async ()
     async () => after,
   );
   await assert.rejects(save(before, after), (e: SaveRecoveryError) => {
-    assert.match(e.message, /may have been saved/);
+    assert.match(e.message, /last change may have been saved/);
     assert.doesNotMatch(e.message, /token secret/);
     assert.equal(e.snapshot, after);
     return true;
@@ -104,7 +104,7 @@ test("pending account batches chain confirmed revisions and stop on conflict", a
   );
   await assert.rejects(
     conflict(before, after),
-    /1 of 3 changes confirmed saved/,
+    /1 of 3 changes were confirmed saved/,
   );
   assert.equal(writes, 2);
 });

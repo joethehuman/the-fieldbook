@@ -18,7 +18,7 @@ import { SelectField } from "./ui/select";
 import { Switch } from "./ui/switch";
 import { DocSectionsSettings, type DocNavigationIssue } from "./DocSectionsSettings";
 import { ActionGroup } from "./ui/action-group";
-import { CircleAlert, Plus, X } from "lucide-react";
+import { CircleAlert, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import PrivacySettingsPanel from "./PrivacySettingsPanel";
 import { CardPaletteSettings } from "./CardPaletteSettings";
@@ -82,6 +82,7 @@ export default function SiteSettingsPanel({
   const savedSettings = useRef(settings);
   const [docMoves, setDocMoves] = useState<DocNavigationMove[]>([]);
   const [docsIssue, setDocsIssue] = useState<DocNavigationIssue | null>(null);
+  const [docsMessageAttempt, setDocsMessageAttempt] = useState(0);
   const docsEditor = useRef<HTMLDivElement>(null);
   const dirty = docMoves.length > 0 || !equalJson(settings, savedSettings.current);
   const visibleDocs = [...data.content, ...(data.publishedContent || [])].filter((item) => item.kind === "doc").map((doc) => {
@@ -89,8 +90,8 @@ export default function SiteSettingsPanel({
     return move ? { ...doc, sectionId: move.sectionId } : doc;
   });
   const docsConflict = legacySectionConflict(visibleDocs);
-  const docsFeedback = docsIssue || (notice ? { title: "Couldn’t save navigation", message: notice } :
-    docsConflict ? { title: "Navigation needs attention", message: docsConflict } : null);
+  const docsFeedback = docsIssue || (notice ? { title: "Navigation couldn’t be saved.", message: notice } :
+    docsConflict ? { title: "Review the document navigation.", message: docsConflict } : null);
   const docsSaveActive = dirty || busy || !!docsFeedback;
   const guard = useRef(async () => true);
   guard.current = async () =>
@@ -160,8 +161,9 @@ export default function SiteSettingsPanel({
       onSubmit={async (e) => {
         e.preventDefault();
         if (busy || !dirty) return;
+        setDocsMessageAttempt(value => value + 1);
         if (section === "ai" && settings.askAi?.enabled && !settings.askAi.model) {
-          setNotice("Choose a primary model before enabling Ask AI.");
+          setNotice("Choose a primary model to enable Ask AI.");
           return;
         }
         if (section === "links") {
@@ -374,17 +376,17 @@ export default function SiteSettingsPanel({
         <div className="min-w-0 [overflow-anchor:none]">
           <PendingChangesBar active={docsSaveActive} feedback={docsFeedback ? (
             <Alert variant="destructive" role="alert" {...saveError.targetProps}
-              className="grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-3 border-s-2">
+              dismissKey={docsMessageAttempt} dismissLabel="Dismiss navigation warning" onDismiss={() => {
+                setDocsIssue(null);
+                setNotice("");
+                docsEditor.current?.focus({ preventScroll: true });
+              }}
+              className="grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 border-s-2">
               <CircleAlert aria-hidden="true" className="mt-0.5 size-5" />
               <div className="min-w-0">
                 <strong className="block font-semibold">{docsFeedback.title}</strong>
                 <p className="mt-1">{docsFeedback.message}</p>
               </div>
-              {(docsIssue || notice) && <Button type="button" variant="ghost" size="icon" aria-label="Dismiss navigation warning" onClick={() => {
-                setDocsIssue(null);
-                setNotice("");
-                docsEditor.current?.focus({ preventScroll: true });
-              }}><X aria-hidden="true" /></Button>}
             </Alert>
           ) : undefined} actions={dirty || busy ? <>
             <Button type="button" variant="outline" disabled={busy} onClick={discard}>Discard changes</Button>
@@ -395,7 +397,7 @@ export default function SiteSettingsPanel({
             id="settings-docs"
             ref={docsEditor}
             tabIndex={-1}
-            className={docsSaveActive ? "rounded-t-none border-t-0" : undefined}
+            className={docsSaveActive ? "rounded-t-none border-t-0 outline-none" : "outline-none"}
             title={<h3>Document sections</h3>}
             description="Organize top-level sections and their subsections. Documents can sit at either level."
             guidance={docSections.length > 0 ? "Drag to reorder or move items between sections, or use Move to… in the menus." : undefined}
@@ -405,6 +407,7 @@ export default function SiteSettingsPanel({
               docs={visibleDocs}
               disabled={busy}
               onError={(issue) => {
+                setDocsMessageAttempt(value => value + 1);
                 setDocsIssue(issue);
                 // Let the previously hidden sticky bar enter before focusing its alert.
                 requestAnimationFrame(() => saveError.reveal());
@@ -682,8 +685,8 @@ export default function SiteSettingsPanel({
         onChange={(askAi) => setSettings({ ...settings, askAi })}
       />}
       {section !== "mcp" && section !== "docs" && notice && (
-        <div className="settings-save-bar" {...saveError.targetProps}>
-          <Alert variant="destructive" role="alert">
+        <div className="settings-save-bar outline-none" {...saveError.targetProps}>
+          <Alert variant="destructive" role="alert" onDismiss={() => setNotice("")}>
             {notice}
           </Alert>
         </div>

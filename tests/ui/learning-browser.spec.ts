@@ -88,7 +88,7 @@ test("due dates off keeps progress and uses recommended language", async ({
   await expect(summary).toContainText("recommended courses complete");
   await expect(summary.getByRole("progressbar")).toHaveCount(1);
   await expect(summary).not.toContainText(
-    /assigned|past their target|onboarding/i,
+    /assigned|past their due date|onboarding/i,
   );
   await summary.screenshot({
     path: info.outputPath("recommended-progress.png"),
@@ -322,6 +322,7 @@ test("no assignments show personal activity without labeling other courses", asy
     );
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
   });
+  await page.goto("/#courses");
   await page.reload();
   await expect(summary).toContainText("1 in progress");
   await expect(summary).not.toContainText("completed");
@@ -334,6 +335,7 @@ test("no assignments show personal activity without labeling other courses", asy
     data.progress["demo-learner"] = [];
     localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(data));
   });
+  await page.goto("/#courses");
   await page.reload();
   await expect(summary).toContainText(
     "Explore the course library at your own pace.",
@@ -469,7 +471,7 @@ test("completion removes a course from the home queue and remains visible in bot
     page.getByRole("heading", { name: "Know the platform", level: 1 }),
   ).toBeVisible();
   await page.getByRole("button", { name: /^Next lesson/ }).click();
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await page
     .getByRole("radio", { name: "The customer’s goal", exact: true })
     .check();

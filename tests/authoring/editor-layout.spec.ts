@@ -16,6 +16,7 @@ async function open(
   lessonCount = 2,
   prepare?: (item: Content) => void,
   prepareWorkspace?: (state: ReturnType<typeof freshWorkspace>) => void,
+  source = false,
 ) {
   if ((page.viewportSize()?.width || 0) >= 1280) await page.setViewportSize({ width: 1600, height: page.viewportSize()!.height });
   let state = withPublishedSnapshots(freshWorkspace());
@@ -77,10 +78,13 @@ async function open(
   await page.goto(installed ? `/admin/content/${item.id}/edit` : "/#admin");
   if (!installed)
     await page.getByRole("link", { name: item.title, exact: true }).click();
-  await expect(
-    page.locator('.writing-content[contenteditable="true"]'),
-  ).toContainText("Paragraph 1.");
-  await expect(page.locator('.writing-content[contenteditable="true"]')).toBeInViewport();
+  if (source) {
+    await expect(page.locator(".writing-source")).toBeVisible();
+    await expect(page.locator(".writing-source")).toHaveValue(/Paragraph 1\./);
+  } else {
+    await expect(page.locator('.writing-content[contenteditable="true"]')).toContainText("Paragraph 1.");
+    await expect(page.locator('.writing-content[contenteditable="true"]')).toBeInViewport();
+  }
   await expect(page.locator(".app")).toHaveClass(/sidebar-collapsed/);
   await page.locator(".main-shell").evaluate(async (el) => {
     await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
@@ -1885,12 +1889,20 @@ test("failed saves stay in the recovery alert and compact headers omit the failu
     await waitForDraftSaved(page);
     if (before) expect((await indicator.boundingBox())!.width).toBeCloseTo(before.width, 0);
     mode = "fail";
+    const details = page.getByRole("button", { name: "Details", exact: true });
+    if (width < 768 && await details.getAttribute("aria-expanded") !== "true") await details.click();
     await page.locator("#editor-title").fill(`Retain this failed draft at ${width}`);
     const alert = page.locator('.editor').getByRole("alert");
-    await expect(alert).toContainText("We couldn’t confirm your latest changes were saved.");
-    await expect(alert).toContainText("Your work is still here. Keep this page open.");
-    await expect(alert.getByRole("button", { name: "Retry saving", exact: true })).toBeEnabled();
-    await expect(alert.getByRole("button", { name: "Download your changes", exact: true })).toBeEnabled();
+    await expect(alert).toContainText("The save couldn’t be confirmed.");
+    await alert.evaluate(async element => { await Promise.all(element.getAnimations().map(animation => animation.finished.catch(() => {}))); });
+    const panelGap = async () => {
+      const navigation = (await page.locator(".editor-canvas-navigation").boundingBox())!;
+      const pane = (await page.getByRole("complementary", { name: "Content details", exact: true }).boundingBox())!;
+      return pane.y - navigation.y - navigation.height;
+    };
+    if (width < 768) await expect.poll(panelGap).toBeCloseTo(8, 0);
+    await expect(page.locator(".editor").getByRole("button", { name: "Retry saving", exact: true })).toBeEnabled();
+    await expect(page.locator(".editor").getByRole("button", { name: "Download your changes", exact: true })).toBeEnabled();
     await expect(header.getByRole("alert")).toHaveCount(0);
     await expect(status).toHaveAttribute("data-save-state", "failed");
     if (width < 768) {
@@ -1900,11 +1912,44 @@ test("failed saves stay in the recovery alert and compact headers omit the failu
     await expect(header).not.toContainText("Unpublished");
     await expect(header.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
     await page.screenshot({ path: info.outputPath(`save-failure-${width}.png`), animations: "disabled" });
+    await alert.getByRole("button", { name: "Dismiss message", exact: true }).click();
+    await expect(alert).toHaveCount(0);
+    if (width < 768) await expect.poll(panelGap).toBeCloseTo(8, 0);
+    await expect(page.locator(".editor").getByRole("button", { name: "Retry saving", exact: true })).toBeEnabled();
+    await expect(page.locator(".editor").getByRole("button", { name: "Download your changes", exact: true })).toBeEnabled();
+    await expect(header.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
     mode = "pass";
-    await alert.getByRole("button", { name: "Retry saving", exact: true }).click();
+    await page.locator(".editor").getByRole("button", { name: "Retry saving", exact: true }).click();
     await waitForDraftSaved(page);
     await expect(alert).toHaveCount(0);
     await expect(status).toHaveAttribute("data-save-state", "saved");
     await expect(header.getByRole("button", { name: "Publish", exact: true })).toBeEnabled();
   }
+});
+
+
+test("source recovery keeps short-screen writing and retry available after notice dismissal", async ({ page }, info) => {
+  const original = "Paragraph 1.\n\n<UnsupportedWidget custom=\"preserved\">Keep this exact source.</UnsupportedWidget>";
+  await page.setViewportSize({ width: 1600, height: 500 });
+  const { read } = await open(page, info.project.name.startsWith("production"), "doc", 2,
+    item => { item.body = original; }, undefined, true);
+  const details = page.getByRole("button", { name: "Details", exact: true });
+  if (await details.getAttribute("aria-expanded") === "true") await details.click();
+  const source = page.locator(".writing-source");
+  await expect(source).toHaveValue(original);
+  const notice = page.locator(".writing-editor-notice");
+  const alert = notice.getByRole("alert");
+  await expect(alert).toBeVisible();
+  await expect(notice.getByRole("button", { name: "Retry visual editor", exact: true })).toBeEnabled();
+  await alert.getByRole("button", { name: "Dismiss message", exact: true }).click();
+  await expect(alert).toHaveCount(0);
+  await expect(notice.getByRole("button", { name: "Retry visual editor", exact: true })).toBeEnabled();
+  await expect(source).toHaveValue(original);
+  await source.fill(original + "\n\nEdited in Markdown.");
+  await waitForDraftSaved(page);
+  expect((await read()).content[0].body).toBe(original + "\n\nEdited in Markdown.");
+  await notice.getByRole("button", { name: "Retry visual editor", exact: true }).click();
+  await expect(source).toBeVisible();
+  await expect(source).toHaveValue(original + "\n\nEdited in Markdown.");
+  await page.screenshot({ path: info.outputPath("short-source-recovery.png"), animations: "disabled" });
 });

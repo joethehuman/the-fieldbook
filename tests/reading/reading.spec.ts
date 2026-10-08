@@ -72,6 +72,23 @@ async function fixture(request: any, extra = {}) {
 }
 test.beforeEach(async ({ request }) => fixture(request));
 
+async function signInReader(page: Page, request: any) {
+  const token = await (
+    await request.post(`${backend}/auth/v1/token`, { data: {} })
+  ).json();
+  await page.context().addCookies([
+    {
+      name: "sb-test-auth-token",
+      value: "base64-" + Buffer.from(JSON.stringify({
+        ...token,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      })).toString("base64url"),
+      domain: "localhost",
+      path: "/",
+    },
+  ]);
+}
+
 test("installed course sidebar preserves header spacing across lessons and quiz", async ({ page, request }, info) => {
   test.skip(info.project.name !== "desktop", "The course panel stacks on narrow screens.");
   await page.setViewportSize({ width: 1440, height: 934 });
@@ -84,7 +101,7 @@ test("installed course sidebar preserves header spacing across lessons and quiz"
   await expect(page.getByRole("heading", { name: "Second lesson", exact: true })).toBeFocused();
   await expect.poll(async () => Math.abs((await courseSidebarGap(page)) - gap)).toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("installed-lesson-2-spacing.png") });
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await expect(page.getByRole("heading", { name: "Check your knowledge" })).toBeFocused();
   await expect.poll(async () => Math.abs((await courseSidebarGap(page)) - gap)).toBeLessThan(2);
   await page.screenshot({ path: info.outputPath("installed-quiz-spacing.png") });
@@ -767,7 +784,7 @@ test("Courses share reader navigation and show the signed-in account immediately
   expect(await page.content()).toContain("Synthetic Admin");
   expect(await page.content()).not.toContain("SECRET DRAFT BODY");
   await page.evaluate(() => ((window as any).__readerMarker = "kept"));
-  await page.locator(`a.course-card[href="/courses/${ids[2]}"]`).click();
+  await page.locator(`a.course-card[href^="/courses/${ids[2]}"]`).click();
   await expect(
     page.getByRole("heading", { name: items[2].title }),
   ).toBeVisible();
@@ -779,15 +796,10 @@ test("Courses share reader navigation and show the signed-in account immediately
     .getByRole("navigation", { name: "Primary" })
     .getByRole("link", { name: "Updates" })
     .click();
-  if ((page.viewportSize()?.width || 0) < 768) {
+  if ((page.viewportSize()?.width || 0) < 768)
     await page.getByRole("button", { name: "Open navigation" }).click();
-    await page
-      .getByRole("navigation", { name: "Primary" })
-      .getByRole("link", { name: "Courses" })
-      .click();
-  } else {
-    await page.getByRole("link", { name: "Organization", exact: true }).click();
-  }
+  await page.getByRole("navigation", { name: "Primary" })
+    .getByRole("link", { name: "Courses" }).click();
   await expect(page).toHaveURL(/\/courses$/);
   expect(await page.evaluate(() => (window as any).__readerMarker)).toBe(
     "kept",
@@ -1329,7 +1341,8 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
     const viewport = await page.locator(".main-content").boundingBox();
     return card!.y - viewport!.y;
   }).toBeGreaterThanOrEqual(0);
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course" })
+    .getByRole("button", { name: /^Quiz/ }).click();
   await expect.poll(async () => {
     const card = await page.locator(".course-quiz").boundingBox();
     const viewport = await page.locator(".main-content").boundingBox();
@@ -1378,16 +1391,77 @@ test("guest lessons and server-graded quiz retain browser progress", async ({
     },
   ]);
   await page.reload();
-  await page
-    .getByRole("region", { name: "Import browser progress" })
-    .getByRole("button", { name: "Save browser progress to my account" })
-    .click();
   await expect(page.getByText(/1 completed/)).toBeVisible();
-  expect(
-    await page.evaluate(() =>
+  await expect.poll(() =>
+    page.evaluate(() =>
       localStorage.getItem("fieldbook.guest-progress.v1"),
     ),
   ).toBeNull();
+  await expect(
+    page.getByRole("region", { name: "Import browser progress" }),
+  ).toHaveCount(0);
+  const saved = await (await request.get(`${backend}/rest/v1/fb_progress`)).json();
+  expect(saved[0].passed).toBe(true);
+  expect(saved[0].attempts).toHaveLength(1);
+});
+
+test("guest restoration quietly skips incompatible records and preserves account completion", async ({ page, request }) => {
+  await fixture(request, {
+    progress: [{
+      user_id: "00000000-0000-4000-8000-000000000010",
+      content_id: ids[2], version: 1, lessons: ["second"], passed: true,
+      attempts: [{ at: "2026-01-01T00:00:00Z", version: 1, passed: true, answers: [1] }],
+    }],
+  });
+  await page.goto("/courses");
+  await page.evaluate((id) => localStorage.setItem("fieldbook.guest-progress.v1", JSON.stringify([
+    null,
+    { content_id: "bad-id", version: 1 },
+    { content_id: "00000000-0000-4000-8000-000000000099", version: 1 },
+    { content_id: id, version: 2 },
+    { content_id: id, version: 1, lessons: ["first"], passed: false },
+  ])), ids[2]);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  const statuses: number[] = [];
+  page.on("response", (response) => {
+    if (response.url().endsWith("/api/progress")) statuses.push(response.status());
+  });
+  await signInReader(page, request);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("fieldbook.guest-progress.v1"))).toBeNull();
+  expect(statuses).toEqual([400, 404, 409, 200]);
+  await expect(page.getByRole("region", { name: "Import browser progress" })).toHaveCount(0);
+  await expect(page.locator(".main-content").getByRole("alert")).toHaveCount(0);
+  expect(errors).toEqual([]);
+  const saved = await (await request.get(`${backend}/rest/v1/fb_progress`)).json();
+  expect(saved).toHaveLength(1);
+  expect(saved[0].lessons.sort()).toEqual(["first", "second"]);
+  expect(saved[0].passed).toBe(true);
+  expect(saved[0].attempts).toHaveLength(1);
+});
+
+test("guest restoration keeps transient failures invisible and retries retained progress on reload", async ({ page, request }) => {
+  await page.goto("/courses");
+  await page.evaluate((id) => localStorage.setItem("fieldbook.guest-progress.v1", JSON.stringify([
+    { content_id: id, version: 1, lessons: ["first"], passed: false },
+  ])), ids[2]);
+  await signInReader(page, request);
+  await page.route("**/api/progress", (route) => route.fulfill({
+    status: 503, contentType: "application/json", body: JSON.stringify({ error: "Unavailable" }),
+  }));
+  const failed = page.waitForResponse((response) => response.url().endsWith("/api/progress"));
+  await page.reload();
+  expect((await failed).status()).toBe(503);
+  await expect(page.getByRole("heading", { name: "Courses", exact: true })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Import browser progress" })).toHaveCount(0);
+  await expect(page.locator(".main-content").getByRole("alert")).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("fieldbook.guest-progress.v1") || "[]"))).toHaveLength(1);
+  await page.unroute("**/api/progress");
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => localStorage.getItem("fieldbook.guest-progress.v1"))).toBeNull();
+  const saved = await (await request.get(`${backend}/rest/v1/fb_progress`)).json();
+  expect(saved[0].lessons).toEqual(["first"]);
 });
 
 test("long lesson transitions reveal next lesson tops and keep short quizzes in view", async ({ page, request }, info) => {
@@ -1410,9 +1484,9 @@ test("long lesson transitions reveal next lesson tops and keep short quizzes in 
   await page.getByRole("button", { name: /^Next lesson/ }).click();
   await expect.poll(() => distanceFromScrollTop(".course-lesson")).toBeLessThan(70);
   await expect.poll(() => distanceFromScrollTop(".course-lesson")).toBeGreaterThanOrEqual(0);
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).scrollIntoViewIfNeeded();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("course-quiz-navigation.png") });
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await expect.poll(async () => {
     const card = (await page.locator(".course-quiz").boundingBox())!;
     const viewport = (await page.locator(".main-content").boundingBox())!;
@@ -1456,9 +1530,11 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
   });
   await page.goto(`/courses/${ids[2]}`);
   await page.getByRole("link", { name: /First lesson/ }).click();
-  await expect(page).toHaveURL(new RegExp(`/courses/${ids[2]}\\?lesson=first`));
+  expect(new URL(page.url()).pathname).toBe(`/courses/${ids[2]}`);
+  expect(new URL(page.url()).searchParams.get("lesson")).toBe("first");
+  expect(new URL(page.url()).searchParams.get("from")).toBe("/courses");
   await page.getByRole("button", { name: "Next lesson" }).click();
-  await page.getByRole("button", { name: "Quiz Check your knowledge" }).click();
+  await page.getByRole("navigation", { name: "Continue course", exact: true }).getByRole("button", { name: /^Quiz(?: Check your knowledge)?$/ }).click();
   await page.getByRole("radio", { name: "First", exact: true }).check();
   await page.getByRole("button", { name: "Submit and see results" }).click();
   await expect(

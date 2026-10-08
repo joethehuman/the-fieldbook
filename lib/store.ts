@@ -12,9 +12,16 @@ import { defaultSettings } from "./settings";
 import { DOC_CATEGORY_ORDER, seedContent } from "./seed";
 import { hooliDemoData } from "./demo-fixtures/hooli";
 import { withCourseOpeningVideo } from "./demo-fixtures/course-opening-videos";
+import {
+  refreshDemoLearningTimeline,
+  DEMO_LEARNING_DAY,
+} from "./demo-fixtures/learning-timeline";
+import { todayUTC } from "./learning";
 import type { Content, User, Group, Progress, Feedback, Team } from "./types";
 import { gradeQuiz, quizUnlocked } from "./course-quiz";
 export type Workspace = {
+  /** Demo-only day used to recognize original sample learning dates. */
+  demoLearningDay?: string;
   /** Read-only report projection; not part of governance writes. */
   progressReport?: {
     asOf: string;
@@ -47,10 +54,10 @@ export type Workspace = {
 };
 const KEY = "fieldbook.workspace.v1";
 export { SESSION, DEMO_PROFILE_IDS } from "./demo-session";
-export function freshWorkspace(): Workspace {
+export function freshWorkspace(day = todayUTC()): Workspace {
   const { settings, contentOverrides, ...sample } =
     structuredClone(hooliDemoData);
-  return withOrganizationTeam({
+  const workspace = withOrganizationTeam({
     schema: 1,
     ...sample,
     settings: {
@@ -63,6 +70,7 @@ export function freshWorkspace(): Workspace {
       withCourseOpeningVideo({ ...item, ...contentOverrides[item.id] }),
     ),
   });
+  return refreshDemoLearningTimeline(workspace, day);
 }
 /** Refresh untouched sample lessons in existing browsers without replacing edits. */
 function refreshDemoCourseOpeningVideos(data: Workspace): Workspace {
@@ -216,7 +224,9 @@ export function loadWorkspace(): Workspace {
     );
   if (!data.users.some((user: User) => user.id === "demo-contributor"))
     data.users.push(
-      freshWorkspace().users.find((user) => user.id === "demo-contributor")!,
+      freshWorkspace(data.demoLearningDay || DEMO_LEARNING_DAY).users.find(
+        (user) => user.id === "demo-contributor",
+      )!,
     );
   // Refresh saved default personas without replacing visitors' custom names.
   const renamedProfiles: Record<string, { previous: string[]; name: string }> =
@@ -237,7 +247,8 @@ export function loadWorkspace(): Workspace {
     const renamed = renamedProfiles[user.id];
     if (renamed?.previous.includes(user.name)) user.name = renamed.name;
   }
-  const upgraded = withPublishedSnapshots(data);
+  const timeline = refreshDemoLearningTimeline(data);
+  const upgraded = withPublishedSnapshots(timeline);
   const refreshed = refreshDemoCourseOpeningVideos(upgraded);
   const repaired = expireDemoDeleted(repairHooliSecurityAssignment(refreshed));
   const legacy = repaired.users.some((p) => !p.learningAssignments)
@@ -261,7 +272,7 @@ export function loadWorkspace(): Workspace {
     );
     saveWorkspace(current);
   }
-  if (current !== upgraded) saveWorkspace(current);
+  if (timeline !== data || current !== upgraded) saveWorkspace(current);
   const reconciled = reconcileLearning(current, current);
   if (JSON.stringify(reconciled) !== JSON.stringify(current))
     saveWorkspace(reconciled);
@@ -280,6 +291,10 @@ export function saveWorkspace(data: Workspace) {
       old.teams,
       old.settings?.organizationTeamId,
     );
+  localStorage.setItem(KEY, JSON.stringify(data));
+}
+/** Only after confirming Reset demo: replace even a damaged sample snapshot. */
+export function resetWorkspace(data: Workspace) {
   localStorage.setItem(KEY, JSON.stringify(data));
 }
 export function updateProgress(

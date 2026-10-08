@@ -76,7 +76,7 @@ export function DeadlineReview({
         Review existing deadlines
       </Button>
       {!review && error && (
-        <Alert variant="destructive" role="alert">
+        <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
           {error}
         </Alert>
       )}
@@ -112,7 +112,7 @@ export function DeadlineReview({
             onboarding window may return someone to New user.
           </p>
           {error && (
-            <Alert variant="destructive" role="alert">
+            <Alert variant="destructive" role="alert" onDismiss={() => setError("")}>
               {error}
             </Alert>
           )}

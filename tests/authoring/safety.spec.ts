@@ -351,9 +351,15 @@ test("failed save preserves downloadable text and does not show success", async 
   await expect(page.getByLabel("Title", { exact: true })).toHaveValue(
     "Recover my draft",
   );
-  await expect(page.locator(".editor-heading [role=status] > .sr-only")).toHaveText("Changes not saved");
+  await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Changes not saved");
   await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", "page");
   await expect(page.locator('[data-slot="toast"]')).toHaveCount(0);
+  await page.locator("form.editor").getByRole("button", { name: "Dismiss message", exact: true }).click();
+  await expect(page.locator("form.editor").getByRole("alert")).toHaveCount(0);
+  await expect(page.getByLabel("Title", { exact: true })).toHaveValue("Recover my draft");
+  await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Changes not saved");
+  await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeDisabled();
+  if (production) await expect(page.getByRole("button", { name: "Retry saving", exact: true })).toBeVisible();
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download your changes" }).click();
   const downloaded = await download;
@@ -376,7 +382,7 @@ test("failed learning-group save shows one concise inline error", async ({
     route.fulfill({
       status: 500,
       json: {
-        error: "Unable to complete this request. Please try again.",
+        error: "This action couldn’t be completed. Try again.",
         requestId: "00000000-0000-4000-8000-000000000010",
       },
     }),
@@ -391,30 +397,31 @@ test("failed learning-group save shows one concise inline error", async ({
     await page.getByRole("tab", { name: "Groups" }).click();
   }
   await page
-    .getByRole("button", { name: `Manage ${state.groups[0].name}` })
+    .getByRole("link", { name: state.groups[0].name, exact: true })
     .click();
-  await page
-    .getByRole("button", { name: "Add courses or curricula", exact: true })
-    .click();
+  await page.getByRole("tab", { name: "Assigned Courses", exact: true }).click();
+  await page.getByRole("button", { name: "Assign Courses", exact: true }).click();
   const picker = page.getByRole("dialog");
   await picker
     .getByRole("checkbox", { name: new RegExp(state.content[0].title) })
     .check();
   await picker
-    .getByRole("button", { name: "Add items 1", exact: true })
+    .getByRole("button", { name: "Review changes", exact: true })
     .click();
+  await picker.getByRole("button", { name: "Save assignments", exact: true }).click();
   const saveAlerts = page.locator('[data-slot="alert"]');
   await expect(saveAlerts).toHaveCount(1);
-  await expect(saveAlerts).toContainText("0 of 1 changes confirmed saved");
+  await expect(saveAlerts).toContainText("0 of 1 changes were confirmed saved");
   await expect(saveAlerts).toContainText(
     "Reference: 00000000-0000-4000-8000-000000000010",
   );
   await expect(
-    picker.getByRole("button", { name: "Add items 1", exact: true }),
+    picker.getByRole("button", { name: "Save assignments", exact: true }),
   ).toBeDisabled();
-  await expect(
-    picker.getByRole("checkbox", { name: new RegExp(state.content[0].title) }),
-  ).toBeChecked();
+  await saveAlerts.getByRole("button", { name: "Dismiss message", exact: true }).click();
+  await expect(saveAlerts).toHaveCount(0);
+  await expect(picker.getByRole("button", { name: "Refresh audience", exact: true })).toBeVisible();
+  await expect(picker.getByRole("button", { name: "Save assignments", exact: true })).toBeDisabled();
   await page.screenshot({
     animations: "disabled",
     path: info.outputPath("group-save-error.png"),
@@ -444,7 +451,7 @@ for (const failure of [false, true])
     });
     await expect.poll(() => control.uploaded).toBe(true);
     await expect(
-      page.locator(".editor-heading").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
+      page.locator(".topbar").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
     ).toBeDisabled();
     await expect(page.getByRole("button", { name: "Details", exact: true })).toBeDisabled();
     // Exercise the handler directly too, bypassing the disabled submit button.
@@ -471,7 +478,7 @@ for (const failure of [false, true])
     ).toHaveText("Keep the original body");
     control.releaseUpload();
     await expect(
-      page.locator(".editor-heading").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
+      page.locator(".topbar").getByRole("button", { name: /^(Publish( changes)?|Review requirements)$/ }),
     ).toBeEnabled();
     if (failure)
       await expect(
@@ -565,7 +572,7 @@ for (const media of ["inline-video", "card-art"] as const)
     if (await actions.isVisible()) await expect(actions).toBeDisabled();
     else await expect(page.getByRole("button", { name: /^Outline/ })).toBeDisabled();
     await expect(
-      page.locator(".editor-heading").getByRole("button", { name: /Publish|Review requirements/, includeHidden: true }),
+      page.locator(".topbar").getByRole("button", { name: /Publish|Review requirements/, includeHidden: true }),
     ).toBeDisabled();
     await page
       .locator("form.editor")
@@ -1375,7 +1382,7 @@ for (const failure of ["storage limit", "expired permission", "verification"] as
     const file = { name: "retry.png", mimeType: "image/png", buffer: Buffer.from("synthetic") };
     await page.locator('.writing-editor input[type="file"]').setInputFiles(file);
     const alert = page.locator(".writing-editor").getByRole("alert");
-    await expect(alert).toContainText(failure === "storage limit" ? "file-size limit" : failure === "expired permission" ? "permission expired or was denied" : "could not be verified");
+    await expect(alert).toContainText(failure === "storage limit" ? "exceeds the upload size limit" : failure === "expired permission" ? "permission expired or was denied" : "upload couldn’t be verified");
     await expect(alert).not.toContainText("private token");
     await expect(editor).toHaveText("Keep this draft intact");
     expect(state.content[0].body).toBe("Keep this draft intact");
@@ -1411,10 +1418,10 @@ test("card artwork above 50 MB reaches storage and a rejection preserves existin
   await writeFile(filePath, Buffer.alloc(54 * 1024 * 1024));
   await page.getByLabel("Upload card artwork", { exact: true }).setInputFiles(filePath);
   const artwork = page.getByRole("region", { name: "Card artwork editor", exact: true });
-  await expect(artwork.locator("p[role='status']")).toContainText("file-size limit");
+  await expect(artwork.getByRole("alert")).toContainText("exceeds the upload size limit");
   expect(signed).toBe(1); expect(completed).toBe(0);
   expect(JSON.stringify(state.content[0].cardArt)).toBe(original);
   await expect(artwork.getByRole("button", { name: "Upload image", exact: true })).toBeEnabled();
-  await artwork.locator("p[role='status']").scrollIntoViewIfNeeded();
+  await artwork.getByRole("alert").scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("large-artwork-recovery.png"), fullPage: true });
 });
