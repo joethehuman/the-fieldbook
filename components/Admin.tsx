@@ -25,7 +25,7 @@ import {
 import { WritingTitle } from "./patterns/writing-title";
 import { useEditorLayout } from "./patterns/use-editor-layout";
 import { useCollapseDesktopSidebar } from "./patterns/desktop-sidebar-state";
-import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
+import { createLessonImageAltValidator } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
 import type { PublicationOptions } from "@/lib/content-publication";
 import { contentSignature, hasUnpublishedEdits } from "@/lib/demo-publication";
@@ -2171,6 +2171,7 @@ export function Editor({
     [uploadCount, setUploadCount] = useState(0);
   const { confirm } = useInteractionDialog();
   const baseline = useRef(c);
+  const [validateLessonImages] = useState(() => createLessonImageAltValidator());
   const original = useRef(content);
   const pendingUploads = useRef(0);
   const savingNow = useRef(false);
@@ -2498,6 +2499,7 @@ export function Editor({
     target?: "title" | "body";
   };
   const requirements: Requirement[] = [];
+  const lessonsMissingImageAlt = validateLessonImages(c.kind === "course" ? c.lessons : []);
   if (!c.title.trim())
     requirements.push({
       id: "title",
@@ -2572,7 +2574,7 @@ export function Editor({
           message: `${label}: use a supported HTTPS video URL`,
           step: lesson.id,
         });
-      if (hasMissingImageAlt(lesson.body))
+      if (lessonsMissingImageAlt.has(lesson.id))
         requirements.push({
           id: `${lesson.id}-alt`,
           message: `${label}: add image alternative text`,
