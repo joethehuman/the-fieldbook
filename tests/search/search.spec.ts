@@ -24,7 +24,7 @@ test("production search handles swapped letters, word forms and mixed title/body
     ["reports", "Progress and reporting"],
     ["search filters", "Search"],
     ["upload video", "Images and video"],
-    ["upolad", "Images and video"],
+    ["upolad video", "Images and video"],
     ["course ass", "Course assignments"],
   ]) {
     await input.fill(query);

@@ -109,7 +109,7 @@ test("search migration preserves existing content and indexed passages while add
       ["focs", "Docs"],
       ["pepole", "People"],
       ["reproting", "Progress and reporting"],
-      ["upolad", "Images and video"],
+      ["upolad video", "Images and video"],
       ["reports", "Progress and reporting"],
       ["search filters", "Search"],
       ["upload video", "Images and video"],
@@ -120,6 +120,10 @@ test("search migration preserves existing content and indexed passages while add
       "formatting",
     );
     assert.equal((await search(pg, "People"))[0].published_revision, 3);
+    assert.deepEqual(
+      (await search(pg, "upolad")).map((row) => row.content_id),
+      (await search(pg, "upload")).map((row) => row.content_id),
+    );
     await pg.query(
       "insert into fb_documents(id,draft,published,published_revision) values($1,'{}',$2,1)",
       [id(92), { kind: "doc", title: "Fresh topics", body: "New vocabulary." }],
