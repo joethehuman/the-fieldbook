@@ -106,6 +106,10 @@ function VideoEditor({ editor, nodeKey, url, label }: { editor: LexicalEditor; n
     })} />;
 }
 
+export function $createWritingVideoNode(url: string) {
+  return new WritingVideoNode(url, "Video", undefined, undefined, false);
+}
+
 export const writingVideoPlugin = realmPlugin({
   init(realm) {
     realm.pub(addLexicalNode$, WritingVideoNode);

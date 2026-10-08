@@ -28,6 +28,8 @@ test("all reading surfaces render video blocks while ordinary references remain 
     assert.match(html, /<iframe[^>]+loading="lazy"/);
     assert.doesNotMatch(html, /Loading video…/);
     assert.match(html, /<video[^>]+00000000-0000-4000-8000-000000000001.mp4/);
+    assert.match(html, /<video[^>]+controls=""/);
+    assert.doesNotMatch(html, /course-video-speed|course-video-actions|<select|role="combobox"/);
     assert.match(html, /<a[^>]+>Reference/);
     assert.doesNotMatch(html, /<div\b/);
   }

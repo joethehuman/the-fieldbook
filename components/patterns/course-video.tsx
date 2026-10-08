@@ -2,10 +2,8 @@
 import { useRef, useState } from "react";
 import { videoSource } from "@/lib/video";
 import { Button } from "../ui/button";
-import { SelectField } from "../ui/select";
 import { ActionGroup } from "../ui/action-group";
 import { Note } from "../ui/note";
-import { Field } from "../ui/field";
 
 function EmbeddedVideo({ url, title, posterUrl, eager }: { url: string; title: string; posterUrl?: string; eager: boolean }) {
   const [ready, setReady] = useState(false);
@@ -36,35 +34,26 @@ function EmbeddedVideo({ url, title, posterUrl, eager }: { url: string; title: s
 
 export function CourseVideo({ url, title, posterUrl, eager = false }: { url: string; title: string; posterUrl?: string; eager?: boolean }) {
   const source = videoSource(url);
-  const ref = useRef<HTMLVideoElement>(null);
-  const [speed, setSpeed] = useState("1.2");
+  const playbackRate = useRef(1);
   const [retry, setRetry] = useState(0);
   const [failed, setFailed] = useState(false);
   const position = useRef(0);
   if (!source) return <Note>This video URL is not supported. Ask an editor to update it.</Note>;
   return <span className="course-video">
     {source.type === "embed" ? <EmbeddedVideo key={source.url} url={source.url} title={title} posterUrl={posterUrl} eager={eager} /> : <video
-      key={retry} ref={ref} src={retry && source.url.startsWith("/api/media/") ? `${source.url}?renew=${retry}` : source.url} controls preload="metadata" playsInline poster={posterUrl}
+      key={retry} src={retry && source.url.startsWith("/api/media/") ? `${source.url}?renew=${retry}` : source.url} controls preload="metadata" playsInline poster={posterUrl}
       aria-label={title}
+      onRateChange={(event) => { playbackRate.current = event.currentTarget.playbackRate; }}
       onTimeUpdate={(event) => { position.current = event.currentTarget.currentTime; }}
       onError={() => setFailed(true)}
       onLoadedMetadata={(event) => {
-        event.currentTarget.playbackRate = Number(speed);
+        event.currentTarget.playbackRate = playbackRate.current;
         if (position.current) event.currentTarget.currentTime = position.current;
         setFailed(false);
       }}
     >Your browser does not support video playback.</video>}
-    {source.type === "file" && <ActionGroup asChild className="course-video-actions"><span>
-      {failed && source.type === "file" && <Button type="button" variant="outline" size="sm" onClick={() => { setRetry((value) => value + 1); setFailed(false); }}>Retry video</Button>}
-      {source.type === "file" && <Field orientation="horizontal" className="course-video-speed">
-        <span>Speed</span>
-        <SelectField value={speed} onValueChange={(value) => {
-          setSpeed(value);
-          if (ref.current) ref.current.playbackRate = Number(value);
-        }}>
-          {["0.75", "1", "1.2", "1.5", "2"].map((value) => <option key={value} value={value}>{value}×</option>)}
-        </SelectField>
-      </Field>}
+    {source.type === "file" && failed && <ActionGroup asChild className="course-video-actions"><span>
+      <Button type="button" variant="outline" size="sm" onClick={() => { setRetry((value) => value + 1); setFailed(false); }}>Retry video</Button>
     </span></ActionGroup>}
   </span>;
 }

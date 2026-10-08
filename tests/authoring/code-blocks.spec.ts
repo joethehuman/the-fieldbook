@@ -306,7 +306,7 @@ test("pasting an image in code leaves the code editor in control and does not up
   });
   await expect(input).toHaveText(code);
   await expect(page.locator(".writing-editor").getByRole("alert")).toHaveCount(0);
-  await expect(page.locator(".writing-content img, .writing-content .writing-image-loading")).toHaveCount(0);
+  await expect(page.locator(".writing-content img, .writing-content .writing-media-loading")).toHaveCount(0);
   expect(uploads).toBe(0);
   expect((await downloadMarkdown(page)).body).toContain(fence(code));
 });

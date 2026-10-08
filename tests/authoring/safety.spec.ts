@@ -1183,7 +1183,7 @@ test("image chooser uploads into the selected lesson line", async ({
   const chooser = page.getByRole("dialog", { name: "Insert image" });
   await expect(writing.locator(".writing-media-line")).toBeVisible();
   await chooser
-    .getByRole("textbox", { name: "Image alternative text" })
+    .getByRole("textbox", { name: "Alt text (optional)" })
     .fill("Course diagram");
   const fileChooser = page.waitForEvent("filechooser");
   await chooser.getByRole("button", { name: "Choose image" }).click();

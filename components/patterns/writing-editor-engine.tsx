@@ -3,8 +3,8 @@
 import { WritingImageDialog, WritingImageToolbar } from "./writing-image";
 import { WritingCodeEditor } from "./writing-code";
 import { writingTableControlsPlugin } from "./writing-table-controls";
-import { writingVideoPlugin } from "./writing-video";
-import { WritingImageLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
+import { $createWritingVideoNode, writingVideoPlugin } from "./writing-video";
+import { WritingMediaLoading, WritingUploadNode, writingUploadPlugin } from "./writing-upload";
 import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
@@ -19,8 +19,6 @@ import { WritingTitleContext, WritingIntroductionContext, WritingTitleEnterConte
 import { WritingInteractionContext } from "./writing-interaction";
 import { Fragment, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { UploadProgress } from "@/lib/upload-media";
-import { MediaUploadStatus } from "./media-upload-status";
 import {
   MDXEditor,
   type MDXEditorMethods,
@@ -271,7 +269,7 @@ export default function WritingEditorEngine({
   const writingActions = useRef<WritingActions | null>(null);
   const selectionTools = useRef<((keyboard: boolean) => boolean) | null>(null);
   const mediaSelection = useRef<BaseSelection | null>(null);
-  const pendingImage = useRef(false);
+  const pendingMedia = useRef(false);
   const slashSelection = useRef<BaseSelection | null>(null);
   const toolbarSelection = useRef<BaseSelection | null>(null);
   const activeLine = useRef<HTMLElement | null>(null);
@@ -298,7 +296,6 @@ export default function WritingEditorEngine({
     restore();
     return unregister;
   }, [uploadCaret, busy, disabled]);
-  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [slashOpen, setSlashOpen] = useState(false);
   const slashFade = useScrollFade<HTMLDivElement>(slashOpen);
   const [slashFromToolbar, setSlashFromToolbar] = useState(false);
@@ -351,7 +348,7 @@ export default function WritingEditorEngine({
     mediaMenu.current.style.left = `${mediaPosition.left}px`;
     const initial = mediaTab === "link"
       ? mediaMenu.current.querySelector<HTMLInputElement>('input[type="url"]')
-      : mediaMenu.current.querySelector<HTMLInputElement>('input[aria-label="Image alternative text"]') || mediaMenu.current.querySelector<HTMLButtonElement>(".writing-media-fields button");
+      : mediaMenu.current.querySelector<HTMLInputElement>('input[aria-label="Alt text (optional)"]') || mediaMenu.current.querySelector<HTMLButtonElement>(".writing-media-fields button");
     initial?.focus({ preventScroll: true });
   }, [mediaChooser, mediaPosition, mediaTab]);
 
@@ -392,22 +389,21 @@ export default function WritingEditorEngine({
     setBusy(true);
     setError("");
     try {
-      return await onUpload(file, file.type.startsWith("image/") ? undefined : setUploadProgress);
+      return await onUpload(file);
     } catch (error) {
       setError((error as Error).message);
       throw error;
     } finally {
       setBusy(false);
-      setUploadProgress(null);
     }
   }
-  async function insertUploadedImage(file: File, alt: string) {
+  async function insertUploadedMedia(file: File, alt: string) {
     const lexical = lexicalEditor.current;
-    if (!lexical || pendingImage.current) return;
+    if (!lexical || pendingMedia.current) return;
     const beforeUpload = lexical.getEditorState();
     let key = "";
     const selection = mediaSelection.current;
-    pendingImage.current = true;
+    pendingMedia.current = true;
     lexical.update(() => {
       if (selection) $setSelection(selection.clone());
       const caret = $getSelection();
@@ -425,21 +421,23 @@ export default function WritingEditorEngine({
     closeMedia();
     try {
       const url = await upload(file);
-      pendingImage.current = false;
+      pendingMedia.current = false;
       lexical.update(() => {
         const loading = $getNodeByKey(key);
         if (!loading?.isAttached()) return;
-        const paragraph = $createParagraphNode().append($createImageNode({ src: url, altText: alt }));
-        loading.replace(paragraph);
-        const next = paragraph.getNextSibling();
+        const block = file.type.startsWith("image/")
+          ? $createParagraphNode().append($createImageNode({ src: url, altText: alt }))
+          : $createWritingVideoNode(url);
+        loading.replace(block);
+        const next = block.getNextSibling();
         // A neighboring table or image block cannot be the following writing line.
         const imageOnlyNext = $isParagraphNode(next) && next.getChildrenSize() > 0 && next.getTextContentSize() === 0;
-        if (!$isElementNode(next) || imageOnlyNext) paragraph.insertAfter($createParagraphNode());
-        setUploadCaret(paragraph.getNextSibling()!.getKey());
-        paragraph.selectNext();
+        if (!$isElementNode(next) || imageOnlyNext) block.insertAfter($createParagraphNode());
+        setUploadCaret(block.getNextSibling()!.getKey());
+        block.selectNext();
       }, { discrete: true, tag: HISTORY_MERGE_TAG });
     } catch {
-      pendingImage.current = false;
+      pendingMedia.current = false;
       // A rejected upload must also restore any text selected before pasting.
       lexical.setEditorState(beforeUpload, { tag: HISTORY_MERGE_TAG });
     }
@@ -722,7 +720,7 @@ export default function WritingEditorEngine({
       disableImageResize: true,
       ImageDialog: WritingImageDialog,
       EditImageToolbar: WritingImageToolbar,
-      imagePlaceholder: WritingImageLoading,
+      imagePlaceholder: WritingMediaLoading,
       imageUploadHandler: onUpload ? upload : undefined,
     }),
     tablePlugin(),
@@ -794,7 +792,7 @@ export default function WritingEditorEngine({
       if (!onUpload) { setError("Uploads are unavailable in this view."); return; }
       rememberSelection();
       const alt = image.name.replace(/\.[^.]+$/, "").replace(/[\[\]\\\n]/g, " ") || "Image";
-      void insertUploadedImage(image, alt);
+      void insertUploadedMedia(image, alt);
     }} onKeyDownCapture={(event) => {
       if (event.target instanceof Element && event.target.closest(".writing-code-block")) return;
       if (slashOpen && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
@@ -876,7 +874,7 @@ export default function WritingEditorEngine({
       </div>, document.body)}
       {mediaChooser && createPortal(<div ref={mediaMenu} className="writing-media-chooser" role="dialog" aria-label={`Insert ${mediaChooser}`} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeMedia(); editor.current?.focus(undefined, { preventScroll: true }); } }}>
         <div className="writing-media-tabs"><Button type="button" variant="ghost" aria-pressed={mediaTab === "upload"} onClick={() => setMediaTab("upload")}>Upload</Button><Button type="button" variant="ghost" aria-pressed={mediaTab === "link"} onClick={() => setMediaTab("link")}>Link</Button></div>
-        {mediaTab === "upload" ? <div className="writing-media-fields">{mediaChooser === "image" && <Input aria-label="Image alternative text" value={imageAlt} onChange={(event) => setImageAlt(event.target.value)} placeholder="Describe the image" />}<Button type="button" disabled={!onUpload || (mediaChooser === "image" && !imageAlt.trim())} onClick={() => file.current?.click()}>Choose {mediaChooser}</Button></div> : <div className="writing-media-fields"><Input aria-label={mediaChooser === "video" ? "Video URL" : "Image URL"} type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder={mediaChooser === "video" ? "YouTube, Vimeo or Loom URL" : "https://example.com/image.jpg"} /><Button type="button" onClick={mediaChooser === "video" ? insertVideo : () => { if (!/^https:\/\//i.test(videoUrl)) { setError("Use an HTTPS image URL."); return; } insertAtMediaSelection(`\n\n![${imageAlt.trim() || "Image"}](${videoUrl})\n\n`); }}>Insert {mediaChooser}</Button></div>}
+        {mediaTab === "upload" ? <div className="writing-media-fields">{mediaChooser === "image" && <Input aria-label="Alt text (optional)" value={imageAlt} onChange={(event) => setImageAlt(event.target.value)} placeholder="Alt text (optional)" />}<Button type="button" disabled={!onUpload} onClick={() => file.current?.click()}>Choose {mediaChooser}</Button></div> : <div className="writing-media-fields"><Input aria-label={mediaChooser === "video" ? "Video URL" : "Image URL"} type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder={mediaChooser === "video" ? "YouTube, Vimeo or Loom URL" : "https://example.com/image.jpg"} /><Button type="button" onClick={mediaChooser === "video" ? insertVideo : () => { if (!/^https:\/\//i.test(videoUrl)) { setError("Use an HTTPS image URL."); return; } insertAtMediaSelection(`\n\n![${imageAlt.trim() || "Image"}](${videoUrl})\n\n`); }}>Insert {mediaChooser}</Button></div>}
         <Button type="button" variant="ghost" size="sm" onClick={closeMedia}>Cancel</Button>
       </div>, document.body)}
       <Input
@@ -889,16 +887,8 @@ export default function WritingEditorEngine({
           const selected = event.target.files?.[0];
           if (!selected) return;
           try {
-            if (selected.type.startsWith("image/")) {
-              const alt = (imageAlt.trim() || selected.name).replace(/[\[\]\\\n]/g, " ");
-              await insertUploadedImage(selected, alt);
-              setImageAlt("");
-              return;
-            }
-            const url = await upload(selected);
             const alt = (imageAlt.trim() || selected.name).replace(/[\[\]\\\n]/g, " ");
-            const markdown = selected.type.startsWith("video/") ? `\n\n[Video](${url})\n\n` : `\n\n![${alt}](${url})\n\n`;
-            insertAtMediaSelection(markdown);
+            await insertUploadedMedia(selected, alt);
             setImageAlt("");
           } catch {
             /* upload() retains the error and the document. */
@@ -907,7 +897,6 @@ export default function WritingEditorEngine({
           }
         }}
       />
-      {uploadProgress && <div className="px-3 py-2"><MediaUploadStatus progress={uploadProgress} /></div>}
       <MDXEditor
         ref={editor}
         markdown={initial.current.markdown}
@@ -930,7 +919,7 @@ export default function WritingEditorEngine({
           onUnsupported();
         }}
         onChange={(markdown, normalized) => {
-          if (failed.current || pendingImage.current) return;
+          if (failed.current || pendingMedia.current) return;
           if (normalized) {
             if (!equivalentMarkdown(readTableWidths(current.current).markdown, markdown)) {
               failed.current = true;
