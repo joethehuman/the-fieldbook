@@ -118,7 +118,11 @@ export function FeedbackAdmin({
     setItem("all");
     setKind("all");
   };
-  const records = feedbackRows(data, kind, item, rating, query, sort);
+  const ratingRecords = feedbackRows(data, kind, item, "all", query, sort);
+  const records =
+    rating === "all"
+      ? ratingRecords
+      : ratingRecords.filter((record) => record.rating === rating);
   const ids = records.map((record) => record.id);
   const selection = useBulkSelection(
     JSON.stringify([kind, item, rating, query]),
@@ -141,7 +145,7 @@ export function FeedbackAdmin({
         },
       ]
     : [];
-  const positive = records.filter((f) => f.rating === "up").length;
+  const positive = ratingRecords.filter((f) => f.rating === "up").length;
   return (
     <>
       <div data-reveal-context className="grid gap-4">
@@ -263,11 +267,34 @@ export function FeedbackAdmin({
       </CollectionControls>
       <div className="report-summary">
         <strong>
-          {records.length} {records.length === 1 ? "rating" : "ratings"}
+          {ratingRecords.length}{" "}
+          {ratingRecords.length === 1 ? "rating" : "ratings"}
         </strong>
         <div className="flex items-center gap-2">
-          <Badge variant="success">{positive} useful</Badge>
-          <Badge>{records.length - positive} not useful</Badge>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-6 rounded-full bg-success/10 px-2 py-0 text-xs leading-6 text-success hover:bg-success/20 hover:text-success aria-pressed:border-success aria-pressed:bg-success/20"
+            aria-pressed={rating === "up"}
+            onClick={() =>
+              setRating((current) => (current === "up" ? "all" : "up"))
+            }
+          >
+            {positive} useful
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-6 rounded-full bg-muted px-2 py-0 text-xs leading-6 hover:bg-muted-hover aria-pressed:border-muted-foreground aria-pressed:bg-muted-hover"
+            aria-pressed={rating === "down"}
+            onClick={() =>
+              setRating((current) => (current === "down" ? "all" : "down"))
+            }
+          >
+            {ratingRecords.length - positive} not useful
+          </Button>
         </div>
         <div className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
           <div className="w-14 shrink-0 [&_[data-slot=distribution-bar]]:h-1.5">
@@ -278,22 +305,22 @@ export function FeedbackAdmin({
                   id: "useful",
                   label: "Useful",
                   count: positive,
-                  tone: "success",
+                  tone: "success-soft",
                 },
                 {
                   id: "not-useful",
                   label: "Not useful",
-                  count: records.length - positive,
+                  count: ratingRecords.length - positive,
                   tone: "muted",
                 },
               ]}
             />
           </div>
           <span>
-            {records.length ? (
+            {ratingRecords.length ? (
               <>
                 <span className="font-semibold text-foreground">
-                  {Math.round((positive / records.length) * 100)}%
+                  {Math.round((positive / ratingRecords.length) * 100)}%
                 </span>{" "}
                 positive
               </>
