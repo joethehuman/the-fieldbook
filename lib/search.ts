@@ -147,23 +147,22 @@ export function scorePassage(
     (p.title + " " + (p.lessonTitle || "") + " " + p.text)
       .toLowerCase()
       .match(/[\p{L}\p{N}]+/gu) || [];
-  const score = words.every((w) =>
-    all.some((t) => t.startsWith(w) || (fuzzy && near(w, t))),
-  )
-    ? words.reduce(
-        (s, w) =>
-          s +
-          (title.some((t) => t === w)
-            ? 20
-            : heading.some((t) => t === w)
-              ? 12
-              : all.some((t) => t.startsWith(w))
-                ? 5
-                : 1),
-        0,
-      ) + (p.title.toLowerCase() === query.trim().toLowerCase() ? 100 : 0)
+  const scores = words.map((w): number => {
+    // Keep field priority while typing; literal matches precede typo fallbacks.
+    if (title.some((t) => t === w)) return 20;
+    if (title.some((t) => t.startsWith(w))) return 16;
+    if (heading.some((t) => t === w)) return 12;
+    if (heading.some((t) => t.startsWith(w))) return 8;
+    if (all.some((t) => t.startsWith(w))) return 5;
+    if (!fuzzy) return 0;
+    if (title.some((t) => near(w, t))) return 3;
+    if (heading.some((t) => near(w, t))) return 2;
+    return all.some((t) => near(w, t)) ? 1 : 0;
+  });
+  return scores.every((score) => score > 0)
+    ? scores.reduce((sum, score) => sum + score, 0) +
+        (p.title.toLowerCase() === query.trim().toLowerCase() ? 100 : 0)
     : 0;
-  return score;
 }
 // Synthetic, browser-local demonstration. PostgreSQL owns production ranking.
 export function demoSearch(
