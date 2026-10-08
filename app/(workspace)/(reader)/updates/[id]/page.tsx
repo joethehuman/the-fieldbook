@@ -28,7 +28,7 @@ export default async function Page({ params }: Props) {
       <CanonicalRecordUrl id={item.id} path={contentPath(item.kind, item.id, item.title)} />
       <WorkspacePage
         section="/updates"
-        context={readerDetailShellContext(context, "updates", item)}
+        context={readerDetailShellContext(context)}
       >
         <Article
           item={item}

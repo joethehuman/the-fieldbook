@@ -51,7 +51,7 @@ export default async function Page({ params, searchParams }: Props) {
       <CanonicalRecordUrl id={item.id} path={contentPath(item.kind, item.id, item.title)} />
       <WorkspacePage
         section="/courses"
-        context={readerDetailShellContext(context, "courses", item)}
+        context={readerDetailShellContext(context)}
       >
         <ReaderCoursePlayer
           course={item}

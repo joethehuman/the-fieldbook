@@ -191,15 +191,6 @@ export const readerContext = cache(async (destination: string) => {
     settings,
     forYou: forYou.map(expose),
     otherUpdates: other.map(expose),
-    courseTitles: rows
-      .filter((item) => item.kind === "course" && item.status === "published")
-      .map(({ id, title }) => ({ id, title })),
-    curriculumTitles: (config.curricula || [])
-      .filter((item: { status: string }) => item.status === "published")
-      .map((item: { id: string; name: string }) => ({
-        id: item.id,
-        title: item.name,
-      })),
   };
 });
 
@@ -456,7 +447,9 @@ export function readerMetadata(
 
 // Narrow presentation DTO, memoized within the current server request only.
 export const readerShellContext = cache(async (destination: string) => {
-  if (destination === "/team" || destination === "/admin")
+  // Only Docs renders catalog navigation in the shared shell. Each other page
+  // loads its own content after the same fresh access check.
+  if (destination !== "/docs")
     return readerWorkspaceContext(destination);
   const context = await readerContext(destination);
   return {
@@ -465,11 +458,6 @@ export const readerShellContext = cache(async (destination: string) => {
     docs: context.docs,
     docCategoryOrder: context.docCategoryOrder,
     docSections: context.docSections,
-    updateTitles: [...context.forYou, ...context.otherUpdates].map(
-      ({ id, title }) => ({ id, title }),
-    ),
-    courseTitles: context.courseTitles,
-    curriculumTitles: context.curriculumTitles,
   };
 });
 
@@ -479,8 +467,6 @@ export function readerDetailShellContext(
     import("@/lib/reader-types").ReaderShellContext,
     "user" | "branding"
   >,
-  section: "updates" | "courses" | "curricula",
-  item: { id: string; title: string },
 ): import("@/lib/reader-types").ReaderShellContext {
   return {
     user: context.user,
@@ -488,10 +474,5 @@ export function readerDetailShellContext(
     docs: [],
     docCategoryOrder: [],
     docSections: [],
-    ...(section === "updates"
-      ? { updateTitles: [{ id: item.id, title: item.title }] }
-      : section === "courses"
-        ? { courseTitles: [{ id: item.id, title: item.title }] }
-        : { curriculumTitles: [{ id: item.id, title: item.title }] }),
   };
 }

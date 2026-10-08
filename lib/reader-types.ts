@@ -28,7 +28,4 @@ export type ReaderShellContext = {
   docs: DocLink[];
   docCategoryOrder: string[];
   docSections: DocSection[];
-  updateTitles?: { id: string; title: string }[];
-  courseTitles?: { id: string; title: string }[];
-  curriculumTitles?: { id: string; title: string }[];
 };
