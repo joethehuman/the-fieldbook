@@ -767,20 +767,32 @@
   .course-row[data-scroll-before="true"][data-scroll-after="true"] {
     mask-image: linear-gradient(
       to right,
-      rgb(0 0 0 / 80%),
+      transparent,
+      rgb(0 0 0 / 60%) calc(var(--space-2) * 0.35),
+      rgb(0 0 0 / 90%) calc(var(--space-2) * 0.65),
       black var(--space-2),
       black calc(100% - var(--space-2)),
-      rgb(0 0 0 / 80%)
+      rgb(0 0 0 / 90%) calc(100% - var(--space-2) * 0.65),
+      rgb(0 0 0 / 60%) calc(100% - var(--space-2) * 0.35),
+      transparent
     );
   }
   .course-row[data-scroll-before="true"][data-scroll-after="false"] {
-    mask-image: linear-gradient(to right, rgb(0 0 0 / 80%), black var(--space-2));
+    mask-image: linear-gradient(
+      to right,
+      transparent,
+      rgb(0 0 0 / 60%) calc(var(--space-2) * 0.35),
+      rgb(0 0 0 / 90%) calc(var(--space-2) * 0.65),
+      black var(--space-2)
+    );
   }
   .course-row[data-scroll-before="false"][data-scroll-after="true"] {
     mask-image: linear-gradient(
       to right,
       black calc(100% - var(--space-2)),
-      rgb(0 0 0 / 80%)
+      rgb(0 0 0 / 90%) calc(100% - var(--space-2) * 0.65),
+      rgb(0 0 0 / 60%) calc(100% - var(--space-2) * 0.35),
+      transparent
     );
   }
   .course-row > [data-slot="content-action"] {
