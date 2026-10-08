@@ -57,6 +57,7 @@ import {
   $getRoot,
   $createParagraphNode,
   $isParagraphNode,
+  $isRootOrShadowRoot,
   $insertNodes,
   $isElementNode,
   $isRangeSelection,
@@ -309,6 +310,26 @@ export default function WritingEditorEngine({
   const [media, setMedia] = useState<"image" | "video">("image");
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const [uploadCaret, setUploadCaret] = useState<string | null>(null);
+  useEffect(() => {
+    if (!uploadCaret || busy || disabled) return;
+    const lexical = lexicalEditor.current;
+    if (!lexical) return;
+    const restore = () => {
+      if (!lexical.isEditable()) return;
+      lexical.update(() => {
+        const line = $getNodeByKey(uploadCaret);
+        if ($isElementNode(line) && line.isAttached()) {
+          lexical.getRootElement()?.focus({ preventScroll: true });
+          line.selectStart();
+        }
+      }, { discrete: true, tag: [HISTORY_MERGE_TAG, SKIP_SCROLL_INTO_VIEW_TAG] });
+      setUploadCaret(null);
+    };
+    const unregister = lexical.registerEditableListener((editable) => { if (editable) restore(); });
+    restore();
+    return unregister;
+  }, [uploadCaret, busy, disabled]);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
   const [slashOpen, setSlashOpen] = useState(false);
   const slashFade = useScrollFade<HTMLDivElement>(slashOpen);
@@ -421,6 +442,14 @@ export default function WritingEditorEngine({
     pendingImage.current = true;
     lexical.update(() => {
       if (selection) $setSelection(selection.clone());
+      const caret = $getSelection();
+      if ($isRangeSelection(caret) && caret.isCollapsed() && caret.anchor.type === "element") {
+        const parent = caret.anchor.getNode();
+        if ($isRootOrShadowRoot(parent)) {
+          const line = parent.getChildAtIndex(caret.anchor.offset);
+          if ($isParagraphNode(line) && line.isEmpty()) line.selectStart();
+        }
+      }
       const loading = new WritingUploadNode();
       $insertNodes([loading]);
       key = loading.getKey();
@@ -434,7 +463,11 @@ export default function WritingEditorEngine({
         if (!loading?.isAttached()) return;
         const paragraph = $createParagraphNode().append($createImageNode({ src: url, altText: alt }));
         loading.replace(paragraph);
-        if (!paragraph.getNextSibling()) paragraph.insertAfter($createParagraphNode());
+        const next = paragraph.getNextSibling();
+        // A neighboring table or image block cannot be the following writing line.
+        const imageOnlyNext = $isParagraphNode(next) && next.getChildrenSize() > 0 && next.getTextContentSize() === 0;
+        if (!$isElementNode(next) || imageOnlyNext) paragraph.insertAfter($createParagraphNode());
+        setUploadCaret(paragraph.getNextSibling()!.getKey());
         paragraph.selectNext();
       }, { discrete: true, tag: HISTORY_MERGE_TAG });
     } catch {
@@ -536,8 +569,19 @@ export default function WritingEditorEngine({
 
   function rememberSelection() {
     mediaSelection.current = null;
-    lexicalEditor.current?.getEditorState().read(() => {
-      const selection = $getSelection()?.clone() || null;
+    const lexical = lexicalEditor.current;
+    lexical?.read(() => {
+      let selection = $getSelection()?.clone() || null;
+      const dom = window.getSelection();
+      const surface = lexical.getRootElement();
+      if (dom?.rangeCount && surface) {
+        const range = dom.getRangeAt(0);
+        if (surface.contains(range.startContainer) && surface.contains(range.endContainer)) {
+          const current = $isRangeSelection(selection) ? selection : $createRangeSelection();
+          current.applyDOMRange(range);
+          selection = current;
+        }
+      }
       if ($isRangeSelection(selection)) normalizeWritingSelection(selection);
       mediaSelection.current = selection;
     });

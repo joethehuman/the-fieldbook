@@ -1799,3 +1799,107 @@ for (const kind of ["doc", "brief"] as const) test(`${kind === "brief" ? "update
   await expect(writing.locator("p").first()).toHaveText("ParagrPaste sentenceaph one.");
   await expect(writing.locator("h2")).toHaveText("Heading below");
 });
+
+for (const placement of ["empty", "next line", "between paragraphs", "existing blank lines"] as const) {
+  test(`pasted image uses the first following writing line without a skipped row; ${placement}`, async ({ page }, info) => {
+    test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(error.message));
+    const { control } = await setup(page, true, "course", true);
+    await page.route("**/api/media/**", (route) => route.fulfill({ contentType: "image/svg+xml", body:
+      '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160"><rect width="640" height="160" fill="#d8e5ed"/></svg>',
+    }));
+    const writing = page.getByRole("textbox", { name: "Lesson content" });
+    await writing.click();
+    if (placement !== "empty") {
+      await page.keyboard.type("Before the image");
+      await page.keyboard.press("Enter");
+      if (placement === "between paragraphs") {
+        await page.keyboard.press("Enter");
+        await page.keyboard.type("After the image");
+        await writing.locator("p").nth(1).click();
+      } else if (placement === "existing blank lines") {
+        await page.keyboard.press("Enter");
+        await page.keyboard.press("Enter");
+        await writing.locator("p").nth(1).click();
+      }
+    }
+    await writing.evaluate((surface) => {
+      const data = new DataTransfer();
+      data.items.add(new File(["synthetic"], "caret.png", { type: "image/png" }));
+      surface.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => control.uploaded).toBe(true);
+    control.releaseUpload();
+    await expect(writing.locator("img")).toBeVisible();
+    await expect(writing.locator("img")).toHaveJSProperty("complete", true);
+    const geometry = await writing.locator("img").evaluate((image) => {
+      const wrapper = image.closest<HTMLElement>('[data-editor-block-type="image"]')!;
+      const paragraph = image.closest("p")!;
+      const next = paragraph.nextElementSibling!;
+      return {
+        wrapperHeight: wrapper.getBoundingClientRect().height,
+        paragraphHeight: paragraph.getBoundingClientRect().height,
+        gap: next.getBoundingClientRect().top - image.getBoundingClientRect().bottom,
+        lineBreak: getComputedStyle(paragraph.querySelector("br")!).display,
+      };
+    });
+    expect(geometry.lineBreak).toBe("none");
+    expect(Math.abs(geometry.paragraphHeight - geometry.wrapperHeight)).toBeLessThan(1);
+    expect(geometry.gap).toBeGreaterThan(0); // Retain the standard non-writing block space.
+    expect(geometry.gap).toBeLessThan(56);
+    await page.keyboard.type("First line. "); // No click: exercise the caret left by paste.
+    const imageParagraph = writing.locator("p:has(img)");
+    await expect(imageParagraph.locator("xpath=following-sibling::*[1]")).toHaveText(
+      placement === "between paragraphs" ? "First line. After the image" : "First line. ",
+    );
+    if (placement !== "empty") await expect(writing.locator("p").first()).toHaveText("Before the image");
+    await expect(writing.locator("p")).toHaveCount(placement === "empty" ? 2 : placement === "existing blank lines" ? 4 : 3);
+    expect(errors).toEqual([]);
+    await page.screenshot({ path: info.outputPath(`image-first-writing-line-${placement}.png`) });
+  });
+}
+
+test("image layout keeps the caret line in paragraphs with real text", async ({ page }, info) => {
+  await page.route("https://example.com/diagram.png", (route) => route.fulfill({ contentType: "image/svg+xml", body:
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="80"><rect width="320" height="80" fill="#d8e5ed"/></svg>',
+  }));
+  await setup(page, info.project.name.startsWith("production"), "course", true, false, "Prefix ![Diagram](https://example.com/diagram.png)");
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await expect(writing.locator("img")).toBeVisible();
+  const display = await writing.locator("img").evaluate((image) => {
+    const paragraph = image.closest("p")!;
+    const lineBreak = paragraph.querySelector("br");
+    return lineBreak ? getComputedStyle(lineBreak).display : null;
+  });
+  expect(display).not.toBe("none");
+  await expect(writing.locator("p").first()).toContainText("Prefix");
+});
+
+for (const next of ["table", "image"] as const) test(`image paste leaves a writing line before the following ${next}`, async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+  const following = next === "table" ? "| Column |\n| --- |\n| Keep this cell |" : "![Existing](/api/media/existing.png)";
+  const { control } = await setup(page, true, "course", true, false, `Before\n\n${following}`);
+  const writing = page.getByRole("textbox", { name: "Lesson content" });
+  await writing.locator("p").first().click();
+  await writing.evaluate((surface) => {
+    const text = surface.querySelector("p span")!.firstChild!;
+    window.getSelection()!.setBaseAndExtent(text, text.textContent!.length, text, text.textContent!.length);
+  });
+  await page.keyboard.press("Enter");
+  await writing.evaluate((surface) => {
+    const data = new DataTransfer();
+    data.items.add(new File(["synthetic"], "caret.png", { type: "image/png" }));
+    surface.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect.poll(() => control.uploaded).toBe(true);
+  control.releaseUpload();
+  const pasted = writing.locator('img[alt="caret"]');
+  await expect(pasted).toBeVisible();
+  await page.keyboard.type("First line after paste");
+  const imageParagraph = writing.locator('p:has(img[alt="caret"])');
+  await expect(imageParagraph.locator("xpath=following-sibling::*[1]")).toHaveText("First line after paste");
+  await expect(writing.locator("p").first()).toHaveText("Before");
+  if (next === "table") await expect(writing.locator("table")).toContainText("Keep this cell");
+  else await expect(writing.locator('img[alt="Existing"]')).toHaveAttribute("src", "/api/media/existing.png");
+});
