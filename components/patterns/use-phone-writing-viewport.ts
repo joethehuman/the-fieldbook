@@ -53,7 +53,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       if (!caret?.height) {
         // A new Lexical paragraph is <p><br></p>: its collapsed range has no
         // text rectangle. Use only that empty line, never the whole canvas.
-        const line = element.closest("p, li, h1, h2, h3, h4, blockquote, pre");
+        const line = element.closest(".cm-line, p, li, h1, h2, h3, h4, blockquote, pre");
         if (!line || line.textContent?.trim()) return;
         caret = line.getBoundingClientRect();
       }
