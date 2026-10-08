@@ -267,9 +267,6 @@ export async function setup(
         url: new URL(String(info.project.use.baseURL)).origin,
       },
     ]);
-    await page.route("**/api/workspace", (route) =>
-      route.fulfill({ json: { data, user } }),
-    );
   } else
     await page.addInitScript(
       ({ data, id }) => {

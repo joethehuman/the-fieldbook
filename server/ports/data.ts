@@ -28,11 +28,6 @@ export type DocumentRecord = {
   updated_at: string;
   deleted_at?: string | null;
 };
-export type WorkspaceDocumentRecord = Pick<
-  DocumentRecord,
-  "id" | "revision" | "published" | "published_revision" | "updated_at"
-> &
-  Partial<Pick<DocumentRecord, "draft" | "deleted_at">>;
 /** Assignment discovery loads published text without unpublished drafts. */
 export type PublishedAssignmentRecord = Pick<
   DocumentRecord,
@@ -180,9 +175,6 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
     "id" | "published" | "published_revision"
   > | null>;
   saveDocument(write: DocumentWrite): Promise<DocumentRecord>;
-  listWorkspaceDocuments(
-    includeDrafts: boolean,
-  ): Promise<WorkspaceDocumentRecord[]>;
   listDocumentPlacements(): Promise<
     Pick<DocumentRecord, "id" | "draft" | "published">[]
   >;
@@ -191,18 +183,8 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
   listPublishedAssignmentContent(): Promise<PublishedAssignmentRecord[]>;
   listPublishedReaderIndex(ids?: readonly string[]): Promise<ReaderIndexRecord[]>;
   listPublishedCourseIndex(): Promise<CourseIndexRecord[]>;
-  listRecentMcpDocuments(): Promise<DocumentRecord[]>;
   findReadyMedia(ids: string[]): Promise<{ id: string; mime: string }[]>;
   findCurriculumArtwork(ids: string[]): Promise<{ id: string; mime: string }[]>;
-  listReadyMcpMedia(): Promise<
-    {
-      id: string;
-      filename: string;
-      mime: string;
-      bytes: number;
-      path: string;
-    }[]
-  >;
   reviewDeadlines(
     actorId: string,
     apply: boolean,
@@ -233,8 +215,6 @@ export interface DataStore extends McpDataStore, McpReportingDataStore {
     ids: string[],
   ): Promise<Pick<ProfileRecord, "id" | "name">[]>;
   findOwnerProfile(email: string): Promise<{ id: string } | null>;
-  ensureLearningSetup(): Promise<void>;
-  ensureOnboardingSetup(): Promise<void>;
   rosterImportOperation(
     actorId: string,
     fileHash: string,

@@ -227,7 +227,6 @@ const handlers: Handlers = {
     { id, expected_revision, new_course_version, renew_update },
   ) {
     const c = await getContent(id, ctx.user, true);
-    const published = c.publishedRevision ? await getContent(id, ctx.user) : null;
     if (new_course_version) {
       if (c.kind !== "course")
         throw new HttpError(

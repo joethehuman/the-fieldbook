@@ -4,7 +4,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { PGlite } from "@electric-sql/pglite";
-import { snapshot } from "../../server/snapshot";
+import { adminSnapshot } from "../../server/admin-snapshot";
+import { getContent } from "../../server/content";
+import { data as dataStore } from "../../server/data";
 import { signedMediaUrl } from "../../server/media";
 import { contentReport } from "../../server/reports";
 import { createMcp } from "../../server/mcp";
@@ -72,7 +74,11 @@ async function fixture(
       });
     }
     if (url.pathname.endsWith("/fb_config"))
-      return reply({ settings: data.settings, revision: 1, curricula: data.curricula });
+      return reply({
+        settings: data.settings,
+        revision: 1,
+        curricula: data.curricula,
+      });
     if (url.pathname.endsWith("/rpc/fb_governance_snapshot")) {
       const actor = JSON.parse(String(init?.body)).p_actor;
       const users =
@@ -96,6 +102,7 @@ async function fixture(
     let rows: any[];
     if (table === "fb_documents") rows = [...data.documents];
     else if (table === "fb_feedback") rows = [...data.feedback];
+    else if (table === "fb_profiles") rows = [admin, learner, manager, peer];
     else if (table === "fb_progress") rows = [...data.progress];
     else if (table === "fb_media")
       rows = data.ready
@@ -132,9 +139,15 @@ async function fixture(
         }),
       );
     }
-    for (const [column, value] of [["published->cardArt->>source", "source"], ["published->cardArt->>imageUrl", "imageUrl"]] as const) {
+    for (const [column, value] of [
+      ["published->cardArt->>source", "source"],
+      ["published->cardArt->>imageUrl", "imageUrl"],
+    ] as const) {
       const filter = params.get(column);
-      if (filter) rows = rows.filter((row) => row.published?.cardArt?.[value] === filter.slice(3));
+      if (filter)
+        rows = rows.filter(
+          (row) => row.published?.cardArt?.[value] === filter.slice(3),
+        );
     }
     const order = params.get("order");
     if (order) {
@@ -162,7 +175,17 @@ async function fixture(
     const select = params.get("select");
     if (select && select !== "*")
       rows = rows.map((r) =>
-        Object.fromEntries(select.split(",").map((k) => [k, r[k]])),
+        Object.fromEntries(
+          select.split(",").map((selection) => {
+            const [alias, path] = selection.split(":");
+            return path
+              ? [
+                  alias,
+                  path.split(/->>?/).reduce((value, key) => value?.[key], r),
+                ]
+              : [alias, r[alias]];
+          }),
+        ),
       );
     const single = new Headers(init?.headers)
       .get("accept")
@@ -257,7 +280,10 @@ function dataFixture() {
     progress,
     feedback,
     settings: { ...defaultSettings },
-    curricula: [] as { status: string; cardArt?: { source: string; imageUrl: string } }[],
+    curricula: [] as {
+      status: string;
+      cardArt?: { source: string; imageUrl: string };
+    }[],
     cap: 137,
     ready: true,
     signs: 0,
@@ -266,49 +292,61 @@ function dataFixture() {
   };
 }
 
-test("complete snapshots preserve older published items and scope drafts, answers, feedback and people", async () =>
+test("current reader and Admin reads preserve complete catalogs, feedback exports and access boundaries", async () =>
   fixture(async (f) => {
+    const index = await dataStore().listPublishedReaderIndex();
+    assert.equal(index.length, 1206);
+    assert.equal(new Set(index.map((item) => item.id)).size, 1206);
+    assert.ok(!JSON.stringify(index).includes("SECRET DRAFT"));
+    assert.ok(index.some((item) => item.id === course.id));
+    assert.deepEqual(await dataStore().listPublishedReaderIndex(), index);
+
+    const content = await adminSnapshot(admin, "content");
+    assert.equal(content.content.length, 2306);
+    assert.equal(content.publishedContent!.length, 1206);
+    const feedback = await adminSnapshot(admin, "feedback");
+    assert.equal(feedback.feedback!.length, 1206);
+    const exportRows = feedbackCsv(feedbackRows(feedback));
+    assert.equal(exportRows.rows.length, 1206);
+    assert.ok(serializeCsv(exportRows).includes("Synthetic"));
+    assert.deepEqual(
+      (await adminSnapshot(admin, "content")).content,
+      content.content,
+    );
+
     for (const user of [null, learner, manager, admin]) {
-      const workspace = await snapshot(user);
-      assert.equal(workspace.publishedContent!.length, 1206);
-      assert.equal(
-        new Set(workspace.publishedContent!.map((d) => d.id)).size,
-        1206,
+      const published = await getContent(course.id, user);
+      assert.ok(!JSON.stringify(published).includes("SECRET DRAFT"));
+      assert.ok(
+        published.questions.every((question) => question.answer === undefined),
       );
-      assert.equal(workspace.content.length, user === admin ? 2306 : 1206);
-      assert.equal(
-        workspace.feedback!.length,
-        user === admin ? 1206 : user === learner ? 1205 : 0,
+      assert.deepEqual(published.groups, []);
+      assert.deepEqual(published.assignments, []);
+    }
+    for (const user of [learner, manager]) {
+      const reads = f.requests.length;
+      await assert.rejects(adminSnapshot(user, "content"), /publishing access/);
+      await assert.rejects(
+        adminSnapshot(user, "feedback"),
+        /publishing access/,
       );
-      if (user !== admin) {
-        assert.ok(!JSON.stringify(workspace.content).includes("SECRET DRAFT"));
-        assert.ok(
-          workspace.content.every((c) =>
-            c.questions.every((q) => q.answer === undefined),
-          ),
-        );
-        assert.ok(!workspace.users.some((u) => u.id === peer.id));
-        assert.ok(!workspace.progress[peer.id]);
-        assert.ok(workspace.feedback!.every((r) => r.userId === user?.id));
-      }
-      if (user === admin) {
-        const exportRows = feedbackCsv(feedbackRows(workspace));
-        assert.equal(exportRows.rows.length, 1206);
-        assert.ok(serializeCsv(exportRows).includes("Synthetic"));
-      }
-      const same = await snapshot(user);
-      assert.deepEqual(
-        same.content.map((d) => d.id),
-        workspace.content.map((d) => d.id),
+      assert.equal(
+        f.requests.length,
+        reads,
+        "Unauthorized Admin reads must stop before provider calls",
       );
     }
     assert.ok(
       f.requests
-        .filter((u) => u.pathname.endsWith("fb_documents"))
-        .every((u) => u.searchParams.get("order") === "id.asc"),
+        .filter(
+          (url) =>
+            url.pathname.endsWith("fb_documents") &&
+            url.searchParams.has("offset"),
+        )
+        .every((url) => url.searchParams.get("order") === "id.asc"),
     );
     f.settings.access = "private";
-    await assert.rejects(snapshot(null), /Sign in/);
+    await assert.rejects(getContent(course.id, null), /Sign in/);
   }));
 
 test("MCP tool returns complete totals and learner activity semantics beyond the cap", async () =>
@@ -373,7 +411,15 @@ test("published media lookup covers old articles, lessons, videos and covers wit
       { lessons: [{ body: `![Image](${reference})` }] },
       { lessons: [{ videoUrl: reference }] },
       { coverImageUrl: reference },
-      { cardArt: { source: "upload", shortTitle: "Cover", version: 1, seed: 3, imageUrl: reference } },
+      {
+        cardArt: {
+          source: "upload",
+          shortTitle: "Cover",
+          version: 1,
+          seed: 3,
+          imageUrl: reference,
+        },
+      },
     ]) {
       old.published = { ...course, ...fragment } as any;
       assert.match(
@@ -387,7 +433,10 @@ test("published media lookup covers old articles, lessons, videos and covers wit
     assert.equal(f.signs, 5);
     await signedMediaUrl(file, admin);
     await assert.rejects(signedMediaUrl(file, null), /Media not found/);
-    f.curricula.push({ status: "published", cardArt: { source: "upload", imageUrl: reference } });
+    f.curricula.push({
+      status: "published",
+      cardArt: { source: "upload", imageUrl: reference },
+    });
     await signedMediaUrl(file, learner);
     f.curricula[0].status = "draft";
     await assert.rejects(signedMediaUrl(file, learner), /Media not found/);
@@ -406,16 +455,26 @@ test("published media lookup covers old articles, lessons, videos and covers wit
         .filter((u) => u.pathname.endsWith("fb_documents"))
         .every(
           (u) =>
-            (u.searchParams.has("or") || u.searchParams.has("published->cardArt->>source")) && u.searchParams.get("select") === "id",
+            (u.searchParams.has("or") ||
+              u.searchParams.has("published->cardArt->>source")) &&
+            u.searchParams.get("select") === "id",
         ),
     );
   }));
 
-test("later page errors never produce a partial workspace or report", async () =>
+test("later page errors never produce partial reader indexes, Admin snapshots or reports", async () =>
   fixture(async (f) => {
     for (const table of ["fb_documents", "fb_feedback"]) {
       f.failTable = table;
-      await assert.rejects(snapshot(admin), /database operation failed/);
+      await assert.rejects(
+        adminSnapshot(admin, table === "fb_feedback" ? "feedback" : "content"),
+        /database operation failed/,
+      );
+      if (table === "fb_documents")
+        await assert.rejects(
+          dataStore().listPublishedReaderIndex(),
+          /database operation failed/,
+        );
       await assert.rejects(contentReport(admin), /database operation failed/);
     }
     f.failTable = "fb_progress";

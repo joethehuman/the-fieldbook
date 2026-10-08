@@ -1114,7 +1114,7 @@ test("guest feedback persists in its browser and reaches administrator reports",
     data: { contentId: ids[1], rating: "down", comment: "Account response" },
   });
   expect(memberSave.status()).toBe(200);
-  const workspace = await (await admin.request.get("/api/workspace")).json();
+  const workspace = await (await admin.request.get("/api/admin/snapshot?scope=feedback")).json();
   expect(workspace.data.feedback).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ userId: "guest", rating: "up" }),

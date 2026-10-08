@@ -1,6 +1,5 @@
 import { test, expect, type Page, type TestInfo } from "@playwright/test";
 import { guestFixture } from "../guest-fixture";
-import { guestRecommendations } from "../../lib/guest-recommendations";
 import { reconcileLearning } from "../../lib/learning-groups";
 import { updateProgress } from "../../lib/store";
 import { gradeQuiz } from "../../lib/course-quiz";
@@ -13,8 +12,7 @@ async function setup(
 ) {
   let data = guestFixture();
   data.settings!.guestGroupId = selected;
-  let current = role,
-    fail = "",
+  let fail = "",
     delay = 0;
   const production = info.project.name.startsWith("production");
   if (production) {
@@ -41,32 +39,6 @@ async function setup(
       },
     });
   }
-  const workspace = () => {
-    if (current === "guest") {
-      const p = guestRecommendations(data);
-      const content = p.content.map((c) => ({
-        ...c,
-        questions: c.questions.map(({ answer, ...q }) => q),
-      }));
-      return {
-        data: {
-          schema: 1,
-          settings: p.settings,
-          users: [p.user],
-          groups: p.groups,
-          curricula: p.curricula,
-          content,
-          publishedContent: content,
-          progress: {},
-          teams: [],
-          feedback: [],
-        },
-        user: null,
-      };
-    }
-    const user = data.users.find((u) => u.id === `demo-${current}`)!;
-    return { data, user };
-  };
   if (production) {
     await syncProvider();
     if (role === "admin") {
@@ -90,20 +62,6 @@ async function setup(
         },
       ]);
     }
-    await page.route("**/api/workspace", async (route) => {
-      if (fail === "load")
-        return route.fulfill({
-          status: 503,
-          json: { error: "Workspace temporarily unavailable." },
-        });
-      if (delay) await new Promise((r) => setTimeout(r, delay));
-      if (current === "guest" && data.settings!.access === "private")
-        return route.fulfill({
-          status: 401,
-          json: { error: "Sign in to continue." },
-        });
-      await route.fulfill({ json: workspace() });
-    });
     for (const kind of ["settings", "governance"])
       await page.route(`**/api/${kind}`, async (route) => {
         if (delay) await new Promise((r) => setTimeout(r, delay));
@@ -205,7 +163,6 @@ async function setup(
         );
     },
     signIn: async () => {
-      current = "learner";
       if (production) {
         await syncProvider("learner", ["account"]);
         const token = await (

@@ -6,7 +6,6 @@ import type {
 } from "../../../ports/data";
 import { db, check } from "../client";
 import { env } from "../../../env";
-import { HttpError } from "../../../errors";
 
 export const configurationData: Pick<
   DataStore,
@@ -16,8 +15,6 @@ export const configurationData: Pick<
   | "readSettingsContext"
   | "readPublicBranding"
   | "updateSettings"
-  | "ensureLearningSetup"
-  | "ensureOnboardingSetup"
 > = {
   cacheNamespace() {
     return env().url;
@@ -70,24 +67,5 @@ export const configurationData: Pick<
       .maybeSingle();
     check(error);
     return data as { revision: number } | null;
-  },
-  async ensureLearningSetup() {
-    const { error } = await db().from("fb_config").select("curricula").limit(0);
-    if (error)
-      throw new HttpError(
-        503,
-        "Learning groups setup is incomplete. Apply the learning-groups migration before saving.",
-      );
-  },
-  async ensureOnboardingSetup() {
-    const { error } = await db()
-      .from("fb_profiles")
-      .select("auth_user_id,hire_date,onboarding_start,onboarding_days")
-      .limit(0);
-    if (error)
-      throw new HttpError(
-        503,
-        "Roster setup is incomplete. Apply the roster-people migration before saving.",
-      );
   },
 };

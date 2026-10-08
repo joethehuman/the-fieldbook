@@ -22,8 +22,6 @@ export async function POST(req: Request) {
         400,
         parsed.error.issues.map((i) => i.message).join(" "),
       );
-    await dataStore().ensureLearningSetup();
-    await dataStore().ensureOnboardingSetup();
     if (body.operation !== "pending") {
       const imageIds = [
         ...new Set(

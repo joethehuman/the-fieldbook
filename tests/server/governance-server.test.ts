@@ -1,143 +1,66 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { snapshot } from "../../server/snapshot";
+import { adminSnapshot } from "../../server/admin-snapshot";
+import { data as dataStore } from "../../server/data";
+import { defaultSettings } from "../../lib/settings";
+import type { User } from "../../lib/types";
 import { env, siteOrigins } from "../../server/env";
 import { sameOrigin } from "../../server/auth";
 
-test("workspace serialization preserves public catalog but scopes assignments, drafts, people and progress", async () => {
-  const savedFetch = globalThis.fetch,
-    savedEnv = { ...process.env };
-  Object.assign(process.env, {
-    NEXT_PUBLIC_SUPABASE_URL: "https://preview.supabase.co",
-    NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "test",
-    SUPABASE_SECRET_KEY: "test",
-    FIELDBOOK_URL: "https://preview.example",
-    FIELDBOOK_OWNER_EMAIL: "owner@example.test",
-  });
-  const user: any = {
+test("Admin governance reads reject stale, inactive or removed authoritative accounts", async () => {
+  const store = dataStore();
+  const previous = { ...store };
+  const user: User = {
     id: "00000000-0000-4000-8000-000000000002",
-    name: "Manager",
-    email: "manager@example.test",
-    role: "manager",
+    name: "Admin",
+    email: "admin@example.test",
+    role: "admin",
     active: true,
     groups: [],
   };
-  const course = {
-    id: "course",
-    kind: "course",
-    status: "published",
-    title: "Public",
-    groups: ["sales", "other"],
-    assignments: [
-      {
-        groupId: "sales",
-        assignedAt: "2026-09-01T00:00:00Z",
-        due: { type: "none" },
-      },
-      {
-        groupId: "other",
-        assignedAt: "2026-09-01T00:00:00Z",
-        due: { type: "none" },
-      },
-      {
-        userId: user.id,
-        assignedAt: "2026-09-01T00:00:00Z",
-        due: { type: "none" },
-      },
-      {
-        userId: "00000000-0000-4000-8000-000000000099",
-        assignedAt: "2026-09-01T00:00:00Z",
-        due: { type: "none" },
-      },
-    ],
-    questions: [{ id: "q", answer: 1, options: ["a", "b"] }],
-  };
-  const row = {
-    id: "course",
-    updated_at: "2026-09-01T00:00:00Z",
-    revision: 2,
-    draft: { ...course, title: "Private draft" },
-    published: course,
-  };
-  let govRole = "manager";
-  globalThis.fetch = async (input) => {
-    const url = String(input);
-    let body: any;
-    if (url.includes("fb_config"))
-      body = {
-        settings: { access: "public", registration: "open" },
-        revision: 1,
-        groups: [],
-        teams: [],
-        curricula: [
-          {
-            id: "published",
-            name: "Playlist",
-            status: "published",
-            courseIds: ["course", "draft"],
-          },
-          { id: "draft-playlist", status: "draft", courseIds: ["draft"] },
-        ],
-      };
-    else if (url.includes("fb_documents"))
-      body = [row, { ...row, id: "draft", published: null }];
-    else if (url.includes("fb_governance_snapshot"))
-      body = {
-        users: [{ ...user, role: govRole, group_joined_at: {} }],
-        groups: [{ id: "sales", name: "Sales" }],
-        teams: [],
-        progress: [
-          {
-            user_id: user.id,
-            content_id: "course",
-            version: 1,
-            lessons: [],
-            passed: false,
-          },
-        ],
-        pending: [],
-        revision: 1,
-      };
-    else if (url.includes("fb_feedback")) {
-      assert.ok(url.includes("user_id=eq."));
-      body = [];
-    } else throw new Error(`Unexpected request ${url}`);
-    return new Response(JSON.stringify(body), {
-      headers: {
-        "Content-Type": "application/json",
-        ...(Array.isArray(body)
-          ? { "Content-Range": `0-${body.length - 1}/${body.length}` }
-          : {}),
-      },
-    });
-  };
+  let current: User | null = user;
+  Object.assign(store, {
+    readConfiguration: async () => ({
+      settings: defaultSettings,
+      groups: [],
+      teams: [],
+      curricula: [],
+      revision: 1,
+      governance_revision: 1,
+    }),
+    listDraftIndex: async () => [],
+    listDraftCourses: async () => [],
+    listPublishedAssignmentContent: async () => [],
+    readGovernanceSnapshot: async () => ({
+      users: current ? [current] : [],
+      groups: [],
+      teams: [],
+      progress: [],
+      pending: [],
+      revision: 1,
+    }),
+  });
   try {
-    const state = await snapshot(user);
-    assert.equal(state.content.length, 1);
-    assert.equal(state.content[0].title, "Public");
-    assert.equal(state.content[0].questions[0].answer, undefined);
-    assert.deepEqual(state.content[0].groups, ["sales"]);
+    const state = await adminSnapshot(user, "governance");
     assert.deepEqual(
-      state.content[0].assignments?.map((a) => a.groupId),
-      ["sales", undefined],
+      state.users.map((person) => person.id),
+      [user.id],
     );
-    assert.deepEqual(Object.keys(state.progress), [user.id]);
-    const guest = await snapshot(null);
-    assert.equal(guest.content.length, 1);
-    assert.deepEqual(guest.content[0].groups, []);
-    assert.deepEqual(guest.groups, []);
-    assert.deepEqual(
-      guest.curricula?.map((c) => ({ id: c.id, courseIds: c.courseIds })),
-      [{ id: "published", courseIds: ["course"] }],
-    );
-    // A stale actor role cannot upgrade the authoritative database-scoped response.
-    govRole = "learner";
-    const changed = await snapshot({ ...user, role: "admin" });
-    assert.equal(changed.content[0].title, "Public");
-    assert.equal(changed.governanceRevision, undefined);
+    assert.equal(state.governanceRevision, 1);
+    for (const changed of [
+      { ...user, role: "learner" as const },
+      { ...user, role: "manager" as const },
+      { ...user, active: false },
+      null,
+    ]) {
+      current = changed;
+      await assert.rejects(
+        adminSnapshot(user, "governance"),
+        /Account access changed/,
+      );
+    }
   } finally {
-    globalThis.fetch = savedFetch;
-    process.env = savedEnv;
+    Object.assign(store, previous);
   }
 });
 

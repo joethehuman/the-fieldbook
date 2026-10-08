@@ -42,17 +42,8 @@ export const feedbackData: Pick<
     if (error.code !== "23505") check(error);
 
     // Retries and a submission's optional comment update only its own entry.
-    // During the pre-release rollout, also support the former unique author/item
-    // constraint until the data-preserving production schema change is applied.
-    const legacy =
-      record.content_id &&
-      (error.message.includes("fb_feedback_user_id_content_id_key") ||
-        error.message.includes("fb_feedback_guest_content_unique"));
     const { id, ...changes } = record;
-    let query = db().from("fb_feedback").update(changes);
-    query = legacy
-      ? query.eq("content_id", record.content_id!)
-      : query.eq("id", id);
+    let query = db().from("fb_feedback").update(changes).eq("id", id);
     query =
       "userId" in identity
         ? query.eq("user_id", identity.userId)

@@ -36,11 +36,11 @@ test("handled database and unknown failures log only safe metadata and matching 
     assert.equal(log.operation, "api/content");
     const other = await errorResponse(
       new Error("secret body token"),
-      "api/workspace",
+      "api/admin/snapshot",
     ).json();
     errorResponse(
       new ServiceError("Auth unavailable", "auth", "private-code-token"),
-      "api/workspace",
+      "api/admin/snapshot",
     );
     assert.doesNotMatch(
       JSON.stringify([logs, body, other]),
