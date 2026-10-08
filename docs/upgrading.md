@@ -17,7 +17,7 @@ Resolve any conflicts with your custom changes before pushing.
 
 A push to the configured production branch starts Vercel's deployment. Afterward, check the changed behavior in your installation and note the deployed release or commit. A separate preview is available if you want to try the update first.
 
-If the release has no new database migrations, no database command is needed. Release 1 starts with the single `20261006061752_initial_install.sql` baseline. It defines the current schema and initial setup directly; later releases add ordered migrations.
+If the release has no new database migrations, no database command is needed. Fresh installations apply the SQL files shipped with the selected source version, beginning with `20261006061752_initial_install.sql`. Existing installations apply only their pending migrations.
 
 ## Releases with database changes
 

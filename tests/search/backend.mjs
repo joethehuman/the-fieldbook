@@ -27,6 +27,25 @@ const content = {
   ],
   questions: [],
 };
+const searchExamples = [
+  ["Course assignments", "Assign courses to learning audiences."],
+  ["People", "Manage account records."],
+  ["Progress and reporting", "Review reports and learner progress."],
+  ["Search", "Use the content type filter to narrow a search."],
+  ["Images and video", "Upload a video file through the editor."],
+  [
+    "AI clients",
+    "Search filters and reports explain limitations. Discuss upload video limitations.",
+  ],
+].map(([title, body], n) => ({
+  ...content,
+  kind: "doc",
+  id: `00000000-0000-4000-8000-${String(100 + n).padStart(12, "0")}`,
+  title,
+  body,
+  summary: body,
+  lessons: [],
+}));
 let access = "public",
   fail = false;
 const send = (res, data, status = 200, headers = {}) => {
@@ -34,6 +53,9 @@ const send = (res, data, status = 200, headers = {}) => {
   res.end(JSON.stringify(data));
 };
 async function reset() {
+  await pg.query("delete from fb_documents where id=any($1::uuid[])", [
+    searchExamples.map((item) => item.id),
+  ]);
   await pg.query("delete from fb_documents where id=$1", [id]);
   await pg.query(
     "insert into fb_documents(id,draft,published,published_revision) values($1,$2,$2,4)",
@@ -55,6 +77,12 @@ createServer(async (req, res) => {
       if (body.reset) await reset();
       if (body.access) access = body.access;
       fail = !!body.fail;
+      if (body.searchExamples)
+        for (const item of searchExamples)
+          await pg.query(
+            "insert into fb_documents(id,draft,published,published_revision) values($1,$2,$2,1)",
+            [item.id, item],
+          );
       if (body.unpublish)
         await pg.query(
           "update fb_documents set published=null,published_revision=null where id=$1",
@@ -76,9 +104,11 @@ createServer(async (req, res) => {
         curricula: [],
       });
     if (url.pathname === "/rest/v1/fb_documents") {
+      const requested = url.searchParams.get("id")?.replace(/^eq\./, "") || id;
       const rows = (
         await pg.query(
-          "select * from fb_documents where published is not null and id='00000000-0000-4000-8000-000000000001'",
+          "select * from fb_documents where published is not null and id=$1",
+          [requested],
         )
       ).rows;
       return send(res, rows, 200, {

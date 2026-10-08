@@ -15,7 +15,7 @@ The installation is a Next.js application backed by Supabase Database, Auth, and
 
 Reader and named Admin record links include a readable title followed by the complete record ID. IDs remain stable, so existing links and links with older titles still work after a rename. Admin content types and page tabs have bookmarkable destinations that survive refresh and browser Back/Forward.
 
-Search is built in. Ask AI and the authenticated MCP endpoint are optional. MCP access follows the account's publishing or reporting permissions and the connection's approved capabilities. The demo can illustrate the interface, but its simulated identities and data do not establish installed permissions or persistence.
+Search is built in. Installed search favors titles and lesson headings, supports partial words, common English word forms and basic typos, including swapped adjacent letters. Literal matching remains available for technical terms and other languages. Ask AI and the authenticated MCP endpoint are optional. MCP access follows the account's publishing or reporting permissions and the connection's approved capabilities. The demo can illustrate the interface, but its simulated identities and data do not establish installed permissions or persistence.
 
 On public installations, guest course progress stays in that browser. After sign-in, Fieldbook quietly saves compatible progress to the account and disregards invalid records, unavailable courses and older course versions. Temporary connection or service failures leave browser records available for a later attempt. This does not interrupt sign-in or show an import prompt.
 
