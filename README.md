@@ -30,4 +30,8 @@ Run the browser-local demo with pnpm dev:demo. The shared interface catalog is a
 
 Each visit refreshes original sample learning dates relative to today, keeping upcoming and overdue examples available. Edited schedules and visitor progress stay saved in the browser. Course cards and deadline rules use the same shared code as the installed app.
 
+## License
+
+Copyright (c) 2026 Joseph DeSapio. All rights reserved.
+
 Fieldbook is available under the [Elastic License 2.0](LICENSE), which allows many internal uses but restricts offering the software's substantial functionality as a hosted or managed service. Review the license itself before relying on a particular use. There is no support SLA or promised release schedule.
