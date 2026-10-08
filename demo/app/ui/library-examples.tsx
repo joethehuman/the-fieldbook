@@ -79,6 +79,59 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ActionGroup } from "@/components/ui/action-group";
 
+// Static catalog data keeps unrelated example updates from remeasuring the chart.
+const exampleReportingTeams = [
+  {
+    id: "revenue",
+    label: "Revenue",
+    description: "Manager: Alex Morgan",
+    managerName: "Alex Morgan",
+    directMemberCount: 120,
+  },
+  {
+    id: "success",
+    label: "Customer success",
+    description: "Manager: Sam Lee",
+    managerName: "Sam Lee",
+    directMemberCount: 45,
+  },
+  {
+    id: "emea",
+    parentId: "revenue",
+    label: "Europe, Middle East and Africa",
+    description: "Manager: Jordan Lee",
+    managerName: "Jordan Lee",
+    directMemberCount: 52,
+  },
+  {
+    id: "emea-enterprise",
+    parentId: "emea",
+    label: "Enterprise customer teams across Europe",
+    description: "Manager: Jordan Lee",
+    managerName: "Jordan Lee",
+    directMemberCount: 18,
+  },
+  ...Array.from({ length: 12 }, (_, index) => ({
+    id: `level-${index + 1}`,
+    parentId: index ? `level-${index}` : "revenue",
+    label:
+      index === 0
+        ? "North America"
+        : `Level ${index + 1} regional team`,
+    description: "Manager: Casey Rivera",
+    managerName: "Casey Rivera",
+    directMemberCount: index === 11 ? 6 : 68,
+  })),
+  ...Array.from({ length: 18 }, (_, index) => ({
+    id: `sibling-${index}`,
+    parentId: "level-2",
+    label: `Enterprise territory ${index + 1}`,
+    description: "Manager: Unassigned",
+    managerName: "Unassigned",
+    directMemberCount: 4,
+  })),
+];
+
 function AudienceSelectionExample() {
   const [selected, setSelected] = useState<string[]>(["team:organization"]);
   const [data] = useState(() => ({
@@ -472,57 +525,7 @@ export function LibraryExamples() {
               />
             ) : undefined
           }
-          items={[
-            {
-              id: "revenue",
-              label: "Revenue",
-              description: "Manager: Alex Morgan",
-              managerName: "Alex Morgan",
-              directMemberCount: 120,
-            },
-            {
-              id: "success",
-              label: "Customer success",
-              description: "Manager: Sam Lee",
-              managerName: "Sam Lee",
-              directMemberCount: 45,
-            },
-            {
-              id: "emea",
-              parentId: "revenue",
-              label: "Europe, Middle East and Africa",
-              description: "Manager: Jordan Lee",
-              managerName: "Jordan Lee",
-              directMemberCount: 52,
-            },
-            {
-              id: "emea-enterprise",
-              parentId: "emea",
-              label: "Enterprise customer teams across Europe",
-              description: "Manager: Jordan Lee",
-              managerName: "Jordan Lee",
-              directMemberCount: 18,
-            },
-            ...Array.from({ length: 12 }, (_, index) => ({
-              id: `level-${index + 1}`,
-              parentId: index ? `level-${index}` : "revenue",
-              label:
-                index === 0
-                  ? "North America"
-                  : `Level ${index + 1} regional team`,
-              description: "Manager: Casey Rivera",
-              managerName: "Casey Rivera",
-              directMemberCount: index === 11 ? 6 : 68,
-            })),
-            ...Array.from({ length: 18 }, (_, index) => ({
-              id: `sibling-${index}`,
-              parentId: "level-2",
-              label: `Enterprise territory ${index + 1}`,
-              description: "Manager: Unassigned",
-              managerName: "Unassigned",
-              directMemberCount: 4,
-            })),
-          ]}
+          items={exampleReportingTeams}
         />
         <CollectionControls
           search={

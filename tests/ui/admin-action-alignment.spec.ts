@@ -329,7 +329,7 @@ test("Docs section bulk deletion remains disabled for one selection and rejects 
   await choices.nth(1).check();
   await bulk(page).click();
   await expect(
-    page.getByRole("menuitem", { name: "Move selected sections", exact: true }),
+    page.getByRole("menuitem", { name: "Move to…", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("menuitem", { name: "Delete selected sections", exact: true })

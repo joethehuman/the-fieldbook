@@ -135,7 +135,7 @@ test("Identity palette modes recolor fixed artwork and keep the saved choice", a
   await palette.screenshot({ path: info.outputPath("card-art-identity.png") });
 });
 
-test("Shuffle opts into v6, avoids repeats and reloads the exact saved SVG without publishing", async ({
+test("Editing refreshes generated art to v6; Shuffle avoids repeats and reloads the exact saved SVG without publishing", async ({
   page,
 }, info) => {
   const data = freshWorkspace();
@@ -156,7 +156,11 @@ test("Shuffle opts into v6, avoids repeats and reloads the exact saved SVG witho
     .fill("Choose a problem worth solving");
   await expect
     .poll(() => storedArt(page, item.id))
-    .toEqual({ ...originalArt, shortTitle: "Choose a problem worth solving" });
+    .toEqual({
+      ...originalArt,
+      version: 6,
+      shortTitle: "Choose a problem worth solving",
+    });
   const first = await editor.locator(".card-artwork-geometry").innerHTML();
   const seen = new Set<string>();
   for (let i = 0; i < 25; i++) {
