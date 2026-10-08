@@ -11,6 +11,9 @@ const config: NextConfig = {
     "/api/og": [
       "./node_modules/geist/dist/fonts/geist-sans/Geist-Regular.ttf",
       "./node_modules/geist/dist/fonts/geist-sans/Geist-Medium.ttf",
+      "./node_modules/geist/LICENSE.txt",
+      "./public/licenses/apache-2.0.txt",
+      "./public/licenses/geist-ofl-1.1.txt",
     ],
   },
   images: { unoptimized: true },
