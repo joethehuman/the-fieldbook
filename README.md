@@ -32,6 +32,8 @@ Run the browser-local demo with pnpm dev:demo. The shared interface catalog is a
 
 Each visit refreshes original sample learning dates relative to today, keeping upcoming and overdue examples available. Edited schedules and visitor progress stay saved in the browser. Course cards and deadline rules use the same shared code as the installed app.
 
+The demo searches published sample content and lesson text locally. Title and lesson-title matches take priority while typing, and search accepts basic typos.
+
 ## License
 
 Copyright (c) 2026 Joseph DeSapio. All rights reserved.

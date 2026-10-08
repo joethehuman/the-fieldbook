@@ -61,17 +61,19 @@ test("search titles, lessons, filters, keyboard, destinations and empty state", 
   await expect(result).toBeVisible();
   await input.fill("a");
   await expect(panel.getByRole("status")).not.toContainText("Searching");
-  expect(await panel.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
+  const scroll = panel.locator('[data-slot="search-results-scroll"]');
+  expect(await scroll.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(
     true,
   );
-  await panel.evaluate((el) => {
+  await scroll.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });
   const filters = await panel
     .getByRole("group", { name: "Content type" })
     .boundingBox();
-  expect(filters!.y).toBeGreaterThanOrEqual(bounds.y);
-  expect(filters!.y).toBeLessThan(bounds.y + 50);
+  const scrollBounds = (await scroll.boundingBox())!;
+  expect(filters!.y).toBeGreaterThanOrEqual(scrollBounds.y);
+  expect(filters!.y).toBeLessThan(scrollBounds.y + 50);
   await input.fill("quorum");
   await expect(result).toBeVisible();
   await expect(result.locator("mark")).toContainText(["quorum"]);
