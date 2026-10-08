@@ -89,11 +89,11 @@ export async function exercisePreviousLessons(
   if (new URL(page.url()).searchParams.has("lesson"))
     expect(new URL(page.url()).searchParams.get("lesson")).toBe("first");
   await page.getByRole("button", { name: /^Next lesson/ }).click();
-  await page
+  await continuation
     .getByRole("button", {
       name: hasQuiz
-        ? "Quiz Check your knowledge"
-        : "Finish course Course complete",
+        ? /^Quiz(?: Check your knowledge)?$/
+        : /^Finish course(?: Course complete)?$/,
     })
     .click();
   await expect(

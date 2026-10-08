@@ -34,7 +34,7 @@ import { headers } from "next/headers";
 import { unstable_cache } from "next/cache";
 import { publishedReaderTag } from "./reader-cache";
 import type { Workspace } from "@/lib/store";
-import { updateMatchesAudience } from "@/lib/content-audiences";
+import { updatesForUser } from "@/lib/learning-groups";
 import { reportTeamIds } from "@/lib/types";
 
 export type ReaderItem = Pick<
@@ -158,28 +158,12 @@ export const readerContext = cache(async (destination: string) => {
           (group: { id: string }) => group.id === config.settings.guestGroupId,
         )
       : undefined;
-  const updates = published
-    .filter((item) => item.kind === "brief")
-    .sort((a, b) => {
-      const left = Date.parse(a.feedAt || a.updatedAt || a.createdAt || "");
-      const right = Date.parse(b.feedAt || b.updatedAt || b.createdAt || "");
-      if (Number.isFinite(left) && Number.isFinite(right))
-        return right - left || a.id.localeCompare(b.id);
-      if (Number.isFinite(right)) return 1;
-      if (Number.isFinite(left)) return -1;
-      return a.id.localeCompare(b.id);
-    });
-  const forYou = updates
-    .filter((item) =>
-      updateMatchesAudience(
-        { groups: item.groups || [], updateTeams: item.updateTeams },
-        user || { ...guest, groups: guestGroup ? [guestGroup.id] : [] },
-        groups,
-        config.teams || [],
-      ),
-    )
-    .slice(0, 2);
-  const featuredIds = new Set(forYou.map((item) => item.id));
+  const { forYou, other } = updatesForUser(
+    published,
+    user || { ...guest, groups: guestGroup ? [guestGroup.id] : [] },
+    groups,
+    config.teams || [],
+  );
   const expose = (item: IndexRow): ReaderItem => ({
     id: item.id,
     kind: item.kind,
@@ -206,18 +190,7 @@ export const readerContext = cache(async (destination: string) => {
     docSections: settings.docSections || [],
     settings,
     forYou: forYou.map(expose),
-    otherUpdates: updates
-      .filter((item) => !featuredIds.has(item.id))
-      .map(expose),
-    courseTitles: rows
-      .filter((item) => item.kind === "course" && item.status === "published")
-      .map(({ id, title }) => ({ id, title })),
-    curriculumTitles: (config.curricula || [])
-      .filter((item: { status: string }) => item.status === "published")
-      .map((item: { id: string; name: string }) => ({
-        id: item.id,
-        title: item.name,
-      })),
+    otherUpdates: other.map(expose),
   };
 });
 
@@ -474,7 +447,9 @@ export function readerMetadata(
 
 // Narrow presentation DTO, memoized within the current server request only.
 export const readerShellContext = cache(async (destination: string) => {
-  if (destination === "/team" || destination === "/admin")
+  // Only Docs renders catalog navigation in the shared shell. Each other page
+  // loads its own content after the same fresh access check.
+  if (destination !== "/docs")
     return readerWorkspaceContext(destination);
   const context = await readerContext(destination);
   return {
@@ -483,11 +458,6 @@ export const readerShellContext = cache(async (destination: string) => {
     docs: context.docs,
     docCategoryOrder: context.docCategoryOrder,
     docSections: context.docSections,
-    updateTitles: [...context.forYou, ...context.otherUpdates].map(
-      ({ id, title }) => ({ id, title }),
-    ),
-    courseTitles: context.courseTitles,
-    curriculumTitles: context.curriculumTitles,
   };
 });
 
@@ -497,8 +467,6 @@ export function readerDetailShellContext(
     import("@/lib/reader-types").ReaderShellContext,
     "user" | "branding"
   >,
-  section: "updates" | "courses" | "curricula",
-  item: { id: string; title: string },
 ): import("@/lib/reader-types").ReaderShellContext {
   return {
     user: context.user,
@@ -506,10 +474,5 @@ export function readerDetailShellContext(
     docs: [],
     docCategoryOrder: [],
     docSections: [],
-    ...(section === "updates"
-      ? { updateTitles: [{ id: item.id, title: item.title }] }
-      : section === "courses"
-        ? { courseTitles: [{ id: item.id, title: item.title }] }
-        : { curriculumTitles: [{ id: item.id, title: item.title }] }),
   };
 }

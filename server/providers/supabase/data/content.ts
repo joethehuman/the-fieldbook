@@ -4,7 +4,6 @@ import type {
   DataStore,
   DocumentRecord,
   PublishedAssignmentRecord,
-  WorkspaceDocumentRecord,
   DraftIndexRecord,
   ReaderIndexRecord,
   CourseIndexRecord,
@@ -19,17 +18,14 @@ export const contentData: Pick<
   | "readPublishedCourse"
   | "readPublishedBody"
   | "saveDocument"
-  | "listWorkspaceDocuments"
   | "listDocumentPlacements"
   | "listDraftIndex"
   | "listDraftCourses"
   | "listPublishedAssignmentContent"
   | "listPublishedReaderIndex"
   | "listPublishedCourseIndex"
-  | "listRecentMcpDocuments"
   | "findReadyMedia"
   | "findCurriculumArtwork"
-  | "listReadyMcpMedia"
 > = {
   async findDocument(id) {
     const { data, error } = await db()
@@ -78,25 +74,6 @@ export const contentData: Pick<
       );
     check(error);
     return data as DocumentRecord;
-  },
-  async listWorkspaceDocuments(includeDrafts) {
-    return await readAll<WorkspaceDocumentRecord>((from, to) => {
-      const query = includeDrafts
-        ? db()
-            .from("fb_documents")
-            .select("*", { count: "exact" })
-            .is("deleted_at", null)
-        : db()
-            .from("fb_documents")
-            .select("id,published,revision,published_revision,updated_at", {
-              count: "exact",
-            })
-            .not("published", "is", null);
-      return query
-        .order("id")
-        .range(from, to)
-        .returns<WorkspaceDocumentRecord[]>();
-    });
   },
   async listDocumentPlacements() {
     return await readAll<Pick<DocumentRecord, "id" | "draft" | "published">>(
@@ -180,16 +157,6 @@ export const contentData: Pick<
         .returns<CourseIndexRecord[]>(),
     );
   },
-  async listRecentMcpDocuments() {
-    const { data, error } = await db()
-      .from("fb_documents")
-      .select("*")
-      .is("deleted_at", null)
-      .order("updated_at", { ascending: false })
-      .limit(500);
-    check(error);
-    return (data || []) as DocumentRecord[];
-  },
   async findReadyMedia(ids) {
     const { data, error } = await db()
       .from("fb_media")
@@ -208,21 +175,5 @@ export const contentData: Pick<
     // Preserve governance's generic failure response without exporting an SDK error.
     if (error) throw new Error("Curriculum artwork lookup failed.");
     return (data || []) as { id: string; mime: string }[];
-  },
-  async listReadyMcpMedia() {
-    const { data, error } = await db()
-      .from("fb_media")
-      .select("id,path,filename,mime,bytes")
-      .eq("ready", true)
-      .order("created_at", { ascending: false })
-      .limit(100);
-    check(error);
-    return (data || []) as {
-      id: string;
-      filename: string;
-      mime: string;
-      bytes: number;
-      path: string;
-    }[];
   },
 };

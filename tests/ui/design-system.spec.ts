@@ -79,14 +79,22 @@ test("catalog: keyboard select, tab spacing, dialog stacking and ordering", asyn
   ).toHaveAttribute("aria-selected", "true");
   const order = page.getByRole("tabpanel", { name: "Assigned Courses" });
   await order
-    .getByRole("button", { name: "Move Company essentials down", exact: true })
+    .getByRole("button", {
+      name: "Actions for Company essentials",
+      exact: true,
+    })
     .click();
+  await page.getByRole("menuitem", { name: "Move down", exact: true }).click();
   await expect(order.locator("li").first()).toContainText(
     "Customer conversations",
   );
   await order
-    .getByRole("button", { name: "Move Company essentials up", exact: true })
+    .getByRole("button", {
+      name: "Actions for Company essentials",
+      exact: true,
+    })
     .click();
+  await page.getByRole("menuitem", { name: "Move up", exact: true }).click();
   await expect(order.locator("li").first()).toContainText("Company essentials");
   const trigger = page.getByRole("button", { name: "Edit example group" });
   await trigger.click();
@@ -193,7 +201,7 @@ test("learning groups: shared controls, save and reload", async ({
     page.getByRole("heading", { name: "Sales design test", exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Group settings", exact: true })
+    .getByRole("button", { name: "Actions for Sales design test", exact: true })
     .click();
   await page
     .getByRole("menuitem", { name: "Rename group", exact: true })
@@ -475,15 +483,22 @@ test("curriculum builder uses shared fields and preserves saved sequence", async
   await picker.getByRole("checkbox", { name: /Know the platform/ }).check();
   await picker.getByRole("button", { name: /^Add courses 2$/ }).click();
   await page
-    .getByRole("button", { name: "Move Know the platform up", exact: true })
+    .getByRole("button", { name: "Actions for Know the platform", exact: true })
     .click();
+  await page.getByRole("menuitem", { name: "Move up", exact: true }).click();
   await page.getByRole("combobox", { name: "Status", exact: true }).click();
   await page.getByRole("option", { name: "Published", exact: true }).click();
   await page
     .getByRole("button", { name: "Save curriculum", exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Edit Onboarding design test", exact: true })
+    .getByRole("button", {
+      name: "Actions for Onboarding design test",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Edit curriculum", exact: true })
     .click();
   await expect(page.locator(".learning-order li").first()).toContainText(
     "Know the platform",
@@ -543,10 +558,22 @@ test("manager reporting uses shared filters and scoped people", async ({
   await expect(
     page.getByRole("combobox", { name: "Search teams or people", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("cell", { name: /Alex Edwards/ })).toBeVisible();
-  const personCell = page.getByRole("cell", { name: /Alex Edwards/ });
-  const nameBox = await personCell.locator("strong").boundingBox();
-  const emailBox = await personCell.locator("small").boundingBox();
+  await expect(
+    page.getByRole("cell", {
+      name: "Alex Edwards alex@example.com",
+      exact: true,
+    }),
+  ).toBeVisible();
+  const personCell = page.getByRole("cell", {
+    name: "Alex Edwards alex@example.com",
+    exact: true,
+  });
+  const nameBox = await personCell
+    .getByRole("button", { name: "Alex Edwards", exact: true })
+    .boundingBox();
+  const emailBox = await personCell
+    .getByText("alex@example.com", { exact: true })
+    .boundingBox();
   expect(emailBox!.y).toBeGreaterThanOrEqual(nameBox!.y + nameBox!.height);
 
   await expect(page.getByRole("cell", { name: /Oliver Anderson/ })).toHaveCount(
@@ -700,7 +727,7 @@ test("admin composition keeps headings, navigation and reorder actions aligned",
   ).toHaveText(firstText);
 });
 
-test("report columns stay fixed across teams, long values and empty results", async ({
+test("report columns stay aligned and bounded across teams, long values and empty results", async ({
   page,
 }, testInfo) => {
   await admin(page);
@@ -724,7 +751,7 @@ test("report columns stay fixed across teams, long values and empty results", as
       name: "Alexandria Example with a deliberately long family name",
       email: "alexandria.long.example@synthetic.example",
       role: "learner",
-      groups: ["sales"],
+      groups: [data.groups[0].id],
       teamId: "long-team",
       active: true,
     });
@@ -733,20 +760,15 @@ test("report columns stay fixed across teams, long values and empty results", as
   await page.reload();
   await adminSection(page, "Progress");
   const table = page.locator("table[data-layout=progressPeople]");
-  const measure = () =>
-    table.getByRole("columnheader").evaluateAll((nodes) =>
-      nodes.map((n) => {
-        const b = n.getBoundingClientRect();
-        return { x: b.x, width: b.width };
-      }),
-    );
-  const baseline = await measure();
+  const headings = table.getByRole("columnheader");
+  await expect(headings).toHaveCount(6);
+  const labels = await headings.allTextContents();
   const picker = page.getByRole("combobox", {
     name: "Search teams or people",
     exact: true,
   });
   for (const team of [
-    "Sales team",
+    "Sales",
     "Customer success and strategic account development",
     "Empty team",
     "Organization",
@@ -756,10 +778,52 @@ test("report columns stay fixed across teams, long values and empty results", as
       .getByRole("group", { name: "Teams", exact: true })
       .getByRole("option", { name: new RegExp(`^${team} —`) })
       .click();
-    const columns = await measure();
-    columns.forEach((column, i) => {
-      expect(Math.abs(column.x - baseline[i].x)).toBeLessThan(1);
-      expect(Math.abs(column.width - baseline[i].width)).toBeLessThan(1);
+    await expect(headings).toHaveText(labels);
+    // Shared tables size columns to their content; every row must still align
+    // with the headers, wrap within the shared measures, and keep actions visible.
+    const geometry = await table.evaluate((node) => {
+      const headers = Array.from(
+        node.querySelectorAll("thead th:not([aria-hidden])"),
+      ).map((cell) => cell.getBoundingClientRect());
+      return Array.from(node.querySelectorAll("tbody tr")).map((row) =>
+        Array.from(row.querySelectorAll("td:not([aria-hidden])")).map(
+          (cell, i) => {
+            const rect = cell.getBoundingClientRect();
+            const content = cell.querySelector<HTMLElement>(
+              '[data-slot="table-cell-content"]',
+            )!;
+            const max = Number.parseFloat(getComputedStyle(content).maxWidth);
+            return {
+              aligned:
+                Math.abs(rect.x - headers[i].x) < 1 &&
+                Math.abs(rect.width - headers[i].width) < 1,
+              bounded:
+                !Number.isFinite(max) ||
+                content.getBoundingClientRect().width <= max + 1,
+              overflow: content.scrollWidth - content.clientWidth,
+            };
+          },
+        ),
+      );
+    });
+    for (const row of geometry)
+      for (const cell of row) {
+        expect(cell.aligned).toBe(true);
+        expect(cell.bounded).toBe(true);
+        expect(cell.overflow).toBeLessThanOrEqual(1);
+      }
+    const actions = table.locator("thead th").last();
+    const beforeScroll = await actions.boundingBox();
+    await table.evaluate((node) => {
+      node.parentElement!.scrollLeft = node.parentElement!.scrollWidth;
+    });
+    const afterScroll = await actions.boundingBox();
+    expect(Math.abs(afterScroll!.x - beforeScroll!.x)).toBeLessThan(1);
+    expect(afterScroll!.x + afterScroll!.width).toBeLessThanOrEqual(
+      page.viewportSize()!.width,
+    );
+    await table.evaluate((node) => {
+      node.parentElement!.scrollLeft = 0;
     });
     if (team === "Empty team")
       await expect(table.locator("tbody tr")).toHaveCount(0);
@@ -800,7 +864,23 @@ test("update footers and saved feedback keep text and actions separated", async 
   await feedback
     .getByRole("button", { name: "Did you find this useful?", exact: true })
     .click();
-  await expect(form.getByRole("textbox")).toHaveValue("The example was clear.");
+  // Feedback submissions are append-only; reopening starts a new response.
+  await expect(form.getByRole("textbox")).toHaveValue("");
+  expect(
+    await page.evaluate(
+      () =>
+        JSON.parse(localStorage.getItem("fieldbook.workspace.v1") || "{}")
+          .feedback,
+    ),
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        userId: "demo-learner",
+        rating: "up",
+        comment: "The example was clear.",
+      }),
+    ]),
+  );
   await noOverflow(page);
   await snapshotReview(page, testInfo, "feedback-composition");
 });
@@ -967,8 +1047,9 @@ test("hire-date guidance labels the date and stage is derived", async ({
   await page
     .getByRole("row")
     .filter({ hasText: "Alex Edwards" })
-    .getByRole("button", { name: "Edit", exact: true })
+    .getByRole("button", { name: "Actions for Alex Edwards", exact: true })
     .click();
+  await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
   const dialog = page.getByRole("dialog");
   const date = dialog.getByLabel("Hire date", { exact: true });
   await expect(date).toHaveAccessibleDescription(
@@ -1015,4 +1096,21 @@ test("feedback remains usable with enlarged text and branded selection under dar
   await snapshotReview(page, info, "feedback-enlarged");
   await form.getByRole("button", { name: "Send", exact: true }).click();
   await expect(form).toBeHidden();
+});
+
+
+test("catalog hierarchy still adapts to viewport height", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "Exercise the desktop chart at two viewport heights.");
+  await page.goto("/ui#catalog-hierarchy");
+  const frame = page.locator('#catalog-hierarchy [data-slot="hierarchy-viewport"]');
+  await expect(frame).toBeVisible();
+  await frame.scrollIntoViewIfNeeded();
+  const height = () => frame.evaluate((node) => node.getBoundingClientRect().height);
+  const initialHeight = await height();
+  await page.setViewportSize({ width: 1440, height: 700 });
+  await expect.poll(height).toBeLessThan(initialHeight);
+  await expect(frame.locator('[data-slot="hierarchy-column"]').first()).toBeVisible();
+  await noOverflow(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await expect.poll(height).toBeGreaterThan(initialHeight - 1);
 });

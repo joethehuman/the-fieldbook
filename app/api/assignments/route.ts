@@ -7,6 +7,7 @@ import {
   errorResponse,
 } from "@server/auth";
 import { data as dataStore } from "@server/data";
+import { invalidatePublishedReader } from "@server/reader-cache";
 const schema = z
   .object({
     operation: z.enum([
@@ -72,6 +73,8 @@ export async function POST(req: Request) {
       ...parsed.data,
       due: { type: "none" },
     });
+    if (["target", "untarget"].includes(parsed.data.operation))
+      invalidatePublishedReader();
     return Response.json(data, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     return errorResponse(e, "api/assignments");

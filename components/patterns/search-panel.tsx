@@ -11,6 +11,7 @@ export function SearchPanel({
   trigger,
   children,
   returnFocus,
+  persistentContent,
 }: {
   id: string;
   open: boolean;
@@ -18,6 +19,8 @@ export function SearchPanel({
   onDismiss: () => void;
   trigger: ReactNode;
   children: ReactNode;
+  /** Session owners that must survive panel dismissal; may portal into the panel. */
+  persistentContent?: ReactNode;
   returnFocus?: RefObject<HTMLElement | null>;
 }) {
   const root = useRef<HTMLDivElement>(null);
@@ -52,6 +55,7 @@ export function SearchPanel({
       }}
     >
       {trigger}
+      {persistentContent}
       {open && (
         <Card
           id={id}

@@ -143,9 +143,9 @@ test("private deep link goes directly to branded sign-in and survives synthetic 
       (c) => c.name === "fieldbook-sign-in-return",
     )?.value,
   ).toContain("guide");
-  const workspace = await request.get("/api/workspace");
-  expect(workspace.status()).toBe(401);
-  expect(await workspace.json()).not.toHaveProperty("requestId");
+  const content = await request.get("/api/content?id=guide");
+  expect(content.status()).toBe(401);
+  expect(await content.json()).toMatchObject({ error: "Sign in to view this Fieldbook." });
   expect((await request.get(`/api/media/${file}`)).status()).toBe(401);
   await expect(page.locator(".logo")).toHaveText("Acme Learning");
   await expect(page.locator(".logo img, .logo svg")).toHaveCount(0);
@@ -750,7 +750,7 @@ test("public guest can send general feedback through the account menu", async ({
   await dialog.getByRole("button", { name: "Send" }).click();
   await expect(dialog).toHaveCount(0);
   await login(page);
-  const workspace = await (await page.request.get("/api/workspace")).json();
+  const workspace = await (await page.request.get("/api/admin/snapshot?scope=feedback")).json();
   expect(workspace.data.feedback).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ userId: "guest", comment: "Guest feedback" }),

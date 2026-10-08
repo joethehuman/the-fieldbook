@@ -20,6 +20,7 @@ export function FormField({
   label,
   description,
   error,
+  errorKey,
   errorPlaceholder,
   visuallyHiddenLabel = false,
   children,
@@ -29,6 +30,8 @@ export function FormField({
   label: ReactNode;
   description?: ReactNode;
   error?: ReactNode;
+  /** Change for a new validation attempt that can repeat a dismissed message. */
+  errorKey?: string | number;
   /** Reserve wrapping space for anticipated validation without announcing it. */
   errorPlaceholder?: ReactNode;
   visuallyHiddenLabel?: boolean;
@@ -68,6 +71,7 @@ export function FormField({
       )}
       {(error || errorPlaceholder) && (
         <FieldError
+          dismissKey={errorKey}
           id={error ? `${id}-error` : undefined}
           aria-hidden={error ? undefined : true}
           className={!error ? "invisible" : undefined}

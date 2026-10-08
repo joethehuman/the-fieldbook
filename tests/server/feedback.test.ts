@@ -34,7 +34,7 @@ test("feedback deletion requires an active administrator and bounded valid targe
   }
 });
 
-test("feedback retries are limited to their author and content; legacy uniqueness supports staged deployment", async () => {
+test("feedback retries update only the same submission, author and content", async () => {
   const previous = { ...process.env },
     original = globalThis.fetch;
   Object.assign(process.env, {
@@ -54,8 +54,7 @@ test("feedback retries are limited to their author and content; legacy uniquenes
     comment: "Comment",
     updated_at: "2026-10-07T00:00:00Z",
   };
-  let conflict = "fb_feedback_pkey",
-    available = true;
+  let available = true;
   const requests: { url: URL; method: string; body: any }[] = [];
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
@@ -68,7 +67,8 @@ test("feedback retries are limited to their author and content; legacy uniquenes
       return Response.json(
         {
           code: "23505",
-          message: `duplicate key violates unique constraint "${conflict}"`,
+          message:
+            'duplicate key violates unique constraint "fb_feedback_pkey"',
         },
         { status: 409 },
       );
@@ -97,12 +97,29 @@ test("feedback retries are limited to their author and content; legacy uniquenes
       `eq.${"a".repeat(64)}`,
     );
     available = true;
-    conflict = "fb_feedback_user_id_content_id_key";
     assert.equal(
-      await feedbackData.saveFeedback(record, { userId: "member" }),
+      await feedbackData.saveFeedback(record, { guestKey: "a".repeat(64) }),
       id,
     );
-    assert.equal(requests.at(-1)!.url.searchParams.has("id"), false);
+    assert.equal(requests.at(-1)!.url.searchParams.get("id"), `eq.${id}`);
+    assert.equal(
+      requests.at(-1)!.url.searchParams.get("guest_key"),
+      `eq.${"a".repeat(64)}`,
+    );
+    assert.equal(
+      requests.at(-1)!.url.searchParams.get("content_id"),
+      `eq.${record.content_id}`,
+    );
+    await feedbackData.saveFeedback(
+      { ...record, content_id: null },
+      { userId: "member" },
+    );
+    assert.equal(requests.at(-1)!.url.searchParams.get("id"), `eq.${id}`);
+    assert.equal(requests.at(-1)!.url.searchParams.get("user_id"), "eq.member");
+    assert.equal(
+      requests.at(-1)!.url.searchParams.get("content_id"),
+      "is.null",
+    );
   } finally {
     globalThis.fetch = original;
     for (const key of Object.keys(process.env))

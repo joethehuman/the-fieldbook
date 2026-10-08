@@ -6,7 +6,6 @@ import { ReaderCurriculum } from "@/components/reader/ReaderCurriculum";
 import {
   readerCurriculum,
   readerWorkspaceContext,
-  readerDetailShellContext,
 } from "@server/reader";
 
 type Props = {
@@ -37,11 +36,7 @@ export default async function Page({ params, searchParams }: Props) {
       />
       <WorkspacePage
         section="/curricula"
-        context={readerDetailShellContext(
-          await readerWorkspaceContext("/courses"),
-          "curricula",
-          { id: curriculum.id, title: curriculum.name },
-        )}
+        context={await readerWorkspaceContext("/courses")}
       >
         <ReaderCurriculum curriculum={curriculum} data={data} from={from} />
       </WorkspacePage>

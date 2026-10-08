@@ -17,16 +17,17 @@ export function ReadingOutline({
     const scrollport = ref.current?.closest<HTMLElement>(".main-content");
     if (!scrollport) return;
     let frame = 0;
-    const targets = headings
-      .map((h) => document.getElementById(h.id))
-      .filter((el): el is HTMLElement => !!el);
     const update = () => {
       frame = 0;
+      // Markdown can replace heading elements while their IDs stay the same.
+      const targets = headings
+        .map((h) => document.getElementById(h.id))
+        .filter((el): el is HTMLElement => !!el);
       const viewport = scrollport.getBoundingClientRect();
       const offset = Math.max(
         viewport.height * 0.25,
         (targets[0]
-          ? parseFloat(getComputedStyle(targets[0]).scrollMarginTop)
+          ? parseFloat(getComputedStyle(targets[0]).scrollMarginTop) || 0
           : 0) +
           (parseFloat(getComputedStyle(scrollport).scrollPaddingTop) || 0) +
           2,

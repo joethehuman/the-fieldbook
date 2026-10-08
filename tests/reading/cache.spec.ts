@@ -90,3 +90,89 @@ test("published reader data is reused, then expired after publish and unpublish"
   expect(unpublish.status()).toBe(200);
   expect((await request.get(path)).status()).toBe(404);
 });
+
+for (const operation of ["target", "untarget"] as const) {
+  test(`Update ${operation} expires a warm reader cache only after a successful save`, async ({
+    page,
+    request,
+    baseURL,
+  }) => {
+    const groupId = "reader-cache-audience";
+    const update = {
+      ...doc,
+      kind: "brief",
+      title: "Audience cache update",
+      groups: operation === "untarget" ? [groupId] : [],
+    };
+    await request.post(`${backend}/fixture`, {
+      data: {
+        settings: { access: "public", logoUrl: "", guestGroupId: groupId },
+        groups: [{ id: groupId, name: "Readers" }],
+        userGroups: [groupId],
+        documents: [
+          {
+            id,
+            draft: update,
+            published: update,
+            revision: 2,
+            published_revision: 1,
+          },
+        ],
+      },
+    });
+    const warm = await request.get("/updates");
+    expect(warm.status()).toBe(200);
+    expect(await warm.text()).toContain(update.title);
+    const reads = async () =>
+      (await (await request.get(`${backend}/reads`)).json()).reads;
+    const initialReads = await reads();
+    expect(initialReads).toBeGreaterThan(0);
+    await request.get("/updates");
+    expect(await reads()).toBe(initialReads);
+
+    const token = await (
+      await request.post(`${backend}/auth/v1/token`, { data: {} })
+    ).json();
+    await page.context().addCookies([
+      {
+        name: "sb-test-auth-token",
+        value:
+          "base64-" +
+          Buffer.from(
+            JSON.stringify({
+              ...token,
+              expires_at: Math.floor(Date.now() / 1000) + 3600,
+            }),
+          ).toString("base64url"),
+        domain: "localhost",
+        path: "/",
+      },
+    ]);
+    const change = (expected: number) =>
+      page.request.post("/api/assignments", {
+        headers: { origin: baseURL! },
+        data: { operation, contentId: id, groupId, expected },
+      });
+    expect((await change(1)).status()).toBe(409);
+    await request.get("/updates");
+    expect(await reads()).toBe(initialReads);
+    expect((await change(2)).status()).toBe(200);
+
+    // A fresh navigation must use the new audience immediately, without a
+    // changed governance cache key or the five-minute cache expiry.
+    await page.goto("/updates");
+    await expect(
+      page.getByRole("heading", { name: "For you", exact: true }),
+    ).toHaveCount(operation === "target" ? 1 : 0);
+    const section = page.locator("section.updates-section").filter({
+      has: page.getByRole("heading", {
+        name: operation === "target" ? "For you" : "All updates",
+        exact: true,
+      }),
+    });
+    await expect(
+      section.getByRole("heading", { name: update.title, exact: true }),
+    ).toBeVisible();
+    expect(await reads()).toBeGreaterThan(initialReads);
+  });
+}

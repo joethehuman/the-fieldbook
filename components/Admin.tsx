@@ -25,7 +25,7 @@ import {
 import { WritingTitle } from "./patterns/writing-title";
 import { useEditorLayout } from "./patterns/use-editor-layout";
 import { useCollapseDesktopSidebar } from "./patterns/desktop-sidebar-state";
-import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
+import { createLessonImageAltValidator } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
 import type { PublicationOptions } from "@/lib/content-publication";
 import { contentSignature, hasUnpublishedEdits } from "@/lib/demo-publication";
@@ -288,9 +288,7 @@ type Props = {
   onDeleteFeedback?: (ids: string[]) => Promise<void>;
   onOpenTab?: (tab: string) => Promise<void>;
   onPrepareAssignments?: () => Promise<Workspace>;
-  onOpenPersonProgress?: (id: string) => Promise<void>;
-  onEdit?: (id: string) => Promise<Content>;
-  onSaveContent?: (content: Content, intent: SaveIntent, options?: PublicationOptions) => Promise<Content>;
+  onSaveContent: (content: Content, intent: SaveIntent, options?: PublicationOptions) => Promise<Content>;
   onUnpublish?: (id: string) => Promise<void>;
   onChange: (
     d: Workspace,
@@ -383,8 +381,6 @@ export default function Admin({
   onDeleteFeedback,
   onOpenTab,
   onPrepareAssignments,
-  onOpenPersonProgress,
-  onEdit,
   onSaveContent,
   onUnpublish,
   onChange: persist,
@@ -966,34 +962,9 @@ export default function Admin({
     }
   }
   async function save(c: Content, intent: SaveIntent = "draft", options?: PublicationOptions) {
-    if (onSaveContent) {
-      const saved = await onSaveContent(c, intent, options);
-      await savedDestination(saved);
-      return saved;
-    }
-    const old = data.content.find((x) => x.id === c.id);
-    const updated = {
-      ...c,
-      createdAt:
-        old?.createdAt ||
-        old?.updatedAt ||
-        c.createdAt ||
-        new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    await onChange({
-      ...data,
-      content: old
-        ? data.content.map((x) => (x.id === c.id ? updated : x))
-        : [...data.content, updated],
-    });
-
-    await savedDestination(updated);
-    setNotice("");
-    // The server may normalize the draft while saving. Keep the editor's
-    // baseline on the persisted revision so a second publish is not treated
-    // as a concurrent edit.
-    return production && onEdit ? await onEdit(c.id) : updated;
+    const saved = await onSaveContent(c, intent, options);
+    await savedDestination(saved);
+    return saved;
   }
   async function savePerson(e: React.FormEvent) {
     e.preventDefault();
@@ -1897,12 +1868,14 @@ export default function Admin({
                                     onSelect: async () => {
                                       setOpeningItem(u.id);
                                       try {
-                                        await navigateDestination({
+                                        const opened = await navigateDestination({
                                           tab: "people",
                                           id: u.id,
                                         });
-                                        setNotice("");
-                                        adminPanel.reveal();
+                                        if (opened) {
+                                          setNotice("");
+                                          adminPanel.reveal();
+                                        }
                                       } catch (error) {
                                         setNotice((error as Error).message);
                                       } finally {
@@ -2171,6 +2144,7 @@ export function Editor({
     [uploadCount, setUploadCount] = useState(0);
   const { confirm } = useInteractionDialog();
   const baseline = useRef(c);
+  const [validateLessonImages] = useState(() => createLessonImageAltValidator());
   const original = useRef(content);
   const pendingUploads = useRef(0);
   const savingNow = useRef(false);
@@ -2498,6 +2472,7 @@ export function Editor({
     target?: "title" | "body";
   };
   const requirements: Requirement[] = [];
+  const lessonsMissingImageAlt = validateLessonImages(c.kind === "course" ? c.lessons : []);
   if (!c.title.trim())
     requirements.push({
       id: "title",
@@ -2572,7 +2547,7 @@ export function Editor({
           message: `${label}: use a supported HTTPS video URL`,
           step: lesson.id,
         });
-      if (hasMissingImageAlt(lesson.body))
+      if (lessonsMissingImageAlt.has(lesson.id))
         requirements.push({
           id: `${lesson.id}-alt`,
           message: `${label}: add image alternative text`,

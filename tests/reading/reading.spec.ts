@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import type { Content } from "../../lib/types";
+import { contentPath } from "../../lib/navigation";
 import { courseSidebarGap, expectDesktopOutlineMinimum, expectContentSizedCourseSidebar, exercisePreviousLessons } from "../fixtures/course-layout";
 import { expectShortLessonFits, exerciseImageViewer, readerImageAlt, readerImageUrl, serveReaderImage } from "../fixtures/reader-layout";
 const backend = "http://127.0.0.1:3130";
@@ -211,7 +212,7 @@ test("authored hyperlinks follow article and course tab rules", async ({
   const popup = page.waitForEvent("popup");
   await reference.click();
   const opened = await popup;
-  await expect(opened).toHaveURL(new RegExp(`/docs/${ids[0]}$`));
+  await expect(opened).toHaveURL(`http://localhost:3131${contentPath("doc", ids[0], items[0].title)}`);
   await expect(page).toHaveURL(original);
   await opened.close();
 });
@@ -237,7 +238,7 @@ test("reader feedback, next navigation and long Docs menu align visibly", async 
   const next = page.locator('.document-pagination [data-direction="next"]');
   await expect(next).toHaveCSS("text-align", "right");
   await expect(next).toHaveCSS("justify-content", "flex-end");
-  const article = await page.locator("article").boundingBox();
+  const article = await page.locator("article .article").boundingBox();
   const previousBox = await previous.boundingBox();
   const nextBox = await next.boundingBox();
   expect(Math.abs(previousBox!.x - article!.x)).toBeLessThan(2);
@@ -264,7 +265,7 @@ test("reader feedback, next navigation and long Docs menu align visibly", async 
   await expect(tree).toHaveAttribute("data-scroll-fade-before", "true");
   await expect(tree).toHaveAttribute("data-scroll-fade-after", "false");
   await page.setViewportSize({ width: 390, height: 844 });
-  const narrowArticle = await page.locator("article").boundingBox();
+  const narrowArticle = await page.locator("article .article").boundingBox();
   const narrowPrevious = await previous.boundingBox();
   const narrowNext = await next.boundingBox();
   expect(Math.abs(narrowPrevious!.x - narrowArticle!.x)).toBeLessThan(2);
@@ -350,7 +351,7 @@ test("guest team report stays empty without a workspace or catalog read", async 
   });
   await page.goto("/team");
   await expect(
-    page.getByText("Reporting requires an administrator or manager account."),
+    page.getByRole("main").getByText("Reporting requires an administrator or manager account."),
   ).toBeVisible();
   expect(workspaceReads).toBe(0);
   await fixture(request, { settings: { access: "private" } });
@@ -452,7 +453,10 @@ test("published curriculum opens in the reader shell with guest progress and no 
   await expect(
     page.getByText("In progress", { exact: true }).first(),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /Published course title/ })).toHaveAttribute("href", new RegExp(`/courses/${ids[2]}\\?curriculum=intro`));
+  const courseHref = await page.getByRole("link", { name: /Published course title/ }).getAttribute("href");
+  const destination = new URL(courseHref!, page.url());
+  expect(destination.pathname).toBe(contentPath("course", ids[2], items[2].title));
+  expect(destination.searchParams.get("curriculum")).toBe("intro");
   await page.screenshot({ path: testInfo.outputPath("curriculum-shell.png") });
   await page.getByRole("link", { name: "Back to courses" }).click();
   await expect(page).toHaveURL(/\/courses$/);
@@ -489,7 +493,7 @@ for (const signedIn of [false, true]) {
       userGroups: signedIn ? ["child"] : [],
       documents: documents([
         { ...items[0], groups: [] },
-        { ...items[1], groups: ["parent"] },
+        { ...items[1], groups: ["child"] },
         items[2],
         secondDoc,
         secondUpdate,
@@ -548,7 +552,7 @@ for (const signedIn of [false, true]) {
       expect(html).not.toContain('"parent"');
     }
     await page.evaluate(() => ((window as any).__readerMarker = "kept"));
-    await page.locator(`a.brief-card[href="/updates/${ids[1]}"]`).click();
+    await page.locator(`a.brief-card[href="${contentPath("brief", ids[1], items[1].title)}"]`).click();
     await expect(
       page.getByRole("heading", { name: items[1].title }),
     ).toBeVisible();
@@ -579,7 +583,7 @@ for (const signedIn of [false, true]) {
       await expect(page.locator(".sidebar")).toHaveClass(/open/);
       await page
         .getByRole("navigation", { name: "Documents", exact: true })
-        .locator(`a[href="/docs/${ids[0]}"]`)
+        .getByRole("link", { name: items[0].title, exact: true })
         .click();
       await expect(page.locator(".sidebar")).not.toHaveClass(/open/);
     }
@@ -588,7 +592,7 @@ for (const signedIn of [false, true]) {
     ).toBeVisible();
     const narrow = (page.viewportSize()?.width || 0) < 768;
     await expect(page).toHaveURL(
-      narrow ? new RegExp(`/docs/${ids[0]}$`) : /\/docs$/,
+      narrow ? `http://localhost:3131${contentPath("doc", ids[0], items[0].title)}` : /\/docs$/,
     );
     await page.goBack();
     if (narrow) {
@@ -623,6 +627,8 @@ for (const signedIn of [false, true]) {
         },
       }),
     );
+    const openSearch = page.getByRole("button", { name: "Open search", exact: true });
+    if (await openSearch.isVisible()) await openSearch.click();
     await page
       .getByRole("textbox", { name: "Search all content" })
       .fill("another");
@@ -690,7 +696,7 @@ test("Courses home splits its progress card on iPad in the installed app", async
         ),
     );
     const summaryBox = await summary.boundingBox();
-    const rowBox = await row.boundingBox();
+    const rowBox = await row.locator(".course-card").first().boundingBox();
     const ring = summary.locator('[data-slot="progress-ring"]');
     const ringBox = await ring.boundingBox();
     const graphicBox = await ring.locator("svg").boundingBox();
@@ -784,7 +790,7 @@ test("Courses share reader navigation and show the signed-in account immediately
   expect(await page.content()).toContain("Synthetic Admin");
   expect(await page.content()).not.toContain("SECRET DRAFT BODY");
   await page.evaluate(() => ((window as any).__readerMarker = "kept"));
-  await page.locator(`a.course-card[href^="/courses/${ids[2]}"]`).click();
+  await page.locator(`a.course-card[href^="${contentPath("course", ids[2], items[2].title)}"]`).click();
   await expect(
     page.getByRole("heading", { name: items[2].title }),
   ).toBeVisible();
@@ -914,7 +920,7 @@ test("client navigation rechecks publication, item type and installation access"
     const coldRequest = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const target = `**/docs/${coldDoc.id}**`;
+    const target = `**${contentPath("doc", coldDoc.id, coldDoc.title)}**`;
     // Keep this a cold request even if intent/neighbor prefetch begins before the change.
     await page.route(target, async (route) => {
       await coldRequest;
@@ -923,7 +929,7 @@ test("client navigation rechecks publication, item type and installation access"
     await page.goto("/docs");
     const link = page
       .getByRole("navigation", { name: "Documents", exact: true })
-      .locator(`a[href="/docs/${coldDoc.id}"]`);
+      .getByRole("link", { name: coldDoc.title, exact: true });
     if (change === "private")
       await fixture(request, { settings: { access: "private", logoUrl: "" } });
     else if (change === "deleted")
@@ -956,7 +962,7 @@ test("client navigation rechecks publication, item type and installation access"
     await page.unroute(target);
   }
 });
-test("server HTML, metadata, redaction and a compact index plus one body read", async ({
+test("server HTML, metadata, redaction and one body read plus the Docs index", async ({
   request,
 }) => {
   for (const [index, section] of ["docs", "updates", "courses"].entries()) {
@@ -985,7 +991,7 @@ test("server HTML, metadata, redaction and a compact index plus one body read", 
     expect(html).not.toContain("Synthetic Admin");
     expect(html).not.toMatch(/\\"answer\\":/);
     expect((await (await request.get(`${backend}/reads`)).json()).reads).toBe(
-      2,
+      section === "docs" ? 2 : 1,
     );
   }
 });
@@ -1061,7 +1067,7 @@ test("feedback lookup checks guest access and publication without loading worksp
   ).toBe(401);
   await context.close();
 });
-test("guest feedback persists in its browser and reaches administrator reports", async ({
+test("guest feedback saves immediately and reaches administrator reports", async ({
   browser,
   page,
   request,
@@ -1084,12 +1090,14 @@ test("guest feedback persists in its browser and reaches administrator reports",
   );
   await region.getByRole("button", { name: "Useful", exact: true }).click();
   expect((await saved).status()).toBe(200);
-  await page.reload();
+  await expect(region.getByRole("status")).toHaveText(
+    "Rating saved. You can add an optional comment.",
+  );
   await expect(
-    page
-      .getByRole("region", { name: "Content feedback" })
+    page.getByRole("form", { name: "Did you find this useful?" })
       .getByRole("button", { name: "Useful", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.reload();
   const token = await (
     await request.post(`${backend}/auth/v1/token`, { data: {} })
   ).json();
@@ -1114,7 +1122,7 @@ test("guest feedback persists in its browser and reaches administrator reports",
     data: { contentId: ids[1], rating: "down", comment: "Account response" },
   });
   expect(memberSave.status()).toBe(200);
-  const workspace = await (await admin.request.get("/api/workspace")).json();
+  const workspace = await (await admin.request.get("/api/admin/snapshot?scope=feedback")).json();
   expect(workspace.data.feedback).toEqual(
     expect.arrayContaining([
       expect.objectContaining({ userId: "guest", rating: "up" }),
@@ -1216,7 +1224,7 @@ test("reading without JavaScript, responsive layout and native sidebar links", a
   await expect(page.getByText(items[2].lessons[0].body, { exact: true })).toBeVisible();
   const lessonHref = await page.getByRole("link", { name: /Second lesson/ }).getAttribute("href");
   const lessonDestination = new URL(lessonHref!, baseURL);
-  expect(lessonDestination.pathname).toBe(`/courses/${ids[2]}`);
+  expect(lessonDestination.pathname).toBe(contentPath("course", ids[2], items[2].title));
   expect(lessonDestination.searchParams.get("lesson")).toBe("second");
   expect(lessonDestination.searchParams.get("from")).toBe("/courses");
   await page.screenshot({
@@ -1301,7 +1309,7 @@ test("private verified sessions refresh and do not contaminate anonymous respons
         path: "/",
       },
     ]);
-    const response = await context.request.get(`/docs/${ids[0]}`);
+    const response = await context.request.get(contentPath("doc", ids[0], items[0].title));
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html).toContain(items[0].title);
@@ -1528,9 +1536,9 @@ test("signed-in lessons keep the reader shell and persist server-graded progress
     if (entry.isNavigationRequest()) documentNavigations++;
     if (entry.url().includes("/api/workspace")) workspaceReads++;
   });
-  await page.goto(`/courses/${ids[2]}`);
+  await page.goto(contentPath("course", ids[2], items[2].title));
   await page.getByRole("link", { name: /First lesson/ }).click();
-  expect(new URL(page.url()).pathname).toBe(`/courses/${ids[2]}`);
+  expect(new URL(page.url()).pathname).toBe(contentPath("course", ids[2], items[2].title));
   expect(new URL(page.url()).searchParams.get("lesson")).toBe("first");
   expect(new URL(page.url()).searchParams.get("from")).toBe("/courses");
   await page.getByRole("button", { name: "Next lesson" }).click();
@@ -1586,7 +1594,14 @@ test("canonical detail routes, curriculum destinations and name-only metadata", 
     expect(html).not.toContain("/api/branding/logo");
     expect(html).not.toContain("SECRET POLICY DRAFT");
     if (index === 2) {
-      expect(html).toContain(`?lesson=first`);
+      const lessonLinks = [...html.matchAll(/href="([^"]+)"/g)]
+        .map((match) => new URL(match[1].replaceAll("&amp;", "&"), response.url()))
+        .filter((url) => url.searchParams.get("lesson") === "first");
+      expect(lessonLinks.length).toBeGreaterThan(0);
+      expect(lessonLinks.some((url) =>
+        url.pathname === contentPath("course", ids[2], items[2].title) &&
+        !url.searchParams.has("curriculum"),
+      )).toBe(true);
       expect(html).toContain('href="/courses"');
     }
   }

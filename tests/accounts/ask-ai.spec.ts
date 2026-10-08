@@ -54,6 +54,13 @@ function stream(
       .join("") + "data: [DONE]\n\n"
   );
 }
+async function openSearch(page: Page) {
+  const input = page.getByRole("textbox", { name: "Search all content" });
+  const trigger = page.getByRole("button", { name: "Open search", exact: true });
+  await expect.poll(async () => await input.isVisible() || await trigger.isVisible()).toBe(true);
+  if (await trigger.isVisible()) await trigger.click();
+  else await input.click();
+}
 async function fixture(
   page: Page,
   request: APIRequestContext,
@@ -126,6 +133,7 @@ async function fixture(
     ]);
   }
   await page.goto("/courses");
+  await openSearch(page);
 }
 test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset", async ({
   page,
@@ -324,8 +332,10 @@ test("citations use consecutive clickable numbers, compact titles and safe desti
   await toggle.press("Enter");
   await refs.first().focus();
   await refs.first().press("Enter");
-  await expect(page).toHaveURL(new RegExp(`/docs/${docId}`));
-  await input.click();
+  await expect(page).toHaveURL(
+    `http://localhost:3131${contentPath("doc", docId, "Published reference")}`,
+  );
+  await openSearch(page);
   await expect(refs).toHaveCount(5);
   expect(
     await page.evaluate(
@@ -334,7 +344,7 @@ test("citations use consecutive clickable numbers, compact titles and safe desti
   ).toBe(true);
 });
 
-test("uncited replies finish quietly and clearing Search closes the panel until typing resumes", async ({
+test("uncited replies finish quietly and clearing Search preserves its responsive panel behavior", async ({
   page,
   request,
 }, info) => {
@@ -347,10 +357,11 @@ test("uncited replies finish quietly and clearing Search closes the panel until 
   );
   const input = page.getByRole("textbox", { name: "Search all content" });
   const panel = page.locator('[data-slot="search-panel"]');
+  const emptyPanelCount = info.project.name === "phone" ? 1 : 0;
   await input.click();
   await input.press("Enter");
   await input.press("ArrowDown");
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toHaveCount(emptyPanelCount);
   await input.fill("Hi?");
   await input.press("Enter");
   const chat = page.getByRole("region", { name: "Ask AI conversation" });
@@ -363,26 +374,26 @@ test("uncited replies finish quietly and clearing Search closes the panel until 
   await page.getByRole("button", { name: "Clear search" }).click();
   await expect(input).toHaveValue("");
   await expect(input).toBeFocused();
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toHaveCount(emptyPanelCount);
   await input.click();
   await input.press("Enter");
   await input.press("ArrowDown");
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toHaveCount(emptyPanelCount);
   await input.fill("   ");
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toHaveCount(emptyPanelCount);
   await input.fill("reference");
   await expect(panel).toBeVisible();
   await page.getByRole("button", { name: "Clear search" }).click();
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toHaveCount(emptyPanelCount);
   await input.click();
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toHaveCount(emptyPanelCount);
   await input.fill("reopen");
   await page.getByRole("tab", { name: "Ask AI", exact: true }).click();
   await expect(chat).toContainText("Hi! What would you like to know?");
   await input.fill("");
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toHaveCount(emptyPanelCount);
   await input.click();
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toHaveCount(emptyPanelCount);
 });
 
 test("expanded sources reveal inside the chat while the page, composer and focus stay put", async ({
@@ -632,6 +643,7 @@ test("Ask AI demo responds locally, respects composition and clears on profile c
     if (/ask-ai|ai-gateway/.test(req.url())) calls++;
   });
   await page.goto("http://127.0.0.1:3132/#courses");
+  await openSearch(page);
   const input = page.getByRole("textbox", { name: "Search all content" });
   await input.fill("Where should I start? ");
   await input.dispatchEvent("keydown", { key: "Enter", isComposing: true });
@@ -652,12 +664,13 @@ test("Ask AI demo responds locally, respects composition and clears on profile c
   expect(calls).toBe(0);
   await page.screenshot({ path: info.outputPath("ask-ai-demo.png") });
   await input.press("Escape");
-  await input.click();
+  await openSearch(page);
   await expect(page.getByRole("log")).toContainText("Where should I start?");
   if (info.project.name === "phone")
     await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: "Switch demo profile" }).click();
   await page.getByRole("button", { name: /Admin/ }).last().click();
+  await openSearch(page);
   await input.fill("new profile");
   await page.getByRole("tab", { name: "Ask AI" }).click();
   await expect(page.getByRole("log")).not.toContainText(
@@ -854,7 +867,7 @@ test("a router burst reveals progressively, fades only new words and completes w
       name: "Source 1: Published reference",
       exact: true,
     }),
-  ).toHaveAttribute("href", `/docs/${docId}`);
+  ).toHaveAttribute("href", contentPath("doc", docId, "Published reference"));
   await expect(assistant.locator("[data-sd-animate]")).toHaveCount(0);
   await expect(
     region.getByText("Response incomplete.", { exact: true }),

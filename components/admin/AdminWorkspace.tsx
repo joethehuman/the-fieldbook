@@ -118,7 +118,9 @@ export function AdminWorkspace({
               "",
               adminHref(destination, name),
             );
-            finishLocalNavigation();
+            // Replacement writes canonicalize or restore the current Admin
+            // form's URL; only a pushed destination leaves that form behind.
+            finishLocalNavigation({ preserveForm: replace });
             return true;
           }}
           onLoadDestination={async (destination) => {
@@ -205,14 +207,6 @@ export function AdminWorkspace({
                         ? "content"
                         : "governance";
             setData(await runtime.admin.prepare(scope));
-          }}
-          onOpenPersonProgress={async (id) => {
-            setData(await runtime.admin.prepare("person", id));
-          }}
-          onEdit={async (id) => {
-            const result = await runtime.admin.edit(id);
-            setData(result.data);
-            return result.item;
           }}
           onUnpublish={async (id) => {
             setData(await runtime.admin.unpublish(id));

@@ -1,11 +1,18 @@
 "use client";
-import { useContext, useLayoutEffect, useRef, useState } from "react";
+import {
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import dynamic from "next/dynamic";
 import { Plus, Search, X } from "lucide-react";
 import type { Content } from "@/lib/types";
 import type { SearchProvider, SearchResult } from "@/lib/search";
 import type { AiCitation } from "@/lib/ai";
-import { useAskAi } from "./use-ask-ai";
-import { AskAiConversation } from "./AskAiConversation";
+import type { AskAiSessionHandle, AskAiSessionProps } from "./AskAiSession";
 import { ContentSearch } from "./ContentSearch";
 import { SearchPanel } from "./patterns/search-panel";
 import { SearchField } from "./patterns/search-field";
@@ -14,7 +21,33 @@ import { AppBarSearchCompactContext } from "./patterns/app-bar";
 import { Toolbar } from "./patterns/layout";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
+import { Alert } from "./ui/alert";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
+
+function AskAiUnavailable({ target, onReady }: AskAiSessionProps) {
+  useEffect(() => {
+    onReady(true);
+  }, [onReady]);
+  return (
+    target &&
+    createPortal(
+      <div className="grid gap-3 p-4">
+        <Alert variant="destructive">
+          <p>Ask AI couldn’t load. Reload the page to try again, or use Search.</p>
+        </Alert>
+        <Button type="button" variant="outline" onClick={() => window.location.reload()}>
+          Reload page
+        </Button>
+      </div>,
+      target,
+    )
+  );
+}
+
+const AskAiSession = dynamic<AskAiSessionProps>(
+  () => import("./AskAiSession").catch(() => ({ default: AskAiUnavailable })),
+  { ssr: false },
+);
 
 /** Mounted by the persistent workspace; panel dismissal never owns chat lifetime. */
 export function SearchExperience({
@@ -45,7 +78,11 @@ export function SearchExperience({
   const [draft, setDraft] = useState("");
   const input = useRef<HTMLInputElement>(null);
   const searchTrigger = useRef<HTMLButtonElement>(null);
-  const chat = useAskAi(aiMode);
+  const session = useRef<AskAiSessionHandle>(null);
+  const [aiActivated, setAiActivated] = useState(false);
+  const [aiReady, setAiReady] = useState(false);
+  const [aiTarget, setAiTarget] = useState<HTMLDivElement | null>(null);
+  const [initialQuestion, setInitialQuestion] = useState<string | null>(null);
   const enabled = aiMode !== "off";
   const visible = open && (compact || !!query.trim());
   useLayoutEffect(() => {
@@ -64,10 +101,13 @@ export function SearchExperience({
       if (results) results.scrollTop = 0;
     }
   }, [id, view, query, visible]);
-  async function ask() {
+  function ask() {
+    setAiActivated(true);
     setView("ai");
     setOpen(true);
-    await chat.submit(query);
+    if (session.current) void session.current.submit(query);
+    // Preserve the first question through chunk loading and repeated Enter.
+    else setInitialQuestion((pending) => pending ?? query);
   }
   async function openResult(result: SearchResult) {
     if ((await onOpen(result)) !== false) setOpen(false);
@@ -161,6 +201,21 @@ export function SearchExperience({
       compact={compact}
       onDismiss={() => setOpen(false)}
       returnFocus={compact ? searchTrigger : undefined}
+      persistentContent={
+        enabled && aiActivated ? (
+          <AskAiSession
+            sessionRef={session}
+            mode={aiMode}
+            initialQuestion={initialQuestion}
+            target={aiTarget}
+            onReady={setAiReady}
+            id={id}
+            onSource={openSource}
+            draft={draft}
+            setDraft={setDraft}
+          />
+        ) : null
+      }
       trigger={
         <Toolbar>
           {compact ? (
@@ -201,7 +256,10 @@ export function SearchExperience({
           {enabled ? (
             <Tabs
               value={view}
-              onValueChange={setView}
+              onValueChange={(next) => {
+                if (next === "ai") setAiActivated(true);
+                setView(next);
+              }}
               className="flex h-full min-h-0 flex-col"
             >
               <div className="flex shrink-0 items-center justify-between gap-2 bg-card px-4 pt-2">
@@ -215,7 +273,8 @@ export function SearchExperience({
                     variant="ghost"
                     size="default"
                     onClick={async () => {
-                      await chat.reset();
+                      setInitialQuestion(null);
+                      await session.current?.reset();
                       setDraft("");
                     }}
                   >
@@ -238,13 +297,17 @@ export function SearchExperience({
                 </div>
               </TabsContent>
               <TabsContent value="ai" className="mt-0 min-h-0 flex-1">
-                <AskAiConversation
-                  id={id}
-                  chat={chat}
-                  onSource={openSource}
-                  draft={draft}
-                  setDraft={setDraft}
-                />
+                <div
+                  ref={setAiTarget}
+                  className="h-full min-h-0"
+                  aria-busy={!aiReady}
+                >
+                  {!aiReady && (
+                    <span className="sr-only" role="status">
+                      Loading Ask AI…
+                    </span>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           ) : (

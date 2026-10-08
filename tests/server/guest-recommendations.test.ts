@@ -1,12 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { guestFixture } from "../guest-fixture";
-import { snapshot } from "../../server/snapshot";
+import { getContent } from "../../server/content";
 import { saveSettings } from "../../server/save-settings";
 import { recordProgress } from "../../server/progress";
-import { assignedCourses } from "../../lib/types";
 
-test("real snapshot/progress/settings boundaries with synthetic PostgREST: no anonymous governance or writes", async () => {
+test("published content/progress/settings boundaries with synthetic PostgREST: no anonymous governance or writes", async () => {
   const originalFetch = globalThis.fetch,
     originalEnv = { ...process.env };
   let data = guestFixture(),
@@ -70,25 +69,14 @@ test("real snapshot/progress/settings boundaries with synthetic PostgREST: no an
     });
   };
   try {
-    const before = JSON.stringify(data.users),
-      guest = await snapshot(null);
-    assert.equal(
-      assignedCourses(guest.content, guest.users[0], guest.groups).length,
-      2,
-    );
-    assert.equal(guest.content[0].questions[0].answer, undefined);
-    assert.deepEqual(guest.teams, []);
-    assert.deepEqual(guest.feedback, []);
-    assert.deepEqual(guest.progress, {});
-    assert.equal(guest.governanceRevision, undefined);
-    assert.equal(guest.revision, undefined);
-    assert.equal("organizationTeamId" in guest.settings!, false);
-    assert.ok(!JSON.stringify(guest).includes("private-organization-team"));
-    assert.ok(!JSON.stringify(guest).includes("SECRET"));
-    assert.ok(!JSON.stringify(guest).includes(data.users[0].email));
+    const before = JSON.stringify(data.users);
+    const course = await getContent(data.content[0].id, null);
+    assert.equal(course.questions[0].answer, undefined);
+    assert.deepEqual(course.groups, []);
+    assert.deepEqual(course.assignments, []);
+    assert.ok(!JSON.stringify(course).includes("SECRET"));
     assert.equal(requests.length, 2);
     assert.ok(requests.every((r) => r.method === "GET"));
-    const course = guest.content[0];
     const beforeImport = requests.length;
     await assert.rejects(
       recordProgress(null, {
@@ -164,7 +152,7 @@ test("real snapshot/progress/settings boundaries with synthetic PostgREST: no an
     });
     assert.equal(data.settings!.guestGroupId, "foundation");
     const count = requests.length;
-    await assert.rejects(snapshot(null), /Sign in/);
+    await assert.rejects(getContent(course.id, null), /Sign in/);
     assert.equal(requests.length, count + 1);
     await assert.rejects(
       recordProgress(null, {

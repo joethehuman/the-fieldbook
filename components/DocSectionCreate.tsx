@@ -26,9 +26,11 @@ export default function DocSectionCreate({
   const [name, setName] = useState("");
   const [parentId, setParentId] = useState(initialParentId);
   const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   async function create() {
     if (busy || disabled) return;
+    setAttempt((value) => value + 1);
     setError("");
     try {
       const next = createDocSection(sections, name, parentId || undefined);
@@ -45,7 +47,7 @@ export default function DocSectionCreate({
   }
   return (
     <div className="doc-section-create">
-      <FormField label="New section name" error={error}>
+      <FormField label="New section name" error={error} errorKey={attempt}>
         <Input
           variant={inputVariant}
           value={name}

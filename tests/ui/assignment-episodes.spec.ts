@@ -19,7 +19,7 @@ async function saved(page: Page): Promise<Workspace> {
 function fixture() {
   const data = freshWorkspace(),
     course = data.content.find(
-      (c) => c.kind === "course" && c.groups.includes("sales"),
+      (c) => c.kind === "course" && c.status === "published",
     )!;
   data.settings!.catchUpDays = 7;
   data.content = [course];

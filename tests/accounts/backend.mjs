@@ -418,6 +418,7 @@ createServer(async (req, res) => {
             "status",
             "createdAt",
             "updatedAt",
+            "feedAt",
             "groups",
             "updateTeams",
             "assignments",
@@ -443,6 +444,43 @@ createServer(async (req, res) => {
     return send(res, rows, 200, {
       "Content-Range": `0-${Math.max(0, rows.length - 1)}/${rows.length}`,
     });
+  }
+  if (url.pathname === "/rest/v1/rpc/fb_manage_learning") {
+    const { p_actor, p_data: action } = JSON.parse(body);
+    if (p_actor !== profile().id || profile().role !== "admin")
+      return send(
+        res,
+        { code: "P0001", message: "Administrator access is required" },
+        400,
+      );
+    const row = documents.find((item) => item.id === action.contentId);
+    if (!row || row.revision !== action.expected)
+      return send(
+        res,
+        { code: "P0001", message: "Course changed. Reload before saving" },
+        400,
+      );
+    if (
+      !["target", "untarget"].includes(action.operation) ||
+      row.published?.kind !== "brief" ||
+      !configuredGroups.some((group) => group.id === action.groupId)
+    )
+      return send(
+        res,
+        { code: "P0001", message: "Choose an update and a learning group" },
+        400,
+      );
+    for (const field of ["draft", "published"]) {
+      const groups = (row[field].groups || []).filter(
+        (id) => id !== action.groupId,
+      );
+      if (action.operation === "target") groups.push(action.groupId);
+      row[field] = { ...row[field], groups };
+    }
+    row.revision++;
+    // Match the real targeting operation: content changes without advancing
+    // governance_revision. Reader freshness must come from cache invalidation.
+    return send(res, { ok: true });
   }
   if (url.pathname === "/rest/v1/rpc/fb_save_document") {
     const input = JSON.parse(body);

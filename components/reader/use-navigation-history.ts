@@ -182,14 +182,16 @@ export function useNavigationHistory(
       await new Promise<void>((done) => requestAnimationFrame(() => done()));
     return restored;
   }, [clean]);
-  const finishNavigation = useCallback(() => {
+  const finishNavigation = useCallback((options?: { preserveForm?: boolean }) => {
     if (!leaving.current) return;
     leaving.current = false;
-    // A committed destination must not inherit the departed form's dirty state.
+    // A new destination must not inherit the departed form's dirty state.
+    // Canonical URL replacements keep that form open, including newer edits
+    // made while the save that supplied the canonical title was in flight.
     const stayed = departureUrl.current === window.location.href;
     departureUrl.current = null;
     observed.current = { url: window.location.href, marker: marker() };
-    if (stayed) reconcile.current();
+    if (stayed || options?.preserveForm) reconcile.current();
   }, []);
   return { beforeNavigation, finishNavigation };
 }
