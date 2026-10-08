@@ -11,12 +11,14 @@ import { ogCardSize } from "../../lib/og-card";
 import { demoSessionScript } from "../../lib/demo-session";
 import "../startup.css";
 
-// Keep the first paint's font when the preloaded Geist asset arrives late.
+// Keep Arial unscaled while Geist loads so the picker note keeps its line count.
 const GeistSans = localFont({
   src: "../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2",
   variable: "--font-geist-sans",
   weight: "100 900",
   display: "optional",
+  fallback: ["Arial"],
+  adjustFontFallback: false,
 });
 
 const ogOrigin = demoOgOrigin();
