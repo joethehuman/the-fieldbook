@@ -440,6 +440,7 @@ export default function Learning({
         {view !== "home" && view !== "curricula" && (
           <FilterOptions
             label="Course views"
+            variant="underline"
             value={view}
             onValueChange={(value) => changeView(value as LearningCollection)}
             options={[
