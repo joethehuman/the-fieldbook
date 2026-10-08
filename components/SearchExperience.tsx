@@ -1,5 +1,5 @@
 "use client";
-import { useLayoutEffect, useRef, useState } from "react";
+import { useContext, useLayoutEffect, useRef, useState } from "react";
 import { Plus, Search, X } from "lucide-react";
 import type { Content } from "@/lib/types";
 import type { SearchProvider, SearchResult } from "@/lib/search";
@@ -10,6 +10,7 @@ import { ContentSearch } from "./ContentSearch";
 import { SearchPanel } from "./patterns/search-panel";
 import { SearchField } from "./patterns/search-field";
 import { useCompactLayout } from "./patterns/use-compact-layout";
+import { AppBarSearchCompactContext } from "./patterns/app-bar";
 import { Toolbar } from "./patterns/layout";
 import { Input } from "./ui/input";
 import { Button } from "./ui/button";
@@ -32,7 +33,9 @@ export function SearchExperience({
   onOpen: (result: SearchResult) => void | Promise<boolean | void>;
 }) {
   const [query, setQuery] = useState("");
-  const compact = useCompactLayout();
+  const compactLayout = useCompactLayout();
+  const searchCollision = useContext(AppBarSearchCompactContext);
+  const compact = compactLayout || searchCollision;
   const [panel, setPanel] = useState({ compact, open: false });
   // A hidden empty panel must not revive when the field switches back to an icon.
   if (panel.compact !== compact) setPanel({ compact, open: false });
@@ -88,7 +91,7 @@ export function SearchExperience({
     />
   ) : null;
   const searchField = (
-    <SearchField>
+    <SearchField className="[&>[data-slot=input]]:pr-10">
       <Input
         ref={input}
         aria-label="Search all content"
@@ -143,6 +146,7 @@ export function SearchExperience({
           variant="ghost"
           size="icon"
           aria-label="Clear search"
+          className="absolute right-1 size-7 rounded-full text-muted-foreground hover:text-foreground"
           onClick={() => {
             setQuery("");
             setView("search");

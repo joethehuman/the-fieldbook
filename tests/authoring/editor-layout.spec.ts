@@ -188,7 +188,7 @@ test("resizing search never revives an empty or populated panel", async ({ page 
     await trigger.click();
     await expect(input).toBeFocused();
     await input.fill(query);
-    await page.setViewportSize({ width: 900, height: 700 });
+    await page.setViewportSize({ width: 1600, height: 700 });
     await expect(panel).toHaveCount(0);
     await expect(input).toHaveValue(query);
     await page.setViewportSize({ width: 600, height: 900 });
@@ -199,7 +199,7 @@ test("resizing search never revives an empty or populated panel", async ({ page 
   await expect(input).toHaveValue("context");
 });
 
-test("editor controls and app navigation share the compact layout boundary", async ({ page }, info) => {
+test("editor controls and app navigation retain the compact layout boundary", async ({ page }, info) => {
   await open(page, info.project.name.startsWith("production"), "course");
   const writer = page.locator('.writing-content[contenteditable="true"]');
   const original = await writer.elementHandle();
@@ -221,7 +221,7 @@ test("editor controls and app navigation share the compact layout boundary", asy
       await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeHidden();
     } else {
       await expect(navigation).toBeHidden();
-      await expect(search).toBeHidden();
+      // Search can independently become an icon when publication controls need space.
       await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeVisible();
     }
     if (mobile) await expect(page.locator(".editor-frame")).toHaveAttribute("data-cards", "true");
@@ -1546,3 +1546,119 @@ for (const kind of ["doc", "brief", "course"] as const) {
     }
   });
 }
+
+
+test("centered search yields to publication controls without changing navigation or editor cutoffs", async ({ page }, info) => {
+  const installed = info.project.name.startsWith("production");
+  await page.setViewportSize({ width: 1800, height: 1000 });
+  await open(page, installed, "course");
+  await page.locator("#editor-title").fill("A changed course title");
+  await waitForDraftSaved(page);
+  const icon = page.getByRole("button", { name: "Open search", exact: true });
+  const input = page.getByRole("textbox", { name: "Search all content", exact: true });
+  let desktopIconSeen = false;
+  for (const expanded of [false, true]) {
+    if (expanded) await page.getByRole("button", { name: "Expand sidebar", exact: true }).click();
+    for (const width of [1800, 1600, 1440, 1180, 1024, 900, 768, 767, 600, 375, 1800]) {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.locator(".main-shell").evaluate(async (el) => {
+        await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      });
+      const geometry = await page.locator(".topbar").evaluate((bar) => {
+        const actions = bar.querySelector(".editor-heading-actions")!.getBoundingClientRect();
+        const field = bar.querySelector(".app-search-measure")!.getBoundingClientRect();
+        const bounds = bar.getBoundingClientRect();
+        const shellCompact = matchMedia("(width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait)").matches;
+        const gap = parseFloat(getComputedStyle(bar).columnGap);
+        return { icon: shellCompact || field.right + gap > actions.left, shellCompact, center: bounds.x + bounds.width / 2, right: bounds.right, actionsRight: actions.right };
+      });
+      expect(geometry.actionsRight).toBeLessThanOrEqual(geometry.right);
+      if (geometry.icon) {
+        await expect(icon).toBeVisible();
+        await expect(input).toBeHidden();
+        if (!geometry.shellCompact) desktopIconSeen = true;
+        const search = (await icon.boundingBox())!;
+        const actions = (await page.locator(".editor-heading-actions").boundingBox())!;
+        expect(search.x + search.width).toBeLessThan(actions.x);
+        expect(search.y + search.height / 2).toBeCloseTo(actions.y + actions.height / 2, 0);
+      } else {
+        await expect(icon).toBeHidden();
+        const search = (await input.locator('..').boundingBox())!;
+        expect(search.x + search.width / 2).toBeCloseTo(geometry.center, 0);
+      }
+      await expect(page.getByRole("button", { name: "Publish", exact: true })).toBeInViewport({ ratio: 1 });
+      if (geometry.shellCompact) {
+        await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeVisible();
+        await expect(page.locator(".editor-frame")).toHaveAttribute("data-cards", "true");
+      } else {
+        await expect(page.getByRole("button", { name: "Open navigation", exact: true })).toBeHidden();
+        await expect(page.locator(".editor-frame")).not.toHaveAttribute("data-cards", "true");
+      }
+    }
+  }
+  expect(desktopIconSeen).toBe(true);
+  await page.setViewportSize({ width: 900, height: 1000 });
+  await icon.click();
+  await expect(input).toBeFocused();
+  await input.fill("context");
+  const panel = page.locator('[data-slot="search-panel"]');
+  await expect(panel).toBeVisible();
+  const header = (await page.locator(".topbar").boundingBox())!;
+  const panelBox = (await panel.boundingBox())!;
+  expect(panelBox.x).toBeGreaterThanOrEqual(header.x);
+  expect(panelBox.x + panelBox.width).toBeLessThanOrEqual(header.x + header.width);
+  await page.keyboard.press("Escape");
+  await expect(icon).toBeFocused();
+  await page.setViewportSize({ width: 1800, height: 1000 });
+  await expect(icon).toBeHidden();
+  await expect(input).toHaveValue("context");
+  await expect(panel).toHaveCount(0);
+  await page.goto(installed ? "/courses" : "/#courses");
+  await page.setViewportSize({ width: 900, height: 1000 });
+  await expect(input).toBeVisible();
+  await expect(page.locator(".editor-heading-actions")).toHaveCount(0);
+  const field = (await input.locator('..').boundingBox())!;
+  const bar = (await page.locator(".topbar").boundingBox())!;
+  expect(field.x + field.width / 2).toBeCloseTo(bar.x + bar.width / 2, 0);
+  await page.screenshot({ path: info.outputPath("centered-reader-search.png"), animations: "disabled" });
+});
+
+
+test("search clear stays inside a stable field and leaves room for long queries", async ({ page }, info) => {
+  await open(page, info.project.name.startsWith("production"), "doc");
+  for (const width of [1800, 600]) {
+    await page.setViewportSize({ width, height: 1000 });
+    const icon = page.getByRole("button", { name: "Open search", exact: true });
+    if (width === 600) {
+      await expect(icon).toBeVisible();
+      await icon.click();
+    } else await expect(icon).toBeHidden();
+    const input = page.getByRole("textbox", { name: "Search all content", exact: true });
+    await expect(input).toBeVisible();
+    const field = input.locator('..');
+    const before = (await field.boundingBox())!;
+    const inputBefore = (await input.boundingBox())!;
+    await input.fill("A long search query ".repeat(12));
+    const clear = page.getByRole("button", { name: "Clear search", exact: true });
+    await expect(clear).toBeVisible();
+    const after = (await field.boundingBox())!;
+    const inputAfter = (await input.boundingBox())!;
+    const button = (await clear.boundingBox())!;
+    expect(after.width).toBeCloseTo(before.width, 0);
+    expect(inputAfter.width).toBeCloseTo(inputBefore.width, 0);
+    expect(button.x).toBeGreaterThan(after.x);
+    expect(button.x + button.width).toBeLessThan(after.x + after.width);
+    expect(button.y).toBeGreaterThanOrEqual(inputAfter.y);
+    expect(button.y + button.height).toBeLessThanOrEqual(inputAfter.y + inputAfter.height);
+    const padding = await input.evaluate(el=>parseFloat(getComputedStyle(el).paddingRight));
+    expect(inputAfter.x + inputAfter.width - padding).toBeLessThanOrEqual(button.x - 4);
+    await page.screenshot({ path: info.outputPath(`search-clear-${width}.png`), animations: "disabled" });
+    await clear.click();
+    await expect(input).toBeFocused();
+    await expect(input).toHaveValue("");
+    await expect(clear).toBeHidden();
+    expect((await field.boundingBox())!.width).toBeCloseTo(before.width, 0);
+    if (await icon.isVisible()) await page.keyboard.press("Escape");
+  }
+});
