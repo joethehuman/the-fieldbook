@@ -1,4 +1,5 @@
 "use client";
+import { MessageSquare } from "lucide-react";
 import { SortPicker } from "./patterns/sort-picker";
 import { DetailNavigation } from "./patterns/detail-navigation";
 import { DataTable } from "./patterns/data-table";
@@ -33,6 +34,7 @@ import { feedbackRows, feedbackCsv } from "@/lib/reporting";
 import { Input } from "@/components/ui/input";
 import { SectionHeader } from "@/components/patterns/layout";
 import { Button } from "./ui/button";
+import { Tooltip } from "./ui/tooltip";
 import { SelectField } from "./ui/select";
 import { useState } from "react";
 import { Checkbox } from "./ui/choice";
@@ -189,15 +191,6 @@ export function FeedbackAdmin({
         }
         onClear={clearFilters}
         filters={[
-          ...(query
-            ? [
-                {
-                  id: "query",
-                  label: `Search: ${query}`,
-                  onRemove: () => setQuery(""),
-                },
-              ]
-            : []),
           ...(rating !== "all"
             ? [
                 {
@@ -279,7 +272,7 @@ export function FeedbackAdmin({
             : "No ratings yet"}
         </span>
       </div>
-      {onDeleteFeedback && selection.canSelect && (
+      {onDeleteFeedback && (
         <BulkActions
           selected={selection.selected}
           collectionSize={records.length}
@@ -287,25 +280,29 @@ export function FeedbackAdmin({
           commands={commands}
           noun="feedback entries"
           summaryControl={
-            <SelectRows
-              ids={ids}
-              value={selection.selected}
-              onChange={selection.setSelected}
-              label="Select all filtered feedback"
-            />
+            selectable ? (
+              <SelectRows
+                ids={ids}
+                value={selection.selected}
+                onChange={selection.setSelected}
+                label="Select all filtered feedback"
+              />
+            ) : (
+              <span aria-hidden="true" className="h-control w-4" />
+            )
           }
         />
       )}
       {!!records.length && (
         <TableContainer aria-label="Feedback table">
           <DataTable
-            layout={selectable ? "feedbackSelection" : "feedback"}
+            layout={onDeleteFeedback ? "feedbackSelection" : "feedback"}
             density="compact"
             className="[&_[data-slot=table-cell-content]]:whitespace-nowrap"
           >
             <TableHeader>
               <TableRow>
-                {selectable && (
+                {onDeleteFeedback && (
                   <TableHead>
                     <span className="sr-only">Select feedback</span>
                   </TableHead>
@@ -324,15 +321,17 @@ export function FeedbackAdmin({
             <TableBody>
               {records.map((f) => (
                 <TableRow key={f.id}>
-                  {selectable && (
+                  {onDeleteFeedback && (
                     <TableCell>
-                      <Checkbox
-                        aria-label={`Select feedback from ${f.person} for ${f.title}`}
-                        checked={selection.selected.includes(f.id)}
-                        onCheckedChange={(checked) =>
-                          selection.toggle(f.id, checked === true)
-                        }
-                      />
+                      {selectable && (
+                        <Checkbox
+                          aria-label={`Select feedback from ${f.person} for ${f.title}`}
+                          checked={selection.selected.includes(f.id)}
+                          onCheckedChange={(checked) =>
+                            selection.toggle(f.id, checked === true)
+                          }
+                        />
+                      )}
                     </TableCell>
                   )}
                   <TableCell>
@@ -425,15 +424,18 @@ function FeedbackComment({
             {excerpt}
           </span>
           <Dialog open={open} onOpenChange={setOpen}>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setOpen(true)}
-              aria-label={`View comment from ${entry.person} for ${entry.title}`}
-            >
-              View comment
-            </Button>
+            <Tooltip content="View comment">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground"
+                onClick={() => setOpen(true)}
+                aria-label={`View comment from ${entry.person} for ${entry.title}`}
+              >
+                <MessageSquare aria-hidden="true" />
+              </Button>
+            </Tooltip>
             <DialogContent>
               <DialogTitle>Feedback comment</DialogTitle>
               <DialogDescription>
