@@ -91,6 +91,7 @@ async function open(
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
   return {
+    state,
     read: async () =>
       installed
         ? state
@@ -1952,4 +1953,100 @@ test("source recovery keeps short-screen writing and retry available after notic
   await expect(source).toBeVisible();
   await expect(source).toHaveValue(original + "\n\nEdited in Markdown.");
   await page.screenshot({ path: info.outputPath("short-source-recovery.png"), animations: "disabled" });
+});
+
+
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`editor delete ${kind} shares list confirmation and preserves cancellation`, async ({ page }, info) => {
+    const installed = info.project.name.startsWith("production");
+    const { state, read } = await open(page, installed, kind);
+    const item = state.content[0];
+    const details = page.getByRole("complementary", { name: "Content details", exact: true });
+    const toggle = page.getByRole("button", { name: "Details", exact: true });
+    if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+    const remove = details.getByRole("button", { name: `Delete ${kind === "doc" ? "Doc" : kind === "course" ? "Course" : "Update"}`, exact: true });
+    await expect(remove).toBeEnabled();
+    await remove.scrollIntoViewIfNeeded();
+    const placement = await remove.evaluate((button) => {
+      const recovery = document.getElementById("writing-recovery")!;
+      return {
+        followsRecovery: !!(recovery.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING),
+        divider: getComputedStyle(recovery).borderBottomStyle,
+        lastButton: button === Array.from(button.closest('[aria-label="Content details"]')!.querySelectorAll("button")).at(-1),
+      };
+    });
+    expect(placement).toEqual({ followsRecovery: true, divider: "solid", lastButton: true });
+    await remove.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading")).toHaveText("Delete");
+    const description = await dialog.locator("p").first().textContent();
+    await expect(dialog).toContainText(`${item.title} can be restored for 30 days. After that, it and its related learning records are permanently erased.`);
+    await expect(dialog.getByRole("button", { name: "Delete", exact: true })).toBeDisabled();
+    await dialog.getByRole("checkbox").check();
+    await expect(dialog.getByRole("button", { name: "Delete", exact: true })).toBeEnabled();
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(remove).toBeFocused();
+    expect((await read()).content[0].id).toBe(item.id);
+    await returnToContent(page);
+    await page.getByRole("button", { name: `Actions for ${item.title}`, exact: true }).click();
+    await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+    await expect(dialog.locator("p").first()).toHaveText(description!);
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByRole("link", { name: item.title, exact: true }).click();
+    await expect(page.locator('.writing-content[contenteditable="true"]')).toContainText("Paragraph 1.");
+    await page.locator(".main-shell").evaluate(async (el) => {
+      await Promise.all(el.getAnimations().map((animation) => animation.finished.catch(() => {})));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    });
+    if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+    if (installed) {
+      await page.route("**/api/admin/bulk", async (route) => {
+        expect(route.request().postDataJSON()).toMatchObject({ entity: "content", operation: "delete", items: [{ id: item.id, expected: item.revision }] });
+        state.content = [];
+        state.publishedContent = [];
+        await syncAuthoringProvider(page, state);
+        await route.fulfill({ json: { results: [{ id: item.id, status: "changed" }] } });
+      });
+    }
+    await remove.click();
+    await dialog.getByRole("checkbox").check();
+    await page.screenshot({ path: info.outputPath(`delete-${kind}-confirmation.png`) });
+    await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(page.locator(".editor")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: item.title, exact: true })).toHaveCount(0);
+    expect((await read()).content).toHaveLength(0);
+    if (!installed) expect((await read()).deletedItems).toEqual([expect.objectContaining({ id: item.id, kind })]);
+  });
+}
+
+test("editor delete failure retains the draft and uses the latest saved revision", async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"));
+  const { state } = await open(page, true, "doc");
+  const toggle = page.getByRole("button", { name: "Details", exact: true });
+  if (await toggle.getAttribute("aria-expanded") !== "true") await toggle.click();
+  const remove = page.getByRole("button", { name: "Delete Doc", exact: true });
+  let finishSave!: () => void;
+  const saving = new Promise<void>((resolve) => { finishSave = resolve; });
+  await page.route("**/api/content", async (route) => {
+    await saving;
+    await route.fallback();
+  });
+  await page.getByRole("textbox", { name: "Title", exact: true }).fill("Keep this edited draft");
+  await expect(remove).toBeDisabled();
+  await expect(page.locator(".editor-save-status [role=status] > .sr-only")).toHaveText("Saving…");
+  await expect(remove).toBeDisabled();
+  finishSave();
+  await waitForDraftSaved(page);
+  await expect(remove).toBeEnabled();
+  await page.route("**/api/admin/bulk", async (route) => {
+    expect(route.request().postDataJSON().items).toEqual([{ id: state.content[0].id, expected: 2 }]);
+    await route.fulfill({ json: { results: [{ id: state.content[0].id, status: "failed", message: "Synthetic delete failure" }] } });
+  });
+  await remove.click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByRole("checkbox").check();
+  await dialog.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue("Keep this edited draft");
+  await expect(page.locator('[data-slot="alert"]')).toContainText("Synthetic delete failure");
+  await expect(remove).toBeEnabled();
 });
