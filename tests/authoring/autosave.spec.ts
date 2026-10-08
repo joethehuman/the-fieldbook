@@ -335,7 +335,7 @@ test("an assigned course stages a new version through autosaves and consumes it 
   const { read, before, data } = await setup(page, installed, "course");
   await page.getByRole("button", { name: /^Details/ }).click();
   const version = page.getByRole("checkbox", {
-    name: "Publish a new version and start a new completion window",
+    name: "Publish new version and reassign to audiences.",
   });
   await version.check();
   await page.getByRole("button", { name: /^Details/ }).click();

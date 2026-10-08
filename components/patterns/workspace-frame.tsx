@@ -1,4 +1,9 @@
-import type { ReactNode, MouseEventHandler } from "react";
+"use client";
+
+import { useEffect, useRef, useState, type ReactNode, type MouseEventHandler } from "react";
+import { useCompactLayout } from "./use-compact-layout";
+import { useSidebarMotion } from "./use-sidebar-motion";
+import { EditorAppHeaderContext } from "./editor-app-header";
 import { brandThemeStyle } from "@/lib/brand-theme";
 import { BrandThemeSync } from "./brand-theme-sync";
 import { SkipLink } from "./skip-link";
@@ -33,8 +38,20 @@ export function WorkspaceFrame({
   onDismiss: () => void;
   onClickCapture?: MouseEventHandler<HTMLDivElement>;
 }) {
+  const [editorHeader, setEditorHeader] = useState<HTMLDivElement | null>(null);
+  const compact = useCompactLayout();
+  const app = useRef<HTMLDivElement>(null);
+  useSidebarMotion(app, collapsed, compact);
+  useEffect(() => {
+    if (!compact && menu) {
+      onDismiss();
+      document.getElementById("main-sidebar")?.querySelector<HTMLButtonElement>(".sidebar-toggle")?.focus({ preventScroll: true });
+    }
+  }, [compact, menu, onDismiss]);
   return (
+    <EditorAppHeaderContext.Provider value={editorHeader}>
     <div
+      ref={app}
       className={`app ${collapsed ? "sidebar-collapsed" : ""}`}
       style={brandThemeStyle(accent)}
       onClickCapture={onClickCapture}
@@ -58,14 +75,14 @@ export function WorkspaceFrame({
       {menu && (
         <Button
           variant="ghost"
-          className="fixed inset-0 z-20 h-full w-full rounded-none bg-overlay p-0 hover:bg-overlay md:hidden"
+          className="app-navigation-backdrop fixed inset-0 z-20 h-full w-full rounded-none bg-overlay p-0 hover:bg-overlay"
           aria-label="Dismiss navigation"
           tabIndex={-1}
           onClick={onDismiss}
         />
       )}
       <div className="main-shell">
-        <AppBar pending={pending}>{header}</AppBar>
+        <AppBar pending={pending}>{header}<div className="app-editor-header" ref={setEditorHeader} /></AppBar>
         {alert}
         <main
           id="main-content"
@@ -77,5 +94,6 @@ export function WorkspaceFrame({
       </div>
       {overlays}
     </div>
+    </EditorAppHeaderContext.Provider>
   );
 }

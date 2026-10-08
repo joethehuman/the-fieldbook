@@ -31,16 +31,27 @@ export function HierarchyPicker({
   value,
   onValueChange,
   searchLabel,
+  placeholder = "Choose a parent",
+  searchPlaceholder = "Search names or hierarchy",
+  emptyMessage = "No matching teams.",
+  visibleRows,
+  showFullHierarchy = true,
+  className,
   disabled,
   ...props
 }: Pick<
   ComponentProps<"button">,
-  "id" | "aria-describedby" | "aria-invalid" | "disabled"
+  "id" | "aria-describedby" | "aria-invalid" | "disabled" | "className"
 > & {
   options: HierarchyPickerOption[];
   value: string;
   onValueChange: (value: string) => void;
   searchLabel: string;
+  placeholder?: string;
+  searchPlaceholder?: string;
+  emptyMessage?: string;
+  visibleRows?: number;
+  showFullHierarchy?: boolean;
 }) {
   const listId = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -95,10 +106,10 @@ export function HierarchyPicker({
             disabled={disabled}
             variant="outline"
             title={selected?.path.join(" / ") || selected?.label}
-            className="w-full justify-between text-left [&>span]:w-full [&>span]:justify-between"
+            className={cn("w-full justify-between text-left [&>span]:w-full [&>span]:justify-between", className)}
           >
             <span className="min-w-0 truncate">
-              {selected?.label || "Choose a parent"}
+              {selected?.label || placeholder}
             </span>
             <ChevronDown aria-hidden="true" />
           </Button>
@@ -118,7 +129,7 @@ export function HierarchyPicker({
             type="search"
             role="combobox"
             aria-label={searchLabel}
-            placeholder="Search names or hierarchy"
+            placeholder={searchPlaceholder}
             aria-autocomplete="list"
             aria-expanded={open}
             aria-controls={listId}
@@ -143,7 +154,7 @@ export function HierarchyPicker({
               }
             }}
           />
-          <PopoverResults id={listId} role="listbox" aria-label={searchLabel}>
+          <PopoverResults id={listId} role="listbox" aria-label={searchLabel} visibleRows={visibleRows}>
             {matching.map((option, index) => (
               <div
                 key={option.id}
@@ -182,11 +193,11 @@ export function HierarchyPicker({
             ))}
             {!matching.length && (
               <p className="px-2 py-3 text-copy text-muted-foreground">
-                No matching teams.
+                {emptyMessage}
               </p>
             )}
           </PopoverResults>
-          <div className="grid h-16 min-w-0 content-start gap-1 border-t pt-2">
+          {showFullHierarchy && <div className="grid h-16 min-w-0 content-start gap-1 border-t pt-2">
             <p className="text-xs text-muted-foreground">Full hierarchy</p>
             <div
               tabIndex={0}
@@ -196,7 +207,7 @@ export function HierarchyPicker({
             >
               {active?.path.join(" / ") || active?.label || "No matching team"}
             </div>
-          </div>
+          </div>}
         </PopoverContent>
       </Popover>
     </div>

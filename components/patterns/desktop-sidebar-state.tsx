@@ -26,6 +26,18 @@ export function DesktopSidebarProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// Collapse once on entry, so authors can still reopen navigation while writing.
+export function useCollapseDesktopSidebar() {
+  const context = useContext(DesktopSidebarContext);
+  if (!context) throw new Error("Desktop sidebar requires its provider");
+  const { setState } = context;
+  useEffect(() => {
+    setState((current) =>
+      current.collapsed ? current : { ...current, collapsed: true },
+    );
+  }, [setState]);
+}
+
 export function useDesktopSidebar(courseKey?: string) {
   const context = useContext(DesktopSidebarContext);
   if (!context) throw new Error("Desktop sidebar requires its provider");

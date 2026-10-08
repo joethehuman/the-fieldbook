@@ -11,6 +11,7 @@ import {
 import { Textarea } from "../ui/textarea";
 
 export const WritingTitleContext = createContext<ReactNode>(null);
+export const WritingIntroductionContext = createContext<ReactNode>(null);
 export const WritingTitleEnterContext = createContext<(() => void) | null>(null);
 
 /** Separate metadata, visually part of the document. Enter continues into its body. */
@@ -39,6 +40,7 @@ export function WritingTitle({
     return () => observer.disconnect();
   }, [value]);
   return (
+    <span className="writing-title-field">
     <Textarea
       {...props}
       ref={(node) => {
@@ -49,6 +51,14 @@ export function WritingTitle({
       value={value}
       variant="document-title"
       rows={1}
+      onPointerDown={(event) => {
+        event.currentTarget.removeAttribute("data-reveal-focus");
+        props.onPointerDown?.(event);
+      }}
+      onBlur={(event) => {
+        event.currentTarget.removeAttribute("data-reveal-focus");
+        props.onBlur?.(event);
+      }}
       onKeyDown={(event) => {
         props.onKeyDown?.(event);
         if (
@@ -76,5 +86,6 @@ export function WritingTitle({
           body.setSelectionRange(0, 0);
       }}
     />
+    </span>
   );
 }

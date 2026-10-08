@@ -25,7 +25,7 @@
     border-right: 1px solid var(--border);
     background: var(--muted);
     padding: var(--space-6) var(--space-4);
-    transition: width 180ms ease;
+    transition: none;
   }
   .sidebar-heading {
     display: grid;
@@ -74,7 +74,7 @@
     flex-direction: column;
     margin-left: var(--active-sidebar-width);
     overflow: clip;
-    transition: margin-left 180ms ease;
+    transition: none;
   }
   .topbar {
     --search-panel-width: min(48rem, calc(100vw - var(--active-sidebar-width) - 3rem));
@@ -88,10 +88,21 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-4);
-    border-bottom: 1px solid var(--border);
     padding: var(--space-3) var(--space-6);
   }
+  .topbar::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: var(--scroll-fade-size);
+    background: var(--scroll-fade-overlay);
+    opacity: 0;
+    transition: opacity 160ms ease;
+    pointer-events: none;
+  }
+  .topbar[data-content-scrolled="true"]::after { opacity: 1; }
   .app-bar-progress {
+    z-index: 1;
     position: absolute;
     inset: auto 0 -1px;
     height: 2px;
@@ -113,12 +124,20 @@
     }
   }
   .topbar > [data-slot="search-root"] {
-    margin-left: auto;
+    order: -1;
     flex: 0 1 auto;
     min-width: 0;
   }
+  .editor-app-actions { display: flex; align-items: center; min-width: 0; width: 100%; gap: var(--space-4); }
+  .app-editor-header:empty { display: none; }
+  .app-editor-header { display: flex; flex: 1; min-width: 0; align-items: center; justify-content: flex-end; gap: var(--space-4); }
+  .topbar:has(.app-editor-header:not(:empty)) .breadcrumb { display: none; }
+  .topbar > .app-navigation-toggle { order: -2; }
+  .topbar [data-slot="search-panel"] [data-slot="search-field"] { width: 100%; }
+  @media (min-width: 768px) { .topbar [data-slot="search-panel"] { left: 0; right: auto; } }
   .breadcrumb {
     flex: 1 1 12rem;
+    justify-content: flex-end;
     overflow: hidden;
     white-space: nowrap;
   }
@@ -148,7 +167,7 @@
     max-width: 100%;
   }
   .main-content {
-    --workspace-inset-block: var(--space-8);
+    --workspace-inset-block: var(--space-5);
     --workspace-inset-inline: var(--space-6);
     container: workspace / inline-size;
     display: grid;
@@ -167,9 +186,7 @@
     scrollbar-gutter: stable both-edges;
     outline: none;
   }
-  .main-content:has(> .editor) {
-    padding-block-start: 0;
-  }
+  .main-content:has(> .editor) { padding-block: var(--space-2) var(--space-4); padding-inline: var(--space-4); }
   .admin-layout {
     display: grid;
     flex: 1 1 auto;
@@ -269,119 +286,183 @@
   .editor-content { gap: var(--space-4); }
   .editor-introduction { display: grid; width: 100%; gap: var(--space-3); padding-block: var(--space-2); }
   .editor-introduction [data-slot="input"], .editor-introduction [data-slot="textarea"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }
-  .editor-frame { --editor-panel-width: calc(18rem + var(--space-6)); display: flex; flex-direction: column; min-width: 0; gap: var(--space-3); overflow-anchor: none; }
-  .editor-frame[data-panels="none"] { --editor-content-padding: max(var(--space-6), calc((100% - var(--editor-writing-width)) / 2)); }
-  .app.sidebar-collapsed .editor-frame[data-panels="none"] { --editor-writing-width: var(--editor-writing-focus-width); }
-  .editor-frame-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-2);
-    min-height: var(--space-12);
-    padding-block: var(--space-2);
+  /* The reading column and edge panels share the workspace without reserving menu gutters. */
+  .editor-frame {
+    --scroll-fade-depth: var(--scroll-fade-size);
+    --editor-panel-width: 320px;
+    --editor-text-inset: max(0px, calc((100% - var(--reading-width)) / 2));
+    --editor-content-padding: var(--space-6);
     position: relative;
-    z-index: 15;
-    background: var(--background);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow-anchor: none;
   }
-  .editor-frame-controls[data-canvas-scrolled="true"]::after {
-    content: "";
+  .editor-frame-controls {
     position: absolute;
-    inset-block-start: 100%;
-    inset-inline-start: var(--editor-outline-width, 0px);
-    inset-inline-end: var(--editor-details-width, 0px);
-    height: var(--space-4);
+    inset: 0 0 auto;
+    height: 0;
+    z-index: 25;
     pointer-events: none;
-    background: linear-gradient(to bottom, var(--background), transparent);
   }
-  .editor-frame-controls[data-heading="true"] {
+  .editor[data-scroll-layout="page"] .editor-frame-controls:not([data-cards="true"]) {
+    position: sticky;
+    top: 0;
+  }
+  .editor-panel-toggle {
+    position: absolute;
+    top: var(--space-3);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: var(--background);
+    box-shadow: var(--shadow-surface);
+    pointer-events: auto;
+  }
+  .editor-panel-toggle[data-side="outline"] { inset-inline-start: var(--space-3); }
+  .editor-panel-toggle[data-side="details"] { inset-inline-end: var(--space-3); }
+  .editor-requirements-badge {
+    position: absolute;
+    inset-block-start: -0.25rem;
+    inset-inline-end: -0.375rem;
     display: grid;
-    grid-template-columns: minmax(max-content, var(--editor-panel-width)) minmax(0, 1fr) minmax(max-content, var(--editor-panel-width));
-    column-gap: 0;
+    place-items: center;
+    min-width: 1.125rem;
+    height: 1.125rem;
+    padding-inline: 0.25rem;
+    border-radius: 999px;
+    background: var(--foreground);
+    color: var(--background);
+    font-size: 0.625rem;
+    font-weight: var(--weight-heading);
   }
-  .editor-frame-controls[data-heading="true"] > :first-child { justify-self: start; }
-  .editor-frame-heading { min-width: 0; width: 100%; max-width: var(--editor-title-width); margin-inline: auto; justify-self: center; }
   .editor-frame-body {
     display: grid;
     min-width: 0;
     align-items: start;
-    grid-template-areas: "outline canvas details";
-    grid-template-columns: var(--editor-outline-width, 0px) minmax(0, 1fr) var(--editor-details-width, 0px);
-    transition: grid-template-columns 220ms ease;
+    grid-template-areas: "canvas";
+    grid-template-columns: minmax(0, 1fr);
   }
-  .editor-frame[data-panels="outline"], .editor-frame[data-panels="both"] { --editor-outline-width: var(--editor-panel-width); }
-  .editor-frame[data-panels="details"], .editor-frame[data-panels="both"] { --editor-details-width: var(--editor-panel-width); }
-  .editor-frame-canvas { grid-area: canvas; min-width: 0; width: 100%; }
+  .editor-frame-canvas { grid-area: canvas; justify-self: center; min-width: 0; width: 100%; max-width: none; }
+  .editor-canvas-navigation {
+    position: sticky;
+    top: 0;
+    z-index: 13;
+    flex-shrink: 0;
+    background: var(--background);
+    padding: var(--space-3) var(--editor-content-padding) var(--space-1);
+    padding-inline: var(--editor-text-inset);
+  }
+  .editor-canvas-navigation::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: var(--scroll-fade-size);
+    background: var(--scroll-fade-overlay);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+  .editor-frame[data-outline="true"]:not([data-cards="true"]) .editor-canvas-navigation {
+    padding-inline-start: max(var(--editor-text-inset), 4.5rem);
+  }
+  .editor[data-scroll-layout="page"] .editor-canvas-navigation { top: 0; }
+  .editor[data-scroll-layout="page"] .editor-canvas-navigation::before {
+    content: "";
+    position: absolute;
+    inset: auto 0 100%;
+    height: var(--space-2);
+    background: var(--background);
+    pointer-events: none;
+  }
+  .editor-frame-canvas:has(.writing-viewport[data-scroll-fade-before="true"]) .editor-canvas-navigation::after,
+  .editor-frame-canvas[data-navigation-scrolled="true"] .editor-canvas-navigation::after,
+  .app:has(.topbar[data-content-scrolled="true"]) .editor[data-scroll-layout="page"] .editor-canvas-navigation::after { opacity: 1; }
   .editor-frame-panel {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
-    overflow: clip;
-    position: static;
-    visibility: visible;
-    transition: visibility 0s;
+    max-height: 100%;
+    position: sticky;
+    /* Above the pinned title (12), below the app header (15). */
+    z-index: 14;
+    top: 0;
+    align-self: start;
+    transition: opacity 160ms ease;
   }
-  .editor-frame-panel[data-side="outline"] { grid-area: outline; }
-  .editor-frame-panel[data-side="details"] { grid-area: details; }
-  .editor-frame-panel[data-open="false"] { visibility: hidden; transition-delay: 220ms; }
+  .editor-frame-panel[data-side="outline"] { grid-area: canvas; width: var(--editor-panel-width); justify-self: start; }
+  .editor-frame-panel[data-side="details"] { grid-area: canvas; width: var(--editor-panel-width); justify-self: end; }
+  .editor-frame-panel[data-open="false"] { opacity: 0; visibility: hidden; }
   .editor-frame-outline, .editor-frame-details {
-    display: grid;
+    display: flex;
+    flex-direction: column;
     min-width: 0;
-    align-content: start;
-    gap: var(--space-4);
-    width: var(--editor-panel-width);
-    overflow-y: visible;
-    scrollbar-gutter: stable;
-    opacity: 1;
-    transform: translateX(0);
-    transition: opacity 220ms ease, transform 220ms ease;
+    min-height: 0;
+    max-height: calc(100dvh - var(--app-bar-height, 4rem) - var(--space-8));
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--border) 65%, var(--background));
+    border-radius: var(--radius-xl);
+    background: var(--background);
+    box-shadow: var(--elevation-editor-panel);
   }
-  .editor-frame-outline { padding-inline-end: var(--space-6); }
-  .editor-frame-details { padding-inline: var(--space-6) var(--space-2); }
-  .editor-frame-panel[data-open="false"] > aside { opacity: 0; }
-  .editor-frame-panel[data-side="outline"][data-open="false"] > aside { transform: translateX(calc(-1 * var(--space-4))); }
-  .editor-frame-panel[data-side="details"][data-open="false"] > aside { transform: translateX(var(--space-4)); }
-  @starting-style {
-    .editor-frame-panel[data-open="true"] > aside { opacity: 0; }
-    .editor-frame-panel[data-side="outline"][data-open="true"] > aside { transform: translateX(calc(-1 * var(--space-4))); }
-    .editor-frame-panel[data-side="details"][data-open="true"] > aside { transform: translateX(var(--space-4)); }
-  }
-  .editor-frame [data-slot="input"], .editor-frame [data-slot="textarea"], .course-builder-panel {
-    scroll-margin-block-start: var(--space-4);
-  }
-  @media (max-width: 767px) {
-    .main-content:has(> .editor) { padding-block-end: calc(var(--workspace-inset-block) + var(--phone-keyboard-space, 0px)); }
-    .main-content[data-phone-keyboard-closing="true"] { transition: padding-block-end 180ms ease-out; }
-    .editor-panel-context { display: none; }
-    .editor-frame-controls { flex-wrap: nowrap; min-height: var(--space-8); padding-block: 0; }
-    .editor-frame-controls[data-heading="true"] { flex-wrap: wrap; }
-    .editor-frame[data-panels] > .editor-frame-body { display: flex; flex-direction: column; }
-    .editor[data-scroll-layout="workspace"] .editor-frame-canvas { flex: 1 1 0; }
-  }
-  .editor-frame-heading [data-slot="input"] { scroll-margin-block-start: calc(var(--editor-header-height, 0px) + var(--space-4)); }
+  .editor-floating-heading { flex-shrink: 0; display: flex; align-items: center; min-height: 4rem; padding: var(--space-4); padding-inline-end: 3.75rem; font-size: var(--type-copy); font-weight: var(--weight-heading); }
+  .editor-frame-outline .editor-floating-heading { padding-inline-start: 3.75rem; padding-inline-end: var(--space-4); }
+  .editor-floating-body { position: relative; flex: 0 1 auto; display: grid; align-content: start; gap: var(--space-4); padding: var(--space-2) var(--space-4) var(--space-4); scroll-padding-block: var(--space-4); }
+  .editor-frame [data-slot="input"], .editor-frame [data-slot="textarea"], .course-builder-panel { scroll-margin-block-start: var(--space-4); }
+  .editor-details-actions { display: grid; gap: var(--space-1); }
+  .editor-details-actions > [data-slot="button"] { justify-content: flex-start; width: 100%; }
   .editor-details-content { gap: var(--space-4); }
   .editor-details-group { display: grid; gap: var(--space-3); padding-block-end: var(--space-4); border-bottom: 1px solid var(--border); }
-  @media (prefers-reduced-motion: reduce) {
-    .main-content[data-phone-keyboard-closing="true"] { transition: none; }
-    .editor-frame-body { transition: none; }
-    .editor-frame-panel, .editor-frame-panel[data-open="false"], .editor-frame-outline, .editor-frame-details { transition: none; }
+  .editor-frame[data-cards="true"] .editor-frame-body { display: flex; flex-direction: column; align-items: center; }
+  .editor-frame[data-cards="true"] .editor-frame-canvas { max-width: none; }
+  .main-content:has(.editor-frame[data-cards="true"]) { padding-block-end: calc(var(--space-4) + var(--phone-keyboard-space, 0px)); }
+  .editor-frame-controls[data-cards="true"] {
+    position: relative;
+    inset: auto;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    height: 2.75rem;
+    margin-block-start: var(--space-3);
+    pointer-events: auto;
   }
-  @container editor-shell (width < 60rem) {
-    .editor-frame-controls[data-heading="true"] { display: flex; column-gap: var(--space-2); }
-    .editor-frame-controls[data-heading="true"] > :last-child { order: 2; }
-    .editor-frame-heading { order: 3; flex-basis: 100%; }
+  .editor-frame-controls[data-cards="true"] .editor-panel-toggle {
+    position: relative;
+    inset: auto;
+    flex-shrink: 0;
+    width: 2.75rem;
+    height: 2.75rem;
   }
-  @container editor-shell (width < 48rem) {
-    .editor-frame-controls[data-canvas-scrolled="true"]::after { inset-inline: 0; }
-    .editor-frame[data-panels] > .editor-frame-body { display: flex; flex-direction: column; }
-    .editor-frame-panel { display: grid; grid-template-rows: 1fr; width: 100%; position: static; margin-block-end: var(--space-4); transition: grid-template-rows 220ms ease, margin-block-end 220ms ease, visibility 0s; }
-    .editor-frame-panel[data-open="false"] { grid-template-rows: 0fr; margin-block-end: 0; transition-delay: 0s, 0s, 220ms; }
-    .editor-frame-outline, .editor-frame-details { min-height: 0; width: 100%; padding-inline: var(--space-1); }
-    .editor-frame-canvas { width: 100%; }
-    @starting-style {
-      .editor-frame-panel[data-open="true"] { grid-template-rows: 0fr; margin-block-end: 0; }
-    }
+  .editor-frame-controls[data-cards="true"] .editor-panel-toggle[data-side="details"] { margin-inline-start: auto; }
+  .editor-writing-actions-host { display: flex; min-width: 0; }
+  .editor-frame[data-cards="true"] .editor-canvas-navigation {
+    padding: var(--space-2) 0 var(--space-2);
+    z-index: 13;
   }
-  @media (prefers-reduced-motion: reduce) {
-    .editor-frame-panel, .editor-frame-panel[data-open="false"] { transition: none; }
+  .editor-mobile-panels { --scroll-fade-depth: var(--scroll-fade-size); }
+  .editor-mobile-panels .editor-frame-panel {
+    position: fixed;
+    top: var(--editor-panel-top, 10rem);
+    z-index: 14;
+    width: min(320px, var(--editor-panel-max-width, calc(100vw - 2rem)));
+    height: auto;
+    max-height: var(--editor-panel-available-height, calc(100dvh - 11rem));
+    padding: 0;
   }
+  .editor-mobile-panels .editor-frame-panel[data-side="outline"] { inset-inline-start: var(--editor-panel-left, var(--space-4)); }
+  .editor-mobile-panels .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
+  .editor-mobile-panels :is(.editor-frame-outline, .editor-frame-details) { max-height: inherit; }
+  .editor-mobile-panels .editor-floating-heading { padding-inline: var(--space-4); min-height: 3.5rem; }
+  .editor-frame[data-cards="true"] { --editor-content-padding: var(--space-4); }
+  @media (max-width: 767px) {
+    .topbar { gap: var(--space-2); padding-inline: var(--space-3); }
+    .app-editor-header, .editor-app-actions { gap: var(--space-2); }
+    .app-editor-header .editor-save-status { gap: var(--space-1); }
+    .app-editor-header .editor-status-wide, .app-editor-header .detail-navigation-label { display: none; }
+    .app-editor-header .editor-status-compact { display: inline-flex; }
+    .editor-frame { --editor-content-padding: var(--space-4); }
+  }
+  @media (prefers-reduced-motion: reduce) { .topbar::after, .editor-canvas-navigation::after, .editor-frame-panel { transition: none; } }
   /* Bound the whole task, including its natural-size title and recovery notices. */
   .editor[data-scroll-layout="workspace"],
   .editor[data-scroll-layout="workspace"] :is(.editor-content, .editor-frame) { flex: 1 1 0; min-height: 0; }
@@ -392,29 +473,15 @@
     align-items: stretch;
   }
   .editor[data-scroll-layout="workspace"] :is(.editor-frame-panel, .editor-frame-canvas) { min-height: 0; }
+  .editor[data-scroll-layout="workspace"] .editor-frame-panel { height: 100%; }
   .editor[data-scroll-layout="workspace"] :is(.editor-frame-outline, .editor-frame-details) {
-    height: 100%;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
+    max-height: 100%;
   }
+  .editor[data-scroll-layout="workspace"] .editor-frame[data-cards="true"] .editor-frame-canvas { flex: 1 1 0; }
   .editor[data-scroll-layout="workspace"] .editor-frame-canvas:has(.writing-root),
   .editor[data-scroll-layout="workspace"] .course-builder-panel:has(.writing-root) { display: flex; flex-direction: column; }
   .editor[data-scroll-layout="workspace"] .course-builder-panel:has(.writing-root) { flex: 1 1 0; min-height: 0; }
-  .editor[data-scroll-layout="workspace"] .editor-frame-canvas:not(:has(.writing-root)) { overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; scroll-padding-block: var(--space-6); }
-  .main-content:has(> .editor[data-focus-mode="true"]) { padding-block-start: var(--space-6); }
-  .editor[data-focus-transition="true"] .editor-frame-canvas { position: relative; z-index: 20; }
-  /* Focus changes only layout. The writer, selections and panel choices stay mounted. */
-  .editor[data-focus-mode="true"] > .editor-heading,
-  .editor[data-focus-mode="true"] .editor-introduction,
-  .editor[data-focus-mode="true"] .editor-frame-controls,
-  .editor[data-focus-mode="true"] .editor-frame-panel { display: none; }
-  .editor[data-focus-mode="true"] .editor-frame {
-    --editor-content-padding: max(var(--space-6), calc((100% - var(--editor-writing-focus-width)) / 2));
-    gap: 0;
-  }
-  .editor[data-focus-mode="true"] .editor-frame-body { grid-template-columns: minmax(0, 1fr); grid-template-areas: "canvas"; transition: none; }
-  .editor[data-focus-mode="true"] .editor-content { gap: 0; }
+  .editor[data-scroll-layout="workspace"] .editor-frame-canvas:not(:has(.writing-root)) { overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable both-edges; scroll-padding-block: var(--space-6); }
   .settings-panel,
   .profile-form,
   .learning-admin,
@@ -871,43 +938,7 @@
     }
   }
   @media (width < 48rem) {
-    .app {
-      --sidebar-nav-width: 100%;
-    }
-    .lesson-nav {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    .sidebar {
-      width: min(var(--sidebar-width), calc(100vw - 2rem));
-      visibility: hidden;
-      transform: translateX(-100%);
-      transition: transform 150ms ease, visibility 150ms ease;
-    }
-    .sidebar.open {
-      visibility: visible;
-      transform: translateX(0);
-    }
-    .sidebar.open.navigation-pending::after {
-      content: "";
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 34%;
-      height: 2px;
-      background: var(--primary);
-      animation: loading-enter 200ms ease-out both,
-        loading-sweep 1.2s ease-in-out 200ms infinite alternate;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .sidebar.open.navigation-pending::after {
-        animation: none;
-        width: 100%;
-      }
-    }
-    .main-shell {
-      margin-left: 0;
-      transition: none;
-    }
+    .lesson-nav { grid-template-columns: minmax(0, 1fr); }
     .main-content {
       --workspace-inset-block: var(--space-6);
       --workspace-inset-inline: var(--space-4);
@@ -923,57 +954,54 @@
       grid-template-columns: minmax(0, 1fr);
     }
   }
-  @media (width >= 48rem) {
-    .sidebar-heading,
-    .primary-navigation,
-    .document-tree,
-    .sidebar-bottom {
-      width: var(--sidebar-inner-width);
-    }
-    .sidebar-heading .logo,
-    .sidebar-nav-text,
-    .nav-count,
-    .document-tree,
-    .sidebar-account-avatar,
-    .sidebar-account-identity,
-    .sidebar-account-secondary {
-      opacity: 1;
-      visibility: visible;
-      transition: opacity 160ms ease, visibility 0s;
-    }
-    .sidebar-nav-text,
-    .nav-count {
-      white-space: nowrap;
-    }
-    .app:not(.sidebar-collapsed) .document-tree {
-      animation: sidebar-content-appear 160ms ease both;
-    }
-    .app.sidebar-collapsed {
-      --active-sidebar-width: var(--sidebar-rail-width);
-      --sidebar-nav-width: 2.25rem;
-    }
-    .sidebar-collapsed .sidebar {
-      scrollbar-width: none;
-    }
-    .sidebar-collapsed .sidebar-heading .logo,
-    .sidebar-collapsed .sidebar-nav-text,
-    .sidebar-collapsed .nav-count,
-    .sidebar-collapsed .document-tree,
-    .sidebar-collapsed .sidebar-account-avatar,
-    .sidebar-collapsed .sidebar-account-identity,
-    .sidebar-collapsed .sidebar-account-secondary {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-      transition: opacity 160ms ease, visibility 0s linear 160ms;
-    }
-    .sidebar-collapsed .sidebar-toggle {
-      transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 1px));
-    }
-    .sidebar-collapsed .sidebar-account-trigger {
-      transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 9px));
-    }
+  .sidebar-heading,
+  .primary-navigation,
+  .document-tree,
+  .sidebar-bottom {
+    width: var(--sidebar-inner-width);
   }
+  .sidebar-heading .logo,
+  .sidebar-nav-text,
+  .nav-count,
+  .document-tree,
+  .sidebar-account-avatar,
+  .sidebar-account-identity,
+  .sidebar-account-secondary {
+    opacity: 1;
+    visibility: visible;
+    transition: none;
+  }
+  .sidebar-nav-text,
+  .nav-count {
+    white-space: nowrap;
+  }
+  /* Keep the saved choice at every viewport width; compact rules change its presentation. */
+  .app.sidebar-collapsed {
+    --active-sidebar-width: var(--sidebar-rail-width);
+    --sidebar-nav-width: 2.25rem;
+  }
+  .sidebar-collapsed .sidebar {
+    scrollbar-width: none;
+  }
+  .sidebar-collapsed .sidebar-heading .logo,
+  .sidebar-collapsed .sidebar-nav-text,
+  .sidebar-collapsed .nav-count,
+  .sidebar-collapsed .document-tree,
+  .sidebar-collapsed .sidebar-account-avatar,
+  .sidebar-collapsed .sidebar-account-identity,
+  .sidebar-collapsed .sidebar-account-secondary {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: none;
+  }
+  .sidebar-collapsed .sidebar-toggle {
+    transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 1px));
+  }
+  .sidebar-collapsed .sidebar-account-trigger {
+    transform: translateX(calc(var(--sidebar-rail-width) - var(--sidebar-width) + 9px));
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .app:not(.sidebar-collapsed) .document-tree {
       animation: none;
@@ -988,6 +1016,34 @@
     .sidebar-account-identity,
     .sidebar-account-secondary {
       transition: none;
+    }
+  }
+  /* Same viewport rule as compactLayoutQuery: phones and portrait touch tablets. */
+  @media (width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait) {
+    .app, .app.sidebar-collapsed { --sidebar-nav-width: 100%; }
+    .app .main-shell { margin-left: 0; transition: none; }
+    .app .sidebar {
+      width: min(var(--sidebar-width), calc(100vw - 2rem));
+      visibility: hidden;
+      transform: translateX(-100%);
+      transition: none;
+    }
+    .app .sidebar.open { visibility: visible; transform: translateX(0); transition: transform 150ms ease; }
+    .app :is(.sidebar-heading, .primary-navigation, .document-tree, .sidebar-bottom) { width: 100%; }
+    .app :is(.sidebar-heading .logo, .sidebar-nav-text, .nav-count, .document-tree, .sidebar-account-avatar, .sidebar-account-identity, .sidebar-account-secondary) { opacity: 1; visibility: inherit; pointer-events: auto; transition: none; }
+    .app .sidebar-account-trigger { transform: none; }
+    .app .topbar { --search-panel-width: min(48rem, calc(100vw - 2rem)); flex-wrap: nowrap; gap: var(--space-2); padding-inline: var(--space-4); }
+    .app .topbar [data-slot="search-panel"] [data-slot="search-field"] { width: 100%; }
+    .app .app-editor-header .editor-status-wide { display: none; }
+    .app .app-editor-header .editor-status-compact { display: inline-flex; }
+    .app .sidebar.open.navigation-pending::after {
+      content: ""; position: fixed; top: 0; left: 0; width: 34%; height: 2px;
+      background: var(--primary);
+      animation: loading-enter 200ms ease-out both, loading-sweep 1.2s ease-in-out 200ms infinite alternate;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .app .sidebar.open { transition: none; }
+      .app .sidebar.open.navigation-pending::after { animation: none; width: 100%; }
     }
   }
   @keyframes sidebar-content-appear {
@@ -1093,5 +1149,17 @@
     .course-lesson, .course-quiz, .course-finish-card { padding-top: 0; scroll-margin-block-start: 0; }
     .course-about details { display: block; }
     .course-desktop-summary { display: none; }
+  }
+}
+
+/* Visibility must share the controls' utility layer to override Button's inline-flex. */
+@layer utilities {
+  .app .sidebar, .app .sidebar * { transition: none; }
+  .app :is(.app-navigation-toggle, .sidebar-mobile-close, .app-navigation-backdrop) { display: none; }
+  @media (width < 768px), (width < 1280px) and (pointer: coarse) and (orientation: portrait) {
+    .app :is(.app-navigation-toggle, .sidebar-mobile-close, .app-navigation-backdrop) { display: flex; }
+    .app .sidebar-toggle { display: none; }
+    .app .sidebar.open { transition: transform 150ms ease; }
+    @media (prefers-reduced-motion: reduce) { .app .sidebar.open { transition: none; } }
   }
 }

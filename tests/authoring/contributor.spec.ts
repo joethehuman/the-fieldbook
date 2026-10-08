@@ -85,7 +85,7 @@ test("contributors share publishing editors with four permitted destinations on 
   await waitForDraftSaved(page);
   await openContentSettings(page);
   await expect(page.getByRole("button", { name: "Create section", exact: true })).toHaveCount(0);
-  await expect(page.getByRole("group", { name: "Doc section choices" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Section", exact: true })).toBeVisible();
   await page.locator("main").evaluate((node) => Promise.all(
     node.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => {})),
   ));
@@ -124,7 +124,7 @@ test("contributor Update audience offers groups without team or Organization con
   await expect(page.locator(".editor-heading [role=status] .sr-only")).toHaveText("Saved");
   await openContentSettings(page);
   await page
-    .getByRole("button", { name: "Edit audience", exact: true })
+    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const panel = page.getByRole("dialog", {
     name: "Update audience",

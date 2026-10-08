@@ -239,10 +239,9 @@ export default function ComponentCatalog() {
       <ScrollingExamples />
       <section className="grid gap-4" aria-label="Content editor frame">
         <SectionHeader title={<h2>Content editor frame</h2>}
-          description="Outline and Details use in-page panels on tablets and desktops, and a bottom panel on phones. The writing canvas stays mounted when either panel changes." />
+          description="Outline and Details float beside a stable desktop canvas. Constrained windows and touch tablets use bottom controls that open cards. The writing canvas stays mounted when either panel changes." />
         <EditorFrame revealCanvas={canvasRequest}
           outlineContext={catalogLesson === "welcome" ? "Lesson 1 of 2" : "Lesson 2 of 2"}
-          heading={<Input variant="lesson-title" aria-label="Example lesson title" placeholder="Untitled lesson" value={catalogTitle} onChange={(event) => setCatalogTitle(event.target.value)} />}
           outline={<nav className="grid gap-1" aria-label="Example course outline">
             {[{ id: "welcome", label: "Welcome" }, { id: "practice", label: "Practice" }].map((lesson) => (
               <NavigationButton key={lesson.id} type="button" aria-current={catalogLesson === lesson.id ? "step" : undefined}
@@ -261,6 +260,7 @@ export default function ComponentCatalog() {
             <FieldDescription>Publication and saving belong to the editor’s owner.</FieldDescription>
           </EditorDetailsGroup>}>
           <div className="grid gap-4">
+            <Input variant="lesson-title" aria-label="Example lesson title" placeholder="Untitled lesson" value={catalogTitle} onChange={(event) => setCatalogTitle(event.target.value)} />
             <FormField label="Example draft text">
               <Textarea rows={6} value={catalogBody} onChange={(event) => setCatalogBody(event.target.value)} />
             </FormField>

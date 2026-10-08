@@ -4,18 +4,18 @@
     mask-image: linear-gradient(
       to bottom,
       transparent,
-      black var(--space-4),
-      black calc(100% - var(--space-4)),
+      black var(--scroll-fade-depth, var(--space-4)),
+      black calc(100% - var(--scroll-fade-depth, var(--space-4))),
       transparent
     );
   }
   .scroll-fade[data-scroll-fade-before="true"][data-scroll-fade-after="false"] {
-    mask-image: linear-gradient(to bottom, transparent, black var(--space-4));
+    mask-image: linear-gradient(to bottom, transparent, black var(--scroll-fade-depth, var(--space-4)));
   }
   .scroll-fade[data-scroll-fade-before="false"][data-scroll-fade-after="true"] {
     mask-image: linear-gradient(
       to bottom,
-      black calc(100% - var(--space-4)),
+      black calc(100% - var(--scroll-fade-depth, var(--space-4))),
       transparent
     );
   }

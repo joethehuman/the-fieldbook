@@ -272,7 +272,7 @@ async function setup(
     route.fulfill({ status: 204 }),
   );
   await page.goto(production ? `/admin/content/${itemId}/edit` : "/#admin");
-  if (!production) await page.getByRole("button", { name: "Edit", exact: true }).click();
+  if (!production) await page.getByRole("link", { name: item.title, exact: true }).click();
   await expect(
     page.getByRole("button", { name: "Back to content", exact: true }),
   ).toBeVisible();
@@ -693,17 +693,18 @@ for (const kind of ["Doc", "Update"]) {
     expect((await read()).content.find((item) => item.title === `New ${kind}`)?.category).toBe("");
     await openContentSettings(page);
     if (kind === "Doc") {
-      const search = page.getByRole("searchbox", { name: "Search sections" });
+      await page.getByRole("button", { name: "Section", exact: true }).click();
+      const search = page.getByRole("combobox", { name: "Search sections", exact: true });
       await expect(search).toBeVisible();
       await search.fill("Start here");
       await expect(
-        page.getByRole("button", {
-          name: "Start here → Getting started",
+        page.getByRole("option", {
+          name: "Start here / Getting started",
           exact: true,
-          pressed: false,
         }),
       ).toBeVisible();
       await search.fill("");
+      await page.keyboard.press("Escape");
       await page
         .getByRole("button", { name: "Create section", exact: true })
         .first()
@@ -1083,9 +1084,10 @@ test("long writing uses a stationary desktop frame and reachable natural page fa
   const header = await page.locator(".editor-frame-controls").boundingBox();
   expect(after!.y).toBeGreaterThanOrEqual(header!.y + header!.height);
   expect(after!.y + after!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
-  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeInViewport();
-  await expect(page.getByRole("button", { name: "More editor actions", exact: true })).toBeInViewport();
-  expect(await surface.evaluate((node) => getComputedStyle(node).borderBottomLeftRadius)).not.toBe("0px");
+  await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeInViewport();
+  await expect(page.getByRole("button", { name: /^Commands:/ })).toBeHidden();
+  await expect(page.getByRole("button", { name: "More editor actions", exact: true })).toHaveCount(0);
+  expect(await surface.evaluate((node) => getComputedStyle(node).borderBottomLeftRadius)).toBe("0px");
   await editor.press("ControlOrMeta+End");
   await page.keyboard.type(" Final caret remains visible.");
   await expect(editor).toContainText("Final caret remains visible.");

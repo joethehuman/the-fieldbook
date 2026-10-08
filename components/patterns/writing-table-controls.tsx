@@ -81,10 +81,12 @@ function GutterActions({
       const origin = frame.getBoundingClientRect();
       const bounds = host.getBoundingClientRect();
       const tableBounds = table?.getBoundingClientRect();
+      const left = (tableBounds ? Math.max(tableBounds.left, bounds.left + 16) : bounds.left)
+        - origin.left + frame.scrollLeft - 44;
       position(anchor.current, {
-        left: (tableBounds ? Math.max(tableBounds.left, bounds.left + 16) : bounds.left)
-          - origin.left + frame.scrollLeft - 44,
-        top: (tableBounds ? tableBounds.top + 4 : bounds.top + bounds.height / 2 - 18)
+        left: Math.max(4, left),
+        // With no outside gutter, use the table's top control space instead of its first cell.
+        top: (tableBounds ? left < 4 ? bounds.top + 4 : tableBounds.top + 4 : bounds.top + bounds.height / 2 - 18)
           - origin.top + frame.scrollTop,
       });
     };

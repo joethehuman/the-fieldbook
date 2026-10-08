@@ -159,7 +159,7 @@ async function setup(
   await page.getByRole("button", { name: "Edit", exact: true }).click();
   const details = await openContentSettings(page);
   await details
-    .getByRole("button", { name: "Edit audience", exact: true })
+    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const panel = page.getByRole("dialog", {
     name: kind === "course" ? "Course audience" : "Update audience",
@@ -392,7 +392,7 @@ test("shared workflow parks new choices, retains saved sources and contains revi
     .click();
   await expect(panel).not.toBeVisible();
   await page
-    .getByRole("button", { name: "Edit audience", exact: true })
+    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   await expect(
     panel.getByRole("checkbox", {
@@ -501,7 +501,7 @@ test("Update picker applies to the draft, saves team/guest audiences, then publi
   expect((await read()).groups).toEqual([]);
   expect((await read(true)).groups).toEqual([]);
   await page
-    .getByRole("button", { name: "Edit audience", exact: true })
+    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   await panel.getByRole("radio", { name: "Organization", exact: true }).check();
   await panel

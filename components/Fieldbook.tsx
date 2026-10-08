@@ -1,4 +1,5 @@
 "use client";
+import { compactLayoutQuery } from "./patterns/use-compact-layout";
 import { teamHref, teamPersonId } from "@/lib/team-destination";
 import { courseLibraryView, courseViewPaths, type LearningView } from "@/lib/course-destination";
 import { adminHref, parseAdminDestination } from "@/lib/admin-destination";
@@ -543,7 +544,7 @@ export default function Fieldbook() {
               }}
               onFeedbackOpen={() => setMenu(false)}
               onFeedbackClose={() => {
-                if (window.matchMedia("(max-width: 767px)").matches)
+                if (window.matchMedia(compactLayoutQuery).matches)
                   menuTrigger.current?.focus();
               }}
               onFeedback={async (rating, comment) => {
@@ -573,7 +574,7 @@ export default function Fieldbook() {
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="app-navigation-toggle"
             ref={menuTrigger}
             aria-expanded={menu}
             aria-label="Open navigation"
@@ -662,7 +663,7 @@ export default function Fieldbook() {
               className="demo-dialog"
               onCloseAutoFocus={(event) => {
                 event.preventDefault();
-                if (window.matchMedia("(max-width: 767px)").matches)
+                if (window.matchMedia(compactLayoutQuery).matches)
                   menuTrigger.current?.focus();
                 else demoTrigger.current?.focus();
               }}

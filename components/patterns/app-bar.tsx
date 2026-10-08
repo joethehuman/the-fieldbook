@@ -1,7 +1,7 @@
 "use client";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 
-/** Remains in flow; only its measured height is shared with scroll destinations. */
+/** Shared app header measures its height and softens content passing beneath it. */
 export function AppBar({
   children,
   pending = false,
@@ -22,8 +22,15 @@ export function AppBar({
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(bar);
+    const content = bar.parentElement?.querySelector<HTMLElement>(".main-content");
+    const measureScroll = () => {
+      bar.dataset.contentScrolled = content && content.scrollTop > 1 ? "true" : "false";
+    };
+    measureScroll();
+    content?.addEventListener("scroll", measureScroll, { passive: true });
     return () => {
       observer.disconnect();
+      content?.removeEventListener("scroll", measureScroll);
       root.style.removeProperty("--app-bar-height");
     };
   }, []);

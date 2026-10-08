@@ -1,4 +1,5 @@
 "use client";
+import { compactLayoutQuery } from "@/components/patterns/use-compact-layout";
 import {
   useEffect,
   useCallback,
@@ -199,7 +200,7 @@ export function ReaderShell({
     const previousFocus = document.activeElement;
     if (!(await canLeave())) {
       if (previousFocus && !previousFocus.isConnected) {
-        if (window.matchMedia("(max-width: 767px)").matches)
+        if (window.matchMedia(compactLayoutQuery).matches)
           trigger.current?.focus();
         else
           document
@@ -402,7 +403,7 @@ export function ReaderShell({
                 }
                 onFeedbackOpen={close}
                 onFeedbackClose={() => {
-                  if (window.matchMedia("(max-width: 767px)").matches)
+                  if (window.matchMedia(compactLayoutQuery).matches)
                     trigger.current?.focus();
                 }}
                 onFeedback={async (rating, comment) => {
@@ -427,7 +428,7 @@ export function ReaderShell({
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="app-navigation-toggle"
               ref={trigger}
               aria-expanded={menu}
               aria-label="Open navigation"

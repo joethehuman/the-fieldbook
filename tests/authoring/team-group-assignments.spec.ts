@@ -203,7 +203,7 @@ test("installed editor saves after assignments change its document revision", as
     .waitFor();
   await page.getByRole("button", { name: "Details", exact: true }).click();
   await page
-    .getByRole("button", { name: "Edit audience", exact: true })
+    .getByRole("button", { name: /^(?:Assign audience|Edit Audience|Edit audience)$/, exact: true })
     .click();
   const panel = page.getByRole("dialog", {
     name: "Course audience",

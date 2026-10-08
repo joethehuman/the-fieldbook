@@ -9,9 +9,10 @@ import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
 import { createWritingBlock, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu } from "./writing-selection-menu";
-import { usePhoneLayout } from "./use-phone-layout";
+import { EditorWritingActionsContext } from "./editor-frame";
+import { useWritingControlsLayout } from "./use-editor-cards-layout";
 import { WritingLinkDialog } from "./writing-link-dialog";
-import { WritingTitleContext, WritingTitleEnterContext } from "./writing-title";
+import { WritingTitleContext, WritingIntroductionContext, WritingTitleEnterContext } from "./writing-title";
 import { WritingInteractionContext } from "./writing-interaction";
 import { Fragment, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -90,6 +91,7 @@ import "@mdxeditor/editor/style.css";
 
 function WritingViewPanel({ children }: { children: ReactNode }) {
   const title = useContext(WritingTitleContext);
+  const introduction = useContext(WritingIntroductionContext);
   const lexical = useCellValue(rootEditor$);
   useEffect(() => {
     if (!lexical) return;
@@ -119,7 +121,7 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
   }
   const fade = useScrollFade<HTMLDivElement>();
   return <div ref={fade.ref} data-state="active" className="writing-viewport writing-scroll-area scroll-fade mt-0 focus-visible:ring-0"
-    data-scroll-fade-before={fade.edges.before} data-scroll-fade-after={false} onScroll={fade.measure}><WritingTitleEnterContext.Provider value={enterBody}><div className="writing-document">{title && <div className="writing-document-heading">{title}</div>}{children}</div></WritingTitleEnterContext.Provider></div>;
+    data-scroll-fade-before={fade.edges.before} data-scroll-fade-after={false} onScroll={fade.measure}><WritingTitleEnterContext.Provider value={enterBody}><div className="writing-document">{introduction && <div className="writing-course-heading">{introduction}</div>}{title && <div className="writing-document-heading">{title}</div>}{children}</div></WritingTitleEnterContext.Provider></div>;
 }
 
 const writingViewPanelPlugin = realmPlugin({
@@ -167,14 +169,17 @@ function WritingToolbar({
   onSelectionReady,
   disabled,
   viewControls,
+  canvas,
 }: {
+  canvas: boolean;
   onInsert: (trigger: HTMLButtonElement, fromKeyboard: boolean) => void;
   onEditorReady: (editor: LexicalEditor | null, actions: WritingActions) => void;
   onSelectionReady: (controller: ((keyboard: boolean) => boolean) | null) => void;
   disabled: boolean;
   viewControls: ReactNode;
 }) {
-  const phone = usePhoneLayout();
+  const phone = useWritingControlsLayout();
+  const actionsHost = useContext(EditorWritingActionsContext);
   const editor = useCellValue(activeEditor$);
   const code = usePublisher(insertCodeBlock$);
   const divider = usePublisher(insertThematicBreak$);
@@ -230,9 +235,8 @@ function WritingToolbar({
       unavailable: !canRedo,
     },
   ];
-  return (
-    <div className="writing-toolbar">
-      <div className="writing-toolbar-controls" role="group" aria-label="Writing actions">
+  const controls = (
+      <div className="writing-toolbar-controls" data-canvas={canvas || undefined} data-mobile={phone || undefined} role="group" aria-label="Writing actions">
         <div className="writing-toolbar-group">
           {historyActions.map(({ label, icon: Icon, run, unavailable }) => (
             <Tooltip key={label} content={label}>
@@ -257,13 +261,18 @@ function WritingToolbar({
           <Plus /><span className="writing-command-label">Commands</span>
         </Button>
       </div>
-      <WritingSelectionMenu disabled={disabled} onReady={onSelectionReady} />
+  );
+  return (
+    <div className="writing-toolbar">
+      {canvas && phone && actionsHost ? createPortal(controls, actionsHost) : controls}
+      <WritingSelectionMenu showPhoneTrigger={!canvas} disabled={disabled} onReady={onSelectionReady} />
       {viewControls}
     </div>
   );
 }
 
 export default function WritingEditorEngine({
+  canvas = false,
   value,
   onChange,
   onUpload,
@@ -731,6 +740,7 @@ export default function WritingEditorEngine({
     toolbarPlugin({
       toolbarContents: () => (
         <WritingToolbar
+          canvas={canvas}
           onInsert={openCommands}
           onSelectionReady={(controller) => { selectionTools.current = controller; }}
           onEditorReady={(active, actions) => { if (active) lexicalEditor.current = active; writingActions.current = actions; }}
@@ -739,7 +749,7 @@ export default function WritingEditorEngine({
         />
       ),
     }),
-  ], [onUpload, disabled, busy, viewControls]);
+  ], [onUpload, disabled, busy, viewControls, canvas]);
   return (
     <WritingInteractionContext.Provider value={reportInteraction}>
     <div ref={root} data-editor-interacting={popupActive || slashOpen || !!mediaChooser || undefined} className="writing-editor writing-surface rounded-lg border border-border bg-background" onPointerDownCapture={(event) => {

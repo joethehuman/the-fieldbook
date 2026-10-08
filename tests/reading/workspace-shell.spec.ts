@@ -1047,6 +1047,67 @@ test("saved settings keep a single Admin stop through Back and repeated Forward"
   await expect(page).toHaveURL(/\/docs$/);
 });
 
+test("app navigation and search share phone and portrait tablet transitions", async ({ page }, info) => {
+  const touch = !!info.project.use.hasTouch;
+  const sizes = [
+    { width: 1180, height: 820, compact: false },
+    { width: 1024, height: 1366, compact: touch },
+    { width: 900, height: 700, compact: false },
+    { width: 767, height: 900, compact: true },
+    { width: 768, height: 900, compact: touch },
+    { width: 1280, height: 1366, compact: false },
+    { width: 375, height: 812, compact: true },
+  ];
+  for (const destination of ["/updates", "/courses", "/docs", "/admin"]) {
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await page.goto(destination);
+    const collapse = page.getByRole("button", { name: "Collapse sidebar", exact: true });
+    await expect(collapse).toBeVisible();
+    await collapse.click();
+    for (const { width, height, compact } of sizes) {
+      await page.setViewportSize({ width, height });
+      const navigation = page.getByRole("button", { name: "Open navigation", exact: true });
+      const search = page.getByRole("button", { name: "Open search", exact: true });
+      const field = page.getByRole("textbox", { name: "Search all content", exact: true });
+      const sidebar = page.locator("#main-sidebar");
+      if (compact) {
+        await expect(navigation).toBeVisible();
+        await expect(search).toBeVisible();
+        await expect(sidebar).toBeHidden();
+        await navigation.click();
+        await expect(page.getByRole("button", { name: "Close navigation", exact: true })).toBeFocused();
+        await expect(sidebar).toBeVisible();
+        await expect.poll(async () => (await sidebar.locator(".sidebar-primary-link").first().boundingBox())!.width).toBeGreaterThan(180);
+        await expect(page.getByRole("button", { name: "Account menu", exact: true })).toBeVisible();
+        await page.keyboard.press("Escape");
+        await expect(navigation).toBeFocused();
+        await expect(sidebar).toBeHidden();
+        await search.click();
+        await expect(field).toBeFocused();
+        const panel = (await page.locator('[data-slot="search-panel"]').boundingBox())!;
+        expect(panel.x).toBeGreaterThanOrEqual(15);
+        expect(panel.x + panel.width).toBeLessThanOrEqual(width - 15);
+        await page.keyboard.press("Escape");
+        await expect(search).toBeFocused();
+        await navigation.click();
+        await page.setViewportSize({ width: 1180, height: 820 });
+        await expect(navigation).toBeHidden();
+        await expect(sidebar).not.toHaveClass(/\bopen\b/);
+        await expect(page.getByRole("button", { name: "Expand sidebar", exact: true })).toBeFocused();
+        await expect(page.getByRole("button", { name: "Dismiss navigation", exact: true })).toHaveCount(0);
+      } else {
+        await expect(navigation).toBeHidden();
+        await expect(search).toBeHidden();
+        await expect(field).toBeVisible();
+        await expect(sidebar).toBeVisible();
+      }
+      // A temporary drawer never changes the author's desktop collapse choice.
+      await expect(page.locator(".app")).toHaveClass(/sidebar-collapsed/);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    }
+  }
+});
+
 test("installed tablet keeps the frame and settled Admin and reader geometry", async ({
   page,
 }, info) => {
@@ -1058,7 +1119,7 @@ test("installed tablet keeps the frame and settled Admin and reader geometry", a
   await page.goto("/admin");
   await expect(page.locator(".admin-layout")).toBeVisible();
   await expect(
-    page.getByRole("columnheader", { name: "Content", exact: true }),
+    page.getByRole("columnheader", { name: "Name", exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(
@@ -1069,13 +1130,13 @@ test("installed tablet keeps the frame and settled Admin and reader geometry", a
     path: info.outputPath("installed-tablet-admin.png"),
     fullPage: true,
   });
-  await page.getByRole("button", { name: "Edit", exact: true }).first().click();
+  await page.goto(`/admin/content/${docId}/edit`);
   await expect(
     page.getByRole("button", { name: /^Commands:/ }),
-  ).toBeVisible();
+  ).toBeHidden();
   await expect(
-    page.getByRole("textbox", { name: "Doc content", exact: true }),
-  ).toBeVisible();
+    page.locator('.writing-content[contenteditable="true"]'),
+  ).toContainText(doc.body);
   await page.screenshot({
     path: info.outputPath("installed-tablet-editor.png"),
     fullPage: true,

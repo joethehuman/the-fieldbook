@@ -22,10 +22,9 @@ import {
   EditorDetailsGroup,
   type DetailsReveal,
 } from "./patterns/editor-frame";
-import { revealEditorTarget } from "./patterns/reveal-editor-target";
-import { EditorFocusContext, useEditorFocus } from "./patterns/editor-focus";
 import { WritingTitle } from "./patterns/writing-title";
 import { useEditorLayout } from "./patterns/use-editor-layout";
+import { useCollapseDesktopSidebar } from "./patterns/desktop-sidebar-state";
 import { hasMissingImageAlt } from "@/lib/markdown-compatibility";
 import { createDraftSaveQueue, type SaveIntent } from "@/lib/draft-save-queue";
 import type { PublicationOptions } from "@/lib/content-publication";
@@ -37,7 +36,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "./ui/dropdown-menu";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, RotateCcw } from "lucide-react";
+import { EditorAppHeader } from "./patterns/editor-app-header";
 import { PublicationStatus } from "./patterns/publication-status";
 import { FieldDescription } from "./ui/field";
 import { FormField } from "@/components/patterns/form-field";
@@ -78,7 +78,8 @@ import LearningGroups from "./LearningGroups";
 import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
 import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
 import { updateAudienceKeys } from "@/lib/content-audiences";
-import { assignLearningToAudiences } from "@/lib/assignment-audiences";
+import { assignLearningToAudiences, assignmentAudiences } from "@/lib/assignment-audiences";
+import { expandLearning } from "@/lib/learning-groups";
 import {
   OrganizationChangeCanceledError,
   type OrganizationChangeOptions,
@@ -2083,9 +2084,9 @@ export function Editor({
     options?: OrganizationChangeOptions,
   ) => void | Promise<void>;
 }) {
+  useCollapseDesktopSidebar();
   const notify = useToast();
   const form = useRef<HTMLFormElement>(null);
-  const focus = useEditorFocus(form);
   const [savedMessage, setSavedMessage] = useState("");
   const [detailsReveal, setDetailsReveal] = useState<DetailsReveal>();
   const [revealStep, setRevealStep] = useState<{
@@ -2233,7 +2234,7 @@ export function Editor({
     }, 900);
     return () => clearTimeout(timer);
   }, [c, dirty, busy, saving]);
-  useEditorLayout(form, focus.active);
+  useEditorLayout(form);
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (pendingUploads.current || recoveringNow.current) return false;
@@ -2446,6 +2447,12 @@ export function Editor({
       message: "Add a title",
       field: "editor-title",
     });
+  if (c.kind !== "course" && !c.body.trim())
+    requirements.push({
+      id: "body",
+      message: "Add content",
+      field: "editor-body",
+    });
   if (!c.summary.trim())
     requirements.push({
       id: "summary",
@@ -2540,9 +2547,6 @@ export function Editor({
         target: item.target,
         questionId: item.questionId,
       });
-    } else if (item.field?.startsWith("editor-") && !window.matchMedia("(max-width: 767px)").matches) {
-      const field = document.getElementById(item.field);
-      if (field) revealEditorTarget(field);
     } else {
       setDetailsReveal((current) => ({
         request: (current?.request || 0) + 1,
@@ -2585,10 +2589,13 @@ export function Editor({
     ? uploadCount ? "Uploading…" : "Saving…"
     : queue.current!.blocked ? "Changes not saved"
     : dirty ? "Saving…" : savedMessage || (existing ? "Saved" : "Not saved");
+  const audienceAssigned = c.kind === "brief"
+    ? updateAudienceKeys(c).length > 0
+    : c.kind === "course" && assignmentAudiences(data).some((audience) => expandLearning(audience.items, data.curricula || []).includes(c.id));
+  const audienceLabel = audienceAssigned ? "Edit Audience" : "Assign audience";
   const details = (
     <FieldGroup disabled={busy} className="editor-details-content">
-      <EditorDetailsGroup id="writing-readiness" title="Before publishing">
-        {requirements.length ? (
+      {requirements.length > 0 && <EditorDetailsGroup id="writing-readiness" title="Before publishing">
           <ul className="grid gap-2">
             {requirements.map((item) => (
               <li key={item.id}>
@@ -2604,37 +2611,23 @@ export function Editor({
               </li>
             ))}
           </ul>
-        ) : (
-          <p className="text-copy text-muted-foreground">
-            {publicationChanged
-              ? "Ready to publish."
-              : "Published version is current."}
-          </p>
-        )}
-        <FieldDescription>
-          Drafts save automatically. Publish when ready for readers.
-        </FieldDescription>
-      </EditorDetailsGroup>
+      </EditorDetailsGroup>}
       <EditorDetailsGroup id="writing-summary" title="Short description">
-        <FormField label="Short description" visuallyHiddenLabel>
+        <FormField label="Short description" visuallyHiddenLabel description={`${c.summary.length}/300`}>
           <Textarea
             id="editor-summary"
             size="compact"
             rows={3}
             maxLength={300}
             value={c.summary}
-            onChange={(event) => set("summary", event.target.value)}
-            placeholder={
-              c.kind === "course"
-                ? "What will people learn?"
-                : "What will people find here?"
-            }
+            onChange={(event) => set("summary", event.target.value.slice(0, 300))}
+            placeholder="Max 300 characters…"
           />
         </FormField>
       </EditorDetailsGroup>
       <EditorDetailsGroup
         id="writing-organization"
-        title={c.kind === "doc" ? "Docs section" : "Category"}
+        title={c.kind === "doc" ? "Section" : "Category"}
       >
         {c.kind === "doc" ? (
           <>
@@ -2661,6 +2654,8 @@ export function Editor({
             {onWorkspaceChange && (
               <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 disabled={busy}
                 onClick={() => setCreatingSection((open) => !open)}
               >
@@ -2715,26 +2710,23 @@ export function Editor({
                 .filter((item) => item.kind === c.kind)
                 .map((item) => item.category)}
               listLabel="Categories"
+              visibleRows={5}
               placeholder="Choose or add category…"
             />
           </FormField>
         )}
       </EditorDetailsGroup>
-      {c.kind !== "doc" && (c.kind === "brief" || onLearning) && (
+      {c.kind !== "doc" && (
         <EditorDetailsGroup
           id="content-assignments"
           title="Audience"
-          description={
-            c.kind === "brief"
-              ? "Appears in For you. No completion requirement or due date. Publish audience changes to make them live."
-              : "Appears in For you and counts toward assigned learning. Due dates follow organization settings."
-          }
         >
           {c.kind === "brief" ? (
             <LearningAssignmentPicker
               data={data}
               item={{ kind: "brief", id: c.id }}
               title={c.title || "Untitled update"}
+              triggerLabel={audienceLabel}
               draftAudiences={updateAudienceKeys(c)}
               showPeople={!!onWorkspaceChange}
               onPrepare={
@@ -2771,6 +2763,7 @@ export function Editor({
               data={data}
               item={{ kind: "course", id: c.id }}
               title={c.title}
+              triggerLabel={audienceLabel}
               onChange={async (next, options) => {
                 await onWorkspaceChange(next, options);
                 setAssignmentSave((count) => count + 1);
@@ -2782,9 +2775,10 @@ export function Editor({
               }}
             />
           ) : (
-            <p className="text-copy text-muted-foreground">
-              Publish this course to assign it to teams or groups.
-            </p>
+            <div className="grid gap-2">
+              <Button type="button" variant="outline" disabled>{audienceLabel}</Button>
+              <FieldDescription>{!c.publishedRevision ? "Publish to assign an audience." : "Audience assignment requires an administrator."}</FieldDescription>
+            </div>
           )}
         </EditorDetailsGroup>
       )}
@@ -2818,7 +2812,7 @@ export function Editor({
       )}
       {c.kind === "course" && (
         <>
-          <EditorDetailsGroup id="course-duration" title="Course details">
+          <EditorDetailsGroup id="course-duration" title="Duration">
             <FormField label="Estimated minutes">
               <Input
                 type="number"
@@ -2831,27 +2825,29 @@ export function Editor({
               />
             </FormField>
           </EditorDetailsGroup>
-          {existing && (
-            <EditorDetailsGroup id="course-version" title="Publishing">
-              <Field orientation="horizontal">
-                <Checkbox
-                  checked={refresh}
-                  disabled={saving}
-                  aria-describedby="course-version-help"
-                  onCheckedChange={(checked) => setRefresh(checked === true)}
-                />
-                Publish a new version and start a new completion window
-              </Field>
-              <FieldDescription id="course-version-help">
-                Current version: {c.version}. Keep this unchecked for minor
-                corrections.
-              </FieldDescription>
-            </EditorDetailsGroup>
-          )}
+          <EditorDetailsGroup id="course-version" title="Version">
+            <FieldDescription>Current version: {c.version}</FieldDescription>
+            {!!c.publishedRevision && (
+              <>
+                <Field orientation="horizontal">
+                  <Checkbox
+                    checked={refresh}
+                    disabled={saving}
+                    aria-describedby="course-version-help"
+                    onCheckedChange={(checked) => setRefresh(checked === true)}
+                  />
+                  Publish new version and reassign to audiences.
+                </Field>
+                <FieldDescription id="course-version-help">
+                  Keep this unchecked for minor corrections.
+                </FieldDescription>
+              </>
+            )}
+          </EditorDetailsGroup>
         </>
       )}
       {c.kind === "brief" && !!c.publishedRevision && (
-        <EditorDetailsGroup id="update-publication" title="Publishing">
+        <EditorDetailsGroup id="update-publication" title="Updates feed">
           <Field orientation="horizontal">
             <Checkbox
               checked={renewUpdate}
@@ -2862,40 +2858,52 @@ export function Editor({
             Bring this update to the top
           </Field>
           <FieldDescription id="update-publication-help">
-            Move this update forward in Updates and For you when published.
             Keep this unchecked for minor corrections.
           </FieldDescription>
         </EditorDetailsGroup>
       )}
-      {!!c.publishedRevision && (
-        <ActionGroup>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={
-              busy ||
-              saving ||
-              needsRecovery ||
-              !publicationChanged ||
-              !onLoadPublished ||
-              !onReload
-            }
-            onClick={() => void restorePublished()}
-          >
-            Revert to published version
-          </Button>
-        </ActionGroup>
-      )}
+
     </FieldGroup>
   );
+  const recovery = !!c.publishedRevision && (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="justify-start px-0 font-normal"
+      disabled={
+        busy ||
+        saving ||
+        needsRecovery ||
+        !publicationChanged ||
+        !onLoadPublished ||
+        !onReload
+      }
+      onClick={() => void restorePublished()}
+    >
+      <RotateCcw aria-hidden="true" />
+      Revert to published version
+    </Button>
+  );
+  const canvasNavigation = (
+        <DetailNavigation
+          flush
+          disabled={busy}
+          items={[
+            {
+              label: "Back to content",
+              onSelect: async () => {
+                if (await guard.current()) onCancel();
+              },
+            },
+          ]}
+        />
+  );
   return (
-    <EditorFocusContext.Provider value={{ active: focus.active, toggle: focus.toggle, status: needsRecovery ? "Not saved" : saveStatus,
-      }}>
     <form
       ref={form}
       className="editor"
-      data-focus-mode={focus.active || undefined}
+      data-kind={c.kind}
       data-scroll-layout="page"
       onSubmit={(event) => void submit(event, "draft")}
       onKeyDown={(event) => {
@@ -2908,24 +2916,8 @@ export function Editor({
         }
       }}
     >
-      <div className="editor-heading">
-        <h1 className="sr-only">
-          {c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"}{" "}
-          editor
-        </h1>
-        <DetailNavigation
-          flush
-          compact
-          disabled={busy}
-          items={[
-            {
-              label: "Back to content",
-              onSelect: async () => {
-                if (await guard.current()) onCancel();
-              },
-            },
-          ]}
-        />
+      <h1 className="sr-only">{c.kind === "doc" ? "Doc" : c.kind === "brief" ? "Update" : "Course"} editor</h1>
+      <EditorAppHeader>
         <div className="editor-heading-actions">
           <EditorSaveStatus
             status={saveStatus}
@@ -2949,7 +2941,7 @@ export function Editor({
             Publish
           </Button>
         </div>
-      </div>
+      </EditorAppHeader>
       {error && (
         <Alert
           variant="destructive"
@@ -3018,27 +3010,13 @@ export function Editor({
         </p>
       )}
       <FieldGroup disabled={busy} className="editor-content flex min-h-0 flex-col">
-        <section
-          className="editor-introduction"
-          aria-label={
-            c.kind === "course" ? "Course introduction" : "Content introduction"
-          }
-        >
-          <FormField label="Title" visuallyHiddenLabel>
-            <Input
-              id="editor-title"
-              variant="title"
-              maxLength={160}
-              value={c.title}
-              onChange={(event) => set("title", event.target.value)}
-              placeholder={`Untitled ${c.kind === "doc" ? "doc" : c.kind === "brief" ? "update" : "course"}`}
-            />
-          </FormField>
-        </section>
         {c.kind === "course" ? (
           <CourseBuilder
             course={c}
+            navigation={canvasNavigation}
+            introduction={<WritingTitle id="editor-title" aria-label="Title" maxLength={160} disabled={busy} value={c.title} onChange={(event) => set("title", event.target.value.replace(/\n/g, " "))} placeholder="Untitled course" />}
             details={details}
+            recovery={recovery}
             requirementsCount={requirements.length}
             revealDetails={detailsReveal}
             incompleteSteps={[
@@ -3055,17 +3033,22 @@ export function Editor({
             />
           ) : (
             <EditorFrame
+              navigation={canvasNavigation}
               details={details}
+              recovery={recovery}
+              download={{ value: c.body, name: c.title }}
               requirementsCount={requirements.length}
               revealDetails={detailsReveal}
               disabled={busy}
             >
               <WritingEditor
+                canvas
                 downloadName={c.title}
                 label={c.kind === "doc" ? "Doc content" : "Update content"}
                 title={
-                  focus.active ? (
                     <WritingTitle
+                      id="editor-title"
+                      disabled={busy}
                       aria-label="Title"
                       maxLength={160}
                       value={c.title}
@@ -3074,7 +3057,6 @@ export function Editor({
                       }
                       placeholder={`Untitled ${c.kind === "doc" ? "doc" : "update"}`}
                     />
-                  ) : undefined
                 }
                 value={c.body}
                 onChange={(value) => set("body", value)}
@@ -3085,6 +3067,5 @@ export function Editor({
           )}
         </FieldGroup>
       </form>
-    </EditorFocusContext.Provider>
   );
 }

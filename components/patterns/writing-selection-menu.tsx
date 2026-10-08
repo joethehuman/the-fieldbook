@@ -10,17 +10,18 @@ import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { createWritingBlock, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
 import { useWritingInteraction } from "./writing-interaction";
-import { usePhoneLayout } from "./use-phone-layout";
+import { useWritingControlsLayout } from "./use-editor-cards-layout";
 
 type SelectionMenuController = (keyboard: boolean) => boolean;
 
 /** Non-modal formatting tools keep the real editor selection as their target. */
-export function WritingSelectionMenu({ disabled, onReady }: {
+export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = true }: {
+  showPhoneTrigger?: boolean;
   disabled: boolean;
   onReady: (controller: SelectionMenuController | null) => void;
 }) {
   const editor = useCellValue(activeEditor$);
-  const phone = usePhoneLayout();
+  const phone = useWritingControlsLayout();
   const phoneTrigger = useRef<HTMLButtonElement>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const format = useCellValue(currentFormat$);
@@ -65,7 +66,7 @@ export function WritingSelectionMenu({ disabled, onReady }: {
     saved.current = selection;
     savedEditor.current = editor;
     virtualAnchor.current = { getBoundingClientRect: () => phone
-      ? phoneTrigger.current?.getBoundingClientRect() || new DOMRect()
+      ? phoneTrigger.current?.getBoundingClientRect() || range.current?.getBoundingClientRect() || new DOMRect()
       : range.current?.getBoundingClientRect() || new DOMRect(), contextElement: surface };
     return true;
   }, [editor, disabled, phone]);
@@ -174,7 +175,7 @@ export function WritingSelectionMenu({ disabled, onReady }: {
   const currentStyle = writingBlockStyles.find(({ kind }) => kind === (listType || blockType)) || writingBlockStyles[0];
 
   return <>
-    {phone && <Button ref={phoneTrigger} type="button" variant="ghost" size="icon" className="writing-phone-format"
+    {phone && showPhoneTrigger && <Button ref={phoneTrigger} type="button" variant="ghost" size="icon" className="writing-phone-format"
       aria-label="Format selected text" aria-expanded={open} disabled={disabled || !hasSelection}
       onPointerDown={(event) => event.preventDefault()} onClick={(event) => show(event.detail === 0)}><Type aria-hidden="true" /></Button>}
     <Popover open={open && !disabled} onOpenChange={(next) => { if (!next) dismiss(); }}>

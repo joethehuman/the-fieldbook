@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, type RefObject } from "react";
+import { compactLayoutQuery } from "./use-compact-layout";
 
 /** Keep phone writing in page flow; reserve keyboard space without resizing it. */
 export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
@@ -10,7 +11,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     const owner = root?.closest<HTMLElement>(".main-content");
     const viewport = window.visualViewport;
     if (!root || !editor || !owner || !viewport) return;
-    const phone = window.matchMedia("(max-width: 767px)");
+    const phone = window.matchMedia(compactLayoutQuery);
     let request = 0;
     let settle = 0;
     let closing = 0;
@@ -59,7 +60,9 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       if (!caret.height) return;
       const bounds = owner!.getBoundingClientRect();
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const top = Math.max(bounds.top, viewport!.offsetTop) + rem;
+      const navigation = root!.closest(".editor-frame-canvas")?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().bottom || bounds.top;
+      const heading = root!.querySelector(".writing-document-heading")?.getBoundingClientRect().bottom || bounds.top;
+      const top = Math.max(bounds.top, viewport!.offsetTop, navigation, heading) + rem;
       const bottom = Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height) - (keyboardOpen ? 3 : 1) * rem;
       if (bottom <= top) return;
       const delta = caret.bottom > bottom ? caret.bottom - bottom : caret.top < top ? caret.top - top : 0;
