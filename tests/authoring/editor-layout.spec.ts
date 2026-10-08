@@ -2113,13 +2113,13 @@ for (const kind of ["doc", "brief", "course"] as const) {
       Object.defineProperty(window.visualViewport, "offsetTop", { configurable: true, get: () => state.offsetTop });
       window.visualViewport!.dispatchEvent(new Event("resize"));
     });
-    for (const { height, offsetTop } of [{ height: 490, offsetTop: 0 }, { height: 400, offsetTop: 90 }]) {
+    for (const { height, offsetTop } of [{ height: 490, offsetTop: 0 }, { height: 400, offsetTop: 35 }, { height: 460, offsetTop: 90 }]) {
       await page.evaluate((next) => {
         Object.assign((window as unknown as { dockViewport: typeof next }).dockViewport, next);
         window.visualViewport!.dispatchEvent(new Event("resize"));
         window.visualViewport!.dispatchEvent(new Event("scroll"));
       }, { height, offsetTop });
-      await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(height + offsetTop - 12, 0);
+      await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(height + offsetTop - 48, 0);
       const detailsToggle = dock.getByRole("button", { name: "Details", exact: true });
       await detailsToggle.click();
       const details = page.getByRole("complementary", { name: "Content details", exact: true });
@@ -2153,4 +2153,153 @@ test("portrait touch tablets keep the existing dock cutoff and desktop returns w
     await expect(page.getByRole("button", { name: "Back to content", exact: true })).toBeVisible();
     expect(await writer!.evaluate((node) => node.isConnected)).toBe(true);
   } finally { await context.close(); }
+});
+
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: compact commands require prose focus and cannot overlap panels`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await open(page, info.project.name.startsWith("production"), kind);
+    const writing = page.getByRole("textbox", { name: kind === "course" ? "Lesson content" : kind === "doc" ? "Doc content" : "Update content", exact: true });
+    const commands = page.getByRole("button", { name: /^Commands:/ });
+    await expect(commands).toBeDisabled();
+    await page.locator("#editor-title").click();
+    await expect(commands).toBeDisabled();
+    if (kind === "course") {
+      await page.getByRole("textbox", { name: "Lesson title", exact: true }).click();
+      await expect(commands).toBeDisabled();
+    }
+    const details = page.getByRole("button", { name: "Details", exact: true });
+    await details.click();
+    await expect(commands).toBeDisabled();
+    await page.locator("#editor-summary").click();
+    await expect(commands).toBeDisabled();
+    await details.click();
+    await expect(commands).toBeDisabled();
+    await writing.locator("p").first().click();
+    await expect(commands).toBeEnabled();
+    await commands.click();
+    await expect(page.getByRole("menu", { name: "Insert content", exact: true })).toBeVisible();
+    // Programmatic opens must coordinate too, not only pointer clicks.
+    await details.evaluate((button) => (button as HTMLButtonElement).click());
+    await expect(page.getByRole("complementary", { name: "Content details", exact: true })).toBeVisible();
+    await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+    await expect(commands).toBeDisabled();
+    await details.click();
+    for (const media of ["image", "video"] as const) {
+      await writing.locator("p").first().click();
+      await commands.click();
+      await page.getByRole("menuitem", { name: media === "image" ? "Image" : "Upload video", exact: true }).click();
+      const chooser = page.getByRole("dialog", { name: `Insert ${media}`, exact: true });
+      await expect(chooser).toBeVisible();
+      await details.evaluate((button) => (button as HTMLButtonElement).click());
+      await expect(chooser).toHaveCount(0);
+      await expect(commands).toBeDisabled();
+      await details.click();
+    }
+    await writing.locator("p").first().click();
+    await commands.click();
+    if (kind === "course") {
+      await page.getByRole("button", { name: "Outline", exact: true }).evaluate((button) => (button as HTMLButtonElement).click());
+      await expect(page.getByRole("complementary", { name: "Course outline", exact: true })).toBeVisible();
+      await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+      await expect(commands).toBeDisabled();
+      await page.getByRole("button", { name: "Outline", exact: true }).click();
+    } else await page.keyboard.press("Escape");
+    await page.locator("#editor-title").click();
+    const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+    await page.mouse.move(0, 0);
+    for (const button of await dock.getByRole("button").all()) {
+      const styles = await button.evaluate((element) => {
+        const css = getComputedStyle(element);
+        return { shadow: css.boxShadow, border: css.borderColor, background: css.backgroundColor, appearance: css.appearance, classes: element.className };
+      });
+      expect(styles.classes).not.toContain("shadow-surface");
+      expect(styles.border).toBe("rgba(0, 0, 0, 0)");
+      expect(styles.background).toBe("rgba(0, 0, 0, 0)");
+      expect(styles.appearance).toBe("none");
+      expect(styles.shadow === "none" || !/rgba?\([^)]*(?:1\)|0\.[1-9])/.test(styles.shadow)).toBe(true);
+    }
+    await page.screenshot({ path: info.outputPath(`${kind}-flat-disabled-dock.png`) });
+  });
+}
+
+test("compact native selection stays native until explicit dock formatting hands off focus", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "course");
+  const writing = page.getByRole("textbox", { name: "Lesson content", exact: true });
+  await writing.fill("Format this sentence");
+  await writing.evaluate((element) => {
+    const text = document.createTreeWalker(element.querySelector("p")!, NodeFilter.SHOW_TEXT).nextNode()!;
+    const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 6);
+    const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+    element.dispatchEvent(new Event("pointerup", { bubbles: true }));
+  });
+  await expect(page.locator('[data-writing-selection-menu="true"]')).toHaveCount(0);
+  const commands = page.getByRole("button", { name: /^Commands:/ });
+  await expect(commands).toBeEnabled();
+  if (info.project.use.hasTouch) await commands.tap(); else await commands.click();
+  const popup = page.locator('[data-writing-selection-menu="true"]').first();
+  await expect(popup).toBeVisible();
+  await expect(page.getByRole("menu", { name: "Insert content", exact: true })).toHaveCount(0);
+  expect(await page.evaluate(() => window.getSelection()?.toString())).toBe("");
+  await expect(popup.getByRole("button").first()).toBeFocused();
+  const box = (await popup.boundingBox())!, dock = (await page.getByRole("group", { name: "Editor controls", exact: true }).boundingBox())!;
+  expect(box.y + box.height).toBeLessThanOrEqual(dock.y - 3);
+  await popup.getByRole("button", { name: "Bold", exact: true }).click();
+  await expect(popup).toHaveCount(0);
+  await expect(writing.locator("strong")).toHaveText("Format");
+  await page.keyboard.type("Updated");
+  await expect(writing).toContainText("Updated this sentence");
+  await waitForDraftSaved(page);
+  await writing.press("ControlOrMeta+End");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("/hea");
+  await expect(page.locator(".writing-slash-menu")).toBeVisible();
+  await page.setViewportSize({ width: 900, height: 812 });
+  await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+  await expect(writing).toContainText("/hea");
+});
+
+test("compact dock follows independent viewport sizes, native app panning and dismissal", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "course");
+  const writing = page.getByRole("textbox", { name: "Lesson content", exact: true });
+  await writing.locator("p").first().click();
+  await page.evaluate(() => {
+    const state = { height: 490, offsetTop: 0, innerHeight: 812 };
+    (window as unknown as { dockViewport: typeof state }).dockViewport = state;
+    for (const key of ["height", "offsetTop"] as const) Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => state[key] });
+    Object.defineProperty(window, "innerHeight", { configurable: true, get: () => state.innerHeight });
+  });
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  for (const state of [
+    { height: 490, offsetTop: 0, innerHeight: 812 },
+    { height: 430, offsetTop: 30, innerHeight: 490 },
+    { height: 390, offsetTop: 60, innerHeight: 720 },
+    { height: 470, offsetTop: 80, innerHeight: 812 },
+  ]) {
+    await page.evaluate((next) => {
+      Object.assign((window as unknown as { dockViewport: typeof next }).dockViewport, next);
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      window.visualViewport!.dispatchEvent(new Event("scroll"));
+      window.dispatchEvent(new Event("scroll"));
+    }, state);
+    await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(state.height + state.offsetTop - 48, 0);
+  }
+  // WebKit can pan the app's client rectangle independently of its scrollTop.
+  await page.locator(".app").evaluate((app) => { (app as HTMLElement).style.transform = "translateY(-84px)"; window.dispatchEvent(new Event("scroll")); });
+  await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(502, 0);
+  await page.getByRole("button", { name: /^Commands:/ }).click();
+  const menu = page.locator(".writing-slash-menu");
+  await expect(menu).toBeVisible();
+  const popup = (await menu.boundingBox())!, controls = (await dock.boundingBox())!;
+  expect(popup.y + popup.height).toBeLessThanOrEqual(controls.y - 7);
+  await page.keyboard.press("Escape");
+  await page.locator(".app").evaluate((app) => { (app as HTMLElement).style.removeProperty("transform"); });
+  await page.evaluate(() => {
+    Object.assign((window as unknown as { dockViewport: { height: number; offsetTop: number; innerHeight: number } }).dockViewport, { height: 812, offsetTop: 90, innerHeight: 490 });
+    window.visualViewport!.dispatchEvent(new Event("resize")); window.dispatchEvent(new Event("scroll"));
+  });
+  await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(800, 0);
+  await page.screenshot({ path: info.outputPath("dock-after-viewport-dismissal.png") });
 });

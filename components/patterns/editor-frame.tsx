@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ListTree, SlidersHorizontal, X } from "lucide-react";
 import { MarkdownDownloadButton } from "./markdown-download";
@@ -11,6 +11,7 @@ import { revealEditorTarget } from "./reveal-editor-target";
 import { useEditorCardsLayout } from "./use-editor-cards-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
+export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
 
 export type DetailsReveal = { request: number; field?: string };
 
@@ -70,40 +71,85 @@ export function EditorFrame({
     if (!element) return;
     const owner = frame.current?.closest<HTMLElement>(".main-content");
     const header = frame.current?.closest(".app")?.querySelector<HTMLElement>(".topbar");
+    let request = 0;
+    let followUntil = 0;
+    let layoutWidth = document.documentElement.clientWidth;
+    let layoutHeight = document.documentElement.clientHeight;
+    let keyboard = false;
     const measure = () => {
       const viewport = window.visualViewport;
-      const bottom = (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
-      if (phone) element.style.setProperty("--editor-dock-offset", `${Math.max(0, window.innerHeight - bottom)}px`);
+      const appBounds = overlayHost?.getBoundingClientRect();
+      const rawTop = viewport?.offsetTop || 0;
+      const height = viewport?.height || (phone ? document.documentElement.clientHeight : window.innerHeight);
+      const bottom = phone && appBounds ? Math.min(rawTop + height, appBounds.bottom) : rawTop + height;
+      const visibleTop = phone ? Math.max(0, bottom - height) : rawTop;
+      if (phone) {
+        const width = document.documentElement.clientWidth;
+        if (width !== layoutWidth) { layoutWidth = width; layoutHeight = document.documentElement.clientHeight; }
+        const active = document.activeElement;
+        const editing = active instanceof HTMLElement && (active.isContentEditable || active.matches("input:not([type=button]):not([type=checkbox]), textarea"));
+        const occluded = layoutHeight - height;
+        keyboard = (viewport?.scale || 1) === 1 && (keyboard ? occluded > 80 : editing && occluded > 120);
+        if (!keyboard && !editing) layoutHeight = Math.max(document.documentElement.clientHeight, height);
+        // Work directly in visible coordinates, relative to the positioned app.
+        // This also compensates for native viewport panning of the app itself.
+        element.style.setProperty("--editor-dock-bottom", `${bottom - (appBounds?.top || 0)}px`);
+        const centered = !viewport?.offsetLeft && Math.abs((viewport?.width || window.innerWidth) - (appBounds?.width || window.innerWidth)) < 1;
+        element.style.setProperty("--editor-dock-center", centered ? "50%" : `${(viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) / 2 - (appBounds?.left || 0)}px`);
+        element.style.setProperty("--editor-dock-gap", keyboard ? "max(3rem, env(safe-area-inset-bottom))" : "max(var(--space-3), env(safe-area-inset-bottom))");
+      }
       const rect = element.getBoundingClientRect();
       const bounds = phone ? frame.current?.getBoundingClientRect() || rect : rect;
-      const panelTop = phone ? Math.max(viewport?.offsetTop || 0, header?.getBoundingClientRect().bottom || 0, bounds.top - 8) + 8 : rect.bottom + 8;
+      const panelTop = phone ? Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0, bounds.top - 8) + 8 : rect.bottom + 8;
       const panelBottom = phone ? rect.top - 8 : bottom - 16;
       if (phone) owner?.style.setProperty("--editor-dock-clearance", `${Math.max(80, bottom - rect.top + 12)}px`);
       frame.current?.style.setProperty("--editor-navigation-height", `${phone ? 0 : rect.height}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-top", `${panelTop}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-left", `${bounds.left}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-right", `${window.innerWidth - bounds.right}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-top", `${panelTop - (phone ? appBounds?.top || 0 : 0)}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-left", `${bounds.left - (phone ? appBounds?.left || 0 : 0)}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-right", `${phone && appBounds ? appBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
       overlayLayer.current?.style.setProperty("--editor-panel-max-width", `${bounds.width}px`);
       overlayLayer.current?.style.setProperty("--editor-panel-available-height", `${Math.max(80, panelBottom - panelTop)}px`);
     };
+    const tick = () => {
+      request = 0;
+      measure();
+      if (performance.now() < followUntil) request = requestAnimationFrame(tick);
+    };
+    const schedule = () => {
+      if (!phone) { measure(); return; }
+      if (!request) request = requestAnimationFrame(tick);
+    };
+    const settle = () => { followUntil = performance.now() + 700; schedule(); };
     measure();
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(schedule);
     observer.observe(element);
-    // Recovery notices and header changes affect the available panel space.
     const editor = frame.current?.closest(".editor");
     if (editor) observer.observe(editor);
     if (phone && header) observer.observe(header);
-    owner?.addEventListener("scroll", measure, { passive: true });
-    window.addEventListener("resize", measure);
-    window.visualViewport?.addEventListener("resize", measure);
-    window.visualViewport?.addEventListener("scroll", measure);
+    owner?.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("scroll", schedule);
+    if (phone) {
+      window.addEventListener("scroll", settle, { passive: true });
+      document.addEventListener("focusin", settle);
+      document.addEventListener("focusout", settle);
+      document.addEventListener("touchend", settle, { passive: true });
+    }
     return () => {
+      cancelAnimationFrame(request);
       observer.disconnect();
       if (phone) owner?.style.removeProperty("--editor-dock-clearance");
-      owner?.removeEventListener("scroll", measure);
-      window.removeEventListener("resize", measure);
-      window.visualViewport?.removeEventListener("resize", measure);
-      window.visualViewport?.removeEventListener("scroll", measure);
+      owner?.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("scroll", schedule);
+      if (phone) {
+        window.removeEventListener("scroll", settle);
+        document.removeEventListener("focusin", settle);
+        document.removeEventListener("focusout", settle);
+        document.removeEventListener("touchend", settle);
+      }
     };
   }, [hasNavigation, phone, overlayHost]);
   const wide = useRef(false);
@@ -113,6 +159,8 @@ export function EditorFrame({
   const outlineId = useId();
   const detailsId = useId();
   const [panels, setPanels] = useState({ outline: false, details: false });
+  const dismissPanels = useCallback(() => setPanels({ outline: false, details: false }), []);
+  const compactControls = useMemo(() => phone ? { panelsOpen: panels.outline || panels.details, dismissPanels } : null, [phone, panels.outline, panels.details, dismissPanels]);
   const defaultsApplied = useRef(false);
   const previousClearance = useRef({ outline: false, details: false });
   const hasOutline = !!outline;
@@ -252,7 +300,7 @@ export function EditorFrame({
   const panelControls = (
       <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} role={phone ? "group" : undefined} aria-label={phone ? "Editor controls" : undefined}>
         {outline && (
-          <Button ref={outlineToggle} type="button" variant="outline" size="icon" className={`editor-panel-toggle size-11 ${phone ? "relative rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute rounded-full"}`} data-side="outline"
+          <Button ref={outlineToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle size-11 ${phone ? "relative appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute rounded-full"}`} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
             onClick={() => { defaultsApplied.current = true; setPanels((current) => ({ outline: !current.outline, details: wide.current ? current.details : false })); }}>
@@ -260,7 +308,7 @@ export function EditorFrame({
           </Button>
         )}
         {phone && <div className="editor-writing-actions-host" ref={setWritingActionsHost} />}
-        <Button ref={detailsToggle} type="button" variant="outline" size="icon" className={`editor-panel-toggle size-11 ${phone ? "relative rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute rounded-full"}`} data-side="details"
+        <Button ref={detailsToggle} type="button" variant={phone ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle size-11 ${phone ? "relative appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : "absolute rounded-full"}`} data-side="details"
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
@@ -302,6 +350,7 @@ export function EditorFrame({
         </div>}
   </>;
   return (
+    <EditorCompactControlsContext.Provider value={compactControls}>
     <EditorWritingActionsContext.Provider value={writingActionsHost}>
     <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
       {!phone && panelControls}
@@ -313,6 +362,7 @@ export function EditorFrame({
       {phone && overlayHost && createPortal(<div ref={overlayLayer} className="editor-mobile-panels">{panelSurfaces}</div>, overlayHost)}
     </section>
     </EditorWritingActionsContext.Provider>
+    </EditorCompactControlsContext.Provider>
   );
 }
 

@@ -1062,14 +1062,21 @@ test("Escape dismisses slash and toolbar commands from canvas or popup focus", a
   await expect(menu).toHaveCount(0);
   await expect(editor).toBeFocused();
   await expectMarkdown(page, "/hea");
-  await replaceWritingText(page, "");
-  await editor.click();
+  await editor.press("ControlOrMeta+A");
+  await editor.press("Backspace");
+  await expect(editor).toHaveText("");
   await page.keyboard.type("/h3");
   await menu.getByRole("menuitem", { name: "Close menu esc" }).focus();
   await page.keyboard.press("Escape");
   await expect(menu).toHaveCount(0);
   await expect(editor).toBeFocused();
   await expectMarkdown(page, "/h3");
+  if (await page.locator(".editor-frame").getAttribute("data-cards") !== "true") {
+    await expect(commands).toBeHidden();
+    return;
+  }
+  await editor.click();
+  await expect(commands).toBeEnabled();
   await commands.focus();
   await page.keyboard.press("Enter");
   await expect(menu.getByRole("menuitem", { name: "Normal Text", exact: true })).toBeFocused();

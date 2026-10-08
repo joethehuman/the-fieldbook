@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   activeEditor$,
   cancelLinkEdit$,
@@ -21,10 +21,12 @@ import { FieldDescription } from "../ui/field";
 import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { FormField } from "./form-field";
 import { useWritingInteraction } from "./writing-interaction";
+import { EditorCompactControlsContext } from "./editor-frame";
 
 /** Use the editor's supported dialog state/actions, but anchor in viewport space. */
 export function WritingLinkDialog() {
   const state = useCellValue(linkDialogState$);
+  const compactControls = useContext(EditorCompactControlsContext);
   const editor = useCellValue(activeEditor$);
   const publishState = usePublisher(linkDialogState$);
   const cancel = usePublisher(cancelLinkEdit$);
@@ -39,6 +41,9 @@ export function WritingLinkDialog() {
   const [copyStatus, setCopyStatus] = useState("");
   const [anchorReady, setAnchorReady] = useState(false);
   useWritingInteraction(state.type !== "inactive");
+  useEffect(() => {
+    if (compactControls?.panelsOpen && state.type !== "inactive") publishState({ type: "inactive" });
+  }, [compactControls?.panelsOpen, state.type, publishState]);
 
   useLayoutEffect(() => {
     const surface = editor?.getRootElement();

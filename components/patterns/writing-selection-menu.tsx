@@ -15,7 +15,7 @@ import { normalizeWritingSelection } from "./writing-selection-boundaries";
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $isListNode } from "@lexical/list";
 
-type SelectionMenuController = (keyboard: boolean) => boolean;
+export type SelectionMenuController = { show: (keyboard: boolean, trigger?: HTMLButtonElement) => boolean; dismiss: () => void };
 
 /** Non-modal formatting tools keep the real editor selection as their target. */
 export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = true }: {
@@ -26,6 +26,8 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
   const editor = useCellValue(activeEditor$);
   const phone = useWritingControlsLayout();
   const phoneTrigger = useRef<HTMLButtonElement>(null);
+  const dockTrigger = useRef<HTMLButtonElement | null>(null);
+  const compact = phone && !showPhoneTrigger;
   const [hasSelection, setHasSelection] = useState(false);
   const [selectionStyle, setSelectionStyle] = useState<string | null>(null);
   const format = useCellValue(currentFormat$);
@@ -83,7 +85,7 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
     saved.current = selection;
     savedEditor.current = editor;
     virtualAnchor.current = { getBoundingClientRect: () => phone
-      ? phoneTrigger.current?.getBoundingClientRect() || range.current?.getBoundingClientRect() || new DOMRect()
+      ? dockTrigger.current?.closest(".editor-frame-controls")?.getBoundingClientRect() || phoneTrigger.current?.getBoundingClientRect() || range.current?.getBoundingClientRect() || new DOMRect()
       : range.current?.getBoundingClientRect() || new DOMRect(), contextElement: surface };
     return true;
   }, [editor, disabled, phone]);
@@ -92,17 +94,18 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
     const selection = saved.current;
     return selection ? `${selection.anchor.key}:${selection.anchor.offset}-${selection.focus.key}:${selection.focus.offset}` : "";
   };
-  const show = useCallback((keyboard: boolean) => {
+  const show = useCallback((keyboard: boolean, trigger?: HTMLButtonElement) => {
+    dockTrigger.current = compact ? trigger || null : null;
     if (!snapshot()) return false;
     dismissed.current = "";
-    keyboardOpen.current = keyboard;
+    keyboardOpen.current = keyboard || compact;
     setOpen(true);
     if (keyboard) firstControl.current?.focus({ preventScroll: true });
     return true;
-  }, [snapshot]);
+  }, [snapshot, compact]);
 
   useEffect(() => {
-    onReady(show);
+    onReady({ show, dismiss: () => setOpen(false) });
     return () => onReady(null);
   }, [onReady, show]);
   useEffect(() => {
@@ -170,12 +173,14 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
   }
   function style(kind: WritingBlockStyle) {
     if (!restore()) return;
+    if (compact) dismiss();
     if (kind === "bullet" || kind === "number") applyList(kind);
     else convert(() => createWritingBlock(kind));
     focusEditor();
   }
   function formatText(kind: "bold" | "italic" | "code") {
     if (!restore()) return;
+    if (compact) dismiss();
     applyFormat(kind);
     focusEditor();
   }
@@ -197,13 +202,15 @@ export function WritingSelectionMenu({ disabled, onReady, showPhoneTrigger = tru
       onPointerDown={(event) => event.preventDefault()} onClick={(event) => show(event.detail === 0)}><Type aria-hidden="true" /></Button>}
     <Popover open={open && !disabled} onOpenChange={(next) => { if (!next) dismiss(); }}>
     <PopoverAnchor virtualRef={virtualAnchor} />
-    <PopoverContent data-writing-selection-menu="true" className="w-auto min-w-50 overflow-visible p-1" side={phone ? "bottom" : "top"} align="start" updatePositionStrategy="always"
+    <PopoverContent data-writing-selection-menu="true" className="w-auto min-w-50 overflow-visible p-1" side={compact ? "top" : phone ? "bottom" : "top"} align={compact ? "center" : "start"} updatePositionStrategy="always"
       aria-label="Format selected text"
-      onOpenAutoFocus={(event) => { event.preventDefault(); if (keyboardOpen.current) firstControl.current?.focus({ preventScroll: true }); }}
+      onOpenAutoFocus={(event) => { event.preventDefault(); if (keyboardOpen.current) firstControl.current?.focus({ preventScroll: true }); if (compact) window.getSelection()?.removeAllRanges(); }}
       onCloseAutoFocus={(event) => event.preventDefault()}
       onEscapeKeyDown={() => { if (restore()) focusEditor(); }}
       onInteractOutside={(event) => {
         const target = event.target;
+        // A touch can finish after this popup mounted on the dock's pointerdown.
+        if (compact && target instanceof Node && dockTrigger.current?.contains(target)) { event.preventDefault(); return; }
         if (target instanceof Element && (editor?.getRootElement()?.contains(target) || target.closest("[data-writing-selection-menu]"))) event.preventDefault();
       }}>
       <DropdownMenu modal={false}>
