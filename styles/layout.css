@@ -768,18 +768,18 @@
     mask-image: linear-gradient(
       to right,
       transparent,
-      black var(--space-12),
-      black calc(100% - var(--space-12)),
+      black var(--space-4),
+      black calc(100% - var(--space-4)),
       transparent
     );
   }
   .course-row[data-scroll-before="true"][data-scroll-after="false"] {
-    mask-image: linear-gradient(to right, transparent, black var(--space-12));
+    mask-image: linear-gradient(to right, transparent, black var(--space-4));
   }
   .course-row[data-scroll-before="false"][data-scroll-after="true"] {
     mask-image: linear-gradient(
       to right,
-      black calc(100% - var(--space-12)),
+      black calc(100% - var(--space-4)),
       transparent
     );
   }
