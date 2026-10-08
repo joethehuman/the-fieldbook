@@ -60,6 +60,10 @@
   overflow: auto;
   overscroll-behavior: contain;
 }
+.code-block-scroll,
+.code-block .cm-scroller {
+  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+}
 .code-block-scroll:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: -2px;
