@@ -328,7 +328,7 @@
     z-index: 13;
     flex-shrink: 0;
     background: var(--background);
-    padding: var(--space-3) var(--editor-content-padding) var(--space-1);
+    padding: var(--space-3) var(--editor-content-padding) 0;
     padding-inline: var(--editor-text-inset);
   }
   .editor-canvas-navigation::after {
@@ -416,7 +416,7 @@
   .editor-frame-controls[data-cards="true"] .editor-panel-toggle[data-side="details"] { margin-inline-start: auto; }
   .editor-writing-actions-host { display: flex; min-width: 0; }
   .editor-frame[data-cards="true"] .editor-canvas-navigation {
-    padding: var(--space-2) 0 var(--space-2);
+    padding: var(--space-2) 0 var(--space-1);
     z-index: 13;
   }
   .editor-mobile-panels { --scroll-fade-depth: var(--scroll-fade-size); }

@@ -575,9 +575,13 @@
   position: sticky;
   top: 0;
   z-index: 12;
-  gap: var(--space-2);
+  gap: var(--space-1);
   background: var(--background);
-  padding-block: var(--space-4) var(--space-3);
+  padding-block: var(--space-2) var(--space-3);
+}
+.editor .course-builder-panel .writing-document-heading .document-title {
+  font-size: 1.75rem;
+  line-height: 2.25rem;
 }
 .editor[data-scroll-layout="page"] .writing-document-heading { top: var(--editor-navigation-height, 0px); }
 .editor .writing-document-heading::after {
@@ -595,7 +599,7 @@
 @media (prefers-reduced-motion: reduce) { .editor .writing-document-heading::after { transition: none; } }
 .editor .writing-course-heading {
   flex-shrink: 0;
-  padding: var(--space-4) var(--editor-content-padding, var(--space-6));
+  padding: var(--space-2) var(--editor-content-padding, var(--space-6));
   padding-inline-start: max(52px, var(--editor-content-padding, var(--space-6)));
 }
 .editor .writing-viewport:has(.writing-document-heading) { mask-image: none; }
