@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, type RefObject } from "react";
+import { touchWritingQuery } from "./use-editor-cards-layout";
 import { compactLayoutQuery } from "./use-compact-layout";
 
 /** Keep phone writing in page flow; reserve keyboard space without resizing it. */
@@ -12,6 +13,8 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     const viewport = window.visualViewport;
     if (!root || !editor || !owner || !viewport) return;
     const phone = window.matchMedia(compactLayoutQuery);
+    const touch = window.matchMedia(touchWritingQuery);
+    let dragging = false;
     let request = 0;
     let settle = 0;
     let closing = 0;
@@ -22,16 +25,20 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       delete owner!.dataset.phoneKeyboardClosing;
     }
     function reserveSpace() {
-      if (!phone.matches || viewport!.scale !== 1) {
+      if (!phone.matches || !touch.matches || viewport!.scale !== 1) {
         keyboardOpen = false;
         space = 0;
         clear();
         return;
       }
-      const occluded = window.innerHeight - viewport!.height;
+      const occluded = document.documentElement.clientHeight - viewport!.height;
       keyboardOpen = keyboardOpen ? occluded > 48 : editor!.contains(document.activeElement) && occluded > 100;
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
-      const next = keyboardOpen ? Math.max(0, window.innerHeight - viewport!.offsetTop - viewport!.height) + 3 * rem : 0;
+      // innerHeight can already be keyboard-sized in iOS browser views. Reserve
+      // the obscured part of the actual scroll owner, including native panning.
+      const bounds = owner!.getBoundingClientRect();
+      const visibleBottom = Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height);
+      const next = keyboardOpen ? Math.max(0, bounds.bottom - visibleBottom) + (editor!.querySelector(".editor-frame[data-dock=true]") ? 0 : 3 * rem) : 0;
       if (next === space) return;
       clearTimeout(closing);
       if (next === 0 && space > 0) {
@@ -44,7 +51,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       owner!.style.setProperty("--phone-keyboard-space", `${space}px`);
     }
     function revealCaret() {
-      if (!phone.matches || viewport!.scale !== 1 || !root!.contains(document.activeElement)) return;
+      if (dragging || !phone.matches || !touch.matches || viewport!.scale !== 1 || !root!.contains(document.activeElement)) return;
       const selection = window.getSelection();
       if (!selection?.rangeCount || !selection.isCollapsed || !root!.contains(selection.focusNode)) return;
       const element = selection.focusNode instanceof Element ? selection.focusNode : selection.focusNode?.parentElement;
@@ -69,7 +76,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       const delta = caret.bottom > bottom ? caret.bottom - bottom : caret.top < top ? caret.top - top : 0;
       if (Math.abs(delta) < 1) return;
       const next = Math.max(0, Math.min(owner!.scrollHeight - owner!.clientHeight, owner!.scrollTop + delta));
-      owner!.scrollTo({ top: next, behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth" });
+      owner!.scrollTo({ top: next, behavior: "instant" });
     }
     function cancelReveal() {
       clearTimeout(settle);
@@ -85,29 +92,37 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     function pan() { reserveSpace(); }
     function editing() { reserveSpace(); schedule(); }
     function blur() { reserveSpace(); }
+    function startDrag() { dragging = true; cancelReveal(); }
+    function endDrag() { dragging = false; }
     reserveSpace();
     viewport.addEventListener("resize", resize);
     viewport.addEventListener("scroll", pan);
+    window.addEventListener("scroll", pan, { passive: true });
     phone.addEventListener("change", resize);
+    touch.addEventListener("change", resize);
     editor.addEventListener("focusin", editing);
     editor.addEventListener("focusout", blur);
     root.addEventListener("input", editing);
-    document.addEventListener("selectionchange", schedule);
     owner.addEventListener("wheel", cancelReveal, { passive: true });
-    owner.addEventListener("touchstart", cancelReveal, { passive: true });
+    owner.addEventListener("touchstart", startDrag, { passive: true });
+    window.addEventListener("touchend", endDrag);
+    window.addEventListener("touchcancel", endDrag);
     return () => {
       cancelReveal();
       clearTimeout(closing);
       clear();
       viewport.removeEventListener("resize", resize);
       viewport.removeEventListener("scroll", pan);
+      window.removeEventListener("scroll", pan);
       phone.removeEventListener("change", resize);
+      touch.removeEventListener("change", resize);
       editor.removeEventListener("focusin", editing);
       editor.removeEventListener("focusout", blur);
       root.removeEventListener("input", editing);
-      document.removeEventListener("selectionchange", schedule);
       owner.removeEventListener("wheel", cancelReveal);
-      owner.removeEventListener("touchstart", cancelReveal);
+      owner.removeEventListener("touchstart", startDrag);
+      window.removeEventListener("touchend", endDrag);
+      window.removeEventListener("touchcancel", endDrag);
     };
   }, [ref]);
 }

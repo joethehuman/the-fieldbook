@@ -1015,7 +1015,7 @@ test("selected text keeps contextual formatting without a desktop toolbar", asyn
   const writer = page.locator('.writing-content[contenteditable="true"]');
   await writer.fill("Keep this selection");
   await writer.press("ControlOrMeta+A");
-  const native = await page.evaluate(() => matchMedia("(width < 768px), (pointer: coarse)").matches);
+  const native = await page.evaluate(() => matchMedia("(pointer: coarse) and (not (any-pointer: fine))").matches);
   const tools = page.getByRole("dialog", { name: "Format selected text", exact: true });
   if (native) {
     await expect(tools).toHaveCount(0);
@@ -2055,8 +2055,11 @@ test("editor delete failure retains the draft and uses the latest saved revision
   await expect(remove).toBeEnabled();
 });
 
+test.describe("touch-only writing dock", () => {
+  test.use({ hasTouch: true });
+
 for (const kind of ["doc", "brief", "course"] as const) {
-  test(`${kind}: thin line toolbar preserves editing and stays inside the visible keyboard area`, async ({ page }, info) => {
+  test(`${kind}: stable bottom toolbar preserves editing and stays inside the visible keyboard area`, async ({ page }, info) => {
     await page.setViewportSize({ width: 375, height: 812 });
     const { read } = await open(page, info.project.name.startsWith("production"), kind);
     const writing = page.getByRole("textbox", { name: kind === "course" ? "Lesson content" : kind === "doc" ? "Doc content" : "Update content", exact: true });
@@ -2380,14 +2383,14 @@ for (const device of ["iPhone", "iPad", "Android"] as const) {
   });
 }
 
-test("thin compact toolbar follows the actual wrapped line without moving the canvas", async ({ page }, info) => {
+test("bottom toolbar stays steady through wrapped lines, selection and scrolling", async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, info.project.name.startsWith("production"), "doc");
   const writing = page.getByRole("textbox", { name: "Doc content", exact: true });
   const dock = page.getByRole("group", { name: "Editor controls", exact: true });
-  await writing.fill("A long paragraph that wraps across several lines so the controls follow the cursor rather than the bottom of this whole paragraph.");
+  await writing.fill("A long paragraph that wraps across several lines so the cursor moves while the controls remain in a predictable place.");
   const canvasLeft = (await writing.boundingBox())!.x;
-  const position = async (offset: number) => {
+  for (const offset of [5, 55, 90]) {
     await writing.evaluate((element, offset) => {
       element.focus();
       const text = document.createTreeWalker(element.querySelector("p")!, NodeFilter.SHOW_TEXT).nextNode()!;
@@ -2395,38 +2398,78 @@ test("thin compact toolbar follows the actual wrapped line without moving the ca
       const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
       document.dispatchEvent(new Event("selectionchange"));
     }, offset);
-    await expect(dock).toHaveAttribute("data-follows-line", "true");
-    await expect.poll(async () => {
-      const line = await writing.evaluate(() => window.getSelection()!.getRangeAt(0).getClientRects()[0].bottom);
-      return (await dock.boundingBox())!.y - line;
-    }).toBeCloseTo(8, 0);
-  };
-  await position(5);
-  const first = (await dock.boundingBox())!;
-  expect(first.height).toBe(46);
-  expect(first.width).toBeLessThan(260);
-  await position(55);
-  expect((await dock.boundingBox())!.y).toBeGreaterThan(first.y);
-  await position((await writing.locator("p").first().textContent())!.length);
-  await page.keyboard.press("Enter");
+    await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(800, 0);
+  }
+  await writing.fill("Final line");
+  await writing.press("End");
+  await writing.press("Enter");
   await expect(writing.locator("p").last()).toHaveText("");
-  await expect(dock).toHaveAttribute("data-follows-line", "true");
-  await expect.poll(async () => (await dock.boundingBox())!.y - (await writing.locator("p").last().boundingBox())!.y - (await writing.locator("p").last().boundingBox())!.height).toBeCloseTo(8, 0);
-  await position(55);
   expect((await writing.boundingBox())!.x).toBe(canvasLeft);
-  await page.screenshot({ path: info.outputPath("thin-line-toolbar-active.png") });
-  await dock.getByRole("button", { name: /^Commands:/ }).click();
+  await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(800, 0);
+  await dock.getByRole("button", { name: /^Commands:/ }).tap();
   const menu = page.getByRole("menu", { name: "Insert content", exact: true });
   await expect(menu).toBeVisible();
   const box = (await menu.boundingBox())!, controls = (await dock.boundingBox())!;
-  expect(box.y + box.height <= controls.y - 7 || box.y >= controls.y + controls.height + 7).toBe(true);
-  expect(box.y).toBeGreaterThanOrEqual((await page.locator(".topbar").boundingBox())!.height);
+  expect(box.y + box.height).toBeLessThanOrEqual(controls.y - 7);
   await page.keyboard.press("Escape");
   await expect(writing).toBeFocused();
-  await page.locator("#editor-title").click();
-  await expect(dock).not.toHaveAttribute("data-follows-line", "true");
-  await expect.poll(async () => { const box = (await dock.boundingBox())!; return box.y + box.height; }).toBeCloseTo(800, 0);
-  await page.screenshot({ path: info.outputPath("thin-line-toolbar.png") });
+  await page.screenshot({ path: info.outputPath("stable-bottom-toolbar.png") });
+});
+
+test("touch selection and manual scrolling do not pull writing back to the caret", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await writer.fill(Array.from({ length: 60 }, (_, i) => `Writing paragraph ${i + 1}.`).join("\n\n"));
+  const owner = page.locator(".main-content");
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport, "height", { configurable: true, get: () => 490 });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  // Allow the resize correction to settle before an intentional scroll gesture.
+  await expect.poll(() => owner.evaluate((element) => element.scrollTop)).toBeGreaterThan(500);
+  await owner.evaluate((element) => {
+    element.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    element.scrollTop = 300;
+    document.dispatchEvent(new Event("selectionchange"));
+    window.dispatchEvent(new Event("touchend"));
+  });
+  await page.waitForTimeout(180); // Exceeds the caret-correction debounce.
+  expect(await owner.evaluate((element) => element.scrollTop)).toBeCloseTo(300, 0);
+  const commands = page.getByRole("button", { name: /^Commands:/ });
+  await commands.dispatchEvent("pointerdown", { pointerId: 1, pointerType: "touch", isPrimary: true, button: 0 });
+  await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+  await commands.dispatchEvent("pointercancel", { pointerId: 1, pointerType: "touch", isPrimary: true });
+  await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+  await commands.tap();
+  await expect(page.locator(".writing-slash-menu")).toBeVisible();
+});
+
+test("last writing line stays reachable when innerHeight is already keyboard-sized", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await writer.fill(Array.from({ length: 60 }, (_, i) => `Writing line ${i + 1}.`).join("\n\n"));
+  await writer.press("End");
+  await writer.press("Enter");
+  await expect(writer.locator("p").last()).toHaveText("");
+  await page.evaluate(() => {
+    const state = { height: 390, offsetTop: 35, innerHeight: 390 };
+    (window as unknown as { keyboardViewport: typeof state }).keyboardViewport = state;
+    for (const key of ["height", "offsetTop"] as const) Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => state[key] });
+    Object.defineProperty(window, "innerHeight", { configurable: true, get: () => state.innerHeight });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  for (const pan of [false, true]) {
+    if (pan) await page.locator(".app").evaluate((app) => {
+      (app as HTMLElement).style.transform = "translateY(-84px)";
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+    });
+    await expect.poll(async () => (await writer.locator("p").last().boundingBox())!.y + (await writer.locator("p").last().boundingBox())!.height - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-7);
+    expect(await page.locator(".main-content").evaluate((owner) => parseFloat(getComputedStyle(owner).getPropertyValue("--phone-keyboard-space")))).toBeGreaterThan(150);
+  }
+  await page.screenshot({ path: info.outputPath("last-line-keyboard-sized-inner-height.png") });
 });
 
 test("compact insertion palette exposes commands in a short keyboard viewport", async ({ page }, info) => {
@@ -2514,3 +2557,78 @@ for (const kind of ["doc", "course"] as const) {
     expect(await title.evaluate((input) => (input as HTMLInputElement).selectionStart)).toBe(2);
   });
 }
+
+});
+
+test.describe("mouse writing controls", () => {
+  test.use({ hasTouch: false });
+for (const width of [640, 767, 900, 1440]) {
+  test(`mouse editor at ${width}px keeps in-page controls and contextual formatting`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 1000 });
+    await open(page, info.project.name.startsWith("production"), "doc");
+    await expect(page.locator('.editor-frame-controls[data-dock="true"]')).toHaveCount(0);
+    await expect(page.locator(".editor-canvas-navigation")).toBeVisible();
+    const details = page.getByRole("button", { name: "Details", exact: true });
+    await expect(details).toBeVisible();
+    if (width < 768) {
+      await expect(page.getByRole("button", { name: "Back to content", exact: true })).toHaveCount(0);
+      const commands = page.getByRole("button", { name: /^Commands:/ });
+      await expect(commands).toBeVisible();
+      expect((await details.boundingBox())!.x).toBeGreaterThan((await commands.boundingBox())!.x + (await commands.boundingBox())!.width);
+    }
+    const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+    await writer.fill("Keep desktop formatting");
+    await writer.evaluate((element) => {
+      const text = document.createTreeWalker(element.querySelector("p")!, NodeFilter.SHOW_TEXT).nextNode()!;
+      const range = document.createRange(); range.setStart(text, 0); range.setEnd(text, 4);
+      const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+      element.dispatchEvent(new Event("pointerup", { bubbles: true }));
+    });
+    await expect(page.locator('[data-writing-selection-menu]')).toBeVisible();
+    await page.locator('[data-writing-selection-menu]').getByRole("button", { name: "Bold", exact: true }).click();
+    await expect(writer.locator("strong")).toHaveText("Keep");
+    await page.screenshot({ path: info.outputPath(`mouse-editor-${width}.png`) });
+  });
+}
+
+});
+
+test("connecting a fine pointer removes the dock without remounting writing", async ({ browser }, info) => {
+  const context = await browser.newContext({ baseURL: info.project.use.baseURL, hasTouch: true, viewport: { width: 640, height: 1000 } });
+  try {
+    const page = await context.newPage();
+    // Model a device capability change; this does not prove physical attachment.
+    await page.addInitScript(() => {
+      const native = window.matchMedia.bind(window);
+      const queries: { query: MediaQueryList; original: MediaQueryList; media: string }[] = [];
+      let fine = false;
+      window.matchMedia = (media) => {
+        const original = native(media);
+        if (!media.includes("any-pointer: fine")) return original;
+        const query = new EventTarget() as MediaQueryList;
+        Object.defineProperties(query, { media: { value: media }, matches: { get: () => !fine && original.matches } });
+        queries.push({ query, original, media });
+        return query;
+      };
+      (window as unknown as { setFinePointer: (value: boolean) => void }).setFinePointer = (value) => {
+        fine = value;
+        queries.forEach(({ query }) => query.dispatchEvent(new Event("change")));
+      };
+    });
+    await open(page, info.project.name.startsWith("production"), "doc");
+    const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+    const mounted = await writer.elementHandle();
+    await writer.fill("Preserve my writing");
+    await page.getByRole("button", { name: /^Commands:/ }).tap();
+    await expect(page.locator(".writing-slash-menu")).toBeVisible();
+    await page.evaluate(() => (window as unknown as { setFinePointer: (value: boolean) => void }).setFinePointer(true));
+    await expect(page.locator('.editor-frame-controls[data-dock="true"]')).toHaveCount(0);
+    await expect(page.locator(".editor-canvas-navigation")).toBeVisible();
+    await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+    expect(await mounted!.evaluate((element) => element === document.querySelector('.writing-content[contenteditable="true"]'))).toBe(true);
+    await expect(writer).toHaveText("Preserve my writing");
+    await page.evaluate(() => (window as unknown as { setFinePointer: (value: boolean) => void }).setFinePointer(false));
+    await expect(page.locator('.editor-frame-controls[data-dock="true"]')).toBeVisible();
+    await expect(writer).toHaveText("Preserve my writing");
+  } finally { await context.close(); }
+});

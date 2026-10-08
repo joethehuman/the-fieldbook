@@ -12,7 +12,7 @@ import { createWritingBlock, writingBlockStyles, type WritingBlock, type Writing
 import { WritingSelectionMenu, type SelectionMenuController } from "./writing-selection-menu";
 import { normalizeWritingSelection, writingSelectionBoundariesPlugin } from "./writing-selection-boundaries";
 import { EditorCompactControlsContext, EditorWritingActionsContext } from "./editor-frame";
-import { useWritingControlsLayout } from "./use-editor-cards-layout";
+import { useWritingControlsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { blurWritingInput } from "./writing-cursor";
 import { hasWritingTarget, useWritingTarget } from "./use-writing-target";
 import { WritingLinkDialog } from "./writing-link-dialog";
@@ -145,13 +145,14 @@ function WritingToolbar({
   canvas,
 }: {
   canvas: boolean;
-  onInsert: (trigger: HTMLButtonElement, fromKeyboard: boolean) => void;
+  onInsert: (trigger: HTMLButtonElement, fromKeyboard: boolean, fromTouch?: boolean) => void;
   onEditorReady: (editor: LexicalEditor | null, actions: WritingActions) => void;
   onSelectionReady: (controller: SelectionMenuController | null) => void;
   disabled: boolean;
   viewControls: ReactNode;
 }) {
-  const phone = useWritingControlsLayout();
+  const compact = useWritingControlsLayout();
+  const phone = useMobileWritingDock();
   const actionsHost = useContext(EditorWritingActionsContext);
   const editor = useCellValue(activeEditor$);
   const compactControls = useContext(EditorCompactControlsContext);
@@ -212,7 +213,7 @@ function WritingToolbar({
     },
   ];
   const controls = (
-      <div className="writing-toolbar-controls" data-canvas={canvas || undefined} data-mobile={phone || undefined} role="group" aria-label="Writing actions">
+      <div className="writing-toolbar-controls" data-canvas={canvas || undefined} data-mobile={compact || undefined} role="group" aria-label="Writing actions">
         <div className="writing-toolbar-group">
           {historyActions.map(({ label, icon: Icon, run, unavailable }) => (
             <Tooltip key={label} content={label}>
@@ -237,17 +238,19 @@ function WritingToolbar({
           onPointerDown={(event) => {
             if (!canvas || !phone || event.button !== 0 || !event.isPrimary) return;
             event.preventDefault();
-            onInsert(event.currentTarget, false);
+          }}
+          onPointerUp={(event) => {
+            if (canvas && phone && event.pointerType === "touch" && event.isPrimary) onInsert(event.currentTarget, false, true);
           }}
           onMouseDown={(event) => event.preventDefault()}
-          onClick={(event) => { if (!canvas || !phone || event.detail === 0) onInsert(event.currentTarget, event.detail === 0); }}>
+          onClick={(event) => onInsert(event.currentTarget, event.detail === 0)}>
           <Plus /><span className="writing-command-label">Commands</span>
         </Button>
       </div>
   );
   return (
     <div className="writing-toolbar">
-      {canvas && phone && actionsHost ? createPortal(controls, actionsHost) : controls}
+      {canvas && compact && actionsHost ? createPortal(controls, actionsHost) : controls}
       <WritingSelectionMenu showPhoneTrigger={!canvas} disabled={disabled || !!compactControls?.panelsOpen} onReady={onSelectionReady} />
       {viewControls}
     </div>
@@ -287,7 +290,7 @@ export default function WritingEditorEngine({
   const pendingMedia = useRef(false);
   const slashSelection = useRef<BaseSelection | null>(null);
   const toolbarSelection = useRef<BaseSelection | null>(null);
-  const openingPointerClick = useRef(false);
+  const openingTouchClick = useRef(false);
   const activeLine = useRef<HTMLElement | null>(null);
   const [media, setMedia] = useState<"image" | "video">("image");
   const [busy, setBusy] = useState(false),
@@ -423,7 +426,7 @@ export default function WritingEditorEngine({
   }, [value]);
   useLayoutEffect(() => {
     if (!canvas || !compactControls || !(slashOpen || mediaChooser)) return;
-    const dock = root.current?.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-cards="true"]');
+    const dock = root.current?.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]');
     if (!dock) return;
     let request = 0;
     const place = () => {
@@ -815,7 +818,7 @@ export default function WritingEditorEngine({
     slashPointer.current = null;
     setSlashQuery(""); setSlashIndex(0); setSlashOpen(true);
   }
-  function openCommands(trigger: HTMLButtonElement, fromKeyboard: boolean) {
+  function openCommands(trigger: HTMLButtonElement, fromKeyboard: boolean, fromTouch = false) {
     if (canvas && compactRef.current && (compactRef.current.panelsOpen || !hasWritingTarget(lexicalEditor.current, true))) return;
     if (selectionTools.current?.show(fromKeyboard, trigger)) {
       setSlashOpen(false);
@@ -823,7 +826,7 @@ export default function WritingEditorEngine({
     }
     openSlash(trigger, fromKeyboard);
     if (canvas && compactRef.current) {
-      openingPointerClick.current = !fromKeyboard;
+      openingTouchClick.current = fromTouch;
       focusInsertItem.current = true;
       blurWritingInput();
     }
@@ -905,14 +908,13 @@ export default function WritingEditorEngine({
   return (
     <WritingInteractionContext.Provider value={reportInteraction}>
     <div ref={root} data-editor-interacting={popupActive || slashOpen || !!mediaChooser || undefined} className="writing-editor writing-surface rounded-lg border border-border bg-background" onClickCapture={(event) => {
-      const pointerClick = event.detail > 0 || ("pointerType" in event.nativeEvent && !!event.nativeEvent.pointerType);
-      const opening = openingPointerClick.current;
-      openingPointerClick.current = false;
-      // The opening touch can finish over a newly painted palette item.
-      // Consume only that gesture; a fresh pointerdown clears this guard.
-      if (canvas && compactRef.current && opening && pointerClick) { event.preventDefault(); event.stopPropagation(); }
+      const opening = openingTouchClick.current;
+      openingTouchClick.current = false;
+      // Some engines synthesize a click after touch release, others suppress it
+      // when pointerdown preserves the caret. Consume only that opening click.
+      if (opening && event.detail > 0) { event.preventDefault(); event.stopPropagation(); }
     }} onPointerDownCapture={(event) => {
-      openingPointerClick.current = false;
+      openingTouchClick.current = false;
       if (event.target instanceof Element && event.target.closest(".writing-toolbar-controls")) {
         toolbarSelection.current = null;
         lexicalEditor.current?.getEditorState().read(() => {

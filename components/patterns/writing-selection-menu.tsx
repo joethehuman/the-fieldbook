@@ -10,7 +10,7 @@ import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { createWritingBlock, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
 import { useWritingInteraction } from "./writing-interaction";
-import { useNativeWritingSelection, useWritingControlsLayout } from "./use-editor-cards-layout";
+import { useNativeWritingSelection, useMobileWritingDock } from "./use-editor-cards-layout";
 import { normalizeWritingSelection } from "./writing-selection-boundaries";
 import { $isHeadingNode } from "@lexical/rich-text";
 import { $isListNode } from "@lexical/list";
@@ -24,7 +24,7 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
   onReady: (controller: SelectionMenuController | null) => void;
 }) {
   const editor = useCellValue(activeEditor$);
-  const phone = useWritingControlsLayout();
+  const phone = useMobileWritingDock();
   const nativeSelection = useNativeWritingSelection();
   const disabled = unavailable || nativeSelection;
   const phoneTrigger = useRef<HTMLButtonElement>(null);
