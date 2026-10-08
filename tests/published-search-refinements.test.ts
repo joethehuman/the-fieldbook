@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { database, pendingMigrationSql } from "./helpers/database.mjs";
+import { database } from "./helpers/database.mjs";
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -87,23 +87,10 @@ async function search(
   ).rows[0].results;
 }
 
-test("search migration preserves existing content and indexed passages while adding forms and typo correction", async () => {
-  const pg = await database({ baselineOnly: true });
+test("published search supports word forms, typo correction and mixed title/body ranking", async () => {
+  const pg = await database();
   try {
     await seed(pg);
-    const snapshot = () =>
-      pg.query(
-        "select (select jsonb_agg(to_jsonb(d) order by id) from fb_documents d) as documents,(select jsonb_agg(to_jsonb(s) order by content_id,passage_id) from fb_search_passages s) as passages,(select array_agg(word order by word) from fb_search_words) as words",
-      );
-    const before = (await snapshot()).rows;
-    assert.equal((await search(pg, "coruse")).length, 0);
-    assert.ok(
-      !(await search(pg, "search filters")).some(
-        (row) => row.title === "Search",
-      ),
-    );
-    await pg.exec(pendingMigrationSql);
-    assert.deepEqual((await snapshot()).rows, before);
     for (const [query, title] of [
       ["coruse", "Course assignments"],
       ["focs", "Docs"],

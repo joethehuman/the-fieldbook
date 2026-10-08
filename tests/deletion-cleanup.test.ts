@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  database,
-  pendingMigrationSql,
-  seedProfile,
-} from "./helpers/database.mjs";
+import { database, seedProfile } from "./helpers/database.mjs";
 
 const id = (n: number) =>
   `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -12,8 +8,8 @@ type Database = Awaited<ReturnType<typeof database>>;
 const value = async (pg: Database, sql: string, args: unknown[] = []) =>
   (await pg.query<{ value: any }>(sql, args)).rows[0]?.value;
 
-async function fixture(baselineOnly = false) {
-  const pg = await database({ baselineOnly });
+async function fixture() {
+  const pg = await database();
   await seedProfile(pg, id(1), { role: "admin", email: "owner@example.test" });
   await seedProfile(pg, id(2), { role: "admin" });
   await seedProfile(pg, id(3), { registered: false });
@@ -48,21 +44,9 @@ async function media(pg: Database, asset: number, ready = true) {
 }
 const reference = (asset: number) => `/api/media/${id(asset)}.png`;
 
-test("cleanup migration preserves existing data and service-only permissions and retires only unused helpers", async () => {
-  const pg = await fixture(true);
+test("the current cleanup model omits retired helpers and keeps service-only permissions", async () => {
+  const pg = await fixture();
   try {
-    await media(pg, 10);
-    const snapshot = () =>
-      value(
-        pg,
-        `select jsonb_build_object(
-      'config',(select to_jsonb(c) from fb_config c),
-      'profiles',(select jsonb_agg(to_jsonb(p) order by id) from fb_profiles p),
-      'media',(select jsonb_agg(to_jsonb(m) order by id) from fb_media m)) value`,
-      );
-    const before = await snapshot();
-    await pg.exec(pendingMigrationSql);
-    assert.deepEqual(await snapshot(), before);
     for (const fn of [
       "fb_assignment_coverage(uuid,uuid)",
       "fb_validate_learning_before_teams(jsonb,jsonb,jsonb)",
@@ -84,59 +68,6 @@ test("cleanup migration preserves existing data and service-only permissions and
           ),
           role === "service_role",
         );
-  } finally {
-    await pg.close();
-  }
-});
-
-test("the migration fixes an already-expired pending deletion without rewriting its records", async () => {
-  const pg = await fixture(true);
-  try {
-    await removePerson(pg, id(3));
-    await assert.rejects(
-      pg.query("select fb_finish_deletion('user',$1,$2)", [id(3), id(99)]),
-      /Delete the Auth account/,
-    );
-    await pg.exec(pendingMigrationSql);
-    await pg.query("select fb_finish_deletion('user',$1,$2)", [id(3), id(99)]);
-    assert.equal(
-      await value(
-        pg,
-        "select count(*)::int value from fb_profiles where id=$1",
-        [id(3)],
-      ),
-      0,
-    );
-  } finally {
-    await pg.close();
-  }
-});
-
-test("helper retirement refuses an installation dependency and rolls back the whole migration", async () => {
-  const pg = await fixture(true);
-  try {
-    await pg.exec(
-      "create view existing_integration as select * from fb_assignment_coverage()",
-    );
-    const definitions = () =>
-      value(
-        pg,
-        `select jsonb_agg(pg_get_functiondef(oid) order by proname) value
-      from pg_proc where pronamespace='public'::regnamespace
-      and proname in ('fb_collect_deleted_media','fb_finish_deletion')`,
-      );
-    const before = await definitions();
-    await pg.exec("begin");
-    await assert.rejects(pg.exec(pendingMigrationSql), /depend|cannot drop/i);
-    await pg.exec("rollback");
-    assert.deepEqual(await definitions(), before);
-    assert.equal(
-      await value(
-        pg,
-        "select count(*)::int value from pg_trigger where tgname='fb_guard_retired_settings_media'",
-      ),
-      1,
-    );
   } finally {
     await pg.close();
   }

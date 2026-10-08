@@ -189,8 +189,13 @@ create table public."fb_search_passages" (
 );
 
 create table public."fb_search_words" (
-  "word" text not null
+  "word" text not null,
+  "stem" text generated always as
+    (coalesce((pg_catalog.ts_lexize('pg_catalog.english_stem'::regdictionary, word))[1], word)) stored
 );
+
+-- The Auth token hook may resolve its public-schema entry point.
+grant usage on schema public to supabase_auth_admin;
 
 -- Application functions
 
@@ -307,12 +312,12 @@ CREATE FUNCTION public.fb_allow_request(p_key text, p_limit integer, p_seconds i
 AS $function$
 declare n integer;
 begin
-  insert into public.fb_rate_limits(key,count,expires_at) values(p_key,1,now()+make_interval(secs=>p_seconds))
-  on conflict(key) do update set
-    count=case when public.fb_rate_limits.expires_at<now() then 1 else public.fb_rate_limits.count+1 end,
-    expires_at=case when public.fb_rate_limits.expires_at<now() then now()+make_interval(secs=>p_seconds) else public.fb_rate_limits.expires_at end
-  returning count into n;
-  return n<=p_limit;
+ insert into public.fb_rate_limits(key,count,expires_at) values(p_key,1,now()+make_interval(secs=>p_seconds))
+ on conflict(key) do update set
+ count=case when public.fb_rate_limits.expires_at<now() then 1 else public.fb_rate_limits.count+1 end,
+ expires_at=case when public.fb_rate_limits.expires_at<now() then now()+make_interval(secs=>p_seconds) else public.fb_rate_limits.expires_at end
+ returning count into n;
+ return n<=p_limit;
 end $function$;
 
 CREATE FUNCTION public.fb_assignment_audience_coverage(p_user uuid DEFAULT NULL::uuid, p_content uuid DEFAULT NULL::uuid)
@@ -348,15 +353,6 @@ begin
  if coalesce(current_setting('fieldbook.learning_batch',true),'')<>'on' then perform public.fb_reconcile_assignments(null,new.id); end if;
  return new;
 end $function$;
-
-CREATE FUNCTION public.fb_assignment_coverage(p_user uuid DEFAULT NULL::uuid, p_content uuid DEFAULT NULL::uuid)
- RETURNS TABLE(user_id uuid, content_id uuid, version integer, source_groups jsonb, baseline_at timestamp with time zone)
- LANGUAGE sql
- STABLE
- SET search_path TO ''
-AS $function$
- select user_id,content_id,version,source_groups,baseline_at from public.fb_assignment_audience_coverage(p_user,p_content);
-$function$;
 
 CREATE FUNCTION public.fb_assignment_due(p_at timestamp with time zone, p_start date, p_onboarding integer, p_catch integer)
  RETURNS date
@@ -475,7 +471,8 @@ begin
  and not exists(select 1 from public.fb_documents d where (d.draft::text||coalesce(d.published::text,'')) like '%/api/media/'||m.id::text||'.%')
  and not exists(select 1 from public.fb_deleted_items d where d.snapshot::text like '%/api/media/'||m.id::text||'.%')
  and not exists(select 1 from public.fb_audit a where a.snapshot::text like '%/api/media/'||m.id::text||'.%')
- and not exists(select 1 from public.fb_config c where c.settings::text like '%/api/media/'||m.id::text||'.%')
+ and not exists(select 1 from public.fb_config c where
+   (c.settings::text||c.curricula::text) like '%/api/media/'||m.id::text||'.%')
  returning m.id,m.path;
 end $function$;
 
@@ -584,7 +581,10 @@ begin
   delete from public.fb_documents where id=p_id and deleted_at is not null;
   delete from public.fb_audit where entity_id=p_id::text;
  else
-  -- Auth deletion happens first through the supported Admin API. The profile and learner records cascade.
+  -- Preregistered people have no Auth account to cascade their profile deletion.
+  -- The locked, expired deletion claim above remains the authorization boundary.
+  delete from public.fb_profiles where id=p_id and auth_user_id is null and deleted_at is not null;
+  -- Linked people still require Auth deletion through the supported Admin API.
   if exists(select 1 from public.fb_profiles where id=p_id) then raise exception 'Delete the Auth account before finalizing'; end if;
   update public.fb_deleted_items set deleted_by='00000000-0000-0000-0000-000000000000' where deleted_by=p_id;
   update public.fb_audit set actor='00000000-0000-0000-0000-000000000000',snapshot=null where actor=p_id;
@@ -1175,14 +1175,14 @@ CREATE FUNCTION public.fb_record_progress(p_user uuid, p_content uuid, p_version
 AS $function$
 declare result public.fb_progress;
 begin
-  insert into public.fb_progress(user_id,content_id,version,lessons,passed,attempts)
-  values(p_user,p_content,p_version,p_lessons,p_passed,case when p_attempt is null then '[]'::jsonb else jsonb_build_array(p_attempt) end)
-  on conflict(user_id,content_id,version) do update set
-    lessons=(select coalesce(jsonb_agg(distinct x),'[]') from jsonb_array_elements(public.fb_progress.lessons || excluded.lessons) x),
-    passed=public.fb_progress.passed or excluded.passed,
-    attempts=public.fb_progress.attempts || excluded.attempts
-  returning * into result;
-  return result;
+ insert into public.fb_progress(user_id,content_id,version,lessons,passed,attempts)
+ values(p_user,p_content,p_version,p_lessons,p_passed,case when p_attempt is null then '[]'::jsonb else jsonb_build_array(p_attempt) end)
+ on conflict(user_id,content_id,version) do update set
+ lessons=(select coalesce(jsonb_agg(distinct x),'[]') from jsonb_array_elements(public.fb_progress.lessons || excluded.lessons) x),
+ passed=public.fb_progress.passed or excluded.passed,
+ attempts=public.fb_progress.attempts || excluded.attempts
+ returning * into result;
+ return result;
 end $function$;
 
 CREATE FUNCTION public.fb_register_profile(p_id uuid, p_email text, p_name text, p_owner boolean)
@@ -1538,10 +1538,12 @@ CREATE FUNCTION public.fb_search(p_query text, p_kind text DEFAULT 'all'::text, 
  LANGUAGE plpgsql
  STABLE
  SET search_path TO 'public', 'extensions', 'pg_temp'
- SET "pg_trgm.similarity_threshold" TO '0.3'
+ SET "pg_trgm.similarity_threshold" TO '0.2'
 AS $function$
-declare q tsquery; exact_q tsquery; normalized text; terms text[]; term text;
-  alternatives text; expression text := ''; candidate text; highlight_terms text[];
+declare q tsquery; exact_q tsquery; raw_q tsquery; normal_q tsquery;
+  raw_queries tsquery[] := '{}'; normal_queries tsquery[] := '{}'; match_queries tsquery[] := '{}';
+  normalized text; terms text[]; term text; stemmed text; alternatives text;
+  expression text := ''; candidate text; swaps text[]; highlight_terms text[];
 begin
   if length(p_query)>160 or p_kind not in ('all','brief','doc','course') then
     raise exception 'Invalid search input'; end if;
@@ -1553,16 +1555,49 @@ begin
   select to_tsquery('simple',string_agg(quote_literal(t)||':*',' & ')) into exact_q from unnest(terms) t;
   foreach term in array terms loop
     alternatives := quote_literal(term)||':*';
-    -- Preserve exact words. Correct unknown words of at least four characters.
-    if length(term)>=4 and not exists(select 1 from public.fb_search_words w where w.word=term) then
-      for candidate in select w.word from public.fb_search_words w
-        where w.word % term and abs(length(w.word)-length(term))<=2
-        order by similarity(w.word,term) desc,w.word limit 2
+    raw_q := to_tsquery('simple',alternatives);
+    raw_queries := array_append(raw_queries,raw_q);
+
+    -- Supplement literal/Unicode/technical tokens with common English forms.
+    -- Restrict suggestions to words that are still in published passages.
+    stemmed := case when term ~ '^[a-z]{4,}$'
+      then (pg_catalog.ts_lexize('pg_catalog.english_stem'::regdictionary,term))[1] end;
+    if stemmed is not null then
+      for candidate in
+        select w.word from public.fb_search_words w where w.stem=stemmed
+          and left(w.word,length(term))<>term
+          and w.word ~ '^[a-z]+$'
+          and exists(select 1 from public.fb_search_passages s
+            where s.search_vector @@ to_tsquery('simple',quote_literal(w.word)))
+        order by abs(length(w.word)-length(term)),w.word limit 8
       loop
         alternatives := alternatives || ' | ' || quote_literal(candidate);
         highlight_terms := array_append(highlight_terms,candidate);
       end loop;
     end if;
+    normal_q := to_tsquery('simple',alternatives);
+    normal_queries := array_append(normal_queries,normal_q);
+
+    -- A valid literal prefix or word form needs no speculative typo guesses.
+    if term ~ '^[[:alpha:]]{4,}$' and not exists
+      (select 1 from public.fb_search_passages s where s.search_vector @@ normal_q) then
+      select array_agg(overlay(term placing substr(term,n+1,1)||substr(term,n,1) from n for 2))
+        into swaps from generate_series(1,length(term)-1) n;
+      for candidate in
+        select w.word from public.fb_search_words w
+        where (w.word=any(swaps) or w.word % term)
+          and abs(length(w.word)-length(term))<=1
+          and public.fb_search_near(term,w.word)
+          and exists(select 1 from public.fb_search_passages s
+            where s.search_vector @@ to_tsquery('simple',quote_literal(w.word)))
+        order by case when w.word=any(swaps) then 0 else 1 end,
+          similarity(w.word,term) desc,w.word limit 4
+      loop
+        alternatives := alternatives || ' | ' || quote_literal(candidate)||':*';
+        highlight_terms := array_append(highlight_terms,candidate);
+      end loop;
+    end if;
+    match_queries := array_append(match_queries,to_tsquery('simple',alternatives));
     expression := expression || case when expression='' then '' else ' & ' end || '('||alternatives||')';
   end loop;
   q := to_tsquery('simple',expression);
@@ -1570,30 +1605,64 @@ begin
   with candidates as (
     select s.content_id,s.passage_id,s.kind,s.content_date, (
       case when lower(s.title)=normalized then 100 else 0 end +
-      case when s.title_vector @@ exact_q then 30
-           when s.title_vector @@ q then 20 else 0 end +
-      case when s.lesson_vector @@ q then 15 else 0 end +
-      case when s.search_vector @@ exact_q then 10 else 0 end + ts_rank(s.search_vector,q)
+      case when s.title_vector @@ exact_q then 30 else 0 end +
+      case when s.search_vector @@ exact_q then 14 else 0 end +
+      (select sum(greatest(
+        case when s.title_vector @@ raw_queries[i] then 24
+             when s.title_vector @@ normal_queries[i] then 18
+             when s.title_vector @@ match_queries[i] then 12 else 0 end,
+        case when s.lesson_vector @@ raw_queries[i] then 14
+             when s.lesson_vector @@ normal_queries[i] then 10
+             when s.lesson_vector @@ match_queries[i] then 6 else 0 end,
+        case when s.search_vector @@ raw_queries[i] then 5
+             when s.search_vector @@ normal_queries[i] then 4 else 1 end
+      )) from generate_subscripts(raw_queries,1) i) + ts_rank(s.search_vector,q,32)
     )::real as rank
     from public.fb_search_passages s
     where (p_kind='all' or s.kind=p_kind) and s.search_vector @@ q
   ), best as (
     select distinct on (c.content_id) c.* from candidates c
     order by c.content_id,c.rank desc,c.passage_id
-  )
-  , limited as (
-    select b.content_id,b.passage_id,b.rank, row_number() over (order by b.rank desc,
-      case when b.kind='brief' and b.content_date ~ '^\d{4}-\d{2}-\d{2}T' then b.content_date end desc nulls last, b.content_id) as result_order from best b order by b.rank desc,
-      case when b.kind='brief' and b.content_date ~ '^\d{4}-\d{2}-\d{2}T' then b.content_date end desc nulls last,
-      b.content_id limit greatest(1,least(p_limit,31))
+  ), limited as (
+    select b.content_id,b.passage_id,b.rank,row_number() over(order by b.rank desc,
+      case when b.kind='brief' and b.content_date ~ '^\d{4}-\d{2}-\d{2}T' then b.content_date end desc nulls last,b.content_id) as result_order
+    from best b order by b.rank desc,
+      case when b.kind='brief' and b.content_date ~ '^\d{4}-\d{2}-\d{2}T' then b.content_date end desc nulls last,b.content_id
+    limit greatest(1,least(p_limit,31))
   ), results as (
     select s.content_id,s.passage_id,s.kind,s.title,s.lesson_id,s.lesson_title,
       s.source_text,s.published_revision,s.content_date,l.rank as score,
-      highlight_terms as matched_terms,
-      l.result_order
+      (select array_agg(distinct t order by t) from unnest(highlight_terms) t) as matched_terms,l.result_order
     from limited l join public.fb_search_passages s using(content_id,passage_id)
-  ) select coalesce(jsonb_agg(to_jsonb(results)-'result_order' order by result_order), '[]'::jsonb) from results);
+  ) select coalesce(jsonb_agg(to_jsonb(results)-'result_order' order by result_order),'[]'::jsonb) from results);
+end $function$;
 
+CREATE FUNCTION public.fb_search_near(p_query text, p_word text)
+ RETURNS boolean
+ LANGUAGE plpgsql
+ IMMUTABLE PARALLEL SAFE STRICT
+ SET search_path TO ''
+AS $function$
+declare differences integer[]; shorter text; longer text; i integer := 1; j integer := 1;
+  skipped boolean := false;
+begin
+  if length(p_query)<4 or abs(length(p_query)-length(p_word))>1 then return false; end if;
+  if length(p_query)=length(p_word) then
+    select array_agg(n) into differences from generate_series(1,length(p_query)) n
+      where substr(p_query,n,1)<>substr(p_word,n,1);
+    return coalesce(cardinality(differences),0)<=1 or
+      (cardinality(differences)=2 and differences[2]=differences[1]+1 and
+       substr(p_query,differences[1],1)=substr(p_word,differences[2],1) and
+       substr(p_query,differences[2],1)=substr(p_word,differences[1],1));
+  end if;
+  shorter := case when length(p_query)<length(p_word) then p_query else p_word end;
+  longer := case when length(p_query)<length(p_word) then p_word else p_query end;
+  while i<=length(shorter) and j<=length(longer) loop
+    if substr(shorter,i,1)=substr(longer,j,1) then i:=i+1; j:=j+1;
+    elsif skipped then return false;
+    else skipped:=true; j:=j+1; end if;
+  end loop;
+  return true;
 end $function$;
 
 CREATE FUNCTION public.fb_section_component(p_value text)
@@ -1733,29 +1802,6 @@ begin
  end loop;
 end $function$;
 
-CREATE FUNCTION public.fb_validate_learning_before_teams(p_groups jsonb, p_teams jsonb, p_curricula jsonb)
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO ''
-AS $function$
-declare g jsonb; old jsonb;
-begin
- perform public.fb_validate_learning_sources(p_groups,p_teams,p_curricula);
- -- Same deletion rule for preserved direct sources as canonical subtree links:
- -- first remove the source in one save, then delete its referenced team.
- if exists(select 1 from public.fb_config c,jsonb_array_elements(c.groups) n,jsonb_array_elements_text(coalesce(n->'legacyDirectTeamIds','[]')) t where not exists(select 1 from jsonb_array_elements(p_teams) x where x->>'id'=t)) then raise exception 'Remove learning-group links before deleting a team'; end if;
- for g in select * from jsonb_array_elements(p_groups) loop
-  if g->>'parentId' is not null then raise exception 'Learning groups are independent audiences and cannot have parents'; end if;
-  if g->>'teamLinkScope'='direct' then raise exception 'Legacy learning links changed. Reload with the matching application'; end if;
-  if jsonb_typeof(coalesce(g->'legacyDirectTeamIds','[]')) is distinct from 'array' then raise exception 'Invalid legacy team links'; end if;
-  select n into old from public.fb_config c,jsonb_array_elements(c.groups) n where n->>'id'=g->>'id';
-  if jsonb_array_length(coalesce(old->'legacyDirectTeamIds','[]'))>0 and g->'legacyDirectTeamIds' is null then raise exception 'Learning links changed. Reload with the matching application'; end if;
-  if exists(select 1 from jsonb_array_elements_text(coalesce(g->'legacyDirectTeamIds','[]')) t where not coalesce(old->'legacyDirectTeamIds','[]') ? t) then raise exception 'New team links include all subteams'; end if;
-  if exists(select 1 from jsonb_array_elements_text(coalesce(g->'legacyDirectTeamIds','[]')||coalesce(g->'teamIds','[]')) t group by t having count(*)>1) then raise exception 'Duplicate team link'; end if;
-  if exists(select 1 from jsonb_array_elements_text(coalesce(g->'legacyDirectTeamIds','[]')) t where not exists(select 1 from jsonb_array_elements(p_teams) x where x->>'id'=t)) then raise exception 'Team does not exist'; end if;
- end loop;
-end $function$;
-
 CREATE FUNCTION public.fb_validate_learning_sources(p_groups jsonb, p_teams jsonb, p_curricula jsonb)
  RETURNS void
  LANGUAGE plpgsql
@@ -1890,11 +1936,12 @@ CREATE INDEX fb_feedback_user_content_idx ON public.fb_feedback USING btree (use
 CREATE UNIQUE INDEX fb_profiles_normalized_email_key ON public.fb_profiles USING btree (lower(TRIM(BOTH FROM email)));
 CREATE INDEX fb_progress_content_id_idx ON public.fb_progress USING btree (content_id);
 CREATE INDEX fb_search_vector_idx ON public.fb_search_passages USING gin (search_vector);
+CREATE INDEX fb_search_words_stem_idx ON public.fb_search_words USING btree (stem, word);
 CREATE INDEX fb_search_words_typo_idx ON public.fb_search_words USING gin (word extensions.gin_trgm_ops);
 
 -- Application triggers
 CREATE TRIGGER fb_guard_organization BEFORE INSERT OR DELETE OR UPDATE ON public.fb_config FOR EACH ROW EXECUTE FUNCTION public.fb_guard_organization();
-CREATE TRIGGER fb_guard_retired_settings_media BEFORE UPDATE OF settings ON public.fb_config FOR EACH ROW EXECUTE FUNCTION public.fb_guard_retired_media();
+CREATE TRIGGER fb_guard_retired_config_media BEFORE UPDATE OF settings, curricula ON public.fb_config FOR EACH ROW EXECUTE FUNCTION public.fb_guard_retired_media();
 CREATE TRIGGER fb_assignment_course_changed AFTER INSERT OR UPDATE OF published, deleted_at ON public.fb_documents FOR EACH ROW EXECUTE FUNCTION public.fb_assignment_course_changed();
 CREATE TRIGGER fb_assignment_guard BEFORE INSERT OR UPDATE ON public.fb_documents FOR EACH ROW EXECUTE FUNCTION public.fb_assignment_guard();
 CREATE TRIGGER fb_guard_retired_media BEFORE INSERT OR UPDATE ON public.fb_documents FOR EACH ROW EXECUTE FUNCTION public.fb_guard_retired_media();
@@ -1978,8 +2025,6 @@ revoke all on function public."fb_assignment_audience_coverage"(p_user uuid, p_c
 grant EXECUTE on function public."fb_assignment_audience_coverage"(p_user uuid, p_content uuid) to "service_role";
 revoke all on function public."fb_assignment_course_changed"() from public, anon, authenticated, service_role, supabase_auth_admin;
 grant EXECUTE on function public."fb_assignment_course_changed"() to "service_role";
-revoke all on function public."fb_assignment_coverage"(p_user uuid, p_content uuid) from public, anon, authenticated, service_role, supabase_auth_admin;
-grant EXECUTE on function public."fb_assignment_coverage"(p_user uuid, p_content uuid) to "service_role";
 revoke all on function public."fb_assignment_due"(p_at timestamp with time zone, p_start date, p_onboarding integer, p_catch integer) from public, anon, authenticated, service_role, supabase_auth_admin;
 grant EXECUTE on function public."fb_assignment_due"(p_at timestamp with time zone, p_start date, p_onboarding integer, p_catch integer) to "service_role";
 revoke all on function public."fb_assignment_guard"() from public, anon, authenticated, service_role, supabase_auth_admin;
@@ -2070,6 +2115,8 @@ revoke all on function public."fb_save_governance"(p_actor uuid, p_expected inte
 grant EXECUTE on function public."fb_save_governance"(p_actor uuid, p_expected integer, p_operation text, p_data jsonb) to "service_role";
 revoke all on function public."fb_search"(p_query text, p_kind text, p_limit integer) from public, anon, authenticated, service_role, supabase_auth_admin;
 grant EXECUTE on function public."fb_search"(p_query text, p_kind text, p_limit integer) to "service_role";
+revoke all on function public."fb_search_near"(p_query text, p_word text) from public, anon, authenticated, service_role, supabase_auth_admin;
+grant EXECUTE on function public."fb_search_near"(p_query text, p_word text) to "service_role";
 revoke all on function public."fb_section_component"(p_value text) from public, anon, authenticated, service_role, supabase_auth_admin;
 grant EXECUTE on function public."fb_section_component"(p_value text) to "service_role";
 revoke all on function public."fb_sync_learning"() from public, anon, authenticated, service_role, supabase_auth_admin;
@@ -2082,8 +2129,6 @@ revoke all on function public."fb_validate_contributor_section"(p_doc jsonb) fro
 grant EXECUTE on function public."fb_validate_contributor_section"(p_doc jsonb) to "service_role";
 revoke all on function public."fb_validate_learning"(p_groups jsonb, p_teams jsonb, p_curricula jsonb) from public, anon, authenticated, service_role, supabase_auth_admin;
 grant EXECUTE on function public."fb_validate_learning"(p_groups jsonb, p_teams jsonb, p_curricula jsonb) to "service_role";
-revoke all on function public."fb_validate_learning_before_teams"(p_groups jsonb, p_teams jsonb, p_curricula jsonb) from public, anon, authenticated, service_role, supabase_auth_admin;
-grant EXECUTE on function public."fb_validate_learning_before_teams"(p_groups jsonb, p_teams jsonb, p_curricula jsonb) to "service_role";
 revoke all on function public."fb_validate_learning_sources"(p_groups jsonb, p_teams jsonb, p_curricula jsonb) from public, anon, authenticated, service_role, supabase_auth_admin;
 grant EXECUTE on function public."fb_validate_learning_sources"(p_groups jsonb, p_teams jsonb, p_curricula jsonb) to "service_role";
 revoke all on function public."fb_validate_nodes"(p_nodes jsonb) from public, anon, authenticated, service_role, supabase_auth_admin;

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 import { pg_trgm } from "@electric-sql/pglite/contrib/pg_trgm";
 
@@ -10,18 +10,8 @@ export const baselineSql = readFileSync(
   "utf8",
 );
 
-const migrations = new URL("../../supabase/migrations/", import.meta.url);
-export const pendingMigrationSql = readdirSync(migrations)
-  .filter(
-    (name) =>
-      /^\d+_.+\.sql$/.test(name) && !name.endsWith("_initial_install.sql"),
-  )
-  .sort()
-  .map((name) => readFileSync(new URL(name, migrations), "utf8"))
-  .join("\n");
-
 /** Current application schema, with only hosted provider services stubbed. */
-export async function database({ baselineOnly = false } = {}) {
+export async function database() {
   const pg = new PGlite({ extensions: { pg_trgm } });
   try {
     await pg.exec(`
@@ -49,8 +39,6 @@ export async function database({ baselineOnly = false } = {}) {
         "",
       ),
     );
-    if (!baselineOnly && pendingMigrationSql)
-      await pg.exec(pendingMigrationSql);
     return pg;
   } catch (error) {
     await pg.close();
