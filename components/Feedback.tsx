@@ -393,12 +393,18 @@ export function FeedbackAdmin({
                     </TableCell>
                   )}
                   <TableCell>
-                    <span
-                      className="block w-44 truncate font-medium"
-                      title={f.version ? `${f.title} · v${f.version}` : f.title}
+                    <Tooltip
+                      content={
+                        f.version ? `${f.title} · v${f.version}` : f.title
+                      }
                     >
-                      {f.title}
-                    </span>
+                      <span
+                        tabIndex={0}
+                        className="block w-44 truncate rounded-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        {f.title}
+                      </span>
+                    </Tooltip>
                   </TableCell>
                   <TableCell>{f.kind}</TableCell>
                   <TableCell>
