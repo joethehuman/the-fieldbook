@@ -267,7 +267,7 @@
   pointer-events: none;
 }
 .writing-editor .writing-content .writing-media-line,
-.writing-image-loading {
+.writing-media-loading {
   display: flex;
   align-items: center;
   min-height: 3.5rem;
@@ -275,8 +275,9 @@
   border-radius: var(--radius);
   background: var(--muted);
 }
-.writing-image-loading {
+.writing-media-loading {
   width: 100%;
+  gap: var(--space-2);
   color: var(--muted-foreground);
   font-size: 0.875rem;
   line-height: 1.5;
@@ -551,11 +552,11 @@
 .writing-editor .mdxeditor-contenteditable-wrapper { position: relative; }
 /* Block decorators must not leave anonymous inline line boxes around their content. */
 .writing-editor .writing-content > [data-lexical-decorator="true"],
-.writing-editor .writing-content > p > [data-lexical-decorator="true"]:has(.writing-media-block, [data-editor-block-type="image"], .writing-image-loading),
+.writing-editor .writing-content > p > [data-lexical-decorator="true"]:has(.writing-media-block, [data-editor-block-type="image"], .writing-media-loading),
 .writing-editor .writing-content [data-editor-block-type="image"] { display: block; }
 /* An image-only paragraph needs no extra caret line inside its block wrapper. */
 .writing-editor .writing-content > p:has(> [data-lexical-decorator="true"]:first-child:nth-last-child(2)):has(
-  [data-editor-block-type="image"], .writing-image-loading
+  [data-editor-block-type="image"], .writing-media-loading
 ) > br[data-lexical-managed-linebreak]:last-child { display: none; }
 .writing-editor .writing-content :is(.writing-code-block, .writing-media-block, [data-editor-block-type="image"], .writing-table-block),
 .writing-editor .writing-content > hr { margin-block-end: var(--space-6); }

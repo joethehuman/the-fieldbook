@@ -28,10 +28,10 @@ function EditorViewHeader({ children }: { children: ReactNode }) {
 
 function WritingToolsLoading() {
   const viewControls = useContext(EditorViewContext);
-  return <div className="writing-surface min-w-0 rounded-lg border border-border bg-background">
+  return <div className="writing-surface min-w-0 rounded-lg border border-border bg-background" aria-busy="true">
     <EditorViewHeader>{viewControls}</EditorViewHeader>
     <div className="writing-viewport mt-0 focus-visible:ring-0">
-      <div className="min-h-96 p-4"><p role="status">Loading writing tools…</p></div>
+      <div className="min-h-96 p-4" aria-hidden="true" />
     </div>
   </div>;
 }

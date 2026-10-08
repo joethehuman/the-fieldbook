@@ -1128,8 +1128,6 @@
   .course-video-poster { position: absolute; inset: 0; display: block; background: var(--muted); }
   .course-video-poster img { display: block; width: 100%; height: 100%; object-fit: cover; }
   .course-video-actions { justify-content: flex-end; }
-  .course-video-speed { display: flex; align-items: center; gap: var(--space-2); font-size: .875rem; }
-  .course-video-speed [data-slot="select-trigger"] { min-width: 5rem; }
   .course-image-open { display: inline-block; max-width: 100%; cursor: zoom-in; border-radius: var(--radius-control); outline-offset: 3px; }
   .course-image-open:focus-visible { outline: 2px solid var(--ring); }
   .course-builder-steps { display: grid; gap: var(--space-1); min-width: 0; }
