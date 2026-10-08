@@ -44,6 +44,7 @@ import { ContentSelectionList } from "@/components/patterns/content-selection-li
 import { SearchableSelectionList } from "@/components/patterns/searchable-selection-list";
 import { useRevealTarget } from "@/components/patterns/use-reveal-target";
 import { ContentFeedback } from "@/components/patterns/content-feedback";
+import { FeedbackAdmin } from "@/components/Feedback";
 import { Settings, Plus, ListChecks, X } from "lucide-react";
 import { CollectionControls } from "@/components/patterns/collection-controls";
 import { Input } from "@/components/ui/input";
@@ -628,6 +629,13 @@ export function LibraryExamples() {
         <ContentFeedback disabled onSave={() => {}} />
       </SettingsSection>
       <SettingsSection
+        id="catalog-feedback-table"
+        title={<h3>Feedback table</h3>}
+        guidance="Single-line feedback rows reserve comment space and pin the action menu at the right edge. Search the content filter, open a full comment, or select rows for deletion. Examples include long and multiline comments, no comment, general feedback and removed content."
+      >
+        <FeedbackTableExample />
+      </SettingsSection>
+      <SettingsSection
         {...progressTarget.targetProps}
         id="catalog-progress"
         title={<h3>Progress and loading</h3>}
@@ -1176,5 +1184,48 @@ function FilePickerExample() {
         />
       </FormField>
     </SettingsSection>
+  );
+}
+
+function FeedbackTableExample() {
+  const [data, setData] = useState(() => {
+    const workspace = freshWorkspace();
+    const entries = (workspace.feedback || []).slice(0, 4);
+    workspace.feedback = [
+      {
+        ...entries[0],
+        comment:
+          "The handoff example helped.\nCould we add a longer example showing how Sales and Implementation Consultants share ownership, communicate with the customer, and agree on the next action?",
+      },
+      { ...entries[1], comment: "" },
+      {
+        ...entries[2],
+        contentId: undefined,
+        version: undefined,
+        comment: "The navigation is easy to use.",
+      },
+      {
+        ...entries[3],
+        contentId: "removed-example",
+        userId: "former-example",
+        comment: "An example attached to removed content.",
+      },
+    ];
+    return workspace;
+  });
+  return (
+    <div className="grid min-w-0 gap-4">
+      <FeedbackAdmin
+        data={data}
+        onDeleteFeedback={async (ids) => {
+          setData((current) => ({
+            ...current,
+            feedback: (current.feedback || []).filter(
+              (entry) => !ids.includes(entry.id),
+            ),
+          }));
+        }}
+      />
+    </div>
   );
 }

@@ -1,8 +1,27 @@
 "use client";
+import { MessageSquare } from "lucide-react";
 import { SortPicker } from "./patterns/sort-picker";
 import { DetailNavigation } from "./patterns/detail-navigation";
-import { Card, CardContent, CardFooter } from "./ui/card";
+import { DataTable } from "./patterns/data-table";
+import { HierarchyPicker } from "./patterns/hierarchy-picker";
+import {
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "./ui/table";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogTitle,
+} from "./ui/dialog";
 import { Badge } from "./ui/badge";
+import { DistributionBar } from "./ui/distribution-bar";
 import { useRevealTarget } from "./patterns/use-reveal-target";
 import { FormField } from "@/components/patterns/form-field";
 import {
@@ -16,8 +35,9 @@ import { feedbackRows, feedbackCsv } from "@/lib/reporting";
 import { Input } from "@/components/ui/input";
 import { SectionHeader } from "@/components/patterns/layout";
 import { Button } from "./ui/button";
+import { Tooltip } from "./ui/tooltip";
 import { SelectField } from "./ui/select";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Checkbox } from "./ui/choice";
 import {
   BulkActions,
@@ -98,12 +118,17 @@ export function FeedbackAdmin({
     setItem("all");
     setKind("all");
   };
-  const records = feedbackRows(data, kind, item, rating, query, sort);
+  const ratingRecords = feedbackRows(data, kind, item, "all", query, sort);
+  const records =
+    rating === "all"
+      ? ratingRecords
+      : ratingRecords.filter((record) => record.rating === rating);
   const ids = records.map((record) => record.id);
   const selection = useBulkSelection(
     JSON.stringify([kind, item, rating, query]),
     ids,
   );
+  const selectable = !!onDeleteFeedback && selection.canSelect;
   const commands: BulkCommand[] = onDeleteFeedback
     ? [
         {
@@ -120,7 +145,7 @@ export function FeedbackAdmin({
         },
       ]
     : [];
-  const positive = records.filter((f) => f.rating === "up").length;
+  const positive = ratingRecords.filter((f) => f.rating === "up").length;
   return (
     <>
       <div data-reveal-context className="grid gap-4">
@@ -171,15 +196,6 @@ export function FeedbackAdmin({
         }
         onClear={clearFilters}
         filters={[
-          ...(query
-            ? [
-                {
-                  id: "query",
-                  label: `Search: ${query}`,
-                  onRemove: () => setQuery(""),
-                },
-              ]
-            : []),
           ...(rating !== "all"
             ? [
                 {
@@ -218,35 +234,103 @@ export function FeedbackAdmin({
           </SelectField>
         </FormField>
         <FormField label="Content item">
-          <SelectField value={item} onValueChange={(value) => setItem(value)}>
-            <option value="all">All feedback</option>
-            {data.content
-              .filter((c) => kind === "all" || c.kind === kind)
-              .sort(
-                (a, b) =>
-                  a.title.localeCompare(b.title) || a.id.localeCompare(b.id),
-              )
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-          </SelectField>
+          <HierarchyPicker
+            value={item}
+            onValueChange={setItem}
+            searchLabel="Search content items"
+            searchPlaceholder="Search content titles"
+            emptyMessage="No matching content."
+            showFullHierarchy={false}
+            options={[
+              { id: "all", label: "All feedback", path: [] },
+              ...data.content
+                .filter((c) => kind === "all" || c.kind === kind)
+                .sort(
+                  (a, b) =>
+                    a.title.localeCompare(b.title) || a.id.localeCompare(b.id),
+                )
+                .map((c) => ({
+                  id: c.id,
+                  label: c.title,
+                  path: [
+                    c.kind === "doc"
+                      ? "Docs"
+                      : c.kind === "brief"
+                        ? "Updates"
+                        : "Courses",
+                    c.title,
+                  ],
+                })),
+            ]}
+          />
         </FormField>
       </CollectionControls>
       <div className="report-summary">
         <strong>
-          {records.length} {records.length === 1 ? "rating" : "ratings"}
+          {ratingRecords.length}{" "}
+          {ratingRecords.length === 1 ? "rating" : "ratings"}
         </strong>
-        <span>{positive} useful</span>
-        <span>{records.length - positive} not useful</span>
-        <span>
-          {records.length
-            ? Math.round((positive / records.length) * 100) + "% positive"
-            : "No ratings yet"}
-        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-6 rounded-full bg-success/10 px-2 py-0 text-xs leading-6 text-success hover:bg-success/20 hover:text-success aria-pressed:border-success aria-pressed:bg-success/20"
+            aria-pressed={rating === "up"}
+            onClick={() =>
+              setRating((current) => (current === "up" ? "all" : "up"))
+            }
+          >
+            {positive} useful
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="min-h-6 rounded-full bg-muted px-2 py-0 text-xs leading-6 hover:bg-muted-hover aria-pressed:border-muted-foreground aria-pressed:bg-muted-hover"
+            aria-pressed={rating === "down"}
+            onClick={() =>
+              setRating((current) => (current === "down" ? "all" : "down"))
+            }
+          >
+            {ratingRecords.length - positive} not useful
+          </Button>
+        </div>
+        <div className="flex items-center gap-2 whitespace-nowrap text-sm text-muted-foreground">
+          <div className="w-14 shrink-0 [&_[data-slot=distribution-bar]]:h-1.5">
+            <DistributionBar
+              label="Feedback ratings"
+              segments={[
+                {
+                  id: "useful",
+                  label: "Useful",
+                  count: positive,
+                  tone: "success-soft",
+                },
+                {
+                  id: "not-useful",
+                  label: "Not useful",
+                  count: ratingRecords.length - positive,
+                  tone: "muted",
+                },
+              ]}
+            />
+          </div>
+          <span>
+            {ratingRecords.length ? (
+              <>
+                <span className="font-semibold text-foreground">
+                  {Math.round((positive / ratingRecords.length) * 100)}%
+                </span>{" "}
+                positive
+              </>
+            ) : (
+              "No ratings yet"
+            )}
+          </span>
+        </div>
       </div>
-      {onDeleteFeedback && selection.canSelect && (
+      {onDeleteFeedback && (
         <BulkActions
           selected={selection.selected}
           collectionSize={records.length}
@@ -254,24 +338,50 @@ export function FeedbackAdmin({
           commands={commands}
           noun="feedback entries"
           summaryControl={
-            <SelectRows
-              ids={ids}
-              value={selection.selected}
-              onChange={selection.setSelected}
-              label="Select all filtered feedback"
-            />
+            selectable ? (
+              <SelectRows
+                ids={ids}
+                value={selection.selected}
+                onChange={selection.setSelected}
+                label="Select all filtered feedback"
+              />
+            ) : (
+              <span aria-hidden="true" className="h-control w-4" />
+            )
           }
         />
       )}
-      <div className="grid gap-4">
-        {records.map((f) => (
-          <Card asChild className="p-0 sm:p-0" key={f.id}>
-            <article>
-              <CardContent className="grid gap-4">
-                <SectionHeader
-                  title={
-                    <div className="flex min-w-0 items-center gap-3">
-                      {onDeleteFeedback && selection.canSelect && (
+      {!!records.length && (
+        <TableContainer aria-label="Feedback table">
+          <DataTable
+            layout={onDeleteFeedback ? "feedbackSelection" : "feedback"}
+            density="compact"
+            className="[&_[data-slot=table-cell-content]]:whitespace-nowrap"
+          >
+            <TableHeader>
+              <TableRow>
+                {onDeleteFeedback && (
+                  <TableHead>
+                    <span className="sr-only">Select feedback</span>
+                  </TableHead>
+                )}
+                <TableHead>Content</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>From</TableHead>
+                <TableHead>Rating</TableHead>
+                <TableHead>Comment</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead>
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {records.map((f) => (
+                <TableRow key={f.id}>
+                  {onDeleteFeedback && (
+                    <TableCell>
+                      {selectable && (
                         <Checkbox
                           aria-label={`Select feedback from ${f.person} for ${f.title}`}
                           checked={selection.selected.includes(f.id)}
@@ -280,45 +390,61 @@ export function FeedbackAdmin({
                           }
                         />
                       )}
-                      <h3>{f.title}</h3>
-                    </div>
-                  }
-                >
-                  <Badge variant={f.rating === "up" ? "success" : "default"}>
-                    {f.ratingLabel}
-                  </Badge>
-                  {onDeleteFeedback && (
+                    </TableCell>
+                  )}
+                  <TableCell>
+                    <FeedbackTitle
+                      title={f.title}
+                      version={f.contentId ? f.version : undefined}
+                    />
+                  </TableCell>
+                  <TableCell>{f.kind}</TableCell>
+                  <TableCell>
+                    <span className="block w-28 truncate" title={f.person}>
+                      {f.person}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={f.rating === "up" ? "success" : "default"}>
+                      {f.ratingLabel}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <FeedbackComment entry={f} />
+                  </TableCell>
+                  <TableCell>
+                    <time dateTime={f.updatedAt}>
+                      {new Date(f.updatedAt).toLocaleDateString()}
+                    </time>
+                  </TableCell>
+                  <TableCell className="[&_button]:size-8">
                     <ItemActions
                       id={f.id}
                       label={`feedback from ${f.person} for ${f.title}`}
                       commands={commands}
+                      actions={
+                        f.contentId && item !== f.contentId
+                          ? [
+                              {
+                                label: "View all feedback for this item",
+                                onSelect: () => viewItem(f.contentId!),
+                              },
+                            ]
+                          : []
+                      }
+                      disabled={
+                        !onDeleteFeedback &&
+                        (!f.contentId || item === f.contentId)
+                      }
                       noun="feedback entries"
                     />
-                  )}
-                </SectionHeader>
-                <p className="whitespace-pre-wrap text-copy [overflow-wrap:anywhere]">
-                  {f.comment || "No written comment."}
-                </p>
-              </CardContent>
-              <CardFooter>
-                <p className="text-copy text-muted-foreground">
-                  {f.person} {f.version ? `· v${f.version} ` : ""}·{" "}
-                  {new Date(f.updatedAt).toLocaleDateString()}
-                </p>
-                {f.contentId && item !== f.contentId && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => viewItem(f.contentId!)}
-                  >
-                    View all feedback for this item
-                  </Button>
-                )}
-              </CardFooter>
-            </article>
-          </Card>
-        ))}
-      </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </DataTable>
+        </TableContainer>
+      )}
       <CollectionEmpty
         count={records.length}
         total={feedbackRows(data, "all", "all", "all", "", "newest").length}
@@ -326,5 +452,108 @@ export function FeedbackAdmin({
         onClear={clearFilters}
       />
     </>
+  );
+}
+
+function FeedbackTitle({
+  title,
+  version,
+}: {
+  title: string;
+  version?: number;
+}) {
+  const displayTitle = version ? `${title} · v${version}` : title;
+  const container = useRef<HTMLDivElement>(null);
+  const [truncated, setTruncated] = useState(false);
+  useLayoutEffect(() => {
+    let active = true;
+    const measure = () => {
+      const label = container.current?.querySelector<HTMLElement>(
+        "[data-slot=feedback-title]",
+      );
+      if (active && label) setTruncated(label.scrollWidth > label.clientWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    if (container.current) observer.observe(container.current);
+    void document.fonts.ready.then(measure);
+    return () => {
+      active = false;
+      observer.disconnect();
+    };
+  }, [displayTitle]);
+  const label = (
+    <span
+      data-slot="feedback-title"
+      tabIndex={truncated ? 0 : undefined}
+      className="block truncate rounded-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {displayTitle}
+    </span>
+  );
+  return (
+    <div ref={container} className="w-44">
+      {truncated ? <Tooltip content={displayTitle}>{label}</Tooltip> : label}
+    </div>
+  );
+}
+
+function FeedbackComment({
+  entry,
+}: {
+  entry: ReturnType<typeof feedbackRows>[number];
+}) {
+  const [open, setOpen] = useState(false);
+  const comment = entry.comment?.trim();
+  const characters = Array.from(comment?.replace(/\s+/g, " ") || "");
+  const excerpt =
+    characters.slice(0, 80).join("") + (characters.length > 80 ? "…" : "");
+  return (
+    <div className="flex w-64 items-center gap-2">
+      {comment ? (
+        <>
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">
+            {excerpt}
+          </span>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <Tooltip content="View comment">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 text-muted-foreground"
+                onClick={() => setOpen(true)}
+                aria-label={`View comment from ${entry.person} for ${entry.title}`}
+              >
+                <MessageSquare aria-hidden="true" />
+              </Button>
+            </Tooltip>
+            <DialogContent>
+              <DialogTitle>Feedback comment</DialogTitle>
+              <DialogDescription>
+                {entry.title} · {entry.person}
+                {entry.version ? ` · v${entry.version}` : ""} ·{" "}
+                {new Date(entry.updatedAt).toLocaleDateString()}
+              </DialogDescription>
+              <Badge variant={entry.rating === "up" ? "success" : "default"}>
+                {entry.ratingLabel}
+              </Badge>
+              <p className="whitespace-pre-wrap text-copy [overflow-wrap:anywhere]">
+                {entry.comment}
+              </p>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Close
+                  </Button>
+                </DialogClose>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      ) : (
+        <span className="text-muted-foreground">No comment</span>
+      )}
+    </div>
   );
 }

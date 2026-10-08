@@ -4,11 +4,18 @@ export type DistributionSegment = {
   id: string;
   label: string;
   count: number;
-  tone: "progress" | "success" | "warning" | "destructive" | "muted";
+  tone:
+    | "progress"
+    | "success"
+    | "success-soft"
+    | "warning"
+    | "destructive"
+    | "muted";
 };
 export const distributionTone = {
   progress: "bg-link hover:bg-link",
   success: "bg-success hover:bg-success",
+  "success-soft": "bg-success/60 hover:bg-success/60",
   warning: "bg-warning hover:bg-warning",
   destructive: "bg-destructive hover:bg-destructive",
   muted: "bg-muted-foreground hover:bg-muted-foreground",
