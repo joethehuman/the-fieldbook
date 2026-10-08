@@ -259,6 +259,7 @@ export function LibraryExamples() {
       </SettingsSection>
       <SettingsSection
         id="catalog-feedback"
+        className="[&_[data-slot=field-group]]:[container-type:inline-size] [&_[data-slot=field-group]]:[container-name:editor-shell] [&_.editor-save-status]:flex-wrap"
         title={<h3>Information and actions</h3>}
         guidance="Notes provide context. Alerts announce new errors or results. Tooltips supplement an already named action; they never hide required instructions."
       >
@@ -279,7 +280,10 @@ export function LibraryExamples() {
           <Badge variant="warning">Needs attention</Badge>
           <Badge variant="destructive">Failed</Badge>
         </ActionGroup>
-        <ActionGroup aria-label="Publication status examples">
+        <ActionGroup
+          aria-label="Publication status examples"
+          className="[&>span]:max-w-full [&>span]:flex-wrap [&>span]:whitespace-normal"
+        >
           <PublicationStatus published={false} />
           <PublicationStatus published />
           <PublicationStatus published hasUnpublishedChanges />

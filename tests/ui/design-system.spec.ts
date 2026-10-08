@@ -562,7 +562,7 @@ test("manager reporting uses shared filters and scoped people", async ({
   });
 });
 
-test("catalog remains usable with enlarged text", async ({ page }) => {
+test("catalog remains usable with enlarged text", async ({ page }, info) => {
   await page.goto("/ui");
   await expect(
     page.getByRole("heading", { name: "Interface reference" }),
@@ -577,6 +577,37 @@ test("catalog remains usable with enlarged text", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: "Edit example group" }),
   ).toBeVisible();
+  const feedback = page.locator("#catalog-feedback");
+  await feedback.scrollIntoViewIfNeeded();
+  // Check the actual examples too: hiding page overflow would mask a failure.
+  const sizes = await feedback.evaluate((section) => {
+    const parent = section.getBoundingClientRect();
+    return Array.from(section.querySelectorAll<HTMLElement>(
+      '[aria-label="Publication status examples"] > span, .editor-save-status',
+    )).map((node) => {
+      const bounds = node.getBoundingClientRect();
+      return {
+        withinSection: bounds.left >= parent.left && bounds.right <= parent.right,
+        overflow: node.scrollWidth - node.clientWidth,
+      };
+    });
+  });
+  expect(sizes).toHaveLength(10);
+  sizes.forEach(size => {
+    expect(size.withinSection).toBe(true);
+    expect(size.overflow).toBeLessThanOrEqual(1);
+  });
+  await expect(feedback.getByRole("button", { name: "Example actions", exact: true })).toBeVisible();
+  await feedback.screenshot({ path: info.outputPath("catalog-feedback-enlarged.png") });
+});
+
+test("catalog status examples fit at normal text size", async ({ page }, info) => {
+  await page.goto("/ui#catalog-feedback");
+  const feedback = page.locator("#catalog-feedback");
+  await expect(feedback.getByRole("heading", { name: "Information and actions" })).toBeVisible();
+  await noOverflow(page);
+  await expect(feedback.getByText("Unpublished edits", { exact: true }).first()).toBeVisible();
+  await feedback.screenshot({ path: info.outputPath("catalog-feedback-normal.png") });
 });
 
 async function snapshotReview(
