@@ -61,7 +61,7 @@ test("admin entry and section changes avoid the full workspace", async ({
     if (req.url().includes("/api/workspace")) workspaceReads++;
     if (req.isNavigationRequest()) documentNavigations++;
   });
-  const response = await page.goto("/admin");
+  const response = await page.goto("/admin/content");
   expect(response?.status()).toBe(200);
   expect(await response!.text()).not.toContain(draft.body);
   await expect(page.locator(".admin-layout")).toBeVisible();
@@ -84,7 +84,7 @@ test("admin entry and section changes avoid the full workspace", async ({
   await expect(page.getByRole("heading", { name: "People" })).toBeVisible();
   expect(workspaceReads).toBe(0);
   await openTab("Content");
-  await page.getByRole("button", { name: "Edit" }).first().click();
+  await page.getByRole("link", { name: draft.title, exact: true }).click();
   await expect(page.getByText(draft.body)).toBeVisible();
   expect(workspaceReads).toBe(0);
   const saved = page.waitForResponse(
@@ -97,8 +97,8 @@ test("admin entry and section changes avoid the full workspace", async ({
     .getByRole("textbox", { name: "Title" })
     .fill("Revised administration article");
   await saved;
-  await expect(page.locator(".editor-save-status [role=status]")).toHaveText(
-    "Saved",
+  await expect(page.locator(".editor-save-status [role=status]")).toHaveAttribute(
+    "data-save-state", "saved",
   );
   expect(workspaceReads).toBe(0);
   await page.getByRole("button", { name: "Back to content" }).click();
@@ -116,7 +116,7 @@ test("admin entry and section changes avoid the full workspace", async ({
   if (await menu.isVisible()) await menu.click();
   await page.getByRole("button", { name: "Account menu" }).click();
   await page.getByRole("menuitem", { name: "Manage organization" }).click();
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/content$/);
   await expect(page.locator(".admin-layout")).toBeVisible();
   expect(documentNavigations).toBe(1);
   expect(workspaceReads).toBe(0);
@@ -408,7 +408,8 @@ test("large People list acknowledges pending reads and preserves search and sele
       else await route.continue();
     },
   );
-  await row.getByRole("button", { name: "Courses & progress" }).click();
+  await row.getByRole("button", { name: "Actions for Person 0599", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Progress", exact: true }).click();
   await expect(
     page.getByRole("alert").filter({ hasText: "Synthetic history failure" }),
   ).toBeVisible();
@@ -419,18 +420,19 @@ test("large People list acknowledges pending reads and preserves search and sele
     (response) =>
       response.url().includes("scope=person&") && response.status() === 200,
   );
-  await row.getByRole("button", { name: "Courses & progress" }).click();
+  await row.getByRole("button", { name: "Actions for Person 0599", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Progress", exact: true }).click();
   const state = await (await response).json();
   expect(Object.keys(state.data.progress)).toEqual([personId]);
   expect(state.data.progress[personId]).toHaveLength(1);
   await expect(
-    page.getByRole("heading", { name: "Courses & progress", exact: true }),
+    page.getByRole("heading", { name: "Person 0599", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("Assigned synthetic course").first(),
   ).toBeVisible();
   await expect(page.getByText("No assigned courses yet.")).toHaveCount(0);
-  await page.getByRole("heading", { name: "Courses & progress", exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole("heading", { name: "Person 0599", exact: true }).scrollIntoViewIfNeeded();
   await page.screenshot({ path: info.outputPath("person-progress.png") });
   await page.getByRole("button", { name: "Back to people" }).click();
   await expect(search).toHaveValue("person59");

@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { defaultSettings } from "../../lib/settings";
 import { freshWorkspace } from "../../lib/store";
 import type { Content } from "../../lib/types";
+import { contentPath } from "../../lib/navigation";
 const backend = "http://127.0.0.1:3130";
 const docs: Content[] = Array.from({ length: 42 }, (_, i) => ({
   id: `00000000-0000-4000-8000-${String(100 + i).padStart(12, "0")}`,
@@ -267,7 +268,8 @@ for (const app of ["demo", "production"] as const) {
       await page.reload();
       await expect(page.locator("article h1")).toHaveText(arranged[0].title);
       await expect(
-        page.locator(`.document-tree a[href="/docs/${arranged[0].id}"]`),
+        page.getByRole("navigation", { name: "Documents", exact: true })
+          .getByRole("link", { name: arranged[0].title, exact: true }),
       ).toHaveAttribute("aria-current", "page");
     }
   });
@@ -679,7 +681,7 @@ test("server navigation is published-only, updates across publication and works 
   await page.goto("http://localhost:3131/docs");
   await expect(page.locator("article h1")).toHaveText(docs[0].title);
   await expect(
-    page.locator(`.document-tree a[href="/docs/${docs[0].id}"]`),
+    page.getByRole("navigation", { name: "Documents", exact: true }).getByRole("link", { name: docs[0].title, exact: true }),
   ).toHaveAttribute("aria-current", "page");
   await page.goto(
     `http://localhost:3131/docs/${docs[39].id}#heading-overview-2`,
@@ -708,7 +710,7 @@ test("a cold Doc click keeps the article visible without header progress", async
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route(`**/docs/${items[2].id}?_rsc=*`, async (route) => {
+  await page.route(`**${contentPath("doc", items[2].id, items[2].title)}?_rsc=*`, async (route) => {
     waiting = true;
     await held;
     await route.continue();

@@ -164,11 +164,11 @@ for (const signedIn of [false, true]) {
     }
     const client = signedIn ? page.request : request;
     for (const path of ["/courses", "/curricula/intro", `/courses/${id(1)}`]) {
-      for (const headers of [{}, { RSC: "1" }] as Record<string, string>[]) {
+      for (const headers of [{}, { RSC: "1", "sec-fetch-dest": "empty" }] as Record<string, string>[]) {
         const response = await client.get(path, { headers });
         expect(response.status()).toBe(200);
         const body = await response.text();
-        expect(body).toContain("Recommended one");
+        expect(body, `${path} (${headers.RSC ? "RSC" : "HTML"})`).toContain("Recommended one");
         expect(body).not.toContain("PRIVATE-");
         expect(body).not.toMatch(/\\?"(?:answer|correctOptionIds)\\?":/);
         expect(body).not.toContain(id(99));

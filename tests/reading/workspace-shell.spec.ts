@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
+import { contentPath } from "../../lib/navigation";
 const backend = "http://127.0.0.1:3130";
 const docId = "00000000-0000-4000-8000-000000000041";
 const owner = "00000000-0000-4000-8000-000000000010";
@@ -220,7 +221,7 @@ test("approved cold navigation shows pending while preserving the old body and m
       return event.defaultPrevented;
     }),
   ).toBe(false);
-  await expect(page).toHaveURL(/\/admin$/);
+  await expect(page).toHaveURL(/\/admin\/content$/);
   await page.getByRole("link", { name: "Updates", exact: true }).click();
   await expect(
     page.getByRole("status", { name: "Opening page", exact: true }),
@@ -349,7 +350,7 @@ test("content navigation keeps its page without progress and Admin entry retains
     ["/docs", "/updates"],
     ["/updates", "/courses"],
     ["/courses", "/docs"],
-    ["/docs", `/docs/${docId}`],
+    ["/docs", contentPath("doc", docId, doc.title)],
     ["/docs", "/admin"],
   ]) {
     let release!: () => void;
@@ -402,7 +403,7 @@ test("content navigation keeps its page without progress and Admin entry retains
     } finally {
       release();
     }
-    await expect(page).toHaveURL(new RegExp(`${destination}$`));
+    await expect(page).toHaveURL(new RegExp(`${destination === "/admin" ? "/admin/content" : destination}$`));
     await expect(
       page.getByRole("status", { name: "Opening page", exact: true }),
     ).toHaveCount(0);

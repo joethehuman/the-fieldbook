@@ -155,6 +155,7 @@ test("demo account menu opens its published privacy policy", async ({ page }) =>
   const data = freshWorkspace();
   data.settings = {
     ...defaultSettings,
+    ...data.settings,
     privacy: {
       ...defaultPrivacy,
       published: {
