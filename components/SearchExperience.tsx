@@ -87,7 +87,6 @@ export function SearchExperience({
       searchProvider={searchProvider}
       clientNavigation={clientNavigation}
       onOpen={(result) => void openResult(result)}
-      onAskAi={enabled ? () => void ask() : undefined}
     />
   ) : null;
   const searchField = (

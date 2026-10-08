@@ -6,6 +6,7 @@ import {
 } from "@playwright/test";
 import { freshWorkspace } from "../../lib/store";
 import { defaultAskAiSettings, aiUnavailableMessage } from "../../lib/ai";
+import { contentPath } from "../../lib/navigation";
 const docId = "00000000-0000-4000-8000-000000000021";
 const sources = [
   {
@@ -145,6 +146,12 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
     });
   });
   const input = page.getByRole("textbox", { name: "Search all content" });
+  async function showSearch() {
+    if (info.project.name === "phone")
+      await page.getByRole("button", { name: "Open search", exact: true }).click();
+    else await input.click();
+  }
+  await showSearch();
   await expect(input).toHaveAttribute(
     "placeholder",
     "Search or Ask AI",
@@ -155,7 +162,13 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
     page.getByRole("heading", { name: "No results", exact: true }),
   ).toBeVisible();
   expect(payloads).toHaveLength(0);
-  await page.getByRole("button", { name: "Ask AI", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Ask AI", exact: true }),
+  ).toHaveCount(0);
+  await page.getByRole("tab", { name: "Ask AI", exact: true }).click();
+  const question = page.getByRole("textbox", { name: "Your question" });
+  await question.fill("ordinary search");
+  await question.press("Enter");
   await expect(
     page
       .getByRole("region", { name: "Ask AI conversation" })
@@ -172,7 +185,7 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
   ).toHaveCount(0);
   await input.press("Escape");
   await expect(page.locator('[data-slot="search-panel"]')).toHaveCount(0);
-  await input.click();
+  await showSearch();
   await expect(
     page.getByText("Keep the response", { exact: false }),
   ).toBeVisible();
@@ -197,8 +210,10 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
     .getByRole("link", { name: /Source 1: Published reference/ })
     .last()
     .click();
-  await expect(page).toHaveURL(new RegExp(`/docs/${docId}`));
-  await input.click();
+  await expect(page).toHaveURL(
+    `http://localhost:3131${contentPath("doc", docId, "Published reference")}`,
+  );
+  await showSearch();
   await expect(page.getByRole("log")).toContainText(
     "What about the second option?",
   );
@@ -214,7 +229,7 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
   const draft = page.getByRole("textbox", { name: "Ask a follow-up" });
   await draft.fill("An unsent follow-up");
   await input.press("Escape");
-  await input.click();
+  await showSearch();
   await expect(draft).toHaveValue("An unsent follow-up");
   const storage = await page.evaluate(() =>
     JSON.stringify({ ...localStorage, ...sessionStorage }),
@@ -222,6 +237,7 @@ test("Ask AI search, follow-ups, verified links, navigation and ephemeral reset"
   expect(storage).not.toContain("A unique temporary question");
   expect(storage).not.toContain("An unsent follow-up");
   await page.reload();
+  await showSearch();
   await input.fill("reopen");
   await page.getByRole("tab", { name: "Ask AI" }).click();
   await expect(page.getByRole("log")).not.toContainText(
