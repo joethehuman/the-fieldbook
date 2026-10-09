@@ -289,7 +289,7 @@ export default function Curricula({
           });
         },
       })),
-      ...curriculumGroupCommands(data, ids, onChange, assignmentPicker.open),
+      ...curriculumGroupCommands(data, ids, assignmentPicker.open),
       {
         id: "delete",
         label: "Delete selected curricula",
@@ -643,11 +643,12 @@ export default function Curricula({
                   actions={[
                     { label: "Edit curriculum", onSelect: edit },
                     ...(assign
-                      ? [{ label: "Edit audience", onSelect: assign }]
+                      ? [{ label: "Manage Audience", onSelect: assign }]
                       : []),
                   ]}
                   commands={curriculumCommands([c.id]).filter(
                     (command) =>
+                      !(assign && command.id === "manage-audience") &&
                       command.id !==
                       (c.status === "published" ? "publish" : "unpublish"),
                   )}

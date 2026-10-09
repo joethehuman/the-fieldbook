@@ -47,6 +47,7 @@ export function AssignmentTransfer({
   searchPlaceholder = "Find content",
   partial = [],
   onAddToAll,
+  assignAllLabel,
   audienceCount = 1,
 }: {
   options: AssignmentTransferOption[];
@@ -59,6 +60,7 @@ export function AssignmentTransfer({
   searchPlaceholder?: string;
   partial?: string[];
   onAddToAll?: (id: string) => void;
+  assignAllLabel?: (option: AssignmentTransferOption) => string;
   audienceCount?: number;
 }) {
   const id = useId();
@@ -159,7 +161,16 @@ export function AssignmentTransfer({
                 .includes(term),
             ),
           );
-          const sections = [...new Set(matches.map((option) => option.type))];
+          const sections = (
+            [
+              "course",
+              "curriculum",
+              "update",
+              "group",
+              "team",
+              undefined,
+            ] as const
+          ).filter((type) => matches.some((option) => option.type === type));
           return (
             <section
               key={key}
@@ -277,12 +288,15 @@ export function AssignmentTransfer({
                                         variant="ghost"
                                         disabled={disabled}
                                         data-transfer-action={`${option.id}-all`}
-                                        aria-label={`Assign ${option.label} to all selected audiences`}
+                                        aria-label={
+                                          assignAllLabel?.(option) ||
+                                          `Assign ${option.label} to all selected audiences`
+                                        }
                                         onClick={() => {
                                           rememberFocus();
                                           onAddToAll?.(option.id);
                                           setAnnouncement(
-                                            `${option.label} assigned to all selected audiences.`,
+                                            `${option.label}: all selected.`,
                                           );
                                         }}
                                       >

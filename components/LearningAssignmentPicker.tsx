@@ -513,13 +513,15 @@ export function LearningAssignmentPicker({
                       : target.mode === "remove"
                         ? "Remove courses"
                         : "Assign courses"
-                    : target.mode === "remove"
-                      ? "Remove assignments"
-                      : "Add assignments"
+                    : target.mode === "manage"
+                      ? "Manage Audience"
+                      : target.mode === "remove"
+                        ? "Remove assignments"
+                        : "Add assignments"
                   : item?.kind === "brief"
                     ? "Update recommendations"
                     : item?.kind === "curriculum"
-                      ? "Curriculum assignments"
+                      ? "Manage Audience"
                       : "Course assignments"}
               </DialogTitle>
               <DialogDescription>{displayTitle}</DialogDescription>
@@ -575,9 +577,11 @@ export function LearningAssignmentPicker({
                 <p className="shrink-0 text-sm text-muted-foreground">
                   {target
                     ? target.mode === "manage"
-                      ? target.kind === "audiences" && target.keys.length > 1
-                        ? "Manage direct courses and curricula. Partial assignments stay as they are; + All assigns to every selected audience."
-                        : "Manage direct courses and curricula. Expand a curriculum to see its included courses."
+                      ? target.kind === "items"
+                        ? "Manage teams and groups. Partial assignments stay as they are; + All assigns every selected curriculum to that audience."
+                        : target.keys.length > 1
+                          ? "Manage direct courses and curricula. Partial assignments stay as they are; + All assigns to every selected audience."
+                          : "Manage direct courses and curricula. Expand a curriculum to see its included courses."
                       : target.mode === "remove"
                         ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."
                         : target.kind === "audiences"
@@ -588,7 +592,9 @@ export function LearningAssignmentPicker({
                       : "Choose who gets this learning in For you and assigned learning."}
                 </p>
               )}
-              {target?.kind === "audiences" || target?.mode === "remove" ? (
+              {target?.kind === "audiences" ||
+              target?.mode === "remove" ||
+              target?.mode === "manage" ? (
                 <AssignmentTransfer
                   options={selectionOptions.map((option) => ({
                     ...option,
@@ -607,8 +613,16 @@ export function LearningAssignmentPicker({
                   onAddToAll={(id) =>
                     setPartial(partial.filter((key) => key !== id))
                   }
+                  assignAllLabel={
+                    target.kind === "items"
+                      ? (option) =>
+                          `Assign all selected learning to ${option.label}`
+                      : undefined
+                  }
                   audienceCount={
-                    target.kind === "audiences" ? target.keys.length : 1
+                    target.kind === "audiences"
+                      ? target.keys.length
+                      : target.items.length
                   }
                   disabled={busy || stale}
                   rightLabel={

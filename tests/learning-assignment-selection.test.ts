@@ -168,14 +168,7 @@ test("course/curriculum bulk menus delegate to the shared workflow without gener
     async () => {},
     open,
   );
-  const curricula = curriculumGroupCommands(
-    data,
-    ["p"],
-    () => {
-      throw new Error("Must use picker");
-    },
-    open,
-  );
+  const curricula = curriculumGroupCommands(data, ["p"], open);
   for (const commands of [courses.slice(0, 2), curricula])
     for (const command of commands) {
       assert.equal(command.externalReview, true);
@@ -185,8 +178,7 @@ test("course/curriculum bulk menus delegate to the shared workflow without gener
   assert.deepEqual(requests, [
     { kind: "items", items, mode: "add" },
     { kind: "items", items, mode: "remove" },
-    { kind: "items", items: [{ kind: "curriculum", id: "p" }], mode: "add" },
-    { kind: "items", items: [{ kind: "curriculum", id: "p" }], mode: "remove" },
+    { kind: "items", items: [{ kind: "curriculum", id: "p" }], mode: "manage" },
   ]);
 });
 
@@ -287,4 +279,75 @@ test("group and team menus use one management action per supported content kind"
     { kind: "audiences", keys: ["group:a"], mode: "manage" },
     { kind: "audiences", keys: ["team:t"], mode: "manage" },
   ]);
+});
+
+test("Manage Audience loads curriculum sources and clearing them retains independent course links", () => {
+  const { data, items } = fixture();
+  data.groups[0].learningItems!.push({ kind: "curriculum", id: "p" });
+  const target = {
+    kind: "items" as const,
+    items: [{ kind: "curriculum" as const, id: "p" }],
+    mode: "manage" as const,
+  };
+  assert.deepEqual(learningSelectionState(data, target), {
+    selected: ["group:a"],
+    partial: [],
+  });
+  const changed = applyLearningSelection(data, target, ["team:t"]);
+  assert.deepEqual(changed.groups[0].learningItems, [items[0]]);
+  assert.deepEqual(changed.teams![0].learningItems, [
+    items[0],
+    { kind: "curriculum", id: "p" },
+  ]);
+  const cleared = applyLearningSelection(data, target, []);
+  assert.deepEqual(cleared.groups[0].learningItems, [items[0]]);
+  assert.deepEqual(cleared.progress, data.progress);
+  assert.deepEqual(cleared.content, data.content);
+});
+test("bulk Manage Audience retains partial curriculum links until explicitly assigned to all", () => {
+  const { data, items } = fixture();
+  data.curricula!.push({
+    ...data.curricula![0],
+    id: "q",
+    name: "Other playlist",
+    courseIds: [items[1].id],
+  });
+  data.groups[0].learningItems!.push({ kind: "curriculum", id: "p" });
+  data.groups[1].learningItems = [{ kind: "curriculum", id: "q" }, items[1]];
+  const target = {
+    kind: "items" as const,
+    items: [
+      { kind: "curriculum" as const, id: "p" },
+      { kind: "curriculum" as const, id: "q" },
+    ],
+    mode: "manage" as const,
+  };
+  const initial = learningSelectionState(data, target);
+  assert.deepEqual(initial, {
+    selected: ["group:a", "group:b"],
+    partial: ["group:a", "group:b"],
+  });
+  assert.deepEqual(
+    applyLearningSelection(data, target, initial.selected, initial.partial),
+    data,
+  );
+  const changed = applyLearningSelection(
+    data,
+    target,
+    ["group:a", "team:t"],
+    ["group:a"],
+  );
+  assert.deepEqual(
+    changed.groups[0].learningItems,
+    data.groups[0].learningItems,
+  );
+  assert.deepEqual(changed.groups[1].learningItems, [items[1]]);
+  assert.deepEqual(changed.teams![0].learningItems, [
+    items[0],
+    ...target.items,
+  ]);
+  assert.throws(
+    () => applyLearningSelection(data, target, ["group:missing"]),
+    /changed/,
+  );
 });

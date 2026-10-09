@@ -7,7 +7,7 @@ import {
 import { sourcePassages } from "./search";
 
 export type LearningAssignmentTarget =
-  | { kind: "items"; items: LearningItem[]; mode: "add" | "remove" }
+  | { kind: "items"; items: LearningItem[]; mode: "add" | "remove" | "manage" }
   | {
       kind: "audiences";
       keys: string[];
@@ -23,8 +23,25 @@ export function learningSelectionState(
   data: Workspace,
   target: LearningAssignmentTarget,
 ): AssignmentSelection {
-  if (target.kind !== "audiences" || target.mode !== "manage")
-    return { selected: [], partial: [] };
+  if (target.mode !== "manage") return { selected: [], partial: [] };
+  if (target.kind === "items") {
+    const plans = assignmentAudiences(data)
+      .map((plan) => ({
+        key: `${plan.kind}:${plan.id}`,
+        count: target.items.filter((item) =>
+          plan.items.some(
+            (saved) => learningItemKey(saved) === learningItemKey(item),
+          ),
+        ).length,
+      }))
+      .filter((plan) => plan.count > 0);
+    return {
+      selected: plans.map((plan) => plan.key),
+      partial: plans
+        .filter((plan) => plan.count < target.items.length)
+        .map((plan) => plan.key),
+    };
+  }
   const plans = assignmentAudiences(data).filter((a) =>
     target.keys.includes(`${a.kind}:${a.id}`),
   );
@@ -87,6 +104,42 @@ export function applyLearningSelection(
   values: string[],
   partial: string[] = [],
 ) {
+  if (target.kind === "items" && target.mode === "manage") {
+    const plans = assignmentAudiences(data);
+    const original = learningSelectionState(data, target);
+    if (
+      !target.items.length ||
+      values.some(
+        (key) => !plans.some((plan) => `${plan.kind}:${plan.id}` === key),
+      ) ||
+      partial.some(
+        (key) => !values.includes(key) || !original.partial.includes(key),
+      )
+    )
+      throw new Error(
+        "Learning or audiences changed. Refresh to review the current selection.",
+      );
+    let next = data;
+    for (const plan of plans) {
+      const key = `${plan.kind}:${plan.id}`;
+      if (partial.includes(key)) continue;
+      const saved = (item: LearningItem) =>
+        plan.items.some(
+          (existing) => learningItemKey(existing) === learningItemKey(item),
+        );
+      const items = target.items.filter((item) =>
+        values.includes(key) ? !saved(item) : saved(item),
+      );
+      if (items.length)
+        next = assignLearningToAudiences(
+          next,
+          items,
+          [key],
+          values.includes(key) ? "add" : "remove",
+        );
+    }
+    return next;
+  }
   if (target.kind === "audiences" && target.mode === "manage") {
     const plans = assignmentAudiences(data).filter((a) =>
       target.keys.includes(`${a.kind}:${a.id}`),
@@ -147,7 +200,7 @@ export function applyLearningSelection(
 type LearningSelectionOption = {
   id: string;
   label: string;
-  type?: "course" | "curriculum";
+  type?: "course" | "curriculum" | "team" | "group";
   description?: string;
   category?: string;
   updatedAt?: string;
@@ -164,7 +217,7 @@ export function learningSelectionOptions(
     return audiences
       .filter(
         (audience) =>
-          target.mode === "add" ||
+          target.mode !== "remove" ||
           target.items.some((item) =>
             audience.items.some(
               (saved) => learningItemKey(saved) === learningItemKey(item),
@@ -173,7 +226,16 @@ export function learningSelectionOptions(
       )
       .map((audience) => ({
         id: `${audience.kind}:${audience.id}`,
-        label: `${audience.kind === "team" ? "Team" : "Group"}: ${audience.name}`,
+        label:
+          target.mode === "manage"
+            ? audience.name
+            : `${audience.kind === "team" ? "Team" : "Group"}: ${audience.name}`,
+        type: audience.kind,
+        assignmentCount: target.items.filter((item) =>
+          audience.items.some(
+            (saved) => learningItemKey(saved) === learningItemKey(item),
+          ),
+        ).length,
       }));
   const plans = audiences.filter((audience) =>
     target.keys.includes(`${audience.kind}:${audience.id}`),

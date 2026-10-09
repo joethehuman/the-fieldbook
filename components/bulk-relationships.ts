@@ -154,53 +154,34 @@ export function contentRelationshipCommands(
 export function curriculumGroupCommands(
   data: Workspace,
   selected: string[],
-  save: Save,
-  openAssignments?: OpenLearningAssignment,
+  openAssignments: OpenLearningAssignment,
 ): BulkCommand[] {
-  return ([true, false] as const).map((add) => ({
-    id: add ? "group-add" : "group-remove",
-    label: add
-      ? "Assign to teams or groups"
-      : "Remove team or group assignments",
-    externalReview: !!openAssignments,
-    applyLabel: "Review assignments",
-    description:
-      "Change direct curriculum assignments. Course content and saved learning history are preserved.",
-    disabledReason:
-      add &&
-      data.curricula?.some(
+  return [
+    {
+      id: "manage-audience",
+      label: "Manage Audience",
+      externalReview: true,
+      description:
+        "Manage direct curriculum audiences. Other learning and saved history remain.",
+      disabledReason: data.curricula?.some(
         (c) => selected.includes(c.id) && c.status !== "published",
       )
         ? "Publish every selected curriculum first."
         : undefined,
-    options: openAssignments
-      ? undefined
-      : assignmentAudiences(data).map((a) => ({
-          id: audienceKey(a),
-          label: `${a.kind === "group" ? "Group" : "Team"}: ${a.name}`,
-        })),
-    apply: async (ids) => {
-      if (openAssignments) {
-        await openAssignments(
+      apply: () =>
+        openAssignments(
           {
             kind: "items",
             items: selected.map((id) => ({ kind: "curriculum", id })),
-            mode: add ? "add" : "remove",
+            mode: "manage",
           },
-          `${selected.length} selected ${selected.length === 1 ? "curriculum" : "curricula"}`,
-        );
-        return;
-      }
-      await save(
-        assignLearningToAudiences(
-          data,
-          selected.map((id) => ({ kind: "curriculum", id })),
-          ids,
-          add ? "add" : "remove",
+          selected.length === 1
+            ? data.curricula?.find((c) => c.id === selected[0])?.name ||
+                "Curriculum"
+            : `${selected.length} selected curricula`,
         ),
-      );
     },
-  }));
+  ];
 }
 export function groupLearningCommands(
   data: Workspace,
