@@ -180,10 +180,13 @@ test("URL paste links table-cell selections and leaves code and caret paste alon
   await expect(editor.locator("code")).toHaveText("https://example.com/code");
   await expect(editor.locator("code a")).toHaveCount(0);
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("link-dialog-preview")).toHaveCount(0);
   const paragraph = editor.locator(":scope > p").last();
   await paragraph.click();
-  await editor.press("ControlOrMeta+End");
-  await pasteWritingText(page, "https://example.com/caret");
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => navigator.clipboard.writeText("https://example.com/caret"));
+  await page.keyboard.press("ControlOrMeta+v");
   await expect(paragraph).toContainText("Caret:");
   await expect(paragraph).toContainText("https://example.com/caret");
   await waitForDraftSaved(page);
@@ -336,7 +339,7 @@ async function setup(
   production: boolean,
   body = original,
   kind: "doc" | "brief" = "doc",
-  itemId = "writing-fixture",
+  itemId = "00000000-0000-4000-8000-000000000011",
 ) {
   let state = withPublishedSnapshots(freshWorkspace());
   if (kind === "doc") {
@@ -420,6 +423,17 @@ async function setup(
       await syncAuthoringProvider(page, state);
       return route.fulfill({ json: saved });
     });
+    await page.route("**/api/admin/bulk", async (route) => {
+      const request = route.request().postDataJSON();
+      expect(request.entity).toBe("content");
+      expect(request.operation).toBe("unpublish");
+      expect(request.items).toEqual([{ id: itemId, expected: state.content[0].revision }]);
+      state.content = [{ ...state.content[0], status: "draft", publishedRevision: undefined,
+        revision: (state.content[0].revision || 0) + 1 }];
+      state.publishedContent = [];
+      await syncAuthoringProvider(page, state);
+      return route.fulfill({ json: { results: [{ id: itemId, status: "changed" }] } });
+    });
   } else {
     await page.addInitScript((data) => {
       if (!localStorage.getItem("fieldbook.workspace.v1"))
@@ -495,7 +509,7 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
   await expect(
     page.getByText("Unpublished edits", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("link", { name: "Private title", exact: true }).click();
   await expect(page.locator(".editor")).toBeVisible();
   await expect(editor).toContainText("A private addition.");
   await page
@@ -508,15 +522,16 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
     fullPage: true,
   });
   await returnToContent(page);
-  await page.getByRole("button", { name: "Unpublish", exact: true }).click();
+  await page.getByRole("button", { name: "Actions for Private title", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Unpublish", exact: true }).click();
   await page
-    .getByRole("alertdialog")
-    .getByRole("button", { name: "Confirm", exact: true })
+    .getByRole("dialog", { name: "Unpublish", exact: true })
+    .getByRole("button", { name: "Apply changes", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Unpublish", exact: true }),
   ).toHaveCount(0);
-  expect((await read()).publishedContent).toEqual([]);
+  await expect.poll(async () => (await read()).publishedContent).toEqual([]);
   expect((await read()).content[0].body).toContain("A private addition.");
   expect(errors).toEqual([]);
 });
