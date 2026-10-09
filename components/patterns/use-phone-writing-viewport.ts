@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect, type RefObject } from "react";
+import { readWritingCaretLine } from "./writing-cursor";
 import { touchWritingQuery } from "./use-editor-cards-layout";
 import { compactLayoutQuery } from "./use-compact-layout";
 
@@ -15,6 +16,9 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     const phone = window.matchMedia(compactLayoutQuery);
     const touch = window.matchMedia(touchWritingQuery);
     let dragging = false;
+    let selectionPending = false;
+    let caretNode: Node | null = null;
+    let caretOffset = -1;
     let request = 0;
     let settle = 0;
     let closing = 0;
@@ -51,12 +55,13 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       owner!.style.setProperty("--phone-keyboard-space", `${space}px`);
     }
     function revealCaret() {
-      if (dragging || !phone.matches || !touch.matches || viewport!.scale !== 1 || !root!.contains(document.activeElement)) return;
+      const active = document.activeElement;
+      if (dragging || !phone.matches || !touch.matches || viewport!.scale !== 1 || !(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)) return;
       const selection = window.getSelection();
       if (!selection?.rangeCount || !selection.isCollapsed || !root!.contains(selection.focusNode)) return;
       const element = selection.focusNode instanceof Element ? selection.focusNode : selection.focusNode?.parentElement;
       if (!element?.closest('[contenteditable="true"]')) return;
-      let caret = selection.getRangeAt(0).getClientRects()[0];
+      let caret = readWritingCaretLine(root) || selection.getRangeAt(0).getClientRects()[0];
       if (!caret?.height) {
         // A new Lexical paragraph is <p><br></p>: its collapsed range has no
         // text rectangle. Use only that empty line, never the whole canvas.
@@ -71,7 +76,12 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       const heading = root!.querySelector(".writing-document-heading")?.getBoundingClientRect().bottom || bounds.top;
       const top = Math.max(bounds.top, viewport!.offsetTop, navigation, heading) + rem;
       const dockClearance = parseFloat(getComputedStyle(owner!).getPropertyValue("--editor-dock-clearance")) || 0;
-      const bottom = Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height) - Math.max((keyboardOpen ? 3 : 1) * rem, dockClearance);
+      // Protect the actual toolbar boundary, including native app panning,
+      // rather than deriving its location from a viewport height difference.
+      const dock = editor!.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]');
+      const bottom = dock
+        ? Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height, dock.getBoundingClientRect().top) - rem
+        : Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height) - Math.max((keyboardOpen ? 3 : 1) * rem, dockClearance);
       if (bottom <= top) return;
       const delta = caret.bottom > bottom ? caret.bottom - bottom : caret.top < top ? caret.top - top : 0;
       if (Math.abs(delta) < 1) return;
@@ -82,18 +92,30 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       clearTimeout(settle);
       cancelAnimationFrame(request);
     }
-    function schedule() {
+    function schedule(delay = 100) {
       clearTimeout(settle);
       cancelAnimationFrame(request);
-      // Let native focus/keyboard panning settle before one minimal correction.
-      settle = window.setTimeout(() => { request = requestAnimationFrame(revealCaret); }, 100);
+      // Focus and viewport changes settle; typing protects the next paint.
+      settle = window.setTimeout(() => { request = requestAnimationFrame(revealCaret); }, delay);
     }
     function resize() { reserveSpace(); schedule(); }
     function pan() { reserveSpace(); }
-    function editing() { reserveSpace(); schedule(); }
+    function editing(event: Event) { reserveSpace(); schedule(event.type === "input" ? 0 : 100); }
     function blur() { reserveSpace(); }
-    function startDrag() { dragging = true; cancelReveal(); }
-    function endDrag() { dragging = false; }
+    function selectionMoved() {
+      const selection = window.getSelection();
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active) || !selection?.isCollapsed || !root!.contains(selection.focusNode)) return;
+      if (selection.focusNode === caretNode && selection.focusOffset === caretOffset) return;
+      caretNode = selection.focusNode; caretOffset = selection.focusOffset;
+      if (dragging) selectionPending = true;
+      else schedule(keyboardOpen ? 0 : 100);
+    }
+    function startDrag() { dragging = true; selectionPending = false; cancelReveal(); }
+    function endDrag() {
+      dragging = false;
+      if (selectionPending) { selectionPending = false; schedule(keyboardOpen ? 0 : 100); }
+    }
     reserveSpace();
     viewport.addEventListener("resize", resize);
     viewport.addEventListener("scroll", pan);
@@ -103,6 +125,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     editor.addEventListener("focusin", editing);
     editor.addEventListener("focusout", blur);
     root.addEventListener("input", editing);
+    document.addEventListener("selectionchange", selectionMoved);
     owner.addEventListener("wheel", cancelReveal, { passive: true });
     owner.addEventListener("touchstart", startDrag, { passive: true });
     window.addEventListener("touchend", endDrag);
@@ -119,6 +142,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       editor.removeEventListener("focusin", editing);
       editor.removeEventListener("focusout", blur);
       root.removeEventListener("input", editing);
+      document.removeEventListener("selectionchange", selectionMoved);
       owner.removeEventListener("wheel", cancelReveal);
       owner.removeEventListener("touchstart", startDrag);
       window.removeEventListener("touchend", endDrag);

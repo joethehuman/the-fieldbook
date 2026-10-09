@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { blurWritingInput, captureWritingCursor, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
+import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
@@ -112,11 +112,17 @@ export function EditorFrame({
     let layoutWidth = document.documentElement.clientWidth;
     let layoutHeight = document.documentElement.clientHeight;
     let keyboard = false;
+    const surface = dock ? element.querySelector<HTMLElement>(".editor-controls-surface") : null;
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let motion: Animation | null = null;
+    let lastDockTop: number | null = null;
+    const stopMotion = () => { motion?.cancel(); motion = null; };
     // Apple can overlay an address pill and an input accessory row above the
     // keyboard without subtracting both from the reported visual viewport.
     const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent)
       || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
     const measure = () => {
+      const before = lastDockTop === null ? null : surface?.getBoundingClientRect();
       const viewport = window.visualViewport;
       const appBounds = overlayHost?.getBoundingClientRect();
       const rawTop = viewport?.offsetTop || 0;
@@ -147,6 +153,28 @@ export function EditorFrame({
         element.style.setProperty("--editor-usable-bottom", `${safeBottom}px`);
       }
       const rect = element.getBoundingClientRect();
+      const menuOpen = panelState.current.outline || panelState.current.details
+        || !!document.querySelector(".writing-slash-menu, .writing-media-chooser");
+      const caretLine = dock && !menuOpen && preparedPanel.current === null ? readWritingCaretLine(canvas.current) : null;
+      const coversLine = (box: DOMRect) => !!caretLine && box.top < caretLine.bottom + 8 && box.bottom > caretLine.top - 8;
+      if (menuOpen || reducedMotion.matches || before && coversLine(before)) stopMotion();
+      if (surface && lastDockTop !== rect.top) {
+        stopMotion();
+        if (before && !reducedMotion.matches && !menuOpen && (viewport?.scale || 1) === 1) {
+          // Animate only the surface. Geometry and scroll clearance use the
+          // immediate anchor, and no visual frame may enter the keyboard lane.
+          const minimum = Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0) + 8;
+          const offset = Math.max(Math.min(0, minimum - rect.top), Math.min(0, before.top - rect.top));
+          const crossesLine = !!caretLine && rect.top + offset < caretLine.bottom + 8 && rect.bottom > caretLine.top - 8;
+          if (offset < -1 && !crossesLine) motion = surface.animate([
+            { transform: `translateY(${offset}px)` }, { transform: "translateY(0)" },
+          ], { duration: 140, easing: "cubic-bezier(0.2, 0, 0, 1)" });
+          else if (offset < -1 || before.top - rect.top > 24) motion = surface.animate([
+            { opacity: 0.65 }, { opacity: 1 },
+          ], { duration: 100, easing: "ease-out" });
+        }
+        lastDockTop = rect.top;
+      }
       const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
       const panelTop = dock ? Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0, bounds.top - 8) + 8 : rect.bottom + 8;
       const panelBottom = dock ? rect.top - 8 : bottom - 16;
@@ -178,6 +206,7 @@ export function EditorFrame({
       cancelAnimationFrame(releaseRequest);
       releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; schedule(); });
     };
+    reducedMotion.addEventListener("change", stopMotion);
     measureDock.current = measure;
     measure();
     const observer = new ResizeObserver(schedule);
@@ -196,12 +225,16 @@ export function EditorFrame({
       document.addEventListener("touchend", settle, { passive: true });
       element.addEventListener("pointerdown", remember, true);
       document.addEventListener("selectionchange", remember);
+      document.addEventListener("selectionchange", schedule);
+      document.addEventListener("input", schedule);
       document.addEventListener("focusin", remember);
       document.addEventListener("pointerup", released);
     }
     return () => {
       cancelAnimationFrame(request);
       cancelAnimationFrame(releaseRequest);
+      stopMotion();
+      reducedMotion.removeEventListener("change", stopMotion);
       if (measureDock.current === measure) measureDock.current = null;
       observer.disconnect();
       if (dock) owner?.style.removeProperty("--editor-dock-clearance");
@@ -216,6 +249,8 @@ export function EditorFrame({
         document.removeEventListener("touchend", settle);
         element.removeEventListener("pointerdown", remember, true);
         document.removeEventListener("selectionchange", remember);
+        document.removeEventListener("selectionchange", schedule);
+        document.removeEventListener("input", schedule);
         document.removeEventListener("focusin", remember);
         document.removeEventListener("pointerup", released);
       }
@@ -368,6 +403,7 @@ export function EditorFrame({
   </EditorDetailsGroup>;
   const panelControls = (
       <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} data-dock={dock || undefined} role={dock ? "group" : undefined} aria-label={dock ? "Editor controls" : undefined}>
+      <div className="editor-controls-surface">
         {outline && (
           <Button ref={outlineToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle size-11 ${dock ? "relative appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative rounded-full" : "absolute rounded-full"}`} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
@@ -391,6 +427,7 @@ export function EditorFrame({
           {panels.details ? <X aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}
           {requirementsCount > 0 && <span className="editor-requirements-badge" aria-hidden="true">{requirementsCount}</span>}
         </Button>
+      </div>
       </div>
   );
   const panelSurfaces = <>
