@@ -560,10 +560,10 @@
 .writing-editor .mdxeditor-contenteditable-wrapper { position: relative; }
 /* Block decorators must not leave anonymous inline line boxes around their content. */
 .writing-editor .writing-content > [data-lexical-decorator="true"],
-.writing-editor .writing-content > p > [data-lexical-decorator="true"]:has(.writing-media-block, [data-editor-block-type="image"], .writing-media-loading),
+.writing-editor .writing-content [data-lexical-decorator="true"]:has(.writing-media-block, [data-editor-block-type="image"], .writing-media-loading),
 .writing-editor .writing-content [data-editor-block-type="image"] { display: block; }
-/* An image-only paragraph needs no extra caret line inside its block wrapper. */
-.writing-editor .writing-content > p:has(> [data-lexical-decorator="true"]:first-child:nth-last-child(2)):has(
+/* Image-only blocks need no extra caret line inside their wrapper. */
+.writing-editor .writing-content :is(p, li, blockquote, h1, h2, h3, h4, h5, h6):has(> [data-lexical-decorator="true"]:first-child:nth-last-child(2)):has(
   [data-editor-block-type="image"], .writing-media-loading
 ) > br[data-lexical-managed-linebreak]:last-child { display: none; }
 .writing-editor .writing-content :is(.writing-code-block, .writing-media-block, [data-editor-block-type="image"], .writing-table-block),

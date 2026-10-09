@@ -8,7 +8,7 @@ import { WritingMediaLoading, WritingUploadNode, writingUploadPlugin } from "./w
 import { useScrollFade } from "./use-scroll-fade";
 import { equivalentMarkdown } from "@/lib/markdown-compatibility";
 import { readTableWidths, setTableColumnWidths, tableColumnWidths, writeTableWidths } from "@/lib/writing-table";
-import { createWritingBlock, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
+import { $applyWritingBlockStyle, $isMediaParagraph, writingBlockStyles, type WritingBlock, type WritingBlockStyle } from "./writing-commands";
 import { WritingSelectionMenu, type SelectionMenuController } from "./writing-selection-menu";
 import { normalizeWritingSelection, writingSelectionBoundariesPlugin } from "./writing-selection-boundaries";
 import { EditorCompactControlsContext, EditorWritingActionsContext } from "./editor-frame";
@@ -47,7 +47,6 @@ import {
   insertThematicBreak$,
 } from "@mdxeditor/editor";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
-import { $setBlocksType } from "@lexical/selection";
 import { $insertList } from "@lexical/list";
 import {
   $getSelection,
@@ -58,6 +57,7 @@ import {
   $isParagraphNode,
   $isDecoratorNode,
   $isLineBreakNode,
+  $isTextNode,
   RootNode,
   $isRootOrShadowRoot,
   $insertNodes,
@@ -66,6 +66,7 @@ import {
   $setSelection,
   type BaseSelection,
   type LexicalEditor,
+  type LexicalNode,
   UNDO_COMMAND,
   REDO_COMMAND,
   CAN_UNDO_COMMAND,
@@ -134,16 +135,40 @@ const writingViewPanelPlugin = realmPlugin({
   init(realm) { realm.pub(addEditorWrapper$, WritingViewPanel); },
 });
 
+/** A media paragraph has no prose, but it is not an empty writing line. */
+function $prepareWritingLine() {
+  const selection = $getSelection();
+  if (!$isRangeSelection(selection) || !selection.isCollapsed()) return;
+  const block = selection.anchor.getNode().getTopLevelElement();
+  if (!$isParagraphNode(block) || !$isMediaParagraph(block)) return;
+  const before = selection.anchor.type === "element" && selection.anchor.key === block.getKey() && selection.anchor.offset === 0;
+  const neighbor = before ? block.getPreviousSibling() : block.getNextSibling();
+  const line = $isParagraphNode(neighbor) && neighbor.getChildrenSize() === 0
+    ? neighbor : $createParagraphNode();
+  if (line !== neighbor) {
+    if (before) block.insertBefore(line); else block.insertAfter(line);
+  }
+  line.selectStart();
+}
+
+function $finishMediaInsertion(anchor: LexicalNode, block: LexicalNode) {
+  anchor.replace(block);
+  const next = block.getNextSibling();
+  if (!$isElementNode(next) || $isMediaParagraph(next)) block.insertAfter($createParagraphNode());
+  block.selectNext();
+  return block.getNextSibling()!.getKey();
+}
+
 const writingTrailingLinePlugin = realmPlugin({
   init(realm) {
     realm.pub(createRootEditorSubscription$, (editor) =>
       editor.registerNodeTransform(RootNode, (root) => {
-        const last = root.getLastChild();
-        // Images live inside paragraphs, so MDXEditor's block-only trailing
-        // line handling misses them. Keep this in the same update and history entry.
-        const end = $isParagraphNode(last)
-          ? last.getChildren().filter((node) => !$isLineBreakNode(node)).at(-1)
-          : last;
+        // Media can end a paragraph, list or callout. Inspect the final leaf,
+        // without changing the authored container or creating another history entry.
+        let end = root.getLastChild();
+        while ($isElementNode(end)) {
+          end = end.getChildren().filter(node => !$isLineBreakNode(node) && !($isTextNode(node) && node.getTextContentSize() === 0)).at(-1) ?? null;
+        }
         if ($isDecoratorNode(end)) root.append($createParagraphNode());
       }),
     );
@@ -184,15 +209,16 @@ function WritingToolbar({
   useEffect(() => {
     const convert = (kind: WritingBlock) =>
       editor?.update(() => {
+        $prepareWritingLine();
         const selection = $getSelection();
         if (!$isRangeSelection(selection)) return;
         normalizeWritingSelection(selection);
-        $setBlocksType(selection, () => createWritingBlock(kind));
+        $applyWritingBlockStyle(selection, kind);
       }, { discrete: true });
     onEditorReady(editor, {
       block: convert,
-      codeBlock: () => code({ code: "", language: "" }),
-      divider: () => divider(),
+      codeBlock: () => editor?.update(() => { $prepareWritingLine(); code({ code: "", language: "" }); }, { discrete: true }),
+      divider: () => editor?.update(() => { $prepareWritingLine(); divider(); }, { discrete: true }),
     });
   }, [editor, onEditorReady, code, divider]);
   useEffect(() => {
@@ -526,14 +552,14 @@ export default function WritingEditorEngine({
       setError((error as Error).message);
       throw error;
     } finally {
-      setBusy(false);
+      if (!pendingMedia.current) setBusy(false);
     }
   }
-  async function insertUploadedMedia(file: File, alt: string) {
+  async function insertUploadedMedia(items: { file: File; alt: string }[]) {
     const lexical = lexicalEditor.current;
     if (!lexical || pendingMedia.current) return;
     const beforeUpload = lexical.getEditorState();
-    let key = "";
+    let keys: string[] = [];
     const selection = mediaSelection.current;
     pendingMedia.current = true;
     lexical.update(() => {
@@ -546,32 +572,32 @@ export default function WritingEditorEngine({
           if ($isParagraphNode(line) && line.isEmpty()) line.selectStart();
         }
       }
-      const loading = new WritingUploadNode();
-      $insertNodes([loading]);
-      key = loading.getKey();
+      const loading = items.map(() => new WritingUploadNode());
+      $insertNodes(loading);
+      keys = loading.map(node => node.getKey());
     }, { discrete: true, tag: HISTORY_PUSH_TAG });
     closeMedia();
     try {
-      const url = await upload(file);
+      const urls: string[] = [];
+      for (const { file } of items) urls.push(await upload(file));
       pendingMedia.current = false;
       lexical.update(() => {
-        const loading = $getNodeByKey(key);
-        if (!loading?.isAttached()) return;
-        const block = file.type.startsWith("image/")
-          ? $createParagraphNode().append($createImageNode({ src: url, altText: alt }))
-          : $createWritingVideoNode(url);
-        loading.replace(block);
-        const next = block.getNextSibling();
-        // A neighboring table or image block cannot be the following writing line.
-        const imageOnlyNext = $isParagraphNode(next) && next.getChildrenSize() > 0 && next.getTextContentSize() === 0;
-        if (!$isElementNode(next) || imageOnlyNext) block.insertAfter($createParagraphNode());
-        setUploadCaret(block.getNextSibling()!.getKey());
-        block.selectNext();
+        const loading = keys.map(key => $getNodeByKey(key));
+        if (loading.some(node => !node?.isAttached())) return;
+        items.forEach(({ file, alt }, index) => {
+          const block = file.type.startsWith("image/")
+            ? $createParagraphNode().append($createImageNode({ src: urls[index], altText: alt }))
+            : $createWritingVideoNode(urls[index]);
+          if (index === items.length - 1) setUploadCaret($finishMediaInsertion(loading[index]!, block));
+          else loading[index]!.replace(block);
+        });
       }, { discrete: true, tag: HISTORY_MERGE_TAG });
     } catch {
       pendingMedia.current = false;
       // A rejected upload must also restore any text selected before pasting.
       lexical.setEditorState(beforeUpload, { tag: HISTORY_MERGE_TAG });
+    } finally {
+      setBusy(false);
     }
   }
   function chooseBlock(kind: WritingBlockStyle) {
@@ -583,12 +609,12 @@ export default function WritingEditorEngine({
       if ($isRangeSelection(selection)) {
         const block = selection.anchor.getNode().getTopLevelElementOrThrow();
         index = block.getIndexWithinParent();
-        emptyBlock = selection.isCollapsed() && !block.getTextContent();
+        emptyBlock = selection.isCollapsed() && $isParagraphNode(block) && block.getChildrenSize() === 0;
       }
     });
     setSlashOpen(false);
     if (kind === "bullet" || kind === "number") {
-      lexical?.update(() => $insertList(kind), { discrete: true });
+      lexical?.update(() => { $prepareWritingLine(); $insertList(kind); }, { discrete: true });
       lexical?.focus();
       return;
     }
@@ -607,6 +633,7 @@ export default function WritingEditorEngine({
     setSlashOpen(false);
     lexical.update(() => {
       if (saved) $setSelection(saved.clone());
+      $prepareWritingLine();
       const selection = $getSelection();
       if (!$isRangeSelection(selection)) return;
       const line = selection.anchor.getNode().getTopLevelElementOrThrow();
@@ -618,7 +645,7 @@ export default function WritingEditorEngine({
         })),
       });
       $insertNodes([table]);
-      if (line.isAttached() && line.getType() === "paragraph" && !line.getTextContent()) line.remove();
+      if (line.isAttached() && $isParagraphNode(line) && line.getChildrenSize() === 0) line.remove();
     }, { discrete: true });
     lexical.focus();
   }
@@ -688,12 +715,20 @@ export default function WritingEditorEngine({
       mediaSelection.current = selection;
     });
   }
-  function insertAtMediaSelection(markdown: string) {
+  function insertAtMediaSelection(createBlock: () => LexicalNode) {
     const selection = mediaSelection.current;
     const lexical = lexicalEditor.current;
-    if (selection && lexical) lexical.update(() => $setSelection(selection.clone()));
-    editor.current?.focus(() => editor.current?.insertMarkdown(markdown), { preventScroll: true });
+    if (!lexical) return;
+    lexical.update(() => {
+      if (selection) $setSelection(selection.clone());
+      // A block decorator splits the current line without inheriting or
+      // flattening its heading/list style. Replace it before any DOM commit.
+      const anchor = new WritingUploadNode();
+      $insertNodes([anchor]);
+      $finishMediaInsertion(anchor, createBlock());
+    }, { discrete: true, tag: HISTORY_PUSH_TAG });
     closeMedia();
+    editor.current?.focus(undefined, { preventScroll: true });
   }
   function closeMedia(returnFocus = false) {
     const selection = mediaSelection.current;
@@ -867,7 +902,7 @@ export default function WritingEditorEngine({
       setError("Use a supported HTTPS YouTube, Vimeo, Loom, MP4, or WebM URL.");
       return;
     }
-    insertAtMediaSelection(`\n\n[Video](${videoUrl})\n\n`);
+    insertAtMediaSelection(() => $createWritingVideoNode(videoUrl));
   }
   const plugins = useMemo(() => [
     writingViewPanelPlugin(),
@@ -967,14 +1002,15 @@ export default function WritingEditorEngine({
     }} onPasteCapture={(event) => {
       if (event.target instanceof Element && event.target.closest(".writing-code-block")) return;
       if (!(event.target instanceof HTMLElement) || !event.target.closest("[contenteditable=true]")) return;
-      const image = Array.from(event.clipboardData.items).find((item) => item.type.startsWith("image/"))?.getAsFile();
-      if (!image) return;
+      const images = Array.from(event.clipboardData.items).filter(item => item.type.startsWith("image/"))
+        .map(item => item.getAsFile()).filter((file): file is File => !!file);
+      if (!images.length) return;
       event.preventDefault();
       event.stopPropagation();
       if (!onUpload) { setError("Uploads are unavailable in this view."); return; }
       rememberSelection();
-      const alt = image.name.replace(/\.[^.]+$/, "").replace(/[\[\]\\\n]/g, " ") || "Image";
-      void insertUploadedMedia(image, alt);
+      void insertUploadedMedia(images.map(file => ({ file,
+        alt: file.name.replace(/\.[^.]+$/, "").replace(/[\[\]\\\n]/g, " ") || "Image" })));
     }} onKeyDownCapture={(event) => {
       if (event.target instanceof Element && event.target.closest(".writing-code-block")) return;
       if (slashOpen && event.target instanceof HTMLElement && event.target.closest("[contenteditable=true]")) {
@@ -1056,7 +1092,7 @@ export default function WritingEditorEngine({
       </div>, document.body)}
       {mediaChooser && createPortal(<div ref={mediaMenu} className="writing-media-chooser" data-touch-motion={canvas && !!compactControls || undefined} role="dialog" aria-label={`Insert ${mediaChooser}`} onKeyDown={(event) => { if (event.key === "Escape") { event.preventDefault(); closeMedia(true); if (!canvas || !compactRef.current) editor.current?.focus(undefined, { preventScroll: true }); } }}>
         <div className="writing-media-tabs"><Button type="button" variant="ghost" aria-pressed={mediaTab === "upload"} onClick={() => setMediaTab("upload")}>Upload</Button><Button type="button" variant="ghost" aria-pressed={mediaTab === "link"} onClick={() => setMediaTab("link")}>Link</Button></div>
-        {mediaTab === "upload" ? <div className="writing-media-fields">{mediaChooser === "image" && <Input aria-label="Alt text (optional)" value={imageAlt} onChange={(event) => setImageAlt(event.target.value)} placeholder="Alt text (optional)" />}<Button type="button" disabled={!onUpload} onClick={() => file.current?.click()}>Choose {mediaChooser}</Button></div> : <div className="writing-media-fields"><Input aria-label={mediaChooser === "video" ? "Video URL" : "Image URL"} type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder={mediaChooser === "video" ? "YouTube, Vimeo or Loom URL" : "https://example.com/image.jpg"} /><Button type="button" onClick={mediaChooser === "video" ? insertVideo : () => { if (!/^https:\/\//i.test(videoUrl)) { setError("Use an HTTPS image URL."); return; } insertAtMediaSelection(`\n\n![${imageAlt.trim() || "Image"}](${videoUrl})\n\n`); }}>Insert {mediaChooser}</Button></div>}
+        {mediaTab === "upload" ? <div className="writing-media-fields">{mediaChooser === "image" && <Input aria-label="Alt text (optional)" value={imageAlt} onChange={(event) => setImageAlt(event.target.value)} placeholder="Alt text (optional)" />}<Button type="button" disabled={!onUpload} onClick={() => file.current?.click()}>Choose {mediaChooser}</Button></div> : <div className="writing-media-fields"><Input aria-label={mediaChooser === "video" ? "Video URL" : "Image URL"} type="url" value={videoUrl} onChange={(event) => setVideoUrl(event.target.value)} placeholder={mediaChooser === "video" ? "YouTube, Vimeo or Loom URL" : "https://example.com/image.jpg"} /><Button type="button" onClick={mediaChooser === "video" ? insertVideo : () => { if (!/^https:\/\//i.test(videoUrl)) { setError("Use an HTTPS image URL."); return; } insertAtMediaSelection(() => $createParagraphNode().append($createImageNode({ src: videoUrl, altText: imageAlt.trim() || "Image" }))); }}>Insert {mediaChooser}</Button></div>}
         <Button type="button" variant="ghost" size="sm" onClick={() => closeMedia(true)}>Cancel</Button>
       </div>, document.body)}
       <Input
@@ -1070,7 +1106,7 @@ export default function WritingEditorEngine({
           if (!selected) return;
           try {
             const alt = (imageAlt.trim() || selected.name).replace(/[\[\]\\\n]/g, " ");
-            await insertUploadedMedia(selected, alt);
+            await insertUploadedMedia([{ file: selected, alt }]);
             setImageAlt("");
           } catch {
             /* upload() retains the error and the document. */

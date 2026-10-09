@@ -1094,6 +1094,51 @@ for (const kind of ["doc", "brief", "course"] as const) {
   });
 }
 
+for (const failure of [false, true]) test(`multiple pasted images preserve order and undo as one edit; failure=${failure}`, async ({ page }, info) => {
+  test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+  await setup(page, true, "doc", false, false, "Before both images.");
+  let prepared = 0;
+  await page.route("**/api/upload", route => {
+    const request = route.request().postDataJSON();
+    if (request.complete) return route.fulfill({ json: { url: `/api/media/${request.complete}.png` } });
+    prepared++;
+    if (failure && prepared === 2) return route.fulfill({ status: 503, json: { error: "Second image unavailable" } });
+    const id = `00000000-0000-4000-8000-${String(prepared).padStart(12, "0")}`;
+    return route.fulfill({ json: { id, upload: { url: `https://test.supabase.co/storage/${id}.png`, method: "PUT", headers: { "Content-Type": "image/png", "x-upsert": "false" } } } });
+  });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  await writer.locator("p").click();
+  await writer.locator("p").selectText();
+  await page.keyboard.press("ArrowRight");
+  await expect.poll(() => writer.evaluate(() => window.getSelection()?.isCollapsed)).toBe(true);
+  await page.keyboard.press("Enter");
+  await writer.evaluate(element => {
+    const data = new DataTransfer();
+    for (const name of ["first.png", "second.png"]) data.items.add(new File(["synthetic"], name, { type: "image/png" }));
+    element.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  await expect.poll(() => prepared).toBe(2);
+  if (failure) {
+    await expect(page.locator(".writing-editor").getByRole("alert")).toContainText("Second image unavailable");
+    await expect(writer.locator("img")).toHaveCount(0);
+    await expect(writer).toHaveText("Before both images.");
+    await expectMarkdown(page, "Before both images.");
+  } else {
+    await expect(writer.locator("img")).toHaveCount(2);
+    expect(await writer.locator("img").evaluateAll(images => images.map(image => image.getAttribute("alt")))).toEqual(["first", "second"]);
+    await writer.locator(":scope > p").last().click();
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect(writer.locator("img")).toHaveCount(0);
+    await page.keyboard.press("ControlOrMeta+Shift+z");
+    await expect(writer.locator("img")).toHaveCount(2);
+    await writer.locator(":scope > p").last().click();
+    await page.keyboard.type("After both images.");
+    await expect(writer.locator(":scope > p").last()).toHaveText("After both images.");
+    await waitForDraftSaved(page);
+    await expectMarkdown(page, /Before both images\.[\s\S]*!\[first\][\s\S]*!\[second\][\s\S]*After both images\./);
+  }
+});
+
 test("pasted image uploads at the editor caret", async ({ page }, info) => {
   test.skip(
     !info.project.name.startsWith("production"),
@@ -1624,11 +1669,11 @@ for (const placement of ["middle", "blank"] as const) for (const payload of ["pl
   });
 }
 
-for (const operation of ["copy", "format"] as const) test(`paragraph boundary ${operation} excludes the next heading`, async ({ page }, info) => {
+for (const operation of ["copy", "format"] as const) for (const backward of [false, true]) test(`paragraph boundary ${operation} excludes the next heading; backward=${backward}`, async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), "course", true, false,
     "Paragraph one.\n\n## Heading below\n\nBody after.");
   const writing = page.getByRole("textbox", { name: "Lesson content" });
-  await paragraphBoundary(page, writing);
+  await paragraphBoundary(page, writing, backward);
   if (operation === "copy") {
     const clipboard = await writing.evaluate((surface) => {
       const data = new DataTransfer();
@@ -1638,11 +1683,14 @@ for (const operation of ["copy", "format"] as const) test(`paragraph boundary ${
     expect(clipboard["text/html"]).not.toMatch(/<h[1-6]/);
     expect(JSON.parse(clipboard["application/x-lexical-editor"]).nodes).toHaveLength(1);
     expect(clipboard["text/plain"]).toBe("Paragraph one.");
+    await expect.poll(() => writing.evaluate(() => {
+      const selection = window.getSelection()!;
+      return selection.anchorNode === selection.focusNode && selection.anchorOffset > selection.focusOffset;
+    })).toBe(backward);
   } else {
     const tools = page.getByRole("dialog", { name: "Format selected text", exact: true });
-    if (info.project.name.endsWith("phone")) {
-      await page.getByRole("button", { name: "Commands: insert blocks or format selected text" }).click();
-    }
+    // This project has a mouse, including at phone width; selection opens its
+    // contextual tools automatically. Touch devices retain their native menu.
     await tools.getByRole("button", { name: "Normal Text", exact: true }).click();
     await page.getByRole("menuitem", { name: "Heading 3", exact: true }).click();
     await expect(writing.locator("h3")).toHaveText("Paragraph one.");

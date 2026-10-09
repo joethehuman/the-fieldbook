@@ -57,6 +57,8 @@ Pasted images and command-uploaded images or videos use the same quiet muted Loa
 
 Text selections exclude adjoining blocks when their endpoints contain none of those blocks’ content, for deletion, replacement, copying, and formatting. Clipboard import drops empty trailing styled-block artifacts and preserves the original style of untouched text after a rich-text paste; meaningful pasted headings retain their formatting. Deliberate paragraph joins and selections that include actual text in the next block keep normal editing behavior.
 
+Media-only paragraphs contain content even without text. Inserting or formatting adjacent blocks must preserve the media and existing heading styles; heading formatting across prose leaves media-only paragraphs unchanged. A document ending in media retains a writable paragraph below it, including media inside a list or callout. Nested media uses the same spacing as standalone media without an extra caret line inside its wrapper. Multiple pasted images retain clipboard order, share one undo step, and restore the original document if an upload fails. Editing commands use the current native selection, preserving its direction, before applying block-boundary rules.
+
 ## Verify interface work
 
 When adding or changing a shared component, show representative states in the demo's `/ui` catalog using the actual component, and document any non-obvious usage or accessibility rules. The catalog uses synthetic content; it does not supply runtime components to the installed interface.

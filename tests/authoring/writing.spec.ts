@@ -995,7 +995,8 @@ test("slash commands stay visible and normal inline slashes remain text", async 
   const oldScroll = await page
     .locator(".main-content")
     .evaluate((node) => node.scrollTop);
-  for (let index = 0; index < 12; index++)
+  const commandCount = await menu.locator(".writing-slash-options").getByRole("menuitem").count();
+  for (let index = 0; index < commandCount - 1; index++)
     await page.keyboard.press("ArrowDown");
   const last = menu.getByRole("menuitem", {
     name: "Embed video link",

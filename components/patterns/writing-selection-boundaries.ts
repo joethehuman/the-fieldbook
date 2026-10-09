@@ -3,6 +3,7 @@ import {
   COPY_COMMAND, CUT_COMMAND, PASTE_COMMAND, DELETE_CHARACTER_COMMAND,
   DELETE_WORD_COMMAND, DELETE_LINE_COMMAND, REMOVE_TEXT_COMMAND,
   CONTROLLED_TEXT_INSERTION_COMMAND, SELECTION_INSERT_CLIPBOARD_NODES_COMMAND,
+  KEY_ENTER_COMMAND, $setSelection,
   COMMAND_PRIORITY_HIGH, type RangeSelection, type LexicalNode,
 } from "lexical";
 import { $isHeadingNode } from "@lexical/rich-text";
@@ -95,14 +96,36 @@ export const writingSelectionBoundariesPlugin = realmPlugin({
   init(realm) {
     realm.pub(createActiveEditorSubscription$, (editor) => {
       const normalize = () => {
-        const selection = $getSelection();
+        let selection = $getSelection();
+        // Native caret/selection changes can precede Lexical's selectionchange
+        // update. Use the visible range before typing, deletion or clipboard work.
+        const surface = editor.getRootElement();
+        const dom = surface?.ownerDocument.getSelection();
+        const active = surface?.ownerDocument.activeElement;
+        if ($isRangeSelection(selection) && !editor.isComposing() && surface && dom?.rangeCount &&
+          active instanceof HTMLElement && active.closest('[contenteditable="true"]') === surface) {
+          const range = dom.getRangeAt(0);
+          if (surface.contains(range.startContainer) && surface.contains(range.endContainer)) {
+            const current = selection.clone();
+            try {
+              current.applyDOMRange(range);
+              if (dom.anchorNode !== range.startContainer || dom.anchorOffset !== range.startOffset) {
+                const { key, offset, type } = current.anchor;
+                current.anchor.set(current.focus.key, current.focus.offset, current.focus.type);
+                current.focus.set(key, offset, type);
+              }
+              $setSelection(current);
+              selection = current;
+            } catch { /* A DOM range already replaced by a commit has no live target. */ }
+          }
+        }
         if ($isRangeSelection(selection)) normalizeWritingSelection(selection);
         return false; // Keep Lexical's standard clipboard, deletion and typing behavior.
       };
       const cleanup = [
         COPY_COMMAND, CUT_COMMAND, PASTE_COMMAND, DELETE_CHARACTER_COMMAND,
         DELETE_WORD_COMMAND, DELETE_LINE_COMMAND, REMOVE_TEXT_COMMAND,
-        CONTROLLED_TEXT_INSERTION_COMMAND,
+        CONTROLLED_TEXT_INSERTION_COMMAND, KEY_ENTER_COMMAND,
       ].map((command) => editor.registerCommand(command, normalize, COMMAND_PRIORITY_HIGH));
       cleanup.push(editor.registerCommand(SELECTION_INSERT_CLIPBOARD_NODES_COMMAND, ({ nodes, selection }) => {
         // Older/native copies can contain an unselected, empty trailing styled block.

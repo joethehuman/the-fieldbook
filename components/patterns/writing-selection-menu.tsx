@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { activeEditor$, applyFormat$, applyListType$, convertSelectionToNode$, currentBlockType$, currentFormat$, currentListType$, openLinkEditDialog$ } from "@mdxeditor/editor";
+import { activeEditor$, applyFormat$, applyListType$, currentBlockType$, currentFormat$, currentListType$, openLinkEditDialog$ } from "@mdxeditor/editor";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
 import { $addUpdateTag, $createRangeSelection, $getSelection, $isRangeSelection, $setSelection, SKIP_SCROLL_INTO_VIEW_TAG, type LexicalEditor, type RangeSelection } from "lexical";
 import { Bold, Check, ChevronRight, Code, Italic, Link, Type } from "lucide-react";
 import { Button } from "../ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
-import { createWritingBlock, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
+import { $applyWritingBlockStyle, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
 import { useWritingInteraction } from "./writing-interaction";
 import { useNativeWritingSelection, useMobileWritingDock } from "./use-editor-cards-layout";
 import { normalizeWritingSelection } from "./writing-selection-boundaries";
@@ -37,7 +37,6 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
   const listType = useCellValue(currentListType$);
   const applyFormat = usePublisher(applyFormat$);
   const applyList = usePublisher(applyListType$);
-  const convert = usePublisher(convertSelectionToNode$);
   const openLink = usePublisher(openLinkEditDialog$);
   const saved = useRef<RangeSelection | null>(null);
   const savedEditor = useRef<LexicalEditor | null>(null);
@@ -185,7 +184,13 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
     if (!restore()) return;
     if (compact) dismiss();
     if (kind === "bullet" || kind === "number") applyList(kind);
-    else convert(() => createWritingBlock(kind));
+    else editor?.update(() => {
+      const selection = $getSelection();
+      if ($isRangeSelection(selection)) {
+        normalizeWritingSelection(selection);
+        $applyWritingBlockStyle(selection, kind);
+      }
+    }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
     focusEditor();
   }
   function formatText(kind: "bold" | "italic" | "code") {
