@@ -48,7 +48,14 @@ export function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   size?:
-    "default" | "media" | "picker" | "selection" | "workflow" | "workflow-list" | "sheet";
+    | "default"
+    | "media"
+    | "picker"
+    | "selection"
+    | "workflow"
+    | "workflow-list"
+    | "assignment"
+    | "sheet";
 }) {
   const returnFocus = React.useRef<HTMLElement | null>(null);
   const modal = React.useContext(DialogModalContext);
@@ -70,6 +77,8 @@ export function DialogContent({
           "flex h-[calc(100dvh-2rem)] sm:h-[min(var(--dialog-workflow-height),calc(100dvh-2rem))] max-h-[calc(100dvh-2rem)] max-w-[var(--dialog-workflow-width)] flex-col overflow-hidden",
         size === "workflow-list" &&
           "[--dialog-workflow-height:var(--dialog-workflow-list-height)]",
+        size === "assignment" &&
+          "flex h-[calc(100dvh-2rem)] max-h-[calc(100dvh-2rem)] max-w-6xl flex-col gap-3 overflow-hidden max-md:top-0 max-md:left-0 max-md:h-dvh max-md:max-h-dvh max-md:w-full max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:pt-[max(1.25rem,env(safe-area-inset-top))] max-md:[&>[data-slot=dialog-footer]]:pb-[max(0.75rem,env(safe-area-inset-bottom))]",
         className,
       )}
       {...props}

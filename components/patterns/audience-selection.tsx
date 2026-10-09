@@ -1,20 +1,36 @@
 "use client";
-import { useMemo, useRef, useState } from "react";
-import { Check } from "lucide-react";
-import type { Workspace } from "@/lib/store";
 import {
-  audienceOptions,
-  audienceCoverage,
-  audienceMemberCoverage,
-  audiencePeople,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Layers,
+  Network,
+  Users,
+  Globe,
+  Info,
+  Plus,
+  X,
+} from "lucide-react";
+import type { Workspace } from "@/lib/store";
+import { audienceTransfer } from "@/lib/audience-transfer";
+import {
   audienceSummary,
   contentAudienceKey,
+  type AudienceOption,
 } from "@/lib/content-audiences";
-import { Checkbox, Radio } from "../ui/choice";
+import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Field, FieldDescription } from "../ui/field";
 import { SelectionViewport } from "../ui/selection-viewport";
+import { CountMetric } from "../ui/count-metric";
+import { Tooltip } from "../ui/tooltip";
 import {
   Collapsible,
   CollapsibleContent,
@@ -22,13 +38,15 @@ import {
 } from "../ui/collapsible";
 import { SearchField } from "./search-field";
 
-/** Shared presentation; callers retain permissions, sources, publication and governance writes. */
+const NO_SOURCES: Record<string, string[]> = {};
+
+/** Assignment sources move between panes; their included teams are explanatory. */
 export function AudienceSelection({
   data,
   selected,
   onChange,
   disabled,
-  inherited = {},
+  inherited = NO_SOURCES,
   showPeople = true,
   initialSelected = [],
   recommendationsOnly = false,
@@ -43,496 +61,780 @@ export function AudienceSelection({
   showPeople?: boolean;
   initialSelected?: string[];
   recommendationsOnly?: boolean;
-  /** Additive batches keep existing sources; they contribute reach without disabling new choices. */
+  /** A batch's existing sources contribute reach, but never disable additions. */
   existingAudienceKeys?: string[];
-  /** Keep discovery outside one scrolling surface for all audience choices. */
   bounded?: boolean;
 }) {
+  const model = useMemo(
+    () => audienceTransfer(data, selected, inherited, showPeople),
+    [data, selected, inherited, showPeople],
+  );
   const [query, setQuery] = useState("");
-  const parked = useRef<string[] | null>(null);
-  const coveredTeams = useRef(new Set<string>());
-  const independentTeams = useRef(new Set<string>());
-  const all = audienceOptions(data).filter(
-    (a) => showPeople || a.kind === "group",
+  const [assignedQuery, setAssignedQuery] = useState("");
+  const [pane, setPane] = useState<"available" | "assigned">(
+    selected.length || Object.keys(inherited).length ? "assigned" : "available",
   );
-  const people = useMemo(
-    () => audiencePeople(data),
-    [data.users, data.groups, data.teams],
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [announcement, setAnnouncement] = useState("");
+  const root = useRef<HTMLDivElement>(null);
+  const pendingFocus = useRef<{
+    pane: string;
+    index: number;
+    element: HTMLElement;
+    key: string;
+  } | null>(null);
+  const id = useId();
+  const additive = existingAudienceKeys !== undefined;
+  const rightLabel = additive
+    ? "To add"
+    : recommendationsOnly
+      ? "Selected"
+      : "Assigned";
+  const inheritedKeys = Object.keys(inherited);
+  const rightCount = new Set([...selected, ...inheritedKeys]).size;
+  const selectedOptions = model.options.filter(
+    (option) =>
+      selected.includes(contentAudienceKey(option)) &&
+      !model.coveredBy.get(contentAudienceKey(option))?.length,
   );
-  const organization = all.find((a) => a.organization),
-    guest = all.find((a) => a.publicGuests);
-  const orgKey = organization && contentAudienceKey(organization),
-    guestKey = guest && contentAudienceKey(guest);
-  const org = !!orgKey && selected.includes(orgKey);
-  const keys = [...new Set([...selected, ...Object.keys(inherited)])];
-  const members = (audienceKeys: string[]) =>
-    new Set(audienceKeys.flatMap((k) => [...(people.get(k) || [])]));
-  const directPeople = members(selected),
-    existingPeople = members(
-      existingAudienceKeys || [...initialSelected, ...Object.keys(inherited)],
-    ),
-    totalPeople = members([...keys, ...(existingAudienceKeys || [])]);
-  const newPeople = [...totalPeople].filter(
-    (id) => !existingPeople.has(id),
-  ).length;
-  const curricula = [...new Set(Object.values(inherited).flat())];
-  const specific = all.filter((a) => !a.organization && !a.publicGuests);
-  const candidates = specific.filter((a) =>
-    `${a.name} ${a.kind}`.toLowerCase().includes(query.trim().toLowerCase()),
+  const missingKeys = selected.filter(
+    (key) =>
+      !model.options.some((option) => contentAudienceKey(option) === key),
   );
-  const changeSelection = (next: string[]) => {
-    const proposed = [...new Set([...next, ...coveredTeams.current])];
-    const coverageKeys = [...proposed, ...Object.keys(inherited)];
-    const result = new Set(next);
-    for (const a of all) {
-      const key = contentAudienceKey(a);
-      if (
-        a.kind !== "team" ||
-        a.organization ||
-        !proposed.includes(key) ||
-        initialSelected.includes(key) ||
-        independentTeams.current.has(key)
-      )
-        continue;
-      if (
-        inherited[key]?.length ||
-        audienceCoverage(data, a, coverageKeys, people).length
-      ) {
-        coveredTeams.current.add(key);
-        result.delete(key);
-      } else {
-        coveredTeams.current.delete(key);
-        result.add(key);
-      }
+  const allKeys = [
+    ...new Set([
+      ...selected,
+      ...inheritedKeys,
+      ...(existingAudienceKeys || []),
+    ]),
+  ];
+  const normalizedQuery = query.trim().toLowerCase();
+  const available = model.available.filter((option) =>
+    `${option.name} ${option.kind}`.toLowerCase().includes(normalizedQuery),
+  );
+  const children = (options: AudienceOption[], parent: AudienceOption) =>
+    options.filter(
+      (option) =>
+        parent.kind === "team" &&
+        option.kind === "team" &&
+        data.teams?.find((team) => team.id === option.id)?.parentId ===
+          parent.id,
+    );
+  const roots = (options: AudienceOption[]) =>
+    options.filter(
+      (option) =>
+        option.kind !== "team" ||
+        !options.some(
+          (parent) =>
+            parent.kind === "team" &&
+            !parent.organization &&
+            !("directMembersOnly" in parent && parent.directMembersOnly) &&
+            parent.id ===
+              data.teams?.find((team) => team.id === option.id)?.parentId,
+        ),
+    );
+  const toggleExpanded = (key: string) =>
+    setExpanded((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const move = (key: string, add: boolean) => {
+    const active = document.activeElement;
+    const section = active?.closest<HTMLElement>("[data-audience-pane]");
+    if (section && active) {
+      const actions = [
+        ...section.querySelectorAll<HTMLElement>("[data-transfer-action]"),
+      ];
+      pendingFocus.current = {
+        pane: section.dataset.audiencePane!,
+        index: actions.indexOf(active as HTMLElement),
+        element: active as HTMLElement,
+        key,
+      };
     }
-    onChange([...result]);
-  };
-  const toggle = (key: string, checked: boolean, independent = false) => {
-    if (!checked) {
-      coveredTeams.current.delete(key);
-      independentTeams.current.delete(key);
-    } else if (independent) independentTeams.current.add(key);
-    if (parked.current)
-      parked.current = checked
-        ? [...new Set([...parked.current, key])]
-        : parked.current.filter((k) => k !== key);
-    changeSelection(
-      checked
+    const name =
+      model.options.find((option) => contentAudienceKey(option) === key)
+        ?.name || "Unavailable audience";
+    onChange(
+      add
         ? [...new Set([...selected, key])]
-        : selected.filter((k) => k !== key),
+        : selected.filter((value) => value !== key),
+    );
+    setAnnouncement(
+      `${name} ${add ? "added" : "removed"}.${!add && (inherited[key]?.length || model.coveredBy.get(key)?.length) ? " Still included through another assignment." : ""}`,
     );
   };
-  const saved = initialSelected.filter((k) => k !== orgKey && k !== guestKey);
-  const independent = specific.filter(
-    (a) =>
-      audienceCoverage(data, a, keys, people).length ||
-      inherited[contentAudienceKey(a)]?.length,
-  );
-  const Results = bounded ? "div" : SelectionViewport;
-  const search = (
-    <SearchField>
-      <Input
-        type="search"
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="Find a team or group"
-        aria-label="Find a team or group"
-        disabled={disabled}
+  useLayoutEffect(() => {
+    const pending = pendingFocus.current;
+    if (!pending) return;
+    pendingFocus.current = null;
+    if (
+      pending.element.isConnected &&
+      !pending.element.hasAttribute("disabled")
+    ) {
+      pending.element.focus({ preventScroll: true });
+      return;
+    }
+    const section = root.current?.querySelector<HTMLElement>(
+      `[data-audience-pane="${pending.pane}"]`,
+    );
+    const actions = [
+      ...(section?.querySelectorAll<HTMLElement>("[data-transfer-action]") ||
+        []),
+    ];
+    (
+      actions.find((action) => action.dataset.transferAction === pending.key) ||
+      (pending.index >= 0
+        ? actions[Math.min(pending.index, actions.length - 1)]
+        : undefined) ||
+      section?.querySelector<HTMLElement>("[data-pane-heading]")
+    )?.focus({ preventScroll: true });
+  }, [selected]);
+
+  const personCount = (option: AudienceOption) => {
+    if (!showPeople) return undefined;
+    const count = model.people.get(contentAudienceKey(option))?.size || 0;
+    if (option.publicGuests && !count) return undefined;
+    return count;
+  };
+  const audienceNote = (option: AudienceOption) =>
+    option.organization
+      ? "Everyone registered, now and in future"
+      : option.publicGuests
+        ? "Includes public guests"
+        : undefined;
+  const name = (option: AudienceOption) =>
+    option.organization ? "Organization" : option.name;
+  const assignedNeedle = assignedQuery.trim().toLowerCase();
+  const matchesAssigned = (option: AudienceOption) =>
+    `${name(option)} ${option.kind}`.toLowerCase().includes(assignedNeedle);
+  const matchesSource = (option: AudienceOption) =>
+    matchesAssigned(option) ||
+    model.includedTeams(option).some(matchesAssigned) ||
+    inherited[contentAudienceKey(option)]?.some((title) =>
+      title.toLowerCase().includes(assignedNeedle),
+    );
+  const searchingSourceChildren = (option: AudienceOption) =>
+    !!assignedNeedle &&
+    !matchesAssigned(option) &&
+    !inherited[contentAudienceKey(option)]?.some((title) =>
+      title.toLowerCase().includes(assignedNeedle),
+    );
+  const audienceHeading = (
+    option: AudienceOption,
+    teamCount = 0,
+    disclosure?: { key: string; open: boolean; label?: string },
+    includePeople = true,
+    note?: string,
+  ) => {
+    const Icon = option.kind === "group" ? Layers : Network;
+    const count = includePeople ? personCount(option) : undefined;
+    const teamLabel = `${teamCount} ${option.kind === "team" ? "subteams" : "included teams"}`;
+    const teamMetric = (
+      <CountMetric
+        icon={<Network className="size-3.5" aria-hidden="true" />}
+        value={teamCount}
+        label={teamLabel}
+        iconPosition="end"
       />
-    </SearchField>
-  );
-  const summary = (
-    <div
-      className="flex h-8 items-center justify-between gap-3 text-xs text-muted-foreground"
-      aria-label="Selected audiences"
-    >
-      <span
-        className="truncate"
-        title={selected
-          .map((k) => all.find((a) => contentAudienceKey(a) === k)?.name || k)
-          .join(", ")}
-      >
-        {selected.length
-          ? `Selected: ${selected.map((k) => all.find((a) => contentAudienceKey(a) === k)?.name || "Unavailable audience").join(", ")}`
-          : existingPeople.size > 0
-            ? "No additional audiences selected"
-            : "No teams or groups selected"}
-      </span>
-      <Button
-        type="button"
-        variant="link"
-        size="sm"
-        className={query ? "shrink-0" : "invisible shrink-0"}
-        tabIndex={query ? 0 : -1}
-        disabled={disabled}
-        onClick={() => setQuery("")}
-      >
-        Clear search
-      </Button>
-    </div>
-  );
-  const choices = (
-    <div className="grid gap-4">
-      {organization && (
-        <div
-          className="grid gap-3 sm:grid-cols-2"
-          role="group"
-          aria-label="Audience scope"
+    );
+    return (
+      <div className="flex min-h-8 min-w-0 items-center gap-2">
+        <span
+          className="inline-flex min-w-0 items-center gap-2 text-sm font-medium"
+          aria-label={[name(option), audienceNote(option), note]
+            .filter(Boolean)
+            .join(" · ")}
         >
-          <Field
-            orientation="horizontal"
-            variant="choice"
-            className="items-start"
-          >
-            <Radio
-              name="audience-scope"
-              value="organization"
-              aria-label="Organization"
-              checked={org}
-              disabled={disabled}
-              onChange={() => {
-                parked.current = selected.filter((k) => k !== orgKey);
-                changeSelection([
-                  ...selected.filter(
-                    (k) => initialSelected.includes(k) || k === guestKey,
-                  ),
-                  orgKey!,
-                ]);
-              }}
-            />
-            <span>
-              Organization
-              <FieldDescription>
-                Everyone registered, now and in future.
-              </FieldDescription>
-            </span>
-          </Field>
-          <Field
-            orientation="horizontal"
-            variant="choice"
-            className="items-start"
-          >
-            <Radio
-              name="audience-scope"
-              value="specific"
-              aria-label="Specific teams or groups"
-              checked={!org}
-              disabled={disabled}
-              onChange={() =>
-                changeSelection(
-                  [
-                    ...new Set([
-                      ...(parked.current || selected),
-                      ...selected.filter((k) => k !== orgKey),
-                    ]),
-                  ].filter((k) => k !== orgKey),
-                )
-              }
-            />
-            <span>
-              Specific teams or groups
-              <FieldDescription>Choose one or more audiences.</FieldDescription>
-            </span>
-          </Field>
-        </div>
-      )}
-      {guest ? (
-        <Field
-          orientation="horizontal"
-          className="items-start border-b border-border pb-4"
-        >
-          <Checkbox
-            id="audience-public-guests"
-            aria-label="Also include public guests"
-            checked={selected.includes(guestKey!)}
-            disabled={disabled}
-            onCheckedChange={(checked) => toggle(guestKey!, checked === true)}
-            aria-describedby="audience-public-guests-help"
+          <Icon
+            className="size-4 shrink-0 text-muted-foreground"
+            role="img"
+            aria-label={option.kind === "group" ? "Group" : "Team"}
           />
-          <span>
-            Also include public guests
-            <FieldDescription id="audience-public-guests-help">
-              Uses {guest.name}.
-              {showPeople && people.get(guestKey!)?.size
-                ? ` Also includes ${people.get(guestKey!)!.size} registered ${people.get(guestKey!)!.size === 1 ? "user" : "users"}.`
-                : ""}{" "}
-              Guests have no due dates or tracked completion.
-              {inherited[guestKey!]?.length
-                ? ` Already included through ${inherited[guestKey!].join(", ")}; removing this direct choice keeps those recommendations.`
-                : ""}
-            </FieldDescription>
-          </span>
-        </Field>
-      ) : (
-        data.settings?.access === "public" && (
-          <p className="text-sm text-muted-foreground">
-            Guest recommendations aren’t configured. Choose a group in Access
-            settings.
-          </p>
-        )
-      )}
-      {org ? (
-        <div className="grid gap-1 rounded-md bg-surface p-4">
-          <p>All {directPeople.size} registered people</p>
-          <p className="text-sm text-muted-foreground">
-            Includes every team, people without a team, and future members. You
-            don’t need to select smaller audiences.
-          </p>
-        </div>
-      ) : (
-        <section className="grid gap-3" aria-label="Teams and groups">
-          <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-sm font-medium">Teams and groups</h3>
-            {showPeople && (
-              <p className="text-xs text-muted-foreground" aria-live="polite">
-                {totalPeople.size} {totalPeople.size === 1 ? "user" : "users"}{" "}
-                {newPeople === 0 && existingPeople.size > 0
-                  ? recommendationsOnly
-                    ? "already included"
-                    : "already assigned"
-                  : "in audience"}
-              </p>
-            )}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            {existingPeople.size} {existingPeople.size === 1 ? "user" : "users"}{" "}
-            {recommendationsOnly ? "already included" : "already assigned"}
-            {existingAudienceKeys ? " across selected learning" : ""} ·{" "}
-            {newPeople} newly included
-          </p>
-          {!bounded && search}
-          <Results aria-label="Matching audiences">
-            {candidates.map((candidate) => {
-              const key = contentAudienceKey(candidate),
-                label = `${candidate.kind === "team" ? "Team" : "Group"}: ${candidate.name}`;
-              const direct = selected.includes(key),
-                coverage = showPeople
-                  ? audienceCoverage(data, candidate, keys, people)
-                  : [];
-              const through = inherited[key] || [];
-              const coverageCurricula = [
-                ...new Set(
-                  coverage.flatMap(
-                    (a) => inherited[contentAudienceKey(a)] || [],
-                  ),
-                ),
-              ];
-              const overlap =
-                showPeople && !coverage.length
-                  ? audienceMemberCoverage(data, candidate, keys, people)
-                  : [];
-              const included =
-                !direct &&
-                (through.length > 0 ||
-                  (candidate.kind === "team" && coverage.length > 0));
-              return (
-                <Field
-                  key={key}
-                  orientation="horizontal"
-                  className={`border-b border-border py-3 font-normal${included ? " text-muted-foreground" : ""}`}
-                >
-                  {included ? (
-                    <span aria-label={`${label} included`}>
-                      <Check className="size-4" aria-hidden="true" />
-                    </span>
-                  ) : (
-                    <Checkbox
-                      aria-label={`Assign directly to ${label}`}
-                      checked={direct}
-                      disabled={disabled}
-                      onCheckedChange={(checked) =>
-                        toggle(key, checked === true)
-                      }
-                    />
-                  )}
-                  <span className="min-w-0 flex-1">
-                    <span>
-                      {candidate.name}{" "}
-                      <span className="text-xs text-muted-foreground">
-                        {candidate.kind === "team" ? "Team" : "Group"}
-                        {included && " · Included"}
-                      </span>
-                    </span>
-                    {through.length > 0 && (
-                      <FieldDescription>
-                        Assigned through{" "}
-                        {through.length === 1 ? "curriculum" : "curricula"}:{" "}
-                        {through.join(", ")}
-                      </FieldDescription>
-                    )}
-                    {coverage.length > 0 && candidate.kind === "team" && (
-                      <FieldDescription>
-                        {coverage
-                          .map((a) =>
-                            a.kind === "group"
-                              ? `Included in group: ${a.name}`
-                              : `Included through team: ${a.name}`,
-                          )
-                          .join(" · ")}
-                      </FieldDescription>
-                    )}
-                    {coverageCurricula.length > 0 &&
-                      candidate.kind === "team" && (
-                        <FieldDescription>
-                          Course assigned through{" "}
-                          {coverageCurricula.length === 1
-                            ? "curriculum"
-                            : "curricula"}
-                          : {coverageCurricula.join(", ")}
-                        </FieldDescription>
-                      )}
-                    {!included &&
-                      !direct &&
-                      (candidate.kind === "group"
-                        ? coverage.length > 0
-                        : overlap.length > 0) && (
-                        <FieldDescription>
-                          Current members already included · select to include
-                          future members.
-                        </FieldDescription>
-                      )}
-                    {direct && (through.length > 0 || coverage.length > 0) && (
-                      <FieldDescription>
-                        {initialSelected.includes(key)
-                          ? "Saved separately"
-                          : "Selected independently"}{" "}
-                        · removing this choice keeps other assignments.
-                      </FieldDescription>
-                    )}
-                  </span>
-                  {showPeople && (
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {people.get(key)?.size || 0}{" "}
-                      {people.get(key)?.size === 1 ? "user" : "users"}
-                    </span>
-                  )}
-                </Field>
-              );
-            })}
-            {!candidates.length && (
-              <p className="py-4 text-sm text-muted-foreground">
-                {query
-                  ? "No matching teams or groups."
-                  : "No teams or groups available."}
-              </p>
-            )}
-          </Results>
-          {!bounded && summary}
-        </section>
-      )}
-      {org && saved.length > 0 && (
-        <section className="grid gap-3 border-t border-border pt-4">
-          <h3 className="text-sm font-medium">Separately saved audiences</h3>
-          <p className="text-xs text-muted-foreground">
-            These were saved before this edit. They stay selected alongside
-            Organization until you remove them.
-          </p>
-          {saved.map((key) => (
-            <div className="flex items-center justify-between gap-3" key={key}>
-              <span className="text-sm">
-                {all.find((a) => contentAudienceKey(a) === key)?.name ||
-                  "Unavailable audience"}
-              </span>
+          <span className="truncate">{name(option)}</span>
+        </span>
+        {(option.publicGuests || note) && (
+          <Tooltip
+            content={[audienceNote(option), note].filter(Boolean).join(" · ")}
+          >
+            <span
+              className="inline-flex shrink-0 text-muted-foreground"
+              role="img"
+              aria-label={[audienceNote(option), note]
+                .filter(Boolean)
+                .join(" · ")}
+            >
+              {option.publicGuests ? (
+                <Globe className="size-3.5" aria-hidden="true" />
+              ) : (
+                <Info className="size-3.5" aria-hidden="true" />
+              )}
+            </span>
+          </Tooltip>
+        )}
+        {count !== undefined && (
+          <CountMetric
+            icon={<Users className="size-3.5" aria-hidden="true" />}
+            value={count}
+            label={`${count} ${option.publicGuests ? "registered people" : "people"}`}
+            iconPosition="end"
+          />
+        )}
+        {teamCount > 0 &&
+          (disclosure ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="gap-1 px-1"
+              disabled={disabled}
+              aria-label={
+                disclosure.label ||
+                `Includes ${teamCount} ${option.kind === "team" && !option.organization ? "subteams" : "teams"} in ${name(option)}`
+              }
+              aria-expanded={disclosure.open}
+              aria-controls={`${id}-${disclosure.key}`}
+              onClick={() => toggleExpanded(disclosure.key)}
+            >
+              {teamMetric}
+              {disclosure.open ? <ChevronDown /> : <ChevronRight />}
+            </Button>
+          ) : (
+            teamMetric
+          ))}
+      </div>
+    );
+  };
+  const sourceChildren = (option: AudienceOption, inheritedSource = false) => {
+    const key = contentAudienceKey(option);
+    const fullIncluded = model.includedTeams(option);
+    const searchingChildren = searchingSourceChildren(option);
+    // Keep matching teams in their source hierarchy, including the path to each match.
+    const matchingBranch = new Set<string>();
+    if (searchingChildren) {
+      const teams = new Map((data.teams || []).map((team) => [team.id, team]));
+      for (const team of fullIncluded.filter(matchesAssigned)) {
+        let current: string | undefined = team.id;
+        while (current && !matchingBranch.has(current)) {
+          matchingBranch.add(current);
+          current = teams.get(current)?.parentId;
+        }
+      }
+    }
+    const included = searchingChildren
+      ? fullIncluded.filter((team) => matchingBranch.has(team.id))
+      : fullIncluded;
+    if (!included.length) return null;
+    const disclosureKey = `${inheritedSource ? "inherited" : "source"}:${key}`;
+    const open = expanded.has(disclosureKey) || searchingChildren;
+    const renderIncluded = (
+      team: (typeof included)[number],
+      visited: Set<string>,
+    ): ReactNode => {
+      if (visited.has(team.id)) return null;
+      const branch = new Set([...visited, team.id]);
+      const nested = team.directMembersOnly
+        ? []
+        : (children(included, team) as typeof included);
+      const teamKey = contentAudienceKey(team);
+      const nestedKey = `${disclosureKey}:${teamKey}`;
+      const nestedOpen = expanded.has(nestedKey) || searchingChildren;
+      return (
+        <li key={teamKey} className="grid gap-1">
+          <div className="flex min-w-0 items-center gap-2 py-0.5">
+            <div className="min-w-0 flex-1 text-muted-foreground">
+              {audienceHeading(
+                team,
+                nested.length,
+                {
+                  key: nestedKey,
+                  open: nestedOpen,
+                  label: `${nestedOpen ? "Collapse" : "Expand"} included ${team.name} in ${name(option)}`,
+                },
+                !team.directMembersOnly,
+                team.directMembersOnly
+                  ? "Direct members only · excludes subteams"
+                  : selected.includes(teamKey)
+                    ? "Also assigned directly"
+                    : `Through ${name(option)}`,
+              )}
+            </div>
+            <span
+              title={`${recommendationsOnly ? "Included" : "Assigned"} through ${name(option)}. This inclusion cannot be removed individually.`}
+            >
               <Button
                 type="button"
-                variant="link"
+                variant="ghost"
+                size="sm"
+                disabled
+                aria-label={`${team.name} cannot be removed individually; included through ${name(option)}`}
+              >
+                <X /> Remove
+              </Button>
+            </span>
+          </div>
+          {nestedOpen && nested.length > 0 && (
+            <ul
+              id={`${id}-${nestedKey}`}
+              className="grid border-l border-border pl-3"
+            >
+              {nested.map((child) => renderIncluded(child, branch))}
+            </ul>
+          )}
+        </li>
+      );
+    };
+    return (
+      <div>
+        {open && (
+          <div id={`${id}-${disclosureKey}`}>
+            <ul className="mt-2 grid border-l border-border pl-3">
+              {(roots(included) as typeof included).map((team) =>
+                renderIncluded(team, new Set()),
+              )}
+            </ul>
+            {included.length > 0 && (
+              <Collapsible className="mt-2">
+                <CollapsibleTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="text-xs [&[data-state=open]_svg]:rotate-90"
+                    disabled={disabled}
+                  >
+                    <ChevronRight
+                      className="size-3.5 transition-transform motion-reduce:transition-none"
+                      aria-hidden="true"
+                    />
+                    {additive
+                      ? "Manage direct selections"
+                      : "Manage direct assignments"}
+                  </Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="mt-2 grid gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {additive
+                      ? "Remove a direct selection to cancel that addition."
+                      : `A direct assignment stays if ${name(option)} is removed later.`}
+                  </p>
+                  {included.map((team) => (
+                    <div
+                      key={team.id}
+                      className="flex items-center justify-between gap-2"
+                    >
+                      <span className="truncate text-xs">
+                        {team.name}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        data-transfer-action={contentAudienceKey(team)}
+                        aria-label={`${selected.includes(contentAudienceKey(team)) ? (additive ? "Remove selection for" : "Remove direct assignment for") : "Add direct assignment for"} ${team.name}`}
+                        onClick={() =>
+                          move(
+                            contentAudienceKey(team),
+                            !selected.includes(contentAudienceKey(team)),
+                          )
+                        }
+                      >
+                        {selected.includes(contentAudienceKey(team))
+                          ? additive
+                            ? "Remove selection"
+                            : "Remove direct"
+                          : "Add direct"}
+                      </Button>
+                    </div>
+                  ))}
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+  const sourceRow = (option: AudienceOption, inheritedSource = false) => {
+    const key = contentAudienceKey(option);
+    const otherSources = model.coveredBy.get(key) || [];
+    const through = inherited[key] || [];
+    const disclosureKey = `${inheritedSource ? "inherited" : "source"}:${key}`;
+    return (
+      <li
+        key={key}
+        className="border-b border-border px-3 py-1 last:border-b-0"
+      >
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            {audienceHeading(
+              option,
+              model.includedTeams(option).length,
+              {
+                key: disclosureKey,
+                open:
+                  expanded.has(disclosureKey) ||
+                  searchingSourceChildren(option),
+              },
+              true,
+              inheritedSource
+                ? `Through ${through.join(", ")}, edit the curriculum to remove`
+                : through.length > 0 || otherSources.length > 0
+                  ? `${initialSelected.includes(key) ? "Assigned directly" : "Selected directly"} · also included through ${[...through, ...otherSources.map(name)].join(" · ")}`
+                  : undefined,
+            )}
+          </div>
+          {inheritedSource ? (
+            !selected.includes(key) && (
+              <Button
+                type="button"
+                variant="ghost"
                 size="sm"
                 disabled={disabled}
-                onClick={() => toggle(key, !selected.includes(key))}
+                data-transfer-action={key}
+                aria-label={`Add direct assignment for ${name(option)}`}
+                onClick={() => move(key, true)}
               >
-                {selected.includes(key) ? "Remove" : "Undo removal"}
-                <span className="sr-only">
-                  {" "}
-                  {all.find((a) => contentAudienceKey(a) === key)?.name}
-                </span>
+                Add direct
               </Button>
-            </div>
-          ))}
-        </section>
-      )}
-      {curricula.length > 0 && (
-        <section className="grid gap-2 border-t border-border pt-4">
-          <h3 className="text-sm font-medium">
-            Assigned through{" "}
-            {curricula.length === 1 ? "curriculum" : "curricula"}:{" "}
-            {curricula.join(", ")}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            These assignments stay in place. To change them, edit the curriculum
-            in Curricula.
-          </p>
-        </section>
-      )}
-      {showPeople && independent.length > 0 && (
-        <Collapsible>
-          <CollapsibleTrigger asChild>
-            <Button type="button" variant="link" size="sm" disabled={disabled}>
-              Keep an audience independently
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="grid gap-3 pt-3">
-            <p className="text-xs text-muted-foreground">
-              An independent audience continues if its covering group, team or
-              curriculum is removed later.
-            </p>
-            {independent.map((a) => (
-              <Field orientation="horizontal" key={contentAudienceKey(a)}>
-                <Checkbox
-                  disabled={disabled}
-                  checked={selected.includes(contentAudienceKey(a))}
-                  onCheckedChange={(checked) =>
-                    toggle(contentAudienceKey(a), checked === true, true)
-                  }
-                  aria-label={`Keep ${a.name} independently`}
-                />
-                <span>{a.name}</span>
-              </Field>
-            ))}
-          </CollapsibleContent>
-        </Collapsible>
-      )}
-      {selected
-        .filter((k) => !all.some((a) => contentAudienceKey(a) === k))
-        .map((key) => (
-          <Field key={key} orientation="horizontal">
-            <Checkbox
-              checked
+            )
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               disabled={disabled}
-              onCheckedChange={() => toggle(key, false)}
-              aria-label={`Keep unavailable audience ${key}`}
-            />
-            <span>
-              Audience no longer exists
-              <FieldDescription>
-                Uncheck to remove this saved audience.
-              </FieldDescription>
-            </span>
-          </Field>
-        ))}
-      <p className="text-xs text-muted-foreground">
-        Everyone allowed into this installation can still read published
-        content.
-      </p>
-      {showPeople && (
-        <p className="sr-only" aria-live="polite">
-          {audienceSummary(data, keys, people)}
-        </p>
-      )}
-    </div>
+              data-transfer-action={key}
+              aria-label={`Remove ${option.kind}: ${name(option)}`}
+              onClick={() => move(key, false)}
+            >
+              <X /> Remove
+            </Button>
+          )}
+        </div>
+        {sourceChildren(option, inheritedSource)}
+      </li>
+    );
+  };
+  const renderAvailable = (
+    option: AudienceOption,
+    visited = new Set<string>(),
+    directMembersOnly = false,
+  ): ReactNode => {
+    const key = contentAudienceKey(option);
+    if (visited.has(key)) return null;
+    const branch = new Set([...visited, key]);
+    const nested =
+      normalizedQuery || option.organization || directMembersOnly
+        ? []
+        : option.kind === "group"
+          ? model
+              .includedTeams(option)
+              .filter((team) =>
+                available.some(
+                  (candidate) =>
+                    contentAudienceKey(candidate) === contentAudienceKey(team),
+                ),
+              )
+          : children(available, option);
+    const disclosureKey = `available:${[...branch].join(":")}`;
+    const open = expanded.has(disclosureKey);
+    const parent =
+      normalizedQuery && option.kind === "team"
+        ? data.teams?.find(
+            (team) =>
+              team.id ===
+              data.teams?.find((team) => team.id === option.id)?.parentId,
+          )
+        : undefined;
+    return (
+      <li key={key} className="border-b border-border last:border-b-0">
+        <div className="flex min-w-0 items-center gap-2 px-3 py-1">
+          <div className="min-w-0 flex-1">
+            {audienceHeading(
+              option,
+              nested.length,
+              {
+                key: disclosureKey,
+                open,
+                label: `${open ? "Collapse" : "Expand"} ${name(option)}`,
+              },
+              !directMembersOnly,
+              directMembersOnly
+                ? "Direct members only · excludes subteams"
+                : parent && !parent.system
+                  ? `In ${parent.name}`
+                  : undefined,
+            )}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={disabled}
+            data-transfer-action={key}
+            aria-label={`Add ${option.kind}: ${name(option)}`}
+            onClick={() => move(key, true)}
+          >
+            <Plus /> Add
+          </Button>
+        </div>
+        {open && nested.length > 0 && (
+          <ul
+            id={`${id}-${disclosureKey}`}
+            className="ml-5 border-l border-border"
+          >
+            {roots(nested).map((child) =>
+              renderAvailable(
+                child,
+                branch,
+                "directMembersOnly" in child && !!child.directMembersOnly,
+              ),
+            )}
+          </ul>
+        )}
+      </li>
+    );
+  };
+  const availableRoots = normalizedQuery ? available : roots(available);
+  const sections = [
+    {
+      label: "Everyone",
+      options: availableRoots.filter((option) => option.organization),
+    },
+    {
+      label: "Groups",
+      options: availableRoots.filter((option) => option.kind === "group"),
+    },
+    {
+      label: "Teams",
+      options: availableRoots.filter(
+        (option) => option.kind === "team" && !option.organization,
+      ),
+    },
+  ];
+  const throughOptions = model.options.filter(
+    (option) =>
+      inheritedKeys.includes(contentAudienceKey(option)) &&
+      !selected.includes(contentAudienceKey(option)),
   );
-  return bounded ? (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      {!org && <div className="shrink-0">{search}</div>}
-      <SelectionViewport
-        fill
-        className="border-t-0"
-        aria-label="Audience choices"
+  const visibleSelected = selectedOptions.filter(matchesSource);
+  const visibleThrough = throughOptions.filter(matchesSource);
+  const visibleMissing = missingKeys.filter(() =>
+    "audience no longer exists".includes(assignedNeedle),
+  );
+  return (
+    <div
+      ref={root}
+      className={cn(
+        "flex min-h-0 flex-col gap-3",
+        bounded ? "h-full flex-1" : "h-[min(36rem,70dvh)]",
+      )}
+    >
+      <div
+        className="flex shrink-0 gap-2 md:hidden"
+        role="group"
+        aria-label="Assignment lists"
       >
-        {choices}
-      </SelectionViewport>
-      {!org && <div className="shrink-0">{summary}</div>}
+        <Button
+          type="button"
+          variant={pane === "available" ? "default" : "outline"}
+          className="flex-1"
+          aria-pressed={pane === "available"}
+          aria-controls={`${id}-available`}
+          onClick={() => setPane("available")}
+        >
+          Available
+        </Button>
+        <Button
+          type="button"
+          variant={pane === "assigned" ? "default" : "outline"}
+          className="flex-1"
+          aria-pressed={pane === "assigned"}
+          aria-controls={`${id}-assigned`}
+          onClick={() => setPane("assigned")}
+        >
+          {rightLabel} ({rightCount})
+        </Button>
+      </div>
+      <div className="grid min-h-0 min-w-0 flex-1 gap-4 md:grid-cols-2">
+        <section
+          id={`${id}-available`}
+          data-audience-pane="available"
+          aria-label="Available audiences"
+          className={cn(
+            "min-h-0 min-w-0 flex-col rounded-lg border border-border",
+            pane === "available" ? "flex" : "hidden md:flex",
+          )}
+        >
+          <div className="flex shrink-0 items-center gap-3 border-b border-border p-3">
+            <h3
+              tabIndex={-1}
+              data-pane-heading
+              className="shrink-0 text-sm font-semibold outline-none"
+            >
+              Available{" "}
+              <span className="font-normal text-muted-foreground">
+                · {model.available.length}
+              </span>
+            </h3>
+            <SearchField className="flex-1">
+              <Input
+                type="search"
+                variant="metadata"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Find a team or group"
+                aria-label="Find a team or group"
+                disabled={disabled}
+              />
+            </SearchField>
+          </div>
+          <SelectionViewport
+            fill
+            className="min-h-0 border-t-0"
+            aria-label="Available teams and groups"
+          >
+            {sections.map(
+              (section) =>
+                section.options.length > 0 && (
+                  <div key={section.label}>
+                    <h4 className="sticky top-0 z-10 bg-surface px-3 py-2 text-xs font-medium text-muted-foreground">
+                      {section.label}
+                    </h4>
+                    <ul>
+                      {section.options.map((option) => renderAvailable(option))}
+                    </ul>
+                  </div>
+                ),
+            )}
+            {!available.length && (
+              <p className="p-4 text-sm text-muted-foreground">
+                {query
+                  ? "No matching teams or groups."
+                  : "All available audiences are included."}
+              </p>
+            )}
+          </SelectionViewport>
+        </section>
+        <section
+          id={`${id}-assigned`}
+          data-audience-pane="assigned"
+          aria-label={`${rightLabel} audiences`}
+          className={cn(
+            "min-h-0 min-w-0 flex-col rounded-lg border border-border",
+            pane === "assigned" ? "flex" : "hidden md:flex",
+          )}
+        >
+          <div className="flex shrink-0 items-center gap-3 border-b border-border p-3">
+            <h3
+              tabIndex={-1}
+              data-pane-heading
+              className="shrink-0 text-sm font-semibold outline-none"
+            >
+              {rightLabel}{" "}
+              <span className="font-normal text-muted-foreground">
+                · {rightCount}
+              </span>
+            </h3>
+            <SearchField className="flex-1">
+              <Input
+                type="search"
+                variant="metadata"
+                value={assignedQuery}
+                onChange={(event) => setAssignedQuery(event.target.value)}
+                placeholder="Find a team or group"
+                aria-label={`Find ${rightLabel.toLowerCase()} teams or groups`}
+                disabled={disabled}
+              />
+            </SearchField>
+          </div>
+          <SelectionViewport
+            fill
+            className="min-h-0 border-t-0"
+            aria-label="Assignment sources"
+          >
+            {(visibleSelected.length > 0 || visibleMissing.length > 0) && (
+              <div>
+                <h4 className="sticky top-0 z-10 bg-surface px-3 py-2 text-xs font-medium text-muted-foreground">
+                  {additive || recommendationsOnly
+                    ? "Direct selections"
+                    : "Direct assignments"}
+                </h4>
+                <ul>
+                  {visibleSelected.map((option) => sourceRow(option))}
+                  {visibleMissing.map((key) => (
+                    <li
+                      key={key}
+                      className="flex items-center justify-between gap-3 border-b border-border p-3"
+                    >
+                      <span className="text-sm">Audience no longer exists</span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={disabled}
+                        data-transfer-action={key}
+                        aria-label={`Remove unavailable audience ${key}`}
+                        onClick={() => move(key, false)}
+                      >
+                        Remove
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {assignedNeedle &&
+              !visibleSelected.length &&
+              !visibleThrough.length &&
+              !visibleMissing.length && (
+                <p className="p-4 text-sm text-muted-foreground">
+                  No matching teams or groups.
+                </p>
+              )}
+            {!assignedNeedle && !selected.length && !throughOptions.length && (
+              <p className="p-4 text-sm text-muted-foreground">
+                {additive
+                  ? "Nothing to add yet. Choose teams or groups from Available."
+                  : "No direct selections. Add teams or groups from Available."}
+              </p>
+            )}
+            {visibleThrough.length > 0 && (
+              <div>
+                <h4 className="sticky top-0 z-10 border-y border-border bg-surface px-3 py-2 text-xs font-medium text-muted-foreground">
+                  Through curricula
+                </h4>
+                <ul>
+                  {visibleThrough.map((option) => sourceRow(option, true))}
+                </ul>
+              </div>
+            )}
+            {additive && (
+              <div className="border-t border-border p-3">
+                <p className="text-xs text-muted-foreground">
+                  Existing assignments stay in place. Remove here only cancels a
+                  pending addition.
+                </p>
+              </div>
+            )}
+          </SelectionViewport>
+        </section>
+      </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
+        {showPeople && (
+          <span>
+            {audienceSummary(data, allKeys, model.people)} included
+            {additive ? " across selected learning" : ""}
+          </span>
+        )}
+      </div>
+      <p className="sr-only" role="status" aria-live="polite">
+        {announcement}
+      </p>
     </div>
-  ) : (
-    choices
   );
 }

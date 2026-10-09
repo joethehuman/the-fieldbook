@@ -1,7 +1,8 @@
 import type { Workspace } from "./store";
 import { assignmentImpact, reportingImpact } from "./assignment-episodes";
-import { effectiveGroups, type Content } from "./types";
+import type { Content } from "./types";
 import { expandLearning, groupItems } from "./learning-groups";
+import { updateMatchesAudience } from "./content-audiences";
 
 /** Context for the one review preceding an organization save. Never an authorization bypass. */
 export type OrganizationChangeOptions = {
@@ -38,16 +39,16 @@ export function organizationChangeSummary(before: Workspace, after: Workspace) {
     .map((person) => {
       const previous = before.users.find((p) => p.id === person.id);
       const relevant = (workspace: Workspace, user = person) => {
-        const memberships = effectiveGroups(
-          user,
-          workspace.groups,
-          workspace.teams || [],
-        );
         return (workspace.publishedContent || workspace.content).filter(
           (c) =>
             c.kind === "brief" &&
             c.status === "published" &&
-            c.groups.some((id) => memberships.has(id)),
+            updateMatchesAudience(
+              c,
+              user,
+              workspace.groups,
+              workspace.teams || [],
+            ),
         );
       };
       const was = previous ? relevant(before, previous) : [],

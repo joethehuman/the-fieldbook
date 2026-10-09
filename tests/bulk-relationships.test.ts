@@ -72,7 +72,7 @@ test("mixed content has no relationship commands and draft curricula cannot be a
     },
   ];
   assert.match(
-    curriculumGroupCommands(data, ["draft"], () => {})[0].disabledReason!,
+    curriculumGroupCommands(data, ["draft"], async () => {})[0].disabledReason!,
     /Publish/,
   );
 });

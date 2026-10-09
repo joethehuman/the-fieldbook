@@ -136,3 +136,85 @@ test("guest review follows pending learning plans before course metadata is reco
   );
   assert.equal(organizationChangeSummary(d, assigned).peopleGaining, 0);
 });
+
+function updateReviewFixture(): Workspace {
+  const data = freshWorkspace();
+  const update = data.content.find((item) => item.kind === "brief")!;
+  data.content = [
+    {
+      ...update,
+      id: "update",
+      status: "published",
+      groups: [],
+      updateTeams: [],
+    },
+  ];
+  data.publishedContent = structuredClone(data.content);
+  data.groups = [{ id: "overlap", name: "Overlap" }];
+  data.teams = [
+    { id: "org", name: "Organization", system: "organization" },
+    { id: "sales", name: "Sales", parentId: "org" },
+    { id: "child", name: "Child", parentId: "sales" },
+  ];
+  const person = data.users[0];
+  data.users = [
+    {
+      ...person,
+      id: "child-person",
+      active: true,
+      teamId: "child",
+      groups: ["overlap"],
+    },
+    { ...person, id: "no-team", active: true, teamId: undefined, groups: [] },
+  ];
+  data.curricula = [];
+  data.progress = {};
+  return data;
+}
+
+test("Update review includes descendants of targeted teams and Organization members without a direct team", () => {
+  const before = updateReviewFixture();
+  const after = structuredClone(before);
+  after.publishedContent![0].updateTeams = ["sales"];
+  let summary = organizationChangeSummary(before, after);
+  assert.equal(summary.changed, true);
+  assert.deepEqual(
+    summary.updates.map(({ person, gained }) => [
+      person.id,
+      gained.map((item) => item.id),
+    ]),
+    [["child-person", ["update"]]],
+  );
+  after.publishedContent![0].updateTeams = ["org"];
+  summary = organizationChangeSummary(before, after);
+  assert.deepEqual(summary.updates.map(({ person }) => person.id).sort(), [
+    "child-person",
+    "no-team",
+  ]);
+});
+
+test("Update review retains overlapping sources and reports loss only after the final route is removed", () => {
+  const before = updateReviewFixture();
+  before.publishedContent![0].groups = ["overlap"];
+  before.publishedContent![0].updateTeams = ["sales"];
+  const groupOnly = structuredClone(before);
+  groupOnly.publishedContent![0].updateTeams = [];
+  assert.equal(organizationChangeSummary(before, groupOnly).updates.length, 0);
+  const removed = structuredClone(groupOnly);
+  removed.publishedContent![0].groups = [];
+  assert.deepEqual(
+    organizationChangeSummary(groupOnly, removed).updates.map(
+      ({ person, lost }) => [person.id, lost.map((item) => item.id)],
+    ),
+    [["child-person", ["update"]]],
+  );
+  const teamOnly = structuredClone(before);
+  teamOnly.publishedContent![0].groups = [];
+  assert.equal(organizationChangeSummary(before, teamOnly).updates.length, 0);
+  assert.deepEqual(
+    organizationChangeSummary(teamOnly, removed).updates.map(
+      ({ person }) => person.id,
+    ),
+    ["child-person"],
+  );
+});

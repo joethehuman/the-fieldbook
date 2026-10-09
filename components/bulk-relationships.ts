@@ -8,6 +8,7 @@ import { groupItems } from "@/lib/learning-groups";
 import type { LearningAction } from "@/lib/learning";
 import type { BulkCommand } from "./patterns/bulk-actions";
 import type { OpenLearningAssignment } from "./use-learning-assignment-picker";
+import type { OpenUpdateAssignment } from "./use-update-assignment-picker";
 type Save = (data: Workspace) => void | Promise<void>;
 export type LearningMany = (actions: LearningAction[]) => Promise<void>;
 export function contentRelationshipCommands(
@@ -16,6 +17,7 @@ export function contentRelationshipCommands(
   save: Save,
   learn: LearningMany,
   openAssignments?: OpenLearningAssignment,
+  openUpdates?: OpenUpdateAssignment,
 ): BulkCommand[] {
   const records = data.content.filter((c) => selected.includes(c.id));
   const kind = records[0]?.kind;
@@ -31,24 +33,47 @@ export function contentRelationshipCommands(
   )
     ? "Publish every selected item before changing assignments or audiences."
     : undefined;
+  if (kind === "brief" && openUpdates)
+    return [
+      {
+        id: "manage-updates",
+        label: "Manage Updates",
+        disabledReason: reason,
+        externalReview: true,
+        description:
+          "Manage direct group recommendations. Team targeting stays in the Update editor.",
+        apply: () =>
+          openUpdates(
+            {
+              kind: "items",
+              ids: records.map((item) => item.id),
+              mode: "manage",
+            },
+            records.length === 1
+              ? records[0].title
+              : `${records.length} selected Updates`,
+          ),
+      },
+    ];
   const commands: BulkCommand[] = ([true, false] as const).map((add) => ({
     id: add ? "group-add" : "group-remove",
     label:
       kind === "brief"
         ? add
-          ? "Add relevant groups"
-          : "Remove relevant groups"
+          ? "Edit group recommendations"
+          : "Remove group recommendations"
         : add
           ? "Assign to teams or groups"
           : "Remove team or group assignments",
     disabledReason: reason,
-    externalReview: kind === "course" && !!openAssignments,
+    externalReview: kind === "course" ? !!openAssignments : !!openUpdates,
     applyLabel: "Review changes",
     description: add
       ? "Add direct learning assignments or Update audiences. Overlapping courses count once. Existing history is preserved."
       : "Remove direct links only. Learning inherited through a curriculum or another team or group remains; saved history is preserved.",
     options:
-      kind === "course" && openAssignments
+      (kind === "course" && openAssignments) ||
+      (kind === "brief" && openUpdates)
         ? undefined
         : kind === "brief"
           ? data.groups.map((g) => ({ id: g.id, label: `Group: ${g.name}` }))
@@ -58,6 +83,19 @@ export function contentRelationshipCommands(
             })),
     apply: async (ids) => {
       if (kind === "brief") {
+        if (openUpdates) {
+          await openUpdates(
+            {
+              kind: "items",
+              ids: records.map((item) => item.id),
+              mode: add ? "add" : "remove",
+            },
+            records.length === 1
+              ? records[0].title
+              : `${records.length} selected Updates`,
+          );
+          return;
+        }
         await learn(
           records.flatMap((c) =>
             ids.map((groupId) => ({
@@ -116,53 +154,34 @@ export function contentRelationshipCommands(
 export function curriculumGroupCommands(
   data: Workspace,
   selected: string[],
-  save: Save,
-  openAssignments?: OpenLearningAssignment,
+  openAssignments: OpenLearningAssignment,
 ): BulkCommand[] {
-  return ([true, false] as const).map((add) => ({
-    id: add ? "group-add" : "group-remove",
-    label: add
-      ? "Assign to teams or groups"
-      : "Remove team or group assignments",
-    externalReview: !!openAssignments,
-    applyLabel: "Review assignments",
-    description:
-      "Change direct curriculum assignments. Course content and saved learning history are preserved.",
-    disabledReason:
-      add &&
-      data.curricula?.some(
+  return [
+    {
+      id: "manage-audience",
+      label: "Manage Audience",
+      externalReview: true,
+      description:
+        "Manage direct curriculum audiences. Other learning and saved history remain.",
+      disabledReason: data.curricula?.some(
         (c) => selected.includes(c.id) && c.status !== "published",
       )
         ? "Publish every selected curriculum first."
         : undefined,
-    options: openAssignments
-      ? undefined
-      : assignmentAudiences(data).map((a) => ({
-          id: audienceKey(a),
-          label: `${a.kind === "group" ? "Group" : "Team"}: ${a.name}`,
-        })),
-    apply: async (ids) => {
-      if (openAssignments) {
-        await openAssignments(
+      apply: () =>
+        openAssignments(
           {
             kind: "items",
             items: selected.map((id) => ({ kind: "curriculum", id })),
-            mode: add ? "add" : "remove",
+            mode: "manage",
           },
-          `${selected.length} selected ${selected.length === 1 ? "curriculum" : "curricula"}`,
-        );
-        return;
-      }
-      await save(
-        assignLearningToAudiences(
-          data,
-          selected.map((id) => ({ kind: "curriculum", id })),
-          ids,
-          add ? "add" : "remove",
+          selected.length === 1
+            ? data.curricula?.find((c) => c.id === selected[0])?.name ||
+                "Curriculum"
+            : `${selected.length} selected curricula`,
         ),
-      );
     },
-  }));
+  ];
 }
 export function groupLearningCommands(
   data: Workspace,

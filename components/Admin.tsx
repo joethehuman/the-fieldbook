@@ -76,6 +76,8 @@ import { useInteractionDialog } from "./ui/interaction-dialog";
 import { SelectField } from "./ui/select";
 import LearningGroups from "./LearningGroups";
 import { useLearningAssignmentPicker } from "./use-learning-assignment-picker";
+import { useUpdateAssignmentPicker } from "./use-update-assignment-picker";
+import { updateSelectionSnapshot } from "@/lib/update-assignment-selection";
 import { LearningAssignmentPicker } from "./LearningAssignmentPicker";
 import { updateAudienceKeys } from "@/lib/content-audiences";
 import { assignLearningToAudiences, assignmentAudiences } from "@/lib/assignment-audiences";
@@ -398,6 +400,8 @@ export default function Admin({
   const notify = useToast();
   const { confirm } = useInteractionDialog();
   const organizationReview = useOrganizationChangeReview();
+  const latestWorkspace = useRef(data);
+  latestWorkspace.current = data;
   async function onChange(
     next: Workspace,
     options?: OrganizationChangeOptions,
@@ -433,7 +437,15 @@ export default function Admin({
     [registerNavigationGuard],
   );
   const assignmentPicker = useLearningAssignmentPicker({
-    data, onChange, onPrepare: onPrepareAssignments,
+    data,
+    onChange,
+    onPrepare: onPrepareAssignments,
+    registerNavigationGuard: registerAdminGuard,
+  });
+  const updatePicker = useUpdateAssignmentPicker({
+    data,
+    onLearningMany: manageLearningMany,
+    onPrepare: onPrepareAssignments,
     registerNavigationGuard: registerAdminGuard,
   });
   const admin = canAdminister(user);
@@ -900,21 +912,32 @@ export default function Admin({
   async function manageLearningMany(
     actions: import("@/lib/learning").LearningAction[],
   ) {
+    const captured = updateSelectionSnapshot(data);
+    const validateCurrent = () => {
+      if (captured !== updateSelectionSnapshot(latestWorkspace.current))
+        throw new Error(
+          "Updates, audiences or membership changed. Refresh to review the current selection.",
+        );
+    };
     const next = structuredClone(data);
     for (const action of actions) {
       for (const collection of [next.content, next.publishedContent || []]) {
         const c = collection.find((c) => c.id === action.contentId);
-        if (c)
+        if (c) {
           c.groups =
             action.operation === "target"
               ? [...new Set([...c.groups, action.groupId!])]
               : c.groups.filter((id) => id !== action.groupId);
+        }
       }
     }
     const options = {
+      validateCurrent,
       review: {
         title: "Review Update audiences",
+        description: `${actions.length} direct recommendation ${actions.length === 1 ? "change" : "changes"}. Published text and other audience links stay in place.`,
         confirmLabel: "Apply changes",
+        always: true,
       },
     };
     if (!onLearning) {
@@ -923,6 +946,7 @@ export default function Admin({
     }
     if (!(await organizationReview.review(data, next, options)))
       throw new OrganizationChangeCanceledError();
+    validateCurrent();
     const revisions = new Map<string, number>();
     let completed = 0;
     try {
@@ -1161,6 +1185,7 @@ export default function Admin({
                 onChange,
                 manageLearningMany,
                 assignmentPicker.open,
+                updatePicker.open,
               )
             : [],
         }).filter((command) =>
@@ -1347,6 +1372,7 @@ export default function Admin({
                 }
                 data={data}
                 onChange={onChange}
+                onPrepareAssignments={onPrepareAssignments}
                 registerNavigationGuard={registerAdminGuard}
               />
             ) : tab === "content" ? (
@@ -1507,6 +1533,7 @@ export default function Admin({
                     onChange,
                     manageLearningMany,
                     assignmentPicker.open,
+                    updatePicker.open,
                   )}
                 />
                 {!!contentRows.length && (
@@ -1978,6 +2005,7 @@ export default function Admin({
         </TabsContent>
       </Tabs>
       {assignmentPicker.picker}
+      {updatePicker.picker}
       <Dialog
         open={!!person}
         onOpenChange={(open) => {

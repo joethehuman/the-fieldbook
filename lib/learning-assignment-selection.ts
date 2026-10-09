@@ -7,16 +7,85 @@ import {
 import { sourcePassages } from "./search";
 
 export type LearningAssignmentTarget =
-  | { kind: "items"; items: LearningItem[]; mode: "add" | "remove" }
+  | { kind: "items"; items: LearningItem[]; mode: "add" | "remove" | "manage" }
   | {
       kind: "audiences";
       keys: string[];
-      mode: "add" | "remove";
+      mode: "add" | "remove" | "manage";
       selected?: string[];
+      omit?: string[];
     };
 
 export const learningItemKey = (item: LearningItem) =>
   `${item.kind}:${item.id}`;
+export type AssignmentSelection = { selected: string[]; partial: string[] };
+export function learningSelectionState(
+  data: Workspace,
+  target: LearningAssignmentTarget,
+): AssignmentSelection {
+  if (target.mode !== "manage") return { selected: [], partial: [] };
+  if (target.kind === "items") {
+    const plans = assignmentAudiences(data)
+      .map((plan) => ({
+        key: `${plan.kind}:${plan.id}`,
+        count: target.items.filter((item) =>
+          plan.items.some(
+            (saved) => learningItemKey(saved) === learningItemKey(item),
+          ),
+        ).length,
+      }))
+      .filter((plan) => plan.count > 0);
+    return {
+      selected: plans.map((plan) => plan.key),
+      partial: plans
+        .filter((plan) => plan.count < target.items.length)
+        .map((plan) => plan.key),
+    };
+  }
+  const plans = assignmentAudiences(data).filter((a) =>
+    target.keys.includes(`${a.kind}:${a.id}`),
+  );
+  const selected = [
+    ...new Set(plans.flatMap((a) => a.items.map(learningItemKey))),
+  ];
+  return {
+    selected,
+    partial: selected.filter(
+      (id) =>
+        plans.filter((a) =>
+          a.items.some((item) => learningItemKey(item) === id),
+        ).length < plans.length,
+    ),
+  };
+}
+/** Retain local intentions while accepting untouched assignments from a refreshed snapshot. */
+export function rebaseAssignmentSelection(
+  before: AssignmentSelection,
+  after: AssignmentSelection,
+  current: AssignmentSelection,
+): AssignmentSelection {
+  const touched = new Set(
+    [...before.selected, ...current.selected].filter(
+      (id) =>
+        before.selected.includes(id) !== current.selected.includes(id) ||
+        before.partial.includes(id) !== current.partial.includes(id),
+    ),
+  );
+  return {
+    selected: [
+      ...new Set([
+        ...after.selected.filter((id) => !touched.has(id)),
+        ...current.selected.filter((id) => touched.has(id)),
+      ]),
+    ],
+    partial: [
+      ...new Set([
+        ...after.partial.filter((id) => !touched.has(id)),
+        ...current.partial.filter((id) => touched.has(id)),
+      ]),
+    ],
+  };
+}
 export function selectedLearningItems(
   target: LearningAssignmentTarget,
   values: string[],
@@ -33,7 +102,82 @@ export function applyLearningSelection(
   data: Workspace,
   target: LearningAssignmentTarget,
   values: string[],
+  partial: string[] = [],
 ) {
+  if (target.kind === "items" && target.mode === "manage") {
+    const plans = assignmentAudiences(data);
+    const original = learningSelectionState(data, target);
+    if (
+      !target.items.length ||
+      values.some(
+        (key) => !plans.some((plan) => `${plan.kind}:${plan.id}` === key),
+      ) ||
+      partial.some(
+        (key) => !values.includes(key) || !original.partial.includes(key),
+      )
+    )
+      throw new Error(
+        "Learning or audiences changed. Refresh to review the current selection.",
+      );
+    let next = data;
+    for (const plan of plans) {
+      const key = `${plan.kind}:${plan.id}`;
+      if (partial.includes(key)) continue;
+      const saved = (item: LearningItem) =>
+        plan.items.some(
+          (existing) => learningItemKey(existing) === learningItemKey(item),
+        );
+      const items = target.items.filter((item) =>
+        values.includes(key) ? !saved(item) : saved(item),
+      );
+      if (items.length)
+        next = assignLearningToAudiences(
+          next,
+          items,
+          [key],
+          values.includes(key) ? "add" : "remove",
+        );
+    }
+    return next;
+  }
+  if (target.kind === "audiences" && target.mode === "manage") {
+    const plans = assignmentAudiences(data).filter((a) =>
+      target.keys.includes(`${a.kind}:${a.id}`),
+    );
+    const options = learningSelectionOptions(data, target);
+    const original = learningSelectionState(data, target);
+    if (
+      !target.keys.length ||
+      plans.length !== new Set(target.keys).size ||
+      values.some((id) => !options.some((option) => option.id === id)) ||
+      partial.some(
+        (id) => !values.includes(id) || !original.partial.includes(id),
+      )
+    )
+      throw new Error(
+        "Learning or audiences changed. Refresh to review the current selection.",
+      );
+    let next = data;
+    for (const plan of plans) {
+      const key = `${plan.kind}:${plan.id}`;
+      const added = selectedLearningItems(
+        target,
+        values.filter(
+          (id) =>
+            !partial.includes(id) &&
+            !plan.items.some((item) => learningItemKey(item) === id),
+        ),
+      );
+      const removed = plan.items.filter(
+        (item) => !values.includes(learningItemKey(item)),
+      );
+      if (added.length)
+        next = assignLearningToAudiences(next, added, [key], "add");
+      if (removed.length)
+        next = assignLearningToAudiences(next, removed, [key], "remove");
+    }
+    return next;
+  }
   const items = selectedLearningItems(target, values);
   const keys = target.kind === "audiences" ? target.keys : values;
   const available = learningSelectionOptions(data, target);
@@ -45,17 +189,24 @@ export function applyLearningSelection(
     throw new Error(
       "Learning or audiences changed. Refresh to review the current selection.",
     );
-  return assignLearningToAudiences(data, items, keys, target.mode);
+  return assignLearningToAudiences(
+    data,
+    items,
+    keys,
+    target.mode === "remove" ? "remove" : "add",
+  );
 }
 
 type LearningSelectionOption = {
   id: string;
   label: string;
-  type?: "course" | "curriculum";
+  type?: "course" | "curriculum" | "team" | "group";
   description?: string;
   category?: string;
   updatedAt?: string;
   searchText?: string;
+  assignmentCount?: number;
+  includedItems?: { id: string; label: string }[];
 };
 export function learningSelectionOptions(
   data: Workspace,
@@ -66,7 +217,7 @@ export function learningSelectionOptions(
     return audiences
       .filter(
         (audience) =>
-          target.mode === "add" ||
+          target.mode !== "remove" ||
           target.items.some((item) =>
             audience.items.some(
               (saved) => learningItemKey(saved) === learningItemKey(item),
@@ -75,7 +226,16 @@ export function learningSelectionOptions(
       )
       .map((audience) => ({
         id: `${audience.kind}:${audience.id}`,
-        label: `${audience.kind === "team" ? "Team" : "Group"}: ${audience.name}`,
+        label:
+          target.mode === "manage"
+            ? audience.name
+            : `${audience.kind === "team" ? "Team" : "Group"}: ${audience.name}`,
+        type: audience.kind,
+        assignmentCount: target.items.filter((item) =>
+          audience.items.some(
+            (saved) => learningItemKey(saved) === learningItemKey(item),
+          ),
+        ).length,
       }));
   const plans = audiences.filter((audience) =>
     target.keys.includes(`${audience.kind}:${audience.id}`),
@@ -86,7 +246,7 @@ export function learningSelectionOptions(
   const content = (data.publishedContent || data.content).filter(
     (item) =>
       item.status === "published" ||
-      (target.mode === "remove" && direct.has(`course:${item.id}`)),
+      (target.mode !== "add" && direct.has(`course:${item.id}`)),
   );
   const searchable = new Map(
     content.map((item) => [
@@ -116,12 +276,17 @@ export function learningSelectionOptions(
       .filter(
         (item) =>
           item.status === "published" ||
-          (target.mode === "remove" && direct.has(`curriculum:${item.id}`)),
+          (target.mode !== "add" && direct.has(`curriculum:${item.id}`)),
       )
       .map((item) => ({
         id: `curriculum:${item.id}`,
         label: item.name,
         type: "curriculum" as const,
+        includedItems: item.courseIds.map((id) => ({
+          id: `course:${id}`,
+          label:
+            content.find((c) => c.id === id)?.title || "Unavailable course",
+        })),
         description: item.description,
         searchText: item.courseIds
           .map((id) => searchable.get(id) || "")
@@ -129,7 +294,7 @@ export function learningSelectionOptions(
       })),
   ];
   const known = new Set(options.map((option) => option.id));
-  if (target.mode === "remove")
+  if (target.mode !== "add")
     for (const item of plans.flatMap((audience) => audience.items)) {
       const id = learningItemKey(item);
       if (!known.has(id)) {
@@ -145,6 +310,13 @@ export function learningSelectionOptions(
         known.add(id);
       }
     }
+  if (target.mode === "manage")
+    return options.map((option) => ({
+      ...option,
+      assignmentCount: plans.filter((plan) =>
+        plan.items.some((item) => learningItemKey(item) === option.id),
+      ).length,
+    }));
   return options.filter((option) =>
     target.mode === "remove"
       ? direct.has(option.id)

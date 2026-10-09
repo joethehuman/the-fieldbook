@@ -2,10 +2,11 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { Workspace } from "@/lib/store";
 import type { LearningItem } from "@/lib/types";
-import { ContentSelectionList } from "./patterns/content-selection-list";
-import { SearchableSelectionList } from "./patterns/searchable-selection-list";
+import { AssignmentTransfer } from "./patterns/assignment-transfer";
 import {
   applyLearningSelection,
+  learningSelectionState,
+  rebaseAssignmentSelection,
   learningSelectionOptions,
   selectedLearningItems,
   type LearningAssignmentTarget,
@@ -36,7 +37,6 @@ import {
   DialogDescription,
   DialogFooter,
   DialogTitle,
-  DialogSteps,
 } from "./ui/dialog";
 import { LearningAudienceReview } from "./LearningAudienceReview";
 import { X } from "lucide-react";
@@ -44,7 +44,7 @@ import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 
 export function LearningAssignmentPicker({
   data,
-  item,
+  item: requestedItem,
   title,
   onChange,
   registerNavigationGuard,
@@ -55,7 +55,7 @@ export function LearningAssignmentPicker({
   draftAudiences,
   onDraftChange,
   showPeople = true,
-  target,
+  target: requestedTarget,
   onFinish,
 }: {
   onPrepare?: () => Promise<Workspace | null>;
@@ -80,8 +80,24 @@ export function LearningAssignmentPicker({
   | { item: LearningItem | { kind: "brief"; id: string }; target?: never }
   | { item?: never; target: LearningAssignmentTarget }
 )) {
+  // A single item's menu opens its complete source editor. Multi-item batches stay additive.
+  const editingSingle =
+    requestedTarget?.kind === "items" &&
+    requestedTarget.mode === "add" &&
+    requestedTarget.items.length === 1;
+  const item =
+    requestedItem || (editingSingle ? requestedTarget.items[0] : undefined);
+  const target = editingSingle ? undefined : requestedTarget;
+  const displayTitle =
+    editingSingle && item
+      ? item.kind === "curriculum"
+        ? data.curricula?.find((curriculum) => curriculum.id === item.id)
+            ?.name || title
+        : data.content.find((content) => content.id === item.id)?.title || title
+      : title;
   const [open, setOpen] = useState(false),
     [selected, setSelected] = useState<string[]>([]),
+    [partial, setPartial] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [stale, setStale] = useState(false),
@@ -112,6 +128,7 @@ export function LearningAssignmentPicker({
       discardDone.current?.(false);
     };
   }, []);
+  const initialPartial = useRef<string[]>([]);
   const initial = useRef<string[]>([]),
     revision = useRef<number | undefined>(undefined),
     snapshot = useRef(""),
@@ -119,9 +136,12 @@ export function LearningAssignmentPicker({
     refreshing = useRef(false);
   const notify = useToast();
   const dirty =
-    open &&
-    JSON.stringify([...selected].sort()) !==
-      JSON.stringify([...initial.current].sort());
+    (open &&
+      JSON.stringify([...selected].sort()) !==
+        JSON.stringify([...initial.current].sort())) ||
+    (open &&
+      JSON.stringify([...partial].sort()) !==
+        JSON.stringify([...initialPartial.current].sort()));
   const guard = useRef(async () => true);
   guard.current = async () => {
     if (running.current || refreshing.current) return false;
@@ -159,7 +179,12 @@ export function LearningAssignmentPicker({
   const allAudiences = assignmentAudiences(data);
   const learningItem = item && item.kind !== "brief" ? item : undefined;
   const learningItems = target
-    ? selectedLearningItems(target, selected)
+    ? selectedLearningItems(
+        target,
+        target.mode === "manage"
+          ? [...new Set([...initial.current, ...selected])]
+          : selected,
+      )
     : learningItem
       ? [learningItem]
       : [];
@@ -251,7 +276,7 @@ export function LearningAssignmentPicker({
         if (!onChange) throw new Error("Assignment saving is unavailable.");
         await onChange(
           target
-            ? applyLearningSelection(dataRef.current, target, selected)
+            ? applyLearningSelection(dataRef.current, target, selected, partial)
             : assignLearningToAudiences(
                 dataRef.current,
                 learningItems,
@@ -319,17 +344,32 @@ export function LearningAssignmentPicker({
         document.activeElement instanceof HTMLElement
           ? document.activeElement
           : null;
+      const managed = target
+        ? learningSelectionState(prepared, target)
+        : { selected: [], partial: [] };
       const ids = target
-        ? []
+        ? managed.selected
         : item?.kind === "brief"
           ? draftKeys || []
           : learningItem
             ? directlyAssignedAudiences(prepared, learningItem)
             : [];
       initial.current = ids;
+      initialPartial.current = managed.partial;
+      setPartial(
+        managed.partial.filter(
+          (id) => target?.kind !== "audiences" || !target.omit?.includes(id),
+        ),
+      );
       revision.current = prepared.governanceRevision;
       snapshot.current = assignmentSnapshot(prepared);
-      setSelected(target?.kind === "audiences" ? target.selected || [] : ids);
+      setSelected(
+        target?.kind === "audiences"
+          ? target.mode === "manage"
+            ? ids.filter((id) => !target.omit?.includes(id))
+            : target.selected || []
+          : ids,
+      );
       setStep("select");
       setReviewPlan(null);
       setOpen(true);
@@ -354,11 +394,26 @@ export function LearningAssignmentPicker({
       if (!latest || !mounted.current) return;
       revision.current = latest.governanceRevision;
       snapshot.current = assignmentSnapshot(latest);
+      if (target?.mode === "manage") {
+        const next = learningSelectionState(latest, target);
+        const rebased = rebaseAssignmentSelection(
+          { selected: initial.current, partial: initialPartial.current },
+          next,
+          { selected, partial },
+        );
+        initialPartial.current = next.partial;
+        const available = new Set(
+          learningSelectionOptions(latest, target).map((option) => option.id),
+        );
+        const valid = rebased.selected.filter((id) => available.has(id));
+        setSelected(valid);
+        setPartial(rebased.partial.filter((id) => valid.includes(id)));
+      }
       initial.current =
         item?.kind === "brief"
           ? draftKeys || []
           : target
-            ? []
+            ? learningSelectionState(latest, target).selected
             : learningItem
               ? directlyAssignedAudiences(latest, learningItem)
               : [];
@@ -375,11 +430,11 @@ export function LearningAssignmentPicker({
     }
   }
   useEffect(() => {
-    if (target) void begin();
-  }, [target]);
+    if (requestedTarget) void begin();
+  }, [requestedTarget]);
   return (
     <>
-      {!target &&
+      {!requestedTarget &&
         (renderTrigger ? (
           renderTrigger({ onClick: () => void begin(), loading: busy && !open })
         ) : (
@@ -393,8 +448,17 @@ export function LearningAssignmentPicker({
             {triggerLabel}
           </Button>
         ))}
-      {!open && error && <Alert variant="destructive" onDismiss={() => { if (!stale) setError(""); }}>{error}</Alert>}
-      {!compact && !target && (
+      {!open && error && (
+        <Alert
+          variant="destructive"
+          onDismiss={() => {
+            if (!stale) setError("");
+          }}
+        >
+          {error}
+        </Alert>
+      )}
+      {!compact && !requestedTarget && (
         <p className="text-sm text-muted-foreground">
           {initialKeys.length || Object.keys(inherited).length
             ? [...new Set([...initialKeys, ...Object.keys(inherited)])]
@@ -419,9 +483,9 @@ export function LearningAssignmentPicker({
         }}
       >
         <DialogContent
-          size={target?.kind === "audiences" ? "workflow-list" : "workflow"}
+          size="assignment"
           onCloseAutoFocus={(event) => {
-            if (target && returnFocus.current?.isConnected) {
+            if (requestedTarget && returnFocus.current?.isConnected) {
               event.preventDefault();
               returnFocus.current.focus();
             }
@@ -444,15 +508,23 @@ export function LearningAssignmentPicker({
               <DialogTitle ref={heading} tabIndex={-1}>
                 {target
                   ? target.kind === "audiences"
-                    ? "Assign Courses"
-                    : "Learning audience"
+                    ? target.mode === "manage"
+                      ? "Manage Courses"
+                      : target.mode === "remove"
+                        ? "Remove courses"
+                        : "Assign courses"
+                    : target.mode === "manage"
+                      ? "Manage Audience"
+                      : target.mode === "remove"
+                        ? "Remove assignments"
+                        : "Add assignments"
                   : item?.kind === "brief"
-                    ? "Update audience"
+                    ? "Update recommendations"
                     : item?.kind === "curriculum"
-                      ? "Curriculum audience"
-                      : "Course audience"}
+                      ? "Manage Audience"
+                      : "Course assignments"}
               </DialogTitle>
-              <DialogDescription>{title}</DialogDescription>
+              <DialogDescription>{displayTitle}</DialogDescription>
             </div>
             <Button
               type="button"
@@ -465,28 +537,24 @@ export function LearningAssignmentPicker({
               <X aria-hidden="true" />
             </Button>
           </div>
-          {item?.kind !== "brief" && (
-            <DialogSteps
-              steps={[
-                target?.kind === "audiences"
-                  ? "Select learning"
-                  : "Select audience",
-                "Review changes",
-              ]}
-              current={step === "review" ? 1 : 0}
-            />
-          )}
           <DialogBody
             ref={body}
             className={
               selecting
-                ? "flex flex-col gap-4 overflow-y-auto"
+                ? "flex flex-col overflow-hidden"
                 : "overflow-y-auto [scrollbar-gutter:stable]"
             }
           >
             {error && (
               <div className="mb-4 grid shrink-0 gap-3">
-                <Alert variant="destructive" onDismiss={() => { if (!stale) setError(""); }}>{error}</Alert>
+                <Alert
+                  variant="destructive"
+                  onDismiss={() => {
+                    if (!stale) setError("");
+                  }}
+                >
+                  {error}
+                </Alert>
                 {stale && (
                   <Button
                     type="button"
@@ -502,40 +570,74 @@ export function LearningAssignmentPicker({
             <div
               hidden={step !== "select"}
               className={
-                selecting ? "flex min-h-0 flex-1 flex-col gap-4" : "grid gap-4"
+                selecting ? "flex min-h-0 flex-1 flex-col gap-3" : "grid gap-4"
               }
             >
-              <p className="shrink-0 text-sm text-muted-foreground">
-                {target
-                  ? target.mode === "remove"
-                    ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."
-                    : target.kind === "audiences"
-                      ? "Choose courses or curricula for this audience. Other assignments stay in place."
-                      : "Add audiences for the selected learning. Other assignments stay in place."
-                  : item?.kind === "brief"
-                    ? "Choose who gets this Update in For you. No completion requirement."
-                    : "Choose who gets this learning in For you and assigned learning."}
-              </p>
-              {target?.kind === "audiences" ? (
-                <ContentSelectionList
-                  bounded
-                  label="Find courses or curricula"
-                  showTypeFilter
-                  disabled={busy || stale}
-                  options={selectionOptions.flatMap((option) =>
-                    option.type ? [{ ...option, type: option.type }] : [],
-                  )}
+              {(target || item?.kind === "brief") && (
+                <p className="shrink-0 text-sm text-muted-foreground">
+                  {target
+                    ? target.mode === "manage"
+                      ? target.kind === "items"
+                        ? "Manage teams and groups. Partial assignments stay as they are; + All assigns every selected curriculum to that audience."
+                        : target.keys.length > 1
+                          ? "Manage direct courses and curricula. Partial assignments stay as they are; + All assigns to every selected audience."
+                          : "Manage direct courses and curricula. Expand a curriculum to see its included courses."
+                      : target.mode === "remove"
+                        ? "Remove selected direct links. Other teams, groups and curricula can still supply this learning."
+                        : target.kind === "audiences"
+                          ? "Choose courses or curricula for this audience. Other assignments stay in place."
+                          : "Add audiences for the selected learning. Other assignments stay in place."
+                    : item?.kind === "brief"
+                      ? "Choose who gets this Update in For you. No completion requirement."
+                      : "Choose who gets this learning in For you and assigned learning."}
+                </p>
+              )}
+              {target?.kind === "audiences" ||
+              target?.mode === "remove" ||
+              target?.mode === "manage" ? (
+                <AssignmentTransfer
+                  options={selectionOptions.map((option) => ({
+                    ...option,
+                    type:
+                      option.type ||
+                      (option.id.startsWith("team:")
+                        ? ("team" as const)
+                        : ("group" as const)),
+                  }))}
                   value={selected}
-                  onChange={setSelected}
-                />
-              ) : target?.mode === "remove" ? (
-                <SearchableSelectionList
-                  bounded
-                  label="Find a team or group"
-                  options={selectionOptions}
-                  value={selected}
-                  onChange={setSelected}
+                  onChange={(value) => {
+                    setSelected(value);
+                    setPartial(partial.filter((id) => value.includes(id)));
+                  }}
+                  partial={partial}
+                  onAddToAll={(id) =>
+                    setPartial(partial.filter((key) => key !== id))
+                  }
+                  assignAllLabel={
+                    target.kind === "items"
+                      ? (option) =>
+                          `Assign all selected learning to ${option.label}`
+                      : undefined
+                  }
+                  audienceCount={
+                    target.kind === "audiences"
+                      ? target.keys.length
+                      : target.items.length
+                  }
                   disabled={busy || stale}
+                  rightLabel={
+                    target.mode === "manage"
+                      ? "Assigned"
+                      : target.mode === "remove"
+                        ? "To remove"
+                        : "To add"
+                  }
+                  removing={target.mode === "remove"}
+                  searchPlaceholder={
+                    target.kind === "audiences"
+                      ? "Find content"
+                      : "Find audiences"
+                  }
                 />
               ) : (
                 <AudienceSelection
@@ -625,11 +727,13 @@ export function LearningAssignmentPicker({
                 <SaveChangesControl
                   dirty={dirty}
                   busy={busy}
-                  blockedReason={stale
-                    ? "Refresh to review current consequences."
-                    : target && !selected.length
-                      ? "Select at least one item to continue."
-                      : undefined}
+                  blockedReason={
+                    stale
+                      ? "Refresh to review current consequences."
+                      : target && target.mode !== "manage" && !selected.length
+                        ? "Select at least one item to continue."
+                        : undefined
+                  }
                   onClick={() => {
                     if (step === "review") {
                       running.current = true;
