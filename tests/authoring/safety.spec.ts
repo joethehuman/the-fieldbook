@@ -3,7 +3,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { expectMarkdown, waitForDraftSaved, openContentSettings, returnToContent } from "./editor-helpers";
 import { freshWorkspace } from "../../lib/store";
-import { authoringUser, setupAuthoringProvider } from "./provider-fixture";
+import { authoringUser, setupAuthoringProvider, syncAuthoringProvider } from "./provider-fixture";
 
 async function tableActionPlacement(table: Locator) {
   return table.evaluate((node) => {
@@ -1056,6 +1056,43 @@ test("slash list begins on the chosen line without an extra blank block", async 
     path: info.outputPath("slash-list-between-paragraphs.png"),
   });
 });
+
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: a pasted final image stays writable after reopening`, async ({ page }, info) => {
+    test.skip(!info.project.name.startsWith("production"), "Uploads are installation-only");
+    const { state, control } = await setup(page, true, kind, true, false, "Before the image.");
+    const writing = page.locator('.writing-content[contenteditable="true"]');
+    await writing.locator("p").click();
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Enter");
+    await writing.evaluate(node => {
+      const data = new DataTransfer();
+      data.items.add(new File(["synthetic"], "final.png", { type: "image/png" }));
+      node.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => control.uploaded).toBe(true);
+    control.releaseUpload();
+    await expect(writing.locator("img")).toBeVisible();
+    const line = writing.locator(":scope > p").last();
+    await expect(line).toBeEmpty();
+    await line.click();
+    await page.keyboard.press("ControlOrMeta+z");
+    await expect(writing.locator("img")).toHaveCount(0);
+    await page.keyboard.press("ControlOrMeta+Shift+z");
+    await expect(writing.locator("img")).toBeVisible();
+    await expect(line).toBeEmpty();
+    await waitForDraftSaved(page);
+    await syncAuthoringProvider(page, state);
+    await page.reload();
+    await expect(writing.locator("img")).toBeVisible();
+    await expect(line).toBeEmpty();
+    await line.click();
+    await page.keyboard.type("After the image.");
+    await expect(line).toHaveText("After the image.");
+    await waitForDraftSaved(page);
+    await expectMarkdown(page, /Before the image\.[\s\S]*!\[final\][\s\S]*After the image\./);
+  });
+}
 
 test("pasted image uploads at the editor caret", async ({ page }, info) => {
   test.skip(

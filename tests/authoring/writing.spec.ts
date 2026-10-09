@@ -31,7 +31,7 @@ const hello = "world";
 
 ![Product diagram](/api/media/example.png)
 
-[Product walkthrough](/api/media/example.mp4)
+[Product walkthrough](/api/media/00000000-0000-4000-8000-000000000010.mp4)
 `;
 
 async function pasteWritingText(page: Page, value: string) {
@@ -41,6 +41,81 @@ async function pasteWritingText(page: Page, value: string) {
     const target = document.activeElement?.closest('[contenteditable="true"]');
     (target && node.contains(target) ? target : node).dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
   }, value);
+}
+
+for (const [label, markdown, selector] of [
+  ["image", "![Product diagram](/api/media/example.png)", '[data-editor-block-type="image"]'],
+  ["inline image", "Context ![Product diagram](/api/media/example.png)", '[data-editor-block-type="image"]'],
+  ["video", "[Video](https://example.test/final.mp4)", ".writing-media-block"],
+  ["code", "```text\nExample\n```", ".writing-code-block"],
+  ["table", "| One | Two |\n| --- | --- |\n| A | B |", ".writing-table-block"],
+  ["divider", "---", "hr"],
+] as const) {
+  test(`a saved final ${label} has a clickable writing line below it`, async ({ page }, info) => {
+    const body = `Before the block.\n\n${markdown}`;
+    const { read, writes } = await setup(page, info.project.name.startsWith("production"), body);
+    const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+    await expect(editor.locator(selector)).toBeVisible();
+    // Opening a document must not save an editor-only empty paragraph.
+    expect((await read()).content[0].body).toBe(body);
+    expect(writes()).toBe(0);
+    const line = editor.locator(":scope > p").last();
+    await expect(line).toBeEmpty();
+    await line.scrollIntoViewIfNeeded();
+    const block = (await editor.locator(selector).boundingBox())!;
+    const bounds = (await line.boundingBox())!;
+    expect(bounds.height).toBeGreaterThan(0);
+    expect(bounds.y - block.y - block.height).toBeGreaterThanOrEqual(24);
+    await line.click();
+    await page.keyboard.type("After the block.");
+    await expect(line).toHaveText("After the block.");
+    await waitForDraftSaved(page);
+    expect((await read()).content[0].body).toContain("After the block.");
+    await page.reload();
+    await expect(editor.locator(selector)).toBeVisible();
+    await expect(editor.locator(":scope > p").last()).toHaveText("After the block.");
+  });
+}
+
+for (const [command, selector] of [
+  ["Image", '[data-editor-block-type="image"]'],
+  ["Embed video link", ".writing-media-block"],
+  ["Code block", ".writing-code-block"],
+  ["Table", ".writing-table-block"],
+  ["Divider", "hr"],
+] as const) {
+  test(`inserting a final ${command} keeps the following line writable`, async ({ page }, info) => {
+    await setup(page, info.project.name.startsWith("production"), "Before the block.");
+    const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+    await editor.locator("p").click();
+    await page.keyboard.press("ControlOrMeta+End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("/");
+    await page.getByRole("menuitem", { name: command, exact: true }).click();
+    if (command === "Image" || command === "Embed video link") {
+      const type = command === "Image" ? "image" : "video";
+      const chooser = page.getByRole("dialog", { name: `Insert ${type}`, exact: true });
+      await chooser.getByRole("button", { name: "Link", exact: true }).click();
+      await page.route("https://example.test/final.png", route => route.fulfill({
+        contentType: "image/png",
+        body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/l9sAAAAASUVORK5CYII=", "base64"),
+      }));
+      await chooser.getByRole("textbox", { name: type === "image" ? "Image URL" : "Video URL", exact: true })
+        .fill(type === "image" ? "https://example.test/final.png" : "https://example.test/final.mp4");
+      await chooser.getByRole("button", { name: `Insert ${type}`, exact: true }).click();
+      await expect(chooser).toBeHidden();
+    }
+    await expect(editor.locator(selector)).toBeVisible();
+    const line = editor.locator(":scope > p").last();
+    await expect(line).toBeEmpty();
+    await line.click();
+    await page.keyboard.type("After insertion.");
+    await expect(line).toHaveText("After insertion.");
+    await waitForDraftSaved(page);
+    await page.reload();
+    await expect(editor.locator(selector)).toBeVisible();
+    await expect(editor.locator(":scope > p").last()).toHaveText("After insertion.");
+  });
 }
 
 test("pasting a URL links selected formatted text, supports undo and survives draft reload", async ({ page }, info) => {
@@ -105,10 +180,13 @@ test("URL paste links table-cell selections and leaves code and caret paste alon
   await expect(editor.locator("code")).toHaveText("https://example.com/code");
   await expect(editor.locator("code a")).toHaveCount(0);
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("link-dialog-preview")).toHaveCount(0);
   const paragraph = editor.locator(":scope > p").last();
   await paragraph.click();
-  await editor.press("ControlOrMeta+End");
-  await pasteWritingText(page, "https://example.com/caret");
+  await page.keyboard.press("ControlOrMeta+End");
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await page.evaluate(() => navigator.clipboard.writeText("https://example.com/caret"));
+  await page.keyboard.press("ControlOrMeta+v");
   await expect(paragraph).toContainText("Caret:");
   await expect(paragraph).toContainText("https://example.com/caret");
   await waitForDraftSaved(page);
@@ -261,7 +339,7 @@ async function setup(
   production: boolean,
   body = original,
   kind: "doc" | "brief" = "doc",
-  itemId = "writing-fixture",
+  itemId = "00000000-0000-4000-8000-000000000011",
 ) {
   let state = withPublishedSnapshots(freshWorkspace());
   if (kind === "doc") {
@@ -345,6 +423,17 @@ async function setup(
       await syncAuthoringProvider(page, state);
       return route.fulfill({ json: saved });
     });
+    await page.route("**/api/admin/bulk", async (route) => {
+      const request = route.request().postDataJSON();
+      expect(request.entity).toBe("content");
+      expect(request.operation).toBe("unpublish");
+      expect(request.items).toEqual([{ id: itemId, expected: state.content[0].revision }]);
+      state.content = [{ ...state.content[0], status: "draft", publishedRevision: undefined,
+        revision: (state.content[0].revision || 0) + 1 }];
+      state.publishedContent = [];
+      await syncAuthoringProvider(page, state);
+      return route.fulfill({ json: { results: [{ id: itemId, status: "changed" }] } });
+    });
   } else {
     await page.addInitScript((data) => {
       if (!localStorage.getItem("fieldbook.workspace.v1"))
@@ -361,7 +450,7 @@ async function setup(
       ),
     }),
   );
-  await page.route("**/api/media/example.mp4", (route) =>
+  await page.route("**/api/media/00000000-0000-4000-8000-000000000010.mp4", (route) =>
     route.fulfill({ status: 204 }),
   );
   await page.goto(production ? `/admin/content/${itemId}/edit` : "/#admin");
@@ -393,7 +482,7 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
   await expect(editor.locator("img")).toHaveAttribute("alt", "Product diagram");
   await expect(editor.locator("video")).toHaveAttribute(
     "src",
-    "/api/media/example.mp4",
+    "/api/media/00000000-0000-4000-8000-000000000010.mp4",
   );
   // Opening and normalizing content must never create a draft revision.
   await page.waitForTimeout(1100);
@@ -420,7 +509,7 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
   await expect(
     page.getByText("Unpublished edits", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await page.getByRole("link", { name: "Private title", exact: true }).click();
   await expect(page.locator(".editor")).toBeVisible();
   await expect(editor).toContainText("A private addition.");
   await page
@@ -433,15 +522,16 @@ test("visual Markdown round trip, autosaved drafts, republish and unpublish", as
     fullPage: true,
   });
   await returnToContent(page);
-  await page.getByRole("button", { name: "Unpublish", exact: true }).click();
+  await page.getByRole("button", { name: "Actions for Private title", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Unpublish", exact: true }).click();
   await page
-    .getByRole("alertdialog")
-    .getByRole("button", { name: "Confirm", exact: true })
+    .getByRole("dialog", { name: "Unpublish", exact: true })
+    .getByRole("button", { name: "Apply changes", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Unpublish", exact: true }),
   ).toHaveCount(0);
-  expect((await read()).publishedContent).toEqual([]);
+  await expect.poll(async () => (await read()).publishedContent).toEqual([]);
   expect((await read()).content[0].body).toContain("A private addition.");
   expect(errors).toEqual([]);
 });
