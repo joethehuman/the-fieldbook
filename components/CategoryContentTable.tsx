@@ -140,10 +140,10 @@ export function CategoryContentTable({
     <section aria-label={label} className="grid min-w-0 gap-3">
       <CollectionControls
         search={
-          <SearchField>
+          <SearchField className="w-64 max-w-full sm:w-80">
             <Input
               type="search"
-              placeholder="Search items…"
+              placeholder="Search items"
               aria-label={`Search items in ${name}`}
               value={query}
               disabled={busy}
