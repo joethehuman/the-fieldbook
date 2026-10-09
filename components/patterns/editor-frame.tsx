@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
+import { blurWritingInput, captureWritingCursor, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
@@ -80,7 +80,9 @@ export function EditorFrame({
     if (!panelState.current.outline && !panelState.current.details) {
       const active = document.activeElement;
       const chooser = active instanceof Element && !!active.closest(".writing-slash-menu, .writing-media-chooser, .editor-frame-controls");
-      panelReturn.current = captureWritingCursor(canvas.current) || (chooser ? lastWritingCursor.current : null);
+      // The popup's capture-phase dismissal can remove its focused input
+      // before this button receives pointerdown, returning focus to body.
+      panelReturn.current = captureWritingCursor(canvas.current) || (chooser || active === document.body ? lastWritingCursor.current : null);
     }
     preparedPanel.current = side;
   }
@@ -108,21 +110,20 @@ export function EditorFrame({
     const header = frame.current?.closest(".app")?.querySelector<HTMLElement>(".topbar");
     let request = 0;
     let releaseRequest = 0;
-    let followUntil = 0;
     let layoutWidth = document.documentElement.clientWidth;
     let layoutHeight = document.documentElement.clientHeight;
     let keyboard = false;
-    const surface = dock ? element.querySelector<HTMLElement>(".editor-controls-surface") : null;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let motion: Animation | null = null;
     let lastDockTop: number | null = null;
-    const stopMotion = () => { motion?.cancel(); motion = null; };
+    let lastDockBottom: number | null = null;
+    let lastAppTop: number | null = null;
+    const setStyle = (target: HTMLElement | null | undefined, name: string, value: string) => {
+      if (target && target.style.getPropertyValue(name) !== value) target.style.setProperty(name, value);
+    };
     // Apple can overlay an address pill and an input accessory row above the
     // keyboard without subtracting both from the reported visual viewport.
     const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent)
       || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
     const measure = () => {
-      const before = lastDockTop === null ? null : surface?.getBoundingClientRect();
       const viewport = window.visualViewport;
       const appBounds = overlayHost?.getBoundingClientRect();
       const rawTop = viewport?.offsetTop || 0;
@@ -140,73 +141,62 @@ export function EditorFrame({
         if (!keyboard && !editing) layoutHeight = Math.max(document.documentElement.clientHeight, height);
         // Work directly in visible coordinates, relative to the positioned app.
         // This also compensates for native viewport panning of the app itself.
-        element.style.setProperty("--editor-dock-bottom", `${bottom - (appBounds?.top || 0)}px`);
+        setStyle(element, "--editor-dock-bottom", `${bottom - (appBounds?.top || 0)}px`);
         const centered = !viewport?.offsetLeft && Math.abs((viewport?.width || window.innerWidth) - (appBounds?.width || window.innerWidth)) < 1;
         const center = centered ? "50%" : `${(viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) / 2 - (appBounds?.left || 0)}px`;
-        element.style.setProperty("--editor-dock-center", center);
-        overlayLayer.current?.style.setProperty("--editor-panel-center", center);
-        element.style.setProperty("--editor-dock-gap", keyboard ? `max(${appleTouch ? 8 : 3}rem, env(safe-area-inset-bottom))` : "max(var(--space-3), env(safe-area-inset-bottom))");
+        setStyle(element, "--editor-dock-center", center);
+        setStyle(overlayLayer.current, "--editor-panel-center", center);
+        setStyle(element, "--editor-dock-gap", keyboard ? `max(${appleTouch ? 8 : 3}rem, env(safe-area-inset-bottom))` : "max(var(--space-3), env(safe-area-inset-bottom))");
         // Keep one stable bottom lane for controls, menus and scroll clearance.
-        element.style.setProperty("--editor-dock-anchor", "calc(var(--editor-dock-bottom) - var(--editor-dock-gap))");
+        setStyle(element, "--editor-dock-anchor", "calc(var(--editor-dock-bottom) - var(--editor-dock-gap))");
         const lane = element.getBoundingClientRect();
         safeBottom = lane.bottom;
-        element.style.setProperty("--editor-usable-bottom", `${safeBottom}px`);
+        setStyle(element, "--editor-usable-bottom", `${safeBottom}px`);
       }
       const rect = element.getBoundingClientRect();
-      const menuOpen = panelState.current.outline || panelState.current.details
-        || !!document.querySelector(".writing-slash-menu, .writing-media-chooser");
-      const caretLine = dock && !menuOpen && preparedPanel.current === null ? readWritingCaretLine(canvas.current) : null;
-      const coversLine = (box: DOMRect) => !!caretLine && box.top < caretLine.bottom + 8 && box.bottom > caretLine.top - 8;
-      if (menuOpen || reducedMotion.matches || before && coversLine(before)) stopMotion();
-      if (surface && lastDockTop !== rect.top) {
-        stopMotion();
-        if (before && !reducedMotion.matches && !menuOpen && (viewport?.scale || 1) === 1) {
-          // Animate only the surface. Geometry and scroll clearance use the
-          // immediate anchor, and no visual frame may enter the keyboard lane.
-          const minimum = Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0) + 8;
-          const offset = Math.max(Math.min(0, minimum - rect.top), Math.min(0, before.top - rect.top));
-          const crossesLine = !!caretLine && rect.top + offset < caretLine.bottom + 8 && rect.bottom > caretLine.top - 8;
-          if (offset < -1 && !crossesLine) motion = surface.animate([
-            { transform: `translateY(${offset}px)` }, { transform: "translateY(0)" },
-          ], { duration: 140, easing: "cubic-bezier(0.2, 0, 0, 1)" });
-          else if (offset < -1 || before.top - rect.top > 24) motion = surface.animate([
-            { opacity: 0.65 }, { opacity: 1 },
-          ], { duration: 100, easing: "ease-out" });
-        }
-        lastDockTop = rect.top;
-      }
+      // Follow native viewport movement directly. Restarting a second animation
+      // on every keyboard/pan frame makes the surface chase its actual anchor.
       const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
       const panelTop = dock ? Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0, bounds.top - 8) + 8 : rect.bottom + 8;
       const panelBottom = dock ? rect.top - 8 : bottom - 16;
-      if (dock) owner?.style.setProperty("--editor-dock-clearance", `${Math.max(80, bottom - safeBottom + rect.height + 12)}px`);
-      frame.current?.style.setProperty("--editor-navigation-height", `${dock ? 0 : rect.height}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-top", `${panelTop - (dock ? appBounds?.top || 0 : 0)}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-left", `${bounds.left - (dock ? appBounds?.left || 0 : 0)}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-right", `${dock && appBounds ? appBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-max-width", `${bounds.width}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-available-height", `${Math.max(dock ? 0 : 80, panelBottom - panelTop)}px`);
+      if (dock) setStyle(owner, "--editor-dock-clearance", `${Math.max(80, bottom - safeBottom + rect.height + 12)}px`);
+      setStyle(frame.current, "--editor-navigation-height", `${dock ? 0 : rect.height}px`);
+      setStyle(overlayLayer.current, "--editor-panel-top", `${panelTop - (dock ? appBounds?.top || 0 : 0)}px`);
+      setStyle(overlayLayer.current, "--editor-panel-left", `${bounds.left - (dock ? appBounds?.left || 0 : 0)}px`);
+      setStyle(overlayLayer.current, "--editor-panel-right", `${dock && appBounds ? appBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
+      setStyle(overlayLayer.current, "--editor-panel-max-width", `${bounds.width}px`);
+      setStyle(overlayLayer.current, "--editor-panel-available-height", `${Math.max(dock ? 0 : 80, panelBottom - panelTop)}px`);
+      // Native panning can move the writing area while the dock returns to
+      // the same screen position. Notify after that compensation as well.
+      const appTop = appBounds?.top || 0;
+      if (dock && (lastDockTop !== rect.top || lastDockBottom !== rect.bottom || lastAppTop !== appTop)) {
+        lastDockTop = rect.top;
+        lastDockBottom = rect.bottom;
+        lastAppTop = appTop;
+        owner?.dispatchEvent(new Event("fieldbook:editor-dock-change"));
+      }
     };
     const tick = () => {
       request = 0;
       measure();
-      if (performance.now() < followUntil) request = requestAnimationFrame(tick);
     };
     const schedule = () => {
       if (!dock) { measure(); return; }
       if (!request) request = requestAnimationFrame(tick);
     };
-    const settle = () => { followUntil = performance.now() + 700; schedule(); };
     const remember = () => {
       const cursor = captureWritingCursor(canvas.current);
       const active = document.activeElement;
       if (cursor) lastWritingCursor.current = cursor;
       else if (active instanceof HTMLElement && (active.isContentEditable || active.matches("input, textarea")) && !active.closest(".writing-media-chooser, .writing-slash-menu")) lastWritingCursor.current = null;
     };
+    // Snapshot the document only at a control handoff, not on every typed
+    // character. Tab can move into the dock without a pointer gesture.
+    const rememberKeyboard = (event: KeyboardEvent) => { if (event.key === "Tab") remember(); };
     const released = () => {
       cancelAnimationFrame(releaseRequest);
       releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; schedule(); });
     };
-    reducedMotion.addEventListener("change", stopMotion);
     measureDock.current = measure;
     measure();
     const observer = new ResizeObserver(schedule);
@@ -219,22 +209,18 @@ export function EditorFrame({
     window.visualViewport?.addEventListener("resize", schedule);
     window.visualViewport?.addEventListener("scroll", schedule);
     if (dock) {
-      window.addEventListener("scroll", settle, { passive: true });
-      document.addEventListener("focusin", settle);
-      document.addEventListener("focusout", settle);
-      document.addEventListener("touchend", settle, { passive: true });
+      window.addEventListener("scroll", schedule, { passive: true });
+      document.addEventListener("focusin", schedule);
+      document.addEventListener("focusout", schedule);
       element.addEventListener("pointerdown", remember, true);
-      document.addEventListener("selectionchange", remember);
-      document.addEventListener("selectionchange", schedule);
-      document.addEventListener("input", schedule);
+      canvas.current?.addEventListener("fieldbook:writing-handoff", remember);
+      document.addEventListener("keydown", rememberKeyboard, true);
       document.addEventListener("focusin", remember);
       document.addEventListener("pointerup", released);
     }
     return () => {
       cancelAnimationFrame(request);
       cancelAnimationFrame(releaseRequest);
-      stopMotion();
-      reducedMotion.removeEventListener("change", stopMotion);
       if (measureDock.current === measure) measureDock.current = null;
       observer.disconnect();
       if (dock) owner?.style.removeProperty("--editor-dock-clearance");
@@ -243,14 +229,12 @@ export function EditorFrame({
       window.visualViewport?.removeEventListener("resize", schedule);
       window.visualViewport?.removeEventListener("scroll", schedule);
       if (dock) {
-        window.removeEventListener("scroll", settle);
-        document.removeEventListener("focusin", settle);
-        document.removeEventListener("focusout", settle);
-        document.removeEventListener("touchend", settle);
+        window.removeEventListener("scroll", schedule);
+        document.removeEventListener("focusin", schedule);
+        document.removeEventListener("focusout", schedule);
         element.removeEventListener("pointerdown", remember, true);
-        document.removeEventListener("selectionchange", remember);
-        document.removeEventListener("selectionchange", schedule);
-        document.removeEventListener("input", schedule);
+        canvas.current?.removeEventListener("fieldbook:writing-handoff", remember);
+        document.removeEventListener("keydown", rememberKeyboard, true);
         document.removeEventListener("focusin", remember);
         document.removeEventListener("pointerup", released);
       }

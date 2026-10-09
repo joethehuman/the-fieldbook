@@ -740,7 +740,10 @@ export default function WritingEditorEngine({
   }
   function openMedia(type: "image" | "video", tab: "upload" | "link" = "upload") {
     rememberSelection();
-    if (canvas && compactRef.current) blurWritingInput();
+    if (canvas && compactRef.current) {
+      root.current?.dispatchEvent(new Event("fieldbook:writing-handoff", { bubbles: true }));
+      blurWritingInput();
+    }
     setSlashOpen(false);
     setMedia(type);
     setMediaTab(tab);
@@ -820,6 +823,7 @@ export default function WritingEditorEngine({
       setSlashOpen(false);
       return;
     }
+    if (canvas && compactRef.current) root.current?.dispatchEvent(new Event("fieldbook:writing-handoff", { bubbles: true }));
     insertTrigger.current = trigger || null;
     focusInsertItem.current = fromKeyboard;
     setSlashFromToolbar(!!trigger);

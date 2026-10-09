@@ -2056,8 +2056,12 @@ test("a final video block retains a writing line below its reserved gap", async 
   await expect(block).toBeVisible();
   const line = writer.locator(":scope > p").last();
   await expect(line).toHaveText("");
-  const bounds = (await block.boundingBox())!;
-  expect((await line.boundingBox())!.y - bounds.y - bounds.height).toBeCloseTo(24, 0);
+  const gap = await writer.evaluate((element) => {
+    const block = element.querySelector(".writing-media-block")!.getBoundingClientRect();
+    const line = Array.from(element.querySelectorAll(":scope > p")).at(-1)!.getBoundingClientRect();
+    return line.top - block.bottom;
+  });
+  expect(gap).toBeCloseTo(24, 0);
   await line.click();
   await page.keyboard.type("After the final video.");
   await waitForDraftSaved(page);
@@ -2671,12 +2675,39 @@ test("touch selection and manual scrolling do not pull writing back to the caret
   await expect.poll(() => owner.evaluate((element) => element.scrollTop)).toBeGreaterThan(500);
   await owner.evaluate((element) => {
     element.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    element.dispatchEvent(new Event("touchmove", { bubbles: true }));
     element.scrollTop = 300;
+    // Mobile selection events can arrive while a scroll gesture is in flight.
+    // Change the collapsed selection so this exercises that event, rather than
+    // redispatching an unchanged caret which the editor correctly ignores.
+    const paragraph = element.querySelector('.writing-content p:last-child')!;
+    const walker = document.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+    let text = walker.nextNode()!;
+    for (let next = walker.nextNode(); next; next = walker.nextNode()) text = next;
+    const range = document.createRange(); range.setStart(text, Math.max(0, text.textContent!.length - 1)); range.collapse(true);
+    const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
     document.dispatchEvent(new Event("selectionchange"));
     window.dispatchEvent(new Event("touchend"));
   });
-  await page.waitForTimeout(180); // Exceeds the caret-correction debounce.
+  await page.waitForTimeout(180); // Check that post-gesture events do not snap the canvas back.
   expect(await owner.evaluate((element) => element.scrollTop)).toBeCloseTo(300, 0);
+  // A hardware keyboard on a touch device explicitly returns to the caret.
+  // That navigation must resume protection without waiting for typed text.
+  await writer.press("End");
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  await expect.poll(async () => {
+    const bottom = await writer.evaluate(() => {
+      const selection = window.getSelection()!;
+      const range = selection.getRangeAt(0).cloneRange();
+      const caret = Array.from(range.getClientRects()).find(rect => rect.height > 0);
+      if (caret) return caret.bottom;
+      const text = selection.focusNode as Text;
+      const offset = Math.min(selection.focusOffset, text.length - 1);
+      range.setStart(text, offset); range.setEnd(text, offset + 1);
+      return range.getBoundingClientRect().bottom;
+    });
+    return bottom - (await dock.boundingBox())!.y;
+  }).toBeLessThanOrEqual(-15);
   const commands = page.getByRole("button", { name: /^Commands:/ });
   await commands.dispatchEvent("pointerdown", { pointerId: 1, pointerType: "touch", isPrimary: true, button: 0 });
   await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
@@ -2684,6 +2715,55 @@ test("touch selection and manual scrolling do not pull writing back to the caret
   await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
   await commands.tap();
   await expect(page.locator(".writing-slash-menu")).toBeVisible();
+});
+
+test("typing stays above the dock while the keyboard viewport keeps changing", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  await writer.locator("p").nth(20).click();
+  await page.evaluate(() => {
+    const state = { height: 600, offsetTop: 0 };
+    (window as unknown as { movingKeyboardViewport: typeof state }).movingKeyboardViewport = state;
+    for (const key of ["height", "offsetTop"] as const)
+      Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => state[key] });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  await expect.poll(async () => (await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeCloseTo(552, 0);
+  await writer.locator("p").nth(20).evaluate((paragraph, dockTop) => {
+    const owner = paragraph.closest<HTMLElement>(".main-content")!;
+    owner.scrollTop += paragraph.getBoundingClientRect().bottom - (dockTop - 32);
+  }, (await dock.boundingBox())!.y);
+  // Model visualViewport events continuing through native text input. Inspect
+  // the rendered line during the burst, so a correction only after it ends
+  // cannot hide the original regression.
+  await page.evaluate(() => {
+    const state = (window as unknown as { movingKeyboardViewport: { height: number; offsetTop: number } }).movingKeyboardViewport;
+    const samples: number[] = [];
+    const timer = window.setInterval(() => {
+      state.height = Math.max(410, state.height - 7);
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const selection = window.getSelection();
+        if (!selection?.isCollapsed || !selection.rangeCount) return;
+        const caret = Array.from(selection.getRangeAt(0).getClientRects()).find(rect => rect.height > 0);
+        const dock = document.querySelector('.editor-frame-controls[data-dock="true"]');
+        if (caret && dock) samples.push(caret.bottom - dock.getBoundingClientRect().top);
+      }));
+    }, 16);
+    (window as unknown as { movingKeyboardTest: { samples: number[]; timer: number } }).movingKeyboardTest = { samples, timer };
+  });
+  await page.keyboard.type(" Keep this line visible.", { delay: 25 });
+  const samples = await page.evaluate(() => {
+    const state = (window as unknown as { movingKeyboardTest: { samples: number[]; timer: number } }).movingKeyboardTest;
+    clearInterval(state.timer);
+    return state.samples;
+  });
+  expect(samples.length).toBeGreaterThan(10);
+  expect(Math.max(...samples)).toBeLessThanOrEqual(-7);
+  await expect(writer).toContainText("Keep this line visible.");
+  await page.screenshot({ path: info.outputPath("mobile-keyboard-viewport-burst.png") });
 });
 
 test("last writing line stays reachable when innerHeight is already keyboard-sized", async ({ page }, info) => {
@@ -2767,6 +2847,7 @@ for (const device of ["iPhone", "iPad"] as const) {
       expect((await dock.boundingBox())!.y).toBeCloseTo(lane.y, 0);
       // Model native panning separately from the owner's scroll position.
       await page.locator(".app").evaluate((app) => { (app as HTMLElement).style.transform = "translateY(84px)"; window.dispatchEvent(new Event("scroll")); });
+      await expect.poll(async () => (await caretBottom()) - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-15);
       await page.keyboard.type("Still visible after panning. ");
       await expect.poll(async () => (await caretBottom()) - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-15);
       expect((await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeCloseTo(visibleHeight - 128, 0);
@@ -2796,7 +2877,7 @@ for (const device of ["iPhone", "iPad"] as const) {
 }
 
 for (const reduced of [false, true]) {
-  test(`touch motion preserves immediate geometry and focus${reduced ? " with reduced motion" : ""}`, async ({ page }, info) => {
+  test(`touch viewport changes preserve immediate geometry and focus${reduced ? " with reduced motion" : ""}`, async ({ page }, info) => {
     await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
     await page.setViewportSize({ width: 375, height: 812 });
     await open(page, info.project.name.startsWith("production"), "doc");
@@ -2811,40 +2892,33 @@ for (const reduced of [false, true]) {
     const dock = page.getByRole("group", { name: "Editor controls", exact: true });
     const surface = dock.locator(".editor-controls-surface");
     await expect.poll(async () => (await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeCloseTo(382, 0);
-    // Hold a visual animation deterministically; its anchor must already be in
-    // the new safe lane and every interpolated frame must fit above that lane.
-    const samples = await dock.evaluate(async (element, reduced) => {
+    // Native keyboard motion already moves the visual viewport. The controls
+    // must follow that anchor without starting a second movement animation.
+    const samples = await dock.evaluate(async (element) => {
       (window as unknown as { motionViewport: { height: number } }).motionViewport.height = 700;
       window.visualViewport!.dispatchEvent(new Event("resize"));
       await new Promise(requestAnimationFrame);
       await new Promise(requestAnimationFrame);
       const surface = element.querySelector<HTMLElement>(".editor-controls-surface")!;
-      const animation = surface.getAnimations()[0];
-      if (animation) animation.pause();
       const anchor = element.getBoundingClientRect();
       const frames = [];
-      for (const time of [0, 35, 70, 140]) {
-        if (animation) animation.currentTime = time;
+      for (let frame = 0; frame < 4; frame++) {
+        await new Promise(requestAnimationFrame);
         const box = surface.getBoundingClientRect();
         frames.push({ top: box.top, bottom: box.bottom, width: box.width });
       }
-      if (animation) animation.currentTime = 35;
-      return { anchorBottom: anchor.bottom, anchorTop: anchor.top, animated: !!animation, reduced, frames };
-    }, reduced);
+      return { anchorBottom: anchor.bottom, anchorTop: anchor.top, animated: surface.getAnimations().length > 0, frames };
+    });
     expect(samples.anchorBottom).toBeCloseTo(652, 0);
-    expect(samples.animated).toBe(!reduced);
+    expect(samples.animated).toBe(false);
     for (const frame of samples.frames) {
       expect(frame.top).toBeGreaterThanOrEqual((await page.locator(".topbar").boundingBox())!.height + 7);
       expect(frame.bottom).toBeLessThanOrEqual(653);
+      expect(frame.top).toBeCloseTo(samples.anchorTop, 0);
+      expect(frame.bottom).toBeCloseTo(samples.anchorBottom, 0);
     }
-    if (!reduced) {
-      expect(samples.frames[0].top).toBeLessThan(samples.anchorTop - 100);
-      expect(samples.frames[1].top).toBeGreaterThan(samples.frames[0].top);
-      expect(samples.frames[2].top).toBeGreaterThan(samples.frames[1].top);
-      expect(samples.frames[3].top).toBeCloseTo(samples.anchorTop, 0);
-    }
-    // Opening from a moving surface must still produce one focused menu and
-    // closing must synchronously restore the saved editing target.
+    // Opening after viewport movement produces one focused menu; closing
+    // synchronously restores the saved editing target.
     await dock.getByRole("button", { name: /^Commands:/ }).evaluate((button) => (button as HTMLButtonElement).click());
     const menu = page.getByRole("menu", { name: "Insert content", exact: true });
     await expect(menu).toBeVisible();
@@ -2946,6 +3020,32 @@ for (const kind of ["doc", "course"] as const) {
     expect(await title.evaluate((input) => (input as HTMLInputElement).selectionStart)).toBe(2);
   });
 }
+
+test("a typed insertion command hands the current cursor back through Details", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+  await writer.fill("Keep this cursor");
+  await writer.press("End");
+  await page.keyboard.type(" new writing");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("/");
+  const insertion = page.getByRole("menu", { name: /^Insert content/ });
+  await expect(insertion).toBeVisible();
+  await insertion.getByRole("menuitem", { name: "Image", exact: true }).tap();
+  const image = page.getByRole("dialog", { name: "Insert image", exact: true });
+  await expect(image).toBeVisible();
+  await expect(writer).not.toBeFocused();
+  const details = page.getByRole("button", { name: "Details", exact: true });
+  await details.tap();
+  await expect(image).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: "Content details", exact: true })).toBeVisible();
+  await details.tap();
+  await expect(writer).toBeFocused();
+  await page.keyboard.type("Write here again.");
+  await expect(writer.locator("p").first()).toHaveText("Keep this cursor new writing");
+  await expect(writer.locator("p").last()).toHaveText("Write here again.");
+});
 
 });
 

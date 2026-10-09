@@ -16,11 +16,12 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     const phone = window.matchMedia(compactLayoutQuery);
     const touch = window.matchMedia(touchWritingQuery);
     let dragging = false;
-    let selectionPending = false;
+    let moved = false;
+    let manualGesture = false;
+    let protecting = false;
     let caretNode: Node | null = null;
     let caretOffset = -1;
     let request = 0;
-    let settle = 0;
     let closing = 0;
     let keyboardOpen = false;
     let space = 0;
@@ -56,7 +57,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     }
     function revealCaret() {
       const active = document.activeElement;
-      if (dragging || !phone.matches || !touch.matches || viewport!.scale !== 1 || !(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)) return;
+      if (!protecting || dragging || !phone.matches || !touch.matches || viewport!.scale !== 1 || !(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)) return;
       const selection = window.getSelection();
       if (!selection?.rangeCount || !selection.isCollapsed || !root!.contains(selection.focusNode)) return;
       const element = selection.focusNode instanceof Element ? selection.focusNode : selection.focusNode?.parentElement;
@@ -89,33 +90,82 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       owner!.scrollTo({ top: next, behavior: "instant" });
     }
     function cancelReveal() {
-      clearTimeout(settle);
       cancelAnimationFrame(request);
+      request = 0;
     }
-    function schedule(delay = 100) {
-      clearTimeout(settle);
-      cancelAnimationFrame(request);
-      // Focus and viewport changes settle; typing protects the next paint.
-      settle = window.setTimeout(() => { request = requestAnimationFrame(revealCaret); }, delay);
+    function schedule() {
+      if (request || !protecting || dragging || !phone.matches || !touch.matches || viewport!.scale !== 1) return;
+      // Input and a stream of keyboard resize events share one next-paint
+      // correction. Later viewport events must never postpone an active edit.
+      request = requestAnimationFrame(() => { request = 0; revealCaret(); });
     }
-    function resize() { reserveSpace(); schedule(); }
-    function pan() { reserveSpace(); }
-    function editing(event: Event) { reserveSpace(); schedule(event.type === "input" ? 0 : 100); }
-    function blur() { reserveSpace(); }
+    function resize() {
+      reserveSpace();
+      if (!manualGesture) protecting = true;
+      schedule();
+    }
+    function pan() {
+      reserveSpace();
+      if (!manualGesture) protecting = true;
+      schedule();
+    }
+    // The frame has already placed the dock for this paint. Protect that
+    // measured boundary immediately rather than waiting for another frame.
+    function dockChanged() { revealCaret(); }
+    function editing(event?: Event) {
+      // Focus and viewport movement own keyboard geometry. Text input is
+      // followed by the rendered-text observer, without another layout read.
+      if (event?.type !== "input") reserveSpace();
+      const active = document.activeElement;
+      protecting = active instanceof HTMLElement && active.isContentEditable && root!.contains(active);
+      if (protecting) {
+        manualGesture = false;
+        schedule();
+      }
+      else cancelReveal();
+    }
+    function blur() { protecting = false; cancelReveal(); reserveSpace(); }
     function selectionMoved() {
       const selection = window.getSelection();
       const active = document.activeElement;
-      if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active) || !selection?.isCollapsed || !root!.contains(selection.focusNode)) return;
+      if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active) || !selection?.isCollapsed || !root!.contains(selection.focusNode)) {
+        // A native selection can briefly disappear or expand while WebKit
+        // updates it. Its return to the same caret must rearm protection.
+        caretNode = null; caretOffset = -1;
+        cancelReveal();
+        return;
+      }
       if (selection.focusNode === caretNode && selection.focusOffset === caretOffset) return;
       caretNode = selection.focusNode; caretOffset = selection.focusOffset;
-      if (dragging) selectionPending = true;
-      else schedule(keyboardOpen ? 0 : 100);
+      if (!manualGesture) { protecting = true; schedule(); }
     }
-    function startDrag() { dragging = true; selectionPending = false; cancelReveal(); }
+    function startDrag() { dragging = true; moved = false; manualGesture = false; cancelReveal(); }
+    function moveDrag() { moved = true; manualGesture = true; protecting = false; cancelReveal(); }
     function endDrag() {
+      if (!dragging) return;
       dragging = false;
-      if (selectionPending) { selectionPending = false; schedule(keyboardOpen ? 0 : 100); }
+      // A tap may place the same caret beside the floating dock. A scroll or
+      // native selection drag keeps ownership through the following momentum.
+      if (!moved) { protecting = true; schedule(); }
     }
+    function cancelDrag() { dragging = false; manualGesture = true; protecting = false; cancelReveal(); }
+    function wheel() { manualGesture = true; protecting = false; cancelReveal(); }
+    function navigateCaret(event: KeyboardEvent) {
+      if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(event.key)) return;
+      const active = document.activeElement;
+      if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)) return;
+      manualGesture = false; protecting = true; schedule();
+    }
+    const writing = new MutationObserver((records) => {
+      if (!protecting || dragging || !phone.matches || !touch.matches || viewport!.scale !== 1 || !records.some(({ target }) => {
+        const element = target instanceof Element ? target : target.parentElement;
+        return !!element?.closest('[contenteditable="true"]');
+      })) return;
+      // Lexical may commit a wrapped row after the input handler's frame.
+      // Observe the actual rendered text, without changing its selection.
+      revealCaret();
+    });
+    writing.observe(root, { childList: true, characterData: true, subtree: true });
     reserveSpace();
     viewport.addEventListener("resize", resize);
     viewport.addEventListener("scroll", pan);
@@ -125,13 +175,17 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     editor.addEventListener("focusin", editing);
     editor.addEventListener("focusout", blur);
     root.addEventListener("input", editing);
+    root.addEventListener("keydown", navigateCaret, true);
     document.addEventListener("selectionchange", selectionMoved);
-    owner.addEventListener("wheel", cancelReveal, { passive: true });
+    owner.addEventListener("fieldbook:editor-dock-change", dockChanged);
+    owner.addEventListener("wheel", wheel, { passive: true });
     owner.addEventListener("touchstart", startDrag, { passive: true });
+    owner.addEventListener("touchmove", moveDrag, { passive: true });
     window.addEventListener("touchend", endDrag);
-    window.addEventListener("touchcancel", endDrag);
+    window.addEventListener("touchcancel", cancelDrag);
     return () => {
       cancelReveal();
+      writing.disconnect();
       clearTimeout(closing);
       clear();
       viewport.removeEventListener("resize", resize);
@@ -142,11 +196,14 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       editor.removeEventListener("focusin", editing);
       editor.removeEventListener("focusout", blur);
       root.removeEventListener("input", editing);
+      root.removeEventListener("keydown", navigateCaret, true);
       document.removeEventListener("selectionchange", selectionMoved);
-      owner.removeEventListener("wheel", cancelReveal);
+      owner.removeEventListener("fieldbook:editor-dock-change", dockChanged);
+      owner.removeEventListener("wheel", wheel);
       owner.removeEventListener("touchstart", startDrag);
+      owner.removeEventListener("touchmove", moveDrag);
       window.removeEventListener("touchend", endDrag);
-      window.removeEventListener("touchcancel", endDrag);
+      window.removeEventListener("touchcancel", cancelDrag);
     };
   }, [ref]);
 }
