@@ -54,12 +54,17 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
     const surface = editor.getRootElement();
     if (!domSelection?.rangeCount || domSelection.isCollapsed || !surface) return false;
     const selected = domSelection.getRangeAt(0).cloneRange();
+    const editableAt = (node: Node) => (node instanceof Element ? node : node.parentElement)?.closest('[contenteditable="true"]');
+    // A nested table cell belongs to its own editor. Never reuse a prose
+    // selection while the active-editor subscription is switching to that cell.
+    if (editableAt(selected.startContainer) !== surface) return false;
     // Native paragraph selection may place its trailing endpoint just outside
     // contenteditable. Clip that endpoint to the document before taking a snapshot.
     if (!surface.contains(selected.startContainer) || !selected.intersectsNode(surface)) return false;
     const contents = document.createRange();
     contents.selectNodeContents(surface);
     if (selected.compareBoundaryPoints(Range.END_TO_END, contents) > 0) selected.setEnd(contents.endContainer, contents.endOffset);
+    if (editableAt(selected.endContainer) !== surface) return false;
     if (!selected.toString().trim()) return false;
     let selection: RangeSelection | null = null;
     editor.read(() => {
@@ -152,6 +157,7 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
     document.addEventListener("selectionchange", update);
     document.addEventListener("pointerup", update);
     const unregister = editor?.registerUpdateListener(update);
+    update(); // Capture an existing native range when switching nested editors.
     return () => {
       cancelAnimationFrame(pending);
       document.removeEventListener("selectionchange", update);
