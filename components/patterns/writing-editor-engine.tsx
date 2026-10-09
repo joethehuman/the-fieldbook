@@ -37,6 +37,7 @@ import {
   toolbarPlugin,
   realmPlugin,
   addEditorWrapper$,
+  createRootEditorSubscription$,
   activeEditor$,
   rootEditor$,
   $createTableNode,
@@ -55,6 +56,9 @@ import {
   $getRoot,
   $createParagraphNode,
   $isParagraphNode,
+  $isDecoratorNode,
+  $isLineBreakNode,
+  RootNode,
   $isRootOrShadowRoot,
   $insertNodes,
   $isElementNode,
@@ -128,6 +132,22 @@ function WritingViewPanel({ children }: { children: ReactNode }) {
 
 const writingViewPanelPlugin = realmPlugin({
   init(realm) { realm.pub(addEditorWrapper$, WritingViewPanel); },
+});
+
+const writingTrailingLinePlugin = realmPlugin({
+  init(realm) {
+    realm.pub(createRootEditorSubscription$, (editor) =>
+      editor.registerNodeTransform(RootNode, (root) => {
+        const last = root.getLastChild();
+        // Images live inside paragraphs, so MDXEditor's block-only trailing
+        // line handling misses them. Keep this in the same update and history entry.
+        const end = $isParagraphNode(last)
+          ? last.getChildren().filter((node) => !$isLineBreakNode(node)).at(-1)
+          : last;
+        if ($isDecoratorNode(end)) root.append($createParagraphNode());
+      }),
+    );
+  },
 });
 
 type WritingActions = {
@@ -851,6 +871,7 @@ export default function WritingEditorEngine({
   }
   const plugins = useMemo(() => [
     writingViewPanelPlugin(),
+    writingTrailingLinePlugin(),
     writingVideoPlugin(),
     writingUploadPlugin(),
     writingSelectionBoundariesPlugin(),
