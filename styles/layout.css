@@ -421,6 +421,24 @@
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="outline"] { inset-inline-start: var(--editor-panel-left, var(--space-4)); }
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
   .editor-controls-surface { display: contents; }
+  .editor-dock-lane {
+    display: none;
+    position: absolute;
+    inset: var(--editor-lane-top, 0px) 0 auto;
+    height: var(--editor-lane-height, 0px);
+    background: var(--background);
+    z-index: 14;
+    pointer-events: none;
+  }
+  .editor-dock-lane[data-dock-position="top"] { display: block; }
+  .editor-dock-lane::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: var(--space-3);
+    background: var(--scroll-fade-overlay);
+    pointer-events: none;
+  }
   .editor-frame-controls[data-dock="true"] {
     position: absolute;
     inset: var(--editor-dock-anchor, calc(var(--editor-dock-bottom, 100dvh) - var(--editor-dock-gap, var(--space-3)))) auto auto var(--editor-dock-center, 50%);
@@ -446,8 +464,8 @@
     background: var(--background);
     box-shadow: var(--shadow-floating);
   }
-  .app:has(.sidebar.open) .editor-frame-controls[data-dock="true"],
-  .editor-frame-controls[data-dock="true"][data-palette-overlay="true"] { visibility: hidden; }
+  .app:has(.sidebar.open) :is(.editor-frame-controls[data-dock="true"], .editor-dock-lane),
+  .app:has(.topbar [data-slot="search-panel"]) :is(.editor-frame-controls[data-dock="true"], .editor-dock-lane) { visibility: hidden; }
   .editor-frame-controls[data-dock="true"] .editor-panel-toggle {
     position: relative;
     inset: auto;
@@ -459,8 +477,12 @@
   .editor-frame-controls[data-dock="true"] .writing-toolbar-controls { flex-wrap: nowrap; gap: var(--space-2); }
   .main-content:has(.editor-frame[data-dock="true"]) {
     --editor-dock-clearance: 80px;
+    margin-block-start: var(--editor-top-reserve, 0px);
+    clip-path: inset(var(--editor-top-clip, 0px) 0 0);
+    transition: margin-block-start 160ms ease;
     padding-block-end: max(96px, var(--phone-writing-clearance, var(--editor-dock-clearance)));
   }
+  .editor-mobile-panels[data-dock="true"][data-panel-ready="false"] .editor-frame-panel { visibility: hidden; pointer-events: none; }
   .editor-mobile-panels { --scroll-fade-depth: var(--scroll-fade-size); }
   .editor-mobile-panels[data-dock="true"] .editor-frame-panel {
     position: absolute;
@@ -488,7 +510,7 @@
     .app-editor-header .detail-navigation-label { display: none; }
     .editor-frame { --editor-content-padding: var(--space-4); }
   }
-  @media (prefers-reduced-motion: reduce) { .topbar::after, .editor-canvas-navigation::after, .editor-frame-panel { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .topbar::after, .editor-canvas-navigation::after, .editor-frame-panel, .main-content:has(.editor-frame[data-dock="true"]) { transition: none; } }
   /* Bound the whole task, including its natural-size title and recovery notices. */
   .editor[data-scroll-layout="workspace"],
   .editor[data-scroll-layout="workspace"] :is(.editor-content, .editor-frame) { flex: 1 1 0; min-height: 0; }

@@ -93,6 +93,10 @@
 .writing-editor .writing-content {
   width: 100%;
 }
+.editor-frame[data-dock="true"] .writing-content::highlight(fieldbook-writing-target) {
+  background: var(--selected);
+  color: var(--selected-foreground);
+}
 .writing-slash-menu {
   position: fixed;
   z-index: 60;
@@ -597,6 +601,8 @@
   line-height: 2.25rem;
 }
 .editor[data-scroll-layout="page"] .writing-document-heading { top: var(--editor-navigation-height, 0px); }
+.editor-frame[data-dock="true"] .writing-document-heading { top: var(--phone-writing-heading-offset, 0px); }
+.editor-frame[data-dock="true"][data-title-yielded="true"] .writing-document-heading { position: relative; top: auto; }
 .editor .writing-document-heading::after {
   content: "";
   position: absolute;

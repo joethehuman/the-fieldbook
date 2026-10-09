@@ -5,7 +5,7 @@ import { readWritingCaretLine } from "./writing-cursor";
 import { touchWritingQuery } from "./use-editor-cards-layout";
 import { compactLayoutQuery } from "./use-compact-layout";
 
-/** Keep phone writing in page flow with one measured reserve below the dock. */
+/** Protect the measured phone writing band without taking over native gestures. */
 export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
   useLayoutEffect(() => {
     const root = ref.current;
@@ -38,8 +38,9 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     function writingBottom(margin: number) {
       const bounds = owner!.getBoundingClientRect();
       const dock = editor!.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]');
+      const published = parseFloat(dock?.style.getPropertyValue("--editor-usable-bottom") || "");
       return Math.min(bounds.bottom, viewport!.offsetTop + viewport!.height,
-        dock?.getBoundingClientRect().top ?? Infinity) - margin;
+        Number.isFinite(published) ? published : dock?.getBoundingClientRect().top ?? Infinity) - margin;
     }
     function reserveSpace() {
       if (!phone.matches || !touch.matches || viewport!.scale !== 1) {
@@ -53,7 +54,10 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       // the dock on phones whose clientHeight already shrank for the keyboard.
       const bounds = owner!.getBoundingClientRect();
       const bottom = writingBottom(lineMargin());
-      const nextGeometry = [bounds.top, bounds.bottom, bottom, viewport!.offsetTop, viewport!.height]
+      const dock = editor!.closest(".app")?.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]');
+      const usableTop = parseFloat(dock?.style.getPropertyValue("--editor-writing-top") || "")
+        || parseFloat(dock?.style.getPropertyValue("--editor-usable-top") || "") || bounds.top;
+      const nextGeometry = [bounds.top, bounds.bottom, bottom, usableTop, viewport!.offsetTop, viewport!.height]
         .map(Math.round).join(":");
       const changed = nextGeometry !== geometry;
       geometry = nextGeometry;
@@ -71,19 +75,8 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
         || !selection.isCollapsed && !returningSelection) return;
       const element = selection.focusNode instanceof Element ? selection.focusNode : selection.focusNode?.parentElement;
       if (!element?.closest('[contenteditable="true"]')) return;
-      let caret = selection.isCollapsed ? readWritingCaretLine(root) || selection.getRangeAt(0).getClientRects()[0] : undefined;
-      if (!selection.isCollapsed && returningSelection && selection.focusNode) {
-        // An explicit menu handback may restore selected text. Reveal its
-        // focus edge without collapsing or rewriting the native selection.
-        const focus = document.createRange();
-        focus.setStart(selection.focusNode, selection.focusOffset); focus.collapse(true);
-        caret = Array.from(focus.getClientRects()).find(rect => rect.height > 0);
-        if (!caret && selection.focusNode instanceof Text && selection.focusNode.length) {
-          const start = Math.min(selection.focusOffset, selection.focusNode.length - 1);
-          focus.setStart(selection.focusNode, start); focus.setEnd(selection.focusNode, start + 1);
-          caret = Array.from(focus.getClientRects()).find(rect => rect.height > 0);
-        }
-      }
+      let caret = readWritingCaretLine(root, returningSelection)
+        || (selection.isCollapsed ? selection.getRangeAt(0).getClientRects()[0] : undefined);
       if (!caret?.height) {
         // A new Lexical paragraph is <p><br></p>: its collapsed range has no
         // text rectangle. Use only that empty line, never the whole canvas.
@@ -97,8 +90,12 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       const bounds = owner!.getBoundingClientRect();
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
       const navigation = root!.closest(".editor-frame-canvas")?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().bottom || bounds.top;
-      const heading = root!.querySelector(".writing-document-heading")?.getBoundingClientRect().bottom || bounds.top;
-      const rawTop = Math.max(bounds.top, viewport!.offsetTop, navigation, heading);
+      const yielded = root!.closest(".editor-frame")?.getAttribute("data-title-yielded") === "true";
+      const projected = parseFloat(dock?.style.getPropertyValue("--editor-writing-top") || "");
+      const heading = Number.isFinite(projected) ? projected : yielded ? bounds.top
+        : root!.querySelector(".writing-document-heading")?.getBoundingClientRect().bottom || bounds.top;
+      const publishedTop = parseFloat(dock?.style.getPropertyValue("--editor-usable-top") || "") || bounds.top;
+      const rawTop = Math.max(bounds.top, viewport!.offsetTop, navigation, heading, publishedTop);
       // Protect the actual toolbar boundary, including native app panning,
       // rather than deriving its location from a viewport height difference.
       const bottom = writingBottom(lineMargin());

@@ -15,6 +15,7 @@ import { EditorCompactControlsContext, EditorWritingActionsContext } from "./edi
 import { useWritingControlsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 import { blurWritingInput } from "./writing-cursor";
 import { hasWritingTarget, useWritingTarget } from "./use-writing-target";
+import { useSavedWritingHighlight } from "./use-saved-writing-highlight";
 import { WritingLinkDialog } from "./writing-link-dialog";
 import { writingLinkPastePlugin } from "./writing-link-paste";
 import { WritingTitleContext, WritingIntroductionContext, WritingTitleEnterContext } from "./writing-title";
@@ -344,7 +345,7 @@ export default function WritingEditorEngine({
   const paletteSession = useRef<{
     menu: HTMLDivElement;
     ready: boolean;
-    mode: "above" | "below" | "expanded" | null;
+    mode: "above" | "below" | null;
     deadline: number;
     fallbackElapsed: boolean;
     cancel?: () => void;
@@ -421,6 +422,8 @@ export default function WritingEditorEngine({
   const [mediaTab, setMediaTab] = useState<"upload" | "link">("upload");
   const [mediaPosition, setMediaPosition] = useState({ top: 0, left: 0 });
   const [imageAlt, setImageAlt] = useState("");
+  const writingHighlight = useSavedWritingHighlight(root, canvas && !!compactControls,
+    canvas && !!compactControls && (slashOpen || !!mediaChooser || compactControls.panelsOpen));
   useLayoutEffect(() => {
     if (!slashOpen || !slashMenu.current) return;
     if (canvas && compactRef.current) return;
@@ -514,36 +517,37 @@ export default function WritingEditorEngine({
       const viewport = window.visualViewport;
       const app = root.current?.closest(".app");
       const bounds = app?.getBoundingClientRect();
-      const bottom = Math.min((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight), bounds?.bottom || window.innerHeight);
-      const top = Math.max(0, bottom - (viewport?.height || window.innerHeight), app?.querySelector(".topbar")?.getBoundingClientRect().bottom || 0);
+      const visibleBottom = Math.min((viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight), bounds?.bottom || window.innerHeight);
+      const visibleTop = Math.max(0, visibleBottom - (viewport?.height || window.innerHeight), app?.querySelector(".topbar")?.getBoundingClientRect().bottom || 0);
+      const dockPosition = dock.dataset.dockPosition === "top" ? "top" : "bottom";
+      const usableTop = parseFloat(dock.style.getPropertyValue("--editor-usable-top"));
+      const usableBottom = parseFloat(dock.style.getPropertyValue("--editor-usable-bottom"));
+      // The frame owns the permitted popup band. Even a constrained chooser
+      // stays in that band, with the dock visible and its own list scrolling.
+      const top = Number.isFinite(usableTop) ? usableTop
+        : dockPosition === "top" ? Math.max(visibleTop + 8, anchor.bottom + 8) : visibleTop + 8;
+      const bottom = Number.isFinite(usableBottom) ? usableBottom
+        : dockPosition === "bottom" ? Math.min(visibleBottom - 8, anchor.top - 8) : visibleBottom - 8;
       const left = viewport?.offsetLeft || 0;
       const visibleWidth = viewport?.width || window.innerWidth;
       const width = Math.min(mediaChooser ? 324 : 288, visibleWidth - 16);
       setStyle("width", `${width}px`);
-      const safeBottom = parseFloat(dock.style.getPropertyValue("--editor-usable-bottom")) || bottom;
-      const aboveSpace = Math.max(0, anchor.top - top - 16);
-      const belowSpace = Math.max(0, safeBottom - anchor.bottom - 16);
-      const expandedSpace = Math.max(0, safeBottom - top - 16);
+      const available = Math.max(0, bottom - top);
       const style = getComputedStyle(menu);
       const chrome = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
         + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
       const preferred = Math.min(360, mediaChooser ? menu.scrollHeight + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth)
         : (menu.querySelector<HTMLElement>(".writing-slash-options")?.scrollHeight || 0)
           + (menu.querySelector<HTMLElement>(".writing-slash-footer")?.offsetHeight || 0) + chrome);
-      const bestSide = aboveSpace >= belowSpace ? "above" : "below";
-      const candidate = Math.max(aboveSpace, belowSpace) >= (waitsForKeyboard ? preferred : 180) ? bestSide : "expanded";
+      const candidate = dockPosition === "top" ? "below" : "above";
       const mode = session.mode || candidate;
-      const available = mode === "expanded" ? expandedSpace : mode === "above" ? aboveSpace : belowSpace;
       const wasReady = session.ready;
-      session.ready ||= !waitsForKeyboard || dock.dataset.keyboardVisible !== "true" && available >= preferred
+      session.ready ||= !waitsForKeyboard || dock.dataset.keyboardVisible !== "true" && dock.dataset.dockSettled !== "false" && available >= preferred
         || session.fallbackElapsed || performance.now() >= session.deadline;
       // Choose a lane once the opening is ready. Native keyboard dismissal
       // may grow its room, but cannot flip the visible menu to another lane.
       if (session.ready && !session.mode) session.mode = mode;
-      const expanded = mode === "expanded";
-      if (expanded && session.ready) dock.dataset.paletteOverlay = "true";
-      else delete dock.dataset.paletteOverlay;
-      setStyle("top", `${expanded ? top + 8 : mode === "above" ? anchor.top - 8 : anchor.bottom + 8}px`);
+      setStyle("top", `${mode === "above" ? bottom : top}px`);
       setStyle("left", `${Math.max(left + 8, Math.min(anchor.x + anchor.width / 2 - width / 2, left + visibleWidth - width - 8))}px`);
       setStyle("transform", mode === "above" ? "translateY(-100%)" : "none");
       setStyle("max-height", `${Math.min(360, available)}px`);
@@ -556,6 +560,20 @@ export default function WritingEditorEngine({
           focusInsertItem.current = false;
           menu.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
           window.getSelection()?.removeAllRanges();
+        }
+        if (!mediaChooser) {
+          const options = menu.querySelector<HTMLElement>(".writing-slash-options");
+          const selected = options?.querySelector<HTMLElement>('[aria-current="true"]')
+            || options?.querySelector<HTMLElement>('[role="menuitem"]');
+          if (options && selected) {
+            const bounds = options.getBoundingClientRect();
+            const item = selected.getBoundingClientRect();
+            const gap = Math.min(4, Math.max(0, (bounds.height - item.height) / 2));
+            // Initial focus never scrolls the canvas. Reveal the actual row
+            // inside this list, including immediately opened typed suggestions.
+            if (item.top < bounds.top + gap) options.scrollTop -= bounds.top + gap - item.top;
+            else if (item.bottom > bounds.bottom - gap) options.scrollTop += item.bottom - bounds.bottom + gap;
+          }
         }
       }
     };
@@ -581,7 +599,7 @@ export default function WritingEditorEngine({
     observer.observe(menu);
     // The dock's position can change without its dimensions changing.
     const movement = new MutationObserver(schedule);
-    movement.observe(dock, { attributes: true, attributeFilter: ["style", "data-keyboard-visible"] });
+    movement.observe(dock, { attributes: true, attributeFilter: ["style", "data-keyboard-visible", "data-dock-position", "data-dock-settled"] });
     const owner = root.current?.closest(".main-content");
     owner?.addEventListener("fieldbook:editor-dock-change", afterDock);
     owner?.addEventListener("scroll", schedule, { passive: true });
@@ -593,7 +611,6 @@ export default function WritingEditorEngine({
       clearTimeout(fallback);
       observer.disconnect();
       movement.disconnect();
-      delete dock.dataset.paletteOverlay;
       if (session.cancel === cancelOpening) session.cancel = undefined;
       if (!menu.isConnected && paletteSession.current?.menu === menu) paletteSession.current = null;
       owner?.removeEventListener("fieldbook:editor-dock-change", afterDock);
@@ -608,7 +625,8 @@ export default function WritingEditorEngine({
     if (!canvas || !compactControls || !(slashOpen || mediaChooser || popupActive)) return;
     const dismiss = (event: PointerEvent) => {
       const target = event.target;
-      if (target instanceof Element && target.closest(".writing-toolbar-controls, .writing-slash-menu, .writing-media-chooser, [data-writing-selection-menu]")) return;
+      if (target instanceof Element && target.closest('.editor-frame-controls[data-dock="true"], .writing-toolbar-controls, .writing-slash-menu, .writing-media-chooser, [data-writing-selection-menu]')) return;
+      writingHighlight.clear();
       if (slashOpen && !slashFromToolbar) keepSlashAsText(slashQuery, false);
       else setSlashOpen(false);
       closeMedia();
@@ -616,7 +634,7 @@ export default function WritingEditorEngine({
     };
     document.addEventListener("pointerdown", dismiss, true);
     return () => document.removeEventListener("pointerdown", dismiss, true);
-  }, [canvas, compactControls, slashOpen, slashFromToolbar, slashQuery, mediaChooser, popupActive]);
+  }, [canvas, compactControls, slashOpen, slashFromToolbar, slashQuery, mediaChooser, popupActive, writingHighlight.clear]);
 
   async function upload(file: File) {
     if (!onUpload) throw new Error("Uploads are unavailable in this view.");
@@ -634,6 +652,7 @@ export default function WritingEditorEngine({
   async function insertUploadedMedia(items: { file: File; alt: string }[]) {
     const lexical = lexicalEditor.current;
     if (!lexical || pendingMedia.current) return;
+    if (canvas && compactRef.current) writingHighlight.clear();
     const beforeUpload = lexical.getEditorState();
     let keys: string[] = [];
     const selection = mediaSelection.current;
@@ -748,15 +767,16 @@ export default function WritingEditorEngine({
   useEffect(() => {
     if (!slashOpen) return;
     function close(event: PointerEvent) {
-      if (canvas && compactRef.current && event.target instanceof Element && event.target.closest(".writing-toolbar-controls")) return;
+      if (canvas && compactRef.current && event.target instanceof Element && event.target.closest('.writing-toolbar-controls, .editor-frame-controls[data-dock="true"]')) return;
       if (!root.current?.contains(event.target as Node) && !slashMenu.current?.contains(event.target as Node)) {
+        if (canvas && compactRef.current) writingHighlight.clear();
         if (slashFromToolbar) setSlashOpen(false);
         else keepSlashAsText(slashQuery, false);
       }
     }
     document.addEventListener("pointerdown", close);
     return () => document.removeEventListener("pointerdown", close);
-  }, [slashOpen, slashFromToolbar, slashQuery, keepSlashAsText]);
+  }, [canvas, slashOpen, slashFromToolbar, slashQuery, keepSlashAsText, writingHighlight.clear]);
 
   useEffect(() => {
     if (!slashOpen) return;
@@ -796,6 +816,7 @@ export default function WritingEditorEngine({
     const selection = mediaSelection.current;
     const lexical = lexicalEditor.current;
     if (!lexical) return;
+    if (canvas && compactRef.current) writingHighlight.clear();
     lexical.update(() => {
       if (selection) $setSelection(selection.clone());
       // A block decorator splits the current line without inheriting or
@@ -811,6 +832,7 @@ export default function WritingEditorEngine({
   }
   function closeMedia(returnFocus = false) {
     paletteSession.current?.cancel?.();
+    if (returnFocus) writingHighlight.clear();
     const selection = mediaSelection.current;
     activeLine.current?.classList.remove("writing-media-line");
     activeLine.current?.removeAttribute("data-media-placeholder");
@@ -823,6 +845,7 @@ export default function WritingEditorEngine({
     if (canvas && compactRef.current) {
       root.current?.dispatchEvent(new Event("fieldbook:writing-handoff", { bubbles: true }));
       blurWritingInput();
+      window.getSelection()?.removeAllRanges();
     }
     setSlashOpen(false);
     setMedia(type);
@@ -855,7 +878,10 @@ export default function WritingEditorEngine({
   const commandsFor = (query: string) => slashCommands.filter(({ name, terms }) => `${name} ${terms}`.toLowerCase().includes(query.trim().toLowerCase()));
   const matchingCommands = commandsFor(slashQuery);
   function resumeWriting() {
-    if (canvas && compactRef.current) root.current?.dispatchEvent(new Event("fieldbook:writing-resume", { bubbles: true }));
+    if (canvas && compactRef.current) {
+      writingHighlight.clear();
+      root.current?.dispatchEvent(new Event("fieldbook:writing-resume", { bubbles: true }));
+    }
   }
   function hasAttachedInsertTarget(selection: BaseSelection | null) {
     const lexical = lexicalEditor.current;
@@ -882,6 +908,7 @@ export default function WritingEditorEngine({
   }
   const closeInsertMenu = useCallback(() => {
     paletteSession.current?.cancel?.();
+    writingHighlight.clear();
     if (slashFromToolbar) {
       setSlashOpen(false);
       if (canvas && compactRef.current) {
@@ -895,7 +922,7 @@ export default function WritingEditorEngine({
         resumeWriting();
       } else editor.current?.focus(undefined, { preventScroll: true });
     }
-  }, [canvas, slashFromToolbar, keepSlashAsText]);
+  }, [canvas, slashFromToolbar, keepSlashAsText, writingHighlight.clear]);
   useEffect(() => {
     if (!slashOpen && !(mediaChooser && canvas && compactRef.current)) return;
     const dismiss = (event: KeyboardEvent) => {
@@ -919,7 +946,10 @@ export default function WritingEditorEngine({
       closeInsertMenu();
       return;
     }
-    if (canvas && compactRef.current) root.current?.dispatchEvent(new Event("fieldbook:writing-handoff", { bubbles: true }));
+    if (canvas && compactRef.current) {
+      writingHighlight.clear();
+      root.current?.dispatchEvent(new Event("fieldbook:writing-handoff", { bubbles: true }));
+    }
     insertTrigger.current = trigger || null;
     focusInsertItem.current = fromKeyboard;
     setSlashFromToolbar(!!trigger);
@@ -989,6 +1019,7 @@ export default function WritingEditorEngine({
       openingTouchClick.current = fromTouch;
       focusInsertItem.current = true;
       blurWritingInput();
+      window.getSelection()?.removeAllRanges();
     }
   }
   function runInsertCommand(run: () => void, mediaCommand = false) {
@@ -997,6 +1028,7 @@ export default function WritingEditorEngine({
       const selection = slashSelection.current;
       const dismissInvalidTarget = () => {
         paletteSession.current?.cancel?.();
+        writingHighlight.clear();
         slashSelection.current = null;
         focusInsertItem.current = false;
         setSlashOpen(false);
@@ -1012,6 +1044,7 @@ export default function WritingEditorEngine({
         run();
       } else {
         if (!restoreInsertTarget(selection)) { dismissInvalidTarget(); return; }
+        writingHighlight.clear();
         lexical.update(run, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
         resumeWriting();
       }

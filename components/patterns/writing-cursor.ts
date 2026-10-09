@@ -56,13 +56,14 @@ export function restoreWritingCursor(cursor: WritingCursor | null) {
 }
 
 /** Read one rendered prose line without changing the native or editor selection. */
-export function readWritingCaretLine(canvas: HTMLElement | null): DOMRect | null {
+export function readWritingCaretLine(canvas: HTMLElement | null, includeSelection = false): DOMRect | null {
   const active = document.activeElement;
   const selection = window.getSelection();
   if (!canvas || !(active instanceof HTMLElement) || !active.isContentEditable
     || !canvas.contains(active) || active.closest(".writing-code-block")
-    || !selection?.isCollapsed || !selection.rangeCount || !canvas.contains(selection.focusNode)) return null;
+    || !selection?.rangeCount || !selection.isCollapsed && !includeSelection || !canvas.contains(selection.focusNode)) return null;
   const range = selection.getRangeAt(0).cloneRange();
+  if (!selection.isCollapsed) { range.setStart(selection.focusNode!, selection.focusOffset); range.collapse(true); }
   const rect = Array.from(range.getClientRects()).find((rect) => rect.height > 0);
   if (rect) return rect;
   // WebKit can omit a collapsed text rectangle. A neighboring character still
