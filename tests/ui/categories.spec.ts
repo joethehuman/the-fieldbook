@@ -3,7 +3,7 @@ import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { categoryLists } from "../../lib/content-categories";
 
-async function fixture(page: Page, largeCategory = false) {
+async function fixture(page: Page, largeCategory = false, categoryCount = 0) {
   const data = withPublishedSnapshots(freshWorkspace());
   if (largeCategory) {
     const source = data.content.find((item) => item.kind === "course")!;
@@ -23,6 +23,13 @@ async function fixture(page: Page, largeCategory = false) {
   };
   data.settings.contentCategories!.course.push("Empty course category");
   data.settings.contentCategories!.brief.push("Empty update category");
+  for (const kind of ["course", "brief"] as const) {
+    const names = data.settings.contentCategories![kind];
+    for (let index = 1; names.length < categoryCount; index++)
+      names.push(
+        `${kind === "course" ? "Course" : "Update"} category ${String(index).padStart(2, "0")}`,
+      );
+  }
   await page.addInitScript((workspace) => {
     if (!localStorage.getItem("fieldbook.workspace.v1"))
       localStorage.setItem("fieldbook.workspace.v1", JSON.stringify(workspace));
@@ -641,6 +648,115 @@ test("category search preserves course order and Curricula remains last", async 
     path: info.outputPath("category-order-home.png"),
     fullPage: true,
   });
+});
+
+test("category discovery and selection stay pinned on long lists below pending settings", async ({
+  page,
+}, info) => {
+  const before = await fixture(page, true, 50);
+  const controls = page.locator('[data-slot="category-controls"]');
+  const search = controls.getByRole("searchbox", {
+    name: "Search course categories",
+    exact: true,
+  });
+  const bulk = controls.getByRole("button", {
+    name: "Categories bulk actions",
+    exact: true,
+  });
+  await expect(controls).toHaveAttribute("data-content-scrolled", "false");
+  await expect(page.locator("[data-category]")).toHaveCount(50);
+  await page
+    .getByRole("button", {
+      name: `Expand ${before.settings!.contentCategories!.course[0]}`,
+      exact: true,
+    })
+    .click();
+  const scrollToEnd = () =>
+    controls.evaluate((element) => {
+      let owner = element.parentElement;
+      while (owner && !/(auto|scroll)/.test(getComputedStyle(owner).overflowY))
+        owner = owner.parentElement;
+      if (owner) owner.scrollTop = owner.scrollHeight;
+      else window.scrollTo(0, document.documentElement.scrollHeight);
+    });
+  await scrollToEnd();
+  await expect(search).toBeInViewport();
+  await expect(bulk).toBeInViewport();
+  await expect(
+    controls.getByRole("button", { name: "Create category", exact: true }),
+  ).toBeInViewport();
+  await expect(controls).toHaveAttribute("data-content-scrolled", "true");
+  await expect
+    .poll(() =>
+      controls.evaluate(
+        (element) => getComputedStyle(element, "::after").opacity,
+      ),
+    )
+    .toBe("1");
+  const last = before.settings!.contentCategories!.course.at(-1)!;
+  await page
+    .getByRole("checkbox", { name: `Select category ${last}`, exact: true })
+    .check();
+  await expect(bulk).toBeEnabled();
+  await search.fill(last);
+  await expect(page.locator("[data-category]")).toHaveCount(1);
+  await expect(controls).toHaveAttribute("data-content-scrolled", "false");
+  await search.fill("");
+  await scrollToEnd();
+  await page.screenshot({
+    path: info.outputPath("category-controls-pinned.png"),
+    fullPage: true,
+  });
+  await controls
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
+  const dialog = page.getByRole("dialog");
+  await dialog
+    .getByLabel("Category name", { exact: true })
+    .fill("Created while scrolling");
+  await dialog
+    .getByRole("button", { name: "Create category", exact: true })
+    .click();
+  const pending = page.locator('[data-slot="pending-changes-region"]');
+  await expect(pending).toHaveAttribute("data-active", "true");
+  await scrollToEnd();
+  await expect(search).toBeInViewport();
+  await expect(
+    page.getByRole("button", { name: "Save settings", exact: true }),
+  ).toBeInViewport();
+  await expect
+    .poll(async () => {
+      const toolbar = await controls.boundingBox();
+      const saveBar = await pending.boundingBox();
+      return toolbar!.y >= saveBar!.y + saveBar!.height - 1;
+    })
+    .toBe(true);
+  await page.screenshot({
+    path: info.outputPath("category-controls-pending.png"),
+    fullPage: true,
+  });
+  await save(page);
+  await expect(controls).toHaveCSS("top", "0px");
+  expect((await saved(page)).settings.contentCategories.course).toContain(
+    "Created while scrolling",
+  );
+  await page.getByRole("tab", { name: "Updates", exact: true }).click();
+  await expect(page.locator("[data-category]")).toHaveCount(50);
+  await expect(controls).toHaveAttribute("data-content-scrolled", "false");
+  await scrollToEnd();
+  await expect(
+    controls.getByRole("searchbox", {
+      name: "Search update categories",
+      exact: true,
+    }),
+  ).toBeInViewport();
+  await expect(bulk).toBeInViewport();
+  await expect(controls).toHaveAttribute("data-content-scrolled", "true");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });
 
 test("managed editor and bulk pickers include empty categories", async ({

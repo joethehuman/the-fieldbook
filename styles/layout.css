@@ -579,6 +579,17 @@
     padding: 0;
     margin: 0;
   }
+  .category-controls::after {
+    content: "";
+    position: absolute;
+    inset: 100% 0 auto;
+    height: var(--scroll-fade-size);
+    background: var(--scroll-fade-overlay);
+    opacity: 0;
+    transition: opacity 160ms ease;
+    pointer-events: none;
+  }
+  .category-controls[data-content-scrolled="true"]::after { opacity: 1; }
   /* Keep the table heading clear while softly fading scrolled rows beneath it. */
   .category-items-scroll::after {
     content: "";

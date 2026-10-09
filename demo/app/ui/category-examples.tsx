@@ -10,7 +10,7 @@ import {
 import { saveCategorySettings } from "@/lib/category-settings-save";
 import { applyDemoBulk } from "@/lib/bulk-actions";
 
-/** The real panel, including a large category, a draft and an empty category. */
+/** The real panel, including fifty categories, a large category and a draft. */
 export function CategoryExamples() {
   const [data, setData] = useState(() => {
     const workspace = freshWorkspace();
@@ -24,12 +24,19 @@ export function CategoryExamples() {
     );
     const initial = withPublishedSnapshots(workspace);
     const lists = categoryLists(initial.content);
+    const categories = {
+      course: [...lists.course, "Empty category"],
+      brief: [...lists.brief],
+    };
+    for (const kind of ["course", "brief"] as const) {
+      for (let index = 1; categories[kind].length < 50; index++)
+        categories[kind].push(
+          `Example ${kind === "course" ? "course" : "update"} category ${String(index).padStart(2, "0")}`,
+        );
+    }
     initial.settings = {
       ...initial.settings!,
-      contentCategories: {
-        ...lists,
-        course: [...lists.course, "Empty category"],
-      },
+      contentCategories: categories,
     };
     return initial;
   });

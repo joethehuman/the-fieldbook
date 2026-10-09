@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { ChevronRight, GripVertical, Plus, Tag } from "lucide-react";
 import type { Workspace } from "@/lib/store";
 import { defaultSettings } from "@/lib/settings";
@@ -50,6 +56,58 @@ import { useToast } from "./ui/toast";
 
 const kinds = ["course", "brief"] as const;
 const labels = { course: "Courses", brief: "Updates" };
+
+/** Keep discovery and selection together, below any active settings review. */
+function CategoryControls({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [scrolled, setScrolled] = useState(false);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    const collection = element?.parentElement;
+    if (!element || !collection) return;
+    const pending = element
+      .closest(".settings-panel")
+      ?.querySelector<HTMLElement>('[data-slot="pending-changes-region"]');
+    let owner: HTMLElement | null = element.parentElement;
+    while (owner && !/(auto|scroll)/.test(getComputedStyle(owner).overflowY))
+      owner = owner.parentElement;
+    const scrollTarget = owner || window;
+    let offset = -1;
+    const measure = () => {
+      const height = pending?.getBoundingClientRect().height || 0;
+      if (height !== offset) {
+        offset = height;
+        element.style.setProperty("--category-controls-offset", `${height}px`);
+      }
+      const frame = element.getBoundingClientRect();
+      const contents = collection.getBoundingClientRect();
+      setScrolled(
+        contents.top < frame.top - 1 && contents.bottom > frame.bottom + 1,
+      );
+    };
+    const resize = new ResizeObserver(measure);
+    resize.observe(element);
+    resize.observe(collection);
+    if (owner) resize.observe(owner);
+    if (pending) resize.observe(pending);
+    scrollTarget.addEventListener("scroll", measure, { passive: true });
+    measure();
+    return () => {
+      resize.disconnect();
+      scrollTarget.removeEventListener("scroll", measure);
+    };
+  }, []);
+  return (
+    <div
+      ref={ref}
+      data-slot="category-controls"
+      data-content-scrolled={scrolled}
+      className="category-controls sticky top-[var(--category-controls-offset,0px)] z-30 -mx-1 grid min-w-0 gap-3 bg-background px-1 py-2"
+    >
+      {children}
+    </div>
+  );
+}
 
 export function CategorySettingsPanel({
   data,
@@ -212,54 +270,56 @@ export function CategorySettingsPanel({
           </TabsList>
           {kinds.map((kind) => (
             <TabsContent key={kind} value={kind}>
-              <div className="mb-4 grid gap-3">
-                <p className="max-w-prose text-copy text-muted-foreground">
-                  {kind === "course"
-                    ? "Reorder categories to change their order on the Courses page. Curricula always appear at the bottom."
-                    : "Update categories are listed alphabetically. They do not change the order of the Updates feed."}
-                </p>
-                <CollectionControls
-                  search={
-                    <SearchField>
-                      <Input
-                        type="search"
-                        value={queries[kind]}
-                        onChange={(event) =>
-                          setQueries((current) => ({
-                            ...current,
-                            [kind]: event.target.value,
-                          }))
-                        }
-                        placeholder="Search categories…"
-                        aria-label={`Search ${kind === "course" ? "course" : "update"} categories`}
-                        disabled={busy}
-                      />
-                    </SearchField>
-                  }
-                  primaryAction={
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => {
-                        setNewName("");
-                        setCreateError("");
-                        setCreate(true);
-                      }}
-                    >
-                      <Plus aria-hidden="true" />
-                      Create category
-                    </Button>
-                  }
-                />
-                {kind === "course" && queries[kind].trim() && (
-                  <p className="text-copy text-muted-foreground">
-                    Clear search to reorder categories.
-                  </p>
-                )}
-              </div>
+              <p className="mb-4 max-w-prose text-copy text-muted-foreground">
+                {kind === "course"
+                  ? "Reorder categories to change their order on the Courses page. Curricula always appear at the bottom."
+                  : "Update categories are listed alphabetically. They do not change the order of the Updates feed."}
+              </p>
               <CategoryList
+                controls={
+                  <>
+                    <CollectionControls
+                      search={
+                        <SearchField>
+                          <Input
+                            type="search"
+                            value={queries[kind]}
+                            onChange={(event) =>
+                              setQueries((current) => ({
+                                ...current,
+                                [kind]: event.target.value,
+                              }))
+                            }
+                            placeholder="Search categories…"
+                            aria-label={`Search ${kind === "course" ? "course" : "update"} categories`}
+                            disabled={busy}
+                          />
+                        </SearchField>
+                      }
+                      primaryAction={
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={busy}
+                          onClick={() => {
+                            setNewName("");
+                            setCreateError("");
+                            setCreate(true);
+                          }}
+                        >
+                          <Plus aria-hidden="true" />
+                          Create category
+                        </Button>
+                      }
+                    />
+                    {kind === "course" && queries[kind].trim() && (
+                      <p className="text-copy text-muted-foreground">
+                        Clear search to reorder categories.
+                      </p>
+                    )}
+                  </>
+                }
                 kind={kind}
                 categories={settings.contentCategories}
                 drafts={drafts}
@@ -340,6 +400,7 @@ export function CategorySettingsPanel({
 }
 
 function CategoryList({
+  controls,
   kind,
   categories,
   drafts,
@@ -350,6 +411,7 @@ function CategoryList({
   onChange,
   onMove,
 }: {
+  controls: ReactNode;
   kind: CategoryKind;
   categories: ContentCategories;
   drafts: Content[];
@@ -466,44 +528,47 @@ function CategoryList({
       tabIndex={-1}
       className="grid min-w-0 gap-3 outline-none"
     >
-      <CategorySelectionBar
-        label="Categories"
-        count={selectedNames.length}
-        total={names.length}
-        range={
-          search
-            ? `${visibleNames.length} of ${names.length} categories`
-            : undefined
-        }
-        noun="categories"
-        busy={busy}
-        onClear={() => setSelectedCategories([])}
-        summaryControl={
-          <SelectRows
-            ids={busy ? [] : visibleNames}
-            value={selectedNames}
-            onChange={setSelectedCategories}
-            label="Select all matching categories"
-          />
-        }
-        actions={[
-          {
-            label: "Move all items to…",
-            disabled: !selectedItems.length,
-            onSelect: () =>
-              openTransfer(
-                selectedItems.map((item) => item.id),
-                selectedNames,
-              ),
-          },
-          {
-            label: "Delete categories",
-            destructive: true,
-            separator: true,
-            onSelect: () => void remove(selectedNames),
-          },
-        ]}
-      />
+      <CategoryControls>
+        {controls}
+        <CategorySelectionBar
+          label="Categories"
+          count={selectedNames.length}
+          total={names.length}
+          range={
+            search
+              ? `${visibleNames.length} of ${names.length} categories`
+              : undefined
+          }
+          noun="categories"
+          busy={busy}
+          onClear={() => setSelectedCategories([])}
+          summaryControl={
+            <SelectRows
+              ids={busy ? [] : visibleNames}
+              value={selectedNames}
+              onChange={setSelectedCategories}
+              label="Select all matching categories"
+            />
+          }
+          actions={[
+            {
+              label: "Move all items to…",
+              disabled: !selectedItems.length,
+              onSelect: () =>
+                openTransfer(
+                  selectedItems.map((item) => item.id),
+                  selectedNames,
+                ),
+            },
+            {
+              label: "Delete categories",
+              destructive: true,
+              separator: true,
+              onSelect: () => void remove(selectedNames),
+            },
+          ]}
+        />
+      </CategoryControls>
       <ul aria-label={`${labels[kind]} categories`} className="grid">
         {visibleNames.map((name) => {
           const index = names.indexOf(name);
