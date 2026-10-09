@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { ListTree, SlidersHorizontal, X } from "lucide-react";
 import { MarkdownDownloadButton } from "./markdown-download";
@@ -8,9 +8,11 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { useEditorCardsLayout } from "./use-editor-cards-layout";
+import { blurWritingInput, captureWritingCursor, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
+import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
+export const EditorCompactControlsContext = createContext<{ panelsOpen: boolean; dismissPanels: () => void } | null>(null);
 
 export type DetailsReveal = { request: number; field?: string };
 
@@ -57,6 +59,7 @@ export function EditorFrame({
   children: ReactNode;
 }) {
   const phone = useEditorCardsLayout();
+  const dock = useMobileWritingDock();
   const frame = useRef<HTMLElement>(null);
   const controls = useRef<HTMLDivElement>(null);
   const [writingActionsHost, setWritingActionsHost] = useState<HTMLDivElement | null>(null);
@@ -65,44 +68,168 @@ export function EditorFrame({
   const [overlayHost, setOverlayHost] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => { setOverlayHost(frame.current?.closest<HTMLElement>(".app") || null); }, []);
   const hasNavigation = !!navigation;
+  const [panels, setPanels] = useState({ outline: false, details: false });
+  const panelState = useRef(panels);
+  panelState.current = panels;
+  const measureDock = useRef<(() => void) | null>(null);
+  const lastWritingCursor = useRef<WritingCursor | null>(null);
+  const panelReturn = useRef<WritingCursor | null>(null);
+  const preparedPanel = useRef<"outline" | "details" | null>(null);
+  function preparePanel(side: "outline" | "details") {
+    if (!dock) return;
+    if (!panelState.current.outline && !panelState.current.details) {
+      const active = document.activeElement;
+      const chooser = active instanceof Element && !!active.closest(".writing-slash-menu, .writing-media-chooser, .editor-frame-controls");
+      panelReturn.current = captureWritingCursor(canvas.current) || (chooser ? lastWritingCursor.current : null);
+    }
+    preparedPanel.current = side;
+  }
+  function returnToWriting(toggle: HTMLButtonElement | null) {
+    const cursor = panelReturn.current;
+    panelReturn.current = null;
+    if (!dock) toggle?.focus();
+    else if (!restoreWritingCursor(cursor)) toggle?.focus({ preventScroll: true });
+  }
+  function togglePanel(side: "outline" | "details") {
+    defaultsApplied.current = true;
+    const closing = panelState.current[side];
+    if (!closing && preparedPanel.current !== side) preparePanel(side);
+    preparedPanel.current = null;
+    if (!closing && dock) blurWritingInput();
+    setPanels((current) => side === "outline"
+      ? { outline: !current.outline, details: wide.current ? current.details : false }
+      : { outline: wide.current ? current.outline : false, details: !current.details });
+    if (closing && dock) returnToWriting(side === "outline" ? outlineToggle.current : detailsToggle.current);
+  }
   useLayoutEffect(() => {
-    const element = canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
+    const element = dock ? controls.current : canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
     if (!element) return;
+    const owner = frame.current?.closest<HTMLElement>(".main-content");
+    const header = frame.current?.closest(".app")?.querySelector<HTMLElement>(".topbar");
+    let request = 0;
+    let releaseRequest = 0;
+    let followUntil = 0;
+    let layoutWidth = document.documentElement.clientWidth;
+    let layoutHeight = document.documentElement.clientHeight;
+    let keyboard = false;
+    // Apple can overlay an address pill and an input accessory row above the
+    // keyboard without subtracting both from the reported visual viewport.
+    const appleTouch = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
     const measure = () => {
-      const rect = element.getBoundingClientRect();
-      frame.current?.style.setProperty("--editor-navigation-height", `${rect.height}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-top", `${rect.bottom + 8}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-left", `${rect.left}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-right", `${window.innerWidth - rect.right}px`);
-      overlayLayer.current?.style.setProperty("--editor-panel-max-width", `${rect.width}px`);
       const viewport = window.visualViewport;
-      const bottom = (viewport?.offsetTop || 0) + (viewport?.height || window.innerHeight);
-      overlayLayer.current?.style.setProperty("--editor-panel-available-height", `${Math.max(80, bottom - rect.bottom - 24)}px`);
+      const appBounds = overlayHost?.getBoundingClientRect();
+      const rawTop = viewport?.offsetTop || 0;
+      const height = viewport?.height || (dock ? document.documentElement.clientHeight : window.innerHeight);
+      const bottom = dock && appBounds ? Math.min(rawTop + height, appBounds.bottom) : rawTop + height;
+      const visibleTop = dock ? Math.max(0, bottom - height) : rawTop;
+      let safeBottom = bottom;
+      if (dock) {
+        const width = document.documentElement.clientWidth;
+        if (width !== layoutWidth) { layoutWidth = width; layoutHeight = document.documentElement.clientHeight; }
+        const active = document.activeElement;
+        const editing = active instanceof HTMLElement && (active.isContentEditable || active.matches("input:not([type=button]):not([type=checkbox]), textarea"));
+        const occluded = layoutHeight - height;
+        keyboard = (viewport?.scale || 1) === 1 && (keyboard ? occluded > 80 : editing && occluded > 120);
+        if (!keyboard && !editing) layoutHeight = Math.max(document.documentElement.clientHeight, height);
+        // Work directly in visible coordinates, relative to the positioned app.
+        // This also compensates for native viewport panning of the app itself.
+        element.style.setProperty("--editor-dock-bottom", `${bottom - (appBounds?.top || 0)}px`);
+        const centered = !viewport?.offsetLeft && Math.abs((viewport?.width || window.innerWidth) - (appBounds?.width || window.innerWidth)) < 1;
+        const center = centered ? "50%" : `${(viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) / 2 - (appBounds?.left || 0)}px`;
+        element.style.setProperty("--editor-dock-center", center);
+        overlayLayer.current?.style.setProperty("--editor-panel-center", center);
+        element.style.setProperty("--editor-dock-gap", keyboard ? `max(${appleTouch ? 8 : 3}rem, env(safe-area-inset-bottom))` : "max(var(--space-3), env(safe-area-inset-bottom))");
+        // Keep one stable bottom lane for controls, menus and scroll clearance.
+        element.style.setProperty("--editor-dock-anchor", "calc(var(--editor-dock-bottom) - var(--editor-dock-gap))");
+        const lane = element.getBoundingClientRect();
+        safeBottom = lane.bottom;
+        element.style.setProperty("--editor-usable-bottom", `${safeBottom}px`);
+      }
+      const rect = element.getBoundingClientRect();
+      const bounds = dock ? frame.current?.getBoundingClientRect() || rect : rect;
+      const panelTop = dock ? Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0, bounds.top - 8) + 8 : rect.bottom + 8;
+      const panelBottom = dock ? rect.top - 8 : bottom - 16;
+      if (dock) owner?.style.setProperty("--editor-dock-clearance", `${Math.max(80, bottom - safeBottom + rect.height + 12)}px`);
+      frame.current?.style.setProperty("--editor-navigation-height", `${dock ? 0 : rect.height}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-top", `${panelTop - (dock ? appBounds?.top || 0 : 0)}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-left", `${bounds.left - (dock ? appBounds?.left || 0 : 0)}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-right", `${dock && appBounds ? appBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-max-width", `${bounds.width}px`);
+      overlayLayer.current?.style.setProperty("--editor-panel-available-height", `${Math.max(dock ? 0 : 80, panelBottom - panelTop)}px`);
     };
+    const tick = () => {
+      request = 0;
+      measure();
+      if (performance.now() < followUntil) request = requestAnimationFrame(tick);
+    };
+    const schedule = () => {
+      if (!dock) { measure(); return; }
+      if (!request) request = requestAnimationFrame(tick);
+    };
+    const settle = () => { followUntil = performance.now() + 700; schedule(); };
+    const remember = () => {
+      const cursor = captureWritingCursor(canvas.current);
+      const active = document.activeElement;
+      if (cursor) lastWritingCursor.current = cursor;
+      else if (active instanceof HTMLElement && (active.isContentEditable || active.matches("input, textarea")) && !active.closest(".writing-media-chooser, .writing-slash-menu")) lastWritingCursor.current = null;
+    };
+    const released = () => {
+      cancelAnimationFrame(releaseRequest);
+      releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; schedule(); });
+    };
+    measureDock.current = measure;
     measure();
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(schedule);
     observer.observe(element);
-    // Recovery notices move the toolbar as they expand/collapse above the canvas.
     const editor = frame.current?.closest(".editor");
     if (editor) observer.observe(editor);
-    const owner = frame.current?.closest(".main-content");
-    owner?.addEventListener("scroll", measure, { passive: true });
-    window.visualViewport?.addEventListener("resize", measure);
-    window.visualViewport?.addEventListener("scroll", measure);
+    if (phone && header) observer.observe(header);
+    owner?.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("scroll", schedule);
+    if (dock) {
+      window.addEventListener("scroll", settle, { passive: true });
+      document.addEventListener("focusin", settle);
+      document.addEventListener("focusout", settle);
+      document.addEventListener("touchend", settle, { passive: true });
+      element.addEventListener("pointerdown", remember, true);
+      document.addEventListener("selectionchange", remember);
+      document.addEventListener("focusin", remember);
+      document.addEventListener("pointerup", released);
+    }
     return () => {
+      cancelAnimationFrame(request);
+      cancelAnimationFrame(releaseRequest);
+      if (measureDock.current === measure) measureDock.current = null;
       observer.disconnect();
-      owner?.removeEventListener("scroll", measure);
-      window.visualViewport?.removeEventListener("resize", measure);
-      window.visualViewport?.removeEventListener("scroll", measure);
+      if (dock) owner?.style.removeProperty("--editor-dock-clearance");
+      owner?.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("resize", schedule);
+      window.visualViewport?.removeEventListener("scroll", schedule);
+      if (dock) {
+        window.removeEventListener("scroll", settle);
+        document.removeEventListener("focusin", settle);
+        document.removeEventListener("focusout", settle);
+        document.removeEventListener("touchend", settle);
+        element.removeEventListener("pointerdown", remember, true);
+        document.removeEventListener("selectionchange", remember);
+        document.removeEventListener("focusin", remember);
+        document.removeEventListener("pointerup", released);
+      }
     };
-  }, [hasNavigation, phone, overlayHost]);
+  }, [hasNavigation, phone, dock, overlayHost]);
+  useLayoutEffect(() => { measureDock.current?.(); }, [panels.outline, panels.details]);
   const wide = useRef(false);
   const narrow = useRef(false);
   const outlineToggle = useRef<HTMLButtonElement>(null);
   const detailsToggle = useRef<HTMLButtonElement>(null);
   const outlineId = useId();
   const detailsId = useId();
-  const [panels, setPanels] = useState({ outline: false, details: false });
+  const dismissPanels = useCallback(() => setPanels({ outline: false, details: false }), []);
+  const compactControls = useMemo(() => dock ? { panelsOpen: panels.outline || panels.details, dismissPanels } : null, [dock, panels.outline, panels.details, dismissPanels]);
   const defaultsApplied = useRef(false);
   const previousClearance = useRef({ outline: false, details: false });
   const hasOutline = !!outline;
@@ -130,7 +257,7 @@ export function EditorFrame({
         outline: column.left - bounds.left >= panelWidth + gap,
         details: bounds.right - column.right >= panelWidth + gap,
       };
-      wide.current = bounds.width >= 2 * panelWidth + 16;
+      wide.current = !phone && bounds.width >= 2 * panelWidth + 16;
       narrow.current = phone || !clearance.outline || !clearance.details;
       if (!defaultsApplied.current) {
         const app = target.closest(".app");
@@ -240,24 +367,27 @@ export function EditorFrame({
     </div>
   </EditorDetailsGroup>;
   const panelControls = (
-      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined}>
+      <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} data-dock={dock || undefined} role={dock ? "group" : undefined} aria-label={dock ? "Editor controls" : undefined}>
         {outline && (
-          <Button ref={outlineToggle} type="button" variant="outline" size="icon" className={`editor-panel-toggle ${phone ? "relative" : "absolute"} size-11 rounded-full`} data-side="outline"
+          <Button ref={outlineToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle size-11 ${dock ? "relative appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative rounded-full" : "absolute rounded-full"}`} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
-            onClick={() => { defaultsApplied.current = true; setPanels((current) => ({ outline: !current.outline, details: wide.current ? current.details : false })); }}>
+            onPointerDown={() => { if (dock) preparePanel("outline"); }}
+            onPointerCancel={() => { preparedPanel.current = null; measureDock.current?.(); }}
+            onMouseDown={(event) => { if (dock) event.preventDefault(); }}
+            onClick={() => togglePanel("outline")}>
             {panels.outline ? <X aria-hidden="true" /> : <ListTree aria-hidden="true" />}
           </Button>
         )}
         {phone && <div className="editor-writing-actions-host" ref={setWritingActionsHost} />}
-        <Button ref={detailsToggle} type="button" variant="outline" size="icon" className={`editor-panel-toggle ${phone ? "relative" : "absolute"} size-11 rounded-full`} data-side="details"
+        <Button ref={detailsToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle size-11 ${dock ? "relative appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative rounded-full" : "absolute rounded-full"}`} data-side="details"
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
-          onClick={() => {
-            defaultsApplied.current = true;
-            setPanels((current) => ({ outline: wide.current ? current.outline : false, details: !current.details }));
-          }}>
+          onPointerDown={() => { if (dock) preparePanel("details"); }}
+          onPointerCancel={() => { preparedPanel.current = null; measureDock.current?.(); }}
+          onMouseDown={(event) => { if (dock) event.preventDefault(); }}
+          onClick={() => togglePanel("details")}>
           {panels.details ? <X aria-hidden="true" /> : <SlidersHorizontal aria-hidden="true" />}
           {requirementsCount > 0 && <span className="editor-requirements-badge" aria-hidden="true">{requirementsCount}</span>}
         </Button>
@@ -271,7 +401,7 @@ export function EditorFrame({
               if (disabled || event.key !== "Escape" || event.defaultPrevented) return;
               event.preventDefault();
               setPanels((current) => ({ ...current, outline: false }));
-              outlineToggle.current?.focus();
+              returnToWriting(outlineToggle.current);
             }}>
             <h2 className="editor-floating-heading">Outline</h2>
             <ScrollRegion id={outlineId} className="editor-floating-body">{outline}</ScrollRegion>
@@ -284,7 +414,7 @@ export function EditorFrame({
               if (disabled || event.key !== "Escape" || event.defaultPrevented) return;
               event.preventDefault();
               setPanels((current) => ({ ...current, details: false }));
-              detailsToggle.current?.focus();
+              returnToWriting(detailsToggle.current);
             }}>
             <h2 className="editor-floating-heading">Details</h2>
             <ScrollRegion id={detailsId} className="editor-floating-body">{details}{recoverySection}{deleteAction}</ScrollRegion>
@@ -292,16 +422,19 @@ export function EditorFrame({
         </div>}
   </>;
   return (
+    <EditorCompactControlsContext.Provider value={compactControls}>
     <EditorWritingActionsContext.Provider value={writingActionsHost}>
-    <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
+    <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-dock={dock || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
       {!phone && panelControls}
+      {dock && overlayHost && createPortal(panelControls, overlayHost)}
       <div className="editor-frame-body">
         {!phone && panelSurfaces}
-        <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{(navigation || phone) && <div className="editor-canvas-navigation">{!phone && navigation}{phone && panelControls}</div>}{children}</div>
+        <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!dock && (navigation || phone) && <div className="editor-canvas-navigation">{!phone && navigation}{phone && panelControls}</div>}{children}</div>
       </div>
-      {phone && overlayHost && createPortal(<div ref={overlayLayer} className="editor-mobile-panels">{panelSurfaces}</div>, overlayHost)}
+      {phone && overlayHost && createPortal(<div ref={overlayLayer} className="editor-mobile-panels" data-dock={dock || undefined}>{panelSurfaces}</div>, overlayHost)}
     </section>
     </EditorWritingActionsContext.Provider>
+    </EditorCompactControlsContext.Provider>
   );
 }
 

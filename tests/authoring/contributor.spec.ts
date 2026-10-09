@@ -164,3 +164,31 @@ test("team managers who contribute get two destinations; administrators get the 
   await expect(page.getByRole("menuitem", { name: "Manage content" })).toHaveCount(0);
   await expect(page.getByRole("menuitem", { name: "My team’s progress" })).toHaveCount(0);
 });
+
+for (const role of ["admin", "contributor"] as const) {
+  test(`compact ${role} picker groups match the visible desktop Admin sections`, async ({ page }, info) => {
+    const production = info.project.name.startsWith("production");
+    await page.setViewportSize({ width: 375, height: 812 });
+    await setup(page, production, role, false);
+    await openMenu(page);
+    await page.getByRole("menuitem", { name: role === "admin" ? "Manage organization" : "Manage content", exact: true }).click();
+    const picker = page.getByRole("combobox", { name: role === "admin" ? "Administration section" : "Publishing section", exact: true });
+    await picker.click();
+    const content = page.locator('[data-slot="select-content"]');
+    const labels = content.locator('[data-slot="select-label"]');
+    await expect(labels).toHaveText(role === "admin" ? ["Publishing", "People & Progress", "Organization Settings"] : ["Publishing", "Organization Settings"]);
+    await expect(content.getByRole("option", { name: "Publishing", exact: true })).toHaveCount(0);
+    if (role === "admin") {
+      const people = content.getByRole("group", { name: "People & Progress", exact: true });
+      await expect(people.getByRole("option", { name: production ? "People" : "Demo profiles", exact: true })).toBeVisible();
+      await expect(people.getByRole("option", { name: "Teams", exact: true })).toBeVisible();
+    }
+    await page.screenshot({ path: info.outputPath(`${role}-grouped-picker.png`) });
+    const destination = role === "admin" ? "Curricula" : "Feedback";
+    await content.getByRole("option", { name: destination, exact: true }).click();
+    await expect(page.getByRole("heading", { name: destination, exact: true })).toBeVisible();
+    await picker.click();
+    await page.keyboard.press("Escape");
+    await expect(picker).toBeFocused();
+  });
+}
