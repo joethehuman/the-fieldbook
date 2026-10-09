@@ -90,6 +90,7 @@ test("cover saves require admin, ready image media and a current revision; draft
       };
       response = row;
     } else if (url.includes("fb_documents")) response = row;
+    else if (url.includes("fb_config")) response = { settings: {} };
     else if (url.includes("fb_media")) response = media;
     else throw new Error(`Unexpected request ${url}`);
     return new Response(JSON.stringify(response), {

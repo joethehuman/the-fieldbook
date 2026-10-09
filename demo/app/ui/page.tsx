@@ -13,6 +13,7 @@ import { ImageViewerExamples } from "./image-viewer-examples";
 import { LibraryExamples } from "./library-examples";
 import { ScrollingExamples } from "./scrolling-examples";
 import { ControlExamples } from "./control-examples";
+import { CategoryExamples } from "./category-examples";
 import { DocumentTree } from "@/components/patterns/document-tree";
 import { Article } from "@/components/patterns/reading";
 import { Course } from "@/components/Course";
@@ -236,6 +237,7 @@ export default function ComponentCatalog() {
       </section>
       <BulkExamples />
       <LibraryExamples />
+      <CategoryExamples />
       <ScrollingExamples />
       <section className="grid gap-4" aria-label="Content editor frame">
         <SectionHeader title={<h2>Content editor frame</h2>}

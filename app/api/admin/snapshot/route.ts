@@ -13,6 +13,7 @@ export async function GET(req: Request) {
     if (
       ![
         "content",
+        "categories",
         "people",
         "person",
         "governance",

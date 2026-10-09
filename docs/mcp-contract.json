@@ -1516,7 +1516,7 @@
     },
     {
       "name": "get_authoring_options",
-      "description": "Discover existing Docs section IDs and paths, content categories and supported Markdown/media/quiz formats. Select existing sections; creating or reordering hierarchy requires the manual settings screen.",
+      "description": "Discover existing Docs section IDs and paths, separate courseCategories and updateCategories, and supported Markdown/media/quiz formats. Select existing managed categories and sections; category creation and ordering use Categories in Fieldbook settings.",
       "capability": "content:read",
       "annotations": {
         "readOnlyHint": true,
@@ -1558,6 +1558,18 @@
               "type": "string"
             }
           },
+          "courseCategories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "updateCategories": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "complete": {
             "type": "boolean",
             "const": true
@@ -1566,6 +1578,8 @@
         "required": [
           "sections",
           "categories",
+          "courseCategories",
+          "updateCategories",
           "complete"
         ],
         "additionalProperties": {}

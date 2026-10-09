@@ -162,6 +162,11 @@ export function AdminWorkspace({
             setData(result.data);
             return result;
           }}
+          onSaveCategories={async (before, settings, moves) => {
+            const result = await runtime.saveCategories(before, settings, moves);
+            setData(result.data);
+            return result;
+          }}
           onSaveSettings={async (before, settings) => {
             const saved = await runtime.saveSettings(before, settings);
             setData(saved);

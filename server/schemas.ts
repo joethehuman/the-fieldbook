@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { askAiSettingsSchema } from "@/lib/ai-schema";
 import { validateDocSections } from "@/lib/docs-navigation";
+import { validateContentCategories } from "@/lib/content-categories";
 import { cardPalettePresets, graphemeCount } from "@/lib/card-art";
 import {
   externalLinkUrlError,
@@ -233,6 +234,10 @@ export const settingsSchema = z
       )
       .max(500)
       .optional(),
+    contentCategories: z.object({
+      course: z.array(text(80).trim().min(1)).max(500),
+      brief: z.array(text(80).trim().min(1)).max(500),
+    }).optional(),
     newUserStage: z.enum(["existing", "newhire"]).default("existing"),
     dueDatesEnabled: z.boolean().default(true),
     onboardingDays: z.number().int().min(1).max(365).default(90),
@@ -277,6 +282,7 @@ export const settingsSchema = z
   .superRefine((settings, context) => {
     try {
       validateDocSections(settings.docSections || []);
+      if (settings.contentCategories) validateContentCategories(settings.contentCategories);
     } catch (error) {
       context.addIssue({ code: "custom", message: (error as Error).message });
     }

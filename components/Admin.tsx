@@ -151,6 +151,9 @@ import { CourseBuilder } from "./CourseBuilder";
 import { requiresPassing, validQuestion } from "@/lib/course-quiz";
 import { canAdminister, canOpenAdminTab, roleLabel } from "@/lib/permissions";
 import SiteSettingsPanel from "./SiteSettingsPanel";
+import { CategorySettingsPanel } from "./CategorySettingsPanel";
+import { availableCategories, categoryLists, categoryName } from "@/lib/content-categories";
+import { HierarchyPicker } from "./patterns/hierarchy-picker";
 import { SaveChangesControl } from "./patterns/save-changes-control";
 import { FeedbackAdmin } from "./Feedback";
 import { TeamsAdmin, TeamProgress } from "./Teams";
@@ -231,6 +234,12 @@ const adminSections = [
         icon: Users,
       },
       {
+        id: "settings-categories",
+        name: "Categories",
+        description: "Manage course and update categories and course category order.",
+        icon: Layers,
+      },
+      {
         id: "settings-docs",
         name: "Docs navigation",
         description: "Arrange sections, subsections and documents for Docs.",
@@ -303,6 +312,7 @@ type Props = {
   registerLandingNavigation?: RegisterLandingNavigation;
   onReload?: () => Promise<Workspace>;
   onSaveDocsNavigation?: import("@/lib/docs-navigation-save").SaveDocsNavigation;
+  onSaveCategories?: import("@/lib/category-settings-save").SaveCategories;
   onSaveSettings?: (
     before: Workspace,
     settings: import("@/lib/settings").SiteSettings,
@@ -394,6 +404,7 @@ export default function Admin({
   onReload,
   onSaveSettings,
   onSaveDocsNavigation,
+  onSaveCategories,
   onReviewDeadlines,
   onLoadPublished,
 }: Props) {
@@ -1268,6 +1279,7 @@ export default function Admin({
                 "progress",
                 "feedback",
                 "teams",
+                "settings-categories",
               ].includes(tab) && (
                 <SectionHeader
                   variant="page"
@@ -1342,6 +1354,8 @@ export default function Admin({
                 filter={destination.deletedKind || "all"}
                 onFilterChange={(kind) => void navigateDestination({ tab: "deleted", ...(kind === "all" ? {} : { deletedKind: kind as "content" | "user" }) })}
               />
+            ) : tab === "settings-categories" ? (
+              <CategorySettingsPanel data={data} onSave={onSaveCategories} registerNavigationGuard={registerAdminGuard} />
             ) : tab.startsWith("settings-") ? (
               <SiteSettingsPanel
                 key={tab}
@@ -2166,7 +2180,7 @@ export function Editor({
     [renewUpdate, setRenewUpdate] = useState(false),
     [saving, setSaving] = useState(false),
     [uploadCount, setUploadCount] = useState(0);
-  const { confirm } = useInteractionDialog();
+  const { confirm, prompt } = useInteractionDialog();
   const baseline = useRef(c);
   const [validateLessonImages] = useState(() => createLessonImageAltValidator());
   const original = useRef(content);
@@ -2761,19 +2775,39 @@ export function Editor({
             )}
           </>
         ) : (
+          <>
           <FormField label="Category" visuallyHiddenLabel>
-            <CreatableCombobox
+            {data.settings?.contentCategories ? <HierarchyPicker
+              inputVariant="metadata"
+              value={c.category}
+              onValueChange={(value) => set("category", value)}
+              options={availableCategories(data.content, c.kind, data.settings).map((name) => ({ id: name, label: name, path: [name] }))}
+              searchLabel="Categories" searchPlaceholder="Find a category…" placeholder="Choose a category…"
+              visibleRows={5} disabled={busy} showFullHierarchy={false}
+              emptyMessage="No categories yet. An administrator can create one."
+            /> : <CreatableCombobox
               variant="metadata"
               value={c.category}
               onValueChange={(value) => set("category", value)}
-              options={data.content
-                .filter((item) => item.kind === c.kind)
-                .map((item) => item.category)}
+              options={availableCategories(data.content, c.kind, data.settings)}
               listLabel="Categories"
               visibleRows={5}
               placeholder="Choose or add category…"
-            />
+            />}
           </FormField>
+            {data.settings?.contentCategories && onWorkspaceChange && <Button type="button" variant="outline" size="sm" disabled={busy}
+              onClick={async () => {
+                try {
+                  const input = await prompt("Category name", "", { title: "Create category", submitLabel: "Create category" });
+                  if (input === null || c.kind === "doc") return;
+                  const lists = categoryLists([...data.content, ...(data.publishedContent || [])], data.settings);
+                  const name = categoryName(input, lists[c.kind]);
+                  await onWorkspaceChange({ ...data, settings: { ...defaultSettings, ...data.settings,
+                    contentCategories: { ...lists, [c.kind]: [...lists[c.kind], name] } } });
+                  set("category", name);
+                } catch (failure) { setError((failure as Error).message); }
+              }}><Plus aria-hidden="true" />Create category</Button>}
+          </>
         )}
       </EditorDetailsGroup>
       {c.kind !== "doc" && (

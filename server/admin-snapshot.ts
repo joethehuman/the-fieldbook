@@ -67,6 +67,7 @@ export async function adminSnapshot(
     publishedAssignmentRows,
     feedback,
     maintenance,
+    categoryPlacements,
   ] = await Promise.all([
     readConfig(),
     contentIndex(),
@@ -102,6 +103,7 @@ export async function adminSnapshot(
           admin ? store.readCleanupStatus() : null,
         ])
       : null,
+    scope === "categories" ? store.listDocumentPlacements() : [],
   ]);
   const data: Workspace = {
     schema: 1,
@@ -111,6 +113,7 @@ export async function adminSnapshot(
           ...publicSettings(config.settings),
           docSections: config.settings.docSections,
           docCategoryOrder: config.settings.docCategoryOrder,
+          contentCategories: config.settings.contentCategories,
         },
     revision: config.revision,
     governanceRevision: admin ? config.governance_revision : undefined,
@@ -135,6 +138,19 @@ export async function adminSnapshot(
     progress: {},
     feedback: [],
   };
+  if (scope === "categories") {
+    data.publishedContent = categoryPlacements.flatMap((row) => {
+      if (!row.published) return [];
+      const draft = content.find((item) => item.id === row.id);
+      return draft ? [{
+        ...draft,
+        title: row.published.title,
+        kind: row.published.kind,
+        category: row.published.category,
+        status: "published" as const,
+      }] : [];
+    });
+  }
   if (maintenance) {
     const [{ deleted, names }, cleanup] = maintenance;
     data.deletedItems = deleted.map((d) => ({

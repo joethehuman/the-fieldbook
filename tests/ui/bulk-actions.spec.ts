@@ -186,7 +186,7 @@ test("existing categories, mixed types and one People menu", async ({
       .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await page
-    .getByRole("menuitem", { name: "Set category", exact: true })
+    .getByRole("menuitem", { name: "Move to category…", exact: true })
     .click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("textbox")).toHaveCount(0);
@@ -217,7 +217,7 @@ test("existing categories, mixed types and one People menu", async ({
     .check();
   await page.getByRole("button", { name: "Bulk actions", exact: true }).click();
   await expect(
-    page.getByRole("menuitem", { name: "Set category", exact: true }),
+    page.getByRole("menuitem", { name: "Move to category…", exact: true }),
   ).toBeDisabled();
   await expect(
     page.getByText(
@@ -226,7 +226,7 @@ test("existing categories, mixed types and one People menu", async ({
   ).toBeVisible();
   await page.keyboard.press("Escape");
   await section(page, "Demo profiles");
-  await page.getByRole("checkbox", { name: /^Select all / }).check();
+  await page.getByRole("checkbox", { name: /^Select page / }).check();
   await expect(
     page.getByRole("button", { name: "Bulk actions", exact: true }),
   ).toHaveCount(1);

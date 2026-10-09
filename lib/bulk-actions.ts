@@ -3,6 +3,7 @@ import type { Workspace } from "./store";
 import type { Content, User } from "./types";
 import { availableDocSections } from "./docs-navigation";
 import { validQuestion } from "./course-quiz";
+import { availableCategories, categoryKey } from "./content-categories";
 
 export type BulkOperation =
   "publish" | "unpublish" | "category" | "section" | "delete" | "restore";
@@ -48,14 +49,11 @@ export function metadataPatch(
     const clean = value.trim();
     if (!clean || clean.length > 80)
       throw new Error("Enter a category of 1–80 characters.");
-    const existing = data.content.find(
-      (c) =>
-        c.kind === item.kind &&
-        c.category.toLowerCase() === clean.toLowerCase(),
-    );
+    const existing = availableCategories(data.content, item.kind, data.settings)
+      .find((name) => categoryKey(name) === categoryKey(clean));
     if (!existing)
       throw new Error("Choose an existing category for this content type.");
-    return { category: existing.category };
+    return { category: existing };
   }
   const sections = availableDocSections(
     data.content.filter((c) => c.kind === "doc"),
@@ -228,9 +226,10 @@ export function applyDemoBulk(
             request.operation,
             request.value || "",
           );
+          const live = data.publishedContent?.find((c) => c.id === item.id);
           if (
             Object.entries(patch).every(
-              ([key, value]) => item[key as keyof Content] === value,
+              ([key, value]) => item[key as keyof Content] === value && (!live || live[key as keyof Content] === value),
             )
           ) {
             results.push({ id: item.id, status: "unchanged" });
@@ -245,7 +244,6 @@ export function applyDemoBulk(
                   .map((c) => c.sectionOrder || 0),
               ) + 1;
           Object.assign(item, patch, { revision: target.expected + 1 });
-          const live = data.publishedContent?.find((c) => c.id === item.id);
           if (live) {
             Object.assign(live, patch);
             if (item.publishedRevision === target.expected)
