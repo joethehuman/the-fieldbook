@@ -261,7 +261,7 @@ test("rename and move selected Updates, with an empty category available as dest
   );
 });
 
-test("course order persists on the homepage and Curricula remains last", async ({
+test("category search preserves course order and Curricula remains last", async ({
   page,
 }, info) => {
   const before = await fixture(page);
@@ -273,6 +273,59 @@ test("course order persists on the homepage and Curricula remains last", async (
     name: `Reorder ${last}`,
     exact: true,
   });
+  const search = page.getByRole("searchbox", {
+    name: "Search course categories",
+    exact: true,
+  });
+  await search.fill(` ${last.toUpperCase()} `);
+  await expect(page.locator("[data-category]")).toHaveCount(1);
+  await expect(handle).toBeDisabled();
+  await page
+    .getByRole("button", { name: `Actions for ${last}`, exact: true })
+    .click();
+  await expect(
+    page.getByRole("menuitem", { name: "Move up", exact: true }),
+  ).toBeDisabled();
+  await page.keyboard.press("Escape");
+  await expect(
+    page.getByText("Unsaved changes", { exact: true }),
+  ).not.toBeVisible();
+  expect((await saved(page)).settings.contentCategories).toEqual(
+    before.settings!.contentCategories,
+  );
+  await page.getByRole("tab", { name: "Updates", exact: true }).click();
+  const updateSearch = page.getByRole("searchbox", {
+    name: "Search update categories",
+    exact: true,
+  });
+  await expect(updateSearch).toHaveValue("");
+  await updateSearch.fill("EMPTY UPDATE");
+  await expect(page.locator("[data-category]")).toHaveCount(1);
+  await expect(page.locator("[data-category]")).toHaveAttribute(
+    "data-category",
+    "Empty update category",
+  );
+  await page.getByRole("tab", { name: "Courses", exact: true }).click();
+  await expect(search).toHaveValue(` ${last.toUpperCase()} `);
+  await search.fill("No matching category");
+  await expect(
+    page.getByText("No categories match your search.", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Clear search", exact: true }).click();
+  await expect(search).toHaveValue("");
+  await expect(page.locator("[data-category]")).toHaveCount(
+    before.settings!.contentCategories!.course.length,
+  );
+  await expect(handle).toBeEnabled();
+  await page.screenshot({
+    path: info.outputPath("category-search.png"),
+    fullPage: true,
+  });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
   await handle.focus();
   for (let index = 1; index < names.length; index++)
     await handle.press("ArrowUp");

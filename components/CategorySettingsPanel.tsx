@@ -26,6 +26,8 @@ import type { RegisterNavigationGuard } from "@/lib/navigation-guard";
 import type { Content } from "@/lib/types";
 import { PendingChangesBar } from "./patterns/pending-changes-bar";
 import { SettingsSection } from "./patterns/settings-section";
+import { CollectionControls } from "./patterns/collection-controls";
+import { SearchField } from "./patterns/search-field";
 import { ReorderRow } from "./patterns/reorder-row";
 import { useRowReorder } from "./patterns/use-row-reorder";
 import { FormField } from "./patterns/form-field";
@@ -77,6 +79,7 @@ export function CategorySettingsPanel({
   const [settings, setSettings] = useState(() => initial(data));
   const [moves, setMoves] = useState<CategoryMove[]>([]);
   const [tab, setTab] = useState<CategoryKind>("course");
+  const [queries, setQueries] = useState({ course: "", brief: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [create, setCreate] = useState(false);
@@ -217,26 +220,52 @@ export function CategorySettingsPanel({
           </TabsList>
           {kinds.map((kind) => (
             <TabsContent key={kind} value={kind}>
-              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div className="mb-4 grid gap-3">
                 <p className="max-w-prose text-copy text-muted-foreground">
                   {kind === "course"
                     ? "Reorder categories to change their order on the Courses page. Curricula always appear at the bottom."
                     : "Update categories are listed alphabetically. They do not change the order of the Updates feed."}
                 </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => {
-                    setNewName("");
-                    setCreateError("");
-                    setCreate(true);
-                  }}
-                >
-                  <Plus aria-hidden="true" />
-                  Create category
-                </Button>
+                <CollectionControls
+                  search={
+                    <SearchField>
+                      <Input
+                        type="search"
+                        value={queries[kind]}
+                        onChange={(event) =>
+                          setQueries((current) => ({
+                            ...current,
+                            [kind]: event.target.value,
+                          }))
+                        }
+                        placeholder="Search categories…"
+                        aria-label={`Search ${kind === "course" ? "course" : "update"} categories`}
+                        disabled={busy}
+                      />
+                    </SearchField>
+                  }
+                  primaryAction={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={busy}
+                      onClick={() => {
+                        setNewName("");
+                        setCreateError("");
+                        setCreate(true);
+                      }}
+                    >
+                      <Plus aria-hidden="true" />
+                      Create category
+                    </Button>
+                  }
+                />
+                {kind === "course" && queries[kind].trim() && (
+                  <p className="text-copy text-muted-foreground">
+                    Clear search to reorder categories.
+                  </p>
+                )}
               </div>
               <CategoryList
                 kind={kind}
@@ -244,6 +273,10 @@ export function CategorySettingsPanel({
                 drafts={drafts}
                 published={published}
                 busy={busy}
+                query={queries[kind]}
+                onClearSearch={() =>
+                  setQueries((current) => ({ ...current, [kind]: "" }))
+                }
                 onChange={update}
                 onMove={(ids, category) => stage(ids, kind, category)}
               />
@@ -272,6 +305,7 @@ export function CategorySettingsPanel({
                   ...settings.contentCategories,
                   [tab]: [...settings.contentCategories[tab], name],
                 });
+                setQueries((current) => ({ ...current, [tab]: "" }));
                 setCreate(false);
               } catch (failure) {
                 setCreateError((failure as Error).message);
@@ -319,6 +353,8 @@ function CategoryList({
   drafts,
   published,
   busy,
+  query,
+  onClearSearch,
   onChange,
   onMove,
 }: {
@@ -327,6 +363,8 @@ function CategoryList({
   drafts: Content[];
   published: Content[];
   busy: boolean;
+  query: string;
+  onClearSearch: () => void;
   onChange: (categories: ContentCategories) => void;
   onMove: (ids: string[], category: string) => void;
 }) {
@@ -349,6 +387,11 @@ function CategoryList({
     kind === "brief"
       ? [...categories[kind]].sort((a, b) => a.localeCompare(b))
       : categories[kind];
+  const search = query.trim().toLowerCase();
+  const visibleNames = names.filter((name) =>
+    name.toLowerCase().includes(search),
+  );
+  const reorderDisabled = busy || !!search || kind !== "course";
   const reorder = useRowReorder(
     names.map((name) => ({ id: name })),
     (name, index) => {
@@ -357,10 +400,11 @@ function CategoryList({
       next.splice(index, 0, name);
       onChange({ ...categories, course: next });
     },
-    busy || kind !== "course",
+    reorderDisabled,
     (item) => item.id,
   );
   function step(name: string, offset: number) {
+    if (reorderDisabled) return;
     const next = [...categories.course],
       index = next.indexOf(name),
       target = index + offset;
@@ -456,7 +500,8 @@ function CategoryList({
         </div>
       )}
       <ul aria-label={`${labels[kind]} categories`} className="grid gap-3">
-        {names.map((name, index) => {
+        {visibleNames.map((name) => {
+          const index = names.indexOf(name);
           const items = categoryItems(drafts, published, kind, name),
             open = expanded.has(name);
           const toggle = () =>
@@ -486,8 +531,8 @@ function CategoryList({
                       type="button"
                       variant="ghost"
                       size="icon"
-                      draggable={!busy}
-                      disabled={busy}
+                      draggable={!reorderDisabled}
+                      disabled={reorderDisabled}
                       aria-label={`Reorder ${name}`}
                       title="Drag to reorder, or use the arrow keys"
                       onDragStart={(event) => reorder.start(event, name)}
@@ -545,13 +590,15 @@ function CategoryList({
                         {kind === "course" && (
                           <>
                             <DropdownMenuItem
-                              disabled={index === 0}
+                              disabled={reorderDisabled || index === 0}
                               onSelect={() => step(name, -1)}
                             >
                               Move up
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              disabled={index === names.length - 1}
+                              disabled={
+                                reorderDisabled || index === names.length - 1
+                              }
                               onSelect={() => step(name, 1)}
                             >
                               Move down
@@ -600,6 +647,16 @@ function CategoryList({
         <EmptyState>
           No {kind === "course" ? "course" : "update"} categories yet. Create a
           category to get started.
+        </EmptyState>
+      )}
+      {names.length > 0 && !visibleNames.length && (
+        <EmptyState>
+          <div className="grid justify-items-center gap-3">
+            <p>No categories match your search.</p>
+            <Button type="button" variant="outline" onClick={onClearSearch}>
+              Clear search
+            </Button>
+          </div>
         </EmptyState>
       )}
       {invalid.length > 0 && (

@@ -61,7 +61,7 @@ Media-only paragraphs contain content even without text. Inserting or formatting
 
 ## Verify interface work
 
-Categories uses the Docs navigation row and pending-change patterns with flat, separate Course and Update lists. Only Course categories expose reordering, with drag, arrow-key and menu controls. Create, rename, move and deletion changes remain staged until Save settings. Empty categories stay available to authors and hidden from readers. Category deletion confirmations describe permanent category removal and content relocation; they do not use the content recovery warning. The UI catalog includes the live category panel with empty and populated states.
+Categories uses the Docs navigation row and pending-change patterns with flat, separate Course and Update lists. Each list has category-name search beside Create category. Only Course categories expose reordering, with drag, arrow-key and menu controls; clear search before reordering so the full order is visible. Create, rename, move and deletion changes remain staged until Save settings. Empty categories stay available to authors and hidden from readers. Category deletion confirmations describe permanent category removal and content relocation; they do not use the content recovery warning. The UI catalog includes the live category panel with empty and populated states.
 
 When adding or changing a shared component, show representative states in the demo's `/ui` catalog using the actual component, and document any non-obvious usage or accessibility rules. The catalog uses synthetic content; it does not supply runtime components to the installed interface.
 
