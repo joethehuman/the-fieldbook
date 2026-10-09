@@ -10,10 +10,19 @@ import {
 import { saveCategorySettings } from "@/lib/category-settings-save";
 import { applyDemoBulk } from "@/lib/bulk-actions";
 
-/** The real panel, with a published item, a draft, an empty category and two independent lists. */
+/** The real panel, including a large category, a draft and an empty category. */
 export function CategoryExamples() {
   const [data, setData] = useState(() => {
-    const initial = withPublishedSnapshots(freshWorkspace());
+    const workspace = freshWorkspace();
+    const course = workspace.content.find((item) => item.kind === "course")!;
+    workspace.content.push(
+      ...Array.from({ length: 48 }, (_, index) => ({
+        ...course,
+        id: `category-example-course-${index + 1}`,
+        title: `Example course ${String(index + 1).padStart(2, "0")}`,
+      })),
+    );
+    const initial = withPublishedSnapshots(workspace);
     const lists = categoryLists(initial.content);
     initial.settings = {
       ...initial.settings!,
@@ -25,7 +34,7 @@ export function CategoryExamples() {
     return initial;
   });
   return (
-    <section className="grid gap-4">
+    <section id="category-settings" className="grid gap-4">
       <h2>Category settings</h2>
       <CategorySettingsPanel
         data={data}

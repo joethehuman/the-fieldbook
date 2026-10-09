@@ -3,8 +3,20 @@ import { freshWorkspace } from "../../lib/store";
 import { withPublishedSnapshots } from "../../lib/demo-publication";
 import { categoryLists } from "../../lib/content-categories";
 
-async function fixture(page: Page) {
+async function fixture(page: Page, largeCategory = false) {
   const data = withPublishedSnapshots(freshWorkspace());
+  if (largeCategory) {
+    const source = data.content.find((item) => item.kind === "course")!;
+    const published = data.publishedContent!.find(
+      (item) => item.id === source.id,
+    )!;
+    for (let index = 1; index <= 48; index++) {
+      const id = `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`;
+      const title = `Example course ${String(index).padStart(2, "0")}`;
+      data.content.push({ ...source, id, title });
+      data.publishedContent!.push({ ...published, id, title });
+    }
+  }
   data.settings = {
     ...data.settings!,
     contentCategories: categoryLists(data.content),
@@ -239,7 +251,13 @@ test("rename and move selected Updates, with an empty category available as dest
     .getByRole("checkbox", { name: `Select ${item.title}`, exact: true })
     .check();
   await page
-    .getByRole("button", { name: "Move to category…", exact: true })
+    .getByRole("button", {
+      name: "Items in Renamed updates bulk actions",
+      exact: true,
+    })
+    .click();
+  await page
+    .getByRole("menuitem", { name: "Move to category…", exact: true })
     .click();
   dialog = page.getByRole("dialog");
   await dialog
@@ -259,6 +277,247 @@ test("rename and move selected Updates, with an empty category available as dest
   ).toBe(
     before.publishedContent!.find((entry) => entry.id === item.id)!.feedAt,
   );
+});
+
+test("category selection moves contents and permanently deletes multiple categories together", async ({
+  page,
+}) => {
+  const before = await fixture(page);
+  const names = before.settings!.contentCategories!.course.slice(0, 2);
+  const bulk = page.getByRole("button", {
+    name: "Categories bulk actions",
+    exact: true,
+  });
+  await expect(bulk).toBeDisabled();
+  for (const name of names)
+    await page
+      .getByRole("checkbox", { name: `Select category ${name}`, exact: true })
+      .check();
+  await expect(bulk).toBeEnabled();
+  await expect(
+    page.getByRole("group", { name: "Categories selection", exact: true }),
+  ).toContainText("2 selected");
+  await bulk.click();
+  await page
+    .getByRole("menuitem", { name: "Move all items to…", exact: true })
+    .click();
+  let dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("combobox", { name: "Destination category", exact: true })
+    .click();
+  for (const name of names)
+    await expect(page.getByRole("option", { name, exact: true })).toHaveCount(
+      0,
+    );
+  await page.keyboard.press("Escape");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(bulk).toBeFocused();
+  await bulk.click();
+  await page
+    .getByRole("menuitem", { name: "Delete categories", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("2 selected categories");
+  await expect(dialog).not.toContainText("30 days");
+  await dialog
+    .getByRole("combobox", { name: "Destination category", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Empty course category", exact: true })
+    .click();
+  await dialog
+    .getByRole("button", {
+      name: "Move items and delete categories",
+      exact: true,
+    })
+    .click();
+  // All changes stay staged until the administrator saves.
+  expect((await saved(page)).settings.contentCategories).toEqual(
+    before.settings!.contentCategories,
+  );
+  await save(page);
+  const after = await saved(page);
+  for (const name of names)
+    expect(after.settings.contentCategories.course).not.toContain(name);
+  const moved = before.content.filter(
+    (item) => item.kind === "course" && names.includes(item.category),
+  );
+  for (const item of moved) {
+    expect(
+      after.content.find((entry: any) => entry.id === item.id),
+    ).toMatchObject({
+      ...item,
+      category: "Empty course category",
+      revision: item.revision! + 1,
+      publishedRevision: item.publishedRevision! + 1,
+    });
+    expect(
+      after.publishedContent.find((entry: any) => entry.id === item.id)
+        .category,
+    ).toBe("Empty course category");
+  }
+  expect(after.progress).toEqual(before.progress);
+  expect(after.deletedItems || []).toEqual(before.deletedItems || []);
+  await expect(bulk).toBeDisabled();
+});
+
+test("large categories have bounded searchable tables, select-all and individual move menus", async ({
+  page,
+}, info) => {
+  const before = await fixture(page, true);
+  const source = before.content.find((item) => item.kind === "course")!;
+  const name = source.category;
+  await page
+    .getByRole("button", { name: `Expand ${name}`, exact: true })
+    .click();
+  const section = page.getByRole("region", {
+    name: `Items in ${name}`,
+    exact: true,
+  });
+  const viewport = section.getByRole("region", {
+    name: `Scrollable items in ${name}`,
+    exact: true,
+  });
+  const table = section.getByRole("table", {
+    name: `Items in ${name}`,
+    exact: true,
+  });
+  const count = before.content.filter(
+    (item) => item.kind === "course" && item.category === name,
+  ).length;
+  await expect(table.locator("tbody tr")).toHaveCount(count);
+  const dimensions = await viewport.evaluate((element) => ({
+    height: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+    header: element.querySelector("thead")!.getBoundingClientRect().height,
+    row: element.querySelector("tbody tr")!.getBoundingClientRect().height,
+  }));
+  expect(dimensions.height).toBeLessThanOrEqual(
+    dimensions.header + dimensions.row * 5 + 2,
+  );
+  expect(dimensions.height - dimensions.header).toBeGreaterThanOrEqual(
+    dimensions.row * 5,
+  );
+  expect(dimensions.scrollHeight).toBeGreaterThan(dimensions.height * 5);
+  const row = table.locator("tbody tr").first();
+  const rowBounds = await row.boundingBox();
+  const checkboxBounds = await row.getByRole("checkbox").boundingBox();
+  expect(
+    Math.abs(
+      checkboxBounds!.y +
+        checkboxBounds!.height / 2 -
+        rowBounds!.y -
+        rowBounds!.height / 2,
+    ),
+  ).toBeLessThanOrEqual(1);
+  const bulk = section.getByRole("button", {
+    name: `Items in ${name} bulk actions`,
+    exact: true,
+  });
+  await expect(bulk).toBeDisabled();
+  await section.scrollIntoViewIfNeeded();
+  await page.screenshot({
+    path: info.outputPath("category-item-table.png"),
+    fullPage: true,
+  });
+  await viewport.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.scrollLeft = element.scrollWidth;
+  });
+  const viewportBounds = await viewport.boundingBox();
+  const headerBounds = await table.locator("thead").boundingBox();
+  expect(Math.abs(headerBounds!.y - viewportBounds!.y - 1)).toBeLessThanOrEqual(
+    1,
+  );
+  const lastAction = await table
+    .locator("tbody tr")
+    .last()
+    .getByRole("button")
+    .boundingBox();
+  expect(lastAction!.x + lastAction!.width).toBeLessThanOrEqual(
+    viewportBounds!.x + viewportBounds!.width,
+  );
+  expect(lastAction!.x).toBeGreaterThanOrEqual(viewportBounds!.x);
+  await viewport.evaluate((element) => {
+    element.scrollTop = 0;
+    element.scrollLeft = 0;
+  });
+  const individual = row.getByRole("button", {
+    name: `Actions for ${source.title}`,
+    exact: true,
+  });
+  await individual.click();
+  await page
+    .getByRole("menuitem", { name: "Move to category…", exact: true })
+    .click();
+  let dialog = page.getByRole("dialog");
+  await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  await expect(individual).toBeFocused();
+  await individual.click();
+  await page
+    .getByRole("menuitem", { name: "Move to category…", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await dialog
+    .getByRole("combobox", { name: "Destination category", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Empty course category", exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "Move items", exact: true }).click();
+  await expect(table.locator("tbody tr")).toHaveCount(count - 1);
+  const search = section.getByRole("searchbox", {
+    name: `Search items in ${name}`,
+    exact: true,
+  });
+  await search.fill("EXAMPLE COURSE 0");
+  await expect(table.locator("tbody tr")).toHaveCount(9);
+  await section
+    .getByRole("checkbox", {
+      name: `Select all matching items in ${name}`,
+      exact: true,
+    })
+    .check();
+  await expect(
+    section.getByRole("group", {
+      name: `Items in ${name} selection`,
+      exact: true,
+    }),
+  ).toContainText("9 selected");
+  await bulk.click();
+  await page
+    .getByRole("menuitem", { name: "Move to category…", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("9 selected items");
+  await dialog
+    .getByRole("combobox", { name: "Destination category", exact: true })
+    .click();
+  await page
+    .getByRole("option", { name: "Empty course category", exact: true })
+    .click();
+  await dialog.getByRole("button", { name: "Move items", exact: true }).click();
+  await expect(
+    section.getByText("No items match your search.", { exact: true }),
+  ).toBeVisible();
+  await section
+    .getByRole("button", { name: "Clear search", exact: true })
+    .click();
+  await expect(table.locator("tbody tr")).toHaveCount(count - 10);
+  await save(page);
+  const after = await saved(page);
+  expect(
+    after.content.filter(
+      (item: any) =>
+        item.kind === "course" && item.category === "Empty course category",
+    ),
+  ).toHaveLength(10);
+  expect(after.progress).toEqual(before.progress);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
 });
 
 test("category search preserves course order and Curricula remains last", async ({

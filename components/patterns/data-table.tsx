@@ -52,6 +52,7 @@ const layouts = {
   groupMembersSelectable: ["select", "record", "text", "text", "actions"],
   groupMembers: ["record", "text", "text"],
   groupUpdates: ["select", "record", "date", "actions"],
+  categoryItems: ["select", "record", "status", "actions"],
   assignmentGroups: ["select", "record", "count"],
   teamDirectory: ["select", "record", "text", "count", "count", "actions"],
   teamBranches: ["record", "text", "count", "actions"],

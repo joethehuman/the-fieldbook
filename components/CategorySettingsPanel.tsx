@@ -4,7 +4,6 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import {
   ChevronRight,
   GripVertical,
-  MoreHorizontal,
   Plus,
   Tag,
 } from "lucide-react";
@@ -31,7 +30,12 @@ import { SearchField } from "./patterns/search-field";
 import { ReorderRow } from "./patterns/reorder-row";
 import { useRowReorder } from "./patterns/use-row-reorder";
 import { FormField } from "./patterns/form-field";
-import { PublicationStatus } from "./patterns/publication-status";
+import { SelectRows } from "./patterns/bulk-selection";
+import { RowActions } from "./patterns/row-actions";
+import {
+  CategoryContentTable,
+  CategorySelectionBar,
+} from "./CategoryContentTable";
 import { EmptyState } from "./patterns/layout";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
@@ -46,13 +50,6 @@ import {
   DialogDescription,
   DialogFooter,
 } from "./ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "./ui/dropdown-menu";
 import { useInteractionDialog } from "./ui/interaction-dialog";
 import { useToast } from "./ui/toast";
 
@@ -369,9 +366,9 @@ function CategoryList({
   onMove: (ids: string[], category: string) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [selected, setSelected] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [transfer, setTransfer] = useState<{
-    name?: string;
+    names: string[];
     ids: string[];
     deleting: boolean;
   } | null>(null);
@@ -382,6 +379,8 @@ function CategoryList({
   const [rename, setRename] = useState<string | null>(null);
   const [renameName, setRenameName] = useState("");
   const [renameError, setRenameError] = useState("");
+  const listRoot = useRef<HTMLDivElement>(null);
+  const transferTrigger = useRef<HTMLElement | null>(null);
   const { confirm } = useInteractionDialog();
   const names =
     kind === "brief"
@@ -391,6 +390,16 @@ function CategoryList({
   const visibleNames = names.filter((name) =>
     name.toLowerCase().includes(search),
   );
+  const selectedNames = selectedCategories.filter((name) =>
+    names.includes(name),
+  );
+  const selectedItems = [
+    ...new Map(
+      selectedNames
+        .flatMap((name) => categoryItems(drafts, published, kind, name))
+        .map((item) => [item.id, item]),
+    ).values(),
+  ];
   const reorderDisabled = busy || !!search || kind !== "course";
   const reorder = useRowReorder(
     names.map((name) => ({ id: name })),
@@ -413,92 +422,93 @@ function CategoryList({
     next.splice(target, 0, name);
     onChange({ ...categories, course: next });
   }
-  function openTransfer(ids: string[], name?: string, deleting = false) {
+  function openTransfer(ids: string[], names: string[] = [], deleting = false) {
     setDestination("");
     setCreatingDestination(false);
     setDestinationName("");
     setTransferError("");
-    setTransfer({ ids, name, deleting });
+    transferTrigger.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    setTransfer({ ids, names, deleting });
   }
-  async function remove(name: string, items: Content[]) {
+  async function remove(removing: string[]) {
+    const items = [
+      ...new Map(
+        removing
+          .flatMap((name) => categoryItems(drafts, published, kind, name))
+          .map((item) => [item.id, item]),
+      ).values(),
+    ];
     if (items.length)
       return openTransfer(
         items.map((item) => item.id),
-        name,
+        removing,
         true,
       );
     if (
-      await confirm(`Delete empty category “${name}”?`, {
-        submitLabel: "Delete category",
-        destructive: true,
-      })
+      await confirm(
+        removing.length === 1
+          ? `Delete empty category “${removing[0]}”?`
+          : `Permanently delete ${removing.length} empty categories?`,
+        {
+          submitLabel:
+            removing.length === 1 ? "Delete category" : "Delete categories",
+          destructive: true,
+        },
+      )
     )
       onChange({
         ...categories,
-        [kind]: categories[kind].filter((item) => item !== name),
+        [kind]: categories[kind].filter((item) => !removing.includes(item)),
       });
   }
   const invalid = categoryItems(drafts, published, kind, undefined, categories);
-  function contentRows(items: Content[], name: string) {
-    return (
-      <ul aria-label={`Items in ${name}`} className="grid gap-2 ps-3 sm:ps-8">
-        {items.map((item) => (
-          <li
-            key={item.id}
-            className="flex min-w-0 items-start gap-3 rounded-lg border border-border px-3 py-2"
-          >
-            <Checkbox
-              aria-label={`Select ${item.title || "Untitled item"}`}
-              disabled={busy}
-              checked={selected.includes(item.id)}
-              onCheckedChange={(checked) =>
-                setSelected((current) =>
-                  checked
-                    ? [...new Set([...current, item.id])]
-                    : current.filter((id) => id !== item.id),
-                )
-              }
-            />
-            <div className="min-w-0 flex-1 text-copy [overflow-wrap:anywhere]">
-              {item.title || "Untitled item"}
-            </div>
-            <PublicationStatus published={!!item.publishedRevision} />
-          </li>
-        ))}
-      </ul>
-    );
-  }
   return (
-    <div className="grid min-w-0 gap-3">
-      {selected.length > 0 && (
-        <div
-          role="region"
-          aria-label="Selected category items"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface p-3"
-        >
-          <span className="text-copy">{selected.length} selected</span>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              disabled={busy}
-              onClick={() => setSelected([])}
-            >
-              Clear selection
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => openTransfer(selected)}
-            >
-              Move to category…
-            </Button>
-          </div>
-        </div>
-      )}
+    <div
+      ref={listRoot}
+      tabIndex={-1}
+      className="grid min-w-0 gap-3 outline-none"
+    >
+      <CategorySelectionBar
+        label="Categories"
+        count={selectedNames.length}
+        total={names.length}
+        range={
+          search
+            ? `${visibleNames.length} of ${names.length} categories`
+            : undefined
+        }
+        noun="categories"
+        busy={busy}
+        onClear={() => setSelectedCategories([])}
+        summaryControl={
+          <SelectRows
+            ids={busy ? [] : visibleNames}
+            value={selectedNames}
+            onChange={setSelectedCategories}
+            label="Select all matching categories"
+          />
+        }
+        actions={[
+          {
+            label: "Move all items to…",
+            disabled: !selectedItems.length,
+            onSelect: () =>
+              openTransfer(
+                selectedItems.map((item) => item.id),
+                selectedNames,
+              ),
+          },
+          {
+            label: "Delete categories",
+            destructive: true,
+            separator: true,
+            onSelect: () => void remove(selectedNames),
+          },
+        ]}
+      />
       <ul aria-label={`${labels[kind]} categories`} className="grid gap-3">
         {visibleNames.map((name) => {
           const index = names.indexOf(name);
@@ -514,6 +524,7 @@ function CategoryList({
             <Fragment key={name}>
               <ReorderRow
                 data-category={name}
+                data-selected={selectedNames.includes(name)}
                 data-dragging={reorder.active === name}
                 data-sortable-preview
                 data-drop={
@@ -550,6 +561,20 @@ function CategoryList({
                     </Button>
                   ) : null
                 }
+                selection={
+                  <Checkbox
+                    aria-label={`Select category ${name}`}
+                    disabled={busy}
+                    checked={selectedNames.includes(name)}
+                    onCheckedChange={(checked) =>
+                      setSelectedCategories((current) =>
+                        checked === true
+                          ? [...new Set([...current, name])]
+                          : current.filter((entry) => entry !== name),
+                      )
+                    }
+                  />
+                }
                 icon={<Tag size={16} />}
                 title={
                   <strong className="[overflow-wrap:anywhere]">{name}</strong>
@@ -574,71 +599,64 @@ function CategoryList({
                         />
                       </Button>
                     )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={busy}
-                          aria-label={`Actions for ${name}`}
-                        >
-                          <MoreHorizontal aria-hidden="true" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {kind === "course" && (
-                          <>
-                            <DropdownMenuItem
-                              disabled={reorderDisabled || index === 0}
-                              onSelect={() => step(name, -1)}
-                            >
-                              Move up
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              disabled={
-                                reorderDisabled || index === names.length - 1
-                              }
-                              onSelect={() => step(name, 1)}
-                            >
-                              Move down
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                          </>
-                        )}
-                        <DropdownMenuItem
-                          onSelect={() => {
+                    <RowActions
+                      label={name}
+                      disabled={busy}
+                      actions={[
+                        ...(kind === "course"
+                          ? [
+                              {
+                                label: "Move up",
+                                disabled: reorderDisabled || index === 0,
+                                onSelect: () => step(name, -1),
+                              },
+                              {
+                                label: "Move down",
+                                disabled:
+                                  reorderDisabled || index === names.length - 1,
+                                onSelect: () => step(name, 1),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: "Rename",
+                          separator: kind === "course",
+                          onSelect: () => {
                             setRename(name);
                             setRenameName(name);
                             setRenameError("");
-                          }}
-                        >
-                          Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          disabled={!items.length}
-                          onSelect={() =>
+                          },
+                        },
+                        {
+                          label: "Move all items to…",
+                          disabled: !items.length,
+                          onSelect: () =>
                             openTransfer(
                               items.map((item) => item.id),
-                              name,
-                            )
-                          }
-                        >
-                          Move all items to…
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onSelect={() => void remove(name, items)}
-                        >
-                          Delete category
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                              [name],
+                            ),
+                        },
+                        {
+                          label: "Delete category",
+                          destructive: true,
+                          separator: true,
+                          onSelect: () => void remove([name]),
+                        },
+                      ]}
+                    />
                   </>
                 }
               />
-              {open && items.length > 0 && <li>{contentRows(items, name)}</li>}
+              {open && items.length > 0 && (
+                <li className="min-w-0 ps-3 sm:ps-8">
+                  <CategoryContentTable
+                    name={name}
+                    items={items}
+                    busy={busy}
+                    onMove={(ids) => openTransfer(ids, [name])}
+                  />
+                </li>
+              )}
             </Fragment>
           );
         })}
@@ -665,7 +683,12 @@ function CategoryList({
             These items need an existing category. Select them and choose Move
             to category…
           </p>
-          {contentRows(invalid, "items needing a category")}
+          <CategoryContentTable
+            name="items needing a category"
+            items={invalid}
+            busy={busy}
+            onMove={(ids) => openTransfer(ids)}
+          />
         </div>
       )}
       <Dialog
@@ -674,13 +697,25 @@ function CategoryList({
           if (!open) setTransfer(null);
         }}
       >
-        <DialogContent>
+        <DialogContent
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            (transferTrigger.current?.isConnected
+              ? transferTrigger.current
+              : listRoot.current
+            )?.focus({ preventScroll: true });
+          }}
+        >
           <DialogTitle>
-            {transfer?.deleting ? "Delete category" : "Move to category"}
+            {transfer?.deleting
+              ? transfer.names.length === 1
+                ? "Delete category"
+                : "Delete categories"
+              : "Move to category"}
           </DialogTitle>
           <DialogDescription>
             {transfer?.deleting
-              ? `Move ${transfer.ids.length} ${transfer.ids.length === 1 ? "item" : "items"} from “${transfer.name}” before permanently deleting the category.`
+              ? `Move ${transfer.ids.length} ${transfer.ids.length === 1 ? "item" : "items"} from ${transfer.names.length === 1 ? `“${transfer.names[0]}”` : `${transfer.names.length} selected categories`} before permanently deleting ${transfer.names.length === 1 ? "the category" : "the categories"}.`
               : `Choose a category for ${transfer?.ids.length || 0} selected items.`}{" "}
             Draft and published categories change together; other edits are
             preserved.
@@ -700,11 +735,11 @@ function CategoryList({
                 onChange({
                   ...categories,
                   [kind]: transfer.deleting
-                    ? nextNames.filter((name) => name !== transfer.name)
+                    ? nextNames.filter((name) => !transfer.names.includes(name))
                     : nextNames,
                 });
                 onMove(transfer.ids, target);
-                setSelected([]);
+                setSelectedCategories([]);
                 setTransfer(null);
               } catch (failure) {
                 setTransferError((failure as Error).message);
@@ -734,7 +769,7 @@ function CategoryList({
                 >
                   <option value="">Choose a category…</option>
                   {names
-                    .filter((name) => name !== transfer?.name)
+                    .filter((name) => !transfer?.names.includes(name))
                     .map((name) => (
                       <option key={name} value={name}>
                         {name}
@@ -777,7 +812,9 @@ function CategoryList({
                 }
               >
                 {transfer?.deleting
-                  ? "Move items and delete category"
+                  ? transfer.names.length === 1
+                    ? "Move items and delete category"
+                    : "Move items and delete categories"
                   : "Move items"}
               </Button>
             </DialogFooter>
