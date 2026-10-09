@@ -2456,6 +2456,7 @@ async function expectKeyboardTopDock(page: Page) {
     const publish = element.closest(".app")!.querySelector(".editor-heading-actions > button")!.getBoundingClientRect();
     return card.top >= header.top && card.bottom <= header.bottom && card.left >= search.right
       && card.right <= publish.left && publish.right <= header.right && search.left >= header.left
+      && Math.abs(card.left - search.right - (publish.left - card.right)) < 1
       && Math.abs(card.top + card.height / 2 - header.top - header.height / 2) < 1;
   })).toBe(true);
 }
@@ -2587,6 +2588,27 @@ async function expectFloatingSurfaceClearDock(page: Page, surface: ReturnType<Pa
   } else expect(box.y + box.height).toBeLessThanOrEqual(lane.y - 7);
 }
 
+test("mobile viewport measurement never moves the focused writing shell with stale geometry", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "course");
+  await page.locator('.writing-content[contenteditable="true"] p').nth(20).tap();
+  await installCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 812, appPan: 0 });
+  await page.locator(".app").evaluate(app => {
+    const bounds = app.getBoundingClientRect();
+    // A browser can retain a previous native rectangle during a keyboard frame.
+    // The old feedback correction assumed every read acknowledged its own write.
+    app.getBoundingClientRect = () => bounds;
+  });
+  for (let frame = 0; frame < 4; frame++) {
+    await changeCommandViewport(page, { height: 490, offsetTop: 120, clientHeight: 812, appPan: 0 });
+  }
+  expect(await page.locator(".app").evaluate(app => getComputedStyle(app).top)).toBe("0px");
+  expect(await page.locator(".app").evaluate(app => (app as HTMLElement).style.getPropertyValue("--editor-viewport-shift"))).toBe("");
+  expect(await page.locator(".topbar").evaluate(header => parseFloat((header as HTMLElement).style.getPropertyValue("--editor-header-shift")))).toBe(120);
+  expect((await page.locator(".main-content").boundingBox())!.y).toBe(60);
+  expect((await page.locator(".topbar").boundingBox())!.height).toBe(60);
+});
+
 test("mobile app header stays with the dock and canvas through native panning", async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, info.project.name.startsWith("production"), "course");
@@ -2604,11 +2626,12 @@ test("mobile app header stays with the dock and canvas through native panning", 
       const dock = document.querySelector('.editor-frame-controls[data-dock="true"]')!.getBoundingClientRect();
       const reserve = parseFloat(getComputedStyle(owner).marginBlockStart);
       const hit = document.elementFromPoint(header.left + 20, header.top + header.height / 2);
-      return { headerTop: header.top, headerBottom: header.bottom, dockTop: dock.top, dockBottom: dock.bottom, dockWidth: dock.width, dockHeight: dock.height, ownerTop: owner.getBoundingClientRect().top, reserve, headerHit: !!hit?.closest(".topbar") };
+      return { headerTop: header.top, headerBottom: header.bottom, dockTop: dock.top, dockBottom: dock.bottom, dockWidth: dock.width, dockHeight: dock.height, ownerTop: owner.getBoundingClientRect().top, shellTop: owner.parentElement!.getBoundingClientRect().top, headerHeight: header.height, clip: parseFloat((owner as HTMLElement).style.getPropertyValue("--editor-header-clip")), reserve, headerHit: !!hit?.closest(".topbar") };
     });
     if (top >= 0) expect(bounds.headerHit).toBe(true);
     expect(bounds.reserve).toBe(0);
-    expect(bounds.ownerTop).toBeCloseTo(bounds.headerBottom, 0);
+    expect(bounds.ownerTop).toBeCloseTo(bounds.shellTop + bounds.headerHeight, 0);
+    expect(bounds.clip).toBeCloseTo(Math.max(0, bounds.headerBottom - bounds.ownerTop), 0);
     expect(bounds.dockWidth).toBe(cardSize.width);
     expect(bounds.dockHeight).toBe(cardSize.height);
     if (keyboard) {
@@ -2681,7 +2704,7 @@ test("mobile app header stays with the dock and canvas through native panning", 
     Object.defineProperty(window.visualViewport, "scale", { configurable: true, value: 2 });
     window.visualViewport!.dispatchEvent(new Event("resize"));
   });
-  await expect.poll(() => page.locator(".app").evaluate(el => (el as HTMLElement).style.getPropertyValue("--editor-viewport-shift"))).toBe("");
+  await expect.poll(() => page.locator(".topbar").evaluate(el => (el as HTMLElement).style.getPropertyValue("--editor-header-shift"))).toBe("");
   await page.evaluate(() => {
     Object.defineProperty(window.visualViewport, "scale", { configurable: true, value: 1 });
     window.visualViewport!.dispatchEvent(new Event("resize"));
@@ -2691,9 +2714,9 @@ test("mobile app header stays with the dock and canvas through native panning", 
   await expectTogether(0, false);
   await page.setViewportSize({ width: 1440, height: 1000 });
   await expect(page.locator('.editor-frame-controls[data-dock="true"]')).toHaveCount(0);
-  expect(await page.locator(".app").evaluate(el => (el as HTMLElement).style.getPropertyValue("--editor-viewport-shift"))).toBe("");
+  expect(await page.locator(".topbar").evaluate(el => (el as HTMLElement).style.getPropertyValue("--editor-header-shift"))).toBe("");
   await returnToContent(page);
-  expect(await page.locator(".app").evaluate(el => (el as HTMLElement).style.getPropertyValue("--editor-viewport-shift"))).toBe("");
+  expect(await page.locator(".topbar").evaluate(el => (el as HTMLElement).style.getPropertyValue("--editor-header-shift"))).toBe("");
 });
 
 test("mobile dock keeps one size inside the header and hides only metadata that cannot fit", async ({ page }, info) => {
@@ -2732,7 +2755,7 @@ test("mobile dock keeps one size inside the header and hides only metadata that 
     expect(await owner.evaluate(() => !!document.elementFromPoint(100, 30)?.closest('.writing-content, .document-title'))).toBe(false);
     await page.screenshot({ path: info.outputPath(`header-dock-${width}.png`) });
   }
-  await page.setViewportSize({ width: 408, height: 812 });
+  await page.setViewportSize({ width: 490, height: 812 });
   await expect(app).toHaveAttribute("data-editor-header-metadata", "hidden");
   const badge = page.locator(".editor-save-status [data-slot=badge]");
   await badge.evaluate(el => { el.textContent = "Draft"; });

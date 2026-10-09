@@ -601,6 +601,7 @@
   line-height: 2.25rem;
 }
 .editor[data-scroll-layout="page"] .writing-document-heading { top: var(--editor-navigation-height, 0px); }
+.editor-frame[data-dock="true"] .writing-document-heading { top: var(--phone-writing-heading-offset, 0px); }
 .editor-frame[data-dock="true"][data-title-yielded="true"] .writing-document-heading { position: relative; top: auto; }
 .editor .writing-document-heading::after {
   content: "";

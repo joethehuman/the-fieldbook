@@ -422,10 +422,13 @@
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
   .editor-controls-surface { display: contents; }
   .editor-header-dock-slot { display: none; }
-  .app:has(.editor-frame[data-dock="true"]) {
-    top: var(--editor-viewport-shift, 0px);
+  .app:has(.editor-frame[data-dock="true"]), .app:has(.editor-frame[data-dock="true"]) .main-shell {
+    overflow: visible;
   }
-  .app:has(.editor-frame[data-dock="true"]) .topbar { padding: 7px var(--space-1); }
+  .app:has(.editor-frame[data-dock="true"]) .topbar {
+    top: var(--editor-header-shift, 0px);
+    padding: 7px var(--space-1);
+  }
   .app:has(.editor-frame-controls[data-dock-position="top"]) .editor-header-dock-slot {
     display: block;
     flex: none;
@@ -481,6 +484,7 @@
   .editor-frame-controls[data-dock="true"] .writing-toolbar-controls [data-slot="button"] { width: 30px; padding-inline: 0; }
   .main-content:has(.editor-frame[data-dock="true"]) {
     --editor-dock-clearance: 80px;
+    clip-path: inset(var(--editor-header-clip, 0px) 0 0);
     padding-block-end: max(96px, var(--phone-writing-clearance, var(--editor-dock-clearance)));
   }
   .editor-mobile-panels[data-dock="true"][data-panel-ready="false"] .editor-frame-panel { visibility: hidden; pointer-events: none; }

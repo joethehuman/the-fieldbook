@@ -140,12 +140,13 @@ export function EditorFrame({
     const owner = frame.current?.closest<HTMLElement>(".main-content");
     const app = frame.current?.closest<HTMLElement>(".app");
     const header = app?.querySelector<HTMLElement>(".topbar");
+    const shell = header?.parentElement;
     let active = true;
     let request = 0;
     let releaseRequest = 0;
     let layoutWidth = document.documentElement.clientWidth;
     let layoutHeight = document.documentElement.clientHeight;
-    let appShift = 0;
+    let headerShift = 0;
     let keyboard = false;
     let lastDockTop: number | null = null;
     let lastDockBottom: number | null = null;
@@ -164,8 +165,10 @@ export function EditorFrame({
     const measure = () => {
       if (!active || !element.isConnected) return;
       const viewport = window.visualViewport;
-      const previousAppShift = appShift;
-      let appBounds = app?.getBoundingClientRect();
+      const previousHeaderShift = headerShift;
+      const appBounds = app?.getBoundingClientRect();
+      const shellBounds = shell?.getBoundingClientRect();
+      const portalTop = shellBounds?.top || 0;
       const rawTop = viewport?.offsetTop || 0;
       const height = viewport?.height || (dock ? document.documentElement.clientHeight : window.innerHeight);
       let visibleTop = rawTop;
@@ -190,22 +193,20 @@ export function EditorFrame({
           // offset. Clamp against the unobscured baseline, not the app's
           // independently panned bottom (nor our previous correction).
           visibleTop = Math.min(rawTop, Math.max(0, layoutHeight - height));
-          if (appBounds) {
-            // Keep header, canvas and portals in one visible frame. Recover
-            // native displacement before applying the next correction so
-            // repeated events cannot accumulate it. Never scroll the page.
-            appShift = visibleTop - (appBounds.top - appShift);
-            setStyle(app, "--editor-viewport-shift", `${appShift}px`);
-            appBounds = app?.getBoundingClientRect();
-          }
+          // Only viewport chrome moves. The reference shell and focused canvas
+          // never receive an authored offset, so stale reads cannot accumulate
+          // corrections or provoke another native focus scroll of the editor.
+          headerShift = visibleTop - portalTop;
+          setStyle(header, "--editor-header-shift", `${headerShift}px`);
         } else {
-          appShift = 0;
-          app?.style.removeProperty("--editor-viewport-shift");
-          appBounds = app?.getBoundingClientRect();
+          headerShift = 0;
+          header?.style.removeProperty("--editor-header-shift");
           visibleTop = Math.max(0, Math.min(rawTop + height, appBounds?.bottom ?? rawTop + height) - height);
         }
       }
-      const bottom = dock && appBounds ? Math.min(visibleTop + height, appBounds.bottom) : rawTop + height;
+      // Chrome follows the visible viewport, including while native panning
+      // leaves the unmodified writing shell above or below that viewport.
+      const bottom = (dock ? visibleTop : rawTop) + height;
       let safeBottom = bottom;
       let usableTop = Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0) + 8;
       let usableBottom = bottom - 16;
@@ -215,7 +216,7 @@ export function EditorFrame({
         if (element.dataset.keyboardVisible !== keyboardVisible) element.dataset.keyboardVisible = keyboardVisible;
         // Work directly in visible coordinates, relative to the positioned app.
         // This also compensates for native viewport panning of the app itself.
-        setStyle(element, "--editor-dock-bottom", `${bottom - (appBounds?.top || 0)}px`);
+        setStyle(element, "--editor-dock-bottom", `${bottom - portalTop}px`);
         const centered = !viewport?.offsetLeft && Math.abs((viewport?.width || window.innerWidth) - (appBounds?.width || window.innerWidth)) < 1;
         const center = centered ? "50%" : `${(viewport?.offsetLeft || 0) + (viewport?.width || window.innerWidth) / 2 - (appBounds?.left || 0)}px`;
         setStyle(element, "--editor-dock-center", center);
@@ -226,26 +227,30 @@ export function EditorFrame({
         const dockHeight = element.getBoundingClientRect().height;
         const dockWidth = element.getBoundingClientRect().width;
         setStyle(app, "--editor-header-dock-width", `${dockWidth}px`);
-        const slot = header?.querySelector<HTMLElement>(".editor-header-dock-slot");
+        const search = header?.querySelector<HTMLElement>('[data-slot="search-root"]');
         const metadata = header?.querySelector<HTMLElement>(".editor-save-status");
         const headingActions = metadata?.parentElement;
         const publish = headingActions?.querySelector<HTMLElement>(":scope > button");
-        const headerActions = header?.querySelector<HTMLElement>(".editor-app-actions");
+        const searchBounds = search?.getBoundingClientRect();
+        const publishBounds = publish?.getBoundingClientRect();
         if (app) {
           // Measure intrinsic metadata children even while the row is visually
-          // hidden. The available header width never depends on that decision.
+          // hidden. Metadata must fit in the right half-gap of the centered
+          // card; Search and Publish endpoints do not depend on its visibility.
           const metadataWidth = metadata ? Array.from(metadata.children).reduce((width, child) => width + child.getBoundingClientRect().width, 0)
             + (parseFloat(getComputedStyle(metadata).columnGap) || 0) : 0;
-          const gap = headerActions ? parseFloat(getComputedStyle(headerActions).columnGap) || 0 : 0;
           const statusGap = headingActions ? parseFloat(getComputedStyle(headingActions).columnGap) || 0 : 0;
-          const needed = dockWidth + gap + (publish?.getBoundingClientRect().width || 0) + statusGap + metadataWidth;
-          app.dataset.editorHeaderMetadata = keyboard && needed > (headerActions?.getBoundingClientRect().width || 0) ? "hidden" : "visible";
+          const halfGap = searchBounds && publishBounds ? (publishBounds.left - searchBounds.right - dockWidth) / 2 : 0;
+          app.dataset.editorHeaderMetadata = keyboard && metadataWidth + statusGap > halfGap ? "hidden" : "visible";
         }
-        const headerBottom = header?.getBoundingClientRect().bottom || visibleTop;
-        const slotBounds = slot?.getBoundingClientRect();
-        if (keyboard && slotBounds?.width) setStyle(element, "--editor-dock-center", `${slotBounds.left + slotBounds.width / 2 - (appBounds?.left || 0)}px`);
+        const headerBounds = header?.getBoundingClientRect();
+        const headerBottom = headerBounds?.bottom ?? visibleTop;
+        // Metadata can change the flex endpoints on this very paint.
+        const finalSearchBounds = search?.getBoundingClientRect();
+        const finalPublishBounds = publish?.getBoundingClientRect();
+        if (keyboard && finalSearchBounds && finalPublishBounds) setStyle(element, "--editor-dock-center", `${(finalSearchBounds.right + finalPublishBounds.left) / 2 - (appBounds?.left || 0)}px`);
         setStyle(element, "--editor-dock-anchor", keyboard
-          ? `${(slotBounds?.height ? slotBounds.top + slotBounds.height / 2 + dockHeight / 2 : headerBottom) - (appBounds?.top || 0)}px`
+          ? `${headerShift + (header?.offsetHeight || 0) / 2 + dockHeight / 2}px`
           : "calc(var(--editor-dock-bottom) - var(--editor-dock-gap))");
         if (lastPosition !== null && lastPosition !== position && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
           fade?.cancel();
@@ -261,6 +266,14 @@ export function EditorFrame({
         setStyle(element, "--editor-usable-top", `${usableTop}px`);
         setStyle(element, "--editor-usable-bottom", `${usableBottom}px`);
         element.dataset.dockSettled = "true";
+        if (owner) {
+          // Clip at the header's actual edge without moving the page scroller.
+          // Sticky titles start at the same boundary, counting its padding once.
+          const bounds = owner.getBoundingClientRect();
+          const padding = parseFloat(getComputedStyle(owner).paddingTop) || 0;
+          setStyle(owner, "--editor-header-clip", `${Math.max(0, headerBottom - bounds.top)}px`);
+          setStyle(owner, "--phone-writing-heading-offset", `${Math.max(0, usableTop - bounds.top - owner.clientTop - padding)}px`);
+        }
         const heading = canvas.current?.querySelector<HTMLElement>(".writing-document-heading") || null;
         writingTop = usableTop;
         if (heading && heading !== observedHeading) {
@@ -277,6 +290,7 @@ export function EditorFrame({
           const ownerStyle = owner ? getComputedStyle(owner) : null;
           const pinnedTop = Math.max(usableTop, owner
             ? owner.getBoundingClientRect().top + owner.clientTop + (parseFloat(ownerStyle!.paddingTop) || 0)
+              + (parseFloat(owner.style.getPropertyValue("--phone-writing-heading-offset")) || 0)
             : usableTop);
           const pinnedBottom = pinnedTop + heading.offsetHeight;
           const room = usableBottom - pinnedBottom - lineHeight;
@@ -304,7 +318,7 @@ export function EditorFrame({
       const panelBottom = dock ? usableBottom : bottom - 16;
       if (dock) setStyle(owner, "--editor-dock-clearance", `${Math.max(80, bottom - safeBottom + rect.height + 12)}px`);
       setStyle(frame.current, "--editor-navigation-height", `${dock ? 0 : rect.height}px`);
-      setStyle(overlayLayer.current, "--editor-panel-top", `${panelTop - (dock ? appBounds?.top || 0 : 0)}px`);
+      setStyle(overlayLayer.current, "--editor-panel-top", `${panelTop - (dock ? portalTop : 0)}px`);
       setStyle(overlayLayer.current, "--editor-panel-left", `${bounds.left - (dock ? appBounds?.left || 0 : 0)}px`);
       setStyle(overlayLayer.current, "--editor-panel-right", `${dock && appBounds ? appBounds.right - bounds.right : window.innerWidth - bounds.right}px`);
       setStyle(overlayLayer.current, "--editor-panel-max-width", `${bounds.width}px`);
@@ -327,7 +341,7 @@ export function EditorFrame({
       // the same screen position. Notify after that compensation as well.
       const appTop = appBounds?.top || 0;
       const band = `${usableTop}:${usableBottom}:${writingTop}:${element.dataset.dockPosition}:${element.dataset.dockSettled}:${frame.current?.dataset.titleYielded}`;
-      if (dock && (previousAppShift !== appShift || lastDockTop !== rect.top || lastDockBottom !== rect.bottom || lastAppTop !== appTop || band !== lastBand)) {
+      if (dock && (previousHeaderShift !== headerShift || lastDockTop !== rect.top || lastDockBottom !== rect.bottom || lastAppTop !== appTop || band !== lastBand)) {
         lastDockTop = rect.top;
         lastDockBottom = rect.bottom;
         lastAppTop = appTop;
@@ -391,7 +405,7 @@ export function EditorFrame({
       observer.disconnect();
       mutations.disconnect();
       if (dock) {
-        app?.style.removeProperty("--editor-viewport-shift");
+        header?.style.removeProperty("--editor-header-shift");
         app?.style.removeProperty("--editor-header-dock-width");
         app?.removeAttribute("data-editor-header-metadata");
         if (owner && frame.current?.dataset.dock !== "true") {
@@ -399,6 +413,8 @@ export function EditorFrame({
           owner.scrollTop += navigationHeight;
         }
         owner?.style.removeProperty("--editor-dock-clearance");
+        owner?.style.removeProperty("--editor-header-clip");
+        owner?.style.removeProperty("--phone-writing-heading-offset");
         frame.current?.removeAttribute("data-title-yielded");
       }
       owner?.removeEventListener("scroll", schedule);
