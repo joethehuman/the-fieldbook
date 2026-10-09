@@ -1330,6 +1330,128 @@ for (const kind of ["doc", "brief", "course"] as const)
     }
   });
 
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: final desktop writing row has useful room through menus and owner changes`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await open(page, info.project.name.startsWith("production"), kind);
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    const mounted = await writer.elementHandle();
+    const details = page.getByRole("button", { name: "Details", exact: true });
+    for (const size of [{ width: 1600, height: 1000 }, { width: 1100, height: 780 }, { width: 600, height: 1000 }]) {
+      await page.setViewportSize(size);
+      await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", size.width >= 1100 ? "workspace" : "page");
+      if (await details.getAttribute("aria-expanded") === "true") await details.click();
+      const finalRow = writer.locator("p").last();
+      const finalBounds = (await finalRow.boundingBox())!;
+      await finalRow.click({ position: { x: finalBounds.width - 4, y: finalBounds.height - 14 } });
+      await expect.poll(() => finalRow.evaluate((paragraph) => {
+        const selection = window.getSelection();
+        return !!selection?.isCollapsed && paragraph.contains(selection.focusNode);
+      })).toBe(true);
+      await page.locator(".editor").evaluate(async (editor) => {
+        const owner = editor.getAttribute("data-scroll-layout") === "workspace" ? editor.querySelector<HTMLElement>(".writing-viewport")! : editor.closest<HTMLElement>(".main-content")!;
+        owner.scrollTop = owner.scrollHeight;
+        await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+      });
+      const read = () => page.locator(".editor").evaluate((editor) => {
+        const owner = editor.getAttribute("data-scroll-layout") === "workspace" ? editor.querySelector<HTMLElement>(".writing-viewport")! : editor.closest<HTMLElement>(".main-content")!;
+        const bounds = owner.getBoundingClientRect();
+        const heading = editor.querySelector(".writing-document-heading")!.getBoundingClientRect();
+        const navigation = editor.querySelector(".editor-canvas-navigation")?.getBoundingClientRect();
+        const last = Array.from(editor.querySelectorAll(".writing-content > p")).at(-1)!.getBoundingClientRect();
+        return { gap: bounds.bottom - last.bottom, usable: bounds.bottom - Math.max(bounds.top, heading.bottom, navigation?.bottom || bounds.top), scrollTop: owner.scrollTop };
+      });
+      const before = await read();
+      expect(before.gap).toBeGreaterThanOrEqual(before.usable * 0.28 - 2);
+      expect(before.gap).toBeLessThanOrEqual(before.usable * 0.36 + 32);
+      await writer.evaluate((element) => element.blur());
+      await writer.evaluate((element) => element.focus({ preventScroll: true }));
+      // The control is already visible in pinned navigation. A screen-point
+      // click avoids Playwright's extra scrollIntoView on that sticky row.
+      await expect(details).toBeInViewport({ ratio: 1 });
+      let button = (await details.boundingBox())!;
+      await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2);
+      await expect(page.getByRole("complementary", { name: "Content details", exact: true })).toBeVisible();
+      button = (await details.boundingBox())!;
+      await page.mouse.click(button.x + button.width / 2, button.y + button.height / 2);
+      const after = await read();
+      expect(after.scrollTop).toBeCloseTo(before.scrollTop, 0);
+      expect(after.gap).toBeCloseTo(before.gap, 0);
+      expect(await mounted!.evaluate((element) => element.isConnected)).toBe(true);
+      await page.screenshot({ path: info.outputPath(`${kind}-desktop-writing-room-${size.width}.png`) });
+    }
+  });
+
+  test(`${kind}: short desktop writing canvas does not gain an extra scroll page`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 1600, height: 1000 });
+    await open(page, info.project.name.startsWith("production"), kind, 2, item => {
+      item.body = "Paragraph 1. A short piece of writing.";
+      if (kind === "course") item.lessons[0].body = item.body;
+    });
+    for (const size of [{ width: 1600, height: 1000 }, { width: 1100, height: 780 }, { width: 600, height: 1000 }]) {
+      await page.setViewportSize(size);
+      await expect(page.locator(".editor")).toHaveAttribute("data-scroll-layout", size.width >= 1100 ? "workspace" : "page");
+      await expect.poll(() => page.locator(".editor").evaluate((editor) => {
+        const page = editor.closest<HTMLElement>(".main-content")!;
+        const owner = editor.getAttribute("data-scroll-layout") === "workspace" ? editor.querySelector<HTMLElement>(".writing-viewport")! : page;
+        return Math.max(owner.scrollHeight - owner.clientHeight, page.scrollHeight - page.clientHeight);
+      })).toBeLessThanOrEqual(2);
+      await expect(page.locator('.writing-content[contenteditable="true"] > p').first()).toHaveText("Paragraph 1. A short piece of writing.");
+    }
+  });
+}
+
+test("desktop trailing canvas stays useful while typing and clicking back into the final row", async ({ page }, info) => {
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  const details = page.getByRole("button", { name: "Details", exact: true });
+  if (await details.getAttribute("aria-expanded") === "true") await details.click();
+  const last = writer.locator("p").last();
+  const lastBounds = (await last.boundingBox())!;
+  // Click after the text on its final rendered line to place a native caret.
+  await last.click({ position: { x: lastBounds.width - 4, y: lastBounds.height - 14 } });
+  await expect.poll(() => writer.locator("p").last().evaluate((paragraph) => {
+    const selection = window.getSelection()!;
+    if (!selection.isCollapsed || !paragraph.contains(selection.focusNode)) return false;
+    const before = document.createRange(); before.selectNodeContents(paragraph);
+    before.setEnd(selection.focusNode!, selection.focusOffset);
+    return before.toString() === paragraph.textContent;
+  })).toBe(true);
+  await page.keyboard.type(" Added writing wraps naturally while preserving the final row and all the paragraphs that came before it.");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("A new final writing row.");
+  await expect(writer.locator("p")).toHaveCount(41);
+  await page.locator(".editor").evaluate(async (editor) => {
+    const owner = editor.getAttribute("data-scroll-layout") === "workspace" ? editor.querySelector<HTMLElement>(".writing-viewport")! : editor.closest<HTMLElement>(".main-content")!;
+    owner.scrollTop = owner.scrollHeight;
+    await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+  });
+  const tail = await writer.evaluate((element) => {
+    const editor = element.closest(".editor")!;
+    const owner = editor.getAttribute("data-scroll-layout") === "workspace" ? editor.querySelector(".writing-viewport")! : editor.closest(".main-content")!;
+    const bounds = owner.getBoundingClientRect();
+    const heading = editor.querySelector(".writing-document-heading")!.getBoundingClientRect();
+    const navigation = editor.querySelector(".editor-canvas-navigation")?.getBoundingClientRect();
+    const line = Array.from(element.querySelectorAll(":scope > p")).at(-1)!.getBoundingClientRect();
+    const gap = bounds.bottom - line.bottom;
+    const x = line.left + line.width / 2, y = line.bottom + gap / 2;
+    return { gap, usable: bounds.bottom - Math.max(bounds.top, heading.bottom, navigation?.bottom || bounds.top), x, y, insideWriting: document.elementFromPoint(x, y)?.closest('.writing-content[contenteditable="true"]') === element };
+  });
+  expect(tail.gap).toBeGreaterThanOrEqual(tail.usable * 0.28 - 2);
+  expect(tail.insideWriting).toBe(true);
+  await page.mouse.click(tail.x, tail.y);
+  await page.keyboard.type(" Appended from the blank canvas.");
+  await expect(writer.locator("p").last()).toHaveText("A new final writing row. Appended from the blank canvas.");
+  await expect(writer.locator("p")).toHaveCount(41);
+  await waitForDraftSaved(page);
+  const { body } = await downloadMarkdown(page);
+  const paragraphs = body.trim().split(/\n{2,}/);
+  expect(paragraphs).toHaveLength(41);
+  expect(paragraphs.at(-1)).toBe("A new final writing row. Appended from the blank canvas.");
+  await page.screenshot({ path: info.outputPath("desktop-typing-in-trailing-canvas.png") });
+});
+
 test("resizing retains the writing position when the scroll owner changes", async ({ page }, info) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await open(page, info.project.name.startsWith("production"), "course");
@@ -2766,6 +2888,79 @@ test("typing stays above the dock while the keyboard viewport keeps changing", a
   await page.screenshot({ path: info.outputPath("mobile-keyboard-viewport-burst.png") });
 });
 
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: final mobile writing row clears the dock with independent layout and keyboard bounds`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    await open(page, info.project.name.startsWith("production"), kind, 2, item => {
+      item.body += "\n\nFinal mobile writing row.";
+      if (kind === "course") item.lessons[0].body = item.body;
+    });
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    await writer.locator("p").last().tap({ position: { x: 4, y: 12 } });
+    await expect.poll(() => writer.evaluate((element) => {
+      const line = Array.from(element.querySelectorAll(":scope > p")).at(-1)!;
+      return line.contains(window.getSelection()?.focusNode || null);
+    })).toBe(true);
+    await page.evaluate(() => {
+      const state = { height: 812, offsetTop: 0, clientHeight: 812 };
+      (window as unknown as { independentWritingViewport: typeof state }).independentWritingViewport = state;
+      for (const key of ["height", "offsetTop"] as const) Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => state[key] });
+      Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, get: () => state.clientHeight });
+      Object.defineProperty(window, "innerHeight", { configurable: true, get: () => state.clientHeight });
+    });
+    for (const state of [
+      { height: 812, offsetTop: 0, clientHeight: 812 },
+      { height: 490, offsetTop: 0, clientHeight: 812 },
+      { height: 390, offsetTop: 35, clientHeight: 390 },
+      { height: 812, offsetTop: 0, clientHeight: 812 },
+    ]) {
+      await page.evaluate((next) => {
+        Object.assign((window as unknown as { independentWritingViewport: typeof next }).independentWritingViewport, next);
+        window.visualViewport!.dispatchEvent(new Event("resize"));
+      }, state);
+      await page.locator(".main-content").evaluate((owner) => { owner.scrollTop = owner.scrollHeight; });
+      await expect.poll(() => writer.evaluate((element) => {
+        const line = Array.from(element.querySelectorAll(":scope > p")).at(-1)!.getBoundingClientRect();
+        const dock = element.closest(".app")!.querySelector('.editor-frame-controls[data-dock="true"]')!.getBoundingClientRect();
+        return line.bottom - dock.top;
+      }), { message: `Final ${kind} row with viewport ${state.height}, layout ${state.clientHeight}` }).toBeLessThanOrEqual(-7);
+      await expect(writer.locator("p").last()).toHaveText("Final mobile writing row.");
+    }
+    await page.screenshot({ path: info.outputPath(`${kind}-final-mobile-writing-row.png`) });
+  });
+}
+
+test("a later native owner scroll protects the caret without moving the dock", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "doc");
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  await writer.locator("p").nth(20).tap();
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport, "height", { configurable: true, get: () => 490 });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  await expect.poll(async () => (await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeCloseTo(442, 0);
+  const caretBottom = () => writer.evaluate(() => {
+    const selection = window.getSelection()!;
+    const range = selection.getRangeAt(0).cloneRange();
+    const caret = Array.from(range.getClientRects()).find(rect => rect.height > 0);
+    if (caret) return caret.bottom;
+    const text = selection.focusNode as Text;
+    const offset = Math.min(selection.focusOffset, text.length - 1);
+    range.setStart(text, offset); range.setEnd(text, offset + 1);
+    return range.getBoundingClientRect().bottom;
+  });
+  // Native caret alignment can adjust the page after the keyboard has settled,
+  // without a new visualViewport event or a touch/wheel gesture.
+  const dockTop = (await dock.boundingBox())!.y;
+  const owner = page.locator(".main-content");
+  await expect.poll(async () => (await caretBottom()) - dockTop).toBeLessThanOrEqual(-15);
+  await owner.evaluate((owner) => { owner.scrollTop -= 120; });
+  await expect.poll(async () => (await caretBottom()) - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-15);
+  expect((await dock.boundingBox())!.y).toBeCloseTo(dockTop, 0);
+});
+
 test("last writing line stays reachable when innerHeight is already keyboard-sized", async ({ page }, info) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await open(page, info.project.name.startsWith("production"), "doc");
@@ -2788,7 +2983,6 @@ test("last writing line stays reachable when innerHeight is already keyboard-siz
       window.visualViewport!.dispatchEvent(new Event("resize"));
     });
     await expect.poll(async () => (await writer.locator("p").last().boundingBox())!.y + (await writer.locator("p").last().boundingBox())!.height - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-7);
-    expect(await page.locator(".main-content").evaluate((owner) => parseFloat(getComputedStyle(owner).getPropertyValue("--phone-keyboard-space")))).toBeGreaterThan(150);
   }
   await page.screenshot({ path: info.outputPath("last-line-keyboard-sized-inner-height.png") });
 });
@@ -2824,7 +3018,10 @@ for (const device of ["iPhone", "iPad"] as const) {
       // This models Apple's ability to place a caret beside an obstructing dock.
       await paragraph.evaluate((paragraph, top) => {
         const owner = paragraph.closest<HTMLElement>(".main-content")!;
+        owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+        owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
         owner.scrollTop += paragraph.getBoundingClientRect().top - top;
+        window.dispatchEvent(new Event("touchend"));
       }, lane.y + 14);
       await expect.poll(async () => (await paragraph.boundingBox())!.y).toBeCloseTo(lane.y + 14, 0);
       expect((await paragraph.boundingBox())!.x + 4).toBeLessThan(lane.x);

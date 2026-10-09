@@ -624,6 +624,10 @@
 .editor-frame .writing-editor-notice { margin-inline: var(--editor-text-inset); }
 .editor-frame .writing-viewport { scrollbar-gutter: stable both-edges; }
 .editor-frame[data-cards="true"] .writing-content { padding-block-end: var(--space-6); }
+/* Border-box padding shares the blank room already present in a short canvas. */
+.editor .writing-root[data-writing-canvas-space="true"] .writing-document > .mdxeditor-root-contenteditable > .mdxeditor-contenteditable-wrapper > .writing-content[contenteditable] {
+  padding-block-end: max(var(--space-6), var(--writing-canvas-space, 0px));
+}
 .editor-frame[data-cards="true"] .writing-toolbar-controls { flex-wrap: nowrap; gap: var(--space-2); }
 .editor-frame[data-cards="true"] :is(.writing-block-actions, .writing-block-gutter-actions) { opacity: 1; }
 
