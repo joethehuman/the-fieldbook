@@ -1795,6 +1795,247 @@ test("every inserted block leaves a consistent noneditable gap before writing re
   }
 });
 
+for (const kind of ["doc", "brief", "course"] as const) {
+  test(`${kind}: headings retain their spacing before and after media blocks`, async ({ page }, info) => {
+    await page.route("https://example.test/heading-spacing.svg", route => route.fulfill({
+      contentType: "image/svg+xml",
+      body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#d8e5ed"/></svg>',
+    }));
+    await page.route("https://www.youtube-nocookie.com/**", route => route.fulfill({ contentType: "text/html", body: "<html><body>Video preview</body></html>" }));
+    await page.route("https://i.ytimg.com/**", route => route.fulfill({ status: 404, body: "" }));
+    const media = [
+      ["image", "![Example](https://example.test/heading-spacing.svg)"],
+      ["video", "[Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)"],
+      ["code", "```text\nExample code\n```"],
+      ["table", "| One | Two |\n| --- | --- |\n| A | B |"],
+      ["divider", "---"],
+    ] as const;
+    const sections = media.flatMap(([label, markdown]) => Array.from({ length: 6 }, (_, index) => {
+      const level = index + 1;
+      const heading = `Heading ${label} H${level}`;
+      return `Start ${label} H${level}.\n\n${markdown}\n\n${"#".repeat(level)} ${heading}\n\n${markdown}\n\nEnd ${label} H${level}.`;
+    }));
+    const body = `Paragraph 1.\n\n${sections.join("\n\n")}`;
+    await open(page, info.project.name.startsWith("production"), kind, 2, item => {
+      if (kind === "course") item.lessons[0].body = body;
+      else item.body = body;
+    });
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    await expect(writer.locator('img[alt="Example"]')).toHaveCount(12);
+    await expect.poll(() => writer.locator('img[alt="Example"]').evaluateAll(images => images.every(image => (image as HTMLImageElement).naturalWidth > 0))).toBe(true);
+    for (const width of [1440, 375]) {
+      await page.setViewportSize({ width, height: 1000 });
+      for (const [label] of media) for (let level = 1; level <= 6; level++) {
+        const heading = writer.getByRole("heading", { name: `Heading ${label} H${level}`, exact: true });
+        const geometry = await heading.evaluate(element => {
+          const previous = element.previousElementSibling!;
+          const next = element.nextElementSibling!;
+          const bounds = element.getBoundingClientRect();
+          return {
+            before: bounds.top - previous.getBoundingClientRect().bottom,
+            after: next.getBoundingClientRect().top - bounds.bottom,
+            marginTop: getComputedStyle(element).marginTop,
+            previous: previous.tagName,
+            next: next.tagName,
+          };
+        });
+        expect.soft(geometry.before, `${kind} ${label} -> H${level} at ${width}: ${JSON.stringify(geometry)}`).toBeGreaterThanOrEqual(level === 2 ? 48 : level <= 3 ? 32 : 24);
+        expect.soft(geometry.after, `${kind} H${level} -> ${label} at ${width}: ${JSON.stringify(geometry)}`).toBeGreaterThanOrEqual(16);
+      }
+    }
+  });
+}
+
+for (const style of ["Heading 1", "Heading 2", "Heading 3", "Heading 4", "Callout", "Bulleted list", "Numbered list"] as const) {
+  test(`an image inserted in an empty ${style} keeps a writing line after its block`, async ({ page }, info) => {
+    await page.route("https://example.test/styled-image.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#d8e5ed"/></svg>' }));
+    await open(page, info.project.name.startsWith("production"), "doc", 2, item => { item.body = "Paragraph 1."; });
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    await writer.locator("p").click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("/");
+    await page.getByRole("menuitem", { name: style, exact: true }).click();
+    await page.keyboard.press("/");
+    await page.getByRole("menuitem", { name: "Image", exact: true }).click();
+    const chooser = page.getByRole("dialog", { name: "Insert image", exact: true });
+    await chooser.getByRole("button", { name: "Link", exact: true }).click();
+    await chooser.getByRole("textbox", { name: "Image URL", exact: true }).fill("https://example.test/styled-image.svg");
+    await chooser.getByRole("button", { name: "Insert image", exact: true }).click();
+    const image = writer.locator('img[alt="Image"]');
+    await expect(image).toBeVisible();
+    const structure = await image.evaluate(element => {
+      const root = element.closest(".writing-content")!;
+      let block: Element = element;
+      while (block.parentElement !== root) block = block.parentElement!;
+      return { tag: block.tagName, next: block.nextElementSibling?.tagName, last: root.lastElementChild?.tagName };
+    });
+    expect(structure.next).toBe("P");
+    expect(structure.last).toBe("P");
+    const gap = await image.evaluate(element => {
+      const root = element.closest(".writing-content")!;
+      const media = element.closest('[data-editor-block-type="image"]')!;
+      return root.lastElementChild!.getBoundingClientRect().top - media.getBoundingClientRect().bottom;
+    });
+    expect(gap).toBeCloseTo(24, 0);
+    await writer.locator(":scope > p").last().click();
+    await page.keyboard.type("After the image.");
+    await expect(writer.locator(":scope > p").last()).toHaveText("After the image.");
+    await waitForDraftSaved(page);
+    expect((await downloadMarkdown(page)).body).toMatch(/Paragraph 1\.[\s\S]*!\[Image\]\([^\n]+\)[\s\S]*After the image\./);
+  });
+}
+
+for (const direction of ["before", "after"] as const) for (const [style, tag] of [
+  ["Normal Text", "P"], ["Heading 1", "H1"], ["Heading 2", "H2"], ["Heading 3", "H3"], ["Heading 4", "H4"],
+  ["Callout", "BLOCKQUOTE"], ["Bulleted list", "UL"], ["Numbered list", "OL"],
+] as const) test(`${style} commands ${direction} an image preserve media, prose and spacing`, async ({ page }, info) => {
+  await page.route("https://example.test/heading-image.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#d8e5ed"/></svg>' }));
+  await open(page, info.project.name.startsWith("production"), "doc", 2, item => {
+    item.body = "Paragraph 1.\n\n![Example](https://example.test/heading-image.svg)\n\nUntouched paragraph.";
+  });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  const image = writer.locator('img[alt="Example"]');
+  await expect(image).toBeVisible();
+  await image.evaluate((element, direction) => {
+    const paragraph = element.closest("p")!;
+    (paragraph.closest("[contenteditable]") as HTMLElement).focus();
+    const range = document.createRange();
+    range.setStart(paragraph, direction === "before" ? 0 : 1);
+    range.collapse(true);
+    window.getSelection()!.removeAllRanges();
+    window.getSelection()!.addRange(range);
+  }, direction);
+  await page.keyboard.press("/");
+  await page.getByRole("menuitem", { name: style, exact: true }).click();
+  const marker = `Authored ${direction} ${style}.`;
+  await page.keyboard.type(marker);
+  const text = writer.getByText(marker, { exact: true });
+  await expect(text).toBeVisible();
+  const geometry = await text.evaluate((element, direction) => {
+    const root = element.closest(".writing-content")!;
+    let block = element;
+    while (block.parentElement !== root) block = block.parentElement!;
+    const media = root.querySelector('img[alt="Example"]')!.closest("p")!;
+    const bounds = block.getBoundingClientRect(), imageBounds = media.getBoundingClientRect();
+    return { tag: block.tagName, mediaTag: media.parentElement === root ? "P" : media.parentElement?.tagName,
+      gap: direction === "before" ? imageBounds.top - bounds.bottom : bounds.top - imageBounds.bottom };
+  }, direction);
+  expect(geometry.tag).toBe(tag);
+  expect(geometry.mediaTag).toBe("P");
+  expect(geometry.gap).toBeGreaterThanOrEqual(direction === "before" ? 16 : style === "Heading 2" ? 48 : style === "Heading 1" || style === "Heading 3" ? 32 : 24);
+  await expect(writer.locator(":scope > p").last()).toHaveText("Untouched paragraph.");
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(image).toBeVisible();
+  await page.keyboard.press("ControlOrMeta+Shift+z");
+  await expect(text).toBeVisible();
+  await waitForDraftSaved(page);
+  const { body } = await downloadMarkdown(page);
+  expect(body).toContain(marker);
+  expect(body).not.toContain("## ![Example]");
+});
+
+test("inserting a table beside an image cannot discard that image", async ({ page }, info) => {
+  await page.route("https://example.test/table-image.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#d8e5ed"/></svg>' }));
+  await open(page, info.project.name.startsWith("production"), "doc", 2, item => {
+    item.body = "Paragraph 1.\n\n![Example](https://example.test/table-image.svg)\n\nUntouched paragraph.";
+  });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  const image = writer.locator('img[alt="Example"]');
+  await expect(image).toBeVisible();
+  await image.evaluate(element => {
+    const paragraph = element.closest("p")!;
+    (paragraph.closest("[contenteditable]") as HTMLElement).focus();
+    const range = document.createRange();
+    range.setStart(paragraph, 1); range.collapse(true);
+    window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+  });
+  await page.keyboard.press("/");
+  await page.getByRole("menuitem", { name: "Table", exact: true }).click();
+  await expect(writer.locator("table")).toBeVisible();
+  await expect(image).toBeVisible();
+  await expect(writer).toContainText("Untouched paragraph.");
+  await waitForDraftSaved(page);
+  const { body } = await downloadMarkdown(page);
+  expect(body).toContain("![Example](https://example.test/table-image.svg)");
+  expect(body).toContain("Untouched paragraph.");
+});
+
+test("inserting an image before an existing H2 preserves its separate heading and spacing", async ({ page }, info) => {
+  await page.route("https://example.test/before-heading.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#d8e5ed"/></svg>' }));
+  await open(page, info.project.name.startsWith("production"), "doc", 2, item => {
+    item.body = "Paragraph 1.\n\n## Bring a real situation\n\nUntouched paragraph.";
+  });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  const heading = writer.locator("h2");
+  await heading.evaluate(element => {
+    (element.closest("[contenteditable]") as HTMLElement).focus();
+    const range = document.createRange(); range.selectNodeContents(element); range.collapse(true);
+    window.getSelection()!.removeAllRanges(); window.getSelection()!.addRange(range);
+  });
+  await page.keyboard.press("/");
+  await page.getByRole("menuitem", { name: "Image", exact: true }).click();
+  const chooser = page.getByRole("dialog", { name: "Insert image", exact: true });
+  await chooser.getByRole("button", { name: "Link", exact: true }).click();
+  await chooser.getByRole("textbox", { name: "Image URL", exact: true }).fill("https://example.test/before-heading.svg");
+  await chooser.getByRole("button", { name: "Insert image", exact: true }).click();
+  const image = writer.locator('img[alt="Image"]');
+  await expect(image).toBeVisible();
+  await expect(heading).toHaveText("Bring a real situation");
+  expect(await image.evaluate(element => element.closest("h2"))).toBeNull();
+  const picture = (await image.boundingBox())!;
+  expect((await heading.boundingBox())!.y - picture.y - picture.height).toBeGreaterThanOrEqual(48);
+  await waitForDraftSaved(page);
+  expect((await downloadMarkdown(page)).body).toContain("\n\n## Bring a real situation");
+});
+
+test("formatting selected prose across an image leaves the media block unformatted", async ({ page }, info) => {
+  await page.route("https://example.test/selected-image.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#d8e5ed"/></svg>' }));
+  await open(page, info.project.name.startsWith("production"), "doc", 2, item => {
+    item.body = "Paragraph 1.\n\n![Example](https://example.test/selected-image.svg)\n\nAfter the image.";
+  });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  await writer.locator("p").first().click();
+  await page.keyboard.press("ControlOrMeta+a");
+  if (await page.getByRole("button", { name: "Format selected text", exact: true }).isVisible())
+    await page.getByRole("button", { name: "Format selected text", exact: true }).click();
+  const formatting = page.getByRole("dialog", { name: "Format selected text", exact: true });
+  await formatting.getByRole("button", { name: "Normal Text", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
+  await expect(writer.locator("h2")).toHaveCount(2);
+  await expect(writer.locator("h2").first()).toHaveText("Paragraph 1.");
+  await expect(writer.locator("h2").last()).toHaveText("After the image.");
+  expect(await writer.locator('img[alt="Example"]').evaluate(element => element.closest("h2"))).toBeNull();
+  await waitForDraftSaved(page);
+  const { body } = await downloadMarkdown(page);
+  expect(body).toContain("![Example](https://example.test/selected-image.svg)");
+  expect(body).not.toContain("## ![Example]");
+});
+
+test("native select-all replacement removes the complete rich document", async ({ page }, info) => {
+  await page.route("https://example.test/replace-image.svg", route => route.fulfill({ contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160"><rect width="320" height="160" fill="#d8e5ed"/></svg>' }));
+  await open(page, info.project.name.startsWith("production"), "doc", 2, item => {
+    item.body = "Paragraph 1.\n\n## A heading\n\n```text\nKeep this code\n```\n\n![Example](https://example.test/replace-image.svg)\n\n| One | Two |\n| --- | --- |\n| A | B |\n\nLast paragraph.";
+  });
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  await expect(writer.locator('img[alt="Example"]')).toBeVisible();
+  await expect(writer.locator("table")).toBeVisible();
+  await expect(writer.locator(".cm-content")).toHaveText("Keep this code");
+  await writer.locator(":scope > p").first().click();
+  await page.keyboard.press("ControlOrMeta+a");
+  await expect.poll(() => writer.evaluate(() => window.getSelection()?.toString())).toContain("Last paragraph.");
+  await page.keyboard.insertText("Replacement document.");
+  await expect(writer).toHaveText("Replacement document.");
+  await expect(writer.locator("img, table, h2, .writing-code-block")).toHaveCount(0);
+  await waitForDraftSaved(page);
+  expect((await downloadMarkdown(page)).body).toBe("Replacement document.");
+  await writer.click();
+  await page.keyboard.press("ControlOrMeta+z");
+  await expect(writer.locator("img")).toHaveCount(1);
+  await expect(writer.locator("table")).toHaveCount(1);
+  await expect(writer.locator("h2")).toHaveText("A heading");
+});
+
 
 test("a final video block retains a writing line below its reserved gap", async ({ page }, info) => {
   await page.route("https://www.youtube-nocookie.com/**", route => route.fulfill({ contentType: "text/html", body: "<html><body>Video preview</body></html>" }));

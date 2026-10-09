@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { activeEditor$, applyFormat$, applyListType$, convertSelectionToNode$, currentBlockType$, currentFormat$, currentListType$, openLinkEditDialog$ } from "@mdxeditor/editor";
+import { activeEditor$, applyFormat$, applyListType$, currentBlockType$, currentFormat$, currentListType$, openLinkEditDialog$ } from "@mdxeditor/editor";
 import { useCellValue, usePublisher } from "@mdxeditor/gurx";
 import { $addUpdateTag, $createRangeSelection, $getSelection, $isRangeSelection, $setSelection, SKIP_SCROLL_INTO_VIEW_TAG, type LexicalEditor, type RangeSelection } from "lexical";
 import { Bold, Check, ChevronRight, Code, Italic, Link, Type } from "lucide-react";
 import { Button } from "../ui/button";
 import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
-import { createWritingBlock, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
+import { $applyWritingBlockStyle, writingBlockStyles, type WritingBlockStyle } from "./writing-commands";
 import { useWritingInteraction } from "./writing-interaction";
 import { useNativeWritingSelection, useMobileWritingDock } from "./use-editor-cards-layout";
 import { normalizeWritingSelection } from "./writing-selection-boundaries";
@@ -37,7 +37,6 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
   const listType = useCellValue(currentListType$);
   const applyFormat = usePublisher(applyFormat$);
   const applyList = usePublisher(applyListType$);
-  const convert = usePublisher(convertSelectionToNode$);
   const openLink = usePublisher(openLinkEditDialog$);
   const saved = useRef<RangeSelection | null>(null);
   const savedEditor = useRef<LexicalEditor | null>(null);
@@ -55,12 +54,17 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
     const surface = editor.getRootElement();
     if (!domSelection?.rangeCount || domSelection.isCollapsed || !surface) return false;
     const selected = domSelection.getRangeAt(0).cloneRange();
+    const editableAt = (node: Node) => (node instanceof Element ? node : node.parentElement)?.closest('[contenteditable="true"]');
+    // A nested table cell belongs to its own editor. Never reuse a prose
+    // selection while the active-editor subscription is switching to that cell.
+    if (editableAt(selected.startContainer) !== surface) return false;
     // Native paragraph selection may place its trailing endpoint just outside
     // contenteditable. Clip that endpoint to the document before taking a snapshot.
     if (!surface.contains(selected.startContainer) || !selected.intersectsNode(surface)) return false;
     const contents = document.createRange();
     contents.selectNodeContents(surface);
     if (selected.compareBoundaryPoints(Range.END_TO_END, contents) > 0) selected.setEnd(contents.endContainer, contents.endOffset);
+    if (editableAt(selected.endContainer) !== surface) return false;
     if (!selected.toString().trim()) return false;
     let selection: RangeSelection | null = null;
     editor.read(() => {
@@ -153,6 +157,7 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
     document.addEventListener("selectionchange", update);
     document.addEventListener("pointerup", update);
     const unregister = editor?.registerUpdateListener(update);
+    update(); // Capture an existing native range when switching nested editors.
     return () => {
       cancelAnimationFrame(pending);
       document.removeEventListener("selectionchange", update);
@@ -185,7 +190,13 @@ export function WritingSelectionMenu({ disabled: unavailable, onReady, showPhone
     if (!restore()) return;
     if (compact) dismiss();
     if (kind === "bullet" || kind === "number") applyList(kind);
-    else convert(() => createWritingBlock(kind));
+    else editor?.update(() => {
+      const selection = $getSelection();
+      if ($isRangeSelection(selection)) {
+        normalizeWritingSelection(selection);
+        $applyWritingBlockStyle(selection, kind);
+      }
+    }, { discrete: true, tag: SKIP_SCROLL_INTO_VIEW_TAG });
     focusEditor();
   }
   function formatText(kind: "bold" | "italic" | "code") {

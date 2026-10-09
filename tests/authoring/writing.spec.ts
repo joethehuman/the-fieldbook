@@ -995,7 +995,8 @@ test("slash commands stay visible and normal inline slashes remain text", async 
   const oldScroll = await page
     .locator(".main-content")
     .evaluate((node) => node.scrollTop);
-  for (let index = 0; index < 12; index++)
+  const commandCount = await menu.locator(".writing-slash-options").getByRole("menuitem").count();
+  for (let index = 0; index < commandCount - 1; index++)
     await page.keyboard.press("ArrowDown");
   const last = menu.getByRole("menuitem", {
     name: "Embed video link",
@@ -1231,6 +1232,61 @@ test("selected-text formatting preserves surrounding text and adjacent list item
   expect((await read()).content[0].body).toMatch(/[*-] First item/);
   expect((await read()).content[0].body).toMatch(/[*-] Third item/);
 });
+
+for (const [name, tag, marker] of [["Bold", "strong", "**"], ["Italic", "em", "*"], ["Inline code", "code", "`"]] as const) {
+  test(`${name} preserves block styles, surrounding text and undo across writing contexts`, async ({ page }, info) => {
+    const contexts = [
+      ["paragraph", ":scope > p", ""],
+      ["heading1", "h1", "# "], ["heading2", "h2", "## "],
+      ["heading3", "h3", "### "], ["heading4", "h4", "#### "],
+      ["callout", "blockquote", "> "], ["bullet", "ul > li", "- "], ["numbered", "ol > li", "1. "],
+    ] as const;
+    const body = contexts.map(([label, , prefix]) => `${prefix}Before target ${label} after.`).join("\n\n") +
+      "\n\n| Cell |\n| --- |\n| Before target cell after. |";
+    const { read } = await setup(page, info.project.name.startsWith("production"), body);
+    const editor = page.getByRole("textbox", { name: "Doc content", exact: true });
+    const tools = page.getByRole("dialog", { name: "Format selected text", exact: true });
+    const targets = [...contexts.map(([label, selector]) => [label, selector] as const), ["cell", "td"] as const];
+    for (const [label, selector] of targets) {
+      const sentence = `Before target ${label} after.`;
+      const block = editor.locator(selector).filter({ hasText: sentence });
+      await block.click();
+      await expect(tools).toBeHidden();
+      if (label === "cell") {
+        // Cell activation schedules its own focus. Select through the real
+        // keyboard after activation rather than racing that focus with a DOM range.
+        await block.getByRole("textbox").selectText();
+        await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(sentence);
+        await page.keyboard.press("ArrowLeft");
+        for (let index = 0; index < 7; index++) await page.keyboard.press("ArrowRight");
+        for (let index = 0; index < `target ${label}`.length; index++) await page.keyboard.press("Shift+ArrowRight");
+      } else await block.evaluate((node, selected) => {
+          (node.closest('[contenteditable="true"]') as HTMLElement).focus();
+          const text = document.createTreeWalker(node, NodeFilter.SHOW_TEXT).nextNode()!;
+          window.getSelection()!.setBaseAndExtent(text, 7, text, 7 + selected.length);
+        }, `target ${label}`);
+      await expect.poll(() => page.evaluate(() => window.getSelection()?.toString())).toBe(`target ${label}`);
+      await tools.getByRole("button", { name, exact: true }).click();
+      await expect(block.locator(tag)).toHaveText(`target ${label}`);
+      await expect(block).toHaveText(sentence);
+      await page.keyboard.press("ControlOrMeta+z");
+      await expect(block.locator(tag)).toHaveCount(0);
+      await expect(block).toHaveText(sentence);
+      await page.keyboard.press("ControlOrMeta+Shift+z");
+      await expect(block.locator(tag)).toHaveText(`target ${label}`);
+      await page.keyboard.press("Escape");
+    }
+    await editor.locator(":scope > p").first().click(); // Commit the nested cell on blur.
+    await waitForDraftSaved(page);
+    const saved = (await read()).content[0].body;
+    for (const [label] of targets) expect(saved).toContain(`${marker}target ${label}${marker}`);
+    await page.reload();
+    for (const [label, selector] of targets) {
+      const block = editor.locator(selector).filter({ hasText: `Before target ${label} after.` });
+      await expect(block.locator(tag)).toHaveText(`target ${label}`);
+    }
+  });
+}
 
 test("long writing uses a stationary desktop frame and reachable natural page fallback", async ({ page }, info) => {
   await setup(page, info.project.name.startsWith("production"), Array.from({ length: 55 }, (_, index) => `Paragraph ${index + 1}. Practical context that keeps growing as the author writes.`).join("\n\n"));
