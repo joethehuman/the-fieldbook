@@ -579,6 +579,19 @@
     padding: 0;
     margin: 0;
   }
+  /* Keep the table heading clear while softly fading scrolled rows beneath it. */
+  .category-items-scroll::after {
+    content: "";
+    position: absolute;
+    inset: calc(2.5rem + 1px) 0 auto;
+    height: var(--scroll-fade-size);
+    background: var(--scroll-fade-overlay);
+    opacity: 0;
+    transition: opacity 160ms ease;
+    pointer-events: none;
+    z-index: 20;
+  }
+  .category-items-scroll[data-scroll-fade-before="true"]::after { opacity: 1; }
   [data-sortable-preview][data-drop] { position: relative; }
   [data-sortable-preview][data-drop]::after {
     content: "";

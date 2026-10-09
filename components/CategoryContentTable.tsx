@@ -8,6 +8,7 @@ import { DataTable } from "./patterns/data-table";
 import { RowActions, type RowAction } from "./patterns/row-actions";
 import { SearchField } from "./patterns/search-field";
 import { PublicationStatus } from "./patterns/publication-status";
+import { useScrollFade } from "./patterns/use-scroll-fade";
 import { Button } from "./ui/button";
 import { Checkbox } from "./ui/choice";
 import { Input } from "./ui/input";
@@ -126,6 +127,7 @@ export function CategoryContentTable({
 }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const fade = useScrollFade<HTMLDivElement>();
   const search = query.trim().toLowerCase();
   const visible = items.filter((item) =>
     (item.title || "Untitled item").toLowerCase().includes(search),
@@ -168,77 +170,91 @@ export function CategoryContentTable({
           },
         ]}
       />
-      <TableContainer
-        aria-label={`Scrollable items in ${name}`}
-        className="max-h-[calc(2.5rem+5*(var(--control-height)+1rem+1px)+2px)] overflow-auto overscroll-contain rounded-none border-0 [scrollbar-gutter:stable]"
+      <div
+        data-slot="category-items-scroll"
+        data-scroll-fade-before={fade.edges.before}
+        className="category-items-scroll relative min-w-0"
       >
-        <DataTable layout="categoryItems" density="compact" aria-label={label}>
-          <TableHeader className="sticky top-0 z-20 bg-background">
-            <TableRow className="h-10 hover:bg-background focus-within:bg-background group-data-[pin-actions=true]/table:hover:bg-background group-data-[pin-actions=true]/table:focus-within:bg-background">
-              <TableHead>
-                <div className="flex items-center justify-center">
-                  <SelectRows
-                    ids={busy ? [] : visible.map((item) => item.id)}
-                    value={selectedIds}
-                    onChange={setSelected}
-                    label={`Select all matching items in ${name}`}
-                  />
-                </div>
-              </TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="group-data-[pin-actions=true]/table:last:bg-background group-data-[pin-actions=true]/table:last:before:to-background">
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.map((item) => (
-              <TableRow key={item.id} className="h-12" data-item-id={item.id}>
-                <TableCell>
+        <TableContainer
+          ref={fade.ref}
+          onScroll={fade.measure}
+          data-scroll-fade-before="false"
+          data-scroll-fade-after={fade.edges.after}
+          aria-label={`Scrollable items in ${name}`}
+          className="scroll-fade max-h-[calc(2.5rem+5*(var(--control-height)+1rem+1px)+2px)] overflow-auto overscroll-contain rounded-none border-0 [scrollbar-gutter:stable] [--scroll-fade-depth:var(--scroll-fade-size)]"
+        >
+          <DataTable
+            layout="categoryItems"
+            density="compact"
+            aria-label={label}
+          >
+            <TableHeader className="sticky top-0 z-20 bg-background">
+              <TableRow className="h-10 hover:bg-background focus-within:bg-background group-data-[pin-actions=true]/table:hover:bg-background group-data-[pin-actions=true]/table:focus-within:bg-background">
+                <TableHead>
                   <div className="flex items-center justify-center">
-                    <Checkbox
-                      aria-label={`Select ${item.title || "Untitled item"}`}
-                      disabled={busy}
-                      checked={selectedIds.includes(item.id)}
-                      onCheckedChange={(checked) =>
-                        setSelected((current) =>
-                          checked === true
-                            ? [...new Set([...current, item.id])]
-                            : current.filter((id) => id !== item.id),
-                        )
-                      }
+                    <SelectRows
+                      ids={busy ? [] : visible.map((item) => item.id)}
+                      value={selectedIds}
+                      onChange={setSelected}
+                      label={`Select all matching items in ${name}`}
                     />
                   </div>
-                </TableCell>
-                <TableCell>
-                  <span
-                    className="block max-w-64 truncate sm:max-w-96"
-                    title={item.title || "Untitled item"}
-                  >
-                    {item.title || "Untitled item"}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <PublicationStatus published={!!item.publishedRevision} />
-                </TableCell>
-                <TableCell>
-                  <RowActions
-                    label={item.title || "Untitled item"}
-                    disabled={busy}
-                    actions={[
-                      {
-                        label: "Move to category…",
-                        onSelect: () => onMove([item.id]),
-                      },
-                    ]}
-                  />
-                </TableCell>
+                </TableHead>
+                <TableHead>Title</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="group-data-[pin-actions=true]/table:last:bg-background group-data-[pin-actions=true]/table:last:before:to-background">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </DataTable>
-      </TableContainer>
+            </TableHeader>
+            <TableBody>
+              {visible.map((item) => (
+                <TableRow key={item.id} className="h-12" data-item-id={item.id}>
+                  <TableCell>
+                    <div className="flex items-center justify-center">
+                      <Checkbox
+                        aria-label={`Select ${item.title || "Untitled item"}`}
+                        disabled={busy}
+                        checked={selectedIds.includes(item.id)}
+                        onCheckedChange={(checked) =>
+                          setSelected((current) =>
+                            checked === true
+                              ? [...new Set([...current, item.id])]
+                              : current.filter((id) => id !== item.id),
+                          )
+                        }
+                      />
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span
+                      className="block max-w-64 truncate sm:max-w-96"
+                      title={item.title || "Untitled item"}
+                    >
+                      {item.title || "Untitled item"}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <PublicationStatus published={!!item.publishedRevision} />
+                  </TableCell>
+                  <TableCell>
+                    <RowActions
+                      label={item.title || "Untitled item"}
+                      disabled={busy}
+                      actions={[
+                        {
+                          label: "Move to category…",
+                          onSelect: () => onMove([item.id]),
+                        },
+                      ]}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </DataTable>
+        </TableContainer>
+      </div>
       {!visible.length && (
         <div
           className="flex flex-wrap items-center justify-between gap-3 text-copy text-muted-foreground"

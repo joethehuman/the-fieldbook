@@ -375,8 +375,11 @@ test("large categories have bounded searchable tables, select-all and individual
     exact: true,
   });
   await expect(
-    page.getByRole("list", { name: "Courses categories", exact: true }).locator(":scope > li"),
+    page
+      .getByRole("list", { name: "Courses categories", exact: true })
+      .locator(":scope > li"),
   ).toHaveCount(before.settings!.contentCategories!.course.length);
+  const scrollFrame = section.locator('[data-slot="category-items-scroll"]');
   const viewport = section.getByRole("region", {
     name: `Scrollable items in ${name}`,
     exact: true,
@@ -419,14 +422,34 @@ test("large categories have bounded searchable tables, select-all and individual
   });
   await expect(bulk).toBeDisabled();
   await section.scrollIntoViewIfNeeded();
+  await expect(viewport).toHaveAttribute("data-scroll-fade-after", "true");
+  await expect(scrollFrame).toHaveAttribute("data-scroll-fade-before", "false");
   await page.screenshot({
     path: info.outputPath("category-item-table.png"),
+    fullPage: true,
+  });
+  await viewport.evaluate((element) => {
+    element.scrollTop = element.scrollHeight / 2;
+  });
+  await expect(viewport).toHaveAttribute("data-scroll-fade-after", "true");
+  await expect(scrollFrame).toHaveAttribute("data-scroll-fade-before", "true");
+  await expect
+    .poll(() =>
+      scrollFrame.evaluate(
+        (element) => getComputedStyle(element, "::after").opacity,
+      ),
+    )
+    .toBe("1");
+  await page.screenshot({
+    path: info.outputPath("category-item-scroll-fade.png"),
     fullPage: true,
   });
   await viewport.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
     element.scrollLeft = element.scrollWidth;
   });
+  await expect(viewport).toHaveAttribute("data-scroll-fade-after", "false");
+  await expect(scrollFrame).toHaveAttribute("data-scroll-fade-before", "true");
   const viewportBounds = await viewport.boundingBox();
   const headerBounds = await table.locator("thead").boundingBox();
   expect(Math.abs(headerBounds!.y - viewportBounds!.y - 1)).toBeLessThanOrEqual(
@@ -473,6 +496,10 @@ test("large categories have bounded searchable tables, select-all and individual
     name: `Search items in ${name}`,
     exact: true,
   });
+  await search.fill("Example course 01");
+  await expect(table.locator("tbody tr")).toHaveCount(1);
+  await expect(viewport).toHaveAttribute("data-scroll-fade-after", "false");
+  await expect(scrollFrame).toHaveAttribute("data-scroll-fade-before", "false");
   await search.fill("EXAMPLE COURSE 0");
   await expect(table.locator("tbody tr")).toHaveCount(9);
   await section
@@ -503,6 +530,8 @@ test("large categories have bounded searchable tables, select-all and individual
   await expect(
     section.getByText("No items match your search.", { exact: true }),
   ).toBeVisible();
+  await expect(viewport).toHaveAttribute("data-scroll-fade-after", "false");
+  await expect(scrollFrame).toHaveAttribute("data-scroll-fade-before", "false");
   await section
     .getByRole("button", { name: "Clear search", exact: true })
     .click();

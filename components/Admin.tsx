@@ -143,6 +143,7 @@ import {
   Check,
   Settings,
   MessageSquare,
+  Tag,
 } from "lucide-react";
 import { CardArtEditor } from "./patterns/card-art-editor";
 import { graphemeCount, resolvedCardArt } from "@/lib/card-art";
@@ -237,7 +238,7 @@ const adminSections = [
         id: "settings-categories",
         name: "Categories",
         description: "Manage course and update categories and course category order.",
-        icon: Layers,
+        icon: Tag,
       },
       {
         id: "settings-docs",
