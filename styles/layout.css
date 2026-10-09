@@ -420,21 +420,27 @@
   }
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="outline"] { inset-inline-start: var(--editor-panel-left, var(--space-4)); }
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
+  .editor-controls-surface { display: contents; }
   .editor-frame-controls[data-dock="true"] {
     position: absolute;
     inset: var(--editor-dock-anchor, calc(var(--editor-dock-bottom, 100dvh) - var(--editor-dock-gap, var(--space-3)))) auto auto var(--editor-dock-center, 50%);
     transform: translate(-50%, -100%);
     display: flex;
-    align-items: center;
     width: max-content;
     max-width: calc(100vw - 24px);
     min-height: 46px;
     height: auto;
     margin: 0;
-    padding: 0 var(--space-1);
-    gap: 0;
+    padding: 0;
     z-index: 25;
     pointer-events: auto;
+  }
+  .editor-frame-controls[data-dock="true"] .editor-controls-surface {
+    display: flex;
+    align-items: center;
+    min-height: 46px;
+    padding: 0 var(--space-1);
+    gap: 0;
     border: 1px solid var(--border);
     border-radius: 12px;
     background: var(--background);

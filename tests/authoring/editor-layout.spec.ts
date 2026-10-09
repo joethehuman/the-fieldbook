@@ -2472,6 +2472,72 @@ test("last writing line stays reachable when innerHeight is already keyboard-siz
   await page.screenshot({ path: info.outputPath("last-line-keyboard-sized-inner-height.png") });
 });
 
+for (const reduced of [false, true]) {
+  test(`touch motion preserves immediate geometry and focus${reduced ? " with reduced motion" : ""}`, async ({ page }, info) => {
+    await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
+    await page.setViewportSize({ width: 375, height: 812 });
+    await open(page, info.project.name.startsWith("production"), "doc");
+    const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+    await writer.locator("p").first().click();
+    await page.evaluate(() => {
+      const state = { height: 430, offsetTop: 0 };
+      (window as unknown as { motionViewport: typeof state }).motionViewport = state;
+      for (const key of ["height", "offsetTop"] as const) Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => state[key] });
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+    });
+    const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+    const surface = dock.locator(".editor-controls-surface");
+    await expect.poll(async () => (await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeCloseTo(382, 0);
+    // Hold a visual animation deterministically; its anchor must already be in
+    // the new safe lane and every interpolated frame must fit above that lane.
+    const samples = await dock.evaluate(async (element, reduced) => {
+      (window as unknown as { motionViewport: { height: number } }).motionViewport.height = 700;
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      await new Promise(requestAnimationFrame);
+      await new Promise(requestAnimationFrame);
+      const surface = element.querySelector<HTMLElement>(".editor-controls-surface")!;
+      const animation = surface.getAnimations()[0];
+      if (animation) animation.pause();
+      const anchor = element.getBoundingClientRect();
+      const frames = [];
+      for (const time of [0, 35, 70, 140]) {
+        if (animation) animation.currentTime = time;
+        const box = surface.getBoundingClientRect();
+        frames.push({ top: box.top, bottom: box.bottom, width: box.width });
+      }
+      if (animation) animation.currentTime = 35;
+      return { anchorBottom: anchor.bottom, anchorTop: anchor.top, animated: !!animation, reduced, frames };
+    }, reduced);
+    expect(samples.anchorBottom).toBeCloseTo(652, 0);
+    expect(samples.animated).toBe(!reduced);
+    for (const frame of samples.frames) {
+      expect(frame.top).toBeGreaterThanOrEqual((await page.locator(".topbar").boundingBox())!.height + 7);
+      expect(frame.bottom).toBeLessThanOrEqual(653);
+    }
+    if (!reduced) {
+      expect(samples.frames[0].top).toBeLessThan(samples.anchorTop - 100);
+      expect(samples.frames[1].top).toBeGreaterThan(samples.frames[0].top);
+      expect(samples.frames[2].top).toBeGreaterThan(samples.frames[1].top);
+      expect(samples.frames[3].top).toBeCloseTo(samples.anchorTop, 0);
+    }
+    // Opening from a moving surface must still produce one focused menu and
+    // closing must synchronously restore the saved editing target.
+    await dock.getByRole("button", { name: /^Commands:/ }).evaluate((button) => (button as HTMLButtonElement).click());
+    const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+    await expect(menu).toBeVisible();
+    await expect(writer).not.toBeFocused();
+    await expect.poll(() => surface.evaluate((element) => element.getAnimations().length)).toBe(0);
+    expect(await menu.evaluate((element) => getComputedStyle(element).animationName)).toBe(reduced ? "none" : "writing-touch-menu-enter");
+    const box = (await menu.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual((await dock.boundingBox())!.y - 7);
+    await menu.getByRole("menuitem", { name: "Close menu esc", exact: true }).click();
+    await expect(writer).toBeFocused();
+    await page.keyboard.type("Still writing. ");
+    await expect(writer).toContainText("Still writing.");
+    await page.screenshot({ path: info.outputPath(`touch-motion-${reduced ? "reduced" : "normal"}.png`) });
+  });
+}
+
 test("compact insertion palette exposes commands in a short keyboard viewport", async ({ page }, info) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" });

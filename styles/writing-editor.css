@@ -106,6 +106,14 @@
   box-shadow: 0 12px 32px rgb(0 0 0 / 0.12);
   overflow: hidden;
 }
+/* Opacity leaves the command geometry and immediate focus lifecycle intact. */
+:is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] {
+  animation: writing-touch-menu-enter 140ms ease-out;
+}
+@keyframes writing-touch-menu-enter { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  :is(.writing-slash-menu, .writing-media-chooser)[data-touch-motion="true"] { animation: none; }
+}
 .writing-slash-options {
   display: grid;
   min-height: 0;
