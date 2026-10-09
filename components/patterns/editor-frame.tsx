@@ -91,6 +91,7 @@ export function EditorFrame({
     panelReturn.current = null;
     if (!dock) toggle?.focus();
     else if (!restoreWritingCursor(cursor)) toggle?.focus({ preventScroll: true });
+    else cursor?.surface.dispatchEvent(new Event("fieldbook:writing-resume", { bubbles: true }));
   }
   function togglePanel(side: "outline" | "details") {
     defaultsApplied.current = true;
@@ -138,7 +139,12 @@ export function EditorFrame({
         const editing = active instanceof HTMLElement && (active.isContentEditable || active.matches("input:not([type=button]):not([type=checkbox]), textarea"));
         const occluded = layoutHeight - height;
         keyboard = (viewport?.scale || 1) === 1 && (keyboard ? occluded > 80 : editing && occluded > 120);
-        if (!keyboard && !editing) layoutHeight = Math.max(document.documentElement.clientHeight, height);
+        // A blurred menu can see an intermediate keyboard-dismissal height.
+        // Retain the established unobscured baseline at this layout width so
+        // a quick return to writing still detects the reopened keyboard.
+        if (!keyboard && !editing) layoutHeight = Math.max(layoutHeight, document.documentElement.clientHeight, height);
+        const keyboardVisible = keyboard ? "true" : "false";
+        if (element.dataset.keyboardVisible !== keyboardVisible) element.dataset.keyboardVisible = keyboardVisible;
         // Work directly in visible coordinates, relative to the positioned app.
         // This also compensates for native viewport panning of the app itself.
         setStyle(element, "--editor-dock-bottom", `${bottom - (appBounds?.top || 0)}px`);

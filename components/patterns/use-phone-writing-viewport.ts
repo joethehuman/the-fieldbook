@@ -19,6 +19,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     let moved = false;
     let manualGesture = false;
     let protecting = false;
+    let returningSelection = false;
     let caretNode: Node | null = null;
     let caretOffset = -1;
     let request = 0;
@@ -66,10 +67,23 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       const active = document.activeElement;
       if (!protecting || dragging || !phone.matches || !touch.matches || viewport!.scale !== 1 || !(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)) return;
       const selection = window.getSelection();
-      if (!selection?.rangeCount || !selection.isCollapsed || !root!.contains(selection.focusNode)) return;
+      if (!selection?.rangeCount || !root!.contains(selection.focusNode)
+        || !selection.isCollapsed && !returningSelection) return;
       const element = selection.focusNode instanceof Element ? selection.focusNode : selection.focusNode?.parentElement;
       if (!element?.closest('[contenteditable="true"]')) return;
-      let caret = readWritingCaretLine(root) || selection.getRangeAt(0).getClientRects()[0];
+      let caret = selection.isCollapsed ? readWritingCaretLine(root) || selection.getRangeAt(0).getClientRects()[0] : undefined;
+      if (!selection.isCollapsed && returningSelection && selection.focusNode) {
+        // An explicit menu handback may restore selected text. Reveal its
+        // focus edge without collapsing or rewriting the native selection.
+        const focus = document.createRange();
+        focus.setStart(selection.focusNode, selection.focusOffset); focus.collapse(true);
+        caret = Array.from(focus.getClientRects()).find(rect => rect.height > 0);
+        if (!caret && selection.focusNode instanceof Text && selection.focusNode.length) {
+          const start = Math.min(selection.focusOffset, selection.focusNode.length - 1);
+          focus.setStart(selection.focusNode, start); focus.setEnd(selection.focusNode, start + 1);
+          caret = Array.from(focus.getClientRects()).find(rect => rect.height > 0);
+        }
+      }
       if (!caret?.height) {
         // A new Lexical paragraph is <p><br></p>: its collapsed range has no
         // text rectangle. Use only that empty line, never the whole canvas.
@@ -84,11 +98,16 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       const rem = parseFloat(getComputedStyle(document.documentElement).fontSize);
       const navigation = root!.closest(".editor-frame-canvas")?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().bottom || bounds.top;
       const heading = root!.querySelector(".writing-document-heading")?.getBoundingClientRect().bottom || bounds.top;
-      const top = Math.max(bounds.top, viewport!.offsetTop, navigation, heading) + rem;
+      const rawTop = Math.max(bounds.top, viewport!.offsetTop, navigation, heading);
       // Protect the actual toolbar boundary, including native app panning,
       // rather than deriving its location from a viewport height difference.
       const bottom = writingBottom(lineMargin());
-      if (bottom <= top) return;
+      const available = bottom - rawTop;
+      if (available < caret.height - 1) return;
+      // Larger formatted glyphs can fit in the writing band while the extra
+      // top comfort margin cannot. Compress only that optional margin rather
+      // than alternate between incompatible top and dock corrections.
+      const top = rawTop + Math.min(rem, Math.max(0, available - caret.height));
       const delta = caret.bottom > bottom ? caret.bottom - bottom : caret.top < top ? caret.top - top : 0;
       if (Math.abs(delta) < 1 || correctionsLeft === 0) return;
       const next = Math.max(0, Math.min(owner!.scrollHeight - owner!.clientHeight, owner!.scrollTop + delta));
@@ -139,6 +158,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       schedule();
     }
     function editing(event?: Event) {
+      returningSelection = false;
       // Focus and viewport movement own keyboard geometry. Text input is
       // followed by the rendered-text observer, without another layout read.
       if (event?.type !== "input") reserveSpace();
@@ -151,11 +171,21 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       }
       else cancelReveal();
     }
-    function blur() { protecting = false; cancelReveal(); reserveSpace(); }
+    function blur() { returningSelection = false; protecting = false; cancelReveal(); reserveSpace(); }
+    function resumeWriting() {
+      const active = document.activeElement;
+      const selection = window.getSelection();
+      if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)
+        || !selection?.rangeCount || !root!.contains(selection.focusNode) || !root!.contains(selection.anchorNode)) return;
+      returningSelection = !selection.isCollapsed;
+      manualGesture = false;
+      reserveSpace(); renewProtection(); revealCaret(); schedule();
+    }
     function selectionMoved() {
       const selection = window.getSelection();
       const active = document.activeElement;
-      if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active) || !selection?.isCollapsed || !root!.contains(selection.focusNode)) {
+      if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)
+        || !selection?.rangeCount || !selection.isCollapsed && !returningSelection || !root!.contains(selection.focusNode)) {
         // A native selection can briefly disappear or expand while WebKit
         // updates it. Its return to the same caret must rearm protection.
         caretNode = null; caretOffset = -1;
@@ -166,7 +196,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       caretNode = selection.focusNode; caretOffset = selection.focusOffset;
       if (!manualGesture) { renewProtection(); schedule(); }
     }
-    function startDrag() { dragging = true; moved = false; manualGesture = false; cancelReveal(); }
+    function startDrag() { returningSelection = false; dragging = true; moved = false; manualGesture = false; cancelReveal(); }
     function moveDrag() { moved = true; manualGesture = true; protecting = false; cancelReveal(); }
     function endDrag() {
       if (!dragging) return;
@@ -176,11 +206,12 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       if (!moved) { renewProtection(); schedule(); }
     }
     function cancelDrag() { dragging = false; manualGesture = true; protecting = false; cancelReveal(); }
-    function wheel() { manualGesture = true; protecting = false; cancelReveal(); }
+    function wheel() { returningSelection = false; manualGesture = true; protecting = false; cancelReveal(); }
     function navigateCaret(event: KeyboardEvent) {
       if (!/^(ArrowLeft|ArrowRight|ArrowUp|ArrowDown|Home|End|PageUp|PageDown)$/.test(event.key)) return;
       const active = document.activeElement;
       if (!(active instanceof HTMLElement) || !active.isContentEditable || !root!.contains(active)) return;
+      returningSelection = false;
       manualGesture = false; renewProtection(); schedule();
     }
     const writing = new MutationObserver((records) => {
@@ -203,6 +234,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
     editor.addEventListener("focusin", editing);
     editor.addEventListener("focusout", blur);
     root.addEventListener("input", editing);
+    root.addEventListener("fieldbook:writing-resume", resumeWriting);
     root.addEventListener("keydown", navigateCaret, true);
     document.addEventListener("selectionchange", selectionMoved);
     owner.addEventListener("fieldbook:editor-dock-change", dockChanged);
@@ -224,6 +256,7 @@ export function usePhoneWritingViewport(ref: RefObject<HTMLElement | null>) {
       editor.removeEventListener("focusin", editing);
       editor.removeEventListener("focusout", blur);
       root.removeEventListener("input", editing);
+      root.removeEventListener("fieldbook:writing-resume", resumeWriting);
       root.removeEventListener("keydown", navigateCaret, true);
       document.removeEventListener("selectionchange", selectionMoved);
       owner.removeEventListener("fieldbook:editor-dock-change", dockChanged);

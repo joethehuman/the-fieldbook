@@ -720,7 +720,9 @@ test("contextual headings, links and table cells serialize as reader-compatible 
     exact: true,
   });
   await editor.click();
-  await page.getByRole("button", { name: /^Commands:/ }).click();
+  await editor.press("ControlOrMeta+A");
+  await page.getByRole("dialog", { name: "Format selected text", exact: true })
+    .getByRole("button", { name: "Normal Text", exact: true }).click();
   await page.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
   await expect(editor.locator("h2")).toHaveText("Write clearly");
   await editor.locator("h2").evaluate((node) => {
@@ -756,8 +758,8 @@ test("contextual headings, links and table cells serialize as reader-compatible 
   await page.keyboard.press("ArrowRight");
   await editor.press("Enter");
   await expect(editor.getByRole("link", { name: "Reference" })).toBeVisible();
-  await page.getByRole("button", { name: /^Commands:/ }).click();
-  await page.getByRole("menuitem", { name: "Table", exact: true }).click();
+  await page.keyboard.type("/table");
+  await page.keyboard.press("Enter");
   const table = editor.getByRole("table");
   await table.getByRole("textbox").first().fill("Topic");
   await table.getByRole("textbox").nth(3).fill("Useful detail");

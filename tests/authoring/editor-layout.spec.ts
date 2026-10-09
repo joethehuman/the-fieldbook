@@ -2425,6 +2425,309 @@ test("editor delete failure retains the draft and uses the latest saved revision
 test.describe("touch-only writing dock", () => {
   test.use({ hasTouch: true });
 
+type CommandViewport = { height: number; offsetTop: number; clientHeight: number; appPan: number };
+type CommandLifecycle = {
+  viewport: CommandViewport;
+  phase: number;
+  closingTimer: number;
+  recordRequest: number;
+  proseFocusCount: number;
+  visibleFrames: { height: number; top: number; bottom: number }[];
+};
+
+async function prepareCommandLifecycle(page: Page, installed: boolean) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" });
+    Object.defineProperty(navigator, "platform", { configurable: true, value: "iPhone" });
+    Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, installed, "doc");
+  const writer = page.locator('.writing-content[contenteditable="true"]');
+  const paragraph = writer.locator("p").nth(20);
+  const bounds = (await paragraph.boundingBox())!;
+  await paragraph.tap({ position: { x: bounds.width - 4, y: bounds.height - 14 } });
+  await page.evaluate(() => {
+    const fixture: CommandLifecycle = { viewport: { height: 490, offsetTop: 0, clientHeight: 812, appPan: 0 }, phase: 0, closingTimer: 0, recordRequest: 0, proseFocusCount: 0, visibleFrames: [] };
+    (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle = fixture;
+    for (const key of ["height", "offsetTop"] as const) Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => fixture.viewport[key] });
+    Object.defineProperty(document.documentElement, "clientHeight", { configurable: true, get: () => fixture.viewport.clientHeight });
+    Object.defineProperty(window, "innerHeight", { configurable: true, get: () => fixture.viewport.clientHeight });
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+  });
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  await expect.poll(async () => (await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeCloseTo(362, 0);
+  const commands = dock.getByRole("button", { name: /^Commands:/ });
+  await expect(commands).toBeEnabled();
+  return { writer, paragraph, dock, commands };
+}
+
+async function animateCommandKeyboardClosing(page: Page) {
+  await page.evaluate(() => {
+    const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+    const writer = document.querySelector('.writing-content[contenteditable="true"]')!;
+    let started = false;
+    const steps = [{ height: 560, wait: 40 }, { height: 650, wait: 40 }, { height: 750, wait: 220 }, { height: 812, wait: 0 }];
+    const advance = (index: number) => {
+      fixture.phase = index + 1;
+      Object.assign(fixture.viewport, { height: steps[index].height, clientHeight: steps[index].height });
+      window.visualViewport!.dispatchEvent(new Event("resize"));
+      if (index + 1 < steps.length) fixture.closingTimer = window.setTimeout(() => advance(index + 1), steps[index].wait);
+    };
+    writer.addEventListener("focusout", () => { started = true; advance(0); }, { once: true });
+    writer.addEventListener("focusin", () => {
+      fixture.proseFocusCount++;
+      if (started) clearTimeout(fixture.closingTimer);
+    });
+  });
+}
+
+async function changeCommandViewport(page: Page, next: CommandViewport) {
+  await page.evaluate(async (next) => {
+    const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+    Object.assign(fixture.viewport, next);
+    const app = document.querySelector<HTMLElement>(".app")!;
+    if (next.appPan) app.style.transform = `translateY(${next.appPan}px)`;
+    else app.style.removeProperty("transform");
+    window.visualViewport!.dispatchEvent(new Event("resize"));
+    window.visualViewport!.dispatchEvent(new Event("scroll"));
+    window.dispatchEvent(new Event("scroll"));
+    await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+  }, next);
+}
+
+async function restoredCommandGeometry(page: Page) {
+  return page.locator('.writing-content[contenteditable="true"]').evaluate(() => {
+    const selection = window.getSelection()!;
+    const focus = document.createRange();
+    focus.setStart(selection.focusNode!, selection.focusOffset); focus.collapse(true);
+    let rect = Array.from(focus.getClientRects()).find(rect => rect.height > 0);
+    if (!rect && selection.focusNode instanceof Text && selection.focusNode.length) {
+      const offset = Math.min(selection.focusOffset, selection.focusNode.length - 1);
+      focus.setStart(selection.focusNode, offset); focus.setEnd(selection.focusNode, offset + 1);
+      rect = Array.from(focus.getClientRects()).find(rect => rect.height > 0);
+    }
+    const dock = document.querySelector('.editor-frame-controls[data-dock="true"]')!.getBoundingClientRect();
+    const native = selection.getRangeAt(0);
+    const backward = !selection.isCollapsed && selection.anchorNode === native.endContainer && selection.anchorOffset === native.endOffset;
+    const writer = document.querySelector<HTMLElement>('.writing-content[contenteditable="true"]')!;
+    const owner = writer.closest<HTMLElement>(".main-content")!;
+    const ownerBounds = owner.getBoundingClientRect();
+    const heading = writer.closest(".writing-root")!.querySelector(".writing-document-heading")!.getBoundingClientRect();
+    const margin = parseFloat(getComputedStyle(writer).lineHeight);
+    const rawTop = Math.max(ownerBounds.top, heading.bottom, window.visualViewport!.offsetTop);
+    const safeTop = rawTop + parseFloat(getComputedStyle(document.documentElement).fontSize);
+    const safeBottom = Math.min(ownerBounds.bottom, window.visualViewport!.offsetTop + window.visualViewport!.height, dock.top) - margin;
+    return { dockBottom: dock.bottom, focusGap: rect!.bottom - dock.top, selectedText: selection.toString(), collapsed: selection.isCollapsed, backward, focusTop: rect!.top, focusBottom: rect!.bottom, focusHeight: rect!.height, rawTop, safeTop, safeBottom, margin, scrollTop: owner.scrollTop, scrollMax: owner.scrollHeight - owner.clientHeight, viewport: (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport };
+  });
+}
+
+test("iPhone Commands insertion retains the keyboard lane after an eager return", async ({ page }, info) => {
+  const { writer, paragraph, commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+  const original = await paragraph.textContent();
+  await animateCommandKeyboardClosing(page);
+  await commands.tap();
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu).toBeVisible();
+  // A person can choose a command while the native dismissal is still moving.
+  // A pending palette may wait for the background animation to finish first.
+  await expect.poll(() => page.evaluate(() => (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport.height)).toBeGreaterThanOrEqual(750);
+  await menu.getByRole("menuitem", { name: "Heading 2", exact: true }).tap();
+  await expect(writer).toBeFocused();
+  for (const state of [
+    { height: 640, offsetTop: 0, clientHeight: 640, appPan: 0 },
+    { height: 490, offsetTop: 0, clientHeight: 490, appPan: 84 },
+  ]) {
+    await changeCommandViewport(page, state);
+    const geometry = await restoredCommandGeometry(page);
+    expect(geometry.dockBottom).toBeLessThanOrEqual(state.height + state.offsetTop - 127);
+    expect(geometry.focusGap, JSON.stringify(geometry)).toBeLessThanOrEqual(-27);
+    expect(geometry.focusTop).toBeGreaterThanOrEqual(geometry.rawTop - 1);
+  }
+  await page.keyboard.type(" Resumed after Commands.");
+  await expect(writer.locator("h2")).toHaveText(`${original} Resumed after Commands.`);
+  await page.screenshot({ path: info.outputPath("commands-eager-keyboard-return.png") });
+});
+
+test("iPhone Commands closing restores a backward selection above the dock", async ({ page }, info) => {
+  const { writer, commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+  for (let index = 0; index < 14; index++) await page.keyboard.press("Shift+ArrowLeft");
+  const selected = await page.evaluate(() => window.getSelection()!.toString());
+  expect(selected.length).toBeGreaterThan(5);
+  expect((await restoredCommandGeometry(page)).backward).toBe(true);
+  await animateCommandKeyboardClosing(page);
+  await commands.tap();
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport.height)).toBe(812);
+  await menu.getByRole("menuitem", { name: "Close menu esc", exact: true }).tap();
+  await expect(writer).toBeFocused();
+  for (const state of [
+    { height: 640, offsetTop: 0, clientHeight: 640, appPan: 0 },
+    { height: 490, offsetTop: 0, clientHeight: 490, appPan: 84 },
+  ]) {
+    await changeCommandViewport(page, state);
+    const geometry = await restoredCommandGeometry(page);
+    expect(geometry.selectedText).toBe(selected);
+    expect(geometry.collapsed).toBe(false);
+    expect(geometry.backward).toBe(true);
+    expect(geometry.dockBottom).toBeLessThanOrEqual(state.height + state.offsetTop - 127);
+    expect(geometry.focusGap).toBeLessThanOrEqual(-27);
+  }
+  await page.screenshot({ path: info.outputPath("commands-restored-native-selection.png") });
+  const owner = page.locator(".main-content");
+  const manual = await owner.evaluate((owner) => {
+    owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+    owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
+    owner.scrollTop = Math.max(0, owner.scrollTop - 180);
+    const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+    fixture.viewport.offsetTop += 1;
+    window.visualViewport!.dispatchEvent(new Event("scroll"));
+    window.dispatchEvent(new Event("touchend"));
+    return owner.scrollTop;
+  });
+  await page.waitForTimeout(180); // Include geometry events following the manual gesture.
+  expect(await owner.evaluate(owner => owner.scrollTop)).toBeCloseTo(manual, 0);
+  expect(await page.evaluate(() => window.getSelection()!.toString())).toBe(selected);
+});
+
+test("iPhone Commands can cancel while opening without a late palette", async ({ page }, info) => {
+  const { writer, paragraph, commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+  const original = await paragraph.textContent();
+  await commands.tap();
+  await page.keyboard.press("Escape");
+  await expect(writer).toBeFocused();
+  await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+  await page.waitForTimeout(420); // Exceeds the pending-palette fallback window.
+  await expect(page.locator(".writing-slash-menu")).toHaveCount(0);
+  await page.keyboard.type(" Still writing.");
+  await expect(paragraph).toHaveText(`${original} Still writing.`);
+});
+
+for (const reduced of [false, true]) {
+  test(`iPhone Commands paints one full palette and retains chosen focus${reduced ? " with reduced motion" : ""}`, async ({ page }, info) => {
+    await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });
+    const { commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+    await animateCommandKeyboardClosing(page);
+    await page.evaluate(() => {
+      const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+      const record = () => {
+        const menu = document.querySelector<HTMLElement>(".writing-slash-menu");
+        if (menu) {
+          const style = getComputedStyle(menu), rect = menu.getBoundingClientRect();
+          if (style.display !== "none" && style.visibility === "visible" && parseFloat(style.opacity) > 0.05 && rect.height > 0)
+            fixture.visibleFrames.push({ height: rect.height, top: rect.top, bottom: rect.bottom });
+        }
+        fixture.recordRequest = requestAnimationFrame(record);
+      };
+      fixture.recordRequest = requestAnimationFrame(record);
+    });
+    await commands.tap();
+    const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+    await expect(menu).toBeVisible();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport.height)).toBe(812);
+    const first = menu.getByRole("menuitem", { name: "Normal Text", exact: true });
+    await expect(first).toBeFocused();
+    await menu.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
+    const finalHeight = (await menu.boundingBox())!.height;
+    const frames = await page.evaluate(() => {
+      const fixture = (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle;
+      cancelAnimationFrame(fixture.recordRequest);
+      return fixture.visibleFrames;
+    });
+    expect(frames.length).toBeGreaterThan(0);
+    expect(finalHeight).toBeGreaterThanOrEqual(320);
+    expect(Math.min(...frames.map(frame => frame.height))).toBeGreaterThanOrEqual(finalHeight - 2);
+    await page.keyboard.press("ArrowDown"); await page.keyboard.press("ArrowDown");
+    const chosen = menu.getByRole("menuitem", { name: "Heading 2", exact: true });
+    await expect(chosen).toBeFocused();
+    await changeCommandViewport(page, { height: 800, offsetTop: 12, clientHeight: 800, appPan: 18 });
+    await expect(chosen).toBeFocused();
+    await changeCommandViewport(page, { height: 812, offsetTop: 0, clientHeight: 812, appPan: 0 });
+    await expect(chosen).toBeFocused();
+    await page.screenshot({ path: info.outputPath(`commands-full-first-paint-${reduced ? "reduced" : "normal"}.png`) });
+  });
+}
+
+test("iPhone Commands to media does not reopen prose input before Cancel", async ({ page }, info) => {
+  const { writer, paragraph, commands } = await prepareCommandLifecycle(page, info.project.name.startsWith("production"));
+  const original = await paragraph.textContent();
+  await animateCommandKeyboardClosing(page);
+  await commands.tap();
+  const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+  await expect(menu).toBeVisible();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.viewport.height)).toBe(812);
+  await page.evaluate(() => { (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.proseFocusCount = 0; });
+  await menu.getByRole("menuitem", { name: "Image", exact: true }).tap();
+  const image = page.getByRole("dialog", { name: "Insert image", exact: true });
+  await expect(image).toBeVisible();
+  await expect(writer).not.toBeFocused();
+  expect(await page.evaluate(() => (window as unknown as { commandLifecycle: CommandLifecycle }).commandLifecycle.proseFocusCount)).toBe(0);
+  const alt = image.getByRole("textbox", { name: "Alt text (optional)", exact: true });
+  await alt.tap();
+  await alt.fill("The chooser retains its current input.");
+  await changeCommandViewport(page, { height: 490, offsetTop: 20, clientHeight: 490, appPan: 18 });
+  await expect(alt).toBeFocused();
+  await expect(alt).toHaveValue("The chooser retains its current input.");
+  await image.getByRole("button", { name: "Cancel", exact: true }).tap();
+  await expect(writer).toBeFocused();
+  await changeCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 490, appPan: 0 });
+  const geometry = await restoredCommandGeometry(page);
+  expect(geometry.dockBottom).toBeLessThanOrEqual(363);
+  expect(geometry.focusGap).toBeLessThanOrEqual(-27);
+  await page.keyboard.type(" Returned from the chooser.");
+  await expect(paragraph).toHaveText(`${original} Returned from the chooser.`);
+});
+
+for (const command of ["Heading 2", "Image"] as const) {
+  test(`mobile Commands ${command} rejects a target removed by Undo`, async ({ page }, info) => {
+    await page.setViewportSize({ width: 375, height: 812 });
+    const { read } = await open(page, info.project.name.startsWith("production"), "doc");
+    const writer = page.locator('.writing-content[contenteditable="true"]');
+    const paragraph = writer.locator("p").nth(20);
+    const bounds = (await paragraph.boundingBox())!;
+    await paragraph.tap({ position: { x: bounds.width - 4, y: bounds.height - 14 } });
+    await page.keyboard.press("Enter");
+    await page.keyboard.type("A temporary command target.");
+    const target = writer.locator("p").filter({ hasText: "A temporary command target." });
+    await expect(target).toHaveText("A temporary command target.");
+    const saved = await target.elementHandle();
+    const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+    await dock.getByRole("button", { name: /^Commands:/ }).tap();
+    const menu = page.getByRole("menu", { name: "Insert content", exact: true });
+    await expect(menu).toBeVisible();
+    const undo = dock.getByRole("button", { name: "Undo", exact: true });
+    // Keyboard activation changes the real model without a pointer gesture
+    // dismissing the command palette before the undo can happen.
+    // Remove the new paragraph, rather than only detaching its rendered DOM.
+    for (let attempt = 0; attempt < 3 && await saved!.evaluate(element => element.isConnected); attempt++) {
+      await expect(undo).toBeEnabled();
+      await undo.press("Enter");
+      await writer.evaluate(async () => { await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame); });
+    }
+    expect(await saved!.evaluate(element => element.isConnected)).toBe(false);
+    await expect(writer).not.toContainText("A temporary command target.");
+    await expect(menu).toBeVisible();
+    await waitForDraftSaved(page);
+    const beforeText = await writer.textContent();
+    const beforeCount = await writer.locator("p").count();
+    const beforeMarkdown = (await read()).content[0].body;
+    await writer.evaluate((element) => {
+      (window as unknown as { staleCommandFocusCount: number }).staleCommandFocusCount = 0;
+      element.addEventListener("focusin", () => { (window as unknown as { staleCommandFocusCount: number }).staleCommandFocusCount++; });
+    });
+    await menu.getByRole("menuitem", { name: command, exact: true }).tap();
+    await expect(menu).toHaveCount(0);
+    await expect(page.getByRole("dialog", { name: "Insert image", exact: true })).toHaveCount(0);
+    await expect(writer.locator("h2")).toHaveCount(0);
+    await expect(writer).toHaveText(beforeText!);
+    await expect(writer.locator("p")).toHaveCount(beforeCount);
+    expect(await page.evaluate(() => (window as unknown as { staleCommandFocusCount: number }).staleCommandFocusCount)).toBe(0);
+    const { body } = await downloadMarkdown(page);
+    expect(body).toBe(beforeMarkdown);
+  });
+}
+
 for (const kind of ["doc", "brief", "course"] as const) {
   test(`${kind}: stable bottom toolbar preserves editing and stays inside the visible keyboard area`, async ({ page }, info) => {
     await page.setViewportSize({ width: 375, height: 812 });
