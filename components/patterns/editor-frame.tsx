@@ -139,12 +139,14 @@ export function EditorFrame({
     const element = dock ? controls.current : canvas.current?.querySelector<HTMLElement>(".editor-canvas-navigation");
     if (!element) return;
     const owner = frame.current?.closest<HTMLElement>(".main-content");
-    const header = frame.current?.closest(".app")?.querySelector<HTMLElement>(".topbar");
+    const app = frame.current?.closest<HTMLElement>(".app");
+    const header = app?.querySelector<HTMLElement>(".topbar");
     let active = true;
     let request = 0;
     let releaseRequest = 0;
     let layoutWidth = document.documentElement.clientWidth;
     let layoutHeight = document.documentElement.clientHeight;
+    let appShift = 0;
     let keyboard = false;
     let lastDockTop: number | null = null;
     let lastDockBottom: number | null = null;
@@ -165,15 +167,11 @@ export function EditorFrame({
     const measure = () => {
       if (!active || !element.isConnected) return;
       const viewport = window.visualViewport;
-      const appBounds = overlayHost?.getBoundingClientRect();
+      const previousAppShift = appShift;
+      let appBounds = app?.getBoundingClientRect();
       const rawTop = viewport?.offsetTop || 0;
       const height = viewport?.height || (dock ? document.documentElement.clientHeight : window.innerHeight);
-      const bottom = dock && appBounds ? Math.min(rawTop + height, appBounds.bottom) : rawTop + height;
-      const visibleTop = dock ? Math.max(0, bottom - height) : rawTop;
-      let safeBottom = bottom;
-      let usableTop = Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0) + 8;
-      let usableBottom = bottom - 16;
-      let writingTop = usableTop;
+      let visibleTop = rawTop;
       if (dock) {
         const width = document.documentElement.clientWidth;
         if (width !== layoutWidth) {
@@ -190,6 +188,32 @@ export function EditorFrame({
         // Retain the established unobscured baseline at this layout width so
         // a quick return to writing still detects the reopened keyboard.
         if (!keyboard && !editing) layoutHeight = Math.max(layoutHeight, document.documentElement.clientHeight, height);
+        if ((viewport?.scale || 1) === 1) {
+          // A restored full-height viewport can briefly retain its keyboard
+          // offset. Clamp against the unobscured baseline, not the app's
+          // independently panned bottom (nor our previous correction).
+          visibleTop = Math.max(0, Math.min(rawTop, layoutHeight - height));
+          if (appBounds) {
+            // Keep header, canvas and portals in one visible frame. Recover
+            // native displacement before applying the next correction so
+            // repeated events cannot accumulate it. Never scroll the page.
+            appShift = visibleTop - (appBounds.top - appShift);
+            setStyle(app, "--editor-viewport-shift", `${appShift}px`);
+            appBounds = app?.getBoundingClientRect();
+          }
+        } else {
+          appShift = 0;
+          app?.style.removeProperty("--editor-viewport-shift");
+          appBounds = app?.getBoundingClientRect();
+          visibleTop = Math.max(0, Math.min(rawTop + height, appBounds?.bottom ?? rawTop + height) - height);
+        }
+      }
+      const bottom = dock && appBounds ? Math.min(visibleTop + height, appBounds.bottom) : rawTop + height;
+      let safeBottom = bottom;
+      let usableTop = Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0) + 8;
+      let usableBottom = bottom - 16;
+      let writingTop = usableTop;
+      if (dock) {
         const keyboardVisible = keyboard ? "true" : "false";
         if (element.dataset.keyboardVisible !== keyboardVisible) element.dataset.keyboardVisible = keyboardVisible;
         // Work directly in visible coordinates, relative to the positioned app.
@@ -313,7 +337,7 @@ export function EditorFrame({
       // the same screen position. Notify after that compensation as well.
       const appTop = appBounds?.top || 0;
       const band = `${usableTop}:${usableBottom}:${writingTop}:${element.dataset.dockPosition}:${element.dataset.dockSettled}:${frame.current?.dataset.titleYielded}`;
-      if (dock && (lastDockTop !== rect.top || lastDockBottom !== rect.bottom || lastAppTop !== appTop || band !== lastBand)) {
+      if (dock && (previousAppShift !== appShift || lastDockTop !== rect.top || lastDockBottom !== rect.bottom || lastAppTop !== appTop || band !== lastBand)) {
         lastDockTop = rect.top;
         lastDockBottom = rect.bottom;
         lastAppTop = appTop;
@@ -385,6 +409,7 @@ export function EditorFrame({
       observer.disconnect();
       mutations.disconnect();
       if (dock) {
+        app?.style.removeProperty("--editor-viewport-shift");
         if (owner && frame.current?.dataset.dock !== "true") {
           const navigationHeight = canvas.current?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().height || 0;
           owner.scrollTop = Math.max(0, owner.scrollTop - lastInset + navigationHeight);

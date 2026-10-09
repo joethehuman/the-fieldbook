@@ -421,6 +421,9 @@
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="outline"] { inset-inline-start: var(--editor-panel-left, var(--space-4)); }
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
   .editor-controls-surface { display: contents; }
+  .app:has(.editor-frame[data-dock="true"]) {
+    top: var(--editor-viewport-shift, 0px);
+  }
   .editor-dock-lane {
     display: none;
     position: absolute;
