@@ -8,7 +8,7 @@ import { Button } from "../ui/button";
 import { FieldDescription } from "../ui/field";
 import { ScrollRegion } from "./scroll-region";
 import { revealEditorTarget } from "./reveal-editor-target";
-import { blurWritingInput, captureWritingCursor, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
+import { blurWritingInput, captureWritingCursor, readWritingCaretLine, restoreWritingCursor, type WritingCursor } from "./writing-cursor";
 import { useEditorCardsLayout, useMobileWritingDock } from "./use-editor-cards-layout";
 
 export const EditorWritingActionsContext = createContext<HTMLElement | null>(null);
@@ -155,7 +155,9 @@ export function EditorFrame({
       const rect = element.getBoundingClientRect();
       const menuOpen = panelState.current.outline || panelState.current.details
         || !!document.querySelector(".writing-slash-menu, .writing-media-chooser");
-      if (menuOpen || reducedMotion.matches) stopMotion();
+      const caretLine = dock && !menuOpen && preparedPanel.current === null ? readWritingCaretLine(canvas.current) : null;
+      const coversLine = (box: DOMRect) => !!caretLine && box.top < caretLine.bottom + 8 && box.bottom > caretLine.top - 8;
+      if (menuOpen || reducedMotion.matches || before && coversLine(before)) stopMotion();
       if (surface && lastDockTop !== rect.top) {
         stopMotion();
         if (before && !reducedMotion.matches && !menuOpen && (viewport?.scale || 1) === 1) {
@@ -163,10 +165,11 @@ export function EditorFrame({
           // immediate anchor, and no visual frame may enter the keyboard lane.
           const minimum = Math.max(visibleTop, header?.getBoundingClientRect().bottom || 0) + 8;
           const offset = Math.max(Math.min(0, minimum - rect.top), Math.min(0, before.top - rect.top));
-          if (offset < -1) motion = surface.animate([
+          const crossesLine = !!caretLine && rect.top + offset < caretLine.bottom + 8 && rect.bottom > caretLine.top - 8;
+          if (offset < -1 && !crossesLine) motion = surface.animate([
             { transform: `translateY(${offset}px)` }, { transform: "translateY(0)" },
           ], { duration: 140, easing: "cubic-bezier(0.2, 0, 0, 1)" });
-          else if (before.top - rect.top > 24) motion = surface.animate([
+          else if (offset < -1 || before.top - rect.top > 24) motion = surface.animate([
             { opacity: 0.65 }, { opacity: 1 },
           ], { duration: 100, easing: "ease-out" });
         }
@@ -222,6 +225,8 @@ export function EditorFrame({
       document.addEventListener("touchend", settle, { passive: true });
       element.addEventListener("pointerdown", remember, true);
       document.addEventListener("selectionchange", remember);
+      document.addEventListener("selectionchange", schedule);
+      document.addEventListener("input", schedule);
       document.addEventListener("focusin", remember);
       document.addEventListener("pointerup", released);
     }
@@ -244,6 +249,8 @@ export function EditorFrame({
         document.removeEventListener("touchend", settle);
         element.removeEventListener("pointerdown", remember, true);
         document.removeEventListener("selectionchange", remember);
+        document.removeEventListener("selectionchange", schedule);
+        document.removeEventListener("input", schedule);
         document.removeEventListener("focusin", remember);
         document.removeEventListener("pointerup", released);
       }

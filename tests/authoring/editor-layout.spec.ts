@@ -2472,6 +2472,88 @@ test("last writing line stays reachable when innerHeight is already keyboard-siz
   await page.screenshot({ path: info.outputPath("last-line-keyboard-sized-inner-height.png") });
 });
 
+for (const device of ["iPhone", "iPad"] as const) {
+  for (const missingCaretRect of [false, true]) {
+    test(`${device}: typing and caret taps stay above the fixed dock${missingCaretRect ? " without collapsed rectangles" : ""}`, async ({ page }, info) => {
+      await page.addInitScript(({ device, missingCaretRect }) => {
+        Object.defineProperty(navigator, "userAgent", { configurable: true, value: device === "iPhone" ? "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 CriOS/143.0 Mobile Safari/604.1" : "Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15 Version/26.0 Safari/605.1.15" });
+        Object.defineProperty(navigator, "platform", { configurable: true, value: device === "iPhone" ? "iPhone" : "MacIntel" });
+        Object.defineProperty(navigator, "maxTouchPoints", { configurable: true, value: 5 });
+        if (missingCaretRect) {
+          const native = Range.prototype.getClientRects;
+          Range.prototype.getClientRects = function () { return this.collapsed ? [] as unknown as DOMRectList : native.call(this); };
+        }
+      }, { device, missingCaretRect });
+      await page.setViewportSize(device === "iPhone" ? { width: 375, height: 812 } : { width: 1024, height: 1366 });
+      await open(page, info.project.name.startsWith("production"), "doc");
+      const writer = page.getByRole("textbox", { name: "Doc content", exact: true });
+      await writer.locator("p").first().tap();
+      const visibleHeight = device === "iPhone" ? 490 : 860;
+      await page.evaluate((height) => {
+        const state = { height, offsetTop: 0 };
+        (window as unknown as { caretViewport: typeof state }).caretViewport = state;
+        for (const key of ["height", "offsetTop"] as const) Object.defineProperty(window.visualViewport, key, { configurable: true, get: () => state[key] });
+        window.visualViewport!.dispatchEvent(new Event("resize"));
+      }, visibleHeight);
+      const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+      await expect.poll(async () => (await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeCloseTo(visibleHeight - 128, 0);
+      const lane = (await dock.boundingBox())!;
+      const paragraph = writer.locator("p").nth(20);
+      // Scroll a writing row behind the toolbar, then tap its exposed left edge.
+      // This models Apple's ability to place a caret beside an obstructing dock.
+      await paragraph.evaluate((paragraph, top) => {
+        const owner = paragraph.closest<HTMLElement>(".main-content")!;
+        owner.scrollTop += paragraph.getBoundingClientRect().top - top;
+      }, lane.y + 14);
+      await expect.poll(async () => (await paragraph.boundingBox())!.y).toBeCloseTo(lane.y + 14, 0);
+      expect((await paragraph.boundingBox())!.x + 4).toBeLessThan(lane.x);
+      await paragraph.tap({ position: { x: 4, y: 12 } });
+      const caretBottom = () => writer.evaluate(() => {
+        const selection = window.getSelection()!;
+        const range = selection.getRangeAt(0).cloneRange();
+        const caret = Array.from(range.getClientRects()).find((rect) => rect.height > 0);
+        if (caret) return caret.bottom;
+        const text = selection.focusNode as Text;
+        const offset = Math.min(selection.focusOffset, text.length - 1);
+        range.setStart(text, offset); range.setEnd(text, offset + 1);
+        return range.getBoundingClientRect().bottom;
+      });
+      await expect.poll(async () => (await caretBottom()) - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-15);
+      expect((await dock.boundingBox())!.y).toBeCloseTo(lane.y, 0);
+      await page.keyboard.type("Hi. Keep this writing line visible as it wraps across the available space. ");
+      await expect(writer).toContainText("Keep this writing line visible");
+      await expect.poll(async () => (await caretBottom()) - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-15);
+      expect((await dock.boundingBox())!.y).toBeCloseTo(lane.y, 0);
+      // Model native panning separately from the owner's scroll position.
+      await page.locator(".app").evaluate((app) => { (app as HTMLElement).style.transform = "translateY(84px)"; window.dispatchEvent(new Event("scroll")); });
+      await page.keyboard.type("Still visible after panning. ");
+      await expect.poll(async () => (await caretBottom()) - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-15);
+      expect((await dock.boundingBox())!.y + (await dock.boundingBox())!.height).toBeCloseTo(visibleHeight - 128, 0);
+      await page.getByRole("button", { name: /^Commands:/ }).tap();
+      await expect(page.getByRole("menu", { name: "Insert content", exact: true })).toBeVisible();
+      await page.getByRole("menuitem", { name: "Close menu esc", exact: true }).tap();
+      await expect(writer).toBeFocused();
+      await page.keyboard.type("Returned to writing. ");
+      await expect.poll(async () => (await caretBottom()) - (await dock.boundingBox())!.y).toBeLessThanOrEqual(-15);
+      await page.screenshot({ path: info.outputPath(`${device}-fixed-dock-active-row-${missingCaretRect ? "fallback" : "native"}.png`) });
+      const owner = page.locator(".main-content");
+      const title = page.locator("#editor-title");
+      await title.evaluate(async (input) => {
+        (input as HTMLTextAreaElement).focus({ preventScroll: true });
+        (input as HTMLTextAreaElement).setSelectionRange(1, 1);
+        await new Promise(requestAnimationFrame); await new Promise(requestAnimationFrame);
+      });
+      // Isolate application events from the browser's own native-field scrolling.
+      // The old prose caret must not pull the canvas during title-field input.
+      const scrolled = await owner.evaluate((owner) => { owner.scrollTop += 300; return owner.scrollTop; });
+      await title.dispatchEvent("input", { bubbles: true });
+      await page.evaluate(() => document.dispatchEvent(new Event("selectionchange")));
+      await page.waitForTimeout(180); // Covers the focus/viewport settling delay.
+      expect(await owner.evaluate((owner) => owner.scrollTop)).toBeCloseTo(scrolled, 0);
+    });
+  }
+}
+
 for (const reduced of [false, true]) {
   test(`touch motion preserves immediate geometry and focus${reduced ? " with reduced motion" : ""}`, async ({ page }, info) => {
     await page.emulateMedia({ reducedMotion: reduced ? "reduce" : "no-preference" });

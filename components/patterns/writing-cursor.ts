@@ -54,3 +54,42 @@ export function restoreWritingCursor(cursor: WritingCursor | null) {
   if (cursor.backward) selection.setBaseAndExtent(cursor.end, cursor.endOffset, cursor.start, cursor.startOffset);
   return true;
 }
+
+/** Read one rendered prose line without changing the native or editor selection. */
+export function readWritingCaretLine(canvas: HTMLElement | null): DOMRect | null {
+  const active = document.activeElement;
+  const selection = window.getSelection();
+  if (!canvas || !(active instanceof HTMLElement) || !active.isContentEditable
+    || !canvas.contains(active) || active.closest(".writing-code-block")
+    || !selection?.isCollapsed || !selection.rangeCount || !canvas.contains(selection.focusNode)) return null;
+  const range = selection.getRangeAt(0).cloneRange();
+  const rect = Array.from(range.getClientRects()).find((rect) => rect.height > 0);
+  if (rect) return rect;
+  // WebKit can omit a collapsed text rectangle. A neighboring character still
+  // identifies the wrapped line, unlike the whole paragraph's bounding box.
+  let text: Text | null = range.startContainer instanceof Text ? range.startContainer : null;
+  let offset = range.startOffset;
+  if (!text && range.startContainer instanceof Element) {
+    const next = range.startContainer.childNodes[offset];
+    const child = next || range.startContainer.childNodes[offset - 1];
+    if (child instanceof Text) text = child;
+    else if (child) {
+      const walker = document.createTreeWalker(child, NodeFilter.SHOW_TEXT);
+      text = walker.nextNode() as Text | null;
+      if (!next) { let last: Node | null; while ((last = walker.nextNode())) text = last as Text; }
+    }
+    offset = next ? 0 : text?.length || 0;
+  }
+  if (text?.length) {
+    const start = Math.min(offset, text.length - 1);
+    range.setStart(text, start); range.setEnd(text, start + 1);
+    return Array.from(range.getClientRects()).find((rect) => rect.height > 0) || null;
+  }
+  const node = selection.focusNode;
+  const block = (node instanceof Element ? node : node?.parentElement)?.closest("p, li, h1, h2, h3, h4, h5, h6, blockquote");
+  if (block && !block.textContent?.trim() && !block.querySelector('img, video, iframe, [data-lexical-decorator="true"]')) {
+    const rect = block.getBoundingClientRect();
+    return rect.height ? rect : null;
+  }
+  return null;
+}
