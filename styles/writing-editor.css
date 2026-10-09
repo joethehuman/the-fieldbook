@@ -601,7 +601,6 @@
   line-height: 2.25rem;
 }
 .editor[data-scroll-layout="page"] .writing-document-heading { top: var(--editor-navigation-height, 0px); }
-.editor-frame[data-dock="true"] .writing-document-heading { top: var(--phone-writing-heading-offset, 0px); }
 .editor-frame[data-dock="true"][data-title-yielded="true"] .writing-document-heading { position: relative; top: auto; }
 .editor .writing-document-heading::after {
   content: "";
@@ -627,7 +626,8 @@
 .editor .course-quiz-content { padding: var(--space-3) var(--editor-content-padding); }
 .editor .course-quiz-canvas > .writing-document-heading { top: var(--editor-navigation-height, 0px); }
 .editor-frame-canvas[data-navigation-scrolled="true"] .course-quiz-canvas > .writing-document-heading::after { opacity: 1; }
-/* Compact writing actions join Outline and Details in the floating bottom dock. */
+/* Compact writing actions join Outline and Details in one floating dock. */
+.editor-frame-controls[data-dock="true"] :is(.writing-toolbar-controls, .writing-toolbar-group) { gap: 0; }
 .editor .writing-editor .mdxeditor-toolbar { display: none; }
 .editor-frame :is(.writing-course-heading, .writing-document-heading, .writing-content, .writing-source, .course-quiz-content) { padding-inline: var(--editor-text-inset); }
 .editor-frame .writing-content { --writing-content-start: var(--editor-text-inset); }

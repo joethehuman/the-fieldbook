@@ -281,7 +281,7 @@ function WritingToolbar({
                 type="button"
                 size="icon"
                 variant="ghost"
-                className={canvas && phone ? "size-11 appearance-none rounded-xl border-transparent bg-transparent shadow-none disabled:bg-transparent disabled:border-transparent" : undefined}
+                className={canvas && phone ? "w-[30px] h-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none disabled:bg-transparent disabled:border-transparent" : undefined}
                 aria-label={label}
                 disabled={disabled || unavailable || !!compactControls?.panelsOpen}
                 onMouseDown={(event) => event.preventDefault()}
@@ -293,7 +293,7 @@ function WritingToolbar({
           ))}
         </div>
         <Button type="button" size={phone ? "icon" : "sm"} variant={canvas && phone ? "ghost" : "outline"} disabled={disabled || canvas && phone && (!writingTarget || !!compactControls?.panelsOpen)}
-          className={canvas && phone ? "size-11 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : undefined}
+          className={canvas && phone ? "w-[30px] h-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : undefined}
           aria-label={phone ? "Commands: insert blocks" : "Commands: insert blocks or format selected text"}
           onPointerDown={(event) => {
             if (!canvas || !phone || event.button !== 0 || !event.isPrimary) return;

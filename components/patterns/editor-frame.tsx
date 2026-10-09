@@ -65,7 +65,6 @@ export function EditorFrame({
   const [writingActionsHost, setWritingActionsHost] = useState<HTMLDivElement | null>(null);
   const canvas = useRef<HTMLDivElement>(null);
   const overlayLayer = useRef<HTMLDivElement>(null);
-  const dockLane = useRef<HTMLDivElement>(null);
   const [overlayHost, setOverlayHost] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => { setOverlayHost(frame.current?.closest<HTMLElement>(".app") || null); }, []);
   const hasNavigation = !!navigation;
@@ -153,8 +152,6 @@ export function EditorFrame({
     let lastAppTop: number | null = null;
     let lastBand = "";
     let lastPosition: string | null = null;
-    let lastInset = owner ? parseFloat(getComputedStyle(owner).marginBlockStart) || 0 : 0;
-    let insetRemainder = 0;
     let fade: Animation | undefined;
     let observedHeading: HTMLElement | null = null;
     const setStyle = (target: HTMLElement | null | undefined, name: string, value: string) => {
@@ -192,7 +189,7 @@ export function EditorFrame({
           // A restored full-height viewport can briefly retain its keyboard
           // offset. Clamp against the unobscured baseline, not the app's
           // independently panned bottom (nor our previous correction).
-          visibleTop = Math.max(0, Math.min(rawTop, layoutHeight - height));
+          visibleTop = Math.min(rawTop, Math.max(0, layoutHeight - height));
           if (appBounds) {
             // Keep header, canvas and portals in one visible frame. Recover
             // native displacement before applying the next correction so
@@ -225,13 +222,31 @@ export function EditorFrame({
         setStyle(overlayLayer.current, "--editor-panel-center", center);
         setStyle(element, "--editor-dock-gap", "max(var(--space-3), env(safe-area-inset-bottom))");
         const position = keyboard ? "top" : "bottom";
-        const dockHeight = element.getBoundingClientRect().height;
-        const headerBottom = header?.getBoundingClientRect().bottom || visibleTop;
-        const top = Math.max(visibleTop, headerBottom) + 8;
-        setStyle(element, "--editor-dock-anchor", keyboard
-          ? `${top + dockHeight - (appBounds?.top || 0)}px`
-          : "calc(var(--editor-dock-bottom) - var(--editor-dock-gap))");
         element.dataset.dockPosition = position;
+        const dockHeight = element.getBoundingClientRect().height;
+        const dockWidth = element.getBoundingClientRect().width;
+        setStyle(app, "--editor-header-dock-width", `${dockWidth}px`);
+        const slot = header?.querySelector<HTMLElement>(".editor-header-dock-slot");
+        const metadata = header?.querySelector<HTMLElement>(".editor-save-status");
+        const headingActions = metadata?.parentElement;
+        const publish = headingActions?.querySelector<HTMLElement>(":scope > button");
+        const headerActions = header?.querySelector<HTMLElement>(".editor-app-actions");
+        if (app) {
+          // Measure intrinsic metadata children even while the row is visually
+          // hidden. The available header width never depends on that decision.
+          const metadataWidth = metadata ? Array.from(metadata.children).reduce((width, child) => width + child.getBoundingClientRect().width, 0)
+            + (parseFloat(getComputedStyle(metadata).columnGap) || 0) : 0;
+          const gap = headerActions ? parseFloat(getComputedStyle(headerActions).columnGap) || 0 : 0;
+          const statusGap = headingActions ? parseFloat(getComputedStyle(headingActions).columnGap) || 0 : 0;
+          const needed = dockWidth + gap + (publish?.getBoundingClientRect().width || 0) + statusGap + metadataWidth;
+          app.dataset.editorHeaderMetadata = keyboard && needed > (headerActions?.getBoundingClientRect().width || 0) ? "hidden" : "visible";
+        }
+        const headerBottom = header?.getBoundingClientRect().bottom || visibleTop;
+        const slotBounds = slot?.getBoundingClientRect();
+        if (keyboard && slotBounds?.width) setStyle(element, "--editor-dock-center", `${slotBounds.left + slotBounds.width / 2 - (appBounds?.left || 0)}px`);
+        setStyle(element, "--editor-dock-anchor", keyboard
+          ? `${(slotBounds?.height ? slotBounds.top + slotBounds.height / 2 + dockHeight / 2 : headerBottom) - (appBounds?.top || 0)}px`
+          : "calc(var(--editor-dock-bottom) - var(--editor-dock-gap))");
         if (lastPosition !== null && lastPosition !== position && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
           fade?.cancel();
           fade = element.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: "ease-out" });
@@ -241,35 +256,11 @@ export function EditorFrame({
         const nativeGap = keyboard ? (appleTouch ? 8 : 3) * rem : 0;
         const lane = element.getBoundingClientRect();
         safeBottom = keyboard ? bottom - nativeGap : lane.top;
-        usableTop = keyboard ? lane.bottom + 8 : Math.max(visibleTop, headerBottom) + 8;
+        usableTop = Math.max(visibleTop, headerBottom) + 8;
         usableBottom = safeBottom - 8;
         setStyle(element, "--editor-usable-top", `${usableTop}px`);
         setStyle(element, "--editor-usable-bottom", `${usableBottom}px`);
-        const reserve = keyboard ? dockHeight + 16 : 0;
-        setStyle(owner, "--editor-top-reserve", `${reserve}px`);
-        // Animate only our lane change. Compensate its measured inset, never
-        // Safari's independent native panning, on the existing page scroller.
-        if (owner) {
-          const inset = parseFloat(getComputedStyle(owner).marginBlockStart) || 0;
-          const requested = inset - lastInset + insetRemainder;
-          if (Math.abs(requested) > 0.001) {
-            const before = owner.scrollTop;
-            owner.scrollTop = Math.round(before + requested);
-            const missed = requested - (owner.scrollTop - before);
-            // Retain only pixel rounding, never an infeasible scroll at an edge.
-            insetRemainder = Math.abs(missed) < 1 ? missed : 0;
-          } else insetRemainder = requested;
-          lastInset = inset;
-          element.dataset.dockSettled = String(Math.abs(inset - reserve) < 1);
-          const clip = keyboard ? Math.max(0, usableTop - owner.getBoundingClientRect().top) : 0;
-          setStyle(owner, "--editor-top-clip", `${clip}px`);
-          setStyle(owner, "--phone-writing-heading-offset", `${clip}px`);
-        }
-        if (dockLane.current) {
-          dockLane.current.dataset.dockPosition = position;
-          setStyle(dockLane.current, "--editor-lane-top", `${Math.max(visibleTop, headerBottom) - (appBounds?.top || 0)}px`);
-          setStyle(dockLane.current, "--editor-lane-height", `${usableTop - Math.max(visibleTop, headerBottom)}px`);
-        }
+        element.dataset.dockSettled = "true";
         const heading = canvas.current?.querySelector<HTMLElement>(".writing-document-heading") || null;
         writingTop = usableTop;
         if (heading && heading !== observedHeading) {
@@ -286,7 +277,6 @@ export function EditorFrame({
           const ownerStyle = owner ? getComputedStyle(owner) : null;
           const pinnedTop = Math.max(usableTop, owner
             ? owner.getBoundingClientRect().top + owner.clientTop + (parseFloat(ownerStyle!.paddingTop) || 0)
-              + (parseFloat(owner.style.getPropertyValue("--phone-writing-heading-offset")) || 0)
             : usableTop);
           const pinnedBottom = pinnedTop + heading.offsetHeight;
           const room = usableBottom - pinnedBottom - lineHeight;
@@ -363,13 +353,6 @@ export function EditorFrame({
     // Snapshot the document only at a control handoff, not on every typed
     // character. Tab can move into the dock without a pointer gesture.
     const rememberKeyboard = (event: KeyboardEvent) => { if (event.key === "Tab") remember(); };
-    const manualInset = () => {
-      if (!owner) return;
-      // A deliberate gesture starts from the layout already on screen, which
-      // can be newer than the last observer frame during the inset transition.
-      lastInset = parseFloat(getComputedStyle(owner).marginBlockStart) || 0;
-      insetRemainder = 0;
-    };
     const released = () => {
       cancelAnimationFrame(releaseRequest);
       releaseRequest = requestAnimationFrame(() => { preparedPanel.current = null; schedule(); });
@@ -384,6 +367,7 @@ export function EditorFrame({
     if (phone && header) observer.observe(header);
     const mutations = new MutationObserver(schedule);
     if (dock && canvas.current) mutations.observe(canvas.current, { childList: true, subtree: true });
+    if (dock && header) mutations.observe(header, { childList: true, characterData: true, subtree: true });
     owner?.addEventListener("scroll", schedule, { passive: true });
     window.addEventListener("resize", schedule);
     window.visualViewport?.addEventListener("resize", schedule);
@@ -397,8 +381,6 @@ export function EditorFrame({
       document.addEventListener("keydown", rememberKeyboard, true);
       document.addEventListener("focusin", remember);
       document.addEventListener("pointerup", released);
-      owner?.addEventListener("touchstart", manualInset, { passive: true });
-      owner?.addEventListener("wheel", manualInset, { passive: true });
     }
     return () => {
       active = false;
@@ -410,11 +392,13 @@ export function EditorFrame({
       mutations.disconnect();
       if (dock) {
         app?.style.removeProperty("--editor-viewport-shift");
+        app?.style.removeProperty("--editor-header-dock-width");
+        app?.removeAttribute("data-editor-header-metadata");
         if (owner && frame.current?.dataset.dock !== "true") {
           const navigationHeight = canvas.current?.querySelector(".editor-canvas-navigation")?.getBoundingClientRect().height || 0;
-          owner.scrollTop = Math.max(0, owner.scrollTop - lastInset + navigationHeight);
+          owner.scrollTop += navigationHeight;
         }
-        for (const name of ["--editor-dock-clearance", "--editor-top-reserve", "--editor-top-clip", "--phone-writing-heading-offset"]) owner?.style.removeProperty(name);
+        owner?.style.removeProperty("--editor-dock-clearance");
         frame.current?.removeAttribute("data-title-yielded");
       }
       owner?.removeEventListener("scroll", schedule);
@@ -430,8 +414,6 @@ export function EditorFrame({
         document.removeEventListener("keydown", rememberKeyboard, true);
         document.removeEventListener("focusin", remember);
         document.removeEventListener("pointerup", released);
-        owner?.removeEventListener("touchstart", manualInset);
-        owner?.removeEventListener("wheel", manualInset);
       }
     };
   }, [hasNavigation, phone, dock, overlayHost]);
@@ -611,7 +593,7 @@ export function EditorFrame({
       <div ref={controls} className="editor-frame-controls" data-cards={phone || undefined} data-dock={dock || undefined} role={dock ? "group" : undefined} aria-label={dock ? "Editor controls" : undefined}>
       <div className="editor-controls-surface">
         {outline && (
-          <Button ref={outlineToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle size-11 ${dock ? "relative appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative rounded-full" : "absolute rounded-full"}`} data-side="outline"
+          <Button ref={outlineToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${dock ? "relative w-[30px] h-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative size-11 rounded-full" : "absolute size-11 rounded-full"}`} data-side="outline"
             disabled={disabled} aria-label="Outline" title={panels.outline ? "Close outline" : "Open outline"}
             aria-controls={outlineId} aria-expanded={panels.outline}
             onPointerDown={() => { if (dock) preparePanel("outline"); }}
@@ -622,7 +604,7 @@ export function EditorFrame({
           </Button>
         )}
         {phone && <div className="editor-writing-actions-host" ref={setWritingActionsHost} />}
-        <Button ref={detailsToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle size-11 ${dock ? "relative appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative rounded-full" : "absolute rounded-full"}`} data-side="details"
+        <Button ref={detailsToggle} type="button" variant={dock ? "ghost" : "outline"} size="icon" className={`editor-panel-toggle ${dock ? "relative w-[30px] h-11 p-0 appearance-none rounded-xl border-transparent bg-transparent shadow-none hover:bg-accent disabled:bg-transparent disabled:border-transparent" : phone ? "relative size-11 rounded-full" : "absolute size-11 rounded-full"}`} data-side="details"
           disabled={disabled} aria-label="Details" title={panels.details ? "Close details" : "Open details"}
           aria-description={requirementsCount > 0 ? `${requirementsCount} required before publishing` : "Content and publishing details"}
           aria-controls={detailsId} aria-expanded={panels.details}
@@ -669,7 +651,7 @@ export function EditorFrame({
     <EditorWritingActionsContext.Provider value={writingActionsHost}>
     <section ref={frame} className="editor-frame" data-panels={open} data-cards={phone || undefined} data-dock={dock || undefined} data-outline={!!outline || undefined} aria-label="Writing workspace">
       {!phone && panelControls}
-      {dock && overlayHost && createPortal(<><div ref={dockLane} className="editor-dock-lane" aria-hidden="true" />{panelControls}</>, overlayHost)}
+      {dock && overlayHost && createPortal(panelControls, overlayHost)}
       <div className="editor-frame-body">
         {!phone && panelSurfaces}
         <div key="canvas" ref={canvas} className="editor-frame-canvas" onScroll={(event) => { event.currentTarget.dataset.navigationScrolled = event.currentTarget.scrollTop > 0 ? "true" : "false"; }}>{!dock && (navigation || phone) && <div className="editor-canvas-navigation">{!phone && navigation}{phone && panelControls}</div>}{children}</div>

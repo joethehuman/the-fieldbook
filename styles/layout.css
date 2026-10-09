@@ -421,26 +421,26 @@
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="outline"] { inset-inline-start: var(--editor-panel-left, var(--space-4)); }
   .editor-mobile-panels:not([data-dock="true"]) .editor-frame-panel[data-side="details"] { inset-inline-end: var(--editor-panel-right, var(--space-4)); }
   .editor-controls-surface { display: contents; }
+  .editor-header-dock-slot { display: none; }
   .app:has(.editor-frame[data-dock="true"]) {
     top: var(--editor-viewport-shift, 0px);
   }
-  .editor-dock-lane {
-    display: none;
-    position: absolute;
-    inset: var(--editor-lane-top, 0px) 0 auto;
-    height: var(--editor-lane-height, 0px);
-    background: var(--background);
-    z-index: 14;
-    pointer-events: none;
+  .app:has(.editor-frame[data-dock="true"]) .topbar { padding: 7px var(--space-1); }
+  .app:has(.editor-frame-controls[data-dock-position="top"]) .editor-header-dock-slot {
+    display: block;
+    flex: none;
+    width: var(--editor-header-dock-width);
+    height: 46px;
   }
-  .editor-dock-lane[data-dock-position="top"] { display: block; }
-  .editor-dock-lane::after {
-    content: "";
+  .app[data-editor-header-metadata="hidden"] .editor-save-status {
     position: absolute;
-    inset: 100% 0 auto;
-    height: var(--space-3);
-    background: var(--scroll-fade-overlay);
-    pointer-events: none;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
   .editor-frame-controls[data-dock="true"] {
     position: absolute;
@@ -467,22 +467,20 @@
     background: var(--background);
     box-shadow: var(--shadow-floating);
   }
-  .app:has(.sidebar.open) :is(.editor-frame-controls[data-dock="true"], .editor-dock-lane),
-  .app:has(.topbar [data-slot="search-panel"]) :is(.editor-frame-controls[data-dock="true"], .editor-dock-lane) { visibility: hidden; }
+  .app:has(.sidebar.open) .editor-frame-controls[data-dock="true"],
+  .app:has(.topbar [data-slot="search-panel"]) .editor-frame-controls[data-dock="true"] { visibility: hidden; }
   .editor-frame-controls[data-dock="true"] .editor-panel-toggle {
     position: relative;
     inset: auto;
     flex-shrink: 0;
-    width: 2.75rem;
+    width: 30px;
     height: 2.75rem;
   }
   .editor-writing-actions-host { display: flex; min-width: 0; }
-  .editor-frame-controls[data-dock="true"] .writing-toolbar-controls { flex-wrap: nowrap; gap: var(--space-2); }
+  .editor-frame-controls[data-dock="true"] :is(.writing-toolbar-controls, .writing-toolbar-group) { flex-wrap: nowrap; gap: 0; }
+  .editor-frame-controls[data-dock="true"] .writing-toolbar-controls [data-slot="button"] { width: 30px; padding-inline: 0; }
   .main-content:has(.editor-frame[data-dock="true"]) {
     --editor-dock-clearance: 80px;
-    margin-block-start: var(--editor-top-reserve, 0px);
-    clip-path: inset(var(--editor-top-clip, 0px) 0 0);
-    transition: margin-block-start 160ms ease;
     padding-block-end: max(96px, var(--phone-writing-clearance, var(--editor-dock-clearance)));
   }
   .editor-mobile-panels[data-dock="true"][data-panel-ready="false"] .editor-frame-panel { visibility: hidden; pointer-events: none; }

@@ -2451,9 +2451,13 @@ async function expectKeyboardTopDock(page: Page) {
   await expect(dock).toBeVisible();
   await expect.poll(() => dock.evaluate((element) => {
     const header = element.closest(".app")!.querySelector(".topbar")!.getBoundingClientRect();
-    const top = Math.max(header.bottom, window.visualViewport!.offsetTop);
-    return element.getBoundingClientRect().top - top;
-  })).toBeCloseTo(8, 0);
+    const card = element.getBoundingClientRect();
+    const search = element.closest(".app")!.querySelector('[data-slot="search-root"]')!.getBoundingClientRect();
+    const publish = element.closest(".app")!.querySelector(".editor-heading-actions > button")!.getBoundingClientRect();
+    return card.top >= header.top && card.bottom <= header.bottom && card.left >= search.right
+      && card.right <= publish.left && publish.right <= header.right && search.left >= header.left
+      && Math.abs(card.top + card.height / 2 - header.top - header.height / 2) < 1;
+  })).toBe(true);
 }
 
 async function savedWritingPaint(page: Page) {
@@ -2543,10 +2547,11 @@ async function restoredCommandGeometry(page: Page) {
     const heading = writer.closest(".writing-root")!.querySelector(".writing-document-heading")!.getBoundingClientRect();
     const margin = parseFloat(getComputedStyle(writer).lineHeight);
     const header = writer.closest(".app")!.querySelector(".topbar")!.getBoundingClientRect();
-    const topDock = dock.top - Math.max(header.bottom, window.visualViewport!.offsetTop) < 32;
+    const topDock = document.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]')!.dataset.dockPosition === "top";
     const apple = /iPad|iPhone|iPod/.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
     const nativeBottom = window.visualViewport!.offsetTop + window.visualViewport!.height - (apple ? 128 : 48);
-    const rawTop = Math.max(ownerBounds.top, heading.bottom, window.visualViewport!.offsetTop, topDock ? dock.bottom + 8 : 0);
+    const yielded = writer.closest(".editor-frame")!.getAttribute("data-title-yielded") === "true";
+    const rawTop = Math.max(ownerBounds.top, yielded ? 0 : heading.bottom, window.visualViewport!.offsetTop, header.bottom + 8);
     const safeTop = rawTop + parseFloat(getComputedStyle(document.documentElement).fontSize);
     const safeBottom = Math.min(ownerBounds.bottom, topDock ? nativeBottom : dock.top) - margin;
     const focusGap = rect!.bottom - (topDock ? nativeBottom : dock.top);
@@ -2573,10 +2578,11 @@ async function expectFloatingSurfaceClearDock(page: Page, surface: ReturnType<Pa
   const band = await page.evaluate(() => {
     const header = document.querySelector(".topbar")!.getBoundingClientRect();
     const apple = /iPad|iPhone|iPod/.test(navigator.userAgent) || navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-    return { top: Math.max(header.bottom, window.visualViewport!.offsetTop), bottom: window.visualViewport!.offsetTop + window.visualViewport!.height - (apple ? 128 : 48) };
+    const dock = document.querySelector<HTMLElement>('.editor-frame-controls[data-dock="true"]')!;
+    return { top: Math.max(header.bottom, window.visualViewport!.offsetTop), bottom: window.visualViewport!.offsetTop + window.visualViewport!.height - (apple ? 128 : 48), keyboard: dock.dataset.dockPosition === "top" };
   });
-  if (lane.y - band.top < 32) {
-    expect(box.y).toBeGreaterThanOrEqual(lane.y + lane.height + 7);
+  expect(box.y).toBeGreaterThanOrEqual(band.top + 7);
+  if (band.keyboard) {
     expect(box.y + box.height).toBeLessThanOrEqual(band.bottom - 7);
   } else expect(box.y + box.height).toBeLessThanOrEqual(lane.y - 7);
 }
@@ -2589,6 +2595,7 @@ test("mobile app header stays with the dock and canvas through native panning", 
   await installCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 812, appPan: 0 });
   const dock = page.getByRole("group", { name: "Editor controls", exact: true });
   const owner = page.locator(".main-content");
+  const cardSize = (await dock.boundingBox())!;
   const expectTogether = async (top: number, keyboard = true) => {
     await expect.poll(() => page.locator(".topbar").evaluate(el => el.getBoundingClientRect().top)).toBeCloseTo(top, 0);
     await expect(dock).toHaveAttribute("data-dock-settled", "true");
@@ -2597,16 +2604,24 @@ test("mobile app header stays with the dock and canvas through native panning", 
       const dock = document.querySelector('.editor-frame-controls[data-dock="true"]')!.getBoundingClientRect();
       const reserve = parseFloat(getComputedStyle(owner).marginBlockStart);
       const hit = document.elementFromPoint(header.left + 20, header.top + header.height / 2);
-      return { headerBottom: header.bottom, dockTop: dock.top, ownerTop: owner.getBoundingClientRect().top, reserve, headerHit: !!hit?.closest(".topbar") };
+      return { headerTop: header.top, headerBottom: header.bottom, dockTop: dock.top, dockBottom: dock.bottom, dockWidth: dock.width, dockHeight: dock.height, ownerTop: owner.getBoundingClientRect().top, reserve, headerHit: !!hit?.closest(".topbar") };
     });
-    expect(bounds.headerHit).toBe(true);
-    expect(bounds.ownerTop - bounds.headerBottom).toBeCloseTo(bounds.reserve, 0);
-    if (keyboard) expect(bounds.dockTop - bounds.headerBottom).toBeCloseTo(8, 0);
+    if (top >= 0) expect(bounds.headerHit).toBe(true);
+    expect(bounds.reserve).toBe(0);
+    expect(bounds.ownerTop).toBeCloseTo(bounds.headerBottom, 0);
+    expect(bounds.dockWidth).toBe(cardSize.width);
+    expect(bounds.dockHeight).toBe(cardSize.height);
+    if (keyboard) {
+      expect(bounds.dockTop).toBeGreaterThanOrEqual(bounds.headerTop);
+      expect(bounds.dockBottom).toBeLessThanOrEqual(bounds.headerBottom);
+      await expectKeyboardTopDock(page);
+    }
   };
   for (const next of [
     { height: 490, offsetTop: 0, clientHeight: 812, appPan: 84 },
     { height: 490, offsetTop: 35, clientHeight: 490, appPan: -84 },
     { height: 490, offsetTop: 35, clientHeight: 490, appPan: 84 },
+    { height: 490, offsetTop: -72, clientHeight: 490, appPan: 84 },
   ]) {
     await changeCommandViewport(page, next);
     await expectTogether(next.offsetTop);
@@ -2622,6 +2637,10 @@ test("mobile app header stays with the dock and canvas through native panning", 
     await expectTogether(next.offsetTop);
     expect(await owner.evaluate(el => el.scrollTop)).toBeCloseTo(scroll, 0);
   }
+  // End the simulated rubberband. The real browser moves its visible origin;
+  // mocked offsets alone do not move Playwright's physical tap coordinates.
+  await changeCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 490, appPan: 0 });
+  await expectTogether(0);
   await page.screenshot({ path: info.outputPath("mobile-header-after-native-panning.png") });
   await writer.press("ArrowRight");
   for (let index = 0; index < 10; index++) await page.keyboard.press("Shift+ArrowLeft");
@@ -2677,6 +2696,59 @@ test("mobile app header stays with the dock and canvas through native panning", 
   expect(await page.locator(".app").evaluate(el => (el as HTMLElement).style.getPropertyValue("--editor-viewport-shift"))).toBe("");
 });
 
+test("mobile dock keeps one size inside the header and hides only metadata that cannot fit", async ({ page }, info) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await open(page, info.project.name.startsWith("production"), "course");
+  const dock = page.getByRole("group", { name: "Editor controls", exact: true });
+  const app = page.locator(".app");
+  const resting = (await dock.boundingBox())!;
+  const headerHeight = (await page.locator(".topbar").boundingBox())!.height;
+  await expect(app).toHaveAttribute("data-editor-header-metadata", "visible");
+  await page.locator('.writing-content[contenteditable="true"] p').nth(20).tap();
+  await installCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 812, appPan: 0 });
+  for (const width of [320, 375, 390, 640]) {
+    await page.setViewportSize({ width, height: 812 });
+    await expectKeyboardTopDock(page);
+    const card = (await dock.boundingBox())!;
+    expect(card.width).toBe(resting.width);
+    expect(card.height).toBe(resting.height);
+    expect((await page.locator(".topbar").boundingBox())!.height).toBe(headerHeight);
+    await expect(app).toHaveAttribute("data-editor-header-metadata", width < 640 ? "hidden" : "visible");
+    expect(await page.locator(".editor-save-status [role=status]").count()).toBe(1);
+    for (const button of await dock.getByRole("button").all()) {
+      const bounds = (await button.boundingBox())!;
+      expect(bounds.width).toBeGreaterThanOrEqual(24);
+      expect(bounds.height).toBeGreaterThanOrEqual(44);
+    }
+    const owner = page.locator(".main-content");
+    const paragraph = page.locator('.writing-content[contenteditable="true"] p').nth(24);
+    await paragraph.evaluate(el => {
+      const owner = el.closest<HTMLElement>(".main-content")!;
+      owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
+      owner.dispatchEvent(new Event("touchmove", { bubbles: true }));
+      owner.scrollTop += el.getBoundingClientRect().top - 28;
+      window.dispatchEvent(new Event("touchend"));
+    });
+    expect(await owner.evaluate(() => !!document.elementFromPoint(100, 30)?.closest('.writing-content, .document-title'))).toBe(false);
+    await page.screenshot({ path: info.outputPath(`header-dock-${width}.png`) });
+  }
+  await page.setViewportSize({ width: 408, height: 812 });
+  await expect(app).toHaveAttribute("data-editor-header-metadata", "hidden");
+  const badge = page.locator(".editor-save-status [data-slot=badge]");
+  await badge.evaluate(el => { el.textContent = "Draft"; });
+  await expect(app).toHaveAttribute("data-editor-header-metadata", "visible");
+  await badge.evaluate(el => { el.textContent = "Published"; });
+  await expect(app).toHaveAttribute("data-editor-header-metadata", "hidden");
+  await expectKeyboardTopDock(page);
+  await page.locator('.writing-content[contenteditable="true"]').evaluate(el => el.blur());
+  await changeCommandViewport(page, { height: 812, offsetTop: 0, clientHeight: 812, appPan: 0 });
+  await expect(dock).toHaveAttribute("data-dock-position", "bottom");
+  await expect(app).toHaveAttribute("data-editor-header-metadata", "visible");
+  const closed = (await dock.boundingBox())!;
+  expect(closed.width).toBe(resting.width);
+  expect(closed.height).toBe(resting.height);
+});
+
 test("two-position mobile course dock clips taps and yields a selected large heading title", async ({ page }, info) => {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 Version/26.0 Mobile Safari/604.1" });
@@ -2707,7 +2779,7 @@ test("two-position mobile course dock clips taps and yields a selected large hea
     (element as HTMLElement).clientTop + parseFloat(getComputedStyle(element).paddingTop));
   // Put the hypothetical pinned band between a body line's room and the
   // selected H1 glyph's room. A body-line fallback would wrongly keep it pinned.
-  const crampedHeight = Math.floor(128 + 8 + roomy.dockBottom + 8 + stickyInset + titleHeight + roomy.margin + (roomy.margin + roomy.focusHeight) / 2 + 8);
+  const crampedHeight = Math.floor(128 + 8 + roomy.headerBottom + stickyInset + titleHeight + roomy.margin + (roomy.margin + roomy.focusHeight) / 2 + 8);
   await animateCommandKeyboardClosing(page);
   await dock.getByRole("button", { name: /^Commands:/ }).tap();
   const menu = page.getByRole("menu", { name: "Insert content", exact: true });
@@ -2725,7 +2797,7 @@ test("two-position mobile course dock clips taps and yields a selected large hea
   await expect(page.getByRole("textbox", { name: "Lesson title", exact: true })).toBeInViewport();
   const owner = page.locator(".main-content");
   const row = writer.locator("p").nth(23);
-  const lane = (await dock.boundingBox())!;
+  const lane = (await page.locator(".topbar").boundingBox())!;
   await row.evaluate((row, top) => {
     const owner = row.closest<HTMLElement>(".main-content")!;
     owner.dispatchEvent(new Event("touchstart", { bubbles: true }));
@@ -2897,7 +2969,7 @@ test("iPhone Commands insertion retains the keyboard lane after an eager return"
   ]) {
     await changeCommandViewport(page, state);
     const geometry = await restoredCommandGeometry(page);
-    expect(geometry.dockTop - geometry.headerBottom).toBeCloseTo(8, 0);
+    await expectKeyboardTopDock(page);
     expect(geometry.focusGap, JSON.stringify(geometry)).toBeLessThanOrEqual(-27);
     expect(geometry.focusTop).toBeGreaterThanOrEqual(geometry.rawTop - 1);
   }
@@ -2928,7 +3000,7 @@ test("iPhone Commands closing restores a backward selection above the dock", asy
     expect(geometry.selectedText).toBe(selected);
     expect(geometry.collapsed).toBe(false);
     expect(geometry.backward).toBe(true);
-    expect(geometry.dockTop - geometry.headerBottom).toBeCloseTo(8, 0);
+    await expectKeyboardTopDock(page);
     expect(geometry.focusGap).toBeLessThanOrEqual(-27);
   }
   await page.screenshot({ path: info.outputPath("commands-restored-native-selection.png") });
@@ -3034,7 +3106,7 @@ test("iPhone Commands to media does not reopen prose input before Cancel", async
   await expect(writer).toBeFocused();
   await changeCommandViewport(page, { height: 490, offsetTop: 0, clientHeight: 490, appPan: 0 });
   const geometry = await restoredCommandGeometry(page);
-  expect(geometry.dockTop - geometry.headerBottom).toBeCloseTo(8, 0);
+  await expectKeyboardTopDock(page);
   expect(geometry.focusGap).toBeLessThanOrEqual(-27);
   await page.keyboard.type(" Returned from the chooser.");
   await expect(paragraph).toHaveText(`${original} Returned from the chooser.`);
@@ -3380,6 +3452,7 @@ for (const device of ["iPhone", "iPad", "Android"] as const) {
       { height: 490, offsetTop: 0 }, { height: 430, offsetTop: 35 }, { height: 460, offsetTop: 60 },
       ...(device === "Android" ? [{ height: 350, offsetTop: 0 }] : []),
       { height: 320, offsetTop: 0 },
+      ...(device === "Android" ? [{ height: 250, offsetTop: 0 }] : []),
     ]) {
       await page.evaluate((next) => {
         Object.assign((window as unknown as { dockViewport: typeof next }).dockViewport, next);
@@ -3390,7 +3463,8 @@ for (const device of ["iPhone", "iPad", "Android"] as const) {
       await expectMobileWritingBand(page, 7);
       if (device === "Android") {
         if (state.height === 350) await expect(page.locator(".editor-frame")).toHaveAttribute("data-title-yielded", "false");
-        if (state.height === 320) await expect(page.locator(".editor-frame")).toHaveAttribute("data-title-yielded", "true");
+        if (state.height === 320) await expect(page.locator(".editor-frame")).toHaveAttribute("data-title-yielded", "false");
+        if (state.height === 250) await expect(page.locator(".editor-frame")).toHaveAttribute("data-title-yielded", "true");
       }
       const padding = await page.locator(".main-content").evaluate((owner) => {
         const style = getComputedStyle(owner);
